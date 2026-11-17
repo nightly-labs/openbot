@@ -57,6 +57,8 @@ export const messages = {
   "app.rail.workflows": "工作流",
   "app.rail.usage": "用量",
   "app.rail.library": "资料库",
+  "app.rail.providers": "服务商",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "市场",
   "app.rail.settings": "设置",
   "app.rail.settingsNotice": "设置。{notice}",

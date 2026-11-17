@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "יש לך רעיון? בוא נגשים אותו.",
   "prompt.approval.report.dontSend": "לא עכשיו",
   "prompt.approval.report.send": "שליחה לצוות OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "יש לפתוח את הצ'אט הזה באפליקציית OpenBot בטלפון ולשלוח את הדיווח משם. הטלפון מוסיף את הגרסה, המערכת ויומן התמיכה שלו. אם הטלפון לא מצליח להתחבר, יש לפתוח הגדרות > תמיכה באפליקציית הטלפון ולדווח על הבעיה ב-GitHub.",
   "prompt.approval.title.command": "הרצת פקודה",
   "prompt.approval.title.fileChange": "שינוי קבצים",
   "prompt.approval.title.permissions": "מתן הרשאות",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "ההתחברות אל {host} בוטלה",
   "prompt.browser.signInBlocked.body":
     "יש להתחבר במחשב הזה. OpenBot שולח אל {server} רק את ההתחברות אל {host}, ו-{name} ממשיך.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם. לאחר מכן {name} ממשיך.",
   "prompt.browser.signInBlocked.cancelledBody": "ההתחברות בוטלה.",
   "prompt.browser.signInBlocked.waiting": "ממתין להתחברות",
   "prompt.browser.signInBlocked.waitingButton": "ממתין להתחברות…",

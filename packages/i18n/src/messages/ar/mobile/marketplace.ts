@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "تسجيل الدخول",
   "mobile.marketplace.facts.accessLocal": "هذا الحاسوب",
   "mobile.marketplace.facts.accessNone": "دون تسجيل دخول",
+  "mobile.marketplace.facts.accessMac": "Mac فقط",
   "mobile.marketplace.permission.admin": "لا يستطيع التثبيت من المتجر إلا المالكون والمشرفون.",
   "mobile.marketplace.permission.unavailable":
     "هذا الخادم غير متصل، أو إصدار OpenBot عليه قديم جدًا لهذا. حدّث OpenBot على الحاسوب الذي يشغّله.",
@@ -108,6 +109,7 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "استخدم رابط https على {hostname}.",
   "mobile.marketplace.app.docs": "الحصول على مفتاح",
   "mobile.marketplace.app.local": "يعمل هذا التطبيق على الحاسوب الذي يشغّل OpenBot. أعدّه على ذلك الحاسوب.",
+  "mobile.marketplace.app.needsMac": "يعمل هذا التطبيق فقط على جهاز Mac يشغّل OpenBot، وهذا الخادم ليس جهاز Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "يحتاج هذا التطبيق إلى تسجيل الدخول عبر المتصفح. حدّث OpenBot على الخادم، أو وصّل التطبيق على الحاسوب.",
   "mobile.marketplace.app.waiting": "في انتظار صفحة تسجيل الدخول…",

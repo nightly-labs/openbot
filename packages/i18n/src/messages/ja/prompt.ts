@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
   "prompt.approval.report.dontSend": "今はしない",
   "prompt.approval.report.send": "OpenBot チームに送信",
+  "prompt.approval.report.phoneOnly":
+    "OpenBot のスマートフォンアプリでこのチャットを開き、そこからレポートを送信してください。スマートフォンがバージョン、システム情報、サポートログを追加します。スマートフォンが接続できない場合は、スマートフォンアプリの「設定」>「サポート」を開き、GitHub で問題を報告してください。",
   "prompt.approval.title.command": "コマンドを実行",
   "prompt.approval.title.fileChange": "ファイルを変更",
   "prompt.approval.title.permissions": "権限を付与",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} へのサインインはキャンセルされました",
   "prompt.browser.signInBlocked.body":
     "このコンピュータでサインインしてください。OpenBot は {host} のサインインだけを {server} に送信し、{name} が続行します。",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} はサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。その後、{name} が続行します。",
   "prompt.browser.signInBlocked.cancelledBody": "サインインはキャンセルされました。",
   "prompt.browser.signInBlocked.waiting": "サインインを待っています",
   "prompt.browser.signInBlocked.waitingButton": "サインインを待っています…",

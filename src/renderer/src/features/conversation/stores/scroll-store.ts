@@ -22,7 +22,7 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
@@ -157,8 +157,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     (deps.props.channel
       ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
       : Boolean(deps.props.activeTurnId) || !turnSettled());
-  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
-  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  /* The quiet answers of a teammate update or request show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
     () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
   );

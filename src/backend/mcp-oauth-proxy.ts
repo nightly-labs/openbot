@@ -327,17 +327,19 @@ export class McpOAuthProxy {
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
     if (!(upstream instanceof Response)) {
-      // Only a renewed token that the server refused proves a good sign-in. A renewal that could not
-      // reach the authorization server leaves an expired token, and that sign-in has ended for now.
-      const active = upstream.renewed && !this.#options.signInEnded(target.url);
+      // A renewed token that the server refused proves a good sign-in. A renewal that failed for now
+      // keeps the sign-in, and the next request tries again; a sign-in that cannot be renewed ended.
+      const ended = this.#options.signInEnded(target.url);
       logger.warn("The MCP server refused a request with the sign-in of this computer.", {
         challengeError: upstream.challengeError,
         renewed: upstream.renewed,
-        signInActive: active,
+        signInActive: !ended,
       });
-      const message = active
-        ? sourceText("error.backend.mcpOAuthRequestRefused")
-        : sourceText("error.backend.mcpOAuthSignInNeeded");
+      const message = ended
+        ? sourceText("error.backend.mcpOAuthSignInNeeded")
+        : upstream.renewed
+          ? sourceText("error.backend.mcpOAuthRequestRefused")
+          : sourceText("error.backend.mcpOAuthRenewalFailed");
       return refuseRequests(response, method, body, message);
     }
     const headers: Record<string, string> = {};

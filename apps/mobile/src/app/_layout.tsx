@@ -1,7 +1,7 @@
 import "../../global.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { usePathname } from "expo-router";
+import { usePathname, useSegments } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
@@ -26,7 +26,9 @@ import { installQuickActions, resetQuickActions } from "@/features/quick-actions
 import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadChatBackground } from "@/features/settings/model/chat-background";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
+import { loadChatPullPreference, loadChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { loadLargeFilePreference } from "@/features/settings/model/large-files";
@@ -39,9 +41,11 @@ import { loadPhotoQualityPreference } from "@/features/settings/model/photo-qual
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
+import { loadFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { resetShortcutDirectory } from "@/features/shortcuts/model/shortcut-directory";
 import { installShortcuts, resetShortcuts } from "@/features/shortcuts/shortcuts-native";
+import { supportLog } from "@/features/support/model/support-log";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
@@ -84,6 +88,13 @@ function RootNavigator() {
   const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
+  const segments = useSegments();
+  // The screen goes to the support log by its route name, such as `chat/[agentId]`: a report then
+  // shows where the user was. Never the path: it has the IDs of agents and chats.
+  const screen = segments.filter((segment) => !segment.startsWith("(")).join("/") || "start";
+  useEffect(() => {
+    supportLog.add("info", "app", `Screen: ${screen}`);
+  }, [screen]);
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
   // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
@@ -228,8 +239,12 @@ export default function RootLayout() {
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
+      void loadChatBackground().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadFullVisualPreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
+      void loadChatSwipePreference().catch(() => undefined);
+      void loadChatPullPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);

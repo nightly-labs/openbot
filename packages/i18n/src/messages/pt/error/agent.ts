@@ -12,6 +12,16 @@ export const messages = {
     "A ferramenta não foi executada. Em tool_call, arguments deve ser um objeto JSON, não texto. Envie a chamada de novo com arguments como objeto.",
   "error.agent.toolCallDiscoveryTool":
     "A ferramenta não foi executada. tool_call não pode executar openbot.tool_search nem openbot.tool_describe. Chame-as diretamente com os mesmos argumentos.",
+  "error.agent.toolCallEnvelopeKeys":
+    "A ferramenta não foi executada. tool_call aceita apenas name e arguments. Coloque os argumentos da ferramenta em arguments, como objeto, e envie a chamada novamente.",
+  "error.agent.toolCallUnknownTool":
+    "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. Use o nome qualificado exato que tool_search fornece, como openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. O nome qualificado talvez seja {name}. Se for, envie a chamada novamente com esse nome.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe não encontrou nenhuma ferramenta do OpenBot chamada {names}. Ele descreve só as ferramentas do OpenBot e do navegador que openbot.tool_search lista, não as ferramentas MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Chame {names} diretamente. tool_describe não descreve as ferramentas de busca.",
   "error.agent.routineScheduleArgumentsInvalid":
     "O agendamento da rotina é inválido: {detail} Corrija o agendamento e tente novamente. openbot.tool_describe fornece o esquema.",
   "error.agent.approvalWhileDeleting": "Não é possível conceder aprovação enquanto o agente está sendo excluído.",
@@ -89,8 +99,12 @@ export const messages = {
     "{provider} parou de responder, então o OpenBot encerrou este turno. Envie a mensagem novamente ou escolha outro modelo.",
   "error.agent.toolLoopStopped":
     "{provider} repetiu muitas vezes uma etapa que falhou, então o OpenBot parou este turno. Envie a mensagem de novo ou escolha outro modelo.",
+  "error.agent.answerCutOff":
+    "O agente parou antes de terminar a resposta, então a resposta não está completa. Envie a mensagem de novo.",
   "error.agent.compactionConnectionLost":
     "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet e envie uma mensagem para continuar.",
+  "error.agent.compactionConnectionLostAddress":
+    "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet e se {variable}, em Variáveis nas configurações de {provider}, é o endereço da API do seu serviço de modelos (muitas vezes termina em /v1). Depois, envie uma mensagem.",
   "error.agent.compactionLoopStopped":
     "{provider} compactou o contexto várias vezes, e em cada vez ele continuou cheio demais para continuar, então o OpenBot parou este turno. Desative os servidores MCP ou o uso do computador de que este agente não precisa e envie uma mensagem. Se você ou o agente mudaram quando o {provider} compacta, desfaça essa mudança.",
   "error.agent.selectedGone": "O agente selecionado não existe mais.",
@@ -150,12 +164,18 @@ export const messages = {
     "O acesso Somente o espaço de trabalho precisa do sandbox do Codex, que o Codex não consegue iniciar neste computador, então os comandos do agente falham. Escolha Perguntar antes ou Acesso completo nas configurações do agente.",
   "error.agent.claudeSandboxUnavailable":
     "O acesso Somente o espaço de trabalho precisa do sandbox do Claude, que o Claude não consegue iniciar neste computador: {reason}. Escolha Acesso completo ou outro provedor nas configurações do agente.",
+  "error.agent.claudeNoSandbox":
+    "O Claude não consegue usar um sandbox neste computador, por isso o acesso Somente o espaço de trabalho não funciona com ele. Escolha Acesso completo ou outro provedor nas configurações do agente.",
+  "error.agent.claudeSandboxBlocked":
+    "O acesso Somente o espaço de trabalho precisa do sandbox do Claude, que o Claude não consegue iniciar neste computador, então os comandos do agente falham. Escolha Acesso completo ou outro provedor nas configurações do agente.",
   "error.agent.screenCaptureOff":
     "A captura de tela está desativada para este agente. O usuário pode ativar o Uso do computador nas configurações do agente.",
   "error.agent.screenCaptureUnavailable": "A captura de tela não está disponível neste computador.",
   "error.agent.screenCaptureShared":
     "A captura de tela não funciona em uma conversa do Slack, Discord ou Telegram, porque outras pessoas recebem os arquivos dela.",
   "error.agent.screenCaptureDeclined": "O usuário não permitiu esta captura de tela. Nada foi capturado.",
+  "error.agent.mcpToolDeclined":
+    "O usuário não permitiu esta chamada da ferramenta MCP. A ferramenta não foi executada.",
   "error.agent.screenCaptureWindowMissing":
     "Essa janela não está aberta agora. Chame list_capture_sources para obter os ids atuais das janelas.",
   "error.agent.screenCaptureDisplayMissing":

@@ -438,7 +438,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "시간대 검색",
   "mobile.server.settings.timezoneNoMatch": "검색과 일치하는 시간대가 없어요.",
   "mobile.server.settings.timezoneMore": "이름을 더 입력하면 다른 시간대를 볼 수 있어요.",
-  "mobile.server.settings.timezoneDescription": "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요.",
+  "mobile.server.settings.timezoneDescription":
+    "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "mobile.server.settings.timezoneLoading": "시간대 불러오는 중…",
   "mobile.server.settings.timezoneLoadFailed": "서버 시간대를 불러오지 못했어요.",
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
@@ -868,6 +869,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
+  "mobile.server.connectors.whatsapp.statusReactions": "상태 반응",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -1091,6 +1095,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code 기본값",
   "mobile.server.providers.compactWindowTokens": "토큰 {size}",
   "mobile.server.providers.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
+  "mobile.server.environment.row": "변수",
+  "mobile.server.environment.title": "환경",
+  "mobile.server.environment.hint":
+    "{name}의 각 프로세스가 받는 API 키, 기본 URL 등 설정이에요. 변경은 진행 중인 턴이 끝나면 적용돼요.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL과 키인 OPENAI_API_KEY로 ChatGPT의 모델 요청을 그 주소로 보내요.",
+  "mobile.server.environment.shellNote": "에이전트가 실행하는 명령은 이 값들을 읽을 수 있어요.",
+  "mobile.server.environment.add": "변수 추가",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "값",
+  "mobile.server.environment.saved": "저장됨",
+  "mobile.server.environment.sensitive": "민감",
+  "mobile.server.environment.remove": "제거",
+  "mobile.server.environment.save": "저장",
+  "mobile.server.environment.loadFailed": "{name}의 변수를 불러올 수 없었어요.",
+  "mobile.server.environment.invalid": "먼저 이름을 고치세요.",
   "mobile.server.providers.disconnect": "연결 해제",
   "mobile.server.providers.disconnectTitle": "{name} 연결을 해제할까요?",
   "mobile.server.providers.disconnectBody":

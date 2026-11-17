@@ -7,7 +7,7 @@ const generatedClip = new URL("../../../packages/ui/src/assets/plush/fishing.web
 
 const generatedAttachment: AttachmentSummary = {
   id: "generated-video-1",
-  name: "generated-video.webm",
+  name: "a-plush-toy-fishing-from-a.webm",
   size: 1_482_752,
   kind: "file",
   mimeType: "video/webm",

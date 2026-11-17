@@ -87,6 +87,8 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
+/** What tar and the system write for ENOSPC, when the failure has no error code. */
+const DISK_FULL_OUTPUT = /no space left on device|not enough space on the disk/iu;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -247,6 +249,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #cancelled = new Set<ManagedRuntimeId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the update target. */
   readonly #systemVersions = new Map<ManagedProviderId, string>();
+  /** Providers whose installed CLI lacks a part that some models need (#9139). */
+  readonly #incompleteSystemClis = new Set<ManagedProviderId>();
   /** The latest upstream release of each provider CLI, as the last check found it. */
   readonly #latest = new Map<ManagedProviderId, RuntimeSpec>();
   /** What each running download installs, so a cancel removes the right partial file. */
@@ -355,7 +359,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const system = this.#systemVersions.get(provider);
         const copy = providers[provider].phase === "ready" ? providers[provider].version : null;
         const installed = system && copy && olderVersion(system, copy) ? copy : (system ?? providers[provider].version);
-        const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
+        // An incomplete CLI of the user's gives way to the copy, so a missing copy is offered (#9139).
+        const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
+        const offer =
+          missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
         // After an app upgrade the first check updates an installed CLI itself, so it is not offered
         // until that check has started its download.
         const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
@@ -656,10 +663,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    *
    * True when the provider runs its copy in the store again. The caller then runs
    * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
+   *
+   * `incomplete`: that CLI lacks a part that some models need. A copy that is not downloaded is then
+   * offered, as the copy runs in its place once downloaded (#9139).
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+  setSystemVersion(provider: ManagedProviderId, version: string | null, incomplete = false): boolean {
     const previous = this.#systemVersions.get(provider) ?? null;
-    if (previous === version) return false;
+    const flagged = Boolean(version) && incomplete;
+    if (previous === version && flagged === this.#incompleteSystemClis.has(provider)) return false;
+    if (flagged) this.#incompleteSystemClis.add(provider);
+    else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
@@ -1232,7 +1245,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
 
       return yield* this.#installEffect(spec, partialPath);
-    }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.mapError(diskFullFailure));
   }
 
   /** Answers whether this instance committed the install, or adopted the one it found. */
@@ -1808,9 +1821,13 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
-        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
-      )).stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1839,6 +1856,25 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * A disk that fills during the download or the install. The space check runs before both, but it
+ * cannot see every write, so the failure itself also names the cause: a Retry on the same disk fails
+ * in the same way, and "Try again" does not tell the user to free space (#10191). tar reports a full
+ * disk in its output, not as an error code. The log keeps the original failure.
+ */
+function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  const diskFull = (error: unknown, depth: number): boolean =>
+    error instanceof Error &&
+    (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
+      DISK_FULL_OUTPUT.test(error.message) ||
+      ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
+      (depth < 3 && diskFull(error.cause, depth + 1)));
+  if (!diskFull(cause, 0)) return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.diskSpace"), { cause }) });
 }
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */

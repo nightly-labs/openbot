@@ -343,6 +343,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
   "mobile.agent.runtime.searchModels": "البحث في النماذج",
   "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "لا يعمل هذا المزوّد مع «مساحة العمل فقط» على Windows وLinux. لاستخدامه، غيّر «الأذونات» أولًا.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",
   "mobile.agent.runtime.usageLimitWindow": "حد {window}",
   "mobile.agent.runtime.usageLimitResets": "{limit} · يُعاد التعيين {time}",
@@ -670,6 +672,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "تعليم الكل كمقروء",
   "mobile.agent.home.sort.title": "ترتيب الدردشات",
   "mobile.agent.home.sort.manual": "يدوي",
+  "mobile.agent.home.sort.recent": "النشاط الأخير",
   "mobile.agent.home.sort.unreadGroup": "غير المقروءة في مجموعة",
   "mobile.agent.home.sort.unreadFirst": "غير المقروءة أولًا في المجلدات",
   "mobile.agent.route.appearance": "المظهر",

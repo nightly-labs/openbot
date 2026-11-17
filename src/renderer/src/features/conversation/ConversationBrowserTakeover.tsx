@@ -40,6 +40,7 @@ export function ConversationBrowserTakeover() {
             onCancel={() => respondToBrowserTakeover("cancel")}
             onSignInLocally={localSignIn.canStartForTakeover() ? localSignIn.startForTakeover : undefined}
             signInBlocked={localSignIn.blockedTakeover()}
+            signInOnDesktop={localSignIn.needsDesktopForTakeover()}
             browserSecret={{
               loadPreview: runtime.browser.capturePreview,
               vault: browserSecretVault(props.server),

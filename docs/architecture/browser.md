@@ -13,6 +13,11 @@ The overlays that both clients raise - join, marketplace, shared agent, server s
 search and channel creation - are prop-driven views in `WorkspaceOverlayViews.tsx`.
 `WorkspaceOverlays` fills them from the desktop contexts, and the web client fills them from its
 host connection, so what an overlay decides from its server is decided in one place.
+An open overlay hides the page of a local tab, because that page is a native view above the window.
+A toast does not hide the page. While the full view shows the page of a local tab, the toasts are
+hidden (`native-browser-page.ts`), so the page does not cut them. A toast that stays until the user
+closes it shows again when the page is hidden; a toast with a timer can end while it is hidden, and
+it is then not reported as shown. A host's tab shows in the window, under the toasts.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
 On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
@@ -36,7 +41,7 @@ checks still apply. `web-account.ts` makes these calls, and the Profile tab of t
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives
-`ServerSettingsModal` the host identity, MCP, and storage routes through
+`ServerSettingsModal` the host identity and storage routes through
 `@openbot/team-client/team-admin-requests`, and member and invitation calls through the closed
 `/api/browser/*` list. The Worker applies the same `RemoteControlPlane` role checks as the bearer
 routes. A member or role change revokes every session on the host; the browser reconnects once when
@@ -100,9 +105,9 @@ object URL has the origin of the app. Remote support is additive through the
 A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
 `previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
 sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
-block that a provider refuses. Only the voice recording keeps its `audio/webm` type. Delivery sends
-the path as a mention. The desktop app
-never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
+block that a provider refuses. For the same reason, a HEIF photo with an image name, such as `.jpg`,
+is also an opaque file: the host reads its first bytes. Only the voice recording keeps its
+`audio/webm` type. Delivery sends the path as a mention. The desktop app never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
 additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
 the extension list for a host without it.
 

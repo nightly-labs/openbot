@@ -115,6 +115,10 @@ export const messages = {
   "marketplace.app.remove.action": "削除",
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
+  "marketplace.app.replace.title": "{server} を置き換えますか?",
+  "marketplace.app.replace.description":
+    "{server} という名前のサーバーがすでにありますが、{name} ではありません。{name} に置き換えますか? そのアドレスと保存されたキーは削除されます。",
+  "marketplace.app.replace.action": "置き換え",
   "marketplace.app.connection": "接続",
   "marketplace.app.access.use": "使用可能",
   "marketplace.app.access.noAgents": "エージェントなし",
@@ -132,6 +136,7 @@ export const messages = {
     "{host} の OpenBot は古いバージョンのため、アプリを接続できません。{host} の OpenBot をアップデートするか、オーナーにアップデートを依頼してください。",
   "marketplace.app.blocked.member":
     "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
+  "marketplace.app.blocked.mac": "{name} は OpenBot を実行している Mac でのみ動作します。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
@@ -407,14 +412,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
   "marketplace.plugin.omnisend.tagline": "メールとSMSのマーケティング",
   "marketplace.plugin.omnisend.description":
-    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーはブラウザで自分の Omnisend アカウントにサインインし、同意画面でアクセスレベルを選びます。書き込みアクセスがあると、エージェントはキャンペーンの送信やデータの削除もできます。レポートだけが必要な場合は読み取り専用アクセスを選んでください。",
+    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーは自分の Omnisend アカウントの API キーで接続します。エージェントはキーが許可する操作ができ、キャンペーンの送信やデータの削除も含まれる場合があります。",
   "marketplace.plugin.omnisend.app":
-    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。ブラウザでサインインし、Omnisend の MCP サーバー経由で使います。",
+    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。API キーを使い、Omnisend の MCP サーバー経由で使います。",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "先週のキャンペーンの成果は、その前の週と比べてどうでしたか?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
   "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.omnisend.hint.apiKey": "Omnisend で Store settings > API keys を開き、キーを作成してください。",
   "marketplace.plugin.postiz.description":
     "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
   "marketplace.plugin.postiz.app":

@@ -51,7 +51,7 @@ import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-app
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
-import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
+import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -1110,7 +1110,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ticket: string,
     ): Effect.fn.Return<VerifiedRemoteSessionTicket, CentralAuthOperationError, CentralAuthTransport> {
       const verify = Effect.gen({ self: this }, function* () {
-        if (!this.#remoteTicketJwks) this.#remoteTicketJwks = yield* Effect.cached(this.#fetchRemoteTicketJwks());
+        // Keep only a loaded key set. A failed load must not refuse every later client until a restart.
+        if (!this.#remoteTicketJwks)
+          this.#remoteTicketJwks = yield* this.#fetchRemoteTicketJwks().pipe(
+            Effect.cachedWithTTL((exit) => (Exit.isSuccess(exit) ? Duration.infinity : 0)),
+          );
         const jwks = yield* this.#remoteTicketJwks;
         const keySet = yield* authDecode(() => createLocalJWKSet(jwks));
         return yield* authCall(() =>
@@ -2586,6 +2590,11 @@ export function isHostNotOnAccount(error: unknown): boolean {
 export function authApiRateLimit(error: unknown): { code: string; retryAfterSeconds: number | null } | null {
   if (!(error instanceof AuthApiError) || error.status !== 429) return null;
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
+}
+
+/** The error code that the account service sent, such as `feedback_not_yours`, or null for another failure. */
+export function authApiErrorCode(error: unknown): string | null {
+  return error instanceof AuthApiError ? error.code : null;
 }
 
 /**

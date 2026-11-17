@@ -535,7 +535,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "لا توجد منطقة زمنية تطابق هذا البحث.",
   "mobile.server.settings.timezoneMore": "اكتب المزيد من الاسم لرؤية مناطق زمنية أخرى.",
   "mobile.server.settings.timezoneDescription":
-    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
+    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "mobile.server.settings.timezoneLoading": "جارٍ تحميل المنطقة الزمنية…",
   "mobile.server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
   "mobile.server.settings.timezoneSaveFailed": "تعذّر حفظ المنطقة الزمنية. أعد المحاولة.",
@@ -819,6 +819,17 @@ export const messages = {
   "mobile.server.vault.variableNameHint":
     "متغير البيئة الذي يقرؤه البرنامج: أحرف لاتينية كبيرة وأرقام و_. يجد الوكلاء المفتاح بهذا الاسم.",
   "mobile.server.vault.apiKey": "مفتاح API",
+  "mobile.server.vault.agents": "الوكلاء",
+  "mobile.server.vault.agentsAll": "كل الوكلاء",
+  "mobile.server.vault.agentsAllHint": "يشمل «كل الوكلاء» أيضًا كل وكيل يُضاف لاحقًا.",
+  "mobile.server.vault.agentsNone": "اختر وكيلًا واحدًا على الأقل.",
+  "mobile.server.vault.agentsSome": "{chosen} من {total}",
+  "mobile.server.vault.agentsListed": "الوكلاء: {agents}",
+  "mobile.server.vault.searchAgents": "البحث عن وكلاء",
+  "mobile.server.vault.noAgentMatches": "لا يوجد وكلاء يطابقون هذا البحث.",
+  "mobile.server.vault.agentOptions": "خيارات",
+  "mobile.server.vault.selectAll": "تحديد الكل",
+  "mobile.server.vault.deselectAll": "إلغاء التحديد",
   "mobile.server.vault.delete": "حذف العنصر",
   "mobile.server.vault.deleteTitle": "هل تريد حذف هذا العنصر؟",
   "mobile.server.vault.deleteBody": "لن يتمكن الوكلاء على {host} من استخدامه بعد الآن. لا يمكنك التراجع عن هذا.",
@@ -1200,6 +1211,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+  "mobile.server.connectors.whatsapp.statusReactions": "تفاعلات الحالة",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",
@@ -1439,6 +1453,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "الافتراضي في Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} رمز",
   "mobile.server.providers.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "mobile.server.environment.row": "المتغيرات",
+  "mobile.server.environment.title": "البيئة",
+  "mobile.server.environment.hint":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "mobile.server.environment.codexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "mobile.server.environment.shellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "mobile.server.environment.add": "إضافة متغير",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "القيمة",
+  "mobile.server.environment.saved": "محفوظة",
+  "mobile.server.environment.sensitive": "حساس",
+  "mobile.server.environment.remove": "إزالة",
+  "mobile.server.environment.save": "حفظ",
+  "mobile.server.environment.loadFailed": "تعذّر تحميل متغيرات {name}.",
+  "mobile.server.environment.invalid": "صحّح الأسماء أولًا.",
   "mobile.server.providers.disconnect": "قطع الاتصال",
   "mobile.server.providers.disconnectTitle": "هل تريد قطع اتصال {name}؟",
   "mobile.server.providers.disconnectBody":

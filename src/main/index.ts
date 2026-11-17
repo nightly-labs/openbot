@@ -32,6 +32,7 @@ import {
   shell,
   systemPreferences,
 } from "electron";
+import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -83,6 +84,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -148,7 +150,7 @@ import {
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
-import { startMainLog } from "./provider-log";
+import { flushMainLog, startMainLog } from "./provider-log";
 import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
@@ -157,6 +159,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
@@ -166,6 +169,7 @@ import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { macShipItDirectory, shipItInstallInProgress } from "./update-install-guard";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
@@ -313,6 +317,11 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
+const systemTimezone =
+  serverMode || hostedServer || localServerChild
+    ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
+    : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
@@ -334,6 +343,23 @@ if (
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
+// macOS #9776: a launch while ShipIt installs an update cancels that install, and the old version stays.
+// Exit at once instead; ShipIt opens the new version when it is done. `process.exit`, as for a second
+// launch: no start marker or log may record this launch as a start that did not finish.
+if (
+  process.platform === "darwin" &&
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  Effect.runSync(
+    shipItInstallInProgress({
+      userDataPath: app.getPath("userData"),
+      shipItDirectory: macShipItDirectory(),
+      currentVersion: app.getVersion(),
+      now: Date.now(),
+    }),
+  )
+)
+  process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -533,6 +559,7 @@ const windowHolder = createMainWindowHolder();
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
+  closeChatNotifications,
   forwardAgentEvent,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
@@ -820,6 +847,7 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   claudeCompactWindow,
+  providerEnvironment,
   modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
@@ -875,6 +903,7 @@ function registerIpcHandlers({
   routineFlows,
   workflows,
   workflowGitHub,
+  crm,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -1041,6 +1070,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -1068,6 +1098,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       claudeCompactWindow,
+      providerEnvironment,
       modelVisibility,
       agentAccess,
       serverAudit,
@@ -1139,6 +1170,7 @@ function registerIpcHandlers({
       }),
       openExternal: openLink,
       modelVisibility,
+      closeChatNotifications,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -1540,6 +1572,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        systemTimezone,
         previousUncleanExit,
         macHapticFeedback,
         teardown,
@@ -1629,11 +1662,12 @@ if (!hasSingleInstanceLock) {
             return;
         }
       };
-      // Routes belong to the signed-in account. A token refresh does not change them.
-      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      // Routes belong to the signed-in account, or, on a server on this computer, to the machine token
+      // that the desktop app gives it (`webhookPrincipal`). A token refresh does not change them.
+      let webhookPrincipalId = built.webhookPrincipal();
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
-      const refreshWebhookRoutes = (state: CentralAuthState): void => {
-        const principalId = centralAuthPrincipalId(state);
+      const refreshWebhookRoutes = (): void => {
+        const principalId = built.webhookPrincipal();
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
         built.eventsRuntime.setAccountPrincipal(principalId);
@@ -1646,7 +1680,7 @@ if (!hasSingleInstanceLock) {
         const hostIdentityChanged = status.serverId !== webhookHostId;
         webhookHostId = status.serverId;
         forwardHostStatus(status);
-        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        const principalId = built.webhookPrincipal();
         if (hostIdentityChanged && principalId !== null && status.serverId !== null)
           built.eventsRuntime.syncRoutes({ all: true });
       };
@@ -1719,7 +1753,7 @@ if (!hasSingleInstanceLock) {
       updater.on("status", (status) => {
         if (!shutdownStarted || status.errorCode !== "install_failed") return;
         logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
-        app.exit(0);
+        exitAfterLogFlush();
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
@@ -2076,8 +2110,23 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
     logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
     runMarker?.quitTimedOut();
-    app.exit(0);
+    exitAfterLogFlush();
   }, deadlineMs);
+}
+
+/** Short, because the user waits: the window is already closed. */
+const LOG_FLUSH_DEADLINE_MS = 2_000;
+
+/**
+ * `app.exit` stops the log writes that are not done. An exit at once after a failed update install
+ * lost the error of the installer from `main.log` and `install_failed` from `update.log` (#5039).
+ */
+function exitAfterLogFlush(): void {
+  void Effect.runPromise(
+    Effect.all([flushMainLog(), services ? services.updater.flushLog() : Effect.void], {
+      concurrency: "unbounded",
+    }).pipe(Effect.timeoutOption(LOG_FLUSH_DEADLINE_MS)),
+  ).finally(() => app.exit(0));
 }
 
 /**

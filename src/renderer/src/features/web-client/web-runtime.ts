@@ -37,6 +37,7 @@ import type {
   InvitePreview,
   LocalBrowserSecretResponse,
   PinnedMessagesSnapshot,
+  ProviderModelSourceEntry,
   QueueSnapshot,
   ReadPendingApprovalInput,
   ReorderQueueInput,
@@ -70,6 +71,8 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeAgentSteeringModels,
+  decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
@@ -86,7 +89,10 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withModelSources,
+  withSteeringModels,
   withUsageCredits,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -160,6 +166,7 @@ import {
   MESSAGE_PINS_CAPABILITY,
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -170,6 +177,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOW_STOP_ROUTES,
@@ -195,6 +206,7 @@ import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -268,6 +280,7 @@ import {
   type WebHostState,
   type WebHostTabMessage,
 } from "./web-host-lock";
+import { closeWebChatNotifications } from "./web-notifications";
 
 /**
  * The host controls of the connected host. The host answers the Team API routes, and the account
@@ -478,6 +491,11 @@ export interface WebWorkspaceRuntime {
   agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
   models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
+  /**
+   * The model sources alone. A released status event carries none, so the client adds the last ones
+   * to each status event and reads them again after it (#9956).
+   */
+  modelSources?: () => Promise<ProviderModelSourceEntry[]>;
   accountUsage?: () => Promise<AccountUsage>;
   createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
@@ -797,6 +815,15 @@ export function createWebWorkspaceRuntime(
       : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
+  }
+  /**
+   * Where each provider's models come from (`provider-model-source-v1`). Optional: an older host, or a
+   * failed read, gives none, and the picker then shows no source.
+   */
+  function readModelSources(): Promise<ProviderModelSourceEntry[]> {
+    return capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
+      ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
+      : Promise.resolve([]);
   }
   async function request(
     method: string,
@@ -1324,6 +1351,9 @@ export function createWebWorkspaceRuntime(
         };
       },
       async channelCommand(command) {
+        // A read comes only while the user looks at the channel, so its notifications are done.
+        if (command.type === "read" && lockedHostId)
+          closeWebChatNotifications(lockedHostId, { channelId: command.channelId });
         const channel = await channels.channelCommand(command);
         if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
         return withChannelPicture(channel);
@@ -1422,6 +1452,8 @@ export function createWebWorkspaceRuntime(
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
+      // As for a channel: the user looks at the chat.
+      if (lockedHostId) closeWebChatNotifications(lockedHostId, { agentId: id });
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
@@ -1711,9 +1743,9 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
-      // models with no Fast switch or listing.
-      const [fast, listings] = await Promise.all([
+      // The fast tiers, the picker listing and the steering models are optional: when a route fails,
+      // the picker gets the models with no Fast switch or listing, and a custom agent shows Send now.
+      const [fast, listings, steering] = await Promise.all([
         // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
@@ -1723,14 +1755,21 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],
+        capabilities.includes(MODEL_STEERING_CAPABILITY)
+          ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
-      return withModelListings(withFastServiceTiers(models, fast), listings);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     async status() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.status);
+      const [value, sources] = await Promise.all([request("GET", TEAM_API_ROUTES.agents.status), readModelSources()]);
       if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withModelSources(value, sources);
     },
+    modelSources: readModelSources,
     async accountUsage() {
       // Whether an account works on credits is optional: when its read fails, the reading shows as before.
       const [value, credits] = await Promise.all([
@@ -1937,7 +1976,8 @@ export function createWebWorkspaceRuntime(
 
 /**
  * The largest file that the browser sends or reads through the host connection: the host's limit, as
- * on desktop. The phone keeps its smaller limit, because its native bridge copies each file.
+ * on desktop. The phone sends a large file in parts, but reads with a smaller limit, because its
+ * native bridge copies each file that it reads.
  */
 const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
 /** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */

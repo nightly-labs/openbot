@@ -25,6 +25,7 @@ import {
   storageTierLookupKey,
   storageTierOf,
 } from "@openbot/contracts/billing";
+import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
 import {
   type HostedServerCatalog,
   type HostedServerCatalogPlan,
@@ -60,7 +61,16 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
-import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
+import type { BillingOss } from "./billing-oss";
+import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
+import {
+  type BillingSales,
+  type BillingSalesSynced,
+  type PaymentReversal,
+  paymentReversal,
+  withoutTax,
+} from "./billing-sales";
+import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
 import type { HostedFailure } from "./hosted-server-service";
 import {
   type FailedLicenseInvoice,
@@ -92,6 +102,7 @@ import {
   subscriptionStorageTier,
   verifyStripeSignature,
 } from "./stripe-client";
+import { ViesClient } from "./vies-client";
 
 /** Stripe retries a webhook for up to 3 days, so older event ids are not needed to stop duplicates. */
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
@@ -161,6 +172,8 @@ export interface BillingServiceOptions {
   webhookSecret: string | null;
   /** A license bought before this time is free until then, in milliseconds since the epoch. */
   licenseTrialEnd?: number | null;
+  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
+  countryRequired?: boolean;
   fetch: StripeFetch;
   now?: () => number;
   /**
@@ -179,6 +192,22 @@ export interface BillingServiceOptions {
   onFirstPlanStarted?: (start: FirstPlanStart) => void;
   /** Runs once for each license email (`LicenseServiceOptions`). It must not throw or wait. */
   onLicenseEmail?: LicenseServiceOptions["onLicenseEmail"];
+  /**
+   * Runs once for each subscription, a server plan or a license, that starts, ends, or cancels or
+   * resumes its renewal, with the email of its account.
+   * It must not throw or wait: the operator message goes after the webhook answers.
+   */
+  onPurchase?: (purchase: BillingPurchase) => void;
+  /** Checks the EU VAT IDs of the billing details. Without it, the service asks VIES itself. */
+  vies?: ViesClient;
+  /**
+   * Runs once for each paid Checkout page whose billing address is in another country than the one that
+   * decided its VAT, and for each running subscription whose VAT treatment a change of the billing details
+   * changed, with the operator text. It must not throw or wait.
+   */
+  onVatMismatch?: (text: string) => void;
+  /** Counts the paid invoices of consumers in other EU countries, for the One Stop Shop limit. */
+  oss?: BillingOss;
 }
 
 /** The first plan of an account, for its welcome email. */
@@ -247,6 +276,11 @@ export class BillingService {
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #onFirstPlanStarted: ((start: FirstPlanStart) => void) | null;
+  readonly #onPurchase: ((purchase: BillingPurchase) => void) | null;
+  readonly #vies: ViesClient;
+  readonly #onVatMismatch: ((text: string) => void) | null;
+  readonly #oss: BillingOss | null;
+  readonly #countryRequired: boolean;
   /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
 
@@ -260,6 +294,11 @@ export class BillingService {
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#sales = options.sales ?? null;
     this.#onFirstPlanStarted = options.onFirstPlanStarted ?? null;
+    this.#onPurchase = options.onPurchase ?? null;
+    this.#vies = options.vies ?? new ViesClient(options.fetch, null);
+    this.#onVatMismatch = options.onVatMismatch ?? null;
+    this.#oss = options.oss ?? null;
+    this.#countryRequired = options.countryRequired ?? false;
     this.#layer = Layer.succeed(BillingDependencies, {
       database,
       stripe,
@@ -272,12 +311,14 @@ export class BillingService {
       stripe,
       secretKey: options.secretKey,
       trialEnd: options.licenseTrialEnd ?? null,
+      countryRequired: this.#countryRequired,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
       ...(options.onLicenseEmail ? { onLicenseEmail: options.onLicenseEmail } : {}),
+      ...(options.onPurchase ? { onPurchase: options.onPurchase } : {}),
     });
   }
 
@@ -365,6 +406,47 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  /** The billing country and the VAT ID of the account. An account with no Stripe customer has none. */
+
+  readonly getBillingDetails = Effect.fn("BillingService.getBillingDetails")(
+    function* (
+      this: BillingService,
+      userId: string,
+    ): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const customerId = yield* this.#customerId(userId);
+      if (!customerId) return billingDetailsOf(null);
+      return billingDetailsOf(yield* this.#stripeCall(() => dependencies.stripe.getCustomerTax(customerId)));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** Saves the billing details on the Stripe customer, which the next Checkout page reads (`billing-tax.ts`). */
+
+  readonly setBillingDetails = Effect.fn("BillingService.setBillingDetails")(
+    function* (
+      this: BillingService,
+      user: { id: string; email: string },
+      request: BillingDetailsRequest,
+    ): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const customerId = yield* this.ensureCustomer(user);
+      const saved = yield* setCustomerBillingDetails(
+        dependencies.stripe,
+        this.#vies,
+        customerId,
+        request,
+        dependencies.now(),
+      );
+      for (const text of saved.vatChanges) {
+        console.warn(`billing: ${text}`);
+        this.#onVatMismatch?.(text);
+      }
+      return saved.details;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   /** A Stripe Checkout page that starts the plan of one server, and its license when the order has one. */
 
   readonly createCheckout = Effect.fn("BillingService.createCheckout")(
@@ -384,6 +466,7 @@ export class BillingService {
       if (order) yield* this.license.assertCanOrder(request.user.id, order.users);
       yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
       // During a promotion the license is free until its trial end, so the order pays for the server only.
@@ -401,6 +484,7 @@ export class BillingService {
           currency: request.currency,
           userId: request.user.id,
           serverId: request.serverId,
+          tax,
           ...(orderMetadata && trialEnd !== null
             ? {
                 metadata: {
@@ -972,6 +1056,7 @@ export class BillingService {
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
+      if (this.#oss) yield* this.#oss.record(event);
       // The event is recorded only after it is applied, so a failed event is applied again on retry.
       yield* billingCall(() =>
         dependencies.database.batch([
@@ -984,6 +1069,12 @@ export class BillingService {
         ]),
       );
       if (!this.#sales) yield* this.#trackEvent(event, synced);
+      // After the record, so that a retry of a failed event sends no second alert.
+      const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
+      if (mismatch) {
+        console.warn(`billing: ${mismatch}`);
+        this.#onVatMismatch?.(mismatch);
+      }
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1041,7 +1132,10 @@ export class BillingService {
       ...(synced.kind === "license" ? { users: synced.users } : { plan: synced.plan }),
       interval: synced.interval,
       currency: synced.currency,
-      amount: currency === synced.currency && isBillingAmount(amount) ? amount : null,
+      amount:
+        currency === synced.currency && isBillingAmount(amount)
+          ? withoutTax(amount, object.total, object.total_excluding_tax)
+          : null,
     });
   });
 
@@ -1161,6 +1255,25 @@ export class BillingService {
         !others.some((row) => isOneOf(BILLING_SUBSCRIPTION_STATUSES, row.status) && isOpenBillingStatus(row.status))
       : undefined;
     if (action) this.#trackChange(action, previous, current, reactivated);
+    const event = purchaseEvent(action);
+    if (event) {
+      yield* reportPurchase(
+        { database: dependencies.database, now: dependencies.now, send: this.#onPurchase },
+        subscription.id,
+        ownerId,
+        {
+          event,
+          periodEnd: subscriptionEnd(subscription),
+          ...(event === "ended" ? { endReason: planEndReason(previous) } : {}),
+          product: "server",
+          plan: key.plan,
+          interval: key.interval,
+          currency,
+          amount,
+          trial: subscription.status === "trialing",
+        },
+      );
+    }
     // A subscription starts once, so the first plan of an account starts once.
     if (others?.length === 0 && serverId) yield* this.#firstPlanStarted(ownerId, serverId, key.plan);
     const onSubscriptionSynced = dependencies.onSubscriptionSynced;

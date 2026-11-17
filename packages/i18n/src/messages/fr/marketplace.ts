@@ -116,6 +116,10 @@ export const messages = {
   "marketplace.app.remove.action": "Supprimer",
   "marketplace.app.remove.confirmTitle": "Supprimer {name} ?",
   "marketplace.app.remove.keep": "Conserver",
+  "marketplace.app.replace.title": "Remplacer {server} ?",
+  "marketplace.app.replace.description":
+    "Vous avez déjà un serveur nommé {server}, mais ce n'est pas {name}. Le remplacer par {name} ? Son adresse et ses clés enregistrées seront supprimées.",
+  "marketplace.app.replace.action": "Remplacer",
   "marketplace.app.connection": "Connexion",
   "marketplace.app.access.use": "Peut utiliser",
   "marketplace.app.access.noAgents": "Aucun agent",
@@ -133,6 +137,7 @@ export const messages = {
     "{host} utilise une ancienne version d’OpenBot qui ne peut pas connecter d’apps. Mettez à jour OpenBot sur {host}, ou demandez à son propriétaire de le faire.",
   "marketplace.app.blocked.member":
     "Seul un propriétaire ou un admin de {host} peut y connecter des apps. Demandez-lui de connecter {name}, ou de mettre à jour OpenBot sur {host} pour que les membres puissent connecter des apps.",
+  "marketplace.app.blocked.mac": "{name} fonctionne uniquement sur un Mac qui exécute OpenBot.",
   "marketplace.app.connectAgain": "Reconnecter",
   "marketplace.app.automation.askOnInstall": "Demander l’accès à macOS à l’installation",
   "marketplace.app.automation.title": "Accès aux apps Apple",
@@ -419,9 +424,9 @@ export const messages = {
     "Rédigez un e-mail de réinitialisation du mot de passe pour le nouveau parcours.",
   "marketplace.plugin.omnisend.tagline": "Marketing par e-mail et SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permet aux agents de lire les rapports des campagnes et des formulaires, de trouver des contacts et des segments, et de créer et modifier des campagnes, des automatisations, des modèles d'e-mail, des formulaires et des produits. Chaque utilisateur se connecte à son propre compte Omnisend dans le navigateur et choisit le niveau d'accès sur l'écran de consentement. Avec l'accès en écriture, les agents peuvent aussi envoyer des campagnes et supprimer des données. Choisissez l'accès en lecture seule si les agents n'ont besoin que des rapports.",
+    "Omnisend permet aux agents de lire les rapports des campagnes et des formulaires, de trouver des contacts et des segments, et de créer et modifier des campagnes, des automatisations, des modèles d'e-mail, des formulaires et des produits. Chaque utilisateur se connecte avec une clé API de son propre compte Omnisend. Les agents peuvent faire ce que la clé autorise, ce qui peut inclure l'envoi de campagnes et la suppression de données.",
   "marketplace.plugin.omnisend.app":
-    "Campagnes, automatisations, contacts, segments, formulaires et rapports, via le serveur MCP d'Omnisend avec connexion dans le navigateur.",
+    "Campagnes, automatisations, contacts, segments, formulaires et rapports, via le serveur MCP d'Omnisend avec une clé API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Quels résultats ont eu les campagnes de la semaine dernière par rapport à la semaine précédente ?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -429,6 +434,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prépare un brouillon de campagne pour la nouvelle collection, mais ne l'envoie pas.",
   "marketplace.plugin.postiz.tagline": "Planification des réseaux sociaux",
+  "marketplace.plugin.omnisend.hint.apiKey": "Dans Omnisend, ouvrez Store settings > API keys et créez une clé.",
   "marketplace.plugin.postiz.description":
     "Postiz permet aux agents de lister vos comptes de réseaux sociaux, et de rédiger, planifier et publier des posts sur plus de 30 réseaux, comme X, LinkedIn, Instagram et TikTok. Les agents peuvent aussi importer des médias et créer des images et des vidéos par IA. Connectez-vous à votre compte Postiz dans le navigateur, ou collez la clé API de Settings › Developers dans Postiz. Toutes les offres cloud de Postiz incluent l'accès à l'API. Les agents peuvent publier un post tout de suite : vérifiez chaque post avant de l'approuver.",
   "marketplace.plugin.postiz.app":

@@ -60,7 +60,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "לנקות את יומן התמיכה?",
   "mobile.settings.support.clearBody": "הפעולה מסירה את כל האירועים מהיומן בטלפון הזה.",
   "mobile.settings.support.logFooter":
-    "היומן נשאר בטלפון הזה, ו-OpenBot אינו שולח אותו. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
+    "היומן נשאר בטלפון הזה. OpenBot שולח שורות ממנו רק עם דיווח על באג באפליקציית הטלפון שנשלח על ידך, וכרטיס הדיווח מציג אותן קודם. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
   "mobile.settings.support.saveFailed": "לא ניתן לשמור את קובץ היומן. אפשר לנסות שוב.",
   "mobile.settings.support.sharingUnavailable": "שיתוף אינו זמין בטלפון הזה.",
   "mobile.settings.support.newestFirst": "מהחדש לישן.",
@@ -121,9 +121,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "בהירות",
   "mobile.settings.appearance.messageColorFooter":
     "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
+  "mobile.settings.appearance.chatBackground": "רקע הצ'אט",
+  "mobile.settings.appearance.chatBackgroundDefault": "ברירת מחדל",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",
+  "mobile.settings.appearance.fullVisuals": "הצגת תצוגות חזותיות מלאות",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "תצוגה חזותית של סוכן מוצגת בצ׳אט בגובה המלא שלה. כשהאפשרות כבויה, תצוגה גבוהה נחתכת, ואפשר להקיש עליה כדי לראות את כולה.",
   "mobile.settings.animations.title": "אנימציות",
   "mobile.settings.animations.footer":
     "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",
@@ -225,6 +232,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeThreads": "שרשורים",
+  "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeFooter":
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. החלקה על הודעה עדיין עונה לה.",
+  "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
+  "mobile.settings.conversations.pullInfoFooter":
+    "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
   "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",

@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, redactSecrets, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { withoutTurnContext } from "./agent/developer-instructions";
@@ -38,7 +38,7 @@ import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-c
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
-import { PiRpc } from "./pi-rpc";
+import { PI_REQUEST_TIMEOUT_MS, PiRpc } from "./pi-rpc";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type AppServerNotification,
@@ -414,7 +414,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         response = { marketplaces: [] };
         break;
       case "account/read": {
-        const models = yield* this.#models(timeoutMs);
+        // `initialize` starts no Pi, so this check is the start of a Pi process. It gets the wait that
+        // `initialize` gives another CLI, not the few seconds of a check of a running CLI. With 5 s,
+        // a slow start on Windows failed, and the row showed "Error" while the key worked (#9945).
+        const startMs = Math.max(timeoutMs ?? 0, this.options.requestTimeoutMs ?? PI_REQUEST_TIMEOUT_MS);
+        const models = yield* this.#models(timeoutMs, startMs);
         response = { account: models.length ? { type: this.provider, email: null } : null, requiresOpenaiAuth: false };
         break;
       }
@@ -490,7 +494,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     return yield* providerSync(() => decoder(response));
   });
 
-  readonly #models = Effect.fn("PiAgentClient.models")(function* (this: PiAgentClient, timeoutMs?: number) {
+  /** `startMs`: the wait of the first request, which includes the start of the new `pi` process. */
+  readonly #models = Effect.fn("PiAgentClient.models")(function* (
+    this: PiAgentClient,
+    timeoutMs?: number,
+    startMs = timeoutMs,
+  ) {
     // With no key a key-only provider has no models, and Pi need not start.
     const keyProvider = this.options.keyProvider;
     if (keyProvider && !keyProvider.apiKey()) return [];
@@ -519,7 +528,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       }),
       ({ connection }) =>
         Effect.gen({ self: this }, function* () {
-          const state = yield* connection.request({ type: "get_state" }, timeoutMs);
+          const state = yield* connection.request({ type: "get_state" }, startMs);
           const listed = yield* connection.request({ type: "get_available_models" }, timeoutMs);
           const models = [];
           for (const model of getArray(listed, "models")) {
@@ -984,7 +993,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #addUserMessage(turn: PiTurn, message: string): void {
     const id = `${turn.id}:user:${randomUUID()}`;
-    turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text: this.#redact(message) }] });
+    // The user's own message, so an email address in it stays, as in the agent's answer (#9988).
+    const text = redactMcpValues(redactSecrets(message), this.#secretValues(), redactSecrets);
+    turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text }] });
   }
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {

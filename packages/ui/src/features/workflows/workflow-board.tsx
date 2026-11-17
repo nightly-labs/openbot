@@ -10,6 +10,7 @@ import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import {
   createContext,
+  createMemo,
   createProjection,
   createSignal,
   createStore,
@@ -682,6 +683,9 @@ export function createBoard(options: BoardOptions) {
     };
   };
 
+  /** While true, `connect` joins the undo step that is open, so one connection to many nodes is one undo. */
+  let joined = false;
+
   /**
    * Connects an output to an input. `slot` names the input, as the first frame of a video: its field
    * then holds the source, and a source that held it before loses its connection.
@@ -692,7 +696,7 @@ export function createBoard(options: BoardOptions) {
     const held = heldSlots(to, from, type);
     if (exists && (slot === undefined ? held.length === 0 : held.includes(slot))) return;
     const loop = reaches(to, from);
-    options.beforeChange?.();
+    if (!joined) options.beforeChange?.();
     const fromName = nameOf(ports.get(portKey(from, "out", type, branch))?.element);
     const toName = nameOf(ports.get(portKey(to, "in", type, slot))?.element);
     const edge: WfnEdge = { id: `${from}${branch ? `.${branch}` : ""}>${to}:${type}`, from, to, type };
@@ -722,9 +726,65 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  /**
+   * The same port on the other selected nodes, when the port is on a node of a selection of two or
+   * more. A connection from it also goes from each of them, so that many pictures go into one input.
+   */
+  const companions = (start: PortRef): PortRef[] => {
+    if (state.selection.length < 2 || !state.selection.includes(start.node)) return [];
+    return state.selection.flatMap((node) =>
+      node !== start.node && ports.has(portKey(node, start.side, start.type, start.branch))
+        ? [{ node, side: start.side, type: start.type, branch: start.branch }]
+        : [],
+    );
+  };
+
+  /**
+   * The companions that can end on a port. A named input, as the first frame of a video, takes one
+   * source. A companion that is already connected to the node of the port keeps its connection as it is.
+   */
+  const companionsTo = (start: PortRef, end: PortRef): PortRef[] => {
+    if (end.side === "in" && end.branch !== undefined) return [];
+    return companions(start).filter((port) => {
+      if (port.node === end.node || refusal(port, end) !== null) return false;
+      const [from, to] = orient(port, end);
+      return !hasEdge(from.node, to.node, from.type, from.branch);
+    });
+  };
+
+  /** The companions of the open connection. A port reads it to show that it is armed. */
+  const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
+
+  /** Whether a port is the start of the open connection, or the same port on another selected node. */
+  const isArmed = (port: PortRef) => {
+    const pending = state.pending;
+    return pending !== null && (samePort(pending, port) || pendingCompanions().some((other) => samePort(other, port)));
+  };
+
   const link = (start: PortRef, end: PortRef) => {
+    const others = companionsTo(start, end);
     const [from, to] = orient(start, end);
-    connect(from.node, to.node, from.type, from.branch, to.branch);
+    if (others.length === 0) {
+      connect(from.node, to.node, from.type, from.branch, to.branch);
+      return;
+    }
+    const starts = [start, ...others];
+    const loop = makesLoop(starts, end);
+    options.beforeChange?.();
+    joined = true;
+    try {
+      for (const port of starts) {
+        const [source, target] = orient(port, end);
+        connect(source.node, target.node, source.type, source.branch, target.branch);
+      }
+    } finally {
+      joined = false;
+    }
+    setState((draft) => {
+      draft.message = t(loop ? "workflow.board.live.connectedManyLoop" : "workflow.board.live.connectedMany", {
+        count: starts.length,
+      });
+    });
   };
 
   const cancelDraft = () => {
@@ -737,8 +797,15 @@ export function createBoard(options: BoardOptions) {
 
   /** Connects an open connection to a node that the canvas added at its drop point. */
   const attach = (start: PortRef, node: string) => {
-    if (start.side === "out") connect(start.node, node, start.type, start.branch);
-    else connect(node, start.node, start.type, undefined, start.branch);
+    const starts = start.side === "out" ? [start, ...companions(start)] : [start];
+    for (const port of starts) {
+      if (port.side === "out") connect(port.node, node, port.type, port.branch);
+      else connect(node, port.node, port.type, undefined, port.branch);
+    }
+    if (starts.length > 1)
+      setState((draft) => {
+        draft.message = t("workflow.board.live.connectedMany", { count: starts.length });
+      });
     cancelDraft();
   };
 
@@ -957,8 +1024,7 @@ export function createBoard(options: BoardOptions) {
         const slots = slotsOf(edge);
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
       }),
-    armed: (node, side, type, branch) =>
-      state.pending !== null && samePort(state.pending, { node, side, type, branch }),
+    armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
     refused: (node, side, type, branch) => {
       const target = state.target;
@@ -985,7 +1051,7 @@ export function createBoard(options: BoardOptions) {
       const pending = state.pending;
       // With no open connection, or one from the same side, the press arms this port or disarms it.
       if (!pending || pending.side === side) {
-        const wasArmed = pending !== null && samePort(pending, port);
+        const wasArmed = isArmed(port);
         setState((draft) => {
           draft.pending = wasArmed ? null : port;
           draft.message = wasArmed ? "" : t(CHOOSE_PORT[side][type]);
@@ -1146,6 +1212,40 @@ export function createBoard(options: BoardOptions) {
     schedule();
   };
 
+  /**
+   * Takes the connections, the locks and the fields of a snapshot that another device changed, and
+   * writes only what is different. Typing, a drag, an open connection and the selection stay, unless
+   * the snapshot no longer has their node or connection.
+   */
+  const sync = (saved: BoardSnapshot) => {
+    const gone = new Set(saved.removed);
+    const kept = (id: string) => id in saved.fields && !gone.has(id);
+    const edgeIds = new Set(saved.edges.map((edge) => edge.id));
+    if (typing !== null && !kept(typing.slice(0, typing.lastIndexOf(":")))) typing = null;
+    setState((draft) => {
+      if (JSON.stringify(draft.edges) !== JSON.stringify(saved.edges)) {
+        draft.edges = saved.edges.map((edge) => ({ ...edge }));
+      }
+      if (draft.removed.join("\u0000") !== saved.removed.join("\u0000")) draft.removed = [...saved.removed];
+      if (draft.locked.join("\u0000") !== saved.locked.join("\u0000")) draft.locked = [...saved.locked];
+      for (const id of Object.keys(draft.fields)) if (!(id in saved.fields)) delete draft.fields[id];
+      for (const [id, fields] of Object.entries(saved.fields)) {
+        if (JSON.stringify(draft.fields[id]) !== JSON.stringify(fields)) draft.fields[id] = { ...fields };
+      }
+      if (draft.selection.some((id) => !kept(id))) draft.selection = draft.selection.filter(kept);
+      if (draft.pending && !kept(draft.pending.node)) {
+        draft.pending = null;
+        draft.draft = null;
+        draft.target = null;
+      }
+      if (draft.edge !== null && !edgeIds.has(draft.edge)) draft.edge = null;
+      if (draft.hover !== null && !edgeIds.has(draft.hover)) draft.hover = null;
+      if (draft.hoverAt && !edgeIds.has(draft.hoverAt.edge)) draft.hoverAt = null;
+      if (draft.removing !== null && !edgeIds.has(draft.removing)) draft.removing = null;
+    });
+    schedule();
+  };
+
   onSettled(() => {
     const onKey = (event: KeyboardEvent) => {
       const active = document.activeElement;
@@ -1231,13 +1331,18 @@ export function createBoard(options: BoardOptions) {
       turn: { x: from.x + LOOP_BEND * 0.75, y: (from.y + y) / 2 },
     };
   };
-  /** Whether the open connection would close a loop on the port under the pointer. */
+  /** Whether one of the given connections to a port closes a loop. */
+  const makesLoop = (starts: readonly PortRef[], end: PortRef) =>
+    starts.some((port) => {
+      const [from, to] = orient(port, end);
+      return reaches(to.node, from.node);
+    });
+  /** Whether the open connection, or a line from another selected node, would close a loop on the port under the pointer. */
   const draftLoops = () => {
     const pending = state.pending;
     const port = state.target?.reason === null ? state.target.port : null;
     if (!pending || !port) return false;
-    const [from, to] = orient(pending, port);
-    return reaches(to.node, from.node);
+    return makesLoop([pending, ...companionsTo(pending, port)], port);
   };
 
   /** The connections, under the nodes. Put it first inside the world element. */
@@ -1255,14 +1360,28 @@ export function createBoard(options: BoardOptions) {
       return slots.length > 0 ? slots : [undefined];
     };
     /** The line follows the pointer, and snaps to a port that can take it. */
-    const draftPath = () => {
+    /** The port that the open connection snaps to, if one can take it. */
+    const draftTarget = () => (state.target?.reason === null ? state.target.port : null);
+    /** Where the open connection ends: the port that it snaps to, else the pointer. */
+    const draftEnd = () => {
+      const port = draftTarget();
+      return (port && point(port.node, port.side, port.type, port.branch)) ?? state.draft;
+    };
+    /** The line of the open connection from one port to its end. */
+    const draftLine = (from: PortRef) => {
+      const anchor = point(from.node, from.side, from.type, from.branch);
+      const end = draftEnd();
+      if (!anchor || !end) return null;
+      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+    };
+    const draftPath = () => (state.pending ? draftLine(state.pending) : null);
+    /** The lines from the other selected nodes, which connect with the dragged one. */
+    const companionPaths = () => {
       const pending = state.pending;
-      const pointer = state.draft;
-      const anchor = pending ? point(pending.node, pending.side, pending.type, pending.branch) : undefined;
-      if (!pending || !anchor || !pointer) return null;
-      const port = state.target?.reason === null ? state.target.port : null;
-      const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
-      return pending.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+      if (!pending || !state.draft) return [];
+      const port = draftTarget();
+      const others = port ? companionsTo(pending, port) : pendingCompanions();
+      return others.flatMap((other) => draftLine(other) ?? []);
     };
     const draftState = () => {
       const target = state.target;
@@ -1322,6 +1441,9 @@ export function createBoard(options: BoardOptions) {
           <Show when={draftPath()}>
             {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path()} />}
           </Show>
+          <For each={companionPaths()}>
+            {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path} />}
+          </For>
         </svg>
         <Show when={draftNote()}>
           {(note) => (
@@ -1428,6 +1550,7 @@ export function createBoard(options: BoardOptions) {
     addEdges,
     snapshot,
     restore,
+    sync,
     /** Ends the typing burst, so the next key stroke is a new change. */
     endTyping: () => {
       typing = null;

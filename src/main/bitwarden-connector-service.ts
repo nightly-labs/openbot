@@ -84,6 +84,13 @@ function cliMissing(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
 }
 
+/**
+ * `bw unlock` unlocked, then failed in its user key id backfill, which a server without that route
+ * (Vaultwarden before 1.37.4) refuses. `bw` then pauses the backfill for 24 hours in its data folder,
+ * so the next `unlock` works (bitwarden/clients#23937).
+ */
+export class BitwardenKeyIdBackfillError extends Error {}
+
 /** No shell, inherited credentials, or command output in an error. */
 const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
   const env: NodeJS.ProcessEnv = { BITWARDENCLI_INTERACTIVE: "false" };
@@ -107,9 +114,11 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
       executable,
       args,
       { env, signal, timeout: 30_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => {
-        if (error) reject(new Error(sourceText("error.connector.bitwardenFailed")));
-        else resolve(stdout);
+      (error, stdout, stderr) => {
+        if (!error) resolve(stdout);
+        else if (stderr.includes("KeyIdBackfillError"))
+          reject(new BitwardenKeyIdBackfillError(sourceText("error.connector.bitwardenFailed")));
+        else reject(new Error(sourceText("error.connector.bitwardenFailed")));
       },
     );
   });
@@ -484,9 +493,18 @@ export class BitwardenConnectorService implements PasswordVault {
           BW_CLIENTSECRET: record.clientSecret,
         });
       }
-      const key = (yield* this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
+      const unlock = this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
         BW_PASSWORD: record.masterPassword,
-      })).trim();
+      });
+      const key = (yield* unlock.pipe(
+        Effect.catchIf(
+          ({ cause }) => cause instanceof BitwardenKeyIdBackfillError,
+          () => {
+            logger.info("The Bitwarden CLI failed its user key id backfill. Unlocking again.");
+            return unlock;
+          },
+        ),
+      )).trim();
       if (!key) return yield* failure();
       registerSecretValue(key);
       session.env = { ...env, BW_SESSION: key };
@@ -583,7 +601,8 @@ export class BitwardenConnectorService implements PasswordVault {
           this.#running.add(pending);
           return pending.finally(() => this.#running.delete(pending));
         },
-        catch: failure,
+        catch: (error) =>
+          error instanceof BitwardenKeyIdBackfillError ? new PasswordVaultError({ cause: error }) : failure(),
       });
       if (this.#session !== session) return yield* failure();
       this.#touch();

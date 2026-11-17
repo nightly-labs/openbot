@@ -61,6 +61,7 @@ import { SidebarAgentIndicator, SidebarPinnedAvatar } from "../sidebar/SidebarAg
 import type { SidebarAgentState } from "../sidebar/sidebar-types";
 import {
   AgentDockChat,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockChatVoice,
   type AgentDockPendingMessage,
@@ -100,7 +101,7 @@ import {
   TUCK_DISTANCE,
 } from "./agent-dock-motion";
 
-export type { AgentDockChatModel } from "./AgentDockChat";
+export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
 
 /** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
@@ -231,6 +232,11 @@ export interface AgentDockProps {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /**
+   * How the chats answer the requests that the agents wait for. Without it, a chat shows the wait bar,
+   * which opens the main window.
+   */
+  answers?: AgentDockChatAnswers | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
   /** Turns the dock off. The right-click menus of the dock show the item only when it is set. */
@@ -1390,7 +1396,9 @@ export function AgentDock(props: AgentDockProps) {
                         onScroll={addFades.measure}
                       >
                         <Show when={addEmpty()}>
-                          <DropdownMenu.Item disabled>{addEmptyText()}</DropdownMenu.Item>
+                          <DropdownMenu.Item class="agent-dock-add-empty" disabled>
+                            {addEmptyText()}
+                          </DropdownMenu.Item>
                         </Show>
                         <For each={addMatches()}>
                           {(agent) => (
@@ -1505,6 +1513,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
+                    answers={props.answers}
                   />
                 )}
               </Show>

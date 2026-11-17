@@ -75,7 +75,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "هل تريد مسح سجل الدعم؟",
   "mobile.settings.support.clearBody": "يزيل هذا كل الأحداث من السجل على هذا الهاتف.",
   "mobile.settings.support.logFooter":
-    "يبقى السجل على هذا الهاتف، ولا يرسله OpenBot. يسجّل خطوات الاتصال والطلبات والأخطاء. لا يسجّل الرسائل أو الملفات، ويُخفي كلمات المرور والرموز المميزة. اقرأ الملف قبل مشاركته.",
+    "يبقى السجل على هذا الهاتف. يرسل OpenBot أسطرًا منه فقط مع بلاغ عن خطأ في تطبيق الهاتف ترسله أنت، وتعرضها بطاقة البلاغ أولًا. يسجّل خطوات الاتصال والطلبات والأخطاء. لا يسجّل الرسائل أو الملفات، ويُخفي كلمات المرور والرموز المميزة. اقرأ الملف قبل مشاركته.",
   "mobile.settings.support.saveFailed": "تعذّر حفظ ملف السجل. أعد المحاولة.",
   "mobile.settings.support.sharingUnavailable": "المشاركة غير متاحة على هذا الهاتف.",
   "mobile.settings.support.newestFirst": "الأحدث أولًا.",
@@ -136,9 +136,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.chatBackground": "خلفية الدردشة",
+  "mobile.settings.appearance.chatBackgroundDefault": "الافتراضي",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "يحتفظ كل مظهر بلونه الخاص. يصبح اللون الذي يصعّب قراءة النص أغمق أو أفتح.",
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
+  "mobile.settings.appearance.fullVisuals": "إظهار المعاينات المرئية كاملة",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "يظهر العرض المرئي من الوكيل في الدردشة بارتفاعه الكامل. عند إيقاف هذا الخيار، يُقص العرض الطويل، ويمكنك النقر عليه لرؤيته كاملًا.",
   "mobile.settings.animations.title": "الحركات",
   "mobile.settings.animations.footer":
     "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",
@@ -240,6 +247,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "تنزيل الملفات الكبيرة تلقائيًا",
   "mobile.settings.conversations.largeFilesFooter":
     "الصور والفيديوهات والملفات الصوتية الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيلها مباشرةً حتى {large}. قد يستهلك هذا الكثير من بيانات الجوال.",
+  "mobile.settings.conversations.swipeLeft": "السحب لليسار في محادثة وكيل",
+  "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
+  "mobile.settings.conversations.swipeThreads": "السلاسل",
+  "mobile.settings.conversations.swipeBrowser": "المتصفح",
+  "mobile.settings.conversations.swipeFooter":
+    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب على رسالة لا يزال يرد عليها.",
+  "mobile.settings.conversations.pullInfo": "السحب لأعلى للمعلومات",
+  "mobile.settings.conversations.pullInfoFooter":
+    "اسحب لأعلى بعد آخر رسالة في محادثة أو قناة أو سلسلة ثم أفلت لفتح معلوماتها.",
   "mobile.settings.conversations.fullQualityPhotos": "إرسال الصور بالجودة الكاملة",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "عند إيقاف هذا الخيار، يرسل التطبيق نسخة أصغر من كل صورة، حتى 2048 بكسل في الضلع الأطول. تصل أسرع على اتصال بطيء. فعّل هذا الخيار لإرسال الصورة الأصلية.",

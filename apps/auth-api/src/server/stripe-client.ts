@@ -8,6 +8,7 @@ import {
 import { LICENSE_LOOKUP_KEYS, LICENSE_METADATA, LICENSE_METADATA_KIND } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Result, Schema } from "effect";
+import type { CheckoutTax } from "./billing-tax";
 import { constantTimeEqual, hexToBytes, importHmacSha256Key } from "./crypto";
 
 /** Stripe changes response shapes by API version, so every request names the version this code reads. */
@@ -54,6 +55,41 @@ const stripeErrorSchema = Schema.Struct({
 });
 const sessionSchema = Schema.Struct({ id: Schema.String, url: Schema.NullOr(Schema.String) });
 const customerSchema = Schema.Struct({ id: Schema.String, deleted: Schema.optional(Schema.Boolean) });
+const taxIdSchema = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  value: Schema.String,
+  /** Stripe's own check of an EU VAT ID with VIES, for an ID that Checkout collected. */
+  verification: Schema.optional(Schema.NullOr(Schema.Struct({ status: Schema.String }))),
+});
+type StripeTaxId = typeof taxIdSchema.Type;
+const customerTaxSchema = Schema.Struct({
+  id: Schema.String,
+  deleted: Schema.optional(Schema.Boolean),
+  address: Schema.optional(Schema.NullOr(Schema.Struct({ country: Schema.optional(Schema.NullOr(Schema.String)) }))),
+  tax_exempt: Schema.optional(Schema.NullOr(Schema.String)),
+  metadata: Metadata,
+  tax_ids: Schema.optional(Schema.NullOr(Schema.Struct({ data: Schema.Array(taxIdSchema) }))),
+});
+const taxRateListSchema = Schema.Struct({
+  data: Schema.Array(Schema.Struct({ id: Schema.String, metadata: Metadata })),
+});
+
+/** The session metadata that records the VAT decision of a Checkout page (`billing-tax.ts`), for the webhook check. */
+export const VAT_METADATA = {
+  country: "openbot_vat_country",
+  treatment: "openbot_vat_treatment",
+} as const;
+
+/** The tax facts of a Stripe customer that decide the VAT of a new subscription. */
+export interface StripeCustomerTax {
+  /** A customer deleted in the Stripe Dashboard has no tax facts. */
+  deleted: boolean;
+  country: string | null;
+  taxExempt: "none" | "exempt" | "reverse";
+  metadata: Readonly<Record<string, string>>;
+  taxIds: readonly StripeTaxId[];
+}
 const deletedSchema = Schema.Struct({ id: Schema.String });
 const checkoutSessionSchema = Schema.Struct({
   id: Schema.String,
@@ -91,6 +127,13 @@ const subscriptionSchema = Schema.Struct({
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
+  /**
+   * Stripe Tax on the invoices. Only subscriptions from the days when Checkout used Stripe Tax have it on;
+   * `scripts/stripe-vat-migrate.ts` moves them to `default_tax_rates`.
+   */
+  automatic_tax: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
+  /** The VAT rate of each invoice. Empty for reverse charge and for a buyer outside the EU. */
+  default_tax_rates: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({ id: Schema.String })))),
   default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
     data: Schema.Array(
@@ -118,6 +161,8 @@ const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struc
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  total: Schema.optional(Schema.NullOr(Schema.Number)),
+  total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   parent: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -333,6 +378,81 @@ export class StripeClient {
     return result.success.deleted === true;
   }).bind(this);
 
+  /** The country, the tax exemption and the tax IDs of a customer. */
+
+  readonly getCustomerTax = Effect.fn("StripeClient.getCustomerTax")(function* (
+    this: StripeClient,
+    customerId: string,
+  ): Effect.fn.Return<StripeCustomerTax, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ "expand[]": "tax_ids" });
+    const path = `/v1/customers/${encodeURIComponent(customerId)}?${query}`;
+    const customer = yield* this.#requestEffect("GET", path, null, customerTaxSchema);
+    const exempt = customer.tax_exempt;
+    return {
+      deleted: customer.deleted === true,
+      country: customer.address?.country || null,
+      taxExempt: exempt === "exempt" || exempt === "reverse" ? exempt : "none",
+      metadata: customer.metadata,
+      taxIds: customer.tax_ids?.data ?? [],
+    };
+  }).bind(this);
+
+  /**
+   * Sets the tax facts of a customer. A new `country` clears the rest of the old address, which belongs to
+   * the old country; the next Checkout asks for the full address again. Metadata keys with an empty value
+   * are removed.
+   */
+
+  readonly setCustomerTax = Effect.fn("StripeClient.setCustomerTax")(function* (
+    this: StripeClient,
+    customerId: string,
+    input: {
+      country?: string;
+      taxExempt: "none" | "reverse";
+      metadata: Readonly<Record<string, string>>;
+    },
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ tax_exempt: input.taxExempt });
+    if (input.country) {
+      body.set("address[country]", input.country);
+      for (const field of ["line1", "line2", "city", "state", "postal_code"]) body.set(`address[${field}]`, "");
+    }
+    for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
+    yield* this.#requestEffect("POST", `/v1/customers/${encodeURIComponent(customerId)}`, body, customerSchema);
+  }).bind(this);
+
+  /** Adds an EU VAT ID to a customer. Stripe shows it on each invoice. */
+
+  readonly addCustomerVatId = Effect.fn("StripeClient.addCustomerVatId")(function* (
+    this: StripeClient,
+    customerId: string,
+    vatId: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ type: "eu_vat", value: vatId });
+    yield* this.#requestEffect("POST", `/v1/customers/${encodeURIComponent(customerId)}/tax_ids`, body, taxIdSchema);
+  }).bind(this);
+
+  readonly deleteCustomerTaxId = Effect.fn("StripeClient.deleteCustomerTaxId")(function* (
+    this: StripeClient,
+    customerId: string,
+    taxId: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const path = `/v1/customers/${encodeURIComponent(customerId)}/tax_ids/${encodeURIComponent(taxId)}`;
+    yield* this.#requestEffect("DELETE", path, null, deletedSchema);
+  }).bind(this);
+
+  /** The ID of the active Tax Rate with `metadata[key] = value`, or null when the account has none. */
+
+  readonly findTaxRate = Effect.fn("StripeClient.findTaxRate")(function* (
+    this: StripeClient,
+    key: string,
+    value: string,
+  ): Effect.fn.Return<string | null, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ active: "true", limit: "100" });
+    const rates = yield* this.#requestEffect("GET", `/v1/tax_rates?${query}`, null, taxRateListSchema);
+    return rates.data.find((rate) => rate.metadata[key] === value)?.id ?? null;
+  }).bind(this);
+
   /**
    * A subscription Checkout for one server, or for the license when `serverId` is absent. The metadata goes
    * on the session and on the subscription, so the webhook links the subscription to the account and the
@@ -358,6 +478,11 @@ export class StripeClient {
       metadata?: Readonly<Record<string, string>>;
       /** Metadata for the session only, such as the order that a later page for the same server repeats. */
       sessionMetadata?: Readonly<Record<string, string>>;
+      /**
+       * The VAT of every invoice of the subscription (`checkoutTax`). `null` is a customer with no country
+       * while the country is not required: Stripe Tax sets the VAT, as before the billing details step.
+       */
+      tax: CheckoutTax | null;
       /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
       trialEndSeconds?: number;
       successUrl: string;
@@ -378,12 +503,10 @@ export class StripeClient {
       origin_context: "web",
       submit_type: "auto",
       payment_method_collection: "always",
-      billing_address_collection: "auto",
+      // The country and the VAT ID come before Checkout (`billing-tax.ts`), which gives `taxRateId`. Checkout
+      // asks for the full address for the invoice and saves it on the customer, with the name.
+      billing_address_collection: "required",
       "phone_number_collection[enabled]": "false",
-      "automatic_tax[enabled]": "false",
-      "tax_id_collection[enabled]": "true",
-      "tax_id_collection[required]": "never",
-      // Stripe refuses tax ID collection for an existing customer without these two.
       "customer_update[name]": "auto",
       "customer_update[address]": "auto",
       "consent_collection[terms_of_service]": "required",
@@ -401,6 +524,21 @@ export class StripeClient {
     }
     if (input.serverId) body.set("client_reference_id", input.serverId);
     if (input.trialEndSeconds !== undefined) body.set("subscription_data[trial_end]", String(input.trialEndSeconds));
+    if (input.tax) {
+      // The rate goes on top of the Price. Reverse charge and a buyer outside the EU have no rate.
+      if (input.tax.rateId) body.set("subscription_data[default_tax_rates][0]", input.tax.rateId);
+      body.set(`metadata[${VAT_METADATA.country}]`, input.tax.country);
+      body.set(`metadata[${VAT_METADATA.treatment}]`, input.tax.treatment);
+      // The subscription keeps its VAT treatment, so that a change of the billing details changes only the
+      // subscriptions that got their VAT from OpenBot (`billing-tax.ts`).
+      body.set(`subscription_data[metadata][${VAT_METADATA.treatment}]`, input.tax.treatment);
+    } else {
+      // No country yet: Stripe Tax sets the VAT from the Checkout address and collects the VAT ID.
+      // `scripts/stripe-vat-migrate.ts` later moves the subscription to the rate.
+      body.set("automatic_tax[enabled]", "true");
+      body.set("tax_id_collection[enabled]", "true");
+      body.set("tax_id_collection[required]", "never");
+    }
     for (const prefix of ["metadata", "subscription_data[metadata]"]) {
       body.set(`${prefix}[${BILLING_METADATA.userId}]`, input.userId);
       if (input.serverId) body.set(`${prefix}[${BILLING_METADATA.serverId}]`, input.serverId);
@@ -467,6 +605,16 @@ export class StripeClient {
       currency: BillingCurrency;
       anchorSeconds: number;
       trial?: boolean;
+      /**
+       * Stripe Tax on the invoices, as on the subscription that this one comes from. Sent only when true, so
+       * the retry of a split that started before Stripe Tax keeps the body of its idempotency key.
+       */
+      automaticTax: boolean;
+      /**
+       * The VAT rates of the invoices, as on the subscription that this one comes from. Sent only when there
+       * is one, so the retry of an older split keeps the body of its idempotency key.
+       */
+      taxRateIds: readonly string[];
       paymentMethodId: string | null;
       metadata: Readonly<Record<string, string>>;
     },
@@ -482,9 +630,30 @@ export class StripeClient {
         : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
       "expand[]": "items.data.price.currency_options",
     });
+    if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
+    for (const [index, id] of input.taxRateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
+  }).bind(this);
+
+  /** Sets the VAT rates of the next invoices of a subscription and its VAT treatment. No rate removes them. */
+
+  readonly setSubscriptionTaxRates = Effect.fn("StripeClient.setSubscriptionTaxRates")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    rateIds: readonly string[],
+    treatment: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ [`metadata[${VAT_METADATA.treatment}]`]: treatment });
+    if (rateIds.length === 0) body.set("default_tax_rates", "");
+    for (const [index, id] of rateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
+    yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionSchema,
+    );
   }).bind(this);
 
   /** Sets metadata on a subscription. An empty value removes the key. */
@@ -539,15 +708,22 @@ export class StripeClient {
   }).bind(this);
 
   /**
-   * The invoice that a PaymentIntent paid, the subscription of that invoice and why Stripe made it. Null for
-   * a payment of no subscription invoice. From API version 2025-03-31 a charge does not name its invoice.
+   * The invoice that a PaymentIntent paid, the subscription of that invoice, why Stripe made it, and its
+   * total with and without tax. Null for a payment of no subscription invoice. From API version
+   * 2025-03-31 a charge does not name its invoice.
    */
 
   readonly getPaymentInvoice = Effect.fn("StripeClient.getPaymentInvoice")(function* (
     this: StripeClient,
     paymentIntentId: string,
   ): Effect.fn.Return<
-    { invoiceId: string; subscriptionId: string; billingReason: string | null } | null,
+    {
+      invoiceId: string;
+      subscriptionId: string;
+      billingReason: string | null;
+      total: number | null;
+      totalExcludingTax: number | null;
+    } | null,
     StripeRequestError | StripeTransportError
   > {
     const query = new URLSearchParams({
@@ -567,6 +743,8 @@ export class StripeClient {
       invoiceId,
       subscriptionId: typeof subscription === "string" ? subscription : subscription.id,
       billingReason: invoiceRecord.billing_reason ?? null,
+      total: invoiceRecord.total ?? null,
+      totalExcludingTax: invoiceRecord.total_excluding_tax ?? null,
     };
   }).bind(this);
 

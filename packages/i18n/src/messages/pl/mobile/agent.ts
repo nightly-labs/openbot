@@ -338,6 +338,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Brak dostępnych modeli dla tego dostawcy.",
   "mobile.agent.runtime.searchModels": "Szukaj modeli",
   "mobile.agent.runtime.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "Ten dostawca nie działa z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby go użyć, najpierw zmień „Uprawnienia”.",
   "mobile.agent.runtime.usageLimit": "Osiągnięto limit użycia",
   "mobile.agent.runtime.usageLimitWindow": "Limit ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Reset {time}",
@@ -659,6 +661,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Oznacz wszystkie jako przeczytane",
   "mobile.agent.home.sort.title": "Sortuj czaty",
   "mobile.agent.home.sort.manual": "Ręcznie",
+  "mobile.agent.home.sort.recent": "Ostatnia aktywność",
   "mobile.agent.home.sort.unreadGroup": "Nieprzeczytane w grupie",
   "mobile.agent.home.sort.unreadFirst": "Nieprzeczytane najpierw w folderach",
   "mobile.agent.route.appearance": "Wygląd",

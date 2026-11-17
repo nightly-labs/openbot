@@ -142,6 +142,7 @@ export const messages = {
   "error.remote.attachmentRejected": "主机拒绝了该附件。",
   "error.remote.attachmentTooLarge": "附件必须小于等于 10 MB。",
   "error.remote.attachmentBusy": "请等待当前附件处理完成。",
+  "error.remote.attachmentChanged": "文件已更改或不可用。请重新选择。",
   "error.remote.uploadTimeout": "附件上传超时。",
   "error.remote.hostSessionActive": "主机已有活跃的远程会话。",
   "error.remote.tooManyConnections": "活跃的远程连接过多。",

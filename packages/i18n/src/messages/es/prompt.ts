@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "¿Tienes una idea? Vamos a hacerla realidad.",
   "prompt.approval.report.dontSend": "Ahora no",
   "prompt.approval.report.send": "Enviar al equipo de OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Abre este chat en la app de OpenBot del teléfono y envía el informe allí. El teléfono añade su versión, su sistema y su registro de soporte. Si el teléfono no se puede conectar, abre Ajustes > Ayuda en la app del teléfono e informa del problema en GitHub.",
   "prompt.approval.title.command": "Ejecutar un comando",
   "prompt.approval.title.fileChange": "Cambiar archivos",
   "prompt.approval.title.permissions": "Conceder permisos",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Inicio de sesión en {host} cancelado",
   "prompt.browser.signInBlocked.body":
     "Inicia sesión en este ordenador. OpenBot envía solo el inicio de sesión de {host} a {server}, y {name} continúa.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} no acepta un inicio de sesión desde el servidor. Abre este chat en la aplicación de escritorio de OpenBot en tu ordenador e inicia sesión allí. Después, {name} continúa.",
   "prompt.browser.signInBlocked.cancelledBody": "El inicio de sesión se canceló.",
   "prompt.browser.signInBlocked.waiting": "Esperando el inicio de sesión",
   "prompt.browser.signInBlocked.waitingButton": "Esperando el inicio de sesión…",

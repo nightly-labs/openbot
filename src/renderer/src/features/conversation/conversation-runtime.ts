@@ -10,6 +10,7 @@ import type {
   SaveSkillSuggestionResult,
   SetAgentSessionSettingInput,
   TestRoutineInput,
+  WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { AgentSkillCalls, SkillCatalogCalls } from "../../skills-port";
@@ -88,6 +89,8 @@ export interface ConversationRuntime {
   liveVoice?: CodexLivePort | undefined;
   /** The marketplace skills catalog that gives the agent's skills their descriptions and icons. */
   skillCatalog?: SkillCatalogCalls | undefined;
+  /** Remove on a feedback thank-you card. Absent, the host does not serve `feedback-withdraw-v1`. */
+  withdrawFeedback?: ((input: { agentId: string; messageId: string }) => Promise<WithdrawFeedbackResult>) | undefined;
   /** Save on a skill question. Absent, the host does not serve `skill-learning-v1`. */
   saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;

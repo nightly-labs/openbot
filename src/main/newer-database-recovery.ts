@@ -11,6 +11,7 @@ import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { DOWNLOAD_URL } from "./download-url";
+import { UPDATE_HANDOVER_FILE } from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE } from "./update-preference-store";
 import {
   electronUpdaterCacheDirectory,
@@ -94,6 +95,8 @@ async function createRecoveryUpdater(
     ...(typeof process.getuid === "function" ? { currentUid: process.getuid() } : {}),
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
+    appImagePath: process.env.APPIMAGE?.trim() || undefined,
+    ...(process.platform === "darwin" ? { handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE) } : {}),
     updaterCacheDirectory: electronUpdaterCacheDirectory(),
   });
 }

@@ -327,6 +327,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
   "mobile.agent.runtime.searchModels": "Modellerde ara",
   "mobile.agent.runtime.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    'Bu sağlayıcı Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için önce "İzinler"i değiştirin.',
   "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
   "mobile.agent.runtime.usageLimitWindow": "{window} sınırı",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} tarihinde sıfırlanır",
@@ -619,6 +621,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Tümünü okundu olarak işaretle",
   "mobile.agent.home.sort.title": "Sohbetleri sırala",
   "mobile.agent.home.sort.manual": "Elle",
+  "mobile.agent.home.sort.recent": "Son etkinlik",
   "mobile.agent.home.sort.unreadGroup": "Okunmamışlar bir grupta",
   "mobile.agent.home.sort.unreadFirst": "Klasörlerde önce okunmamışlar",
   "mobile.agent.route.appearance": "Görünüm",

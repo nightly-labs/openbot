@@ -45,6 +45,7 @@ import {
   mcpFingerprintValues,
   NO_MCP_TOOL_RUNTIMES,
   openCodeMcpServers,
+  providerMcpServerName,
   toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
@@ -70,6 +71,7 @@ import {
   unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
+import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
@@ -215,6 +217,8 @@ export interface ThreadLifecycleOptions {
   agentCursorDrawn?: boolean;
   /** The Computer Use driver drives a native Wayland desktop, where video can have no route. */
   computerUseOnWayland?: boolean;
+  /** The Computer Use driver refuses keys and clicks on this Wayland desktop, read at each start and resume of a session. */
+  computerUseInputRefused?: () => boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -265,6 +269,7 @@ export class ThreadLifecycle {
   readonly #hostedStorageGb: () => number | null;
   readonly #agentCursorDrawn: boolean;
   readonly #computerUseOnWayland: boolean;
+  readonly #computerUseInputRefused: () => boolean;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -286,6 +291,11 @@ export class ThreadLifecycle {
    */
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
   readonly #pendingRuntimeRefreshes = new Set<string>();
+  /**
+   * The marks of `#pendingRuntimeRefreshes` that an MCP set change wrote. They do not wait for
+   * background work: a revoked server or a signed-out account must leave the session at once.
+   */
+  readonly #mcpRuntimeRefreshes = new Set<string>();
   /**
    * How many starts of each agent are in flight: a provider session, or a turn on one.
    *
@@ -322,6 +332,7 @@ export class ThreadLifecycle {
     this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
     this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
     this.#computerUseOnWayland = options.computerUseOnWayland ?? false;
+    this.#computerUseInputRefused = options.computerUseInputRefused ?? (() => false);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -370,6 +381,7 @@ export class ThreadLifecycle {
   ) {
     for (const agent of this.#store.list()) {
       this.#pendingRuntimeRefreshes.add(agent.id);
+      this.#mcpRuntimeRefreshes.add(agent.id);
       yield* this.applyPendingRuntimeRefresh(agent);
     }
   }, Effect.uninterruptible).bind(this);
@@ -504,6 +516,7 @@ export class ThreadLifecycle {
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();
+    this.#mcpRuntimeRefreshes.clear();
     this.#pendingStarts.clear();
     this.#pendingMainStarts.clear();
   }
@@ -1196,6 +1209,8 @@ export class ThreadLifecycle {
             ...(excluded.length ? [["excluded", ...excluded]] : []),
             ...(agentAutomationAllowed(agent, this.#store.agentDefaults()) ? ["automation"] : []),
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
+            // Only "off" adds a value: on is the default, so its sessions keep their fingerprint (#10033).
+            ...(this.#store.agentDefaults().commitCoAuthor ? [] : ["no-commit-co-author"]),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
@@ -1484,6 +1499,7 @@ export class ThreadLifecycle {
       hostedStorageGb: this.#hostedStorageGb(),
       agentCursorDrawn: this.#agentCursorDrawn,
       computerUseOnWayland: this.#computerUseOnWayland,
+      computerUseInputRefused: this.#computerUseInputRefused(),
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
@@ -1502,7 +1518,20 @@ export class ThreadLifecycle {
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
-            : [],
+            : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
+              // tools of the saved rows through tool_call, so only the rows that it can run are listed.
+              // The built-in servers are not saved rows.
+              client.provider === "antigravity"
+              ? mcpServers
+                  .filter(
+                    (config) =>
+                      mcpFallbackRunsServer(config, agent) &&
+                      config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID &&
+                      config.id !== COMPUTER_USE_MCP_SERVER_ID,
+                  )
+                  .map((config) => providerMcpServerName(config.name))
+              : [],
+      catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
@@ -1817,21 +1846,38 @@ export class ThreadLifecycle {
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);
+    const reloadProvider = RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null;
+    const waitsForBackground = reloadProvider !== null && !this.#mcpRuntimeRefreshes.has(agent.id);
     for (const threadId of threadIds) {
       // A running turn owns its provider session, so the refresh waits for it. The mark stays, and
-      // the next drain of this agent refreshes the thread that was busy this time.
-      if (this.#activeTurnOf(agent.id, threadId)) deferred = true;
-      else
-        yield* this.#refreshThreadRuntime(
-          threadId,
-          RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null,
-        );
+      // the next drain of this agent refreshes the thread that was busy this time. A reload closes
+      // the process, which also ends the background subagents and commands of a finished turn, so
+      // a skill or setting change waits for them in the same way (#8484). An MCP change does not.
+      if (this.#activeTurnOf(agent.id, threadId) || (waitsForBackground && (yield* this.#runsBackgroundWork(threadId))))
+        deferred = true;
+      else yield* this.#refreshThreadRuntime(threadId, reloadProvider);
     }
     if (!deferred) {
       this.#pendingRuntimeRefreshes.delete(agent.id);
+      this.#mcpRuntimeRefreshes.delete(agent.id);
       this.#store.clearSessionSettingReset(agent.id, settingsIdentity);
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether a loaded session of this thread runs background work. A failed check keeps the session. */
+  readonly #runsBackgroundWork = Effect.fn("ThreadLifecycle.runsBackgroundWork")(function* (
+    this: ThreadLifecycle,
+    threadId: string,
+  ) {
+    for (const session of this.#store.database.listProviderSessions(threadId)) {
+      if (session.state !== "active") continue;
+      const client = this.#conversation.openClientFor(session.externalSessionId);
+      if (!client?.holdsBackgroundWork) continue;
+      const background = yield* Effect.result(client.holdsBackgroundWork(session.externalSessionId));
+      if (Result.isFailure(background) || background.success) return true;
+    }
+    return false;
+  });
 
   /**
    * Whether a provider turn may own a session of this agent's own thread, as the checks of

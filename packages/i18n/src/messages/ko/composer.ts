@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "대기열의 메시지를 수정하는 중이에요. 수정을 저장하거나 취소해야 실행돼요.",
   "composer.queueEdit.cancel": "수정 취소",
+  "composer.feedbackFix.body":
+    "보고서 #{number}을(를) 수정하는 중입니다. 요청을 보내거나, 취소해서 보고서를 그대로 두세요.",
+  "composer.feedbackFix.cancel": "취소",
   "composer.providerWait.offlineTitle": "인터넷에 연결되어 있지 않아요",
   "composer.providerWait.offline": "이 컴퓨터가 다시 온라인이 될 때까지 {provider}이(가) 답할 수 없어요.",
   "composer.providerWait.silent": "{provider}에서 {duration} 동안 업데이트가 없어요.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "계속하려면 {provider}이(가) 실행되는 컴퓨터에서 업데이트하세요.",
   "composer.update.pending": "업데이트 중…",
   "composer.update.action": "업데이트",
+  "composer.imageInput.body":
+    "{model}은(는) 텍스트만 받으므로 첨부한 이미지를 볼 수 없습니다. 이 모델이 이미지를 읽을 수 있다면 이미지를 켜세요.",
+  "composer.imageInput.label": "{model}의 이미지 켜기",
+  "composer.imageInput.pending": "켜는 중…",
+  "composer.imageInput.action": "이미지 켜기",
   "composer.usageLimit.credits": "{provider} 플랜 한도를 모두 사용했어요. 이제 에이전트가 크레딧을 사용해요.",
   "composer.usageLimit.creditsResets":
     "{provider} 플랜 한도를 모두 사용했어요. {reset}에 초기화될 때까지 에이전트가 크레딧을 사용해요.",
@@ -108,6 +116,12 @@ export const messages = {
   "composer.error.holdQueued": "수정을 위해 대기열 메시지를 보류할 수 없었어요.",
   "composer.error.cancelEdit": "대기열 수정을 취소할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.updateQueued": "대기열 메시지를 업데이트할 수 없었어요. 다시 시도해 주세요.",
+  "composer.queueEdit.received": "에이전트가 이미 이 메시지를 받아서 편집이 끝났습니다.",
+  "composer.queueEdit.receivedKept":
+    "에이전트가 이미 이 메시지를 받아서 편집이 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
+  "composer.queueEdit.deletedKept":
+    "이 메시지가 삭제되어 편집이 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
+  "composer.queueEdit.endedKept": "이 편집은 저장되기 전에 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
   "composer.voice.prepareFailed": "음성 모델을 준비할 수 없었어요. 다시 시도해 주세요.",
   "composer.voice.noSpeechRecorded": "녹음된 음성이 없어요.",
   "composer.voice.noSpeechDetected": "감지된 음성이 없어요.",
@@ -152,6 +166,7 @@ export const messages = {
   "composer.picker.section.files": "파일",
   "composer.picker.section.tabs": "브라우저 탭",
   "composer.picker.section.threads": "스레드",
+  "composer.picker.section.messages": "메시지에서",
   "composer.token.tab": "브라우저 탭 {name}",
   "composer.token.thread": "스레드 {name}",
   "composer.token.unavailableTab": "닫힌 브라우저 탭 {name}",

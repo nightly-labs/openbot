@@ -7,6 +7,7 @@ import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
@@ -596,7 +597,12 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   );
   const { t } = useText();
   return (
-    <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
+    <ScrollEdges
+      axis="x"
+      class="message-table-frame message-markdown-table-frame"
+      viewClass="message-markdown-table-scroll"
+      label={t("chat.table.data")}
+    >
       <table
         class="message-markdown-table"
         style={`--message-markdown-table-columns: ${headers().length}`}
@@ -633,7 +639,7 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
           </For>
         </tbody>
       </table>
-    </section>
+    </ScrollEdges>
   );
 }
 

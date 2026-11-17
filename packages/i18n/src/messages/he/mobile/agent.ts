@@ -309,6 +309,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
   "mobile.agent.runtime.searchModels": "חיפוש מודלים",
   "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "הספק הזה לא עובד עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בו, שנו קודם את „הרשאות”.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",
   "mobile.agent.runtime.usageLimitWindow": "מגבלת {window}",
   "mobile.agent.runtime.usageLimitResets": "{limit} · מתאפס {time}",
@@ -607,6 +609,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "סימון הכול כנקרא",
   "mobile.agent.home.sort.title": "מיון צ'אטים",
   "mobile.agent.home.sort.manual": "ידני",
+  "mobile.agent.home.sort.recent": "פעילות אחרונה",
   "mobile.agent.home.sort.unreadGroup": "לא נקראו בקבוצה",
   "mobile.agent.home.sort.unreadFirst": "לא נקראו ראשונים בתיקיות",
   "mobile.agent.route.appearance": "מראה",

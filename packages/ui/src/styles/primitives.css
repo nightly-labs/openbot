@@ -3010,6 +3010,12 @@ button.ui-bubble-content {
   pointer-events: auto;
 }
 
+/* Not `display: none`: Sonner measures the height of a toast when it mounts, so a hidden toast keeps
+ * its layout and the stack is correct when the layer shows again. */
+.ui-toast-layer-hidden {
+  visibility: hidden;
+}
+
 /* The toasts float over areas that move the window: the window headers, and the full window on the
  * sign-in, setup, onboarding and loading screens. The window swallows mouse events over a
  * `-webkit-app-region: drag` area, so a pointer on a toast left the stack and collapsed it, and only its

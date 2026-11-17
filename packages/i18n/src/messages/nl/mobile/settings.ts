@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Ondersteuningslog wissen?",
   "mobile.settings.support.clearBody": "Hiermee verwijder je alle gebeurtenissen uit het log op deze telefoon.",
   "mobile.settings.support.logFooter":
-    "Het log blijft op deze telefoon en OpenBot verstuurt het niet. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
+    "Het log blijft op deze telefoon. OpenBot verstuurt er alleen regels van met een bugrapport over de telefoon-app dat je zelf verstuurt, en de rapportkaart toont ze eerst. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
   "mobile.settings.support.saveFailed": "Kan het logbestand niet opslaan. Probeer het opnieuw.",
   "mobile.settings.support.sharingUnavailable": "Delen is niet beschikbaar op deze telefoon.",
   "mobile.settings.support.newestFirst": "Nieuwste eerst.",
@@ -123,9 +123,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.chatBackground": "Chatachtergrond",
+  "mobile.settings.appearance.chatBackgroundDefault": "Standaard",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
+  "mobile.settings.appearance.fullVisuals": "Volledige visuele voorbeelden tonen",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Een visual van een agent staat op volle hoogte in de chat. Als dit uit staat, wordt een hoge visual afgekapt. Tik erop om alles te zien.",
   "mobile.settings.animations.title": "Animaties",
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
@@ -229,6 +236,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Grote bestanden automatisch downloaden",
   "mobile.settings.conversations.largeFilesFooter":
     "Afbeeldingen, video’s en audio groter dan {small} worden pas gedownload als je erop tikt. Zet dit aan om ze meteen te downloaden, tot {large}. Dit kan veel mobiele data gebruiken.",
+  "mobile.settings.conversations.swipeLeft": "Naar links vegen in een agentchat",
+  "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
+  "mobile.settings.conversations.swipeThreads": "Threads",
+  "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeFooter":
+    "Vegen weg van Terug in de chat van een agent opent dit. Vegen over een bericht beantwoordt het nog steeds.",
+  "mobile.settings.conversations.pullInfo": "Omhoog trekken voor info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Trek in een chat, kanaal of thread omhoog voorbij het laatste bericht en laat los om de info te openen.",
   "mobile.settings.conversations.fullQualityPhotos": "Foto’s in volle kwaliteit versturen",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Als dit uit staat, verstuurt de app een kleinere kopie van elke foto, tot 2048 pixels aan de lange zijde. Die komt sneller aan op een trage verbinding. Zet dit aan om de originele foto te versturen.",

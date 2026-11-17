@@ -304,6 +304,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
   "mobile.agent.runtime.searchModels": "搜索模型",
   "mobile.agent.runtime.noMatches": "没有匹配的模型。",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "在 Windows 和 Linux 上，此提供商无法以“仅工作区”运行。要使用它，请先更改“权限”。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
   "mobile.agent.runtime.usageLimitWindow": "{window}上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 重置",
@@ -576,6 +578,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "全部标为已读",
   "mobile.agent.home.sort.title": "排序聊天",
   "mobile.agent.home.sort.manual": "手动",
+  "mobile.agent.home.sort.recent": "最近活动",
   "mobile.agent.home.sort.unreadGroup": "未读集中显示",
   "mobile.agent.home.sort.unreadFirst": "文件夹内未读优先",
   "mobile.agent.route.appearance": "外观",

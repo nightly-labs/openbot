@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Destek günlüğü temizlensin mi?",
   "mobile.settings.support.clearBody": "Bu işlem, bu telefondaki günlükten tüm olayları kaldırır.",
   "mobile.settings.support.logFooter":
-    "Günlük bu telefonda kalır ve OpenBot onu göndermez. Bağlantı adımlarını, istekleri ve hataları kaydeder. Mesajları ve dosyaları kaydetmez; parolaları ve belirteçleri gizler. Paylaşmadan önce dosyayı okuyun.",
+    "Günlük bu telefonda kalır. OpenBot yalnızca sizin gönderdiğiniz telefon uygulaması hata raporuyla günlükten satırlar gönderir ve rapor kartı bunları önce gösterir. Bağlantı adımlarını, istekleri ve hataları kaydeder. Mesajları ve dosyaları kaydetmez; parolaları ve belirteçleri gizler. Paylaşmadan önce dosyayı okuyun.",
   "mobile.settings.support.saveFailed": "Günlük dosyası kaydedilemedi. Tekrar deneyin.",
   "mobile.settings.support.sharingUnavailable": "Bu telefonda paylaşım kullanılamıyor.",
   "mobile.settings.support.newestFirst": "En yeniler önce gösterilir.",
@@ -123,9 +123,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Açıklık",
   "mobile.settings.appearance.messageColorFooter":
     "Ajan rengi ile bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Özel renk ile tüm sohbetlerdeki mesajlarınız seçtiğiniz rengi kullanır. Metin rengi okunaklı kalması için değişir.",
+  "mobile.settings.appearance.chatBackground": "Sohbet arka planı",
+  "mobile.settings.appearance.chatBackgroundDefault": "Varsayılan",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Her tema kendi rengini korur. Metnin okunmasını zorlaştıran bir renk koyulaşır veya açılır.",
   "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",
+  "mobile.settings.appearance.fullVisuals": "Görsel önizlemeleri tam göster",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Bir ajanın görseli sohbette tam yüksekliğiyle görünür. Bu kapalıyken uzun bir görsel kesilir; tamamını görmek için ona dokunun.",
   "mobile.settings.animations.title": "Animasyonlar",
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
@@ -229,6 +236,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Büyük dosyaları otomatik indir",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} üzerindeki görseller, videolar ve sesler yalnızca dokunduğunuzda iner. {large} boyutuna kadar hemen indirmek için bunu açın. Bu çok mobil veri kullanabilir.",
+  "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
+  "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
+  "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
+  "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
+  "mobile.settings.conversations.swipeFooter":
+    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Bir mesajda kaydırmak yine ona yanıt verir.",
+  "mobile.settings.conversations.pullInfo": "Bilgi için yukarı çek",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Bir sohbet, kanal veya mesaj dizisinde son mesajın ötesine yukarı çekip bırakarak bilgisini açın.",
   "mobile.settings.conversations.fullQualityPhotos": "Fotoğrafları tam kalitede gönder",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Bu kapalıyken uygulama her fotoğrafın daha küçük bir kopyasını gönderir, uzun kenarda en fazla 2048 piksel. Yavaş bağlantıda daha hızlı ulaşır. Orijinal fotoğrafı göndermek için açın.",

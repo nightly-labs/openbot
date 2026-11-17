@@ -21,6 +21,7 @@ import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
+import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("dynamic-island-window");
 
@@ -78,6 +79,8 @@ export interface DynamicIslandWindowControllerOptions {
   showContextMenu?: (window: BrowserWindow) => void;
   /** Windows: forwards the pointer moves to an island window only while the cursor is on it. */
   pointerForwarding?: PointerForwardingGate | null;
+  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
+  topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
@@ -450,7 +453,10 @@ export class DynamicIslandWindowController {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
-    window.setAlwaysOnTop(true, "status");
+    // Only macOS uses the level. On Windows, Electron puts a "status" window just behind the taskbar, and
+    // the window then goes under other apps when a full-screen app makes the taskbar not topmost.
+    window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "status" : "normal");
+    this.#options.topmost?.keep(window);
     // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
     // defined on Windows, so a call there throws.
     if (this.#options.windowKind === "panel") {

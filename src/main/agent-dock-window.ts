@@ -21,6 +21,7 @@ import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
+import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("agent-dock-window");
 
@@ -59,6 +60,8 @@ export interface AgentDockWindowControllerOptions {
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
   /** Windows: forwards the pointer moves to a dock window only near the dock. */
   pointerForwarding?: PointerForwardingGate | null;
+  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
+  topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
@@ -403,7 +406,10 @@ export class AgentDockWindowController {
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
         window.setHasShadow(false);
-        window.setAlwaysOnTop(true, "floating");
+        // Only macOS uses the level. On Windows, Electron puts a "floating" window just behind the taskbar,
+        // and the window then goes under other apps when a full-screen app makes the taskbar not topmost.
+        window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "floating" : "normal");
+        this.#options.topmost?.keep(window);
         // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
         // defined on Windows, so a call there throws.
         if (this.#options.windowKind === "panel") {

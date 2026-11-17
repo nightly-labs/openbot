@@ -151,11 +151,13 @@ export class WhatsAppConnect implements WhatsAppPolicy {
 
   rules(workspaceId: string): WhatsAppSenderRules {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
-    if (!record) return { ownNumber: true, contacts: new Set(), groups: new Set() };
+    if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set() };
     const senders = this.#store.allowedSenders(record.connectionId);
     return {
       ownNumber: this.#ownNumber(record.connectionId),
-      contacts: new Set(senders.filter((sender) => sender.kind === "contact").map((sender) => sender.id)),
+      contacts: new Map(
+        senders.filter((sender) => sender.kind === "contact").map((sender) => [sender.id, savedName(sender.name)]),
+      ),
       groups: new Set(senders.filter((sender) => sender.kind === "group").map((sender) => sender.id)),
     };
   }
@@ -180,6 +182,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         workspaceId: record.workspaceId,
         ownNumber: this.#ownNumber(record.connectionId),
         workingMessage: this.workingMessage(record.connectionId),
+        statusReactions: this.statusReactions(record.connectionId),
         allowedSenders: this.#store.allowedSenders(record.connectionId).slice(0, MESSAGING_LIMITS.allowedSenders),
         pendingRequests: this.#requests.list(record.workspaceId),
       }));
@@ -265,6 +268,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     yield* this.#credentials.set(connectionId, { ...values, workingMessage: workingMessage ? "1" : "0" });
   });
 
+  readonly setStatusReactions = Effect.fn("WhatsAppConnect.setStatusReactions")(function* (
+    this: WhatsAppConnect,
+    workspaceId: string,
+    statusReactions: boolean,
+  ) {
+    const connectionId = yield* this.#connectionId(workspaceId);
+    const values = this.#credentials.get(connectionId);
+    if (!values) return yield* failure("error.messaging.whatsappNotConnected");
+    yield* this.#credentials.set(connectionId, { ...values, statusReactions: statusReactions ? "1" : "0" });
+  });
+
   readonly groups = Effect.fn("WhatsAppConnect.groups")(function* (this: WhatsAppConnect, workspaceId: string) {
     const connectionId = yield* this.#connectionId(workspaceId);
     const handle = this.#handle(connectionId);
@@ -310,8 +324,9 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         whatsappStoreKey: Buffer.from(key).toString("base64"),
         storeId: link.storeId,
         ownNumber: ownNumber ? "1" : "0",
-        // A number that links again keeps this setting, as it keeps its allowed senders.
+        // A number that links again keeps these settings, as it keeps its allowed senders.
         ...(earlier?.workingMessage === "0" ? { workingMessage: "0" } : {}),
+        ...(earlier?.statusReactions === "0" ? { statusReactions: "0" } : {}),
       });
       // The number's earlier device was replaced by this link, so its keys go, but only once the new
       // link is saved: a failed save keeps the device that worked before.
@@ -395,6 +410,12 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return values ? whatsAppCredentials(values).workingMessage : true;
   }
 
+  /** True unless the owner turned off the status reactions of this number. */
+  statusReactions(connectionId: string): boolean {
+    const values = this.#credentials.get(connectionId);
+    return values ? whatsAppCredentials(values).statusReactions : true;
+  }
+
   #connectionId(workspaceId: string): Effect.Effect<string, WhatsAppConnectFailed> {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
     return record && this.#credentials.status(record.connectionId) !== "missing"
@@ -414,4 +435,13 @@ function failureError(key: WhatsAppErrorKey): WhatsAppConnectFailed {
 
 function failure(key: WhatsAppErrorKey): Effect.Effect<never, WhatsAppConnectFailed> {
   return Effect.fail(failureError(key));
+}
+
+/**
+ * The name that the settings keep for a contact, or empty. An approved pairing request without a
+ * profile name saved only the number, which must not hide the profile name that WhatsApp sends later.
+ */
+function savedName(name: string): string {
+  const trimmed = name.trim();
+  return /^[0-9]+$/u.test(trimmed) ? "" : trimmed;
 }

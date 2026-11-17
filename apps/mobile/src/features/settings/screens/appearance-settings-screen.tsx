@@ -1,7 +1,8 @@
-import { CHAT_COLOR_PRESETS, type ChatColorPresetId } from "@openbot/brand/chat-colors";
-import { APP_INTERFACE_SIZES, type AppInterfaceSize } from "@openbot/contracts/ipc";
+import { CHAT_BACKGROUND_PRESETS, CHAT_COLOR_PRESETS, type ChatColorPresetId } from "@openbot/brand/chat-colors";
+import { APP_INTERFACE_SIZES, type AppInterfaceSize, type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
+import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
@@ -12,6 +13,7 @@ import { MessageColorPicker } from "@/features/settings/components/message-color
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { saveChatBackground, useChatBackground } from "@/features/settings/model/chat-background";
 import {
   type MessageColorMode,
   type MessageColorValue,
@@ -23,6 +25,7 @@ import {
   useRoutineCollapsePreference,
 } from "@/features/settings/model/routine-collapse";
 import { saveTextSize, useTextSize } from "@/features/settings/model/text-size";
+import { saveFullVisualPreference, useFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { PauseSlider } from "@/features/voice/components/pause-slider";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -148,8 +151,89 @@ export function AppearanceSettingsScreen() {
           />
         ) : null}
       </SettingsSection>
+      <ChatBackgroundSection dark={theme === "dark"} />
       <RoutineCollapseSection dark={theme === "dark"} />
+      <FullVisualSection dark={theme === "dark"} />
     </SettingsContent>
+  );
+}
+
+/**
+ * The chat background of the theme that the app shows now: the theme's own background, a preset or
+ * any color. The other theme keeps its color, as on the desktop.
+ */
+function ChatBackgroundSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const scheme = dark ? "dark" : "light";
+  const saved = useChatBackground((state) => state[scheme]);
+  const ready = useChatBackground((state) => state.ready);
+  const themeBackground = String(useThemeColor("background"));
+  const [error, setError] = useState<string | null>(null);
+  const change = (color: AvatarColor | null) => {
+    setError(null);
+    void haptics.selection();
+    void saveChatBackground(scheme, color).catch(() => {
+      setError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
+    });
+  };
+  const choices: { id: string; label: string; value: AvatarColor | null; swatch: string }[] = [
+    {
+      id: "default",
+      label: t("mobile.settings.appearance.chatBackgroundDefault"),
+      value: null,
+      swatch: themeBackground,
+    },
+    ...CHAT_BACKGROUND_PRESETS[scheme].map((preset) => ({
+      id: preset.id,
+      label: t(PRESET_LABELS[preset.id]),
+      value: preset.value,
+      swatch: preset.value,
+    })),
+  ];
+  return (
+    <SettingsSection
+      title={t("mobile.settings.appearance.chatBackground")}
+      footer={error ?? t("mobile.settings.appearance.chatBackgroundFooter")}
+    >
+      <View
+        className="flex-row flex-wrap gap-3 px-4 py-3"
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t("mobile.settings.appearance.chatBackground")}
+      >
+        {choices.map((choice) => {
+          const checked = choice.value === saved;
+          return (
+            <Pressable
+              key={choice.id}
+              accessibilityRole="radio"
+              accessibilityLabel={choice.label}
+              accessibilityState={{ checked, disabled: !ready }}
+              disabled={!ready}
+              hitSlop={4}
+              onPress={() => {
+                if (!checked) change(choice.value);
+              }}
+            >
+              {({ pressed }) => (
+                <View
+                  className="size-8 items-center justify-center rounded-full border border-border"
+                  style={{ backgroundColor: choice.swatch, opacity: pressed && !checked ? 0.6 : 1 }}
+                >
+                  {checked ? <Check size={18} strokeWidth={2.5} color={readableOn(choice.swatch)} /> : null}
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+      <MessageColorPicker
+        value={saved ?? (isAvatarColor(themeBackground) ? themeBackground : CHAT_BACKGROUND_PRESETS[scheme][0].value)}
+        disabled={!ready}
+        dark={dark}
+        onChange={change}
+      />
+    </SettingsSection>
   );
 }
 
@@ -169,6 +253,32 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
           onValueChange={(enabled) => {
             setError(null);
             void saveRoutineCollapsePreference(enabled).catch(() => {
+              setError(t("mobile.settings.saveFailed"));
+              void haptics.notification("error");
+            });
+          }}
+        />
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** Whether a visual reply in a chat grows to the full height of its page. */
+function FullVisualSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const preference = useFullVisualPreference();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingsSection footer={error ?? t("mobile.settings.appearance.fullVisualsFooter")}>
+      <SettingsRow>
+        <SettingsSwitch
+          value={preference.enabled}
+          disabled={!preference.ready || preference.saving}
+          label={t("mobile.settings.appearance.fullVisuals")}
+          dark={dark}
+          onValueChange={(enabled) => {
+            setError(null);
+            void saveFullVisualPreference(enabled).catch(() => {
               setError(t("mobile.settings.saveFailed"));
               void haptics.notification("error");
             });

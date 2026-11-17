@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Limpar o registro de suporte?",
   "mobile.settings.support.clearBody": "Isso remove todos os eventos do registro neste celular.",
   "mobile.settings.support.logFooter":
-    "O registro fica neste celular e o OpenBot não o envia. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
+    "O registro fica neste celular. O OpenBot envia linhas dele só com um relato de bug do app do celular que você envia, e o cartão do relato as mostra antes. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
   "mobile.settings.support.saveFailed": "Não foi possível salvar o arquivo de registro. Tente novamente.",
   "mobile.settings.support.sharingUnavailable": "O compartilhamento não está disponível neste celular.",
   "mobile.settings.support.newestFirst": "Mais recentes primeiro.",
@@ -125,9 +125,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.chatBackground": "Fundo do chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Padrão",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Cada tema mantém a sua própria cor. Uma cor que dificulta a leitura do texto fica mais escura ou mais clara.",
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",
+  "mobile.settings.appearance.fullVisuals": "Mostrar prévias visuais completas",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Um visual de um agente aparece no chat com a altura inteira. Quando isto está desligado, um visual alto é cortado, e você toca nele para ver tudo.",
   "mobile.settings.animations.title": "Animações",
   "mobile.settings.animations.footer":
     "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
@@ -232,6 +239,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
+  "mobile.settings.conversations.swipeLeft": "Deslizar para a esquerda no chat",
+  "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
+  "mobile.settings.conversations.swipeThreads": "Tópicos",
+  "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeFooter":
+    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. Deslizar em uma mensagem ainda responde a ela.",
+  "mobile.settings.conversations.pullInfo": "Puxar para cima para ver info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Em um chat, canal ou tópico, puxe para cima além da última mensagem e solte para abrir as informações.",
   "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos em qualidade máxima",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Quando desativado, o app envia uma cópia menor de cada foto, com até 2048 pixels no lado maior. Ela chega mais rápido em uma conexão lenta. Ative para enviar a foto original.",

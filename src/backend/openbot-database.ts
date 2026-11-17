@@ -235,6 +235,10 @@ export class OpenBotDatabase {
     return this.#conversations.readConversationMessages(agentId, threadId, messageIds);
   }
 
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return this.#conversations.readConversationMessagesOfItemType(agentId, threadId, itemType);
+  }
+
   readConversationRecoveryMessages(
     agentId: string,
     threadId: string | null,

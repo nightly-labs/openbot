@@ -17,11 +17,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "该步骤的助手消息在助手回答之前已被移除。",
   "error.workflow.conditionUnclear": "模型没有回答“是”或“否”。",
   "error.workflow.modelFailed": "模型无法回答，请再次运行该步骤。",
+  "error.workflow.modelTimedOut": "模型未能及时回答。请为该步骤选择更低的强度或更快的模型，然后再次运行。",
+  "error.workflow.modelToolUse": "模型尝试使用工具，但该步骤只能用文本回答。请再次运行该步骤，或为它选择其他模型。",
+  "error.workflow.modelUnavailable": "该步骤的模型不可用。请为该步骤选择其他模型。",
+  "error.workflow.providerBusy": "提供商正忙。请等待几分钟，然后再次运行该步骤。",
+  "error.workflow.providerOffline": "OpenBot 无法连接到提供商。请检查网络连接，然后再次运行该步骤。",
   "error.workflow.modelBusy": "另一个模型请求正在运行，请稍后再次运行该步骤。",
   "error.workflow.mediaFailed": "模型无法生成图片或视频，请再次运行该步骤。",
   "error.workflow.pictureMissing": "服务器上已没有这张图片，请重新发送。",
   "error.workflow.pictureType": "请使用 PNG、JPEG 或 WebP 图片。",
   "error.workflow.mediaInputMissing": "前一步的图片不可用，请再次运行该步骤。",
+  "error.workflow.mediaEmptyRequest": "请写一段描述，或先运行前面的步骤，让文本或图片传进来。",
   "error.workflow.mediaInputNotImage": "此步骤只接收图片，不接收视频。请删除来自视频的连接。",
   "error.workflow.stepMissing": "该步骤已不存在。",
   "error.workflow.nodeMissing": "该步骤不在工作流中。",
@@ -67,4 +73,14 @@ export const messages = {
   "error.workflow.sunraTeamInputs": "Sunra 仅在个人账户下使用输入图片。请在 Sunra 中选择你的个人账户，或移除图片连接。",
   "error.workflow.sunraFailed": "Sunra 无法生成文件：{reason}",
   "error.workflow.sunraTimeout": "Sunra 未能按时完成文件。再次运行此步骤前，请先查看 sunra.ai 上的 OpenBot 项目。",
+  "error.workflow.higgsfieldSignIn": "请在“应用”中登录 Higgsfield，以使用 Higgsfield 模型。",
+  "error.workflow.higgsfieldNoCredits":
+    "你的 Higgsfield 账户积分不足。请在 higgsfield.ai/pricing 添加积分，然后再次运行该步骤。",
+  "error.workflow.higgsfieldNeedsPlan":
+    "此 Higgsfield 模型需要 Higgsfield 套餐。请在 higgsfield.ai/pricing 选择套餐，或选择其他模型。",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield 的内容检查拦截了该文件，因此未生成。请修改提示词或输入图片，然后再次运行该步骤。",
+  "error.workflow.higgsfieldFailed": "Higgsfield 无法生成文件：{reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield 未能按时完成文件。再次运行该步骤前，请先查看 higgsfield.ai 上的历史记录。",
 } as const satisfies PartialTranslation<typeof source>;

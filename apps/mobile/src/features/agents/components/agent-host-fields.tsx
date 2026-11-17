@@ -21,6 +21,7 @@ import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
+import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
@@ -188,12 +189,14 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
   const { current, enabled, error, save } = useAgentHostSettings(props);
+  const steering = useAgentSteers(props.agent);
   if (!current) return null;
   const { agent } = props;
   const choice: BusyMessageChoice = current.busyMessageMode ?? "default";
   const mode = current.busyMessageMode ?? current.defaultBusyMessageMode;
-  const steerUnsupported =
-    mode === "steer" && agent.provider !== undefined && agentProviderDescriptor(agent.provider).steer !== "native";
+  // As on desktop: a custom agent that reports steering steers. While the phone cannot tell (an older
+  // host or models that did not load), the note does not show.
+  const steerUnsupported = mode === "steer" && steering.known && !steering.steers;
   return (
     <>
       <SettingsSection

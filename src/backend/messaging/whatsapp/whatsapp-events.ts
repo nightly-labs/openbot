@@ -17,8 +17,14 @@ import { type SenderDecision, senderDecision, type WhatsAppSenderRules } from ".
 
 /** The conversation of a direct chat: the whole chat. */
 export const WHATSAPP_DIRECT_THREAD = "dm";
-/** An `append` message older than the connect time minus this is history, not a new message. */
+/** On a new link, an `append` message older than the connect time minus this is history, not a new message. */
 const APPEND_GRACE_MS = 60_000;
+/**
+ * WhatsApp sends the messages that it held while this device was away (asleep, closed, a dead socket)
+ * as `append` after the connect. Only the first socket after a link gets history, so on a later socket
+ * an `append` message this recent is a held message that still gets an answer.
+ */
+const HELD_MAX_AGE_MS = 20 * 60_000;
 /** A message older than this is not answered: its asker has moved on. */
 const MESSAGE_MAX_AGE_MS = 24 * 60 * 60_000;
 const APPROVE_TEXT = /^(1|approve|yes)$/iu;
@@ -44,6 +50,8 @@ export interface WhatsAppInboundContext {
   threadOf(messageId: string): string | null;
   /** The phone number of a LID user, from WhatsApp's mapping. */
   numberForLid(lid: string): Promise<string | null>;
+  /** The message is older than a new one can be (see `freshUpsert`): it is saved, and nothing answers it. */
+  historyOnly?: boolean;
 }
 
 export type WhatsAppEvent =
@@ -52,10 +60,24 @@ export type WhatsAppEvent =
   /** An unknown person wrote to a dedicated number. */
   | { type: "pairing"; chatJid: string; senderId: string; name: string };
 
+/** The socket facts that tell a held message from history. */
+export interface WhatsAppUpsertWindow {
+  /** When the socket opened, in milliseconds. */
+  openedAt: number;
+  /** WhatsApp sent the number its history before this socket opened, so an `append` is not history. */
+  synced: boolean;
+  now: number;
+}
+
 /** True for an upsert that can carry a new message: live ones, and recent `append` ones. */
-export function freshUpsert(type: string, message: WAMessage, openedAt: number): boolean {
+export function freshUpsert(type: string, message: WAMessage, upsertWindow: WhatsAppUpsertWindow): boolean {
   if (type === "notify") return true;
-  return type === "append" && sentAt(message) >= openedAt - APPEND_GRACE_MS;
+  if (type !== "append") return false;
+  const sent = sentAt(message);
+  return (
+    sent >= upsertWindow.openedAt - APPEND_GRACE_MS ||
+    (upsertWindow.synced && sent >= upsertWindow.now - HELD_MAX_AGE_MS)
+  );
 }
 
 /** The dedup key of a message, stable across redeliveries. */
@@ -68,6 +90,8 @@ export function whatsAppDedupKey(message: WAMessage): string | null {
 /**
  * Turns one WhatsApp message into a message for the agents, an answer to an approval menu, a pairing
  * request, or nothing. The sender rules run first, so a chat that may not give work leaves no trace.
+ * A message that only goes into the saved history, such as the owner's own message in an allowed group,
+ * gives nothing.
  */
 export async function whatsAppInbound(
   message: WAMessage,
@@ -110,13 +134,15 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
+  const historyOnly = decision.type === "save" || context.historyOnly === true;
   const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   if (protocol) {
     applyChange(protocol, chatJid, authorId, context.chats);
     return null;
   }
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
-  if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
+  if (decision.type === "pair")
+    return authorNumber && !historyOnly ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 
   context.chats.rememberName(authorId, key.fromMe ? null : message.pushName);
   const contextInfo = contextOf(content);
@@ -142,7 +168,7 @@ export async function whatsAppInbound(
 
   // A numbered answer to an approval menu: the quoted menu, or the newest one of the conversation.
   const approve = APPROVE_TEXT.test(text.trim());
-  if ((approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
+  if (!historyOnly && (approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
     const menu =
       (quotedId ? ((m) => (m ? { messageId: quotedId, menu: m } : null))(context.chats.menu(quotedId)) : null) ??
       context.chats.latestMenu(chatJid, threadKey);
@@ -174,7 +200,7 @@ export async function whatsAppInbound(
     sentAt: isoTime(message),
     ...(files.length ? { files } : {}),
   };
-  if (isGroup && !addressed && !quotedThread) {
+  if (historyOnly || (isGroup && !addressed && !quotedThread)) {
     context.chats.rememberMessage(remembered);
     return null;
   }

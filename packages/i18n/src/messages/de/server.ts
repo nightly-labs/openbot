@@ -259,9 +259,6 @@ export const messages = {
   "server.settings.membersDescription": "Veröffentliche diesen Server, lade Personen ein und verwalte den Zugriff.",
   "server.settings.desktopTitle": "Remotedesktop",
   "server.settings.desktopDescription": "Richte den Desktop dieses Servers ein oder verbinde dich damit.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Verbinde MCP-Server und wähle, welche die Agenten dieses Servers verwenden dürfen.",
   "server.settings.storageTitle": "Speicher",
   "server.settings.storageDescription":
     "Sieh nach, was OpenBot auf der Festplatte dieses Servers speichert, und gib Speicherplatz frei.",
@@ -306,13 +303,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "Kopieren fehlgeschlagen",
   "server.settings.copyFailed": "OpenBot konnte diesen Wert nicht kopieren.",
   "server.settings.unavailableTitle": "Servereinstellungen nicht verfügbar",
-  "server.settings.unsavedMcpChanges": "Nicht gespeicherte MCP-Änderungen",
   "server.settings.reset": "Zurücksetzen",
   "server.settings.unsavedChanges": "Nicht gespeicherte Änderungen",
   "server.settings.changesNotSaved": "Änderungen nicht gespeichert",
   "server.settings.group.agents": "Agenten",
   "server.settings.group.people": "Personen",
   "server.settings.group.server": "Server",
+  "server.settings.experimentalTitle": "Experimentell",
+  "server.settings.experimentalDescription": "Funktionen einschalten, die noch nicht fertig sind.",
+  "server.settings.experimentalFeatures": "Funktionen",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Die CRM-Seite für Eigentümer und Admins zeigen, Agenten das CRM lesen lassen und Stripe synchronisieren. Beim Ausschalten bleiben die Daten erhalten.",
   "server.settings.agentDefaultsTitle": "Standardwerte für Agenten",
   "server.settings.threadsCard": "Threads und Zeitzone",
   "server.settings.memoryTitle": "Gedächtnis",
@@ -351,7 +353,7 @@ export const messages = {
     "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
-    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
+    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
   "server.settings.turnLimit": "Threads gleichzeitig",

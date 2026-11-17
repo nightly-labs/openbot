@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Een idee? Laten we het waarmaken.",
   "prompt.approval.report.dontSend": "Niet nu",
   "prompt.approval.report.send": "Naar het OpenBot-team sturen",
+  "prompt.approval.report.phoneOnly":
+    "Open deze chat in de OpenBot-app op de telefoon en stuur het rapport daar. De telefoon voegt zijn versie, zijn systeem en zijn ondersteuningslog toe. Kan de telefoon geen verbinding maken, open dan Instellingen > Ondersteuning in de telefoon-app en meld het probleem op GitHub.",
   "prompt.approval.title.command": "Een commando uitvoeren",
   "prompt.approval.title.fileChange": "Bestanden wijzigen",
   "prompt.approval.title.permissions": "Machtigingen verlenen",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Inloggen bij {host} geannuleerd",
   "prompt.browser.signInBlocked.body":
     "Log in op deze computer. OpenBot stuurt alleen de inloggegevens van {host} naar {server}, en {name} gaat verder.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} accepteert geen aanmelding vanaf de server. Open deze chat in de OpenBot-desktopapp op je computer en log daar in. Daarna gaat {name} verder.",
   "prompt.browser.signInBlocked.cancelledBody": "Het inloggen is geannuleerd.",
   "prompt.browser.signInBlocked.waiting": "Wachten op inloggen",
   "prompt.browser.signInBlocked.waitingButton": "Wachten op inloggen…",

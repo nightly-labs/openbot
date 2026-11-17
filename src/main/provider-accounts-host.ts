@@ -20,6 +20,10 @@ export interface ProviderAccountsHostDependencies {
     | "updateAgent"
     | "signInProviderAccountOnHost"
     | "connectProviderAccountKey"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "renameProviderAccount"
     | "removeProviderAccount"
     | "setProviderAccountPool"
@@ -144,6 +148,30 @@ export class ProviderAccountsHost {
   /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
   connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
     return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
+  }
+
+  /**
+   * Starts the code sign-in of an account (`provider-account-code-v1`): a new account when
+   * `accountId` is null. The provider's CLI gives the page and the code; no tab opens on this host.
+   */
+  startCodeSignIn(provider: AgentProviderId, accountId: string | null) {
+    return this.#dependencies.service.startProviderAccountCodeLogin(provider, accountId);
+  }
+
+  /** Types the code of a `paste` sign-in into the provider's CLI. The code is a credential. */
+  submitCodeSignIn(provider: AgentProviderId, accountId: string, code: string): void {
+    this.#dependencies.service.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** How the code sign-in of the account ended; `result` is null while it runs. */
+  codeSignInStatus(provider: AgentProviderId, accountId: string) {
+    const { result } = this.#dependencies.service.providerAccountCodeLoginStatus(provider, accountId);
+    return { result: result && { error: result.error?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null } };
+  }
+
+  /** Stops the code sign-in: a new account goes, another one shows as signed out. */
+  cancelCodeSignIn(provider: AgentProviderId, accountId: string) {
+    return this.#dependencies.service.cancelProviderAccountSignIn(provider, accountId).pipe(Effect.asVoid);
   }
 
   /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */

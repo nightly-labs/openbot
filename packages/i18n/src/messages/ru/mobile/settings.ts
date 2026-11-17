@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Очистить журнал поддержки?",
   "mobile.settings.support.clearBody": "Все события будут удалены из журнала на этом телефоне.",
   "mobile.settings.support.logFooter":
-    "Журнал хранится на этом телефоне, OpenBot его не отправляет. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
+    "Журнал хранится на этом телефоне. OpenBot отправляет его строки только с отчётом об ошибке в приложении на телефоне, который отправляете вы, и карточка отчёта сначала их показывает. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
   "mobile.settings.support.saveFailed": "Не удалось сохранить файл журнала. Повторите попытку.",
   "mobile.settings.support.sharingUnavailable": "На этом телефоне нельзя поделиться файлом.",
   "mobile.settings.support.newestFirst": "Сначала новые.",
@@ -133,9 +133,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.chatBackground": "Фон чата",
+  "mobile.settings.appearance.chatBackgroundDefault": "По умолчанию",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
+  "mobile.settings.appearance.fullVisuals": "Показывать визуальные превью полностью",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Визуальный ответ агента показывается в чате на всю высоту. Если выключено, высокий ответ обрезается; нажмите на него, чтобы увидеть всё.",
   "mobile.settings.animations.title": "Анимации",
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
@@ -239,6 +246,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
+  "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
+  "mobile.settings.conversations.swipeThreads": "Ветки",
+  "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeFooter":
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Свайп по сообщению по-прежнему отвечает на него.",
+  "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",
   "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",

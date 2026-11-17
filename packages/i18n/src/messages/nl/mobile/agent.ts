@@ -317,6 +317,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "Deze provider werkt niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig eerst ‘Machtigingen’ om hem te gebruiken.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
   "mobile.agent.runtime.usageLimitWindow": "Limiet ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Reset op {time}",
@@ -609,6 +611,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Markeer alles als gelezen",
   "mobile.agent.home.sort.title": "Chats sorteren",
   "mobile.agent.home.sort.manual": "Handmatig",
+  "mobile.agent.home.sort.recent": "Recente activiteit",
   "mobile.agent.home.sort.unreadGroup": "Ongelezen in een groep",
   "mobile.agent.home.sort.unreadFirst": "Ongelezen eerst in mappen",
   "mobile.agent.route.appearance": "Uiterlijk",

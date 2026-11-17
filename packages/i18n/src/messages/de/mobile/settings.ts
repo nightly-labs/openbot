@@ -64,7 +64,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Supportprotokoll leeren?",
   "mobile.settings.support.clearBody": "Dies entfernt alle Ereignisse aus dem Protokoll auf diesem Telefon.",
   "mobile.settings.support.logFooter":
-    "Das Protokoll bleibt auf diesem Telefon und wird von OpenBot nicht gesendet. Es erfasst Verbindungsschritte, Anfragen und Fehler. Es erfasst keine Nachrichten oder Dateien und maskiert Passwörter und Tokens. Lies die Datei, bevor du sie teilst.",
+    "Das Protokoll bleibt auf diesem Telefon. OpenBot sendet Zeilen daraus nur mit einem Fehlerbericht zur Telefon-App, den du sendest, und die Berichtskarte zeigt sie vorher an. Es erfasst Verbindungsschritte, Anfragen und Fehler. Es erfasst keine Nachrichten oder Dateien und maskiert Passwörter und Tokens. Lies die Datei, bevor du sie teilst.",
   "mobile.settings.support.saveFailed": "Die Protokolldatei konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.settings.support.sharingUnavailable": "Teilen ist auf diesem Telefon nicht verfügbar.",
   "mobile.settings.support.newestFirst": "Neueste zuerst.",
@@ -128,9 +128,16 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Helligkeit",
   "mobile.settings.appearance.messageColorFooter":
     "Mit Agentenfarbe verwenden deine Nachrichten in einem Agentenchat die Farbe dieses Agenten. Mit eigener Farbe verwenden deine Nachrichten in allen Chats die gewählte Farbe. Die Textfarbe passt sich an, damit der Text lesbar bleibt.",
+  "mobile.settings.appearance.chatBackground": "Chathintergrund",
+  "mobile.settings.appearance.chatBackgroundDefault": "Standard",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Jedes Design behält seine eigene Farbe. Eine Farbe, die Text schwer lesbar macht, wird dunkler oder heller.",
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
+  "mobile.settings.appearance.fullVisuals": "Ganze visuelle Vorschauen zeigen",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Ein Visual eines Agenten erscheint im Chat in voller Höhe. Wenn dies aus ist, wird ein hohes Visual abgeschnitten. Tippe darauf, um alles zu sehen.",
   "mobile.settings.animations.title": "Animationen",
   "mobile.settings.animations.footer":
     "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
@@ -236,6 +243,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
+  "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
+  "mobile.settings.conversations.swipeThreads": "Threads",
+  "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeFooter":
+    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Ein Wischen auf einer Nachricht antwortet weiter darauf.",
+  "mobile.settings.conversations.pullInfo": "Nach oben ziehen für Info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Ziehe in einem Chat, Kanal oder Thread über die letzte Nachricht hinaus nach oben und lass los, um die Info zu öffnen.",
   "mobile.settings.conversations.fullQualityPhotos": "Fotos in voller Qualität senden",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Wenn dies aus ist, sendet die App eine kleinere Kopie jedes Fotos, bis zu 2048 Pixel an der langen Seite. Sie kommt bei einer langsamen Verbindung schneller an. Schalte dies ein, um das Originalfoto zu senden.",

@@ -38,6 +38,12 @@ export interface AgentClient {
    * the result on as it is, and its `request_user_input` response has no field for a note.
    */
   readonly userInputNote?: boolean;
+  /**
+   * The provider variable that sends the model requests to an address that the user set, such as
+   * Codex's `OPENAI_BASE_URL`. A wrong address can fail as a lost connection: Codex reads a web page
+   * from it as a stream that ends early (#10165). Absent when the provider uses its own address.
+   */
+  readonly modelAddressVariable?: string;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**
@@ -52,6 +58,11 @@ export interface AgentClient {
    * because the other providers take the current servers on resume.
    */
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
+  /**
+   * True when the agent of `model` gets each OpenBot catalog tool as an MCP tool of its own (`AcpFlavor`
+   * `catalogAsMcpTools`). Optional, because the other providers do not hide OpenBot's tools.
+   */
+  readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;
@@ -155,6 +166,17 @@ export class RequestTimeoutError extends Error {
 export class ProviderTurnActiveError extends Error {
   constructor(readonly providerName: string) {
     super(`${providerName} is in a turn that it started itself.`);
+  }
+}
+
+/**
+ * The provider refused to open the session because a prompt that OpenBot stopped still runs in it.
+ * Nothing ran. No event tells when that prompt ends, so the caller tries the message again later.
+ */
+export class ProviderSessionBusyError extends ProviderTurnActiveError {
+  constructor(providerName: string) {
+    super(providerName);
+    this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
   }
 }
 
