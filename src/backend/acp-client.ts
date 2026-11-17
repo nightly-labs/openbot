@@ -278,6 +278,8 @@ interface AcpTurn {
    * server then sends the failure as answer text and ends the turn as a success.
    */
   sdkFailureAt: number | null;
+  /** Where the answer text stood when a tool call that the model wrote as text started (`AcpFlavor.sdkHarness.textToolCall`). */
+  textToolCallAt: number | null;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -2738,6 +2740,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       accountLink: null,
       sessionLost: false,
       sdkFailureAt: null,
+      textToolCallAt: null,
       answerOptional,
       messages: [],
       toolNames: new Map(),
@@ -2905,7 +2908,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       const sdkHarness = this.#flavor.sdkHarness;
-      if (sdkHarness && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
+      const textToolCallAt = turn.textToolCallAt;
+      if (
+        sdkHarness &&
+        !turn.providerError &&
+        !turn.stopped &&
+        response.stopReason === "end_turn" &&
+        // A failure that follows the call keeps its own cause, below.
+        turn.sdkFailureAt === null &&
+        textToolCallAt !== null &&
+        sdkHarness.textToolCall?.whole.test(turn.text.slice(textToolCallAt))
+      ) {
+        // The model ended the turn on a tool call that it wrote as text, which did not run (#11087).
+        // The turn ends as a turn with no answer does, and the answer does not show the call.
+        if (!turn.answerOptional) {
+          turn.failureCause = "empty_answer";
+          turn.providerError = sourceText("error.provider.acpNoAnswer", { provider: this.#label });
+        }
+      } else if (sdkHarness && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
         // The server's SDK failed the prompt and sent its message as the answer (1.3.0). The text
         // before the failure is the partial answer; the rest is the message.
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
@@ -3279,6 +3299,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     turn.text = "";
     turn.sdkFailureAt = null;
+    turn.textToolCallAt = null;
     turn.receivedOutput = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
@@ -3564,12 +3585,32 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (!turn.text && this.#flavor.sdkHarness?.mcpLoadFailure(text)))
       )
         turn.sdkFailureAt = turn.text.length;
-      if (update.content.text.trim() && turn.sdkFailureAt === null) {
+      // A tool call that the model wrote as text is held back until its message ends (#11087). The CLI
+      // can split the call's first word, so the start of a message waits while it can still be one.
+      const textToolCall = turn.sdkFailureAt === null ? this.#flavor.sdkHarness?.textToolCall : undefined;
+      let released = "";
+      if (
+        textToolCall &&
+        turn.textToolCallAt === null &&
+        textToolCall.starts.some((start) => text.trimStart().startsWith(start))
+      )
+        turn.textToolCallAt = turn.text.length;
+      else if (textToolCall && (turn.textToolCallAt === 0 || (turn.textToolCallAt === null && !turn.text))) {
+        const message = (turn.text + text).trimStart();
+        if (textToolCall.starts.some((start) => message.startsWith(start) || start.startsWith(message)))
+          turn.textToolCallAt = 0;
+        else if (turn.textToolCallAt === 0) {
+          turn.textToolCallAt = null;
+          released = turn.text;
+        }
+      }
+      const held = turn.sdkFailureAt !== null || turn.textToolCallAt !== null;
+      if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
       }
-      if (this.#flavor.streamAnswerBeforePromptReturns && text && turn.sdkFailureAt === null) {
-        if (!turn.text)
+      if (this.#flavor.streamAnswerBeforePromptReturns && text && !held) {
+        if (!turn.text || released)
           this.emit("notification", {
             method: "item/started",
             params: {
@@ -3580,7 +3621,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           });
         this.emit("notification", {
           method: "item/agentMessage/delta",
-          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: text },
+          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: released + text },
         });
       }
       turn.text += text;
@@ -3666,6 +3707,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
     }
+    // A tool call that the model wrote as text did not run, so it is not shown (#11087). Held text
+    // that is not one is the answer.
+    const textToolCallAt = turn.textToolCallAt;
+    if (textToolCallAt !== null) {
+      const held = turn.text.slice(textToolCallAt);
+      if (this.#flavor.sdkHarness?.textToolCall?.whole.test(held)) {
+        turn.text = turn.text.slice(0, textToolCallAt);
+        if (!turn.text.trim()) {
+          this.#endMessage(turn);
+          return;
+        }
+      } else if (held.trim() && turn.sdkFailureAt === null) {
+        turn.receivedOutput = true;
+        if (phase === "commentary") turn.interruptedAnswer = null;
+      }
+    }
     // A later step follows the empty-step failure, so the model went on: the failure is not news, and
     // a quiet routine run that then succeeded showed it (#11010). The same rule as at the turn's end.
     const failureAt = turn.sdkFailureAt;
@@ -3700,6 +3757,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // An SDK failure ends the turn, so text that a later step follows was not one. A model's or the
     // CLI's warning line ("\n⚠ ...") made the next step's answer the error (#7479).
     turn.sdkFailureAt = null;
+    turn.textToolCallAt = null;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
     turn.messageChunks = 0;
