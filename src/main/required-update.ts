@@ -1,11 +1,6 @@
-// The minimum app version (plan 011, item 24). The account service names the lowest version that it
-// still supports for this surface: about 2 months (60 days) of releases. Below it, the renderer shows
-// "Update required" and `RequestedUpdate` installs the next release at the next safe point: after the
-// agent turns and the other work that `describeReadiness` lists, never mid-turn.
-//
-// Only a confirmed answer blocks. When the request fails, times out, or the answer cannot be read,
-// the state stays as it was, so an offline app is never blocked. The request names only the surface;
-// the version comparison runs here.
+// The minimum app version (plan 011, item 24). Below the minimum that the account service names, the
+// renderer shows "Update required" and `RequestedUpdate` installs the next release when the agents
+// are idle. A failed check never blocks: it keeps the last confirmed state.
 
 import {
   APP_MINIMUM_VERSION_PATH,
@@ -15,43 +10,29 @@ import {
 import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { Effect, Exit, Result, Schema, Scope } from "effect";
 
-/** The surfaces of this process. A phone asks with its own platform. */
-type DesktopAppSurface = "desktop" | "host";
-
-const DEFAULT_INITIAL_DELAY_MS = 15_000;
-const DEFAULT_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const INITIAL_DELAY_MS = 15_000;
+const INTERVAL_MS = 6 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
 class RequiredUpdateCheckError extends Schema.TaggedError<RequiredUpdateCheckError>()("RequiredUpdateCheckError", {
   cause: Schema.Defect(),
 }) {}
 
-/** The part of `fetch` that the check uses. */
 export type RequiredUpdateFetch = (url: URL, init: RequestInit) => Promise<Response>;
 
-interface RequiredUpdateUpdater {
-  getStatus(): UpdateStatus;
-  setRequiredVersion(version: string | null): void;
-}
-
 export interface RequiredUpdateOptions {
-  surface: DesktopAppSurface;
+  surface: "desktop" | "host";
   currentVersion: string;
-  /** The account service address of a path, such as `centralAuth.resolveApiUrl`. */
   resolveApiUrl: (path: string) => string;
-  updater: RequiredUpdateUpdater;
+  updater: { getStatus(): UpdateStatus; setRequiredVersion(version: string | null): void };
   /** Installs the next release by itself while true. */
   setRequired: (required: boolean) => void;
   /** A line for the main log. It has no account data. */
   log: (message: string) => void;
   fetch?: RequiredUpdateFetch;
-  initialDelayMs?: number;
-  intervalMs?: number;
 }
 
-export type RequiredUpdateOutcome =
-  | { kind: "supported" | "required"; minimumVersion: string | null }
-  | { kind: "unknown"; reason: string };
+type RequiredUpdateOutcome = "supported" | "required" | "unknown";
 
 export class RequiredUpdate {
   readonly #options: RequiredUpdateOptions;
@@ -67,10 +48,9 @@ export class RequiredUpdate {
   }
 
   start(): void {
-    this.#schedule(this.#options.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS);
+    this.#schedule(INITIAL_DELAY_MS);
   }
 
-  /** Asks once and applies the answer. A failure keeps the state of the last confirmed answer. */
   readonly check = Effect.fn("RequiredUpdate.check")(function* (this: RequiredUpdate) {
     const url = new URL(this.#options.resolveApiUrl(APP_MINIMUM_VERSION_PATH));
     url.searchParams.set("surface", this.#options.surface);
@@ -89,17 +69,15 @@ export class RequiredUpdate {
     );
     if (Result.isFailure(answer)) {
       const { cause } = answer.failure;
-      const reason = cause instanceof Error ? cause.message : String(cause);
-      this.#options.log(`The minimum version check failed; the app stays as it is: ${reason}`);
-      return { kind: "unknown", reason } satisfies RequiredUpdateOutcome;
+      this.#options.log(`The minimum version check failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+      return "unknown" satisfies RequiredUpdateOutcome;
     }
-    const minimumVersion = answer.success;
-    // A tenant whose host manages updates cannot install one; its host asks for itself.
+    // A tenant whose host manages updates cannot install one; its host checks for itself.
     const required =
       !this.#options.updater.getStatus().managedByHost &&
-      isBelowMinimumVersion(this.#options.currentVersion, minimumVersion);
-    this.#apply(required ? minimumVersion : null);
-    return { kind: required ? "required" : "supported", minimumVersion } satisfies RequiredUpdateOutcome;
+      isBelowMinimumVersion(this.#options.currentVersion, answer.success);
+    this.#apply(required ? answer.success : null);
+    return (required ? "required" : "supported") satisfies RequiredUpdateOutcome;
   }).bind(this);
 
   readonly dispose = Effect.fn("RequiredUpdate.dispose")(function* (this: RequiredUpdate) {
@@ -114,7 +92,7 @@ export class RequiredUpdate {
     this.#required = minimumVersion;
     this.#options.log(
       minimumVersion
-        ? `OpenBot ${this.#options.currentVersion} is below the minimum version ${minimumVersion}; the update is required.`
+        ? `OpenBot ${this.#options.currentVersion} is below the minimum version ${minimumVersion}.`
         : "OpenBot is at or above the minimum version.",
     );
     this.#options.updater.setRequiredVersion(minimumVersion);
@@ -125,7 +103,7 @@ export class RequiredUpdate {
     if (this.#disposed) return;
     this.#timer = setTimeout(() => {
       this.#timer = null;
-      const next = Effect.sync(() => this.#schedule(this.#options.intervalMs ?? DEFAULT_INTERVAL_MS));
+      const next = Effect.sync(() => this.#schedule(INTERVAL_MS));
       Effect.runFork(
         Effect.forkIn(this.check().pipe(Effect.ensuring(next)), this.#workScope, { startImmediately: true }),
       );

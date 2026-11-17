@@ -274,7 +274,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #rolloutMiss: string | null = null;
   /** A newer release in its staged rollout that the last check did not offer to this install. */
   #stagedVersion: string | null = null;
-  /** The lowest version that the account service still supports, while this install is below it. */
+  /** The supported minimum, while this install is below it. */
   #requiredVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
@@ -412,11 +412,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return status;
   }
 
-  /**
-   * Shows that this version is below the lowest supported one, and which version that is.
-   * `RequiredUpdate` owns the check and `RequestedUpdate` the install; this only carries it to the
-   * renderer, which then shows "Update required". It is not a phase change.
-   */
+  /** Carries the minimum from `RequiredUpdate` to the renderer. It is not a phase change. */
   setRequiredVersion(version: string | null): void {
     if (this.#requiredVersion === version) return;
     this.#requiredVersion = version;

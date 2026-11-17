@@ -19,9 +19,8 @@ export interface UpdateRequiredScreenProps {
 }
 
 /**
- * Shown in place of the app while this version is below the lowest one that the account service
- * supports. The update downloads by itself and installs when the agents are idle; the button skips
- * the wait. It uses the layout of the sign-in screen.
+ * Shown in place of the app while this version is below the supported minimum. The update installs
+ * when the agents are idle; the button skips the wait. It uses the sign-in screen layout.
  */
 export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
   const { t, format, errorMessage } = useText();

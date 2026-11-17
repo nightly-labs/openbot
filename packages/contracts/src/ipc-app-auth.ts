@@ -99,9 +99,8 @@ export interface UpdateStatus {
    */
   stagedVersion?: string;
   /**
-   * The lowest version that the account service still supports, while this version is below it.
-   * The app then shows "Update required" and installs the update. Absent when the version is
-   * supported, and when the check failed or could not run: only a confirmed answer blocks the app.
+   * The supported minimum, while this version is below it: the app shows "Update required". Absent
+   * when the version is supported or no check succeeded.
    */
   requiredVersion?: string;
 }

@@ -234,10 +234,8 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   }).bind(this);
 
   /**
-   * The account service says that this version is below the lowest supported one (`RequiredUpdate`).
-   * The host then installs the next release by itself, as the automatic install does: it checks,
-   * downloads, and restarts when no agent turn or other work runs. It never stops work mid-turn. A
-   * failed or cancelled install of a version is not tried again by itself, so it cannot loop.
+   * This version is below the supported minimum (`RequiredUpdate`). Installs the next release as the
+   * automatic install does: only when no agent turn or other work runs, and once per version.
    */
   setRequired(required: boolean): void {
     if (this.#required === required) return;
@@ -252,8 +250,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       return;
     }
     if (status.managedByHost || status.phase === "unsupported") return;
-    // A periodic check may not have run yet, or found nothing before the release; this one also gets
-    // a release that is still in its staged rollout.
+    // A periodic check may not have found the release yet.
     if (status.phase === "idle" || status.phase === "up-to-date" || status.errorCode === "check_failed")
       yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
     else yield* this.#advance(status);
@@ -305,10 +302,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     }
   });
 
-  /**
-   * Downloads a new version and schedules the restart when the host user or an admin turned it on, or
-   * when the update is required.
-   */
+  /** Downloads a new version and schedules the restart when the host user or an admin turned it on. */
   readonly #installAutomatically = Effect.fn("RequestedUpdate.installAutomatically")(function* (
     this: RequestedUpdate,
     status: UpdateStatus,
@@ -388,7 +382,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     return this.#autoInstall || this.#clientInUse !== null;
   }
 
-  /** The automatic install, or a required update. Only the first is a setting that admins see. */
   #installsByItself(): boolean {
     return this.#installsAutomatically() || this.#required;
   }

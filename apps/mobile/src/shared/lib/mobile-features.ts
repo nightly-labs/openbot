@@ -106,10 +106,7 @@ export function useLatestAppVersion(apiUrl: string): string | null {
   return devLatestAppVersion() ?? latest;
 }
 
-/**
- * The lowest store version that the account server of this session still supports. Null until it
- * answers, after a failed read with no earlier answer, and from an account server that sends none.
- */
+/** The lowest supported store version. Null until the account server answers, or when it sends none. */
 export function useMinimumAppVersion(apiUrl: string): string | null {
   return useMobileFeatures((state) => (state.apiUrl === apiUrl ? state.minimumVersion : null));
 }

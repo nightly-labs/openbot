@@ -156,6 +156,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
 
+          - name: Check minimum app versions
+            if: env.CODE == 'true'
+            run: bun run check:app-minimum-version
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where

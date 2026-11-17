@@ -68,7 +68,7 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const updates = useUpdates();
-  // Main sets it only on a confirmed answer that this version is below the supported minimum.
+  // Main sets it only after a check confirms that this version is below the supported minimum.
   const updateRequired = () => updates.status().requiredVersion !== undefined;
   // The splash also waits for the catalogs of the first language, so the first screen is not in
   // English. A later language change does not bring the splash back.
@@ -113,117 +113,109 @@ export function AppAccessGate() {
 
   return (
     <>
-      <Show when={started()}>
+      <Show when={started() && updateRequired()}>
+        <UpdateRequiredScreen
+          status={updates.status()}
+          logoVariant={platform.appInfo()?.variant ?? "production"}
+          onUpdate={updates.runAction}
+          onOpenDownloadPage={() => void appPort().openExternal("download")}
+        />
+      </Show>
+      <Show when={started() && !updateRequired()}>
         <Show
-          when={!updateRequired()}
+          when={auth.visibleSignedInAccount()}
           fallback={
-            <UpdateRequiredScreen
-              status={updates.status()}
-              logoVariant={platform.appInfo()?.variant ?? "production"}
-              onUpdate={updates.runAction}
-              onOpenDownloadPage={() => void appPort().openExternal("download")}
-            />
+            <Loading fallback={<LoadingScreen />}>
+              <Show
+                when={languageStepShown()}
+                fallback={
+                  <AccountLogin
+                    variant={platform.appInfo()?.variant ?? "production"}
+                    state={auth.centralAuth()}
+                    onRetry={auth.retryCentralAccount}
+                    onRequestEmailCode={auth.requestEmailCode}
+                    onVerifyEmailCode={auth.verifyEmailCode}
+                    onReset={auth.logoutCentralAccount}
+                    onOpenCompanySignIn={auth.openCompanySignIn}
+                    language={i18n.locale()}
+                    onChangeLanguage={languageStep.reopen}
+                  />
+                }
+              >
+                <LanguageStep
+                  variant={platform.appInfo()?.variant ?? "production"}
+                  reopened={languageStep.reopened()}
+                  onDone={languageStep.complete}
+                />
+              </Show>
+            </Loading>
           }
         >
-          <Show
-            when={auth.visibleSignedInAccount()}
-            fallback={
-              <Loading fallback={<LoadingScreen />}>
+          {(account) => (
+            <Show
+              when={setup.setupState()?.completed}
+              fallback={
                 <Show
-                  when={languageStepShown()}
+                  when={scope.connection.hasContent}
                   fallback={
-                    <AccountLogin
-                      variant={platform.appInfo()?.variant ?? "production"}
-                      state={auth.centralAuth()}
-                      onRetry={auth.retryCentralAccount}
-                      onRequestEmailCode={auth.requestEmailCode}
-                      onVerifyEmailCode={auth.verifyEmailCode}
-                      onReset={auth.logoutCentralAccount}
-                      onOpenCompanySignIn={auth.openCompanySignIn}
-                      language={i18n.locale()}
-                      onChangeLanguage={languageStep.reopen}
+                    <WorkspaceShell
+                      account={account}
+                      behindSplash={splashMoving}
+                      onStartupReady={() => setWorkspaceReady(true)}
                     />
                   }
                 >
-                  <LanguageStep
-                    variant={platform.appInfo()?.variant ?? "production"}
-                    reopened={languageStep.reopened()}
-                    onDone={languageStep.complete}
-                  />
-                </Show>
-              </Loading>
-            }
-          >
-            {(account) => (
-              <Show
-                when={setup.setupState()?.completed}
-                fallback={
-                  <Show
-                    when={scope.connection.hasContent}
-                    fallback={
-                      <WorkspaceShell
-                        account={account}
-                        behindSplash={splashMoving}
-                        onStartupReady={() => setWorkspaceReady(true)}
-                      />
-                    }
-                  >
-                    <Show when={!setup.setupReadFailed()} fallback={<SetupReadError />}>
-                      <Show
-                        when={setup.pendingInviteUrl().trim()}
-                        fallback={
-                          <Loading fallback={<LoadingScreen />}>
-                            <FirstRunFlow
-                              {...setupProviders}
-                              state={
-                                setup.setupState() ?? {
-                                  completed: false,
-                                  preferredProvider: null,
-                                  preferredModel: null,
-                                }
-                              }
-                              platform={platform.appInfo()?.platform ?? "darwin"}
-                              onSave={setup.saveSetup}
-                              onAnalyticsChoice={(enabled, chosen) =>
-                                settings.updateGeneralSettings(
-                                  { ...settings.generalSettings(), productAnalytics: enabled },
-                                  { analyticsChosen: chosen },
-                                )
-                              }
-                              onProviderStepShown={detection.scanOnce}
-                              logoVariant={platform.appInfo()?.variant ?? "production"}
-                            />
-                          </Loading>
-                        }
-                      >
+                  <Show when={!setup.setupReadFailed()} fallback={<SetupReadError />}>
+                    <Show
+                      when={setup.pendingInviteUrl().trim()}
+                      fallback={
                         <Loading fallback={<LoadingScreen />}>
-                          <InitialSetup
+                          <FirstRunFlow
                             {...setupProviders}
                             state={
                               setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
                             }
                             platform={platform.appInfo()?.platform ?? "darwin"}
-                            accountEmail={account().email}
-                            inviteUrl={setup.pendingInviteUrl()}
                             onSave={setup.saveSetup}
-                            onPreviewInvite={setup.previewInvite}
-                            onJoinRemote={joinRemoteDuringSetup}
-                            onLogout={auth.logoutCentralAccount}
+                            onAnalyticsChoice={(enabled, chosen) =>
+                              settings.updateGeneralSettings(
+                                { ...settings.generalSettings(), productAnalytics: enabled },
+                                { analyticsChosen: chosen },
+                              )
+                            }
+                            onProviderStepShown={detection.scanOnce}
+                            logoVariant={platform.appInfo()?.variant ?? "production"}
                           />
                         </Loading>
-                      </Show>
+                      }
+                    >
+                      <Loading fallback={<LoadingScreen />}>
+                        <InitialSetup
+                          {...setupProviders}
+                          state={
+                            setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
+                          }
+                          platform={platform.appInfo()?.platform ?? "darwin"}
+                          accountEmail={account().email}
+                          inviteUrl={setup.pendingInviteUrl()}
+                          onSave={setup.saveSetup}
+                          onPreviewInvite={setup.previewInvite}
+                          onJoinRemote={joinRemoteDuringSetup}
+                          onLogout={auth.logoutCentralAccount}
+                        />
+                      </Loading>
                     </Show>
                   </Show>
-                }
-              >
-                <WorkspaceShell
-                  account={account}
-                  behindSplash={splashMoving}
-                  onStartupReady={() => setWorkspaceReady(true)}
-                />
-              </Show>
-            )}
-          </Show>
+                </Show>
+              }
+            >
+              <WorkspaceShell
+                account={account}
+                behindSplash={splashMoving}
+                onStartupReady={() => setWorkspaceReady(true)}
+              />
+            </Show>
+          )}
         </Show>
       </Show>
       <WhatsNewOverlay

@@ -740,7 +740,7 @@ export interface ApplicationServices {
   requestedUpdate: RequestedUpdate;
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
-  /** The minimum version check. Null in a development run and in a local server, whose parent updates it. */
+  /** Null in a development run and in a local server child. */
   requiredUpdate: RequiredUpdate | null;
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
@@ -4607,7 +4607,6 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
   });
   teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
-  // A server asks with its own surface, so its window can differ from the desktop app's.
   const requiredUpdate =
     app.isPackaged && !localServerChild
       ? new RequiredUpdate({

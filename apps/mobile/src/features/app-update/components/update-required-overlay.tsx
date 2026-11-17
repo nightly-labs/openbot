@@ -13,10 +13,8 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 /**
- * Covers the app while its store version is below the lowest one that the account server of the
- * session supports (plan 011, item 24). Only a confirmed answer shows it: before the first answer,
- * offline, or from an account server that sends no minimum, the app opens as usual. The store
- * installs the update; an over-the-air bundle does not change the store version.
+ * Covers the app while its store version is below the minimum of the session's account server
+ * (plan 011, item 24). Only a confirmed answer shows it; a failed check never blocks.
  */
 export function UpdateRequiredOverlay() {
   const { session } = useMobileSession();
@@ -24,7 +22,7 @@ export function UpdateRequiredOverlay() {
   const minimum = useMinimumAppVersion(apiUrl ?? "");
   const current = currentAppVersion();
 
-  // The features answer carries the minimum. Home reads it too; the shared time limit keeps it to one request.
+  // The features answer carries the minimum. Its shared time limit keeps this to one request with Home.
   useEffect(() => {
     if (!apiUrl) return;
     void refreshMobileFeatures(apiUrl);
