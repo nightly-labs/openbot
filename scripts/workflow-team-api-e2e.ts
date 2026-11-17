@@ -20,6 +20,13 @@
 // The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
 // or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
 // with the ask of its provider; a video and a step without the field do not.
+// The host advertises `workflows-media-size-v1` to a protocol 9 peer. An image step with `aspect`
+// "custom" asks the model for the nearest aspect ratio and keeps the file that the host cropped to its
+// width and height; a failed crop keeps the model's file, and a video or a side out of range is not cropped.
+// An image step with `aspect` "4:5" or "5:4" asks the model for that ratio; a video model without them gets
+// its first ratio.
+// An image step with no description runs from its text input; with no description, no text and no
+// picture it fails with "mediaEmptyRequest" and never reaches the media maker.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -44,7 +51,13 @@ import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CODECS,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -89,10 +102,15 @@ import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 /** As the app answers: true while an enabled Sunra row of the host is signed in. */
 let sunraSignedIn = false;
+/** As the app answers: true while an enabled Higgsfield row of the host is signed in. */
+let higgsfieldSignedIn = false;
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
-/** Whether each media request asks for a transparent image, and its prompt, in order. */
-const mediaRequests: { transparent: boolean; prompt: string }[] = [];
+/** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
+const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+/** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
+const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
+let sizeFails = false;
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -305,15 +323,32 @@ async function startHost(): Promise<Host> {
       // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
-      mediaProviders: () => ({ sunra: sunraSignedIn }),
-      // As the app answers: no credits with no sign-in, and a team quota after the sign-in. No Sunra call is made.
-      mediaCredits: () => Effect.succeed({ sunra: sunraSignedIn ? { available: 120, quota: 500 } : null }),
+      // The app crops the file with Electron's image decoder, which this check does not load. The stand-in
+      // keeps a new file id, as the app does.
+      sizePicture: (attachmentId, size) => {
+        sizeRequests.push({ attachmentId, ...size });
+        return sizeFails
+          ? Effect.fail({ message: "The e2e crop failed." })
+          : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
+      },
+      mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
+      // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
+      // quota after the sign-in. No Sunra or Higgsfield call is made.
+      mediaCredits: () =>
+        Effect.succeed({
+          sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
+          higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
+        }),
       // A step with an account goes to the real agent service, which must refuse an account that this
       // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
       // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
-        mediaRequests.push({ transparent: request.specs.transparent, prompt: request.prompt });
+        mediaRequests.push({
+          transparent: request.specs.transparent,
+          prompt: request.prompt,
+          aspect: request.specs.aspect,
+        });
         if (request.account === null) return Effect.succeed("e2e-media-file");
         return agents.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
@@ -1344,6 +1379,75 @@ try {
   );
 
   await step(
+    "higgsfield: a member reads whether the host has a Higgsfield sign-in and its credits; each media route answers only its own field; an old client is refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      const codec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+      assert.ok(codec, "No workflows-higgsfield-v1 codec for providers.");
+      const creditsCodec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+      assert.ok(creditsCodec, "No workflows-higgsfield-v1 codec for credits.");
+      // The raw body, so that a field of another media service in the answer fails the check.
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const read = async () => {
+        codec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const credits = async () => {
+        creditsCodec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        creditsCodec.response(response.status, response.body);
+        return response.body;
+      };
+      // Sunra is still signed in from the step before; Higgsfield is not.
+      assert.equal(sunraSignedIn, true);
+      higgsfieldSignedIn = false;
+      const signedOut = await read();
+      assert.deepEqual(signedOut, { higgsfield: false });
+      const creditsSignedOut = await credits();
+      assert.deepEqual(creditsSignedOut, { higgsfield: null });
+      higgsfieldSignedIn = true;
+      const signedIn = await read();
+      assert.deepEqual(signedIn, { higgsfield: true });
+      const creditsSignedIn = await credits();
+      assert.deepEqual(creditsSignedIn, { higgsfield: { available: 42, quota: null } });
+      // The frozen Sunra routes keep their `{ sunra }` answer while Higgsfield is signed in too.
+      const sunraProviders = await raw(WORKFLOWS_SUNRA_ROUTES.providers);
+      assert.deepEqual(sunraProviders.body, { sunra: true });
+      const sunraCredits = await raw(WORKFLOWS_SUNRA_ROUTES.credits);
+      assert.deepEqual(sunraCredits.body, { sunra: { available: 120, quota: 500 } });
+      const old = await raw(
+        WORKFLOWS_HIGGSFIELD_ROUTES.providers,
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+          (capability) => capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+        ),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      higgsfieldSignedIn = false;
+      return {
+        signedOut,
+        signedIn,
+        creditsSignedOut,
+        creditsSignedIn,
+        sunraProviders: sunraProviders.body,
+        sunraCredits: sunraCredits.body,
+        old: old.status,
+      };
+    },
+  );
+
+  await step(
     "media account: the host advertises workflows-media-account-v1; an unknown account fails and never falls back",
     async () => {
       const capabilities = async (protocol: number) =>
@@ -1428,6 +1532,103 @@ try {
       assert.equal(solid.transparent, false);
       assert.doesNotMatch(solid.prompt, /transparent background/);
       return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
+    },
+  );
+
+  await step(
+    "custom size, 4:5 and 5:4: the host advertises workflows-media-size-v1; the model gets the nearest aspect and the step keeps the cropped file",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = { media: mediaRequests.length, size: sizeRequests.length };
+        const workflow = await hostWorkflow(`Size ${JSON.stringify(fields)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before.media];
+        assert.ok(request, "the step reached the media maker");
+        return { output: done.output, aspect: request.aspect, sizes: sizeRequests.slice(before.size) };
+      };
+      const wide = await run({ model: "gpt-image", aspect: "custom", width: 1600, height: 900 });
+      assert.equal(wide.aspect, "16:9");
+      assert.deepEqual(wide.sizes, [{ attachmentId: "e2e-media-file", width: 1600, height: 900 }]);
+      assert.equal(wide.output, "e2e-media-file-1600x900");
+      const tall = await run({ model: "grok-imagine", aspect: "custom", width: 700, height: 1300 });
+      assert.equal(tall.aspect, "9:16");
+      assert.equal(tall.output, "e2e-media-file-700x1300");
+      sizeFails = true;
+      const failed = await run({ model: "gpt-image", aspect: "custom", width: 800, height: 800 }).finally(() => {
+        sizeFails = false;
+      });
+      assert.equal(failed.sizes.length, 1);
+      assert.equal(failed.output, "e2e-media-file");
+      const video = await run({ model: "grok-imagine", media: "video", aspect: "custom", width: 1600, height: 900 });
+      assert.deepEqual(video.sizes, []);
+      assert.equal(video.output, "e2e-media-file");
+      const tooLarge = await run({ model: "gpt-image", aspect: "custom", width: 5000, height: 900 });
+      assert.deepEqual(tooLarge.sizes, []);
+      assert.equal(tooLarge.output, "e2e-media-file");
+      const post = await run({ model: "gpt-image", aspect: "4:5" });
+      assert.equal(post.aspect, "4:5");
+      assert.deepEqual(post.sizes, []);
+      const postVideo = await run({ model: "grok-imagine", media: "video", aspect: "4:5" });
+      assert.equal(postVideo.aspect, "1:1");
+      const postSize = await run({ model: "gpt-image", aspect: "custom", width: 1080, height: 1350 });
+      assert.equal(postSize.aspect, "4:5");
+      assert.equal(postSize.output, "e2e-media-file-1080x1350");
+      const print = await run({ model: "grok-imagine", aspect: "5:4" });
+      assert.equal(print.aspect, "5:4");
+      const printVideo = await run({ model: "grok-imagine", media: "video", aspect: "5:4" });
+      assert.equal(printVideo.aspect, "1:1");
+      const printSize = await run({ model: "gpt-image", aspect: "custom", width: 1350, height: 1080 });
+      assert.equal(printSize.aspect, "5:4");
+      assert.equal(printSize.output, "e2e-media-file-1350x1080");
+      return { wide, tall, failed, video, tooLarge, post, postVideo, postSize, print, printVideo, printSize };
+    },
+  );
+
+  await step(
+    "empty media request: a step with no description runs from its input, and fails with no input",
+    async () => {
+      const run = async (title: string, input: string) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(title, {
+          nodes: [
+            { ...promptNode, fields: { text: input } },
+            { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        return { done, requests: mediaRequests.slice(before) };
+      };
+      const fromInput = await run("No description, text input", "A red kite over a beach.");
+      assert.equal(fromInput.done.status, "done", JSON.stringify(fromInput.done.error));
+      assert.equal(fromInput.requests.length, 1);
+      assert.match(fromInput.requests[0]?.prompt ?? "", /A red kite over a beach\./);
+      const empty = await run("No description, empty input", "");
+      assert.equal(empty.done.status, "failed");
+      assert.equal(empty.done.error, sourceText("error.workflow.mediaEmptyRequest"), JSON.stringify(empty.done.error));
+      assert.equal(empty.requests.length, 0, "an empty request never reaches the media maker");
+      return { fromInput: fromInput.done.status, empty: empty.done.error };
     },
   );
 

@@ -12,7 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { withoutQueuePositions } from "../database/conversation-writer";
+import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-writer";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -393,6 +393,8 @@ export class ConversationRuntime {
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
         if (cached?.snapshot.activeTurnId) trim(cached);
+        // SQLite cannot rebuild a request that waits for a teammate, as the idle sweep says.
+        else if (cached?.snapshot.messages.some(hasActiveDelivery)) untrimmable.add(cached);
         else {
           // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
           // while the process budget evicts it; dropping the map entry without a marker would make
@@ -463,7 +465,7 @@ export class ConversationRuntime {
 
   /**
    * Removes from memory each agent snapshot that is idle and that SQLite can rebuild with the same
-   * content. A snapshot stays when it has no thread, has a turn that runs, or is different from
+   * content. A snapshot stays when it has no thread, has a turn that runs, waits for a delivery, or is different from
    * SQLite: streamed text before its flush, and mailbox messages that a read merged, are in memory
    * only. `revision` is not compared: a rebuilt snapshot takes the thread's last event sequence from
    * SQLite, as after a restart.
@@ -476,6 +478,9 @@ export class ConversationRuntime {
       // A snapshot that must stay is read again only after one more idle period.
       this.#snapshotUsedAt.set(agentId, now);
       if (!snapshot.threadId || snapshot.activeTurnId) continue;
+      // A rebuild reads only the latest messages. An older request that a teammate still works on is
+      // in memory only, and when the teammate finishes, the chat must show that the request ended (#9885).
+      if (snapshot.messages.some(hasActiveDelivery)) continue;
       const cached = this.#cachedSnapshots.get(agentId);
       if (cached && cached.signature !== conversationContentSignature(snapshot)) continue;
       this.#dropCachedSnapshot(agentId);
@@ -692,7 +697,11 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
+    const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
+    // A turn end is stored also when an earlier write already saved this chat, such as the failure
+    // note to an agent that asked: only the turn-end write closes the stored turn (#10698).
+    const turnEnd = isTurnEndEvent(eventType);
+    if (unchanged && !turnEnd) {
       this.#retainPublishedSnapshot(snapshot);
       return;
     }
@@ -719,7 +728,8 @@ export class ConversationRuntime {
         !cached ||
         changedMessages.length > 0 ||
         removedMessageIds.length > 0 ||
-        cached.activeTurnId !== snapshot.activeTurnId
+        cached.activeTurnId !== snapshot.activeTurnId ||
+        turnEnd
       ) {
         snapshot.revision = this.#store.database.persistConversationChanges({
           agentId: snapshot.agentId,

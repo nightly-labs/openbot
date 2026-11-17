@@ -360,13 +360,25 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
     .flatMap((question) => {
       const values = answers[question.id] ?? [];
       if (values.length === 0) return [];
-      const quote = question.question
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-      return [`${quote}\n\n${values.join(", ")}`];
+      return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
+}
+
+/**
+ * The message for a detached `request_vault_item` card: its title as a quote, and the name of the saved
+ * item below. No form value goes in it. Empty for a skip (null), which sends nothing, as a question does.
+ */
+export function vaultLateAnswerText(title: string, savedName: string | null): string {
+  if (savedName === null) return "";
+  return [title ? quoted(title) : "", savedName].filter(Boolean).join("\n\n");
+}
+
+function quoted(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
 }
 
 /** The answer for a question that expired before the user answered it. Only the model reads it. */
@@ -578,11 +590,28 @@ export function vaultPromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** `vault` says what happened to a password that the user asked to keep in the Vault. */
+/** Done on a phone or in a web browser: the card there cannot send a sign-in from the user's own device. */
+const TAKEOVER_SIGN_IN_MISSING_NEXT =
+  "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked once more so that they can answer the card there. If this result comes again, do not ask again: tell the user and end your turn.";
+
+/**
+ * The person selected Cancel on the card. A turn end or a closed tab also cancels, so only this result
+ * tells the agent that the user said no; without it the agent asked again (#10452).
+ */
+const TAKEOVER_USER_CANCELLED_NEXT =
+  "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
+
+/**
+ * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
+ * the person selected Done on a sign-in-blocked takeover, but no sign-in came from their device.
+ * `userCancelled`: the person selected Cancel, not a turn end or a closed tab.
+ */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
   vaultSkipped?: string,
+  signInMissing = false,
+  userCancelled = false,
 ): DynamicToolResult {
   return {
     success: true,
@@ -593,11 +622,29 @@ export function browserTakeoverResult(
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
           ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
+          ...(signInMissing ? { signIn: "not-received" } : {}),
+          ...(decision === "complete"
+            ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
+            : userCancelled
+              ? { next: TAKEOVER_USER_CANCELLED_NEXT }
+              : {}),
         }),
       },
     ],
   };
+}
+
+/**
+ * The answer for a takeover call that the provider cannot wait for: it stops each tool call after a
+ * fixed time (#9689). The card stays open, and the next call for the same tab waits on it again. Only
+ * the model reads it.
+ */
+export function browserTakeoverWaitingResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 /** The answer for a browser tool call that waited while the user controlled its tab. Only the model reads it. */

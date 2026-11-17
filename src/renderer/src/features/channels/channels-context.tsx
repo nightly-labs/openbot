@@ -5,6 +5,7 @@ import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/cha
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
+import { noteAgentRequest } from "../../agent-requests";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
@@ -14,7 +15,7 @@ import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
 import { type ChannelsController, createChannelsController } from "./channels-controller";
-import { channelsPort } from "./channels-port";
+import { type ChannelsPort, channelsPort } from "./channels-port";
 
 const ChannelsContext = createContext<ChannelsController>(undefined, { name: "Channels" });
 
@@ -43,8 +44,25 @@ export function ChannelsProvider(props: ParentProps) {
     const auth = centralAuth();
     return auth.status === "signed_in" ? auth.user.id : auth.status;
   };
+  /** A message in a channel asks its members, so a workflow that one of them makes opens here (#11072). */
+  const port = (): ChannelsPort => {
+    const base = channelsPort();
+    return {
+      ...base,
+      agent: {
+        ...base.agent,
+        channelCommand: (command) => {
+          const page = controller.state.page;
+          if (command.type === "send" && page?.channel.id === command.channelId) {
+            for (const member of page.channel.members) noteAgentRequest(selectionServerId, member.agentId);
+          }
+          return base.agent.channelCommand(command);
+        },
+      },
+    };
+  };
   const controller = createChannelsController({
-    port: channelsPort,
+    port,
     agents: agentList,
     scopeKey: accountKey,
     readSelection: (account) =>

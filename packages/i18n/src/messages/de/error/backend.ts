@@ -264,9 +264,15 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kann diese MCP-Server-Konfiguration nicht speichern.",
   "error.backend.mcpServerNoAnswer": "Der Server hat innerhalb von {seconds} Sekunden nicht geantwortet.",
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
+  "error.backend.mcpSignInAccountRefused":
+    "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
+  "error.backend.mcpSignInAppRefused":
+    "Der Anmeldeserver hat die Anmelde-App dieses Servers nicht akzeptiert. Prüfe die Client-ID und das Client-Secret der Anmelde-App und melde dich dann erneut an.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
+  "error.backend.mcpProviderLimit":
+    "Dieser Agent kann nur eine begrenzte Anzahl von MCP-Servern nutzen. Um diesen Server zu nutzen, schalte einen MCP-Server aus, den der Agent nicht braucht.",
   "error.backend.mcpRegistrationRefused":
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",
@@ -289,17 +295,26 @@ export const messages = {
     "Der Anmeldeserver hat eine Antwort gesendet, die OpenBot nicht lesen kann. Wenn der Dienst dir einen API-Schlüssel oder ein Token gibt, füge ihn in den Einstellungen dieses Servers hinzu und teste die Verbindung erneut.",
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
+  "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
   "error.backend.mcpToolSchemaRefused":
     "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne die MCP-Einstellungen und wähle Anmelden.",
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne {name} unter Marketplace, Apps und wähle Anmelden.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} konnte den MCP-Server {name} nicht starten. Öffne die MCP-Einstellungen und wähle Verbindung testen, um die Ursache zu sehen.",
+    "{provider} konnte den MCP-Server {name} nicht starten. Öffne {name} unter Marketplace, Apps und wähle Verbindung testen, um die Ursache zu sehen.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
     "Die Anmeldung bei diesem MCP-Server ist beendet. Der Benutzer muss sich in OpenBot erneut anmelden.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot konnte die Anmeldung bei diesem MCP-Server gerade nicht erneuern. Die Anmeldung bleibt erhalten, und die nächste Anfrage versucht es erneut. Wenn dieser Fehler bleibt, kann sich der Nutzer in OpenBot vom Server abmelden und erneut anmelden.",
   "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
   "error.backend.mcpLocalServerOff":
     "Unter {address} antwortet auf diesem Computer kein Server. Starte den Server oder schalte ihn in der App ein, die ihn ausführt, und versuche es dann erneut.",
@@ -362,6 +377,8 @@ export const messages = {
   "error.backend.promptInactive": "Diese Rückfrage ist nicht mehr aktiv.",
   "error.backend.promptAnswerMismatch": "Eine Antwort passt zu keiner aktiven Frage.",
   "error.backend.approvalInactive": "Diese Genehmigung ist nicht mehr aktiv.",
+  "error.backend.feedbackNeedsPhone":
+    "Nur die OpenBot-Telefon-App kann diesen Bericht senden, weil sie Version und Supportprotokoll des Telefons hinzufügt. Öffne diesen Chat auf dem Telefon. Wenn du diese Meldung dort siehst, aktualisiere die Telefon-App.",
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
@@ -423,6 +440,8 @@ export const messages = {
     "Der Server hat mit {status} geantwortet. Prüfe den API-Schlüssel oder andere Zugangsdaten.",
   "error.backend.mcpServerHttpUrl":
     "Der Server hat mit {status} geantwortet. Prüfe die URL. Der Link ist möglicherweise falsch, abgelaufen oder gelöscht.",
+  "error.backend.mcpServerBearerKey":
+    "Dieser Server nutzt einen API-Schlüssel, keine Anmeldung. Setze unter Header den Schlüssel auf Authorization und den Wert auf Bearer, ein Leerzeichen und deinen API-Schlüssel.",
   "error.backend.mcpSignInAppUrl": "Die Anmelde-App braucht eine gültige Server-URL.",
   "error.backend.mcpSignInAppClientId": "Gib die Client-ID der Anmelde-App ein.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -445,6 +464,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Stoppe die laufende Runde, bevor du diesen Chat abzweigst.",
   "error.backend.branchMessageNotFound": "Du kannst nur von einer fertigen Antwort des Agenten abzweigen.",
   "error.backend.branchRemoteUnsupported": "Abzweigungen sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Bitte den Agenten, diesen Bericht zu entfernen.",
   "error.backend.threadMoveRefused":
     "Nur eine Nachricht, die du allein an diesen Agenten gesendet hast, kann in einem neuen Thread laufen.",
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",

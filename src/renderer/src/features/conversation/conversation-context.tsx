@@ -8,13 +8,16 @@ import {
   type ConversationSnapshot,
   openExchangesOutside,
 } from "@openbot/contracts/ipc";
+import { THREAD_MESSAGE_SEARCH_PAGE_LIMIT } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import type { AgentMessage } from "@openbot/ui/data";
+import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
+import { noteAgentRequest } from "../../agent-requests";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
+  collectThreadMessageMatches,
   formatMessageTime,
   retainThinkingMessages,
   toAgentMessage,
@@ -26,6 +29,8 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
+import { useUiErrors } from "../../ui-errors";
+import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
 import { appendLatestRuntimeMessages, attentionKey } from "../agents/agent-runtime-snapshot";
@@ -149,6 +154,17 @@ const Conversation = createSimpleContext({
       setActiveTurns,
       setTurnProgress,
     } = useTurns();
+    const { clearUiErrors } = useUiErrors();
+    const { centralAuth } = useAuth();
+    const signedInAccount = createMemo(() => {
+      const auth = centralAuth();
+      return auth.status === "signed_in" ? auth.user.id : null;
+    });
+    // A read fails while no one is signed in. After a sign-in, its error no longer holds (#9796).
+    createEffect(signedInAccount, (account, previous) => {
+      if (account && previous !== undefined && account !== previous)
+        clearUiErrors(currentText().t("chat.errorStatus.readState"));
+    });
 
     const [conversations, writeConversations] = createStore<Record<string, ConversationState>>({});
     const rawAgentMessageBodies = new Map<string, string>();
@@ -919,6 +935,19 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /** The side thread messages of the agent that have the `@` query. A message of the agent's own chat names no thread. */
+    function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
+      return collectThreadMessageMatches((cursor) =>
+        conversationPort().agent.searchConversationMessages({
+          query,
+          agentId,
+          ...(cursor ? { cursor } : {}),
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+          includeSideThreads: true,
+        }),
+      );
+    }
+
     function pruneInactiveAgentHistory(agentId: string): void {
       flushConversationDeltas();
       const messages = conversations[agentId]?.messages;
@@ -1014,6 +1043,7 @@ const Conversation = createSimpleContext({
           ...(clientMessageId ? { clientMessageId } : {}),
           ...(voiceRecordingDraftId ? { voiceRecordingDraftId } : {}),
         };
+        noteAgentRequest(serverId, agentId);
         const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
         setUiErrors((current) => ({ ...current, [errorKey]: [] }));
@@ -1082,6 +1112,8 @@ const Conversation = createSimpleContext({
             serverId,
           );
           agentChatsToRetryRead.delete(requestKey);
+          // The read is saved now, so an earlier failure to save it no longer holds.
+          clearUiErrors(currentText().t("chat.errorStatus.readState"), requestKey);
           flushConversationDeltas();
           const nextState = isAgentChatReadable(agentId)
             ? state
@@ -1310,6 +1342,7 @@ const Conversation = createSimpleContext({
       markReplyCompleted,
       clearRecentReply,
       searchAgentMessages,
+      searchAgentThreadMessages,
       sendMessage,
       markAgentMessagesRead,
       markAgentMessagesUnread,

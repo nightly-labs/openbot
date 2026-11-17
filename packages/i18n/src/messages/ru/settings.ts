@@ -43,6 +43,20 @@ export const messages = {
   "settings.chatBackground.light": "Фон чата в светлой теме",
   "settings.chatBackground.dark": "Фон чата в тёмной теме",
   "settings.chatBackground.default": "По умолчанию",
+  "settings.chatBackdrop.title": "Фон окна",
+  "settings.chatBackdrop.description":
+    "Сцена, изображение или GIF за всем окном на этом устройстве. Попросите агента сделать сцену, затем выберите «Сделать фоном» у его ответа.",
+  "settings.chatBackdrop.none": "Нет",
+  "settings.chatBackdrop.pond": "Пруд с карпами кои",
+  "settings.chatBackdrop.jellyfish": "Медузы",
+  "settings.chatBackdrop.sunset": "Ретро-закат",
+  "settings.chatBackdrop.snowfall": "Снегопад",
+  "settings.chatBackdrop.fireflies": "Светлячки",
+  "settings.chatBackdrop.upload": "Загрузить изображение…",
+  "settings.chatBackdrop.uploadRefused":
+    "Используйте изображение PNG, JPEG, GIF, WebP или AVIF размером не больше 20 МБ.",
+  "settings.chatBackdrop.saveFailed": "Фон не сохранён.",
+  "settings.chatBackdrop.removeFailed": "Фон не удалён.",
   "settings.chatColor.title": "Цвет чата",
   "settings.chatColor.description": "Подкрашивает пузыри ваших сообщений. Люди на ваших серверах тоже его видят.",
   "settings.chatColor.yours": "Ваш цвет чата",
@@ -104,7 +118,7 @@ export const messages = {
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description": "Выберите клавиши для отправки сообщения на этом устройстве и в этом браузере.",
   "settings.chatOrder.description":
-    "Выберите, где боковая панель показывает непрочитанные чаты на этом устройстве. «Вручную» отключает группу «Непрочитанные».",
+    "Выберите, как боковая панель сортирует чаты на этом устройстве. «Вручную» и «Недавняя активность» отключают группу «Непрочитанные».",
   "settings.sendShortcut.enter": "Отправка по Enter",
   "settings.sendShortcut.modEnterMac": "Отправка по ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Отправка по Ctrl+Enter",
@@ -693,6 +707,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified распознаёт только английский. Чтобы задать язык, используйте Whisper, Cohere или ElevenLabs.",
   "settings.voice.language.automatic": "Автоматически",
+  "settings.voice.pause.title": "Пауза перед отправкой",
+  "settings.voice.pause.description":
+    "В голосовом разговоре OpenBot отправляет ваши слова, когда вы молчите столько времени. Выберите паузу длиннее, если говорите медленно или останавливаетесь подумать. Живой голос Codex сам находит конец.",
+  "settings.voice.pause.seconds": "{seconds} с",
   "settings.voice.loadFailed": "Не удалось прочитать голосовые модели.",
   "settings.voice.saveFailed": "Не удалось сохранить настройку голоса. Повторите попытку.",
   "settings.voice.downloadFailed": "Не удалось начать загрузку. Повторите попытку.",

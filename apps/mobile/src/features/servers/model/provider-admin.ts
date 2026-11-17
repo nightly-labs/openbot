@@ -28,8 +28,13 @@ import {
   MANAGED_RUNTIME_PROVIDERS,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
+  type ProviderEnvironment,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
   type ProviderModelVisibility,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
@@ -55,13 +60,16 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-default-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import {
@@ -92,6 +100,7 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
+  cancelProviderAccountCodeLogin,
   cancelProviderCodeLogin,
   cancelProviderRuntime,
   cancelProviderSignInRelay,
@@ -106,12 +115,14 @@ import {
   getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostProviderDefault,
+  getHostProviderEnvironment,
   getProviderApiKeyState,
   getProviderRuntimes,
   type HostProviderDefault,
   listCustomAgents,
   listCustomProviders,
   listProviderAccountsWithModels,
+  providerAccountCodeLoginStatus,
   providerUsageResets,
   removeProviderAccount,
   renameProviderAccount,
@@ -122,13 +133,16 @@ import {
   setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostProviderDefault,
+  setHostProviderEnvironment,
   setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
   signOutProvider,
+  startProviderAccountCodeLogin,
   startProviderAccountSignInRelay,
   startProviderCodeLogin,
   startProviderSignInRelay,
+  submitProviderAccountCodeLogin,
   submitProviderCodeLogin,
   updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
@@ -157,13 +171,15 @@ function codeSignInProviders(capabilities: readonly string[]): readonly AgentPro
     );
     if (!capabilities.includes(PROVIDERS_V8_CAPABILITY)) return v4;
     // `providers-v8` also signs in the later providers that have a device code, such as Kimi and
-    // Hermes. A provider that the relay already signs in, such as Muse, keeps the relay.
+    // Hermes. A provider that the relay already signs in, such as Muse, keeps the relay. Mistral's
+    // code sign-in is a page, not a device code, so it needs `mistral-code-sign-in-v1`.
     return AGENT_PROVIDERS.filter(
       (provider) =>
         isOneOf(v4, provider) ||
         (agentProviderDescriptor(provider).localCodeSignIn === "device" &&
           !isOneOf(PROVIDERS_V4_SIGN_IN_PROVIDERS, provider) &&
-          !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)),
+          !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)) ||
+        (provider === "mistral" && capabilities.includes(MISTRAL_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (capabilities.includes(PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
@@ -390,7 +406,7 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `custom-provider-edit-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1`,
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-environment-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1`,
  * `provider-account-pool-v1` and `provider-account-keys-v1`), with the newest
  * route set that the host serves. The
  * host checks the role on every route.
@@ -537,6 +553,33 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
               await runTeamRequest(startProviderAccountSignInRelay(request, accountRelay, { provider, accountId }))
             ).flowId;
           },
+          /**
+           * The code sign-in of one account (`provider-account-code-v1`), or null on an older host. The
+           * host runs the provider's CLI for the account, and the phone opens the page that it gives.
+           * `accountId: null` adds an account; the start names it. A cancel removes a new account that
+           * did not sign in.
+           */
+          code: has(PROVIDER_ACCOUNT_CODE_CAPABILITY)
+            ? {
+                /**
+                 * As on desktop and the web: a `paste` sign-in needs a host that can type a pasted code
+                 * into the CLI, and only such a host has `providers-v3`.
+                 */
+                offered: (provider: AgentProviderId): boolean => {
+                  const codeSignIn = agentProviderDescriptor(provider).accountCodeSignIn;
+                  return codeSignIn === "device" || (codeSignIn === "paste" && has(PROVIDERS_SIGN_IN_V3_CAPABILITY));
+                },
+                start: (provider: AgentProviderId, accountId: string | null): Promise<ProviderAccountCodeLoginStart> =>
+                  runTeamRequest(startProviderAccountCodeLogin(request, { provider, accountId })),
+                /** The code is a credential: it goes to the host in the body, and no reply carries it. */
+                submit: (provider: AgentProviderId, accountId: string, code: string): Promise<void> =>
+                  runTeamRequest(submitProviderAccountCodeLogin(request, { provider, accountId, code })),
+                status: (provider: AgentProviderId, accountId: string): Promise<ProviderAccountCodeLoginStatus> =>
+                  runTeamRequest(providerAccountCodeLoginStatus(request, { provider, accountId })),
+                cancel: (provider: AgentProviderId, accountId: string): Promise<void> =>
+                  runTeamRequest(cancelProviderAccountCodeLogin(request, { provider, accountId })),
+              }
+            : null,
         }
       : null,
     /**
@@ -595,6 +638,18 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
           read: (): Promise<ClaudeCompactWindowSetting> => runTeamRequest(getHostClaudeCompactWindow(request)),
           set: (tokens: number | null): Promise<ClaudeCompactWindowSetting> =>
             runTeamRequest(setHostClaudeCompactWindow(request, tokens)),
+        }
+      : null,
+    /**
+     * The environment variables of one provider of the host (`provider-environment-v1`), or null. A
+     * read gives a sensitive variable without its value.
+     */
+    environment: has(PROVIDER_ENVIRONMENT_CAPABILITY)
+      ? {
+          read: (provider: ProviderEnvironmentProvider): Promise<ProviderEnvironment> =>
+            runTeamRequest(getHostProviderEnvironment(request, provider)),
+          set: (update: ProviderEnvironmentUpdate): Promise<ProviderEnvironment> =>
+            runTeamRequest(setHostProviderEnvironment(request, update)),
         }
       : null,
     /** Signs the host's own sign-in of a provider out (`provider-sign-out-v1`), or null. Its agents wait. */

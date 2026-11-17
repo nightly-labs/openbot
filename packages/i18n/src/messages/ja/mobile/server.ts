@@ -447,7 +447,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "この検索に一致するタイムゾーンはありません。",
   "mobile.server.settings.timezoneMore": "他のタイムゾーンを表示するには、名前をもっと入力してください。",
   "mobile.server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "mobile.server.settings.timezoneLoading": "タイムゾーンを読み込んでいます…",
   "mobile.server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "mobile.server.settings.timezoneSaveFailed": "タイムゾーンを保存できませんでした。もう一度お試しください。",
@@ -882,10 +882,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "再リンク",
   "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
+  "mobile.server.connectors.whatsapp.statusReactions": "ステータスのリアクション",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",
@@ -902,10 +905,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "番号",
   "mobile.server.connectors.whatsapp.kindPersonal": "自分の個人番号",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。",
+    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。それ以外の人には返信しません。",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 専用の番号",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "知らない人には、あなたに伝えるためのコードが届きます。ここでその人を承認します。",
+    "OpenBot はこの番号から、知らない人それぞれに、あなたに伝えるためのコードを返信します。ここでその人を承認します。",
   "mobile.server.connectors.whatsapp.phoneLabel": "電話番号",
   "mobile.server.connectors.whatsapp.phoneDescription": "国番号を含めて入力します（例: +44 7700 900123）。",
   "mobile.server.connectors.whatsapp.phoneInvalid": "電話番号を国番号付きで入力してください。",
@@ -1068,6 +1071,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.addAccountWithCode": "コードでアカウントを追加",
+  "mobile.server.providers.accountSignInWithCode": "コードでログイン",
   "mobile.server.providers.accountsKeyHint":
     "各エージェントは1つのアカウントを使います。エージェントの設定で選んでください。新しいアカウントには、そのアカウントの API キーが必要です。",
   "mobile.server.providers.accountChangeKey": "キーを変更",
@@ -1116,6 +1121,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code の既定",
   "mobile.server.providers.compactWindowTokens": "{size} トークン",
   "mobile.server.providers.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
+  "mobile.server.environment.row": "変数",
+  "mobile.server.environment.title": "環境",
+  "mobile.server.environment.hint":
+    "{name} の各プロセスが受け取る API キー、ベース URL などの設定です。変更は進行中のターンが終わると適用されます。",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL と、そのキーとしての OPENAI_API_KEY で、ChatGPT のモデルへのリクエストをそのアドレスに送ります。",
+  "mobile.server.environment.shellNote": "エージェントが実行するコマンドはこれらの値を読めます。",
+  "mobile.server.environment.add": "変数を追加",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "値",
+  "mobile.server.environment.saved": "保存済み",
+  "mobile.server.environment.sensitive": "機密",
+  "mobile.server.environment.remove": "削除",
+  "mobile.server.environment.save": "保存",
+  "mobile.server.environment.loadFailed": "{name} の変数を読み込めませんでした。",
+  "mobile.server.environment.invalid": "先に名前を修正してください。",
   "mobile.server.providers.disconnect": "接続を解除",
   "mobile.server.providers.disconnectTitle": "{name} の接続を解除しますか？",
   "mobile.server.providers.disconnectBody":

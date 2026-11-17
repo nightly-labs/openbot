@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isAgentProvider } from "@openbot/contracts/ipc";
+import { isAgentProvider, mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { ConversationQueries } from "./conversation-queries";
-import { activityTurnId } from "./conversation-writer";
+import { activityTurnId, keptUnsavedImage } from "./conversation-writer";
 import { type DatabaseCore, deleteThreadAttachments } from "./database-core";
 import { databaseRows, decodeThreadAgentRow, objectValue, requiredEventRow } from "./database-rows";
 import { withoutDeletedMessages } from "./deleted-thread-messages";
@@ -428,6 +428,7 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
   const attachments = mergeReplayValues(existing.attachments, imported.attachments, (value) => value.id);
   const reactions = mergeReplayValues(existing.reactions, imported.reactions, (value) => JSON.stringify(value));
   const turnId = existing.turnId ?? imported.turnId;
+  const imageGeneration = mergeImageGenerationInfo(existing.imageGeneration, imported.imageGeneration);
   return {
     ...existing,
     ...imported,
@@ -440,6 +441,8 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+    ...(imageGeneration ? { imageGeneration } : {}),
+    ...keptUnsavedImage(existing, imported, imageGeneration),
   };
 }
 

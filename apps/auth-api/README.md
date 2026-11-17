@@ -35,12 +35,23 @@ commands continue to use that file.
 
 `bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
 the twelve storage add-on Prices (`openbot_storage_{plan}_{1|2}_{month|year}`, one Product for each
-plan), the license Prices and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`.
+plan), the license Prices, the Polish VAT Tax Rate and the Customer Portal settings in the Stripe account of
+`STRIPE_SECRET_KEY`.
 It is safe to run again: a changed amount makes a new Price and moves the lookup key to it. The Portal
 has no plan change (`subscription_update` is off); it cancels plans and updates payment methods.
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+
+The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
+`PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
+Stripe customer keeps as proof of the check. Without it, the check works and has no number.
+`bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
+a dry run unless you give `--apply`.
+The Worker variable `BILLING_COUNTRY_REQUIRED=true` refuses a Checkout of an account with no billing
+country (409 `billing_country_required`). `wrangler.jsonc` sets it, so production and local development
+refuse. With `false`, such an account gets a Stripe Tax Checkout, so that a desktop app older than 0.72.0
+can still buy. Set `BILLING_COUNTRY_REQUIRED=false` in the shell to try that path locally.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:
@@ -158,15 +169,25 @@ exercise real delivery locally, put a full set in the ignored `.dev.vars` file:
 ```dotenv
 EMAIL_SMTP_HOST=mail.privateemail.com
 EMAIL_SMTP_PORT=465
-EMAIL_SMTP_USERNAME=hello@openbot.run
+EMAIL_SMTP_USERNAME=no_reply@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
-EMAIL_FROM=hello@openbot.run
-EMAIL_LICENSE_FROM=licenses@openbot.run
+EMAIL_FROM=no_reply@openbot.run
+EMAIL_REPLY_TO=hello@openbot.run
+EMAIL_LICENSE_REPLY_TO=licenses@openbot.run
 ```
+
+Sign-in codes, invitations and welcome emails go from `EMAIL_FROM`, the `no_reply@openbot.run`
+mailbox, with `EMAIL_REPLY_TO` in `Reply-To`, so a reply goes to the team's inbox. An empty
+`EMAIL_REPLY_TO` uses `EMAIL_FROM` and adds no `Reply-To`. `EMAIL_SMTP_PASSWORD` is the password of
+the `EMAIL_SMTP_USERNAME` mailbox. The CI deploy reads it from the `EMAIL_SMTP_PASSWORD` secret of the
+`cloudflare-production` GitHub Environment, not from `.env.production`: when the mailbox changes,
+change both, at the time of the merge.
 
 License emails (the first payment, a failed renewal payment, and the end of a license) go from
 `EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
-make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`, as production
+does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in production), or to the
+license sender when it is empty.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
@@ -196,8 +217,15 @@ before remote changes. Test deployments do not send account analytics.
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
 agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
-an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. With no key, the route answers 503, the app
-gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. Each report ends with a hidden owner mark
+(`feedback-owner.ts`): a random value and an HMAC of it and the account ID, with a key that HKDF derives
+from the app key. `POST /v1/feedback/withdraw` takes `{ number }` and, for the account whose mark ends
+the text, deletes its comments on that issue or moves its issue to `FEEDBACK_WITHDRAWN_REPOSITORY`, a
+private repository where the app has Issues write access. GitHub keeps every earlier version of an
+edited text, so the route never edits. Without that variable, an issue answers 503
+`feedback_withdraw_unavailable`; a comment can still go. A new app key makes the earlier marks invalid.
+With no key, the route answers 503, the app gives the GitHub form link instead, and the desktop acts
+as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
@@ -254,7 +282,7 @@ onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
 Workers have no fallback.
 
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
-`EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
+`EMAIL_REPLY_TO` (or `EMAIL_FROM` when it is empty) through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute
 window, so the form cannot spend the quota that sign-in codes need. A Cloudflare rate-limit binding
 counts in each location separately, so it cannot hold a total. Without SMTP the route answers 503

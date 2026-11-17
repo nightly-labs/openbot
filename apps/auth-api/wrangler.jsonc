@@ -54,9 +54,13 @@
     "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
-    "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-    "EMAIL_FROM": "hello@openbot.run",
-    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+    "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+    "EMAIL_FROM": "no_reply@openbot.run",
+    "EMAIL_REPLY_TO": "hello@openbot.run",
+    "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+    // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+    // license emails from EMAIL_FROM.
+    "EMAIL_LICENSE_FROM": "",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
@@ -78,9 +82,17 @@
     // A license bought before this time is free until then: Stripe charges its first payment at this time.
     // Local development reads it too; set LICENSE_TRIAL_END= in the shell to sell licenses with no trial.
     "LICENSE_TRIAL_END": "2026-12-01T00:00:00Z",
+    // An account with no billing country cannot open Checkout (409 billing_country_required), so no
+    // payment uses Stripe Tax. Desktop 0.72.0 and the web client ask for the country. Deploys keep
+    // removed vars: set "false" to let older clients buy with Stripe Tax again.
+    // Local development reads it too; set BILLING_COUNTRY_REQUIRED=false in the shell to turn it off.
+    "BILLING_COUNTRY_REQUIRED": "true",
     // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
     // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
+    // The private repository where a withdrawn feedback issue moves, as `owner/name`. The GitHub App
+    // needs Issues write access to it. Empty, the app can withdraw a comment, but not an issue.
+    "FEEDBACK_WITHDRAWN_REPOSITORY": "",
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
@@ -99,7 +111,7 @@
   "send_email": [
     {
       "name": "EMAIL_FALLBACK",
-      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+      "allowed_sender_addresses": ["no_reply@openbot.run"]
     }
   ],
   "d1_databases": [
@@ -180,9 +192,13 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -280,9 +296,13 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",

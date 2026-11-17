@@ -1,4 +1,4 @@
-import type { QueueDeliveryStatus } from "@openbot/contracts/ipc";
+import type { QueueDeliveryStatus, WithdrawFeedbackStatus } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -55,17 +55,27 @@ interface ChatActionMarkerProps {
   onOpenHostedSite?: ((url: string) => void) | undefined;
   /** Opens a web link outside the app, such as the issue of sent feedback. */
   onOpenLink?: ((url: string) => void) | undefined;
+  /** Takes the report of a thank-you card off GitHub, by the card's message id. Absent where this client cannot. */
+  onWithdrawFeedback?: ((messageId: string) => Promise<WithdrawFeedbackStatus>) | undefined;
+  /**
+   * Puts a request about a sent report in the composer, by its issue number: a corrected report, or,
+   * where `onWithdrawFeedback` is absent, a removal. Absent, a thank-you card offers no change.
+   */
+  onRequestFeedbackChange?: ((request: { number: number; change: "fix" | "remove" }) => void) | undefined;
   /** Opens or closes the messages of a run, or the runs of a group, whose marker sets `expanded`. */
   onToggleRoutineRun?: ((marker: RoutineRunToggleMarkerModel) => void) | undefined;
   /** Opens or closes the text of an agent message whose marker sets `expanded`, by its `messageId`. */
   onToggleAgentMessage?: ((messageId: string) => void) | undefined;
   /** Draws the text of an open agent message under its marker, by its `messageId`. */
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
-  /** The instruction file of the agent, for View and Undo on its change line. */
+  /** The instruction file of the agent, for Undo on its change line. Without it, the line has View only. */
   instructions?: AgentInstructionsFileCalls | undefined;
   /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
   onOpenInstructions?: ((agentId: string) => void) | undefined;
 }
+
+/** The actions of a skill or instruction change line, the same in the agent's chat and in its threads. */
+export type ChangeMarkerActions = Pick<ChatActionMarkerProps, "onOpenSkill" | "instructions" | "onOpenInstructions">;
 
 /** The parts of a marker that open the text of an agent message, for the markers in a group. */
 type AgentMessageTextProps = Pick<ChatActionMarkerProps, "onToggleAgentMessage" | "agentMessageText">;
@@ -157,7 +167,23 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                   title={sent().title}
                   number={sent().number}
                   url={sent().url}
+                  withdrawn={sent().withdrawn}
                   onOpenLink={props.onOpenLink}
+                  onWithdraw={
+                    props.onWithdrawFeedback
+                      ? () => props.onWithdrawFeedback?.(sent().messageId) ?? Promise.resolve("notFound")
+                      : undefined
+                  }
+                  onFix={
+                    props.onRequestFeedbackChange
+                      ? () => props.onRequestFeedbackChange?.({ number: sent().number, change: "fix" })
+                      : undefined
+                  }
+                  onAskRemove={
+                    props.onRequestFeedbackChange
+                      ? () => props.onRequestFeedbackChange?.({ number: sent().number, change: "remove" })
+                      : undefined
+                  }
                 />
               )}
             </Show>
@@ -553,7 +579,7 @@ function SingleChatActionMarker(
               </span>
             )}
           </Show>
-          <Show when={instructionsChange(props.marker, props.instructions)}>
+          <Show when={instructionsChange(props.marker, props.instructions, props.onOpenInstructions)}>
             {(target) => (
               <InstructionsChangeActions
                 agentId={target().agentId}
@@ -1041,9 +1067,13 @@ function skillInstallCount(marker: SingleChatActionMarkerModel): number | undefi
   return count > 1 ? count : undefined;
 }
 
-/** The change line of a local agent, which can show View and Undo. */
-function instructionsChange(marker: SingleChatActionMarkerModel, calls: AgentInstructionsFileCalls | undefined) {
-  if (marker.kind !== "instructions-change" || !marker.agentId || !calls) return undefined;
+/** The change line of a local agent, which can show View, and Undo when it has the file calls. */
+function instructionsChange(
+  marker: SingleChatActionMarkerModel,
+  calls: AgentInstructionsFileCalls | undefined,
+  onView: ((agentId: string) => void) | undefined,
+) {
+  if (marker.kind !== "instructions-change" || !marker.agentId || (!calls && !onView)) return undefined;
   return { agentId: marker.agentId, change: marker.change, calls };
 }
 
@@ -1063,6 +1093,7 @@ function markerLabel(
     return sourceText(marker.text);
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
   if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
+  if (marker.kind === "setting-link") return t("chat.marker.settingLink");
   if (marker.kind === "skill-suggestion") return t("chat.marker.skillSuggestion");
   if (marker.kind === "mcp-sign-in") return t("chat.marker.mcpSignIn");
   if (marker.kind === "server-install") return t("chat.marker.serverInstall");
@@ -1141,6 +1172,7 @@ function markerAccessibleLabel(
     marker.kind === "unavailable" ||
     marker.kind === "context-reset" ||
     marker.kind === "marketplace-suggestion" ||
+    marker.kind === "setting-link" ||
     marker.kind === "mcp-sign-in" ||
     marker.kind === "server-install" ||
     marker.kind === "model-switch" ||

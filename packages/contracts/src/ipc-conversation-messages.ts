@@ -24,6 +24,11 @@ export type ImageGenerationAspectRatio = (typeof IMAGE_GENERATION_ASPECT_RATIOS)
 
 export interface ImageGenerationInfo {
   prompt?: string | undefined;
+  /**
+   * The pixel size, such as "1254 × 1254". The host writes the real size of the image file when it
+   * stores the file. Before that, it is the size that the agent asked for, or empty when the size is
+   * not known. A host before 2026-11 wrote "1024 × 1024" when the provider gave no size.
+   */
   resolution: string;
   aspectRatio: ImageGenerationAspectRatio;
   error?: string;
@@ -31,6 +36,50 @@ export interface ImageGenerationInfo {
 
 export function isImageGenerationAspectRatio(value: unknown): value is ImageGenerationAspectRatio {
   return isOneOf(IMAGE_GENERATION_ASPECT_RATIOS, value);
+}
+
+export interface ImagePixelSize {
+  width: number;
+  height: number;
+}
+
+/** The width and height in a size such as "1254 × 1254" or "1536x1024", or null for another value. */
+export function imagePixelSize(value: string | undefined): ImagePixelSize | null {
+  const match = /^\s*(\d{1,5})\s*[×xX]\s*(\d{1,5})\s*$/.exec(value ?? "");
+  const width = Number(match?.[1] ?? 0);
+  const height = Number(match?.[2] ?? 0);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+/** The size text of an image, as the chat shows it. */
+export function imagePixelSizeText(size: ImagePixelSize): string {
+  return `${size.width} × ${size.height}`;
+}
+
+/** The nearest of the three frames for an image of this size. */
+export function imageAspectRatioOf(size: ImagePixelSize): ImageGenerationAspectRatio {
+  const ratio = size.width / size.height;
+  if (ratio > 1.05) return "landscape";
+  if (ratio < 1 / 1.05) return "portrait";
+  return "square";
+}
+
+/**
+ * The image info of a stored message after a provider sends the message again. Provider history has
+ * no image size, and Codex history can have no prompt. Thus the stored size, frame and prompt stay
+ * when the new info does not have them.
+ */
+export function mergeImageGenerationInfo(
+  stored: ImageGenerationInfo | undefined,
+  update: ImageGenerationInfo | undefined,
+): ImageGenerationInfo | undefined {
+  if (!stored || !update) return update ?? stored;
+  const keepSize = imagePixelSize(stored.resolution) !== null && imagePixelSize(update.resolution) === null;
+  return {
+    ...update,
+    ...(update.prompt === undefined && stored.prompt !== undefined ? { prompt: stored.prompt } : {}),
+    ...(keepSize ? { resolution: stored.resolution, aspectRatio: stored.aspectRatio } : {}),
+  };
 }
 
 export function isImageGenerationInfo(value: unknown): value is ImageGenerationInfo {
@@ -382,6 +431,14 @@ export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
  * does not go to a Team API client.
  */
 export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
+
+/**
+ * The item type of the message that continues a channel request after the sub-tasks that it waited
+ * for ended. It repeats the person's request for the member, but the person did not send it again
+ * (#8812). No chat, history page, search, queue or preview shows it, and it does not go to a Team API
+ * client.
+ */
+export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";
 
 /**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the

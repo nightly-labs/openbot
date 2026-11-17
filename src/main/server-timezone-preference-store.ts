@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { HostTimezoneSettings } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -6,6 +7,8 @@ import { localTimezone } from "../backend/agent/routine-tools";
 import { isMissingFileError } from "../backend/file-errors";
 import { validTimezone } from "./agent-marketplace-service";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
+
+export const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 
 /**
  * The server timezone. A routine that an agent creates with no zone from the tool call or the
@@ -18,22 +21,19 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  */
 export class ServerTimezonePreferenceStore {
   readonly #path: string;
+  readonly #systemTimezone: () => string;
   #timezone: string | null = null;
   #writes = Semaphore.makeUnsafe(1);
 
-  constructor(path: string) {
+  /** `systemTimezone` is the zone of this computer, also when `applyServerTimezone` changed `TZ`. */
+  constructor(path: string, systemTimezone: () => string) {
     this.#path = path;
+    this.#systemTimezone = systemTimezone;
   }
 
   load(): Effect.Effect<void, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
-      const loaded = yield* Effect.result(
-        readPreferenceFile(this.#path, (parsed): string | null =>
-          isDynamicRecord(parsed) && parsed.version === 1 && isString(parsed.timezone) && validTimezone(parsed.timezone)
-            ? parsed.timezone
-            : null,
-        ),
-      );
+      const loaded = yield* Effect.result(readPreferenceFile(this.#path, decodeServerTimezone));
       if (Result.isSuccess(loaded)) this.#timezone = loaded.success;
       else if (!isMissingFileError(loaded.failure.cause) && !(loaded.failure.cause instanceof SyntaxError))
         return yield* loaded.failure;
@@ -41,12 +41,12 @@ export class ServerTimezonePreferenceStore {
   }
 
   get(): HostTimezoneSettings {
-    return { timezone: this.#timezone, systemTimezone: localTimezone() };
+    return { timezone: this.#timezone, systemTimezone: this.#systemTimezone() };
   }
 
   /** The zone that applies now: the chosen one, or the system zone. */
   effective(): string {
-    return this.#timezone ?? localTimezone();
+    return this.#timezone ?? this.#systemTimezone();
   }
 
   /** The caller reads the zone with `parseServerTimezone` first. */
@@ -72,4 +72,41 @@ export function parseServerTimezone(value: unknown): string | null {
   if (!isString(value) || value.length > 128 || !validTimezone(value))
     throw new Error(sourceText("error.host.timezoneInvalid"));
   return value;
+}
+
+/** The `TZ` from before `applyServerTimezone` changed it: `=` and the value, or `unset`. */
+const SYSTEM_TZ = "OPENBOT_SYSTEM_TZ";
+
+function decodeServerTimezone(parsed: unknown): string | null {
+  return isDynamicRecord(parsed) && parsed.version === 1 && isString(parsed.timezone) && validTimezone(parsed.timezone)
+    ? parsed.timezone
+    : null;
+}
+
+/**
+ * On a server, sets `TZ` to the chosen zone before the app is ready. Chromium reads the zone of its
+ * pages only when a renderer starts, so the agent browser shows the zone of the server only with
+ * `TZ` (#8935). A change applies at the next start. Returns the zone of this computer from before.
+ * A file that `load` reads as automatic leaves `TZ` as it is.
+ */
+export function applyServerTimezone(path: string, environment: NodeJS.ProcessEnv): () => string {
+  // A relaunch (`relaunchApp`) gives the new process the environment of this one, with the chosen
+  // `TZ`. Put back the `TZ` of the computer first, so "Automatic" shows its zone and applies again.
+  const before = environment[SYSTEM_TZ];
+  if (before !== undefined) {
+    if (before.startsWith("=")) environment.TZ = before.slice(1);
+    else delete environment.TZ;
+    delete environment[SYSTEM_TZ];
+  }
+  const systemTimezone = localTimezone();
+  let chosen: string | null = null;
+  try {
+    chosen = decodeServerTimezone(JSON.parse(readFileSync(path, "utf8")));
+  } catch {
+    // A missing or damaged file is automatic. `load` reports a read failure that is not expected.
+  }
+  if (chosen === null || chosen === systemTimezone) return localTimezone;
+  environment[SYSTEM_TZ] = environment.TZ === undefined ? "unset" : `=${environment.TZ}`;
+  environment.TZ = chosen;
+  return () => systemTimezone;
 }

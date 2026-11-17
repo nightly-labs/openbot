@@ -13,6 +13,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { DynamicToolCallParams } from "../protocol";
+import type { ToolApprovalDecision } from "./attention-registry";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -98,7 +99,7 @@ export interface SetBrowserProfileToolOptions {
   /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
   /** Waits for the owner's answer to a card with this text. */
-  approve(reason: string): Effect.Effect<"accept" | "decline" | "cancel" | string, ToolOperationFailed>;
+  approve(reason: string): Effect.Effect<ToolApprovalDecision, ToolOperationFailed>;
   redactMcp(text: string): string;
 }
 

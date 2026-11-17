@@ -7,6 +7,7 @@ import { bytesToBase64 } from "./base64";
 // whose path, body and decoding are the same in both are here. A request that differs in one of them
 // stays at its call site.
 
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import {
   type AgentApproval,
   type AgentImportPreview,
@@ -58,6 +59,7 @@ import {
   isRoutine,
   isRoutineFlowCanvas,
   isRoutineFlowLink,
+  isRoutinePausedByRun,
   isRoutineRun,
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
@@ -131,8 +133,14 @@ import {
   decodePendingApprovalResponse,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+  type RoutinePauseReasonEntry,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
   decodeRoutineRunPlace,
   decodeRoutineRunPlaces,
@@ -842,6 +850,23 @@ export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(f
   );
 });
 
+/**
+ * Sends a bug report about the phone app that an agent waits on, with the phone's version, system
+ * and support log (`phone-feedback-v1`). It answers the approval: the host takes no plain "accept"
+ * of such a report.
+ */
+export const sendPhoneFeedback = Effect.fn("TeamClient.sendPhoneFeedback")(function* (
+  request: TeamApiRequest,
+  input: { requestId: string | number; phone: FeedbackPhone },
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PHONE_FEEDBACK_ROUTES.send, ignoreResponse, {
+      requestId: input.requestId,
+      phone: { ...input.phone },
+    }),
+  );
+});
+
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
   request: TeamApiRequest,
   input: RespondToBrowserTakeoverInput,
@@ -965,15 +990,40 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
 }
 
 /**
+ * Gives each paused routine the scheduled run of its own that paused it, from the
+ * `routine-pause-reasons-v1` list (#10048).
+ */
+export function withRoutinePauseReasons<R extends { id: string; active: boolean }>(
+  routines: readonly R[],
+  reasons: readonly RoutinePauseReasonEntry[],
+): R[] {
+  if (reasons.length === 0) return [...routines];
+  const reasonOf = new Map(reasons.map((reason) => [reason.routineId, reason.scheduledFor]));
+  return routines.map((routine) => {
+    const pausedByRun = routine.active ? undefined : { scheduledFor: reasonOf.get(routine.id) };
+    // The preload refuses the whole list for one time that does not parse, so a bad one is dropped here.
+    return isRoutinePausedByRun(pausedByRun) ? { ...routine, pausedByRun } : routine;
+  });
+}
+
+/** The `routine-pause-reasons-v1` list of an agent. */
+export function listRoutinePauseReasons(request: TeamApiRequest, agentId: string): Promise<RoutinePauseReasonEntry[]> {
+  return request("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, { agentId });
+}
+
+/**
  * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
  * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes. They
  * also leave out the `once` routines, so with `once`, for a host with `routines-once-v1`, the list
- * adds them and every routine update goes to their routes, which save the place too.
+ * adds them and every routine update goes to their routes, which save the place too. They leave out
+ * why a routine is paused, so with `pauseReasons`, for a host with `routine-pause-reasons-v1`, the
+ * list reads it on that route.
  */
 export function teamAgentRoutinesApi(
   request: TeamApiRequest,
   runPlaces: () => boolean = () => false,
   once: () => boolean = () => false,
+  pauseReasons: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
   const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
   // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
@@ -994,18 +1044,15 @@ export function teamAgentRoutinesApi(
   };
   return {
     listRoutines: async (agentId) => {
-      const routines = request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-      const onceRoutines = once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]);
-      if (!runPlaces()) {
-        const [released, extra] = await Promise.all([routines, onceRoutines]);
-        return [...released, ...extra];
-      }
-      const [list, places, extra] = await Promise.all([
-        routines,
-        request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
-        onceRoutines,
+      const [list, places, reasons, extra] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+        runPlaces()
+          ? request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId })
+          : Promise.resolve([]),
+        pauseReasons() ? listRoutinePauseReasons(request, agentId) : Promise.resolve([]),
+        once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]),
       ]);
-      return [...withRoutineRunPlaces(list, places), ...extra];
+      return [...withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons), ...extra];
     },
     createRoutine: async ({ runIn, ...input }) => {
       if (isOnceSchedule(input.schedule)) {

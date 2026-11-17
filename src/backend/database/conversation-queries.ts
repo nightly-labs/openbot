@@ -12,12 +12,14 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -42,6 +44,7 @@ export interface ConversationMarkerExclusions {
   excludeRoutineRunEvents?: boolean;
   excludeHostedSiteEvents?: boolean;
   excludeRoutineQuietAnswers?: boolean;
+  excludeSettingLinks?: boolean;
 }
 
 /**
@@ -240,6 +243,20 @@ export class ConversationQueries {
            ORDER BY created_at, ordinal, message_id`,
         )
         .all(threadId, ...messageIds, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
+  /** Reads the messages of one thread with one item type, such as the thank-you cards of one report. */
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND item_type = ?
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, itemType, agentId),
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
@@ -458,11 +475,12 @@ export class ConversationQueries {
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
              WHERE ${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
-               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}')
+               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
+               AND COALESCE(message.item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'
                AND json_extract(message.message_json, '$.routine') IS NULL
                ${includeSideThreads ? ARCHIVED_SIDE_THREAD_EXCLUSION : SIDE_THREAD_EXCLUSION}
                ${filter}
@@ -793,10 +811,13 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
   ];
 }
 
-/** A new agent's setup message (`agent-welcome-v1`) is for the agent only, so no page or read state has it. */
+/**
+ * A new agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for
+ * the agent only, so no page or read state has them.
+ */
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
-    `AND COALESCE(item_type, '') != '${AGENT_WELCOME_ITEM_TYPE}'`,
+    `AND COALESCE(item_type, '') NOT IN ('${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')`,
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`
       : "",
@@ -807,6 +828,7 @@ function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): 
       ? `AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'`
       : "",
     exclusions.excludeRoutineQuietAnswers ? `AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'` : "",
+    exclusions.excludeSettingLinks ? `AND COALESCE(item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'` : "",
   ]
     .filter(Boolean)
     .join("\n");

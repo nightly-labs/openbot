@@ -84,6 +84,7 @@ import {
   MOBILE_CHAT_ORDERS,
   type MobileChatOrder,
   type MobileSidebarItem,
+  mobileChatOrderSortsSections,
   mobileSidebarItems,
   mobileUnreadItems,
   mobileWaitingItems,
@@ -91,7 +92,6 @@ import {
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
 import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
@@ -268,6 +268,7 @@ function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, chan
 /** The name of each chat order in the chat options menu. */
 const CHAT_ORDER_LABEL = {
   manual: "mobile.agent.home.sort.manual",
+  recent: "mobile.agent.home.sort.recent",
   "unread-group": "mobile.agent.home.sort.unreadGroup",
   "unread-first": "mobile.agent.home.sort.unreadFirst",
 } as const satisfies Record<MobileChatOrder, MobileTextKey>;
@@ -293,7 +294,7 @@ const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
 const PANE_BAR_HEIGHT = NATIVE_BAR_HEIGHT;
 
 /**
- * The glass behind a header button that the screen draws. Android has the solid glass of the design.
+ * The glass behind a header button that the screen draws. Android has the plain fill of the search field.
  * On iOS, the chat list pane draws its own bar, so its buttons take Liquid Glass as the native bar does.
  */
 function HeaderGlass({
@@ -309,7 +310,6 @@ function HeaderGlass({
   if (isAndroid) {
     return (
       <View className="size-10 items-center justify-center overflow-hidden rounded-full" style={glass}>
-        <ChromeGlassSheen />
         {children}
       </View>
     );
@@ -397,7 +397,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   // The Android header buttons have the glass of the search field.
   const buttonGlass = useChromeGlass({ shadow: isIOS });
-  const searchBlurTarget = useRef<ViewInstance>(null);
+  const barBlurTarget = useRef<ViewInstance>(null);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
@@ -485,13 +485,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const sidebar = sidebarByServer[activeServer.id];
   // A waiting agent leaves its section for "Needs you". A pinned agent stays in its tile, which shows the same badge.
   const waitingAgentIds = useWaitingAgentIds();
-  // This phone's own choice. "Unread in a group" takes the unread chats out of their sections, under
-  // "Needs you"; "Unread first in folders" puts them first in each section. Neither changes the layout.
+  // This phone's own choice. "Recent activity" sorts each section by last activity. "Unread in a group"
+  // takes the unread chats out of their sections, under "Needs you"; "Unread first in folders" puts them
+  // first in each section. None of them changes the layout.
   const chatOrder = useChatOrderPreference((state) => state.order);
-  // The manual order does not read the unread state, so a read does not build the list again.
+  // The manual and recent orders do not read the unread state, so a read does not build the list again.
   const unreadChatIds = useMemo(
     () =>
-      chatOrder === "manual"
+      chatOrder === "manual" || chatOrder === "recent"
         ? NO_CHAT_IDS
         : new Set<string>([
             ...unreadAgentIds,
@@ -500,7 +501,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [chatOrder, unreadAgentIds, openChannels],
   );
   const [dragging, setDragging] = useState(false);
-  // As on the desktop, an unread order holds still during a drag: a reply then does not move the rows
+  // As on the desktop, an order other than manual holds still during a drag: a reply then does not move the rows
   // under the finger. The list takes the new order when the drag ends.
   const heldItems = useRef<MobileSidebarItem[] | null>(null);
   const items = useMemo(() => {
@@ -523,6 +524,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           )
         : []),
       ...mobileSidebarItems(layout, listedAgents, listedChannels, undefined, t, {
+        recent: chatOrder === "recent",
         unreadFirst: chatOrder === "unread-first" ? unread : null,
         aside: grouped ? unread : null,
       }),
@@ -729,8 +731,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      // The unread-first order is not manual, so a drag in the list does not reorder it. Pins still work.
-      sections: sidebarLayout !== null && chatOrder !== "unread-first",
+      // The recent and unread-first orders are not manual, so a drag in the list does not reorder them.
+      // Pins still work.
+      sections: sidebarLayout !== null && !mobileChatOrderSortsSections(chatOrder),
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
       beginScroll: () => {
@@ -750,7 +753,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
       // Without manual sections, a drop in the list only unpins: it does not move the chat in the layout.
-      layout: () => (chatOrder === "unread-first" ? null : sidebarLayout),
+      layout: () => (mobileChatOrderSortsSections(chatOrder) ? null : sidebarLayout),
     }),
     [
       items,
@@ -912,8 +915,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
 
   const listTree = (
     <View className="flex-1 bg-background">
-      {/* The search field and the bar blur the home content. */}
-      <AndroidBlurTarget target={searchBlurTarget} surface="canvas">
+      {/* The bar blurs the home content. */}
+      <AndroidBlurTarget target={barBlurTarget} surface="canvas">
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
             // The scene has the insets of the welcome, so the characters stand in the same places on
@@ -1086,7 +1089,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <LargeTitleBar
           scroll={scroll}
           title={activeServer.name}
-          blurTarget={searchBlurTarget}
+          blurTarget={barBlurTarget}
           // The connection state takes the place of the title in the bar.
           hidden={!searchShows || statusShows || search.open}
         >
@@ -1098,7 +1101,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       {searchShows ? <HomeSearchResults search={search} barHeight={searchBarOffset} /> : null}
 
       {/* What's new covers home with the update block, so the field leaves while it shows. */}
-      {searchShows && !updateHeader.expanded ? <HomeSearchBar search={search} blurTarget={searchBlurTarget} /> : null}
+      {searchShows && !updateHeader.expanded ? <HomeSearchBar search={search} /> : null}
 
       {onboardingReady ? (
         // The flow fades out over the home, which comes in under it with its own reveal.

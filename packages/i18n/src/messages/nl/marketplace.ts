@@ -85,6 +85,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
   "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",
   "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
   "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
@@ -131,6 +132,7 @@ export const messages = {
     "{host} draait een oudere OpenBot-versie die geen apps kan koppelen. Werk OpenBot op {host} bij, of vraag de eigenaar dat te doen.",
   "marketplace.app.blocked.member":
     "Alleen een eigenaar of beheerder van {host} kan daar apps koppelen. Vraag een van hen om {name} te koppelen, of om OpenBot op {host} bij te werken zodat leden apps kunnen koppelen.",
+  "marketplace.app.blocked.mac": "{name} werkt alleen op een Mac waarop OpenBot draait.",
   "marketplace.app.connectAgain": "Opnieuw koppelen",
   "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
   "marketplace.app.automation.title": "Toegang tot Apple-apps",
@@ -388,8 +390,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Sla deze beslissing op als nieuwe notitie in mijn kluis.",
   "marketplace.plugin.obsidian.prompt.log":
     "Voeg een samenvatting van het werk van vandaag toe aan mijn notitie Work log.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    "Open in Obsidian Settings > Local REST API. Kopieer de API-sleutel en zet “Enable non-encrypted (HTTP) server” aan.",
+  "marketplace.plugin.obsidian.hint.apiKey": "Open in Obsidian Settings > Local REST API en kopieer de API-sleutel.",
   "marketplace.plugin.resend.tagline": "Transactionele e-mail",
   "marketplace.plugin.resend.description":
     "Met Resend kunnen agents transactionele e-mail versturen en de bezorging controleren via één API. Een API-sleutel uit het Resend-dashboard gaat als één omgevingsvariabele naar de lokale server.",
@@ -401,9 +402,9 @@ export const messages = {
     "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
   "marketplace.plugin.omnisend.tagline": "E-mail- en sms-marketing",
   "marketplace.plugin.omnisend.description":
-    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker meldt zich in de browser aan bij een eigen Omnisend-account en kiest het toegangsniveau op het toestemmingsscherm. Met schrijftoegang kunnen agents ook campagnes versturen en gegevens verwijderen. Kies alleen-lezen toegang als agents alleen rapporten nodig hebben.",
+    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker maakt verbinding met een API-sleutel uit het eigen Omnisend-account. Agents kunnen doen wat de sleutel toestaat, ook campagnes versturen en gegevens verwijderen.",
   "marketplace.plugin.omnisend.app":
-    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met aanmelding in de browser.",
+    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met een API-sleutel.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Hoe presteerden de campagnes van vorige week ten opzichte van de week ervoor?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -411,6 +412,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
   "marketplace.plugin.postiz.tagline": "Socialemediaplanning",
+  "marketplace.plugin.omnisend.hint.apiKey": "Open in Omnisend Store settings > API keys en maak een sleutel.",
   "marketplace.plugin.postiz.description":
     "Met Postiz kunnen agents je socialemediakanalen tonen en berichten opstellen, inplannen en publiceren op meer dan 30 netwerken, zoals X, LinkedIn, Instagram en TikTok. Agents kunnen ook media uploaden en AI-afbeeldingen en -video's maken. Log in de browser in op je Postiz-account, of plak de API-sleutel uit Settings › Developers in Postiz. Alle cloudabonnementen van Postiz bevatten API-toegang. Agents kunnen een bericht direct publiceren, dus controleer elk bericht voordat je het goedkeurt.",
   "marketplace.plugin.postiz.app":

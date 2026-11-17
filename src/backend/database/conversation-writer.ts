@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
-import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
+import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
@@ -190,12 +191,7 @@ export class ConversationWriter {
             WHERE projection_turns.completed_at IS NULL
           `).run(snapshot.activeTurnId, snapshot.threadId, snapshot.threadId, new Date().toISOString(), sequence);
         }
-        if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-          isDynamicRecord(payload) &&
-          "turnId" in payload &&
-          isString(payload.turnId)
-        ) {
+        if (isTurnEndEvent(eventType) && isDynamicRecord(payload) && "turnId" in payload && isString(payload.turnId)) {
           const status =
             "status" in payload && isString(payload.status)
               ? payload.status
@@ -606,9 +602,7 @@ export class ConversationWriter {
           `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
         }
         if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(
-            input.eventType,
-          ) &&
+          isTurnEndEvent(input.eventType) &&
           isDynamicRecord(input.detail) &&
           "turnId" in input.detail &&
           isString(input.detail.turnId)
@@ -891,19 +885,47 @@ export class ConversationWriter {
   }
 }
 
+/** The events that end a turn. Only their write closes the stored turn row. */
+export function isTurnEndEvent(eventType: string): boolean {
+  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType);
+}
+
 /** A turn-end event clears the active turn, so the turn it ends is only in its detail (#3722). */
 export function activityTurnId(eventType: string, detail: unknown, activeTurnId: string | null): string | null {
-  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-    isDynamicRecord(detail) &&
-    isString(detail.turnId)
-    ? detail.turnId
-    : activeTurnId;
+  return isTurnEndEvent(eventType) && isDynamicRecord(detail) && isString(detail.turnId) ? detail.turnId : activeTurnId;
+}
+
+/**
+ * A generated image that OpenBot could not save, or that stopped, keeps its status and its reason when
+ * provider history comes again. The history can mark the call completed but gives OpenBot no file, and
+ * a completed image with no file showed only "The generated image preview is unavailable" (#10267).
+ */
+export function keptUnsavedImage(
+  existing: ConversationMessage,
+  imported: ConversationMessage,
+  imageGeneration: ImageGenerationInfo | undefined,
+): Partial<ConversationMessage> {
+  if (
+    existing.itemType !== "image_generation" ||
+    (existing.status !== "failed" && existing.status !== "interrupted") ||
+    existing.attachments?.length ||
+    imported.attachments?.length
+  )
+    return {};
+  const stored = existing.imageGeneration;
+  return {
+    status: existing.status,
+    ...(stored?.error === undefined
+      ? {}
+      : { imageGeneration: { ...(imageGeneration ?? stored), error: stored.error } }),
+  };
 }
 
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
   const turnId = existing.turnId ?? imported.turnId;
+  const imageGeneration = mergeImageGenerationInfo(existing.imageGeneration, imported.imageGeneration);
   return {
     ...existing,
     ...imported,
@@ -916,6 +938,8 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+    ...(imageGeneration ? { imageGeneration } : {}),
+    ...keptUnsavedImage(existing, imported, imageGeneration),
   };
 }
 

@@ -8,11 +8,14 @@ import {
   axValue,
   type CdpResult,
   exceptionDescription,
+  frameAutomationContextId,
   frameIds,
+  isFrameGone,
   isRecord,
   numberValue,
   recordValue,
   type SendCommand,
+  skipGoneFrame,
   stringValue,
   textMatches,
 } from "./browser-cdp-values";
@@ -34,6 +37,8 @@ const MAX_CANDIDATE_TEXT = 120;
 const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
+/** The frames of all captures that get their own walk, after the root frame of each capture. */
+const MAX_FRAME_DOCUMENTS = 12;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 /**
  * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
@@ -49,14 +54,30 @@ const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
  */
 type HiddenSubtreeRule = "strict" | "drawn" | "drawn-usable";
 
+/** SVG elements whose content the browser never draws where it is in the document. */
+const SVG_RESOURCE_TAGS = [
+  "clipPath",
+  "defs",
+  "filter",
+  "linearGradient",
+  "marker",
+  "mask",
+  "pattern",
+  "radialGradient",
+  "symbol",
+];
+
 function skipHiddenSubtrees(rule: HiddenSubtreeRule): string {
   const strict = rule === "strict";
   return `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
   // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
   if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
+  // An SVG resource is drawn only where a use, fill, clip or mask references it, never in place.
+  // An icon sprite of thousands of symbols would otherwise use the budget before the page (#9897).
+  let hidden = node.namespaceURI === 'http://www.w3.org/2000/svg' && ${JSON.stringify(SVG_RESOURCE_TAGS)}.includes(node.localName);
   // The attributes, not the properties: a form control named "hidden" or "inert" replaces the form's property (#7187).
-  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
+  hidden ||= Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (${strict} && style.opacity === '0');
@@ -98,6 +119,8 @@ export interface TargetRecord {
   visibleText: string;
   /** The fallback pass found it, so an action checks it with the same rules. */
   drawnOnly?: true;
+  /** It is in a frame that the walk of the capture's root frame cannot enter, so checks run in its frame. */
+  ownFrame?: true;
 }
 
 export interface SnapshotTarget {
@@ -144,13 +167,27 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   let hasFrame = captures.length > 1;
   let hasRoot = true;
   let truncated = false;
+  const documents: Array<{ capture: SnapshotTarget; contextId?: number }> = [];
+  let frameBudget = MAX_FRAME_DOCUMENTS;
   for (const capture of captures) {
+    documents.push({ capture });
+    const frames = yield* frameDocumentContexts(send, capture.sessionId, frameBudget).pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+    frameBudget -= frames.length;
+    documents.push(...frames.map((contextId) => ({ capture, contextId })));
+  }
+  for (const { capture, contextId } of documents) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText, drawnOnly).pipe(
-        Effect.catch(() => Effect.succeed(null)),
-      );
+      const summary = yield* collectPageSummaryEffect(
+        send,
+        capture.sessionId,
+        remainingText,
+        drawnOnly,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
       if (summary) {
         if (summary.text) {
           textParts.push(summary.text);
@@ -159,17 +196,17 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
-        if (!capture.sessionId) hasRoot = summary.hasRoot;
+        if (!capture.sessionId && contextId === undefined) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
     if (remainingElements <= 0) continue;
     const candidates =
-      capture.sessionId && deadline === undefined
-        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly).pipe(
+      (capture.sessionId || contextId !== undefined) && deadline === undefined
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, undefined, contextId).pipe(
             Effect.catch(() => Effect.succeed([])),
           )
-        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline);
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline, contextId);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -200,6 +237,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         element,
         visibleText: candidate.visibleText,
         ...(drawnOnly ? { drawnOnly: true as const } : {}),
+        ...(contextId === undefined ? {} : { ownFrame: true as const }),
       });
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
@@ -216,13 +254,52 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   };
 });
 
+/**
+ * The automation worlds of the frames of a capture that the walk of their parent cannot enter: a frame
+ * whose origin differs from its parent frame's, also when it is in the same process, as Apple's sign-in
+ * frame on another apple.com host (#10148). A frame of another process is a capture of its own.
+ */
+const frameDocumentContexts = Effect.fn("Browser.frameDocumentContexts")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  limit: number,
+) {
+  if (limit <= 0) return [];
+  const tree = recordValue((yield* send("Page.getFrameTree", {}, sessionId)).frameTree);
+  const frames: string[] = [];
+  const pending = (Array.isArray(tree?.childFrames) ? tree.childFrames : []).map((child) => ({
+    child: recordValue(child),
+    parentOrigin: stringValue(recordValue(tree?.frame)?.securityOrigin),
+  }));
+  while (pending.length > 0 && frames.length < limit) {
+    const next = pending.shift();
+    const frame = recordValue(next?.child?.frame);
+    const id = stringValue(frame?.id);
+    const origin = stringValue(frame?.securityOrigin);
+    if (id && origin !== next?.parentOrigin) frames.push(id);
+    const children = next?.child?.childFrames;
+    if (Array.isArray(children))
+      pending.push(...children.map((child) => ({ child: recordValue(child), parentOrigin: origin })));
+  }
+  const contexts: number[] = [];
+  for (const frameId of frames) {
+    // A frame that detached since the tree was read, or that has no world, has nothing to read.
+    const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+    );
+    if (contextId !== undefined) contexts.push(contextId);
+  }
+  return contexts;
+});
+
 const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(function* (
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
   drawnOnly: boolean,
+  frameContextId?: number,
 ) {
-  const contextId = yield* automationContextId(send, sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, sessionId));
   const result = yield* send(
     "Runtime.evaluate",
     {
@@ -361,7 +438,10 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     const scanBudgetMs = Math.max(1, deadline - Date.now());
-    const contextId = yield* automationContextId(send, capture.sessionId);
+    const contextId = yield* automationContextId(send, capture.sessionId).pipe(
+      skipGoneFrame(capture.sessionId, undefined),
+    );
+    if (contextId === undefined) continue;
     const result = yield* send(
       "Runtime.evaluate",
       {
@@ -516,8 +596,15 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
   const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
-  for (const frameId of frameIds(frameTree)) {
-    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+  const ids = frameIds(frameTree);
+  for (const frameId of ids) {
+    // A child frame that the page removed after the tree was read has no match.
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId).pipe(
+      Effect.catchIf(
+        (failure) => frameId !== ids[0] && isFrameGone(failure),
+        () => Effect.succeed({ nodes: [] }),
+      ),
+    );
     yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;
@@ -735,13 +822,14 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   limit: number,
   drawnOnly: boolean,
   deadline?: number,
+  frameContextId?: number,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* Effect.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)], {
     concurrency: "unbounded",
   });
   yield* browserSync(() => assertBeforeDeadline(deadline));
-  const contextId = yield* automationContextId(send, capture.sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, capture.sessionId));
   const results: Array<{
     backendNodeId: number;
     node: CdpResult;

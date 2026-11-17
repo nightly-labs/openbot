@@ -109,6 +109,7 @@ type McpDropReason =
   | "command_not_found"
   | "working_directory_unsupported"
   | "name_conflict"
+  | "provider_limit"
   | "unusable"
   | "failed_to_start";
 
@@ -178,7 +179,7 @@ export type UsableMcpServer =
       proxied?: undefined;
       error: string;
       /** Machine-readable beside the sentence, so a reporter never has to match on the wording. */
-      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict">;
+      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict" | "provider_limit">;
     };
 
 /** The failed arm, for the readers that have already narrowed to it. */
@@ -545,7 +546,8 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * arguments and an environment, so a server that names a directory is left out rather than started
  * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
  * create a second, empty database beside the agent's workspace. The form says so before the save,
- * the row says so afterwards, and the hand-off reports it as a drop.
+ * the row says so afterwards, and the hand-off reports it as a drop. A client that starts stdio
+ * servers itself (`relayStdioMcpServers`) takes the directory as `cwd`, which stays in OpenBot.
  *
  * **Names travel as `providerMcpServerName`.** Antigravity refuses `session/new` with `invalid
  * params` when one name has a space, so a server the user named "My Server" failed every Gemini
@@ -555,7 +557,7 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * **A name the agent's own files already use travels as `openbot_<name>`.** See `acpMcpServerName`.
  */
 export type AcpMcpServer =
-  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }>; cwd?: string }
   | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
 
 /**
@@ -594,6 +596,13 @@ export function acpMcpServers(
   servers: readonly UsableMcpServer[],
   own: readonly string[] = [],
   form?: (name: string) => string,
+  /** OpenBot starts the stdio servers itself (`relayStdioMcpServers`), so it can use their directory. */
+  relaysStdio = false,
+  /**
+   * The number of the user's servers that the agent takes (`AcpFlavor.mcpServerLimit`). The servers
+   * after it are reported as dropped, so the session still opens.
+   */
+  limit = Number.POSITIVE_INFINITY,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -604,6 +613,14 @@ export function acpMcpServers(
       continue;
     }
     const { config } = server;
+    if (entries.length >= limit) {
+      dropped.push({
+        name: config.name,
+        reason: "provider_limit",
+        detail: sourceText("error.backend.mcpProviderLimit"),
+      });
+      continue;
+    }
     const name = acpMcpServerName(config, own, form);
     if (
       entries.some((entry) => entry.name === name) ||
@@ -613,7 +630,7 @@ export function acpMcpServers(
       continue;
     }
     if (config.transport === "stdio") {
-      if (config.workingDirectory) {
+      if (config.workingDirectory && !relaysStdio) {
         dropped.push({
           name: config.name,
           reason: "working_directory_unsupported",
@@ -626,6 +643,7 @@ export function acpMcpServers(
         command: server.command,
         args: server.args,
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
+        ...(config.workingDirectory ? { cwd: server.workingDirectory } : {}),
       });
     } else {
       entries.push({

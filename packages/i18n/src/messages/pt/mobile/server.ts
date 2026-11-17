@@ -457,7 +457,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Nenhum fuso horário corresponde à busca.",
   "mobile.server.settings.timezoneMore": "Digite mais do nome para ver outros fusos horários.",
   "mobile.server.settings.timezoneDescription":
-    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
+    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "mobile.server.settings.timezoneLoading": "Carregando fuso horário…",
   "mobile.server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
   "mobile.server.settings.timezoneSaveFailed": "Não foi possível salvar o fuso horário. Tente de novo.",
@@ -918,10 +918,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Vincular de novo",
   "mobile.server.connectors.whatsapp.ownNumber": "Número pessoal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Desative para um número só para o OpenBot.",
+    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
   "mobile.server.connectors.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Desative para enviar só a resposta.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Reações de status",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "O OpenBot reage com 👀 quando uma mensagem chega e com ✅ quando a resposta está pronta. Desative para não enviar reações.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestrador do WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recebe as mensagens para o OpenBot de todos os seus números vinculados. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e responde no WhatsApp.",
@@ -938,10 +941,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Número",
   "mobile.server.connectors.whatsapp.kindPersonal": "Meu número pessoal",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir.",
+    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir. Outras pessoas não recebem resposta.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Um número só para o OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Pessoas desconhecidas recebem um código para passar a você. Você as aprova aqui.",
+    "O OpenBot responde deste número a cada pessoa desconhecida com um código para passar a você. Você as aprova aqui.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Número de telefone",
   "mobile.server.connectors.whatsapp.phoneDescription": "Com o código do país, como +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Digite o número de telefone com o código do país.",
@@ -1105,6 +1108,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Não instalado",
   "mobile.server.providers.status.checking": "Verificando",
+  "mobile.server.providers.addAccountWithCode": "Adicionar conta com código",
+  "mobile.server.providers.accountSignInWithCode": "Entrar com código",
   "mobile.server.providers.accountsKeyHint":
     "Cada agente usa uma conta. Escolha-a nas configurações do agente. Uma conta nova precisa de uma chave de API dessa conta.",
   "mobile.server.providers.accountChangeKey": "Alterar chave",
@@ -1155,6 +1160,22 @@ export const messages = {
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed":
     "Não foi possível carregar o tamanho de compactação deste servidor.",
+  "mobile.server.environment.row": "Variáveis",
+  "mobile.server.environment.title": "Ambiente",
+  "mobile.server.environment.hint":
+    "Chaves de API, URLs base e outras configurações que cada processo do {name} recebe. Uma mudança vale quando os turnos atuais terminam.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, com OPENAI_API_KEY como chave, envia as solicitações de modelo do ChatGPT para esse endereço.",
+  "mobile.server.environment.shellNote": "Os comandos que os agentes executam podem ler esses valores.",
+  "mobile.server.environment.add": "Adicionar variável",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Valor",
+  "mobile.server.environment.saved": "Salva",
+  "mobile.server.environment.sensitive": "Sensível",
+  "mobile.server.environment.remove": "Remover",
+  "mobile.server.environment.save": "Salvar",
+  "mobile.server.environment.loadFailed": "Não foi possível carregar as variáveis do {name}.",
+  "mobile.server.environment.invalid": "Corrija os nomes primeiro.",
   "mobile.server.providers.disconnect": "Desconectar",
   "mobile.server.providers.disconnectTitle": "Desconectar {name}?",
   "mobile.server.providers.disconnectBody":

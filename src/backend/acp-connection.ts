@@ -221,10 +221,11 @@ export class AcpConnection {
     this: AcpConnection,
     error: unknown,
     ended: Deferred.Deferred<ProcessEnd> | null,
+    serverLost = false,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
     if (!ended || this.#stopping) return yield* providerSync(() => error);
     const message = error instanceof Error ? error.message : "";
-    if (message !== "ACP connection closed" && message !== "ACP client is not running.")
+    if (!serverLost && message !== "ACP connection closed" && message !== "ACP client is not running.")
       return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),

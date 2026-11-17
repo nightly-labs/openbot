@@ -329,6 +329,45 @@ export class RoutineScheduler implements RoutineDueSource {
     return routine;
   }
 
+  /**
+   * Keeps why a routine is paused when a scheduled run of its own paused it (#10048), so Routines and
+   * the chat card say so. A failure of this record leaves the pause as it is.
+   */
+  notePausedByRun(agentId: string, routineId: string, scheduledFor: string): void {
+    try {
+      this.#routines.markPausedByRun(routineId, { scheduledFor });
+    } catch (error) {
+      logger.warn("OpenBot could not keep why a run paused its routine.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    this.stateChanged(agentId);
+  }
+
+  /**
+   * Turns on again the routine that a run paused before it reported a failure (#9856). Its card joins
+   * the run's turn, as the card of the pause did. A routine that changed after the pause, such as one
+   * that the user edited or deleted, stays as it is ("kept"). "failed" when the change failed.
+   */
+  resumeAfterFailedRun(
+    pause: { agentId: string; routineId: string; updatedAt: string },
+    params: DynamicToolCallParams,
+  ): "resumed" | "kept" | "failed" {
+    const { agentId, routineId } = pause;
+    const current = this.#routines.get(agentId, routineId);
+    if (current === null || current.active || current.updatedAt !== pause.updatedAt) return "kept";
+    try {
+      this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
+      return "resumed";
+    } catch (error) {
+      logger.warn("A routine that a failed run paused could not be turned on again.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return "failed";
+    }
+  }
+
   /** Routines of every trigger kind, for the events surface. */
   listRecords(agentId: string): OwnedRoutineRecord[] {
     this.#conversation.requireKnownAgent(agentId);
@@ -1013,6 +1052,8 @@ export class RoutineScheduler implements RoutineDueSource {
       run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
       agentId: string;
       text: string;
+      /** Files of this host that the message carries as copies, such as the pictures of a workflow's image steps. */
+      sourcePaths?: readonly string[];
       idempotencyKey: string;
     },
   ) {
@@ -1035,6 +1076,7 @@ export class RoutineScheduler implements RoutineDueSource {
         recipientAgentIds: [agent.id],
         text: input.text,
         draftIds: [],
+        sourcePaths: [...(input.sourcePaths ?? [])],
         replyToMessageId: null,
         idempotencyKey: input.idempotencyKey,
       })

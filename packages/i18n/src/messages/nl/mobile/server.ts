@@ -455,7 +455,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Geen tijdzone komt overeen met deze zoekopdracht.",
   "mobile.server.settings.timezoneMore": "Typ meer van de naam om andere tijdzones te zien.",
   "mobile.server.settings.timezoneDescription":
-    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt.",
+    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "mobile.server.settings.timezoneLoading": "Tijdzone laden…",
   "mobile.server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
   "mobile.server.settings.timezoneSaveFailed": "Kan de tijdzone niet opslaan. Probeer het opnieuw.",
@@ -883,10 +883,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
@@ -903,10 +906,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Nummer",
   "mobile.server.connectors.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat. Andere mensen krijgen geen antwoord.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+    "OpenBot antwoordt vanaf dit nummer elke onbekende persoon met een code om aan jou te geven. Je keurt ze hier goed.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Telefoonnummer",
   "mobile.server.connectors.whatsapp.phoneDescription": "Met de landcode, zoals +31 6 12345678.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Typ het telefoonnummer met de landcode.",
@@ -1065,6 +1068,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.addAccountWithCode": "Account toevoegen met code",
+  "mobile.server.providers.accountSignInWithCode": "Inloggen met code",
   "mobile.server.providers.accountsKeyHint":
     "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
   "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",
@@ -1113,6 +1118,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Standaard van Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
+  "mobile.server.environment.row": "Variabelen",
+  "mobile.server.environment.title": "Omgeving",
+  "mobile.server.environment.hint":
+    "API-sleutels, basis-URL’s en andere instellingen die elk {name}-proces krijgt. Een wijziging geldt als de lopende beurten klaar zijn.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL stuurt met OPENAI_API_KEY als sleutel de modelverzoeken van ChatGPT naar dat adres.",
+  "mobile.server.environment.shellNote": "De opdrachten die agents uitvoeren, kunnen deze waarden lezen.",
+  "mobile.server.environment.add": "Variabele toevoegen",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Waarde",
+  "mobile.server.environment.saved": "Opgeslagen",
+  "mobile.server.environment.sensitive": "Gevoelig",
+  "mobile.server.environment.remove": "Verwijderen",
+  "mobile.server.environment.save": "Opslaan",
+  "mobile.server.environment.loadFailed": "Kan de variabelen van {name} niet laden.",
+  "mobile.server.environment.invalid": "Verbeter eerst de namen.",
   "mobile.server.providers.disconnect": "Ontkoppelen",
   "mobile.server.providers.disconnectTitle": "{name} ontkoppelen?",
   "mobile.server.providers.disconnectBody":

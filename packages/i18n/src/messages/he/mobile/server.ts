@@ -574,7 +574,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "אין אזור זמן שמתאים לחיפוש הזה.",
   "mobile.server.settings.timezoneMore": "יש להקליד עוד מהשם כדי לראות אזורי זמן אחרים.",
   "mobile.server.settings.timezoneDescription":
-    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח.",
+    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "mobile.server.settings.timezoneLoading": "טוען אזור זמן…",
   "mobile.server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
   "mobile.server.settings.timezoneSaveFailed": "לא ניתן לשמור את אזור הזמן. אפשר לנסות שוב.",
@@ -832,6 +832,17 @@ export const messages = {
   "mobile.server.vault.variableNameHint":
     "משתנה הסביבה שתוכנית קוראת: אותיות גדולות באנגלית, ספרות ו-_. סוכנים מוצאים את המפתח לפי השם הזה.",
   "mobile.server.vault.apiKey": "מפתח API",
+  "mobile.server.vault.agents": "סוכנים",
+  "mobile.server.vault.agentsAll": "כל הסוכנים",
+  "mobile.server.vault.agentsAllHint": "„כל הסוכנים” כולל גם כל סוכן שיתווסף בהמשך.",
+  "mobile.server.vault.agentsNone": "יש לבחור לפחות סוכן אחד.",
+  "mobile.server.vault.agentsSome": "{chosen} מתוך {total}",
+  "mobile.server.vault.agentsListed": "סוכנים: {agents}",
+  "mobile.server.vault.searchAgents": "חיפוש סוכנים",
+  "mobile.server.vault.noAgentMatches": "אין סוכנים שתואמים לחיפוש.",
+  "mobile.server.vault.agentOptions": "אפשרויות",
+  "mobile.server.vault.selectAll": "בחירת הכול",
+  "mobile.server.vault.deselectAll": "ביטול הבחירה",
   "mobile.server.vault.delete": "מחיקת פריט",
   "mobile.server.vault.deleteTitle": "למחוק את הפריט הזה?",
   "mobile.server.vault.deleteBody": "סוכנים ב-{host} לא יוכלו עוד להשתמש בו. אי אפשר לבטל את הפעולה.",
@@ -1202,10 +1213,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר ששייך רק ל-OpenBot.",
+    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
+  "mobile.server.connectors.whatsapp.statusReactions": "תגובות סטטוס",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים, ועונה ב-WhatsApp.",
@@ -1221,10 +1235,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "מספר",
   "mobile.server.connectors.whatsapp.kindPersonal": "המספר האישי שלי",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת.",
+    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת. אנשים אחרים לא מקבלים תשובה.",
   "mobile.server.connectors.whatsapp.kindDedicated": "מספר ששייך רק ל-OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "אנשים לא מוכרים מקבלים קוד למסור לך. את האישור נותנים כאן.",
+    "OpenBot משיב מהמספר הזה לכל אדם לא מוכר עם קוד שיש למסור לך. את האישור נותנים כאן.",
   "mobile.server.connectors.whatsapp.phoneLabel": "מספר טלפון",
   "mobile.server.connectors.whatsapp.phoneDescription": "עם קידומת המדינה, למשל +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "יש להקליד את מספר הטלפון עם קידומת המדינה.",
@@ -1385,11 +1399,13 @@ export const messages = {
   "mobile.server.providers.accountsOnComputer":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון מוסיפים ב-OpenBot במחשב.",
   "mobile.server.providers.addAccount": "הוספת חשבון",
+  "mobile.server.providers.addAccountWithCode": "הוספת חשבון עם קוד",
   "mobile.server.providers.accountGone": "החשבון הזה כבר לא נמצא בשרת הזה.",
   "mobile.server.providers.accountFailed": "לא ניתן לשנות את החשבון הזה. אפשר לנסות שוב.",
   "mobile.server.providers.accountName": "שם",
   "mobile.server.providers.accountNameHint": "מוצג רק לך ולמנהלי השרת הזה. אם השדה ריק, יוצג האימייל.",
   "mobile.server.providers.accountSignInAgain": "התחברות מחדש",
+  "mobile.server.providers.accountSignInWithCode": "התחברות עם קוד",
   "mobile.server.providers.accountsKeyHint":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון חדש צריך מפתח API של אותו חשבון.",
   "mobile.server.providers.accountChangeKey": "החלפת מפתח",
@@ -1439,6 +1455,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "ברירת המחדל של Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} טוקנים",
   "mobile.server.providers.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
+  "mobile.server.environment.row": "משתנים",
+  "mobile.server.environment.title": "סביבה",
+  "mobile.server.environment.hint":
+    "מפתחות API, כתובות בסיס והגדרות אחרות שכל תהליך של {name} מקבל. שינוי חל כשהתורות הנוכחיים מסתיימים.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, עם OPENAI_API_KEY כמפתח שלו, שולח את בקשות המודל של ChatGPT לכתובת הזו.",
+  "mobile.server.environment.shellNote": "הפקודות שסוכנים מריצים יכולות לקרוא את הערכים האלה.",
+  "mobile.server.environment.add": "הוספת משתנה",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "ערך",
+  "mobile.server.environment.saved": "נשמר",
+  "mobile.server.environment.sensitive": "רגיש",
+  "mobile.server.environment.remove": "הסרה",
+  "mobile.server.environment.save": "שמירה",
+  "mobile.server.environment.loadFailed": "לא ניתן לטעון את המשתנים של {name}.",
+  "mobile.server.environment.invalid": "תקנו קודם את השמות.",
   "mobile.server.providers.disconnect": "ניתוק",
   "mobile.server.providers.disconnectTitle": "לנתק את {name}?",
   "mobile.server.providers.disconnectBody":

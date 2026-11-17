@@ -11,6 +11,11 @@ export const messages = {
     "{provider} kan geen verbinding maken met zijn server. Poging {attempt} van {maxAttempts}.",
   "status.provider.retryServerError":
     "De server van {provider} is bezet of heeft een fout. Poging {attempt} van {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} kan geen verbinding maken met de modelaanbieder. Nieuwe poging: {attempt}.",
+  "status.provider.modelRetryServerError":
+    "De modelaanbieder is bezet of heeft een fout. {provider} probeert het opnieuw: poging {attempt}.",
+  "status.provider.modelRetryRecovered": "De modelaanbieder antwoordt weer.",
   "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude antwoordde op de standaardsnelheid. Met een Claude-abonnement gebruikt de snelle modus gebruikstegoed. Schakel het in je Claude-account in.",

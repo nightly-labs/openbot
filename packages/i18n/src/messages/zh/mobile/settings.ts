@@ -58,7 +58,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "清空支持日志？",
   "mobile.settings.support.clearBody": "这会删除这台手机上日志中的所有事件。",
   "mobile.settings.support.logFooter":
-    "日志只保存在这台手机上，OpenBot 不会发送它。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
+    "日志保存在这台手机上。只有在你发送手机应用的错误报告时，OpenBot 才会随报告发送其中几行，报告卡片会先显示这些内容。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
   "mobile.settings.support.saveFailed": "无法保存日志文件，请重试。",
   "mobile.settings.support.sharingUnavailable": "这台手机不支持分享。",
   "mobile.settings.support.newestFirst": "最新的在最前面。",
@@ -118,19 +118,29 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "亮度",
   "mobile.settings.appearance.messageColorFooter":
     "选择助手颜色时，助手对话中你的消息使用该助手的颜色。选择自定义颜色时，所有对话中你的消息使用你选的颜色。文字颜色会自动调整，保持清晰可读。",
+  "mobile.settings.appearance.chatBackground": "聊天背景",
+  "mobile.settings.appearance.chatBackgroundDefault": "默认",
+  "mobile.settings.appearance.chatBackgroundFooter": "每个主题保留各自的颜色。让文字难以阅读的颜色会变深或变浅。",
   "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",
+  "mobile.settings.appearance.replyDetails": "回复详情",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "关闭某项详情即可在聊天中隐藏对应的行。智能体仍会思考、运行子智能体并保存记忆。",
+  "mobile.settings.appearance.showThinking": "显示智能体的思考",
+  "mobile.settings.appearance.showSubagents": "显示子智能体",
+  "mobile.settings.appearance.showMemoryChanges": "显示已保存的记忆",
+  "mobile.settings.appearance.fullVisuals": "完整显示可视化预览",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "智能体的可视化内容在聊天中按完整高度显示。关闭时，较高的内容会被截断，轻点即可查看全部。",
   "mobile.settings.animations.title": "动画",
-  "mobile.settings.animations.footer":
-    "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
-  "mobile.settings.animations.all": "动画",
+  "mobile.settings.animations.fullMotion": "完整动态",
+  "mobile.settings.animations.reduced": "减弱",
+  "mobile.settings.animations.motionFooter":
+    "“减弱”会减少整个应用中的动态效果，并让下方动画保持关闭。手机设置中开启“减弱动态效果”时，应用也会减少动态效果。",
   "mobile.settings.animations.agentFaces": "助手表情动画",
   "mobile.settings.animations.agentFacesFooter":
     "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止，欢迎页和空白主页上的角色也不再漂浮。",
-  "mobile.settings.animations.composerResize": "紧凑输入框",
-  "mobile.settings.animations.composerResizeFooter":
-    "键盘收起时输入框变成一条小工具栏。关闭该选项后输入框保持完整高度。",
   "mobile.settings.animations.textReveal": "回复打字动画",
   "mobile.settings.animations.textRevealFooter": "回复会逐词显示，气泡平滑变大。关闭该选项后文字随到随显。",
   "mobile.settings.animations.searchTransitions": "搜索结果动画",
@@ -218,6 +228,22 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "自动下载大文件",
   "mobile.settings.conversations.largeFilesFooter":
     "超过 {small} 的图片、视频和音频只在你轻点时下载。开启后，{large} 以内的会立即下载。这可能会使用大量移动数据。",
+  "mobile.settings.conversations.messageField": "消息框",
+  "mobile.settings.conversations.compact": "紧凑",
+  "mobile.settings.conversations.fullSize": "完整大小",
+  "mobile.settings.conversations.compactFooter": "“紧凑”会在键盘关闭时把消息框变成一个小条。",
+  "mobile.settings.conversations.compactComposerReduced":
+    "已在“动画”或手机设置中减弱动态效果，因此消息框保持完整大小。",
+  "mobile.settings.conversations.media": "照片和文件",
+  "mobile.settings.conversations.swipeLeft": "在助手聊天中向左滑动",
+  "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
+  "mobile.settings.conversations.swipeThreads": "话题",
+  "mobile.settings.conversations.swipeBrowser": "浏览器",
+  "mobile.settings.conversations.swipeOff": "关闭",
+  "mobile.settings.conversations.swipeFooter":
+    "在助手聊天中朝返回的反方向滑动会打开此项。在消息上同样滑动会显示消息的时间。",
+  "mobile.settings.conversations.pullInfo": "上拉查看信息",
+  "mobile.settings.conversations.pullInfoFooter": "在聊天、频道或话题中越过最新消息继续上拉并松开，即可打开其信息。",
   "mobile.settings.conversations.fullQualityPhotos": "以原始画质发送照片",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "关闭时，应用会发送每张照片的较小副本，长边最多 2048 像素，在慢速连接上更快送达。打开后发送原始照片。",

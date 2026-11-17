@@ -507,7 +507,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Żadna strefa czasowa nie pasuje do wyszukiwania.",
   "mobile.server.settings.timezoneMore": "Wpisz więcej liter nazwy, aby zobaczyć inne strefy czasowe.",
   "mobile.server.settings.timezoneDescription":
-    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
+    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "mobile.server.settings.timezoneLoading": "Wczytywanie strefy czasowej…",
   "mobile.server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
   "mobile.server.settings.timezoneSaveFailed": "Nie udało się zapisać strefy czasowej. Spróbuj ponownie.",
@@ -1014,10 +1014,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
   "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Wyłącz dla numeru tylko dla OpenBot.",
+    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "mobile.server.connectors.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Reakcje stanu",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reaguje 👀, gdy przychodzi wiadomość, i ✅, gdy odpowiedź jest gotowa. Wyłącz, aby nie wysyłać reakcji.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Ten agent odbiera wiadomości do OpenBot ze wszystkich twoich połączonych numerów. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i odpowiada w WhatsApp.",
@@ -1034,10 +1037,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Numer",
   "mobile.server.connectors.whatsapp.kindPersonal": "Mój numer prywatny",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz.",
+    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz. Inne osoby nie dostają odpowiedzi.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Numer tylko dla OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Nieznane osoby dostają kod, który mają ci przekazać. Zatwierdzasz je tutaj.",
+    "OpenBot odpowiada z tego numeru każdej nieznanej osobie kodem, który ma ci przekazać. Zatwierdzasz je tutaj.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Numer telefonu",
   "mobile.server.connectors.whatsapp.phoneDescription": "Z kodem kraju, np. +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Wpisz numer telefonu z kodem kraju.",
@@ -1200,6 +1203,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Zainstalowano",
   "mobile.server.providers.status.notInstalled": "Nie zainstalowano",
   "mobile.server.providers.status.checking": "Sprawdzanie",
+  "mobile.server.providers.addAccountWithCode": "Dodaj konto kodem",
+  "mobile.server.providers.accountSignInWithCode": "Zaloguj się kodem",
   "mobile.server.providers.accountsKeyHint":
     "Każdy agent używa jednego konta. Wybierz je w ustawieniach agenta. Nowe konto wymaga klucza API tego konta.",
   "mobile.server.providers.accountChangeKey": "Zmień klucz",
@@ -1249,6 +1254,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Domyślne Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} tokenów",
   "mobile.server.providers.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
+  "mobile.server.environment.row": "Zmienne",
+  "mobile.server.environment.title": "Środowisko",
+  "mobile.server.environment.hint":
+    "Klucze API, bazowe adresy URL i inne ustawienia, które dostaje każdy proces {name}. Zmiana działa po zakończeniu bieżących tur.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL z kluczem OPENAI_API_KEY wysyła zapytania ChatGPT do modeli pod ten adres.",
+  "mobile.server.environment.shellNote": "Polecenia uruchamiane przez agentów mogą odczytać te wartości.",
+  "mobile.server.environment.add": "Dodaj zmienną",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Wartość",
+  "mobile.server.environment.saved": "Zapisana",
+  "mobile.server.environment.sensitive": "Poufna",
+  "mobile.server.environment.remove": "Usuń",
+  "mobile.server.environment.save": "Zapisz",
+  "mobile.server.environment.loadFailed": "Nie udało się wczytać zmiennych {name}.",
+  "mobile.server.environment.invalid": "Najpierw popraw nazwy.",
   "mobile.server.providers.disconnect": "Rozłącz",
   "mobile.server.providers.disconnectTitle": "Rozłączyć {name}?",
   "mobile.server.providers.disconnectBody":

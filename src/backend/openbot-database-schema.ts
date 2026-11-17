@@ -17,6 +17,7 @@ import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
 import { BROWSER_PROXY_SCHEMA_SQL } from "./browser-profiles/browser-proxy-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { CRM_SCHEMA_SQL } from "./crm/crm-schema";
 import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schema";
 import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
 import { PINNED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/pinned-thread-messages-schema";
@@ -656,7 +657,8 @@ const LATEST_SCHEMA_SQL =
   MESSAGING_PINGS_SCHEMA_SQL +
   V60_AGENT_MEMORY_SITE_INDEX_SQL +
   PINNED_THREAD_MESSAGES_SCHEMA_SQL +
-  MESSAGING_HISTORY_SCHEMA_SQL;
+  MESSAGING_HISTORY_SCHEMA_SQL +
+  CRM_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -1037,9 +1039,25 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // was saved before it, so the table starts empty and each number saves what it sees from then on.
     up: (db) => db.exec(MESSAGING_HISTORY_SCHEMA_SQL),
   },
+  {
+    version: 63,
+    // Only creates tables and their indexes, and adds the three built-in statuses, so no foreign-key
+    // pause and no vacuum. No CRM data was saved before it, so the other tables start empty.
+    up: (db) => db.exec(CRM_SCHEMA_SQL),
+  },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
+
+/**
+ * True when `migrateOpenBotDatabase` will build a new database or run a migration. Both end with the
+ * full check on this connection, so a check elsewhere before them would only read the file twice.
+ */
+export function openBotDatabaseNeedsMigration(db: DatabaseSync): boolean {
+  if (!hasExistingSchema(db)) return true;
+  const currentVersion = latestAppliedVersion(readAppliedVersions(db));
+  return MIGRATIONS.some((migration) => migration.version > currentVersion);
+}
 
 export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrationOptions = {}): void {
   validateMigrationRegistry();
@@ -1272,10 +1290,16 @@ function readOldForeignKeyViolations(db: DatabaseSync): Map<string, number> {
 }
 
 function assertQuickCheck(db: DatabaseSync): void {
-  const problems = db
-    .prepare("PRAGMA quick_check(20)")
-    .all()
-    .map((row) => (isDynamicRecord(row) ? row.quick_check : row));
+  assertQuickCheckResult(
+    db
+      .prepare("PRAGMA quick_check(20)")
+      .all()
+      .map((row) => (isDynamicRecord(row) ? row.quick_check : row)),
+  );
+}
+
+/** Throws the integrity error unless the lines of a `PRAGMA quick_check` are the one line "ok". */
+export function assertQuickCheckResult(problems: readonly unknown[]): void {
   if (problems.length === 1 && problems[0] === "ok") return;
   // The lines name the damaged pages and tables, which tell a page left by a disk save from a bad index.
   logger.error("The OpenBot database failed its integrity check.", { problems });

@@ -458,7 +458,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Bu aramayla eşleşen saat dilimi yok.",
   "mobile.server.settings.timezoneMore": "Diğer saat dilimlerini görmek için adın devamını yazın.",
   "mobile.server.settings.timezoneDescription":
-    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
+    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "mobile.server.settings.timezoneLoading": "Saat dilimi yükleniyor…",
   "mobile.server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
   "mobile.server.settings.timezoneSaveFailed": "Saat dilimi kaydedilemedi. Tekrar deneyin.",
@@ -911,10 +911,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Yeniden bağla",
   "mobile.server.connectors.whatsapp.ownNumber": "Kişisel numara",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Durum tepkileri",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
@@ -931,10 +934,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Numara",
   "mobile.server.connectors.whatsapp.kindPersonal": "Kişisel numaram",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar. Diğer kişiler yanıt almaz.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+    "OpenBot bu numaradan tanımadığınız her kişiye, size iletmesi için bir kodla yanıt verir. Onları burada onaylarsınız.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Telefon numarası",
   "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123 gibi ülke koduyla birlikte.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Telefon numarasını ülke koduyla birlikte yazın.",
@@ -1092,6 +1095,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.addAccountWithCode": "Kodla hesap ekle",
+  "mobile.server.providers.accountSignInWithCode": "Kodla oturum aç",
   "mobile.server.providers.accountsKeyHint":
     "Her ajan bir hesap kullanır. Hesabı ajanın ayarlarından seçin. Yeni bir hesap için o hesabın API anahtarı gerekir.",
   "mobile.server.providers.accountChangeKey": "Anahtarı değiştir",
@@ -1140,6 +1145,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code varsayılanı",
   "mobile.server.providers.compactWindowTokens": "{size} token",
   "mobile.server.providers.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
+  "mobile.server.environment.row": "Değişkenler",
+  "mobile.server.environment.title": "Ortam",
+  "mobile.server.environment.hint":
+    "Her {name} sürecinin aldığı API anahtarları, temel URL’ler ve diğer ayarlar. Bir değişiklik, süren turlar bitince geçerli olur.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, anahtar olarak OPENAI_API_KEY ile ChatGPT’nin model isteklerini bu adrese gönderir.",
+  "mobile.server.environment.shellNote": "Ajanların çalıştırdığı komutlar bu değerleri okuyabilir.",
+  "mobile.server.environment.add": "Değişken ekle",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Değer",
+  "mobile.server.environment.saved": "Kayıtlı",
+  "mobile.server.environment.sensitive": "Gizli",
+  "mobile.server.environment.remove": "Kaldır",
+  "mobile.server.environment.save": "Kaydet",
+  "mobile.server.environment.loadFailed": "{name} değişkenleri yüklenemedi.",
+  "mobile.server.environment.invalid": "Önce adları düzeltin.",
   "mobile.server.providers.disconnect": "Bağlantıyı kes",
   "mobile.server.providers.disconnectTitle": "{name} bağlantısı kesilsin mi?",
   "mobile.server.providers.disconnectBody":

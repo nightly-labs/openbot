@@ -1,11 +1,12 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type {
-  AgentEvent,
-  AgentSummary,
-  ConversationMessage,
-  ConversationSnapshot,
-  QueueHold,
-  QueueSnapshot,
+import {
+  type AgentEvent,
+  type AgentSummary,
+  type ConversationMessage,
+  type ConversationSnapshot,
+  modelSwitchReason,
+  type QueueHold,
+  type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
@@ -62,10 +63,20 @@ export class MailboxSync {
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
     // A plan continuation keeps the request in its first turn, so that turn's plan and answer stay
-    // between the request and the continuation's answer.
-    const turnId = context.planContinuation?.turnIds[0] ?? context.delivery.turnId;
+    // between the request and the continuation's answer. So does work that a backup model continues:
+    // with the request in the continuation's turn, its answer showed above the text of the stopped
+    // turn and the note of the switch (#8406).
+    const turnId =
+      context.planContinuation?.turnIds[0] ??
+      context.resumeAfterUsageLimit?.previousTurnIds[0] ??
+      context.delivery.turnId;
     if (turnId === null) delete message.turnId;
     else message.turnId = turnId;
+    // A switch note waits for this delivery's turn under the delivery's id. A provider that names
+    // its own turn, such as Codex, takes the note into that turn, so it stays above the answer.
+    if (turnId !== null && turnId !== deliveryId)
+      for (const note of snapshot.messages)
+        if (note.turnId === deliveryId && modelSwitchReason(note) !== null) note.turnId = turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,

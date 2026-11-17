@@ -239,6 +239,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "פתיחת {name}",
   "routine.calendar.completed": "הושלמה",
+  "routine.calendar.new": "שגרה חדשה",
+  "routine.calendar.newOn": "שגרה חדשה ב{day}",
+  "routine.calendar.agent": "סוכן",
+  "routine.calendar.agentChoice": "סוכן: {name}",
 
   "routine.settings.loadFailed": "לא ניתן לטעון את השגרות.",
   "routine.settings.loadRunsFailed": "לא ניתן לטעון את היסטוריית הריצות.",
@@ -255,6 +259,7 @@ export const messages = {
   "routine.settings.loading": "טוען שגרות…",
   "routine.settings.empty": "אין שגרות עדיין.",
   "routine.settings.paused": "מושהית",
+  "routine.settings.pausedByRun": "הושהתה על ידי ההרצה של {time}",
   "routine.settings.completed": "הושלמה · {schedule}",
   "routine.settings.active": "פעילה",
   "routine.settings.pauseFailed": "לא ניתן להשהות את השגרה הזו.",

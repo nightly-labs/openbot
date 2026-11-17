@@ -438,7 +438,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "시간대 검색",
   "mobile.server.settings.timezoneNoMatch": "검색과 일치하는 시간대가 없어요.",
   "mobile.server.settings.timezoneMore": "이름을 더 입력하면 다른 시간대를 볼 수 있어요.",
-  "mobile.server.settings.timezoneDescription": "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요.",
+  "mobile.server.settings.timezoneDescription":
+    "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "mobile.server.settings.timezoneLoading": "시간대 불러오는 중…",
   "mobile.server.settings.timezoneLoadFailed": "서버 시간대를 불러오지 못했어요.",
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
@@ -864,10 +865,13 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
   "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
+  "mobile.server.connectors.whatsapp.statusReactions": "상태 반응",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -883,10 +887,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "번호",
   "mobile.server.connectors.whatsapp.kindPersonal": "내 개인 번호",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 전용 번호",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "mobile.server.connectors.whatsapp.phoneLabel": "전화번호",
   "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123처럼 국가 코드를 포함해 주세요.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "국가 코드를 포함한 전화번호를 입력하세요.",
@@ -1043,6 +1047,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.addAccountWithCode": "코드로 계정 추가",
+  "mobile.server.providers.accountSignInWithCode": "코드로 로그인",
   "mobile.server.providers.accountsKeyHint":
     "에이전트마다 계정 하나를 사용해요. 에이전트 설정에서 선택하세요. 새 계정에는 해당 계정의 API 키가 필요해요.",
   "mobile.server.providers.accountChangeKey": "키 변경",
@@ -1091,6 +1097,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code 기본값",
   "mobile.server.providers.compactWindowTokens": "토큰 {size}",
   "mobile.server.providers.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
+  "mobile.server.environment.row": "변수",
+  "mobile.server.environment.title": "환경",
+  "mobile.server.environment.hint":
+    "{name}의 각 프로세스가 받는 API 키, 기본 URL 등 설정이에요. 변경은 진행 중인 턴이 끝나면 적용돼요.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL과 키인 OPENAI_API_KEY로 ChatGPT의 모델 요청을 그 주소로 보내요.",
+  "mobile.server.environment.shellNote": "에이전트가 실행하는 명령은 이 값들을 읽을 수 있어요.",
+  "mobile.server.environment.add": "변수 추가",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "값",
+  "mobile.server.environment.saved": "저장됨",
+  "mobile.server.environment.sensitive": "민감",
+  "mobile.server.environment.remove": "제거",
+  "mobile.server.environment.save": "저장",
+  "mobile.server.environment.loadFailed": "{name}의 변수를 불러올 수 없었어요.",
+  "mobile.server.environment.invalid": "먼저 이름을 고치세요.",
   "mobile.server.providers.disconnect": "연결 해제",
   "mobile.server.providers.disconnectTitle": "{name} 연결을 해제할까요?",
   "mobile.server.providers.disconnectBody":

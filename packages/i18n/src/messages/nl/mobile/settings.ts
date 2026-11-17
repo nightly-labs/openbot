@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Ondersteuningslog wissen?",
   "mobile.settings.support.clearBody": "Hiermee verwijder je alle gebeurtenissen uit het log op deze telefoon.",
   "mobile.settings.support.logFooter":
-    "Het log blijft op deze telefoon en OpenBot verstuurt het niet. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
+    "Het log blijft op deze telefoon. OpenBot verstuurt er alleen regels van met een bugrapport over de telefoon-app dat je zelf verstuurt, en de rapportkaart toont ze eerst. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
   "mobile.settings.support.saveFailed": "Kan het logbestand niet opslaan. Probeer het opnieuw.",
   "mobile.settings.support.sharingUnavailable": "Delen is niet beschikbaar op deze telefoon.",
   "mobile.settings.support.newestFirst": "Nieuwste eerst.",
@@ -123,19 +123,30 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.chatBackground": "Chatachtergrond",
+  "mobile.settings.appearance.chatBackgroundDefault": "Standaard",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
+  "mobile.settings.appearance.replyDetails": "Antwoorddetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Zet een detail uit om de rij ervan in chats te verbergen. De agent blijft denken, subagents starten en herinneringen opslaan.",
+  "mobile.settings.appearance.showThinking": "Denken van agent tonen",
+  "mobile.settings.appearance.showSubagents": "Subagents tonen",
+  "mobile.settings.appearance.showMemoryChanges": "Opgeslagen herinneringen tonen",
+  "mobile.settings.appearance.fullVisuals": "Volledige visuele voorbeelden tonen",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Een visual van een agent staat op volle hoogte in de chat. Als dit uit staat, wordt een hoge visual afgekapt. Tik erop om alles te zien.",
   "mobile.settings.animations.title": "Animaties",
-  "mobile.settings.animations.footer":
-    "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
-  "mobile.settings.animations.all": "Animaties",
+  "mobile.settings.animations.fullMotion": "Volledige beweging",
+  "mobile.settings.animations.reduced": "Beperkt",
+  "mobile.settings.animations.motionFooter":
+    "Beperkt vermindert beweging in de hele app en houdt de animaties hieronder uit. Als Beperk beweging aan staat in de instellingen van je telefoon, vermindert de app ook beweging.",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
     "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil en zweven de figuren op het welkomstscherm en het lege startscherm niet meer.",
-  "mobile.settings.animations.composerResize": "Compact berichtveld",
-  "mobile.settings.animations.composerResizeFooter":
-    "Het berichtveld wordt een kleine balk zolang het toetsenbord dicht is. Als dit uitstaat, blijft het veld op volledige grootte.",
   "mobile.settings.animations.textReveal": "Antwoorden animeren",
   "mobile.settings.animations.textRevealFooter":
     "Een antwoord verschijnt woord voor woord en de ballon groeit vloeiend mee. Als dit uitstaat, wordt de tekst getoond zodra die binnenkomt.",
@@ -229,6 +240,24 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Grote bestanden automatisch downloaden",
   "mobile.settings.conversations.largeFilesFooter":
     "Afbeeldingen, video’s en audio groter dan {small} worden pas gedownload als je erop tikt. Zet dit aan om ze meteen te downloaden, tot {large}. Dit kan veel mobiele data gebruiken.",
+  "mobile.settings.conversations.messageField": "Berichtveld",
+  "mobile.settings.conversations.compact": "Compact",
+  "mobile.settings.conversations.fullSize": "Volledige grootte",
+  "mobile.settings.conversations.compactFooter":
+    "Compact maakt het berichtveld een kleine balk zolang het toetsenbord dicht is.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Beweging is beperkt in Animaties of in de instellingen van je telefoon, dus het berichtveld blijft volledig groot.",
+  "mobile.settings.conversations.media": "Foto's en bestanden",
+  "mobile.settings.conversations.swipeLeft": "Naar links vegen in een agentchat",
+  "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
+  "mobile.settings.conversations.swipeThreads": "Threads",
+  "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Uit",
+  "mobile.settings.conversations.swipeFooter":
+    "Vegen weg van Terug in de chat van een agent opent dit. Dezelfde veeg over een bericht toont de tijden van de berichten.",
+  "mobile.settings.conversations.pullInfo": "Omhoog trekken voor info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Trek in een chat, kanaal of thread omhoog voorbij het laatste bericht en laat los om de info te openen.",
   "mobile.settings.conversations.fullQualityPhotos": "Foto’s in volle kwaliteit versturen",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Als dit uit staat, verstuurt de app een kleinere kopie van elke foto, tot 2048 pixels aan de lange zijde. Die komt sneller aan op een trage verbinding. Zet dit aan om de originele foto te versturen.",

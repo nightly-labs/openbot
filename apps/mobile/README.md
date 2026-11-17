@@ -603,13 +603,15 @@ Do not publish the draft by hand in the GitHub page with the prerelease mark cle
 The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
 the version has no release: the link on the site is then dead. Stage the APK of that version, then
 start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
-download while it is `null` or newer than the newest Google Play version. It is `null` now.
+download while it is `null` or newer than the newest Google Play version. It is `1.4.11` now.
 
-**The APK that Google Play makes does not work as a direct download.** Play's automatic integrity
-protection is on for the app, so the generated APK has an installer check
-(`com.pairip.licensecheck`). After an install from the file, the app shows "Get this app from Play"
-and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed this. Keep the download
-hidden until an APK starts after an install from the file: test each new source on a phone first.
+**Play's automatic integrity protection must stay off.** With it, the APK that Google Play makes
+has an installer check (`com.pairip.licensecheck`). After an install from the file, the app shows
+"Get this app from Play" and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed
+this. The protection is off in Play Console (Protected by Google Play > Automatic protection:
+"Installer check: off") since 2026-11-16. It changes only new uploads, so builds up to 1.4.10 still have it, and
+the first APK is the one of 1.4.11. Do not turn the protection on again: each APK on the site then
+stops after an install.
 
 The service account must have the Play Console permission to download the generated APKs of the
 app. Without it, Google Play answers "The caller does not have permission" (run 43252109769). The

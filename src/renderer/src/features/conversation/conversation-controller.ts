@@ -55,6 +55,25 @@ function readBrowserPipBounds(): BrowserBounds | null {
   return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
 }
 
+/** A request for a corrected feedback report that Fix on a thank-you card put in a composer. */
+export interface FeedbackFix {
+  number: number;
+  /** The draft text before the request. */
+  before: string;
+  /** The request line that Fix added to the draft. */
+  request: string;
+}
+
+/**
+ * The draft after Cancel: the request and the words after it go. The draft before the request comes
+ * back. When the user changed that part, only the request and what follows it go.
+ */
+function draftWithoutFix(text: string, fix: FeedbackFix): string {
+  if (text.startsWith(fix.before)) return fix.before;
+  const start = text.indexOf(fix.request);
+  return start === -1 ? text : text.slice(0, start).trimEnd();
+}
+
 interface ConversationResources {
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
@@ -161,6 +180,22 @@ export function createStableConversationState(
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
+  // The corrected-report requests from thank-you cards, by draft key. Only in memory: after a restart,
+  // the text stays in the draft without its notice.
+  const [feedbackFixes, setFeedbackFixes] = createSignal<Record<string, FeedbackFix>>({});
+  // A fix ends when its draft is empty: the user sent the request, or deleted it.
+  createEffect(
+    () => {
+      const current = drafts();
+      return Object.keys(feedbackFixes()).filter((key) => !current[key]?.text.trim());
+    },
+    (ended) => {
+      if (ended.length === 0) return;
+      setFeedbackFixes((current) =>
+        Object.fromEntries(Object.entries(current).filter(([key]) => !ended.includes(key))),
+      );
+    },
+  );
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
   // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
@@ -360,6 +395,34 @@ export function createStableConversationState(
       setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
       setComposerFocusRequest((value) => value + 1);
     },
+    /**
+     * Puts the request for a corrected feedback report in the composer, and keeps what the composer had,
+     * so the composer notice can take the request out again.
+     */
+    startFeedbackFix(target: { serverId: string; agentId: string }, number: number, prompt: string) {
+      const key = composerDraftKey(target);
+      const draft = drafts()[key] ?? EMPTY_DRAFT;
+      const next = appendDraftText(draft, prompt);
+      setDrafts((current) => ({ ...current, [key]: next }));
+      setFeedbackFixes((current) => ({
+        ...current,
+        [key]: { number, before: draft.text, request: prompt.trim() },
+      }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Cancel on the notice: the request leaves the composer, so the report stays as it is. */
+    cancelFeedbackFix(target: { serverId: string; agentId: string }) {
+      const key = composerDraftKey(target);
+      const fix = feedbackFixes()[key];
+      if (!fix) return;
+      setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        return { ...current, [key]: { ...draft, text: draftWithoutFix(draft.text, fix) } };
+      });
+      setFeedbackFixes(({ [key]: _cancelled, ...rest }) => rest);
+      setComposerFocusRequest((value) => value + 1);
+    },
+    feedbackFixes,
     /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
     appendChannelText(target: { serverId: string; channelId: string }, text: string) {
       const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
@@ -455,7 +518,14 @@ export function createServerConversationState() {
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
+  // A chat window asked the main window to show the page of a browser takeover. The agent's view opens it.
+  const [browserTakeoverPageRequest, setBrowserTakeoverPageRequest] = createSignal<{
+    agentId: string;
+    tabId: string;
+  } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
+  // True when the user left the side panel open. Another agent or channel opens with the panel in the same state.
+  const [sidePanelShown, setSidePanelShown] = createSignal(false);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
@@ -502,8 +572,12 @@ export function createServerConversationState() {
     setDropActive,
     rightPanels,
     setRightPanels,
+    browserTakeoverPageRequest,
+    setBrowserTakeoverPageRequest,
     sidePanels,
     setSidePanels,
+    sidePanelShown,
+    setSidePanelShown,
     settingsProvider,
     setSettingsProvider,
     settingsModel,

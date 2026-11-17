@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
@@ -29,10 +29,12 @@ import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
 import {
   copyComposerDraft,
+  draftAfterEndedEdit,
   EMPTY_DRAFT,
   insertAtSelection,
   insertPastedText,
   QUEUE_EDIT_STORAGE_KEY,
+  queueEditChanged,
   type StoredQueueEdit,
 } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
@@ -578,6 +580,60 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: backup ?? EMPTY_DRAFT }));
       deps.setComposerError(null, target);
     }
+    clearQueueEditState();
+    return true;
+  }
+
+  /**
+   * Ends the edit of a queued message that is no longer queued: it started, or somebody deleted it.
+   * `ended` is that message, or null when the host refused a Save or Begin because the edit is over.
+   * The host has no hold to give back. Changes stay in the message box (`draftAfterEndedEdit`), and a
+   * note says what happened.
+   */
+  function endQueuedMessageEdit(ended: QueueDelivery | null): void {
+    const agentId = deps.editingAgentId();
+    const serverId = deps.editingServerId();
+    if (!agentId || !serverId || (ended && deps.editingDeliveryId() !== ended.id)) return;
+    const target = { agentId, serverId };
+    const draft = deps.drafts()[composerDraftKey(target)] ?? EMPTY_DRAFT;
+    // A refused Save discards the files that it sent, so they cannot stay in the box.
+    const gone = new Set(deps.editingPendingSave()?.attachmentDraftIds ?? []);
+    const changed =
+      !ended ||
+      queueEditChanged(
+        draft,
+        ended.text,
+        ended.attachments.map((attachment) => attachment.id),
+      );
+    const { next, dropped } = draftAfterEndedEdit(
+      { ...draft, attachments: draft.attachments.filter((attachment) => !gone.has(attachment.id)) },
+      deps.editingDraftBackup() ?? EMPTY_DRAFT,
+      deps.editingOriginalAttachmentIds(),
+      changed,
+    );
+    for (const attachment of dropped)
+      void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
+    deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: next }));
+    clearQueueEditState();
+    const deleted = ended?.status === "cancelled";
+    // A delete with no change ends the edit with no notice, as before.
+    if (deleted && !changed) deps.setComposerError(null, target);
+    else
+      deps.setComposerError(
+        t(
+          !ended
+            ? "composer.queueEdit.endedKept"
+            : deleted
+              ? "composer.queueEdit.deletedKept"
+              : changed
+                ? "composer.queueEdit.receivedKept"
+                : "composer.queueEdit.received",
+        ),
+        target,
+      );
+  }
+
+  function clearQueueEditState(): void {
     deps.setEditingAgentId(null);
     deps.setEditingServerId(null);
     deps.setEditingDeliveryId(null);
@@ -586,7 +642,6 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     clearStoredQueueEdit();
     deps.setEditingDraftBackup(null);
     deps.setEditingOriginalAttachmentIds([]);
-    return true;
   }
 
   async function saveQueuedMessageEdit(
@@ -661,6 +716,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         }
       } catch (error) {
         deps.setSubmitting(false);
+        // The host refuses a hold that is over: the message started, or another edit has it.
+        if (isQueueEditRejected(error) && deps.editingDeliveryId() === deliveryId) {
+          endQueuedMessageEdit(null);
+          return false;
+        }
         deps.setComposerError(
           errorMessage(error, t("composer.error.holdQueued")),
           {
@@ -715,14 +775,17 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         });
       }
     } catch (error) {
-      deps.setComposerError(
-        errorMessage(error, t("composer.error.updateQueued")),
-        {
-          agentId,
-          serverId,
-        },
-        error,
-      );
+      // A Save that comes after the end of its edit cannot apply. Its text stays in the box.
+      if (editId && isQueueEditRejected(error) && deps.editingDeliveryId() === deliveryId) endQueuedMessageEdit(null);
+      else
+        deps.setComposerError(
+          errorMessage(error, t("composer.error.updateQueued")),
+          {
+            agentId,
+            serverId,
+          },
+          error,
+        );
     } finally {
       deps.setSubmitting(false);
     }
@@ -741,14 +804,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       for (const attachment of deps.editingDraftBackup()?.attachments ?? []) {
         void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
       }
-      deps.setEditingAgentId(null);
-      deps.setEditingServerId(null);
-      deps.setEditingDeliveryId(null);
-      deps.setEditingEditId(null);
-      deps.setEditingPendingSave(null);
-      clearStoredQueueEdit();
-      deps.setEditingDraftBackup(null);
-      deps.setEditingOriginalAttachmentIds([]);
+      clearQueueEditState();
     }
     return true;
   }
@@ -984,9 +1040,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
   function agentSteers(): boolean {
-    return !deps.props.agent || providerSteersTurns(deps.props.agent.provider);
+    return !deps.props.agent || agentSteersTurns(deps.props.agent, deps.props.modelOptions);
   }
 
   /** The host steers each message sent while this agent works. Not known for a joined server until it answers. */
@@ -1051,6 +1110,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     openAttachmentPicker,
     editQueuedMessage,
     cancelQueuedMessageEdit,
+    endQueuedMessageEdit,
     saveQueuedMessageEdit,
     reorderPresentedQueue,
     submitMessage,

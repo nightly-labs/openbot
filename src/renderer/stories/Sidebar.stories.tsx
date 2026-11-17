@@ -279,6 +279,12 @@ export const Populated: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
+/** "Recent activity": each section shows its chats by last activity, the most recent first. */
+export const RecentActivity: Story = {
+  args: { chatOrder: "recent", pinnedItems: pinnedOne },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 /** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },

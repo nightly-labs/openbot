@@ -54,6 +54,8 @@ export type MessagingActivity =
       followUp: boolean;
       answer: string | null;
       files: MessagingAnswerFile[];
+      /** The catalog text of a start that failed, such as a provider that is not downloaded. */
+      reason?: string | null;
     }
   | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
   /** A new progress line that the agent wrote between its steps, with the Natural style. */
@@ -242,7 +244,8 @@ export type MessagingMentionResult = "none" | "started" | "skipped";
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
   queueChanged(agentId: string): void;
-  busy(agentId: string): boolean;
+  /** Whether a new message of this conversation waits for other work of the agent. */
+  busy(agentId: string, linkId: string): boolean;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   /** Removes live provider state for an execution thread before its rows are deleted. */
   forgetThread(threadId: string): Effect.Effect<void, MessagingThreadFailed>;
@@ -316,6 +319,11 @@ export class MessagingThreads {
     string,
     { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
   >();
+  /**
+   * The requester of the last turn of each conversation, by link id. A turn that the provider starts
+   * itself continues that request. Kept in memory only: a restart also ends the provider's background work.
+   */
+  readonly #lastOrigins = new Map<string, MessagingOrigin>();
   /** The deliveries whose requester stopped them while they were starting, so their turn stops when it starts. */
   readonly #stopsBeforeStart = new Set<string>();
   /**
@@ -749,7 +757,7 @@ export class MessagingThreads {
       (context) => this.#mailbox.messagingOrigin(context.delivery.id)?.authorId === input.origin.authorId,
     );
     if (pending.length >= AGENT_QUEUE_LIMIT || byAuthor.length >= AUTHOR_QUEUE_LIMIT) return { status: "busy", link };
-    const waiting = this.#hooks.busy(agentId);
+    const waiting = this.#hooks.busy(agentId, link.linkId);
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "user" },
@@ -902,8 +910,16 @@ export class MessagingThreads {
           .unresolvedMessagingDeliveries(link.linkId)
           .filter((context) => context.delivery.status !== "queued");
         const running = active[0];
-        const origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
-        const followUp = running?.delivery.sender.kind === "agent";
+        let origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
+        let followUp = running?.delivery.sender.kind === "agent";
+        if (origin) this.#lastOrigins.set(link.linkId, origin);
+        // The provider started this turn itself, as Claude does when a background command of the last
+        // request ends. It continues that request, so the conversation gets its status, Stop and answer.
+        // Before, the conversation got nothing, while the turn still held its queue (#10703).
+        else if (!running && event.origin === "unknown" && !this.#hooks.ownChat(event.threadId)) {
+          origin = this.#lastOrigins.get(link.linkId) ?? null;
+          followUp = origin !== null;
+        }
         const deliveryIds = active.map((context) => context.delivery.id);
         this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
@@ -960,6 +976,12 @@ export class MessagingThreads {
     return this.store.linkForThread(threadId) !== null && !this.#hooks.ownChat(threadId);
   }
 
+  /** Whether the turns of this thread run in the agent's messaging lane (`MailboxStore.inMessagingLane`). */
+  inMessagingLane(agentId: string, threadId: string): boolean {
+    const link = this.store.linkForThread(threadId);
+    return link !== null && !this.#hooks.ownChat(threadId) && this.#mailbox.inMessagingLane(agentId, link.linkId);
+  }
+
   /**
    * Reports the newest completed progress line of the running turn once. Only narration counts: the
    * agent's thinking never goes to the conversation.
@@ -989,9 +1011,12 @@ export class MessagingThreads {
     this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
   }
 
-  /** A messaging delivery that failed before its turn started ends like a failed turn. */
-  deliveryFailed(deliveryId: string): void {
-    this.deliverySettled(deliveryId, "failed");
+  /**
+   * A messaging delivery that failed before its turn started ends like a failed turn. `reason` is a
+   * catalog text that says why, or null for the general text.
+   */
+  deliveryFailed(deliveryId: string, reason: string | null): void {
+    this.deliverySettled(deliveryId, "failed", reason);
   }
 
   /**
@@ -1000,7 +1025,11 @@ export class MessagingThreads {
    * this, the conversation keeps the "working" status and its Stop button, and gets no answer. A
    * turn that the recovery found complete posts its answer, without its files.
    */
-  deliverySettled(deliveryId: string, status: "completed" | "failed" | "interrupted"): void {
+  deliverySettled(
+    deliveryId: string,
+    status: "completed" | "failed" | "interrupted",
+    reason: string | null = null,
+  ): void {
     this.#prepared.delete(deliveryId);
     this.#stopsBeforeStart.delete(deliveryId);
     const origin = this.#mailbox.messagingOrigin(deliveryId);
@@ -1026,6 +1055,7 @@ export class MessagingThreads {
       followUp: delivery?.sender.kind === "agent",
       answer,
       files: [],
+      reason,
     });
   }
 
@@ -1074,6 +1104,12 @@ export class MessagingThreads {
         stopped = true;
       }
     }
+    // A turn that the provider started itself has no delivery: it continues this author's last request.
+    for (const [turnId, turn] of this.#turnOrigins)
+      if (turn.deliveryIds.length === 0 && turn.origin?.linkId === linkId && turn.origin.authorId === authorId) {
+        yield* this.#hooks.interrupt(link.agentId, turnId, link.threadId).pipe(toMessagingThreadFailed);
+        stopped = true;
+      }
     if (stopped) this.#hooks.schedule(link.agentId);
     return stopped;
   });
@@ -1089,6 +1125,7 @@ export class MessagingThreads {
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
       yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
+    for (const link of this.store.links(agentId)) this.#lastOrigins.delete(link.linkId);
     yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 

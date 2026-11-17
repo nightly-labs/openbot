@@ -32,6 +32,7 @@ import {
   shell,
   systemPreferences,
 } from "electron";
+import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -83,6 +84,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -157,6 +159,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
@@ -166,6 +169,7 @@ import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { macShipItDirectory, shipItInstallInProgress } from "./update-install-guard";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
@@ -313,6 +317,11 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
+const systemTimezone =
+  serverMode || hostedServer || localServerChild
+    ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
+    : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
@@ -334,6 +343,23 @@ if (
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
+// macOS #9776: a launch while ShipIt installs an update cancels that install, and the old version stays.
+// Exit at once instead; ShipIt opens the new version when it is done. `process.exit`, as for a second
+// launch: no start marker or log may record this launch as a start that did not finish.
+if (
+  process.platform === "darwin" &&
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  Effect.runSync(
+    shipItInstallInProgress({
+      userDataPath: app.getPath("userData"),
+      shipItDirectory: macShipItDirectory(),
+      currentVersion: app.getVersion(),
+      now: Date.now(),
+    }),
+  )
+)
+  process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -533,6 +559,7 @@ const windowHolder = createMainWindowHolder();
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
+  closeChatNotifications,
   forwardAgentEvent,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
@@ -820,6 +847,7 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   claudeCompactWindow,
+  providerEnvironment,
   modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
@@ -875,6 +903,7 @@ function registerIpcHandlers({
   routineFlows,
   workflows,
   workflowGitHub,
+  crm,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -927,6 +956,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
+      chatRendererIds: () => new Set(windows.getChatWindows().map((window) => window.webContents.id)),
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
       keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
@@ -1041,6 +1071,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -1068,6 +1099,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       claudeCompactWindow,
+      providerEnvironment,
       modelVisibility,
       agentAccess,
       serverAudit,
@@ -1139,6 +1171,7 @@ function registerIpcHandlers({
       }),
       openExternal: openLink,
       modelVisibility,
+      closeChatNotifications,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -1506,7 +1539,8 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild) await presentApplication();
+      // A server has no desktop: invitation links open on the client, and a container has no xdg-settings (#10861).
+      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");
@@ -1540,6 +1574,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        systemTimezone,
         previousUncleanExit,
         macHapticFeedback,
         teardown,

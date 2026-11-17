@@ -257,9 +257,6 @@ export const messages = {
   "server.settings.membersDescription": "Publiez ce serveur, invitez des personnes et gérez l’accès.",
   "server.settings.desktopTitle": "Bureau distant",
   "server.settings.desktopDescription": "Configurez le bureau de ce serveur ou connectez-vous à celui-ci.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Connectez des serveurs MCP et choisissez ceux que les agents de ce serveur peuvent utiliser.",
   "server.settings.storageTitle": "Stockage",
   "server.settings.storageDescription":
     "Voyez ce qu’OpenBot conserve sur le disque de ce serveur et libérez de l’espace.",
@@ -305,13 +302,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "Échec de la copie",
   "server.settings.copyFailed": "OpenBot n’a pas pu copier cette valeur.",
   "server.settings.unavailableTitle": "Réglages du serveur indisponibles",
-  "server.settings.unsavedMcpChanges": "Modifications MCP non enregistrées",
   "server.settings.reset": "Réinitialiser",
   "server.settings.unsavedChanges": "Modifications non enregistrées",
   "server.settings.changesNotSaved": "Modifications non enregistrées",
   "server.settings.group.agents": "Agents",
   "server.settings.group.people": "Personnes",
   "server.settings.group.server": "Serveur",
+  "server.settings.experimentalTitle": "Expérimental",
+  "server.settings.experimentalDescription": "Activez des fonctions qui ne sont pas encore terminées.",
+  "server.settings.experimentalFeatures": "Fonctions",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Affiche la page CRM aux propriétaires et administrateurs, permet aux agents de lire le CRM et synchronise Stripe. Si vous le désactivez, les données restent.",
   "server.settings.agentDefaultsTitle": "Valeurs par défaut des agents",
   "server.settings.threadsCard": "Fils et fuseau horaire",
   "server.settings.memoryTitle": "Mémoire",
@@ -350,7 +352,7 @@ export const messages = {
     "Choisissez ce que les agents de ce serveur peuvent faire quand vous ne le définissez pas pour un agent.",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "server.settings.turnLimit": "Fils en même temps",

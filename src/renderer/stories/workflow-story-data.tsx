@@ -43,6 +43,7 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-launch", name: "launch" },
     { id: "story-channel-support", name: "support" },
   ],
+  mediaSize: true,
   imageModels: [
     {
       id: "gpt-image",
@@ -76,8 +77,8 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
       kinds: ["image", "video"],
       voices: true,
     },
-    // The host is signed in to Sunra in Apps.
-    ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === "sunra"),
+    // The host is signed in to Sunra and Higgsfield in Apps.
+    ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === "sunra" || model.provider === "higgsfield"),
   ],
   files: FILES_ROWS,
   self: STORY_TEAM_MEMBERS.find((member) => member.id === "member-self")?.name ?? undefined,

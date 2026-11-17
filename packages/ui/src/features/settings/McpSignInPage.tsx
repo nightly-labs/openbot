@@ -69,7 +69,10 @@ export interface McpSignInPageDialogProps {
   onCancel: () => void;
 }
 
-/** The page in its own dialog, for the MCP list. It is there for as long as the sign-in waits. */
+/**
+ * The page in its own dialog, for a sign-in page that only the joined server can reach, such as an
+ * MCP server on the host's own loopback address. It is there for as long as the sign-in waits.
+ */
 export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
   const { t } = useText();
   const [cancelling, setCancelling] = createSignal(false);

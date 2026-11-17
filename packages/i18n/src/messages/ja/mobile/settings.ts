@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "サポートログを消去しますか？",
   "mobile.settings.support.clearBody": "このスマートフォンのログから、すべてのイベントを削除します。",
   "mobile.settings.support.logFooter":
-    "ログはこのスマートフォンに保存され、OpenBot が送信することはありません。接続の手順、リクエスト、エラーを記録します。メッセージやファイルは記録せず、パスワードとトークンは伏せて記録します。共有する前にファイルの内容を確認してください。",
+    "ログはこのスマートフォンに保存されます。OpenBot がログの行を送信するのは、あなたがスマートフォンアプリのバグレポートを送信するときだけで、送信前にレポートのカードに表示されます。接続の手順、リクエスト、エラーを記録します。メッセージやファイルは記録せず、パスワードとトークンは伏せて記録します。共有する前にファイルの内容を確認してください。",
   "mobile.settings.support.saveFailed": "ログファイルを保存できませんでした。もう一度お試しください。",
   "mobile.settings.support.sharingUnavailable": "このスマートフォンでは共有を利用できません。",
   "mobile.settings.support.newestFirst": "新しい順に表示しています。",
@@ -124,19 +124,30 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "明度",
   "mobile.settings.appearance.messageColorFooter":
     "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
+  "mobile.settings.appearance.chatBackground": "チャットの背景",
+  "mobile.settings.appearance.chatBackgroundDefault": "デフォルト",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.replyDetails": "返信の詳細",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "詳細をオフにすると、チャットでその行が非表示になります。エージェントは引き続き思考し、サブエージェントを実行し、記憶を保存します。",
+  "mobile.settings.appearance.showThinking": "エージェントの思考を表示",
+  "mobile.settings.appearance.showSubagents": "サブエージェントを表示",
+  "mobile.settings.appearance.showMemoryChanges": "保存した記憶を表示",
+  "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",
   "mobile.settings.animations.title": "アニメーション",
-  "mobile.settings.animations.footer":
-    "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
-  "mobile.settings.animations.all": "アニメーション",
+  "mobile.settings.animations.fullMotion": "フルモーション",
+  "mobile.settings.animations.reduced": "軽減",
+  "mobile.settings.animations.motionFooter":
+    "「軽減」はアプリ全体の動きを減らし、下のアニメーションをオフのままにします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
-  "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
-  "mobile.settings.animations.composerResizeFooter":
-    "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",
   "mobile.settings.animations.textReveal": "返信のアニメーション",
   "mobile.settings.animations.textRevealFooter":
     "返信が一語ずつ表示され、吹き出しがなめらかに大きくなります。オフにすると、テキストは届いた時点で表示されます。",
@@ -232,6 +243,24 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.messageField": "メッセージ欄",
+  "mobile.settings.conversations.compact": "コンパクト",
+  "mobile.settings.conversations.fullSize": "フルサイズ",
+  "mobile.settings.conversations.compactFooter":
+    "「コンパクト」では、キーボードが閉じている間メッセージ欄が小さなバーになります。",
+  "mobile.settings.conversations.compactComposerReduced":
+    "アニメーションまたはスマートフォンの設定で視差効果が減らされているため、メッセージ欄はフルサイズのままです。",
+  "mobile.settings.conversations.media": "写真とファイル",
+  "mobile.settings.conversations.swipeLeft": "エージェントのチャットで左にスワイプ",
+  "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
+  "mobile.settings.conversations.swipeThreads": "スレッド",
+  "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeOff": "オフ",
+  "mobile.settings.conversations.swipeFooter":
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上で同じ方向にスワイプすると、メッセージの時刻が表示されます。",
+  "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
+  "mobile.settings.conversations.pullInfoFooter":
+    "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
   "mobile.settings.conversations.fullQualityPhotos": "写真を元の画質で送信",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "オフの場合、アプリは各写真の小さいコピー(長辺 最大 2048 ピクセル)を送信します。遅い接続でも早く届きます。元の写真を送信するにはオンにしてください。",
