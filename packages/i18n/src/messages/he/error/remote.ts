@@ -25,8 +25,7 @@ export const messages = {
     "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
   "error.remote.streamTooSlowLowerQuality":
     "החיבור למארח איטי מדי בשביל התמונה. יש לנסות שוב: החיבור הבא ישתמש באיכות נמוכה יותר.",
-  "error.remote.streamTooSlow":
-    "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר או באיכות נמוכה יותר ולנסות שוב.",
+  "error.remote.streamTooSlow": "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר ולנסות שוב.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",

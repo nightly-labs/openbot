@@ -29,7 +29,7 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "ホストへの接続が遅すぎて画面を表示できません。再試行してください。次の接続では画質を下げます。",
   "error.remote.streamTooSlow":
-    "ホストへの接続が遅すぎて画面を表示できません。より速いネットワークを使うか画質を下げてから、再試行してください。",
+    "ホストへの接続が遅すぎて画面を表示できません。より速いネットワークを使ってから、再試行してください。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",

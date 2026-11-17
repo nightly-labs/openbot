@@ -31,7 +31,7 @@ export const messages = defineMessages("error.remote", {
     "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
   // The same stall on the phone app, which has its own quality menu, or at the lower quality already.
   "error.remote.streamTooSlow":
-    "The connection to the host is too slow for the picture. Use a faster network or a lower quality, then try again.",
+    "The connection to the host is too slow for the picture. Use a faster network, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",

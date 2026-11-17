@@ -1205,13 +1205,14 @@ export class RemoteScreenGateway {
     if (upstreamPath === PASTE_SCRIPT_PATH) {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
       response.end(
-        remoteDesktopStreamWatchScript() + (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
+        remoteDesktopStreamWatchScript(session.snapshot.serverId) +
+          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
       );
       return;
     }
     // The viewer page loads this script before Moonlight's own, so its listeners run first and the
     // watcher sees Moonlight's peer connection.
-    const addPasteScript = upstreamPath === "/stream.html" && request.method === "GET";
+    const addViewerScript = upstreamPath === "/stream.html" && request.method === "GET";
     const target = new URL(`${upstreamPath}${search}`, this.#runtimeState.baseUrl);
     const authHeader = this.#runtimeState.authHeader;
     yield* Effect.callback<void>((resume) => {
@@ -1229,7 +1230,7 @@ export class RemoteScreenGateway {
         (upstreamResponse) => {
           const headers = { ...upstreamResponse.headers };
           delete headers["set-cookie"];
-          if (addPasteScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
+          if (addViewerScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
             const chunks: Buffer[] = [];
             upstreamResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
             upstreamResponse.once("end", () => {

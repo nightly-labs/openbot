@@ -26,7 +26,7 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
   "error.remote.streamTooSlow":
-    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci lub niższej jakości, a następnie spróbuj ponownie.",
+    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci, a następnie spróbuj ponownie.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",

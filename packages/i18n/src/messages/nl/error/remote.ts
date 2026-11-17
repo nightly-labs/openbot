@@ -27,7 +27,7 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
   "error.remote.streamTooSlow":
-    "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk of een lagere kwaliteit en probeer het opnieuw.",
+    "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk en probeer het opnieuw.",
   "error.remote.teamSessionExpired": "De teamsessie is verlopen.",
   "error.remote.finishTestBeforeSwitch": "Rond de test van extern bureaublad af voordat je van beeldscherm wisselt.",
   "error.remote.displayNotFound": "Extern beeldscherm niet gevonden.",

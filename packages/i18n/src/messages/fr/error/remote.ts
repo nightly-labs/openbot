@@ -30,7 +30,7 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "La connexion à l’hôte est trop lente pour l’image. Réessayez : la prochaine connexion utilisera une qualité inférieure.",
   "error.remote.streamTooSlow":
-    "La connexion à l’hôte est trop lente pour l’image. Utilisez un réseau plus rapide ou une qualité inférieure, puis réessayez.",
+    "La connexion à l’hôte est trop lente pour l’image. Utilisez un réseau plus rapide, puis réessayez.",
   "error.remote.teamSessionExpired": "La session de l’équipe a expiré.",
   "error.remote.finishTestBeforeSwitch": "Terminez le test du bureau à distance avant de changer d’écran.",
   "error.remote.displayNotFound": "Écran distant introuvable.",
