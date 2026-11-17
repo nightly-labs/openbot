@@ -110,6 +110,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
@@ -478,6 +479,7 @@ type HostRequestActions = Pick<
   | "startLiveVoice"
   | "stopLiveVoice"
   | "compactContext"
+  | "deleteAgentHistory"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
   | "addAgentFolder"
@@ -692,6 +694,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
     canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
+    canDeleteChatHistory: (serverId) => has(serverId, CHAT_HISTORY_CAPABILITY),
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
@@ -1584,6 +1587,10 @@ export function createHostRequestActions({
       if (taskId === undefined)
         await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
       else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, ignoreResponse, { agentId, taskId }, serverId);
+    },
+    deleteAgentHistory: async (agentId, serverId) => {
+      requireCapability(capabilities, serverId, CHAT_HISTORY_CAPABILITY, "error.team.historyDeleteUnsupported");
+      await request("POST", CHAT_HISTORY_ROUTES.agentDelete, ignoreResponse, { agentId }, serverId);
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),

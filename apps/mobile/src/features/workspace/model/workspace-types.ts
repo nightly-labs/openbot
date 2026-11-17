@@ -1065,6 +1065,16 @@ export interface MobileWorkspaceContextValue {
    * messages stay. The host refuses while the chat or task works, or when its provider cannot compact.
    */
   compactContext: (agentId: string, serverId: string, taskId?: string) => Promise<void>;
+  /**
+   * True when the host advertises `chat-history-v1`: "Delete history" of an agent's own chat, and
+   * "New conversation", "Compact context" and "Delete history" of a channel.
+   */
+  canDeleteChatHistory: (serverId: string) => boolean;
+  /**
+   * Deletes the messages of the agent's own chat, and the agent forgets them. Side threads, profile,
+   * memories and workspace stay. Needs `manage` on the agent; the host refuses while the chat works.
+   */
+  deleteAgentHistory: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -1278,6 +1288,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"
+  | "canDeleteChatHistory"
   | "canChooseNewAgentModel"
   | "canInstallAgentTemplate"
   | "canSearchFiles"
