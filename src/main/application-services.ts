@@ -859,6 +859,31 @@ function safeStorageCipher(
   return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
+/**
+ * The account service requests go through Chromium's network stack, which uses the computer's proxy
+ * settings as the built-in browser does. Node `fetch` ignores them, so the server list and a
+ * connection timed out on a network that needs the system proxy (#10314). The requests carry a
+ * bearer token: they send no browser cookie and use no HTTP cache, as with Node `fetch`.
+ *
+ * A Chromium network failure (`net::ERR_CONNECTION_REFUSED`) is thrown as Node `fetch` throws one,
+ * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
+ * An abort rejects with the signal's reason, as in Node.
+ */
+async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  try {
+    return await net.fetch(input instanceof URL ? input.href : input, {
+      ...init,
+      credentials: "omit",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    const code = /^net::(ERR_[A-Z0-9_]+)$/u.exec(error.message)?.[1];
+    if (code === undefined) throw error;
+    throw new TypeError("fetch failed", { cause: Object.assign(error, { code }) });
+  }
+}
+
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
@@ -1274,6 +1299,7 @@ export async function createApplicationServices({
     apiUrl: centralAuthApiUrl,
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
+    fetch: accountServiceFetch,
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
     keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
