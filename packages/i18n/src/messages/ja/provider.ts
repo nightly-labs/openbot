@@ -125,6 +125,9 @@ export const messages = {
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.endpointModelsInCustom":
+    "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
+  "provider.picker.showCustomModels": "モデルを表示",
   "provider.picker.museNoModels":
     "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
