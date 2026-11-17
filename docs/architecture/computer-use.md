@@ -178,6 +178,19 @@ script presses V. Text that the host
 already has from an earlier paste is not sent again, so a copy made on the host stays on its
 clipboard. A host with no clipboard writer serves neither route.
 
+The same script watches the stream. Moonlight's viewer says "connected" when the video track
+arrives, before a frame, and neither Moonlight Web nor Sunshine can lower the rate during a stream.
+On a connection slower than the stream, each lost frame makes the streamer wait for a full frame,
+which the connection loses again, so the picture stays black or frozen (#11271). The script counts
+the frames that the browser decodes (`framesDecoded` of Moonlight's peer connection). Sunshine
+sends at least half the frame rate, also for a still screen, so no frame for 20 s while the page
+shows is a stall: the script reports `error` with a text that says the connection is too slow, and
+`connected` again when frames come back. In the desktop app and the browser, a stall also sets
+Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s, 30 fps) for the
+streams of that viewer origin in the next 24 hours, so Retry shows a picture. The phone app keeps
+the quality from its menu. The host serves this script also when it has no clipboard writer, but
+then without the paste part.
+
 On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
 sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
