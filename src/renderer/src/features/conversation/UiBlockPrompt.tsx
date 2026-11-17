@@ -4,6 +4,7 @@ import {
   isSecretFormField,
   UI_API_KEY_SCOPE_FIELD_ID,
   UI_BLOCK_SUBMIT_ACTION_ID,
+  UI_CONFIRM_PREVIEW_ANSWER_ID,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockState,
@@ -33,6 +34,8 @@ export interface UiBlockPromptProps {
    * in the history, which only shows its stored state.
    */
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
+  /** The host reads an edited confirm preview (`ui-block-preview-edit-v1`), so the card can edit it. */
+  canEditPreview?: boolean | undefined;
   /** The answer went through and the card shows it. */
   onAnswered?: (() => void) | undefined;
   /** Gets the card's element, and undefined once the card is gone. */
@@ -134,10 +137,11 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  function respond(response: UiBlockResponse): void {
+  function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    void send(uiBlockAnswersFromResponse(spec, response), {
+    const answers = uiBlockAnswersFromResponse(spec, response);
+    void send(preview === undefined ? answers : { ...answers, [UI_CONFIRM_PREVIEW_ANSWER_ID]: [preview] }, {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
@@ -238,6 +242,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
+        onRespondEdited={props.canEditPreview ? respond : undefined}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (

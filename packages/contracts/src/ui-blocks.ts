@@ -69,6 +69,17 @@ export const UI_CONFIRM_ACTION_QUESTION_ID = "action";
 export const UI_QUICK_REPLIES_QUESTION_ID = "reply";
 /** The fallback question id of a `choice`. */
 export const UI_CHOICE_QUESTION_ID = "choice";
+/**
+ * The id of a `confirm` button that opens the preview for editing in the card, on a host with
+ * `ui-block-preview-edit-v1`. The card then sends the edited text with the button the person presses
+ * next. Elsewhere this button answers as any other button.
+ */
+export const UI_CONFIRM_EDIT_ACTION_ID = "edit_preview";
+/**
+ * The answer key of an edited `confirm` preview, beside the fallback answers. It is no question, so the
+ * stored resolution leaves it out. A host without `ui-block-preview-edit-v1` refuses it.
+ */
+export const UI_CONFIRM_PREVIEW_ANSWER_ID = "_preview";
 
 // Keys the legacy message read renames (`legacy-conversation-message.ts`). An id that becomes a record
 // key in a response must not be one of them.
@@ -1092,6 +1103,22 @@ export function uiBlockResponseFromAnswers(
   const only = questions.length === 1 ? questions[0] : undefined;
   const single = only && !only.isSecret ? (answers[only.id] ?? []).join("\n").trim() : "";
   return { actionId: UI_BLOCK_TEXT_ACTION_ID, text: clip(single || text, UI_BLOCK_LIMITS.fieldValue) };
+}
+
+/**
+ * Splits the edited preview (`UI_CONFIRM_PREVIEW_ANSWER_ID`) from the answers. `preview` is there only
+ * when the text changed. Null when the block has no preview to edit, or the text is blank or too long.
+ */
+export function uiConfirmPreviewEdit<Answer extends readonly string[]>(
+  spec: UiBlockSpec,
+  answers: Readonly<Record<string, Answer>>,
+): { answers: Record<string, Answer>; preview?: string } | null {
+  const { [UI_CONFIRM_PREVIEW_ANSWER_ID]: edit, ...rest } = answers;
+  if (edit === undefined) return { answers: rest };
+  const [text, ...more] = edit;
+  if (spec.type !== "confirm" || spec.preview === undefined || more.length > 0) return null;
+  if (!isBoundedString(text, UI_BLOCK_LIMITS.preview) || !text.trim()) return null;
+  return text === spec.preview ? { answers: rest } : { answers: rest, preview: text };
 }
 
 /**

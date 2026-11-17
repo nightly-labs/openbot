@@ -23,6 +23,7 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import {
   addUiBlockVaultRequests,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
@@ -43,6 +44,8 @@ import {
 import {
   type ConversationUiBlock,
   normalizeUiBlockSpec,
+  UI_CONFIRM_EDIT_ACTION_ID,
+  UI_CONFIRM_PREVIEW_ANSWER_ID,
   type UiBlockResponse,
   type UiBlockSpec,
   type UiBlockValue,
@@ -71,6 +74,7 @@ interface AgentAnswer {
   actionId?: string;
   values?: Record<string, UiBlockValue>;
   text?: string;
+  preview?: string;
   next?: string;
 }
 
@@ -178,6 +182,17 @@ const confirmSpec: UiBlockSpec = {
   actions: [
     { id: "send", label: "Send", style: "primary" },
     { id: "cancel", label: "Cancel" },
+  ],
+};
+const draftSpec: UiBlockSpec = {
+  type: "confirm",
+  title: "Send the letter to Ann?",
+  fields: [{ label: "To", value: "ann@example.com" }],
+  preview: "Hi Ann, see you on Monday.",
+  actions: [
+    { id: "send", label: "Send", style: "primary" },
+    { id: UI_CONFIRM_EDIT_ACTION_ID, label: "Edit" },
+    { id: "keep", label: "Keep draft" },
   ],
 };
 const dangerSpec: UiBlockSpec = {
@@ -298,6 +313,47 @@ try {
     });
     assert.deepEqual(message.uiBlock?.state.respondedBy, MEMBER.sender);
     return message.uiBlock?.state;
+  });
+
+  // An edited draft (#10516): the card sends the text beside the answers of the button pressed next.
+  await step("ui-block-preview-edit-v1: a protocol 9 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(9).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+  });
+
+  await step("an edited draft reaches the agent, and the closed card shows it", async () => {
+    const edited = "Hi Ann, see you on Tuesday.";
+    const { id, spec, message } = ask(draftSpec, "turn-edit");
+    const answers = { ...asNewClient(spec, { actionId: "send" }), [UI_CONFIRM_PREVIEW_ANSWER_ID]: [edited] };
+    await answer(id, answers, OWNER);
+    const sent = client.answers.get(id)?.value;
+    assert.equal(sent?.actionId, "send");
+    assert.equal(sent?.preview, edited);
+    assert.ok(sent?.next);
+    assert.deepEqual(message.uiBlock?.state.response, { actionId: "send" });
+    assert.equal(message.uiBlock?.spec.type === "confirm" && message.uiBlock.spec.preview, edited);
+    const resolution = message.questionPrompt?.resolution;
+    assert.deepEqual(Object.keys(resolution?.status === "answered" ? resolution.responses : {}), ["action"]);
+    return { agentGot: sent, stored: message.uiBlock };
+  });
+
+  await step("an unchanged draft adds nothing; a blank one, or an edit without a preview, is refused", async () => {
+    const draft = ask(draftSpec, "turn-edit-2");
+    const keep = asNewClient(draft.spec, { actionId: "keep" });
+    await assert.rejects(answer(draft.id, { ...keep, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["  "] }, OWNER));
+    assert.equal(draft.message.uiBlock?.state.status, "pending");
+    await answer(draft.id, { ...keep, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Monday."] }, OWNER);
+    assert.deepEqual(client.answers.get(draft.id)?.value, {
+      status: "answered",
+      blockId: `block-${draft.id}`,
+      actionId: "keep",
+    });
+    const plain = ask(confirmSpec, "turn-edit-3");
+    const send = asNewClient(plain.spec, { actionId: "cancel" });
+    await assert.rejects(answer(plain.id, { ...send, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["text"] }, OWNER));
+    await answer(plain.id, send, OWNER);
+    assert.equal(plain.message.uiBlock?.state.status, "answered");
   });
 
   await step("member cannot press a danger action or answer it in words; an admin can", async () => {

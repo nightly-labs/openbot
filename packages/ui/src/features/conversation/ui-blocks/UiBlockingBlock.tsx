@@ -1,4 +1,4 @@
-import type { UiBlockSpec } from "@openbot/contracts/ui-blocks";
+import type { UiBlockResponse, UiBlockSpec } from "@openbot/contracts/ui-blocks";
 import type { JSX } from "@solidjs/web";
 import { Match, Switch } from "solid-js";
 import { UiChoiceBlock } from "./UiChoiceBlock";
@@ -9,6 +9,8 @@ import type { UiBlockProps } from "./ui-block-support";
 export interface UiBlockingBlockProps extends UiBlockProps<UiBlockSpec> {
   /** Draws a confirm block's preview as safe Markdown. */
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
+  /** Lets a confirm block's preview be edited in the card (see `UiConfirmBlock`). */
+  onRespondEdited?: ((response: UiBlockResponse, preview: string) => void) | undefined;
 }
 
 /** The card for any blocking block type: confirm, choice or form. An old quick replies block shows as a choice. */
@@ -42,7 +44,14 @@ export function UiBlockingBlock(props: UiBlockingBlockProps) {
   return (
     <Switch>
       <Match when={props.spec.type === "confirm" && props.spec}>
-        {(spec) => <UiConfirmBlock {...shared} spec={spec()} renderPreview={props.renderPreview} />}
+        {(spec) => (
+          <UiConfirmBlock
+            {...shared}
+            spec={spec()}
+            renderPreview={props.renderPreview}
+            onRespondEdited={props.onRespondEdited}
+          />
+        )}
       </Match>
       <Match when={(props.spec.type === "choice" || props.spec.type === "quick_replies") && props.spec}>
         {(spec) => <UiChoiceBlock {...shared} spec={spec()} />}

@@ -1,5 +1,12 @@
-import type { UiAction, UiActionStyle, UiConfirmBlock as UiConfirmSpec } from "@openbot/contracts/ui-blocks";
-import { Button, NativeSelect } from "@openbot/ui";
+import {
+  UI_BLOCK_LIMITS,
+  UI_CONFIRM_EDIT_ACTION_ID,
+  type UiAction,
+  type UiActionStyle,
+  type UiBlockResponse,
+  type UiConfirmBlock as UiConfirmSpec,
+} from "@openbot/contracts/ui-blocks";
+import { Button, NativeSelect, Textarea } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, flush, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
@@ -21,6 +28,11 @@ const BUTTON_VARIANT = {
 export interface UiConfirmBlockProps extends UiBlockProps<UiConfirmSpec> {
   /** Draws `spec.preview` as safe Markdown. Without it the preview is plain text. */
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
+  /**
+   * With it, the `UI_CONFIRM_EDIT_ACTION_ID` button opens the preview for editing in the card, and the
+   * next button sends its response here with the edited text. An unchanged text goes to `onRespond`.
+   */
+  onRespondEdited?: ((response: UiBlockResponse, preview: string) => void) | undefined;
 }
 
 function actionStyle(action: UiAction): UiActionStyle {
@@ -149,6 +161,14 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       : state().outcome;
 
   const [selected, setSelected] = createSignal<Record<string, string>>({});
+  // The preview as the person edits it in the card, and the edited text that went with the answer.
+  const [draft, setDraft] = createSignal<string>();
+  const [sentDraft, setSentDraft] = createSignal<string>();
+  const editing = () => !frozen() && draft() !== undefined;
+  const blankDraft = () => editing() && !draft()?.trim();
+  let editor: HTMLTextAreaElement | undefined;
+  const opensEditor = (action: UiAction) =>
+    action.id === UI_CONFIRM_EDIT_ACTION_ID && props.onRespondEdited !== undefined && props.spec.preview !== undefined;
   // A `confirm: true` action, or a held action that was clicked instead of held. The card asks for it
   // again before it acts.
   const [confirming, setConfirming] = createSignal<UiAction>();
@@ -173,17 +193,34 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       ? String(state().response?.values?.[select])
       : (selected()[select] ?? options[0] ?? "");
 
+  function startEditing(): void {
+    setDraft(props.spec.preview);
+    flush();
+    editor?.focus();
+  }
+
   function respond(action: UiAction): void {
-    if (locked()) return;
+    if (locked() || blankDraft()) return;
     setConfirming(undefined);
+    if (opensEditor(action)) {
+      startEditing();
+      return;
+    }
     const values: Record<string, string> = {};
     for (const field of props.spec.fields ?? []) {
       if ("select" in field) values[field.select] = selected()[field.select] ?? field.options[0] ?? "";
     }
+    const edited = draft();
+    const onRespondEdited = edited !== undefined && edited !== props.spec.preview ? props.onRespondEdited : undefined;
     sendUiBlockResponse(
       props.spec,
       { actionId: action.id, ...(Object.keys(values).length > 0 ? { values } : {}) },
-      props.onRespond,
+      (response) => {
+        if (onRespondEdited && edited !== undefined) {
+          setSentDraft(edited);
+          onRespondEdited(response, edited);
+        } else props.onRespond(response);
+      },
     );
   }
 
@@ -195,14 +232,14 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   function actionButtonsOrNone(): JSX.Element | undefined {
     if (confirming()) return undefined;
     return (
-      <For each={props.spec.actions.toReversed()}>
+      <For each={props.spec.actions.filter((action) => !(editing() && opensEditor(action))).toReversed()}>
         {(action) => (
           <Switch>
             <Match when={isHeld(action)}>
               <UiHoldButton
                 holdMs={holdMs()}
                 variant={BUTTON_VARIANT[actionStyle(action)]}
-                disabled={locked()}
+                disabled={locked() || blankDraft()}
                 describedBy={hintId}
                 ref={(element) => actionButtons.set(action.id, element)}
                 onComplete={() => respond(action)}
@@ -216,7 +253,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
                 type="button"
                 size="sm"
                 variant={BUTTON_VARIANT[actionStyle(action)]}
-                disabled={locked()}
+                disabled={locked() || blankDraft()}
                 ref={(element: HTMLButtonElement) => {
                   actionButtons.set(action.id, element);
                 }}
@@ -274,14 +311,31 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
           </For>
         </dl>
       </Show>
-      <Show when={props.spec.preview}>
-        {(preview) => (
-          <UiConfirmPreview>
-            <Show when={props.renderPreview} fallback={<p class="ui-block-preview-text">{preview()}</p>}>
-              {(render) => render()(preview())}
-            </Show>
-          </UiConfirmPreview>
-        )}
+      <Show
+        when={editing()}
+        fallback={
+          <Show when={(frozen() ? sentDraft() : undefined) ?? props.spec.preview}>
+            {(preview) => (
+              <UiConfirmPreview>
+                <Show when={props.renderPreview} fallback={<p class="ui-block-preview-text">{preview()}</p>}>
+                  {(render) => render()(preview())}
+                </Show>
+              </UiConfirmPreview>
+            )}
+          </Show>
+        }
+      >
+        <Textarea
+          ref={(element: HTMLTextAreaElement) => {
+            editor = element;
+          }}
+          rows={8}
+          value={draft() ?? ""}
+          maxlength={UI_BLOCK_LIMITS.preview}
+          aria-label={t("uiBlock.confirm.previewLabel")}
+          disabled={locked()}
+          onValueChange={(value) => setDraft(value)}
+        />
       </Show>
       <Show when={!frozen() && confirming()}>
         {(action) => (

@@ -398,6 +398,7 @@ import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -3505,6 +3506,12 @@ try {
         (process.platform !== "darwin") &&
         !list(field(hiddenWorkV8.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY),
       { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises ui-block-preview-edit to a protocol 9 peer only",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY) &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
+      { v9: summary(hiddenWorkV9) },
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(
