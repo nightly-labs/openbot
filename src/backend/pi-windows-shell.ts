@@ -26,12 +26,12 @@ const workingLaunchers = new Set<string>();
  * fails each command when WSL has no Linux, and with no `bash.exe` at all Pi fails each command too.
  * Pi then gets its `powershell` tool in place of `bash`. Git Bash, another bash, and a WSL with a Linux
  * that runs keep `bash`. The `+` and `-` entries keep the tools that the user set in Pi's settings.
+ * Call it only on Windows.
  */
 export const piWindowsShellArguments = Effect.fn("PiWindowsShell.arguments")(function* (
   cwd: string,
   environment: Record<string, string>,
 ) {
-  if (process.platform !== "win32") return [];
   const bash = yield* piBashPath(cwd, environment);
   if (bash && (!isWslLauncher(bash) || (yield* launcherRuns(bash, cwd, environment)))) return [];
   logger.info("Pi has no bash that runs commands, so it uses PowerShell.", { wslLauncher: bash !== null });
@@ -47,8 +47,8 @@ const piBashPath = Effect.fn("PiWindowsShell.bashPath")(function* (cwd: string, 
     if (yield* exists(gitBash)) return gitBash;
   }
   // Pi takes the first answer of `where`, which also looks in the folder that Pi runs in.
-  const found = yield* Effect.tryPromise(() =>
-    execFileAsync("where.exe", ["bash.exe"], { cwd, env: environment, timeout: 5_000, windowsHide: true }),
+  const found = yield* Effect.tryPromise((signal) =>
+    execFileAsync("where.exe", ["bash.exe"], { cwd, env: environment, signal, timeout: 5_000, windowsHide: true }),
   ).pipe(
     Effect.map(({ stdout }) => stdout.trim().split(/\r?\n/u)[0]?.trim() ?? ""),
     Effect.orElseSucceed(() => ""),
@@ -60,23 +60,31 @@ function isWslLauncher(path: string): boolean {
   return WSL_LAUNCHER_FOLDERS.has(win32.basename(win32.dirname(path)).toLowerCase());
 }
 
-/** Whether the WSL launcher runs a command. A check that does not end in time keeps `bash`, as before. */
+/**
+ * Whether the WSL launcher runs a command. A check that does not end in time keeps `bash`, as before,
+ * and the next thread checks again.
+ */
 const launcherRuns = Effect.fn("PiWindowsShell.launcherRuns")(function* (
   bash: string,
   cwd: string,
   environment: Record<string, string>,
 ) {
   if (workingLaunchers.has(bash)) return true;
-  const runs = yield* Effect.tryPromise({
-    try: () =>
-      execFileAsync(bash, ["-c", "true"], { cwd, env: environment, timeout: WSL_CHECK_TIMEOUT_MS, windowsHide: true }),
+  return yield* Effect.tryPromise({
+    try: (signal) =>
+      execFileAsync(bash, ["-c", "true"], {
+        cwd,
+        env: environment,
+        signal,
+        timeout: WSL_CHECK_TIMEOUT_MS,
+        windowsHide: true,
+      }),
     catch: (cause) => cause,
   }).pipe(
+    Effect.tap(() => Effect.sync(() => workingLaunchers.add(bash))),
     Effect.as(true),
     Effect.catch((cause) => Effect.succeed(isDynamicRecord(cause) && cause.killed === true)),
   );
-  if (runs) workingLaunchers.add(bash);
-  return runs;
 });
 
 function exists(path: string) {
