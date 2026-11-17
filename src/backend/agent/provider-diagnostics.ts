@@ -401,6 +401,9 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
  */
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
+/** The clause, up to a full stop, a semicolon or a line break, that names a count of images. */
+const IMAGE_COUNT_CLAUSE = /[^.;\n]*\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])[^.;\n]*/giu;
+
 /** A limit over time, such as "at most 50 images per day", which a new session does not change. */
 const IMAGE_QUOTA_PERIOD =
   /\b(?:per|a|each|every) (?:second|minute|hour|day|week|month)\b|\b(?:hourly|daily|weekly|monthly|quota)\b/iu;
@@ -414,16 +417,15 @@ const IMAGE_QUOTA_PERIOD =
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
  * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
  * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
- * "maximum of", a number, and "images". A daily quota of images is not a count in one request, so it
- * does not match.
+ * "maximum of", a number, and "images". A daily quota of images is not a count in one request, so a
+ * clause that names a period does not match. A period in a different clause, such as "try again in a
+ * minute", does not stop the match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
   return (
     /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
       message,
-    ) ||
-    (/\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])/iu.test(message) &&
-      !IMAGE_QUOTA_PERIOD.test(message))
+    ) || Array.from(message.matchAll(IMAGE_COUNT_CLAUSE)).some(([clause]) => !IMAGE_QUOTA_PERIOD.test(clause))
   );
 }
 
