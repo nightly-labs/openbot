@@ -164,11 +164,9 @@ const OPENCODE_REQUEST_FAILURES = [
   ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b/iu],
   ["error.provider.opencodeInvalidUpload", /\binvalid upload request\b/iu],
   // A gateway that does not let the key use the model, such as new-api's "令牌的所有分组均不支持模型
-  // kimi-k3". Each try fails the same way, so the user selects another model (#10997).
-  [
-    "error.provider.opencodeModelUnavailable",
-    /\bmodel[_ ]not[_ ]found\b|\bmodel_not_supported\b|\bmodel is not supported\b|不支持模型/iu,
-  ],
+  // kimi-k3". Each try fails the same way, so the user selects another model (#10997). Not "model is
+  // not supported": "reasoning_effort 'high' for this model is not supported" refuses a setting.
+  ["error.provider.opencodeModelUnavailable", /\bmodel[_ ]not[_ ]found\b|\bmodel_not_supported\b|不支持模型/iu],
   [
     "error.provider.opencodeProviderFailed",
     /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
