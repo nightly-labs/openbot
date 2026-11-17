@@ -1278,20 +1278,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.#endIfUnresponsive(sessionId ? this.#threads.get(sessionId) : undefined),
           this.#scope,
         );
-      // A session open or a settings change of a turn sent no prompt, so the message can go again.
+      // A session open or a settings change of a turn sent no prompt, so the message can go again. A
+      // turn that runs in the session fails by itself, and its failure ends the process.
       if (
         sessionId &&
         (method === "turn/start" || method === "thread/resume") &&
         !this.#threads.get(sessionId)?.transport &&
+        !this.#threads.get(sessionId)?.activeTurn &&
         this.#flavor.lostServerUntilRestart?.(error)
       ) {
         logger.warn("An ACP agent lost the connection to its server.", {
           provider: this.provider,
           reason: this.#redact(failureText(error)),
         });
-        const message = this.#serverLostMessage();
-        yield* this.#endFailingProcess(sessionId, message);
-        return yield* providerFailure(new Error(message));
+        yield* this.#endFailingProcess(sessionId, this.#serverLostEnd(), false);
+        return yield* providerFailure(new Error(sourceText("error.provider.acpServerLost", { provider: this.#label })));
       }
       if (
         sessionId &&
@@ -2917,22 +2918,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           yield* this.#endFailingProcess(
             thread.id,
             sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }),
+            true,
           );
         else if (this.#flavor.lostServerUntilRestart?.(failure))
-          yield* this.#endFailingProcess(thread.id, this.#serverLostMessage());
+          yield* this.#endFailingProcess(thread.id, this.#serverLostEnd(), false);
       }
     }
   });
 
   /**
-   * Ends a process that answered a prompt before and now can fail each request until it ends, so the
-   * next message starts a new process. A turn of another session, also one that still opens, must
-   * not end with it.
+   * Ends a process that can fail each request until it ends, so the next message starts a new
+   * process. A turn of another session, also one that still opens, must not end with it. With
+   * `answeredFirst`, a process that refused from its first prompt is not ended again.
    */
-  #endFailingProcess(threadId: string, message: string): Effect.Effect<void> {
+  #endFailingProcess(threadId: string, message: string, answeredFirst: boolean): Effect.Effect<void> {
     return Effect.suspend(() => {
       if (
-        !this.#promptAnswered ||
+        (answeredFirst && !this.#promptAnswered) ||
         this.#startingThreads.size > 0 ||
         [...this.#openingTurns.keys()].some((id) => id !== threadId) ||
         [...this.#threads.ids()].some((id) => id !== threadId && this.#threads.get(id)?.activeTurn)
@@ -2943,8 +2945,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  #serverLostMessage(): string {
-    return sourceText("error.provider.acpServerLost", { provider: this.#label });
+  /** Says nothing about the message: a prompt that the agent took can have run. */
+  #serverLostEnd(): string {
+    return sourceText("error.provider.acpServerLostEnded", { provider: this.#label });
   }
 
   /** Reports the usage of one prompt reply. `promptId` names it: a delivery that runs again keeps its turn ID. */

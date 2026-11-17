@@ -12,6 +12,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpRefusedUntilRestart":
     "{provider} refused a message, so OpenBot ended its process. Send your message again.",
   "error.provider.acpServerLost": "{provider} lost its connection. Send your message again.",
+  "error.provider.acpServerLostEnded": "{provider} lost its connection, so OpenBot ended its process.",
   "error.provider.acpSettingsTimedOut": "{provider} did not answer in time. Try again in a moment.",
   "error.provider.acpPlanUsedUp":
     "{provider} says that your plan is used up. Choose another model, or upgrade your {provider} plan.",

@@ -13,6 +13,8 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider} heeft een bericht geweigerd, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
   "error.provider.acpServerLost": "{provider} heeft de verbinding verloren. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLostEnded":
+    "{provider} heeft de verbinding verloren, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpSettingsTimedOut": "{provider} reageerde niet op tijd. Probeer het zo opnieuw.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",

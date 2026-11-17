@@ -13,6 +13,7 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider} がメッセージを拒否したため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
   "error.provider.acpServerLost": "{provider} の接続が切れました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLostEnded": "{provider} の接続が切れたため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSettingsTimedOut":
     "{provider} が時間内に応答しませんでした。しばらくしてからもう一度お試しください。",
   "error.provider.acpPlanUsedUp":

@@ -13,6 +13,7 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider}이(가) 메시지를 거부하여 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpServerLost": "{provider}의 연결이 끊겼습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpServerLostEnded": "{provider}의 연결이 끊겨 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpSettingsTimedOut": "{provider}가 제시간에 응답하지 않았습니다. 잠시 후 다시 시도하세요.",
   "error.provider.acpPlanUsedUp":
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",

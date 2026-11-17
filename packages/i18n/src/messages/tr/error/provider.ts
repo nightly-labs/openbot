@@ -14,6 +14,7 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider} bir mesajı reddetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
   "error.provider.acpServerLost": "{provider} bağlantısını kaybetti. Mesajınızı yeniden gönderin.",
+  "error.provider.acpServerLostEnded": "{provider} bağlantısını kaybetti, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSettingsTimedOut": "{provider} zamanında yanıt vermedi. Biraz sonra yeniden deneyin.",
   "error.provider.acpPlanUsedUp":
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",

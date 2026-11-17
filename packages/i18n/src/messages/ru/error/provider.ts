@@ -13,6 +13,7 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider} отклонил сообщение, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
   "error.provider.acpServerLost": "{provider} потерял соединение. Отправьте сообщение ещё раз.",
+  "error.provider.acpServerLostEnded": "{provider} потерял соединение, поэтому OpenBot завершил его процесс.",
   "error.provider.acpSettingsTimedOut": "{provider} не ответил вовремя. Повторите попытку чуть позже.",
   "error.provider.acpPlanUsedUp":
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",

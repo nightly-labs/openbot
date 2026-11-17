@@ -12,6 +12,7 @@ export const messages = {
   "error.provider.acpSignInLost": "{provider} 的登录已失效，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpRefusedUntilRestart": "{provider} 拒绝了一条消息，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpServerLost": "{provider} 的连接已断开。请重新发送消息。",
+  "error.provider.acpServerLostEnded": "{provider} 的连接已断开，OpenBot 已结束其进程。",
   "error.provider.acpSettingsTimedOut": "{provider} 未及时响应。请稍后重试。",
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":

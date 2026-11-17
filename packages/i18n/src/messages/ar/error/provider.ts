@@ -11,6 +11,7 @@ export const messages = {
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
   "error.provider.acpRefusedUntilRestart": "رفض {provider} رسالة، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
   "error.provider.acpServerLost": "فقد {provider} اتصاله. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLostEnded": "فقد {provider} اتصاله، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSettingsTimedOut": "لم يستجب {provider} في الوقت المحدد. حاول مرة أخرى بعد قليل.",
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":

@@ -13,6 +13,7 @@ export const messages = {
   "error.provider.acpRefusedUntilRestart":
     "{provider} a refusé un message, OpenBot a donc arrêté son processus. Renvoyez votre message.",
   "error.provider.acpServerLost": "{provider} a perdu sa connexion. Renvoyez votre message.",
+  "error.provider.acpServerLostEnded": "{provider} a perdu sa connexion, OpenBot a donc arrêté son processus.",
   "error.provider.acpSettingsTimedOut": "{provider} n’a pas répondu à temps. Réessayez dans un instant.",
   "error.provider.acpPlanUsedUp":
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
