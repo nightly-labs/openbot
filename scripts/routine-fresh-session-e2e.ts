@@ -262,6 +262,7 @@ const report: {
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
   chatRoutine?: { threads: number; answersInChat: number; runStatus: string };
+  lateAnswerInRoutineThread?: { threadId: string; readsEarlierRuns: boolean; answerShown: boolean };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -753,6 +754,33 @@ try {
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&
       report.threadStarts.filter((entry) => entry.persistSession !== false).length === 1,
   );
+
+  // The late answer to a routine card is a message in the routine thread (#11550). It starts a turn
+  // there, not in the chat. As a message that the user types there, it starts a new session, which does
+  // not read the earlier runs: the report keeps that, and the quoted card is the turn's context.
+  const lateQuestion = "Send the build report?";
+  const late = await runCauseEffect(
+    agents.sendMessage({ agentId: agent.id, taskId: buildThread.taskId, text: `> ${lateQuestion}\n\nSend` }),
+  );
+  const lateDeliveryId = late.deliveries[0]?.id;
+  assert.ok(lateDeliveryId, "late answer: no delivery");
+  await settled(lateDeliveryId, "late answer in the routine thread");
+  const lateTurn = await waitFor("the late answer turn", () =>
+    fakeEntries().find((entry) => entry.method === "turn/start" && entry.text?.includes(lateQuestion)),
+  );
+  report.lateAnswerInRoutineThread = {
+    threadId: String(lateTurn.threadId),
+    readsEarlierRuns: lateTurn.text?.includes("Routine report 2") === true,
+    answerShown: agents
+      .readTask(agent.id, buildThread.taskId)
+      // Only this turn answers "Done." in the routine thread: each run answers with its report.
+      .messages.some((message) => message.text === "Done."),
+  };
+  pass(
+    "A late answer in a routine thread starts a turn there, not in the chat",
+    lateTurn.threadId !== mainBefore && report.lateAnswerInRoutineThread.answerShown,
+  );
+  pass("The late answer turn gets the quoted card", lateTurn.text?.includes(`> ${lateQuestion}\n\nSend`) === true);
 
   // An archive stops the subagents of a Codex thread, so a run whose subagent still works keeps its
   // session listed. The chat routine below runs after it, so the close has ended before the check.
