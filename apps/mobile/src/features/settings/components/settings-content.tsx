@@ -40,8 +40,17 @@ export function SettingsContent({
 export function SettingsSection({
   title,
   footer,
+  rowsDrawSeparators = false,
   children,
-}: PropsWithChildren<{ title?: string; footer?: ReactNode }>) {
+}: PropsWithChildren<{
+  title?: string;
+  footer?: ReactNode;
+  /**
+   * For rows that can hide themselves, such as a setting that only some hosts serve: the section
+   * cannot see which of them render, so each row draws its own separator in `SettingsGroupRow`.
+   */
+  rowsDrawSeparators?: boolean;
+}>) {
   return (
     <View className="gap-2">
       {title ? (
@@ -50,13 +59,18 @@ export function SettingsSection({
         </Typography>
       ) : null}
       <ListGroup variant="secondary" className="overflow-hidden rounded-grouped bg-grouped p-0 shadow-none">
-        {Children.map(Children.toArray(children), (child, index) =>
-          child ? (
-            <View>
-              {index > 0 ? <View className="ml-4 h-px bg-grouped-border" /> : null}
-              {child}
-            </View>
-          ) : null,
+        {rowsDrawSeparators ? (
+          // The group clips the separator of the first row.
+          <View className="-mt-px">{children}</View>
+        ) : (
+          Children.map(Children.toArray(children), (child, index) =>
+            child ? (
+              <View>
+                {index > 0 ? <View className="ml-4 h-px bg-grouped-border" /> : null}
+                {child}
+              </View>
+            ) : null,
+          )
         )}
       </ListGroup>
       {footer ? (
@@ -64,6 +78,16 @@ export function SettingsSection({
           {footer}
         </Typography.Paragraph>
       ) : null}
+    </View>
+  );
+}
+
+/** One row of a `SettingsSection` with `rowsDrawSeparators`, with its separator above it. */
+export function SettingsGroupRow({ children }: PropsWithChildren) {
+  return (
+    <View>
+      <View className="ml-4 h-px bg-grouped-border" />
+      {children}
     </View>
   );
 }
@@ -92,6 +116,7 @@ const ROW_PADDING_X = 32;
 export function SettingsRow({
   children,
   supportingText,
+  description,
   value,
   onPress,
   trailing: trailingControl,
@@ -106,6 +131,11 @@ export function SettingsRow({
   onAccessibilityAction,
 }: PropsWithChildren<{
   supportingText?: string;
+  /**
+   * Text under the whole row, also under a trailing control. For a longer explanation of a row with
+   * a picker or a switch, where `supportingText` beside the control would be narrow.
+   */
+  description?: ReactNode;
   /** A short value, such as a count, before the disclosure chevron. */
   value?: string;
   onPress?: () => void;
@@ -162,22 +192,42 @@ export function SettingsRow({
   // the value moved to another parent, React would mount a new native control, which is narrow
   // until it measures its contents. The row would then change its layout again at each mount and
   // flicker.
-  const content = (
+  const body = (
+    <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
+      <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
+      {trailingContent ? (
+        // The value limit is a part of this row, which has a fixed width. A percent limit inside the
+        // value would refer to this wrapper, which takes the width of its contents.
+        <View
+          className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 max-w-[60%] shrink"}
+          onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
+        >
+          {trailingContent}
+        </View>
+      ) : null}
+    </View>
+  );
+  // `ListGroup.Item` lays out its children in a row, so the description shares one column with the
+  // row content, after the icon, so that it lines up with the title.
+  // The icon shares a line with the title, so both center on it. A 20 pt icon and the 12 pt gap put
+  // the description under the title.
+  const content = description ? (
+    <View className="min-w-0 flex-1 gap-0.5">
+      <View className="min-w-0 flex-row items-center gap-3">
+        {leading}
+        {body}
+      </View>
+      <Typography.Paragraph
+        type="body-xs"
+        className={leading ? "pl-8 text-grouped-secondary" : "text-grouped-secondary"}
+      >
+        {description}
+      </Typography.Paragraph>
+    </View>
+  ) : (
     <>
       {leading}
-      <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
-        <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
-        {trailingContent ? (
-          // The value limit is a part of this row, which has a fixed width. A percent limit inside the
-          // value would refer to this wrapper, which takes the width of its contents.
-          <View
-            className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 max-w-[60%] shrink"}
-            onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
-          >
-            {trailingContent}
-          </View>
-        ) : null}
-      </View>
+      {body}
     </>
   );
   return onPress ? (

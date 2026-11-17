@@ -400,7 +400,9 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
-  "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
+  "mobile.agent.advanced.behavior": "動作",
+  "mobile.agent.advanced.workspace": "ワークスペース",
+  "mobile.agent.advanced.chat": "チャット",
   "mobile.agent.notifications.failed": "通知を変更できませんでした",
   "mobile.agent.notifications.failedBody": "ホストはこの変更を保存できませんでした。",
   "mobile.agent.notificationLevel.title": "通知する内容",
@@ -695,6 +697,15 @@ export const messages = {
   "mobile.agent.compact.failed": "コンテキストを圧縮できません",
   "mobile.agent.compact.failedBody": "ホストがコンテキストを圧縮できませんでした。",
   "mobile.agent.compact.unsupported": "このホストでは、リモートデバイスからコンテキストを圧縮できません。",
+  "mobile.agent.deleteHistory.title": "履歴を削除",
+  "mobile.agent.deleteHistory.deleting": "履歴を削除しています…",
+  "mobile.agent.deleteHistory.footer": "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
+  "mobile.agent.deleteHistory.confirmTitle": "{name} とのチャット履歴を削除しますか？",
+  "mobile.agent.deleteHistory.confirmBody":
+    "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+  "mobile.agent.deleteHistory.confirm": "履歴を削除",
+  "mobile.agent.deleteHistory.failed": "履歴を削除できませんでした",
+  "mobile.agent.deleteHistory.failedBody": "ホストは履歴を削除できませんでした。",
   "mobile.agent.instructionsFile.title": "指示ファイル",
   "mobile.agent.instructionsFile.placeholder": "このエージェントが常に従うルール",
   "mobile.agent.instructionsFile.footer":

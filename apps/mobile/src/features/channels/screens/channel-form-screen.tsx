@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
+import { ChannelContextActions } from "@/features/channels/components/channel-context-actions";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -70,6 +71,7 @@ export function ChannelFormScreen({ create = false }: { create?: boolean }) {
       channel={create ? undefined : (current ?? last.current)}
       available={available}
       pictureSupported={state.canSetPicture}
+      contextActionsSupported={state.canUseContextActions}
       store={state.store}
     />
   );
@@ -82,6 +84,7 @@ function ChannelForm({
   channel,
   available,
   pictureSupported,
+  contextActionsSupported,
   store,
 }: {
   create: boolean;
@@ -91,6 +94,8 @@ function ChannelForm({
   available: boolean;
   /** The host takes a channel picture (`channel-picture-v1`). */
   pictureSupported: boolean;
+  /** The host takes "New conversation", "Compact context" and "Delete history" (`chat-history-v1`). */
+  contextActionsSupported: boolean;
   store: MobileChannelStore;
 }) {
   const { t, errorMessage } = useText();
@@ -349,6 +354,17 @@ function ChannelForm({
             <Typography.Paragraph>{t("mobile.channel.form.routines")}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
+      ) : null}
+      {/* The host refuses these for an archived channel. */}
+      {!create && channel && !channel.archived && contextActionsSupported ? (
+        <ChannelContextActions
+          serverId={serverId}
+          channelId={channelId}
+          channelName={channel.name}
+          store={store}
+          available={available && !saving && !finished}
+          canDeleteHistory={canManage}
+        />
       ) : null}
       {!create && !channel?.archived ? (
         <SettingsSection>
