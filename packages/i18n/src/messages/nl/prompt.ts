@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "Open de pagina om het inloggen, de verificatie of de toestemming af te ronden. Laat {name} daarna verdergaan.",
   "prompt.browser.openPage": "{title} openen",
+  "prompt.browser.openFailed": "Kan de pagina niet openen in het hoofdvenster. Probeer het opnieuw.",
   "prompt.browser.done": "Ik ben klaar",
   "prompt.browser.pageFallback": "Browserpagina",
   "prompt.browser.hostFallback": "de browser",

@@ -19,6 +19,7 @@ import {
   FEEDBACK_WITHDRAW_ROUTES,
 } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import {
   decodeRoutineRunCommandResponse,
@@ -80,6 +81,7 @@ function webHostAdmin(
   webhookSenderSecretEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
   routinesOnceEnabled?: () => boolean,
+  routinePauseReasonsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -89,6 +91,7 @@ function webHostAdmin(
     () => webhookSenderSecretEnabled?.() === true,
     () => routineRunPlaceEnabled?.() === true,
     () => routinesOnceEnabled?.() === true,
+    () => routinePauseReasonsEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -173,6 +176,7 @@ export function createWebConversationRuntime(
   skillCatalog?: () => SkillCatalogCalls,
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
+  const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
@@ -503,6 +507,7 @@ export function createWebConversationRuntime(
             (...args) => adminRequest()(...args),
             () => routineRunPlaceEnabled?.() === true,
             routinesOnceEnabled,
+            routinePauseReasonsEnabled,
           ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
@@ -521,6 +526,7 @@ export function createWebConversationRuntime(
           webhookSenderSecretEnabled,
           routineRunPlaceEnabled,
           routinesOnceEnabled,
+          routinePauseReasonsEnabled,
         )
       : undefined,
   };

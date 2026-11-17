@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "Otwórz stronę, aby dokończyć logowanie, weryfikację lub wyrażenie zgody. Następnie pozwól agentowi {name} kontynuować.",
   "prompt.browser.openPage": "Otwórz: {title}",
+  "prompt.browser.openFailed": "Nie udało się otworzyć strony w oknie głównym. Spróbuj ponownie.",
   "prompt.browser.done": "Gotowe",
   "prompt.browser.pageFallback": "Strona przeglądarki",
   "prompt.browser.hostFallback": "przeglądarka",

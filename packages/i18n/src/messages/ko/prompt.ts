@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "페이지를 열어 로그인, 인증 또는 동의를 완료해 주세요. 그런 다음 {name}이(가) 이어서 진행하게 해 주세요.",
   "prompt.browser.openPage": "{title} 열기",
+  "prompt.browser.openFailed": "기본 창에서 페이지를 열 수 없어요. 다시 시도해 주세요.",
   "prompt.browser.done": "완료했어요",
   "prompt.browser.pageFallback": "브라우저 페이지",
   "prompt.browser.hostFallback": "브라우저",

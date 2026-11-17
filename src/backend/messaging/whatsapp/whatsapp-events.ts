@@ -13,6 +13,7 @@ import {
 } from "@openbot/whatsapp/baileys";
 import type { InboundAction, InboundFile, InboundMessage, MessageTarget } from "../messaging-types";
 import type { WhatsAppChatState } from "./whatsapp-chats";
+import { isOtherOpenBotPost } from "./whatsapp-loop-guard";
 import { type SenderDecision, senderDecision, type WhatsAppSenderRules } from "./whatsapp-senders";
 
 /** The conversation of a direct chat: the whole chat. */
@@ -58,7 +59,9 @@ export type WhatsAppEvent =
   | { type: "message"; message: InboundMessage; chatJid: string; isGroup: boolean }
   | { type: "action"; action: InboundAction }
   /** An unknown person wrote to a dedicated number. */
-  | { type: "pairing"; chatJid: string; senderId: string; name: string };
+  | { type: "pairing"; chatJid: string; senderId: string; name: string }
+  /** Another OpenBot linked to the same number posted in the owner's own chat. Nothing answers it. */
+  | { type: "otherOpenBot"; chatJid: string };
 
 /** The socket facts that tell a held message from history. */
 export interface WhatsAppUpsertWindow {
@@ -154,6 +157,7 @@ export async function whatsAppInbound(
     (context.isOwnPost(quotedId) ||
       (contextInfo?.participant ? isMe(jidNormalizedUser(contextInfo.participant), context.me) : false));
   const text = textOf(content);
+  if (isSelfChat && isOtherOpenBotPost(text)) return historyOnly ? null : { type: "otherOpenBot", chatJid };
   const files = filesOf(content, chatJid, id);
   context.chats.rememberKey(id, { fromMe: Boolean(key.fromMe), participant: key.participant ?? null, text });
   if (files[0]) context.chats.rememberMedia(files[0].id, message);
@@ -430,7 +434,8 @@ function userOf(jid: string | null | undefined): string | null {
 }
 
 /** The send time in milliseconds. Baileys gives a number, or a protobuf Long after a decode. */
-function sentAt(message: WAMessage): number {
+/** When the message was sent, in milliseconds, or 0 when WhatsApp did not say. */
+export function sentAt(message: WAMessage): number {
   const value = message.messageTimestamp;
   const seconds = typeof value === "number" ? value : value ? value.toNumber() : 0;
   return seconds * 1_000;

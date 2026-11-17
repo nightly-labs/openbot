@@ -117,6 +117,7 @@ import {
   type AppServerNotification,
   type AppServerRequest,
   CLAUDE_API_KEY_ACCOUNT_TYPE,
+  CLAUDE_CLI_API_KEY_ACCOUNT_TYPE,
   getString,
   isRecord,
   type RequestId,
@@ -528,6 +529,18 @@ interface ThreadRuntime {
   subagents: SubagentState;
   /** Background subagents and commands that outlive their turn. Stopping the process ends them (#1870). */
   backgroundTasks: number;
+  /**
+   * The background work ended while no turn ran, and the CLI starts a turn of its own to answer its
+   * result. Until that turn begins, closing the query loses the result (#10743).
+   */
+  awaitsResultTurn: boolean;
+  /** The turn that started each background subagent or command that still works, by CLI task id. */
+  taskTurns: Map<string, string>;
+  /**
+   * The turns that started the background work that ended while no turn ran, null for work of no known
+   * turn. The turn that the CLI then starts to answer the results continues them (#10847).
+   */
+  endedTaskTurns: (string | null)[];
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
@@ -621,6 +634,8 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
+  /** `task_started`, `task_updated` and `task_notification`: the CLI's id of the background task. */
+  task_id?: unknown;
   /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
   command_uuid?: unknown;
   state?: unknown;
@@ -789,6 +804,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #userSetup: () => boolean;
   /** Whether the last account read found no claude.ai account and signed in with the key. */
   #onApiKey = false;
+  /** Whether the last account read found an API key of the user's own: `CLAUDE_CLI_API_KEY_ACCOUNT_TYPE`. */
+  #cliApiKey = false;
   /** Whether this client read the account. A client for one generation without tools does not. */
   #accountRead = false;
   readonly readHistory: ReadProviderHistory;
@@ -934,9 +951,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
   }
 
-  /** A background subagent or command of this thread ends when its query closes. */
+  /**
+   * A background subagent or command of this thread ends when its query closes, and so does the turn
+   * that the CLI starts by itself to answer the result of work that ended.
+   */
   holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
-    return Effect.sync(() => (this.#threads.get(threadId)?.backgroundTasks ?? 0) > 0);
+    return Effect.sync(() => {
+      const thread = this.#threads.get(threadId);
+      return thread !== undefined && (thread.backgroundTasks > 0 || thread.awaitsResultTurn);
+    });
   }
 
   /**
@@ -1252,16 +1275,42 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (onApiKey) status = yield* this.#readAuthStatusEffect(true, timeoutMs);
     this.#onApiKey = onApiKey && status.loggedIn === true;
     this.#accountRead = true;
+    this.#cliApiKey = status.loggedIn === true && !this.#onApiKey && (yield* this.#billsOwnApiKey(status));
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
     return {
       account: {
-        type: this.#onApiKey ? CLAUDE_API_KEY_ACCOUNT_TYPE : "claude",
+        type: this.#onApiKey
+          ? CLAUDE_API_KEY_ACCOUNT_TYPE
+          : this.#cliApiKey
+            ? CLAUDE_CLI_API_KEY_ACCOUNT_TYPE
+            : "claude",
         email: isString(status.email) ? status.email : null,
         planType: isString(status.subscriptionType) ? status.subscriptionType : null,
         organization: isString(status.orgId) ? status.orgId : null,
       },
       requiresOpenaiAuth: false,
     };
+  });
+
+  /**
+   * Whether `auth status` names an API key that OpenBot did not give the CLI: an `apiKeyHelper`, or a key
+   * in the user's environment or Claude settings. A Console sign-in (`/login managed key`) and a cloud
+   * backend are not such a key. The status does not name a gateway that takes the key, so a base URL in
+   * the environment or the settings is not Anthropic billing.
+   */
+  readonly #billsOwnApiKey = Effect.fn("ClaudeAgentClient.billsOwnApiKey")(function* (
+    this: ClaudeAgentClient,
+    status: DynamicRecord,
+  ) {
+    if (status.apiKeySource !== "ANTHROPIC_API_KEY" && status.apiKeySource !== "apiKeyHelper") return false;
+    if (status.apiProvider !== undefined && status.apiProvider !== "firstParty") return false;
+    if (status.authMethod !== "api_key" && status.authMethod !== "api_key_helper") return false;
+    const environment = { ...claudeEnvironment(this.#cli), ...this.#environment(false) };
+    if (this.#environment(false).ANTHROPIC_API_KEY || environment.ANTHROPIC_BASE_URL) return false;
+    const settings = yield* readClaudeSettingsFile(
+      join(environment.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json"),
+    );
+    return !(isDynamicRecord(settings.env) && settings.env.ANTHROPIC_BASE_URL);
   });
 
   /**
@@ -1334,9 +1383,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return yield* providerSync(() => (last?.loggedIn === true ? last : { loggedIn: true }));
   });
 
-  /** Whether the CLI uses an Anthropic API key: the saved key, a key account's key, or one that OpenBot inherited. */
+  /** Whether the CLI uses an Anthropic API key: the saved key, a key account's key, or one of the user's own. */
   #usesApiKey(): boolean {
-    return Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY);
+    return (
+      this.#cliApiKey ||
+      Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY)
+    );
   }
 
   /** The agent environment, with the saved key when `withApiKey`. */
@@ -1438,9 +1490,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
-      usable?.flatMap((server) =>
-        server.proxied || (server.url && server.config.headers.length > 0) ? [server.config.name] : [],
-      ) ?? [],
+      usable?.flatMap((server) => (server.url ? [server.config.name] : [])) ?? [],
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
@@ -1637,6 +1687,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       plan: newClaudePlanState(),
       subagents: newSubagentState(),
       backgroundTasks: 0,
+      awaitsResultTurn: false,
+      taskTurns: new Map(),
+      endedTaskTurns: [],
       lastOutputAt: Date.now(),
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
@@ -1789,17 +1842,25 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       messageIds: new Set<string>(),
       promptStarted: false,
     };
+    // A turn that answers background work that ended continues the turns that started it. Work of an
+    // unknown turn continues none, so the lifecycle does not take the turn as quiet.
+    const continues =
+      unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
+    runtime.endedTaskTurns = [];
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
+    runtime.awaitsResultTurn = false;
     startClaudePlanTurn(runtime.plan);
     this.#threads.holdForTurn(runtime);
     this.emit("notification", {
       method: "turn/started",
-      // `unprompted` tells the lifecycle that no delivery started this turn.
+      // `unprompted` tells the lifecycle that no delivery started this turn, and `continues` names the
+      // turns whose background work it answers.
       params: {
         threadId: runtime.id,
         turn: { id: turnId, status: "inProgress" },
         ...(unprompted ? { unprompted } : {}),
+        ...(continues.length > 0 ? { continues } : {}),
       },
     });
     return turn;
@@ -2020,14 +2081,35 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.backgroundTasks = Array.isArray(message.tasks)
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
-      // The level can arrive after the turn that started the work ended, so it holds or frees the idle timer.
-      // When the work ends, the CLI starts a turn of its own to answer the result. Until that turn shows
-      // output, the idle limit must not close the thread (#6557).
+      // Claude Code 2.1.322 sends the first level after the Bash or Agent call with `run_in_background`, before
+      // its tool result, so before the result of that turn. The level that ends the work comes with no turn.
+      // With no turn, a level holds or frees the idle timer. When the work ends, the CLI starts a turn of its
+      // own to answer the result. Until that turn shows output, the idle limit must not close the thread (#6557).
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
-        else if (before > 0 && runtime.backgroundTasks === 0) this.#threads.awaitOwnTurn(runtime);
+        else if (before > 0 && runtime.backgroundTasks === 0) {
+          runtime.awaitsResultTurn = true;
+          this.#threads.awaitOwnTurn(runtime);
+        }
       }
       return;
+    }
+    // A task starts in the turn that called its tool. Its end with no turn running makes the CLI start a
+    // turn of its own, which then continues that turn (#10847). A task that ends in a turn of the CLI's
+    // own also goes to that turn, which then continues its turn too. A person's turn decides by itself.
+    if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
+      const turn = runtime.activeTurn;
+      if (message.subtype === "task_started" && turn) runtime.taskTurns.set(message.task_id, turn.id);
+      else if (message.subtype === "task_notification") {
+        const origin = runtime.taskTurns.get(message.task_id) ?? null;
+        runtime.taskTurns.delete(message.task_id);
+        if (!turn) runtime.endedTaskTurns.push(origin);
+        else if (turn.unprompted && origin !== turn.id)
+          this.emit("notification", {
+            method: "openbot/turn-continues",
+            params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+          });
+      }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {
       this.#emitSubagents(runtime, foldClaudeTaskMessage(runtime.subagents, message, new Date().toISOString()));
@@ -2916,8 +2998,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   /**
-   * An MCP server's question, shown on the same card as a Codex one. The card declines what it
-   * cannot show, such as a sign-in on a web page. When Claude stops waiting, the card closes.
+   * An MCP server's question, shown on the same card as a Codex one. A sign-in on an https page shows
+   * its link; the card declines what it cannot show. When Claude stops waiting, the card closes.
    */
   readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
     this: ClaudeAgentClient,
@@ -3084,12 +3166,13 @@ export function claudeBrowserTools(call: (name: string, args: unknown) => Promis
  * Removes the CLI's "needs sign-in" marks of the servers in `names` before a query starts (#6325).
  * After a 401, the CLI writes the server name to `mcp-needs-auth-cache.json` in its configuration
  * folder, and for 15 minutes each new process skips a server of that name without a connection,
- * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
- * which never answers 401, so their marks are from before the sign-in, when the row's own URL
- * refused the CLI. The names also include the http rows that send headers the user typed, such as
- * an API key: a mark can be from before the key, and the CLI keeps it for the new key too (#6556).
- * When the key is wrong, the CLI asks the server once and marks the row again. The file is the
- * CLI's own: a missing or unknown file stays as it is.
+ * whatever its URL and headers are now. The names are all the http rows that OpenBot hands over.
+ * A row that goes through the sign-in proxy never answers 401, so its mark is from before the
+ * sign-in. A row with headers the user typed, such as an API key, can have a mark from before the
+ * key (#6556). A row with neither can have a mark from a 401 that the server no longer sends, while
+ * OpenBot's own test finds it ready, and the user had no way to clear the mark (#10152). When the
+ * server still refuses, the CLI asks it once and marks the row again. The file is the CLI's own: a
+ * missing or unknown file stays as it is.
  */
 const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
   function* (configDirectory: string, names: readonly string[]) {

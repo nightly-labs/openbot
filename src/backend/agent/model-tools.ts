@@ -68,7 +68,7 @@ function toolModel(model: AgentModelOption): ToolModel {
 }
 
 /** A provider row of the settings page, as `list_models` reads it. */
-export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message" | "lastError">;
 
 /**
  * Whether an agent can run on the provider now or soon: it runs, OpenBot checks it, or it is not
@@ -114,6 +114,17 @@ export function requireRunnableChange(
 const NEEDS_USER_STATES: ReadonlySet<AgentProviderState> = new Set(["sign-in-required", "outdated", "error"]);
 /** Where the user fixes such a provider. It is in the payload, not in the tool description that each turn sends. */
 const FIX_IN = "Server settings > Providers";
+
+/**
+ * Why a provider that is on and ready lists no model. Without it, the agent sent the user to the
+ * provider settings, where the provider shows as ready, and the user had nothing to fix there (#10693).
+ */
+function emptyCatalogMessage(provider: AgentProvider): string {
+  // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+  if (provider === "muse")
+    return "Muse is signed in, but Muse sent no models for this account. Muse may not be available in the country where this agent runs, or this account may have no access to Muse models. The provider settings cannot fix this. Choose a model from another provider.";
+  return `${providerLabel(provider)} is ready, but it lists no models now. Choose a model from another provider.`;
+}
 
 /** The models of each provider that a list with no query shows, before the models in use. */
 const SHORT_LIST_LENGTH = 8;
@@ -223,7 +234,8 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * A provider that cannot run lists no model, also when the catalogue keeps its built-in models (#7866).
  * A provider that the request names is there in each state in which it has no model, also when it is
  * off or not downloaded: a CLI of the user's own on `PATH` does not make it available, and the agent
- * got an empty list with no reason (#7647). A list of all providers leaves those rows out.
+ * got an empty list with no reason (#7647). A list of all providers leaves those rows out. A named
+ * provider that is ready but lists no model has a message that says so (#10693).
  * `customProviders` names each saved custom endpoint, its first model ids, and where the user changes
  * it, or why it lists no model (#6471).
  */
@@ -242,7 +254,8 @@ export function listModelsPayload(
     /** True when the user turned the provider off in its settings row. */
     off?: true;
     message?: string;
-    fixIn: string;
+    /** Where the user fixes the provider; absent when the provider settings cannot fix it. */
+    fixIn?: string;
   }[];
   customProviders?: { settings: string; endpoints: CustomEndpointModels[] };
 } {
@@ -290,20 +303,27 @@ export function listModelsPayload(
       ];
     },
   );
-  const unavailableProviders = statuses.flatMap((row) =>
-    (request.provider === undefined ? !row.off && NEEDS_USER_STATES.has(row.state) : row.id === request.provider) &&
-    !providers.some((listed) => listed.provider === row.id)
-      ? [
-          {
-            provider: row.id,
-            state: row.state,
-            ...(row.off ? { off: true as const } : {}),
-            ...(row.message ? { message: row.message } : {}),
-            fixIn: FIX_IN,
-          },
-        ]
-      : [],
-  );
+  const unavailableProviders = statuses.flatMap((row) => {
+    if (
+      !(request.provider === undefined ? !row.off && NEEDS_USER_STATES.has(row.state) : row.id === request.provider) ||
+      providers.some((listed) => listed.provider === row.id)
+    )
+      return [];
+    // A ready row with a message holds a connection failure, and a `lastError` holds a model list
+    // that failed. That text stays the reason, and the settings row shows it.
+    const available = !row.off && row.state === "available";
+    const ready = available && !row.message && !row.lastError;
+    const message = ready ? emptyCatalogMessage(row.id) : row.message || (available ? row.lastError : null);
+    return [
+      {
+        provider: row.id,
+        state: row.state,
+        ...(row.off ? { off: true as const } : {}),
+        ...(message ? { message } : {}),
+        ...(ready && row.id === "muse" ? {} : { fixIn: FIX_IN }),
+      },
+    ];
+  });
   const endpoints = customEndpointModels(
     (request.customEndpoints ?? []).filter(
       (endpoint) => request.provider === undefined || endpoint.provider === request.provider,

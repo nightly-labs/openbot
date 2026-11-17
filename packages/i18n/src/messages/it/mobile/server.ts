@@ -907,7 +907,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Ricollega",
   "mobile.server.connectors.whatsapp.ownNumber": "Numero personale",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Possono scrivere solo la tua chat «Messaggio a te stesso» e le persone che autorizzi. Disattiva per un numero solo per OpenBot.",
+    "Possono scrivere solo la tua chat «Messaggio a te stesso» e le persone che autorizzi. Le altre non ricevono risposta. Quando è disattivato, OpenBot risponde alle persone sconosciute con un codice.",
   "mobile.server.connectors.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Disattiva per inviare solo la risposta.",
@@ -930,10 +930,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Numero",
   "mobile.server.connectors.whatsapp.kindPersonal": "Il mio numero personale",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot risponde solo alla tua chat «Messaggio a te stesso» e alle persone che autorizzi.",
+    "OpenBot risponde solo alla tua chat «Messaggio a te stesso» e alle persone che autorizzi. Le altre persone non ricevono risposta.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Un numero solo per OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Le persone sconosciute ricevono un codice da darti. Le approvi qui.",
+    "OpenBot risponde da questo numero a ogni persona sconosciuta con un codice da darti. Le approvi qui.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Numero di telefono",
   "mobile.server.connectors.whatsapp.phoneDescription": "Con il prefisso internazionale, ad esempio +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Scrivi il numero di telefono con il prefisso internazionale.",
@@ -1096,6 +1096,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installato",
   "mobile.server.providers.status.notInstalled": "Non installato",
   "mobile.server.providers.status.checking": "Controllo",
+  "mobile.server.providers.addAccountWithCode": "Aggiungi account con codice",
+  "mobile.server.providers.accountSignInWithCode": "Accedi con un codice",
   "mobile.server.providers.accountsKeyHint":
     "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Un nuovo account richiede una chiave API di quell'account.",
   "mobile.server.providers.accountChangeKey": "Cambia chiave",

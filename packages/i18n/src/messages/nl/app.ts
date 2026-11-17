@@ -108,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Instellingen zoeken…",
   "app.settingsPage.results": "Zoekresultaten in instellingen",
   "app.settingsPage.noResults": "Geen overeenkomende instellingen.",
+  "app.settingsPage.marketplaceApps": "Connectors en MCP-servers",
   "app.settingsPage.resultCount": {
     one: "{count} overeenkomende instelling.",
     other: "{count} overeenkomende instellingen.",

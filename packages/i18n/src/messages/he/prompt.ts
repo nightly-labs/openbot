@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "יש לפתוח את הדף כדי להשלים התחברות, אימות או הסכמה. לאחר מכן אפשר לתת ל-{name} להמשיך.",
   "prompt.browser.openPage": "פתיחת {title}",
+  "prompt.browser.openFailed": "לא ניתן היה לפתוח את הדף בחלון הראשי. יש לנסות שוב.",
   "prompt.browser.done": "סיימתי",
   "prompt.browser.pageFallback": "דף דפדפן",
   "prompt.browser.hostFallback": "הדפדפן",

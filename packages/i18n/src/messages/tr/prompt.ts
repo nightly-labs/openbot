@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "Oturum açma, doğrulama veya onayı tamamlamak için sayfayı açın. Ardından {name} ajanının devam etmesine izin verin.",
   "prompt.browser.openPage": "{title} sayfasını aç",
+  "prompt.browser.openFailed": "Sayfa ana pencerede açılamadı. Yeniden deneyin.",
   "prompt.browser.done": "Tamamladım",
   "prompt.browser.pageFallback": "Tarayıcı sayfası",
   "prompt.browser.hostFallback": "tarayıcı",

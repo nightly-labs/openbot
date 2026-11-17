@@ -11,6 +11,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpSignInLost": "{provider} lost its sign-in, so OpenBot ended its process. Send your message again.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} refused a message, so OpenBot ended its process. Send your message again.",
+  "error.provider.acpServerLost": "{provider} lost its connection. Send your message again.",
+  "error.provider.acpServerLostEnded": "{provider} lost its connection, so OpenBot ended its process.",
   "error.provider.acpSettingsTimedOut": "{provider} did not answer in time. Try again in a moment.",
   "error.provider.acpPlanUsedUp":
     "{provider} says that your plan is used up. Choose another model, or upgrade your {provider} plan.",
@@ -331,6 +333,8 @@ export const messages = defineMessages("error.provider", {
     "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Marketplace, Apps, then send your message again.",
   "error.provider.hermesRefused":
     "Hermes refused this message before it started. Send it again. If Hermes refuses each message, restart OpenBot on the computer that runs this agent.",
+  "error.provider.hermesConnectionLost":
+    "Hermes lost its connection during this message, so it does not know if the work finished. Check what the agent did before you send the message again.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot could not use this model: the model did not accept its thinking setting. Select a different model for this agent, then send your message again.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",

@@ -563,8 +563,7 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "Find it in your Composio account, in Settings > Sessions & API Key.": "marketplace.plugin.composio.hint.apiKey",
   "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.":
     "marketplace.plugin.revenuecat.hint.apiKey",
-  'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
-    "marketplace.plugin.obsidian.hint.apiKey",
+  "In Obsidian, open Settings > Local REST API and copy the API key.": "marketplace.plugin.obsidian.hint.apiKey",
   "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
   "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
   "In Omnisend, open Store settings > API keys and create a key.": "marketplace.plugin.omnisend.hint.apiKey",

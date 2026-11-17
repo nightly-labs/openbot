@@ -72,9 +72,11 @@ import {
   frameIds,
   isFiniteNumber,
   isRecord,
+  isSessionGone,
   numberValue,
   recordValue,
   type SendCommand,
+  skipGoneFrame,
   stringValue,
 } from "./browser-cdp-values";
 import { type DetectedChallenge, detectChallenge } from "./browser-challenge";
@@ -116,6 +118,36 @@ const CHOOSER_WAIT_MS = 5_000;
  */
 const DROP_FRAME_WAIT_MS = 1_500;
 const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
+/**
+ * Chromium can drop key events, with no error, that reach a new page before its first frame. That
+ * frame comes in less than 100 ms after the response, so only a page that got its response less
+ * than this time ago waits for a frame before a key. The age counts from the response, because
+ * redirects and a slow server come before it. An older page does not wait: a tab that draws one
+ * frame each second would make each key slow.
+ */
+const NEW_PAGE_MS = 1_500;
+const NEW_PAGE_FRAME_SCRIPT = `performance.now() - (performance.getEntriesByType("navigation")[0]?.responseStart ?? 0) < ${NEW_PAGE_MS} && ${DROP_FRAME_SCRIPT}`;
+
+/**
+ * Lets the page render one frame, as `DROP_FRAME_WAIT_MS` says. The wait only helps the page: the
+ * action continues, before the deadline, when no frame comes.
+ */
+const waitForFrame = Effect.fn("Browser.waitForFrame")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  deadline: number | undefined,
+  expression = DROP_FRAME_SCRIPT,
+) {
+  const frameWaitMs =
+    deadline === undefined
+      ? DROP_FRAME_WAIT_MS
+      : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+  if (frameWaitMs <= 0) return;
+  yield* Effect.gen(function* () {
+    const contextId = yield* automationContextId(send, sessionId);
+    yield* send("Runtime.evaluate", { expression, contextId, awaitPromise: true }, sessionId);
+  }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+});
 
 type ActionDispatch = () => void;
 
@@ -969,13 +1001,16 @@ export class BrowserCdpEngine {
       if (method === "Page.javascriptDialogOpening" && !sessionId && isRecord(params)) this.#dialogOpened(params);
       if (method === "Page.javascriptDialogClosed" && !sessionId) this.#dialogClosed();
       if (method === "Target.detachedFromTarget" && isRecord(params)) {
-        const detached = stringValue(params.sessionId);
-        for (const [targetId, target] of this.#targetSessions) {
-          if (target.sessionId === detached) this.#targetSessions.delete(targetId);
-        }
+        this.#forgetTargetSession(stringValue(params.sessionId));
       }
     });
     contents.debugger.on("detach", () => this.#clearDebuggerSessions());
+  }
+
+  #forgetTargetSession(sessionId: string): void {
+    for (const [targetId, target] of this.#targetSessions) {
+      if (target.sessionId === sessionId) this.#targetSessions.delete(targetId);
+    }
   }
 
   readonly snapshot = Effect.fn("BrowserCdp.snapshot")(function* (
@@ -1491,6 +1526,8 @@ export class BrowserCdpEngine {
             yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, sessionId);
           }
         }
+        // A click waits for frames when it moves the pointer. A press waits here, as `NEW_PAGE_MS` says.
+        yield* waitForFrame(send, sessionId, deadline, NEW_PAGE_FRAME_SCRIPT);
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
         yield* dispatchShortcut(send, key, sessionId);
@@ -1931,21 +1968,7 @@ export class BrowserCdpEngine {
           if (dragData) {
             yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
             yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
-            // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
-            const frameWaitMs =
-              deadline === undefined
-                ? DROP_FRAME_WAIT_MS
-                : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
-            if (frameWaitMs > 0) {
-              yield* Effect.gen(function* () {
-                const contextId = yield* automationContextId(send, sessionId);
-                yield* send(
-                  "Runtime.evaluate",
-                  { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
-                  sessionId,
-                );
-              }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
-            }
+            yield* waitForFrame(send, sessionId, deadline);
             yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           }
           yield* send(
@@ -3237,9 +3260,10 @@ export class BrowserCdpEngine {
         return yield* browserFailure(new Error("Stale browser reference. Take a fresh snapshot before acting."));
       }
       const record = this.#targets.get(target.ref);
-      if (!record)
+      const sessionId = record?.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
+      // A frame in another process that went away: its node id can name another node in the page's session.
+      if (!record || (record.targetId && sessionId === undefined))
         return yield* browserFailure(new Error("Element reference is no longer available. Take a fresh snapshot."));
-      const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
       if (deadline !== undefined) {
         yield* browserSync(() => assertBeforeDeadline(deadline));
         const contextId = record.ownFrame
@@ -3284,7 +3308,10 @@ export class BrowserCdpEngine {
         );
       yield* Effect.gen({ self: this }, function* () {
         for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId, limit)) {
+          const found = yield* cssObjectMatch(send, target.selector, capture.sessionId, limit).pipe(
+            skipGoneFrame(capture.sessionId, []),
+          );
+          for (const objectId of found) {
             matches.push({
               objectId,
               ...(capture.sessionId === undefined ? {} : { sessionId: capture.sessionId }),
@@ -3366,7 +3393,7 @@ export class BrowserCdpEngine {
         allowNonActionableRole,
         deadline,
         limit,
-      )) {
+      ).pipe(skipGoneFrame(capture.sessionId, []))) {
         const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -3375,10 +3402,14 @@ export class BrowserCdpEngine {
       }
       if (candidates.length >= limit) break;
       if (target.kind === "text") {
-        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline, limit);
+        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline, limit).pipe(
+          skipGoneFrame(capture.sessionId, []),
+        );
         yield* Effect.gen({ self: this }, function* () {
           for (const objectId of objectIds) {
-            const candidate = yield* describedMatch(send, objectId, capture, target.text);
+            const candidate = yield* describedMatch(send, objectId, capture, target.text).pipe(
+              skipGoneFrame(capture.sessionId, undefined),
+            );
             if (!candidate) continue;
             const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
             if (seen.has(key)) continue;
@@ -3827,7 +3858,14 @@ export class BrowserCdpEngine {
     this.#activeLeases += 1;
     const send: SendCommand = (method, params = {}, sessionId) =>
       Effect.gen({ self: this }, function* () {
-        const result = yield* browserCall(() => this.#contents.debugger.sendCommand(method, params, sessionId));
+        const result = yield* browserCall(() => this.#contents.debugger.sendCommand(method, params, sessionId)).pipe(
+          // Chromium can end a frame's session and send no detach event for it. Forget that session.
+          Effect.tapError((failure) =>
+            Effect.sync(() => {
+              if (sessionId !== undefined && isSessionGone(failure)) this.#forgetTargetSession(sessionId);
+            }),
+          ),
+        );
         if (!isDynamicRecord(result))
           return yield* browserFailure(new Error(`CDP ${method} returned an invalid result.`));
         return result;
@@ -4120,6 +4158,8 @@ const waitForDomQuietAcrossTargets = Effect.fn("Browser.waitForDomQuietAcrossTar
           capture.sessionId,
         );
       }).pipe(
+        // A frame that went away has no more changes.
+        skipGoneFrame(capture.sessionId, { result: { type: "boolean", value: true } }),
         // A frame whose timers do not run, such as a 1x1 cross-origin ad frame, never reaches the
         // deadline timer above, and a frame that answers nothing never returns. Either one would hold
         // every caller until the caller's own deadline.

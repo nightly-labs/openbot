@@ -292,17 +292,31 @@ function isMistralApi(baseUrl: string): boolean {
 }
 
 /**
- * The `provider` entry in OpenCode's `providers` format, with `requireReasoning` off. OpenCode 2.2.5
- * and 2.3.0 use a `providers` entry in place of the `provider` entry of the same id, as a whole, so
- * this one carries every field of {@link providerEntry}, moved as OpenCode moves them
- * (`migrateStandardProvider` in `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores
- * `providers`, so the `provider` entry stays for a user's own OpenCode 1. Checked with
- * `scripts/opencode-mistral-reasoning-e2e.ts`.
+ * The package of an endpoint on Mistral's API in the `providers` format. With reasoning on, Mistral
+ * streams `delta.content` as a list of `thinking` and `text` parts. The OpenAI-compatible adapter
+ * reads only a string there, so each such turn stopped with "Invalid … openai-compatible-chat stream
+ * event" (#10591). OpenCode's own catalog uses this package for `api.mistral.ai`; it reads the parts,
+ * and it never adds `reasoning_content`.
+ *
+ * Only with a key: without `apiKey`, this adapter reads `MISTRAL_API_KEY` from the environment that
+ * OpenCode inherits, and that key would replace the `Authorization` header of a keyless endpoint. The
+ * OpenAI-compatible adapter reads no environment variable, so a keyless endpoint keeps it.
+ */
+const OPENCODE_MISTRAL_PACKAGE = "aisdk:@ai-sdk/mistral";
+
+/**
+ * The `provider` entry in OpenCode's `providers` format, with Mistral's own adapter when the endpoint
+ * has a key, and `requireReasoning` off. Only the OpenAI-compatible adapter reads `requireReasoning`,
+ * so it still protects a keyless endpoint from #10094. OpenCode 2.2.5 and 2.3.0 use a `providers` entry
+ * in place of the `provider` entry of the same id, as a whole, so this one carries every field of
+ * {@link providerEntry}, moved as OpenCode moves them (`migrateStandardProvider` in
+ * `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores `providers`, so the `provider`
+ * entry stays for a user's own OpenCode 1. Checked with `scripts/opencode-mistral-reasoning-e2e.ts`.
  */
 function nativeProviderEntry({ npm, name, options, models }: OpenCodeProviderEntry): OpenCodeNativeProviderEntry {
   const { headers, ...settings } = options;
   return {
-    package: `aisdk:${npm}`,
+    package: options.apiKey ? OPENCODE_MISTRAL_PACKAGE : `aisdk:${npm}`,
     name,
     compatibility: { requireReasoning: false },
     settings,

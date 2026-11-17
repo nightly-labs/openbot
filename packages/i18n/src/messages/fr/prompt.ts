@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "Ouvrez la page pour terminer la connexion, la vérification ou le consentement. Laissez ensuite {name} continuer.",
   "prompt.browser.openPage": "Ouvrir {title}",
+  "prompt.browser.openFailed": "Impossible d’ouvrir la page dans la fenêtre principale. Réessayez.",
   "prompt.browser.done": "J’ai terminé",
   "prompt.browser.pageFallback": "Page du navigateur",
   "prompt.browser.hostFallback": "le navigateur",

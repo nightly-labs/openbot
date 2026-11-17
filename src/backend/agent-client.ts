@@ -21,6 +21,11 @@ export interface AgentClient {
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   /**
+   * True when the provider compacts its own context, although OpenBot cannot ask it to. The context
+   * meter shows that the provider manages compaction, as for `native`.
+   */
+  readonly compactsItself?: boolean;
+  /**
    * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
    * become a step: the provider names no phase, and the client classifies the text only at the next
    * tool call or at the end of the turn.

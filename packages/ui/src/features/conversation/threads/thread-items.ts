@@ -7,7 +7,7 @@ export function agentTaskThreadStatus(task: AgentTask, waitsFor: SidebarWaitReas
   if (task.state === "running") return waitsFor ? { kind: "waiting", reason: waitsFor } : { kind: "working" };
   if (task.state === "queued") return { kind: "queued" };
   if (task.outcome === "failed") return { kind: "failed" };
-  return { kind: "idle" };
+  return task.awaitedReplies?.length ? { kind: "awaiting" } : { kind: "idle" };
 }
 
 export interface ThreadListsInput {

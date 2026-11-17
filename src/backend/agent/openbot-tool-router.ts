@@ -2300,7 +2300,7 @@ export class OpenBotToolRouter {
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
+        note: "The new chat starts when this turn ends, your background subagents and commands finish, and your queue is empty. A queued message that runs first ends the request. When only routine runs wait and no background work runs, the new chat starts before them; otherwise a routine run also ends the request. Finish your answer now.",
       });
     }
 
@@ -2394,11 +2394,15 @@ export class OpenBotToolRouter {
       runPause !== null && routineResult?.success
         ? this.#routines.listFor(runPause.agentId).find((routine) => routine.id === runPause.routineId)
         : undefined;
-    if (runPause !== null && pausedRoutine)
+    if (runPause !== null && pausedRoutine) {
+      const { scheduledFor, ...pause } = runPause;
       this.#noteRoutineRunTurn(params.turnId, {
         failed: false,
-        paused: [...(runTurn?.paused ?? []), { ...runPause, updatedAt: pausedRoutine.updatedAt }],
+        paused: [...(runTurn?.paused ?? []), { ...pause, updatedAt: pausedRoutine.updatedAt }],
       });
+      // Routines and the chat card say which run paused the routine (#10048).
+      if (!pausedRoutine.active) this.#routines.notePausedByRun(pause.agentId, pause.routineId, scheduledFor);
+    }
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -2593,7 +2597,7 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Server settings, Connectors, also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Marketplace > Apps > GitHub also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
             : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
       });
     }
@@ -3105,17 +3109,19 @@ export class OpenBotToolRouter {
   #runRoutinePause(
     params: DynamicToolCallParams,
     senderAgentId: string,
-  ): { agentId: string; routineId: string } | null {
+  ): { agentId: string; routineId: string; scheduledFor: string } | null {
     if (params.tool !== "update_routine" || !isRecord(params.arguments) || params.arguments.active !== false)
       return null;
     const { agentId, routineId } = params.arguments;
     if ((agentId !== undefined && agentId !== senderAgentId) || !isString(routineId)) return null;
     const ownRun = this.#mailbox
       .findDeliveriesByTurn(senderAgentId, params.turnId)
-      .some(({ delivery }) => delivery.sender.kind === "routine" && delivery.sender.routineId === routineId);
+      .map(({ delivery }) => delivery.sender)
+      .find((sender) => sender.kind === "routine" && sender.routineId === routineId);
     const active =
-      ownRun && this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
-    return active ? { agentId: senderAgentId, routineId } : null;
+      ownRun?.kind === "routine" &&
+      this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
+    return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
   }
 
   #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {

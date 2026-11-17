@@ -1181,7 +1181,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.linkAgain": "Link again",
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+    "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
@@ -1204,10 +1204,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.kindLabel": "Number",
   "mobile.server.connectors.whatsapp.kindPersonal": "My personal number",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+    "OpenBot answers only your “Message yourself” chat and the people you allow. Other people get no reply.",
   "mobile.server.connectors.whatsapp.kindDedicated": "A number only for OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Unknown people get a code to give you. You approve them here.",
+    "OpenBot replies from this number to each unknown person, with a code to give you. You approve them here.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Phone number",
   "mobile.server.connectors.whatsapp.phoneDescription": "With the country code, such as +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Type the phone number with its country code.",
@@ -1370,12 +1370,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.accountsOnComputer":
     "Each agent uses one account. Choose it in the agent's settings. Add an account in OpenBot on a computer.",
   "mobile.server.providers.addAccount": "Add account",
+  "mobile.server.providers.addAccountWithCode": "Add account with code",
   "mobile.server.providers.accountGone": "This account is no longer on this server.",
   "mobile.server.providers.accountFailed": "Could not change this account. Try again.",
   "mobile.server.providers.accountName": "Name",
   "mobile.server.providers.accountNameHint":
     "Only for you and the admins of this server. Leave it empty to show the email.",
   "mobile.server.providers.accountSignInAgain": "Sign in again",
+  "mobile.server.providers.accountSignInWithCode": "Log in with code",
   // An account that is an API key of the provider (`provider-account-keys-v1`), such as a Cursor account after the first.
   "mobile.server.providers.accountsKeyHint":
     "Each agent uses one account. Choose it in the agent's settings. A new account needs an API key of that account.",

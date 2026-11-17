@@ -1,11 +1,14 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef } from "react";
 
-/** What the sign-in page signs in: `account` signs in that account again, and `add: "1"` adds one. */
+/**
+ * What the sign-in page signs in: `account` signs in that account again, and `add: "1"` adds one.
+ * `account-code` is the code sign-in of one account (`provider-account-code-v1`).
+ */
 export interface SignInTarget {
   serverId: string;
   provider: string;
-  method: "code" | "relay";
+  method: "code" | "relay" | "account-code";
   account?: string;
   add?: "1";
 }

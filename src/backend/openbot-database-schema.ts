@@ -1049,6 +1049,16 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
 
+/**
+ * True when `migrateOpenBotDatabase` will build a new database or run a migration. Both end with the
+ * full check on this connection, so a check elsewhere before them would only read the file twice.
+ */
+export function openBotDatabaseNeedsMigration(db: DatabaseSync): boolean {
+  if (!hasExistingSchema(db)) return true;
+  const currentVersion = latestAppliedVersion(readAppliedVersions(db));
+  return MIGRATIONS.some((migration) => migration.version > currentVersion);
+}
+
 export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrationOptions = {}): void {
   validateMigrationRegistry();
   const appliedAt = options.appliedAt ?? new Date().toISOString();
@@ -1280,10 +1290,16 @@ function readOldForeignKeyViolations(db: DatabaseSync): Map<string, number> {
 }
 
 function assertQuickCheck(db: DatabaseSync): void {
-  const problems = db
-    .prepare("PRAGMA quick_check(20)")
-    .all()
-    .map((row) => (isDynamicRecord(row) ? row.quick_check : row));
+  assertQuickCheckResult(
+    db
+      .prepare("PRAGMA quick_check(20)")
+      .all()
+      .map((row) => (isDynamicRecord(row) ? row.quick_check : row)),
+  );
+}
+
+/** Throws the integrity error unless the lines of a `PRAGMA quick_check` are the one line "ok". */
+export function assertQuickCheckResult(problems: readonly unknown[]): void {
   if (problems.length === 1 && problems[0] === "ok") return;
   // The lines name the damaged pages and tables, which tell a page left by a disk save from a bad index.
   logger.error("The OpenBot database failed its integrity check.", { problems });

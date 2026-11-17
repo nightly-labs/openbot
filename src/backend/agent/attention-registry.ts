@@ -108,6 +108,7 @@ import {
   uiBlockPromptResult,
   userMessagePromptResult,
   validPromptQuestions,
+  vaultLateAnswerText,
   vaultPromptResult,
   vaultRequestFormSpec,
 } from "./prompts";
@@ -873,7 +874,12 @@ export class AttentionRegistry {
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
-      const lateAnswer = pending.detached ? lateAnswerText(pending.questions, input.answers) : "";
+      // The form of a Vault request holds secrets, so its late answer names the saved item only.
+      const lateAnswer = !pending.detached
+        ? ""
+        : pending.uiBlock?.vault
+          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
+          : lateAnswerText(pending.questions, input.answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -1965,17 +1971,7 @@ export class AttentionRegistry {
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
-    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    const detachAfterMs = deadlines.length > 0 ? Math.min(...deadlines) : undefined;
-    const target =
-      detachAfterMs === undefined || questions.some((question) => question.isSecret)
-        ? null
-        : this.#lateAnswerTarget(agentId, publicThreadId);
-    if (target)
-      pending.detach = {
-        target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), detachAfterMs),
-      };
+    if (!questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -2051,7 +2047,7 @@ export class AttentionRegistry {
       timer.unref?.();
       autoAnswerTimer = { state: auto, timer };
     }
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "ui-block",
@@ -2064,7 +2060,10 @@ export class AttentionRegistry {
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
-    });
+    };
+    // The late answer of a Vault request names the saved item only, never a value of the form (#10577).
+    if (block.vault) this.#scheduleDetach(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -2339,6 +2338,21 @@ export class AttentionRegistry {
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * Starts the timer of `#detachPrompt` when the provider stops the call at a fixed time
+   * (`AppServerRequest.detachAfterMs` or `answerBeforeMs`, the smaller) and a chat can get the answer.
+   */
+  #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    if (deadlines.length === 0) return;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    if (target)
+      pending.detach = {
+        target,
+        timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)),
+      };
   }
 
   /**

@@ -840,7 +840,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "重新关联",
   "mobile.server.connectors.whatsapp.ownNumber": "个人号码",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "只有你的“给自己发消息”聊天和你允许的人可以发消息。如果是 OpenBot 专用号码，请关闭该选项。",
+    "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
@@ -858,10 +858,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.codeOnly": "在手机上，请使用配对码关联。如需扫描二维码，请在电脑上使用 OpenBot。",
   "mobile.server.connectors.whatsapp.kindLabel": "号码",
   "mobile.server.connectors.whatsapp.kindPersonal": "我的个人号码",
-  "mobile.server.connectors.whatsapp.kindPersonalDescription": "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。其他人不会收到回复。",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 专用号码",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "陌生人会收到一个代码，需要把它交给你。你在这里批准他们。",
+    "OpenBot 会用这个号码回复每个陌生人一个代码，需要把它交给你。你在这里批准他们。",
   "mobile.server.connectors.whatsapp.phoneLabel": "电话号码",
   "mobile.server.connectors.whatsapp.phoneDescription": "包含国家代码，例如 +44 7700 900123。",
   "mobile.server.connectors.whatsapp.phoneInvalid": "请输入带国家代码的电话号码。",
@@ -1013,6 +1014,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "已安装",
   "mobile.server.providers.status.notInstalled": "未安装",
   "mobile.server.providers.status.checking": "检查中",
+  "mobile.server.providers.addAccountWithCode": "用验证码添加账号",
+  "mobile.server.providers.accountSignInWithCode": "用验证码登录",
   "mobile.server.providers.accountsKeyHint": "每个助手使用一个账号，可在助手设置中选择。新账号需要该账号的 API 密钥。",
   "mobile.server.providers.accountChangeKey": "更换密钥",
   "mobile.server.providers.accountKeyHint": "粘贴 {provider} 账号的 API 密钥。密钥会发送到服务器，这台手机不保存。",
