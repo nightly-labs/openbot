@@ -238,7 +238,8 @@ export interface OpenBotMigrationOptions {
 
 const logger = createOpenBotLogger("openbot-database-schema");
 
-const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
+/** The highest schema version that this build can open. */
+export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
 
 /**
  * True when `migrateOpenBotDatabase` will build a new database or run a migration. Both end with the
