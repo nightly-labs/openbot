@@ -359,7 +359,10 @@ export class WhatsAppSession {
     return metadata;
   });
 
-  /** The user JIDs, without a device, that WhatsApp has an account for, of the phone numbers in digits. */
+  /**
+   * The user JIDs, without a device, that WhatsApp has an account for, of the phone numbers in digits.
+   * Null when WhatsApp gave no answer, which does not say that a number has no account.
+   */
   readonly registered = Effect.fn("WhatsAppSession.registered")(function* (
     this: WhatsAppSession,
     numbers: readonly string[],
@@ -370,7 +373,8 @@ export class WhatsAppSession {
       try: () => socket.onWhatsApp(...numbers),
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
-    return (found ?? []).filter((result) => result.exists).map((result) => jidNormalizedUser(result.jid));
+    if (!found) return null;
+    return found.filter((result) => result.exists).map((result) => jidNormalizedUser(result.jid));
   });
 
   readonly groups = Effect.fn("WhatsAppSession.groups")(function* (this: WhatsAppSession) {
