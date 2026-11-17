@@ -190,8 +190,9 @@ export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): s
 }
 
 /**
- * Null for a message that this client does not know: a newer host can send more. A client that
- * reads only `decodeBrowserViewCopied` asks for no cursor and no menu, so a host sends it neither.
+ * Null for a message that this client does not know: a newer host can send more. An older client
+ * that reads only the answer to a copy asks for no cursor, no menu and no page copy, so a host sends
+ * it none of them.
  */
 export function decodeBrowserViewHostMessage(value: string): BrowserViewHostMessage | null {
   return decodeHostMessageValue(JSON.parse(value));
@@ -468,10 +469,6 @@ export function encodeBrowserViewCopied(message: BrowserViewCopied): string {
 }
 
 /** The client decodes what the host sends, with the same bound as a paste going the other way. */
-export function decodeBrowserViewCopied(value: string): BrowserViewCopied {
-  return decodeBrowserViewCopiedValue(JSON.parse(value));
-}
-
 function decodeBrowserViewCopiedValue(message: unknown): BrowserViewCopied {
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view message.");
   if (message.type === "copyTooLarge") return { type: "copyTooLarge" };
