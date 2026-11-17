@@ -903,8 +903,8 @@ export function activityTurnId(eventType: string, detail: unknown, activeTurnId:
 
 /**
  * A generated image that OpenBot could not save, or that stopped, keeps its status and its reason when
- * provider history comes again. The history marks the call completed but gives OpenBot no file, and a
- * completed image with no file showed only "The generated image preview is unavailable" (#10267).
+ * provider history comes again. The history can mark the call completed but gives OpenBot no file, and
+ * a completed image with no file showed only "The generated image preview is unavailable" (#10267).
  */
 export function keptUnsavedImage(
   existing: ConversationMessage,
@@ -914,15 +914,16 @@ export function keptUnsavedImage(
   if (
     existing.itemType !== "image_generation" ||
     (existing.status !== "failed" && existing.status !== "interrupted") ||
-    imported.status !== "completed" ||
     existing.attachments?.length ||
     imported.attachments?.length
   )
     return {};
-  const error = existing.imageGeneration?.error;
+  const stored = existing.imageGeneration;
   return {
     status: existing.status,
-    ...(imageGeneration && error !== undefined ? { imageGeneration: { ...imageGeneration, error } } : {}),
+    ...(stored?.error === undefined
+      ? {}
+      : { imageGeneration: { ...(imageGeneration ?? stored), error: stored.error } }),
   };
 }
 
