@@ -63,6 +63,7 @@ export interface ChosenSignInPage {
 export class SignInRelayClient {
   readonly #dependencies: SignInRelayClientDependencies;
   readonly #waiting = new Map<string, Waiting>();
+  readonly #earlier = new Set<Waiting>();
 
   constructor(dependencies: SignInRelayClientDependencies) {
     this.#dependencies = dependencies;
@@ -74,7 +75,7 @@ export class SignInRelayClient {
   }
 
   deliver(state: string, query: string): boolean {
-    for (const waiting of this.#waiting.values()) {
+    for (const waiting of [...this.#waiting.values(), ...this.#earlier]) {
       if (waiting.state === null || waiting.state !== state) continue;
       waiting.receive(query);
       return true;
@@ -117,10 +118,14 @@ export class SignInRelayClient {
     let own: Waiting | null = null;
     const wait = (waiting: Waiting) => {
       own = waiting;
+      const earlier = self.#waiting.get(key);
+      if (earlier) self.#earlier.add(earlier);
       self.#waiting.set(key, waiting);
     };
     const forget = () => {
-      if (own !== null && self.#waiting.get(key) === own) self.#waiting.delete(key);
+      if (own === null) return;
+      self.#earlier.delete(own);
+      if (self.#waiting.get(key) === own) self.#waiting.delete(key);
     };
     return yield* Effect.gen(function* () {
       const first = yield* awaitPage(remote, flowId);
@@ -213,7 +218,13 @@ export class SignInRelayClient {
       language: this.#dependencies.language,
       noPort: () => new Error("The sign-in relay listener was given no port."),
       receive: (url) => {
-        if (url.searchParams.get("state") !== state) return { status: 400, message: "error.mcp.redirectNoSignIn" };
+        const returned = url.searchParams.get("state");
+        if (returned !== state) {
+          const delivered = returned !== null && this.deliver(returned, url.search.slice(1));
+          return delivered
+            ? { status: 200, message: "error.mcp.redirectRelayed" }
+            : { status: 400, message: "error.mcp.redirectNoSignIn" };
+        }
         receive(url.search.slice(1));
         return { status: 200, message: "error.mcp.redirectRelayed" };
       },

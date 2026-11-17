@@ -59,7 +59,7 @@ interface SignInCase {
 async function signIn(name: string, fake: string, origin: string): Promise<SignInCase> {
   const result: SignInCase = { name, pageOrigin: null, callback: null, replayed: false, error: null };
   const host = new SignInRelayHost({
-    mcp: { startRelay: unused, relayStatus: noPage, cancel: () => undefined },
+    mcp: { startRelay: unused },
     providers: { startRelay: unused, relayStatus: noPage, cancel: unused },
     accounts: { startRelay: unused, relayStatus: noPage, cancelSignIn: unused },
     receiveMcpGrant: () => false,

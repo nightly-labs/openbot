@@ -63,7 +63,7 @@ async function runCase(name: string, successAt: (port: number, otherPort: number
     const unused = () => Effect.die(new Error("A replay does not start a sign-in."));
     const noPage = () => ({ pageUrl: null, result: null });
     const host = new SignInRelayHost({
-      mcp: { startRelay: unused, relayStatus: noPage, cancel: () => undefined },
+      mcp: { startRelay: unused },
       providers: { startRelay: unused, relayStatus: noPage, cancel: unused },
       accounts: { startRelay: unused, relayStatus: noPage, cancelSignIn: unused },
       receiveMcpGrant: () => false,
