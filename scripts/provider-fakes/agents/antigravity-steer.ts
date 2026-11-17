@@ -129,7 +129,7 @@ serveFakeAcpAgent(
                 answer(peer, request);
               });
           },
-          Number(process.env.FAKE_HOLD_MS ?? 500),
+          Number(process.env.FAKE_HOLD_MS ?? 2000),
         );
         return;
       }

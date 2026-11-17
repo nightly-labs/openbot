@@ -316,6 +316,8 @@ interface AcpTurn {
   readonly steerReplies: Deferred.Deferred<Result.Result<PromptResponse, ProviderClientOperationError>>[];
   /** Completes when the agent answers the last prompt sent for this turn (`#turnPrompt`). */
   lastPrompt: Deferred.Deferred<void> | null;
+  /** Sends the steers by prompt one at a time, so each one knows the prompt that it joins. */
+  readonly steerLock: Semaphore.Semaphore;
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
   /** The model retry notices since the agent's last other update (`AcpFlavor.modelRetryUpdate`). */
@@ -1512,7 +1514,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             messageId: getString(params, "clientUserMessageId"),
             blocks,
           });
-        else yield* this.#steerByPrompt(thread, turn, blocks);
+        else yield* turn.steerLock.withPermit(this.#steerByPrompt(thread, turn, blocks));
         turn.lastActivityAt = Date.now();
         // A steer can start a new model request, and its first retry gets the whole limit again.
         turn.modelRetries = 0;
@@ -2766,6 +2768,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       task: null,
       steerReplies: [],
       lastPrompt: null,
+      steerLock: Semaphore.makeUnsafe(1),
       lastActivityAt: Date.now(),
       modelRetries: 0,
       answered: false,
@@ -3130,6 +3133,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn: AcpTurn,
     prompt: ContentBlock[],
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    // A steer that waited for another one checks the turn again.
+    if (thread.activeTurn !== turn || turn.stopped || turn.completing || turn.waitingOnUser > 0)
+      return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
     const open = turn.lastPrompt;
     const reply = Deferred.makeUnsafe<Result.Result<PromptResponse, ProviderClientOperationError>>();
     turn.steerReplies.push(reply);

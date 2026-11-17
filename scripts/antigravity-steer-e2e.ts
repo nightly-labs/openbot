@@ -273,8 +273,8 @@ try {
     status: asked.status,
   };
 
-  // The CLI waits for an approval before its request reaches OpenBot, and refuses the steer prompt
-  // (#11107). The steer is refused, so the message waits in the queue, and the turn goes on.
+  // The CLI waits for an approval before its request reaches OpenBot, and refuses the steer prompts
+  // (#11107). The steers are refused, so the messages wait in the queue, and the turn goes on.
   const toolShown = new Promise<void>((shown) => {
     const listener = (notification: AppServerNotification) => {
       if (notification.method !== "item/started" || getString(notification.params, "threadId") !== thread) return;
@@ -286,9 +286,13 @@ try {
   const approvalsBefore = approvals;
   const holding = await startTurn(client, thread, log, "hold");
   await toolShown;
-  const cliRefused = await refusal(steer(client, thread, holding.id, "do this too"));
+  // Two messages at the same time: the second steer must not take the refusal of the first for its own answer.
+  const [cliRefused] = await Promise.all([
+    refusal(steer(client, thread, holding.id, "do this too")),
+    refusal(steer(client, thread, holding.id, "and this")),
+  ]);
   const cliRefusals = (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "refused").length;
-  assert.equal(cliRefusals, 1, "The steer must reach the CLI before its permission request.");
+  assert.equal(cliRefusals, 2, "Both steers must reach the CLI before its permission request.");
   const deadline = Date.now() + 10_000;
   while (approvals === approvalsBefore) {
     if (Date.now() > deadline) throw new Error("The CLI did not ask for the permission.");
