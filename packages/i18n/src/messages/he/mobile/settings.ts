@@ -511,6 +511,12 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "לא ניתן לעצור את התהליך.",
   "mobile.settings.agents.processes.stopTitle": "לעצור את התוכנית הזו?",
   "mobile.settings.agents.processes.stopLabel": "עצירת תהליך {pid}",
+  "mobile.settings.quickActions.title": "תפריט סמל האפליקציה",
+  "mobile.settings.quickActions.footer":
+    "לחצו לחיצה ארוכה על סמל OpenBot כדי לראות את הפעולות. אפשר להפעיל עד {count}.",
+  "mobile.settings.quickActions.latestChat": "הצ׳אט האחרון",
+  "mobile.settings.quickActions.secondChat": "הצ׳אט הלפני אחרון",
+  "mobile.settings.quickActions.support": "בקשת משוב",
   "mobile.settings.shortcuts.title": "קיצורים",
   "mobile.settings.shortcuts.agent": "סוכן",
   "mobile.settings.shortcuts.none": "ללא",

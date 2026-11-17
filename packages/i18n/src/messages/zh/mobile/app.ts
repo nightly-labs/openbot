@@ -41,6 +41,9 @@ export const messages = {
   "mobile.app.route.library": "资料库",
   // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "搜索",
+  "mobile.app.quickAction.share": "分享 OpenBot",
+  "mobile.app.quickAction.support": "等等，别删除我！",
+  "mobile.app.quickAction.supportSubtitle": "告诉我们哪里可以改进",
   "mobile.app.update.title": "OpenBot {version} 来了",
   "mobile.app.update.readyTitle": "新版 OpenBot 已就绪",
   "mobile.app.update.storeBody": "获取最新功能和修复。",

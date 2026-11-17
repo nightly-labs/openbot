@@ -531,6 +531,12 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossible d’arrêter le processus.",
   "mobile.settings.agents.processes.stopTitle": "Arrêter ce programme ?",
   "mobile.settings.agents.processes.stopLabel": "Arrêter le processus {pid}",
+  "mobile.settings.quickActions.title": "Menu de l’icône",
+  "mobile.settings.quickActions.footer":
+    "Touchez longuement l’icône OpenBot pour voir ces actions. Vous pouvez en activer {count} au maximum.",
+  "mobile.settings.quickActions.latestChat": "Dernier chat",
+  "mobile.settings.quickActions.secondChat": "Avant-dernier chat",
+  "mobile.settings.quickActions.support": "Demander un avis",
   "mobile.settings.shortcuts.title": "Raccourcis",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Aucun",

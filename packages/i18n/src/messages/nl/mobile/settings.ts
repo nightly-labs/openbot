@@ -391,6 +391,12 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Het proces kon niet worden gestopt.",
   "mobile.settings.agents.processes.stopTitle": "Dit programma stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Proces {pid} stoppen",
+  "mobile.settings.quickActions.title": "App-symboolmenu",
+  "mobile.settings.quickActions.footer":
+    "Houd het OpenBot-symbool ingedrukt om deze acties te zien. Je kunt er maximaal {count} aanzetten.",
+  "mobile.settings.quickActions.latestChat": "Laatste chat",
+  "mobile.settings.quickActions.secondChat": "Op één na laatste chat",
+  "mobile.settings.quickActions.support": "Om feedback vragen",
   "mobile.settings.shortcuts.title": "Opdrachten",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Geen",

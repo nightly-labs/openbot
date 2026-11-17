@@ -4,6 +4,7 @@ import { supportLog, supportLogValue } from "@/features/support/model/support-lo
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 import { useText } from "@/shared/lib/text";
+import { loadQuickActionChoice, useQuickActionChoice } from "./model/quick-action-choice";
 import { currentRecentAgents, quickActionItems, type RecentAgent, withOpenedAgent } from "./model/quick-action-items";
 import { decodeRecentAgents, recentAgentsKey, useOpenedChat } from "./model/recent-agents";
 import { publishQuickActions } from "./quick-actions-native";
@@ -22,8 +23,8 @@ interface QuickActionsSyncProps {
 }
 
 /**
- * Keeps the quick actions of the app icon current: the chats that this phone opened last, then
- * Routines and Search. The phone keeps the items while the app is closed. A hidden chat does not show,
+ * Keeps the quick actions of the app icon current: the items that the user chose in Settings > App
+ * Icon Menu, with the chats that this phone opened last. The phone keeps the items while the app is closed. A hidden chat does not show,
  * and it is not saved. A separate component, so an opened chat renders only this and not the workspace.
  */
 export function QuickActionsSync({
@@ -41,6 +42,7 @@ export function QuickActionsSync({
   const [recents, setRecents] = useState(() => readRecentAgents(key));
   const saved = useRef(recents === null ? null : JSON.stringify(recents));
   const openedAgentId = useOpenedChat((state) => state.agentId);
+  const kinds = useQuickActionChoice((state) => state.kinds);
   const hiddenIds = useCallback((serverId: string) => preferences[serverId]?.hidden ?? NO_IDS, [preferences]);
 
   useEffect(() => {
@@ -66,8 +68,10 @@ export function QuickActionsSync({
         supportLog.add("warn", "app", `Recent agents not saved: ${supportLogValue(error)}`);
       });
     }
-    void publishQuickActions(quickActionItems({ recents: current, servers, activeServerId, t }));
-  }, [current, key, servers, activeServerId, t]);
+    // Until the phone reads the choice, the icon keeps the items it has. A locked phone reads it at a later change.
+    if (!kinds) loadQuickActionChoice();
+    else void publishQuickActions(quickActionItems({ kinds, recents: current, servers, activeServerId, t }));
+  }, [current, key, kinds, servers, activeServerId, t]);
 
   return null;
 }
