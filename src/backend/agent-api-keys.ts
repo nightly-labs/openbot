@@ -325,10 +325,20 @@ export class AgentApiKeys {
           .filter((key) => key.own && API_KEY_NAME_PATTERN.test(key.name))
           .map((key) => [key.name, key.value]),
       );
-      // A copy goes before its name leaves the record, so a copy is never read as a plain key.
+      // The names that the record keeps. A copy goes before its name leaves the record, so a copy is never
+      // read as a plain key: a copy that cannot be removed now keeps its name, and the next sync removes it.
       const copies = yield* readWrittenKeys(folder);
-      for (const name of copies) if (!own.has(name)) yield* removeFile(join(folder, name));
-      const kept = new Set([...copies].filter((name) => own.has(name)));
+      const kept = new Set<string>();
+      for (const name of copies) {
+        if (own.has(name)) kept.add(name);
+        else if (
+          !(yield* removeFile(join(folder, name)).pipe(
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+          ))
+        )
+          kept.add(name);
+      }
       if (!vault) return yield* writeKeyRecord(folder, copies, kept);
       for (const entry of entries) {
         const path = join(folder, entry.name);
