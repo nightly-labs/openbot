@@ -56,7 +56,7 @@ interface AgentDatabaseClose {
  * minutes on a large file, so the main process asks a host of its own for it. Only the main process
  * sends it; no agent request can carry it.
  */
-export interface AgentDatabaseIntegrityCheck {
+interface AgentDatabaseIntegrityCheck {
   kind: "integrity-check";
   id: number;
   databasePath: string;
