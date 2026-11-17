@@ -203,6 +203,7 @@ import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reaction
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
+import { WORKFLOWS_GITHUB_OWNERS_CAPABILITY } from "./workflows-github-owners-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
@@ -459,6 +460,7 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_GITHUB_OWNERS_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -704,6 +706,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  WORKFLOWS_GITHUB_OWNERS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -956,7 +959,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
     capability !== MAC_APPS_LIMIT_CAPABILITY &&
     capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+    capability !== WORKFLOWS_GITHUB_OWNERS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1085,6 +1089,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  WORKFLOWS_GITHUB_OWNERS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1296,6 +1301,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
       capability !== MAC_APPS_LIMIT_CAPABILITY &&
       capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+      capability !== WORKFLOWS_GITHUB_OWNERS_CAPABILITY,
   );
 }

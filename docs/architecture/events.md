@@ -149,14 +149,23 @@ triggers, and the `ingress` socket sends it to Signal. The account service check
 with the host's GitHub sign-in; D1 keeps none of them. Signal gives each event to every host that
 watches its repository, and the host answers with `github-delivery-result`.
 
-A trigger can also watch all repositories of an owner (its `owners` field, one login a line). The host
-sends these owners in the optional `owners` list of the route request, and the account service adds
-each repository of the owner's App installation that the sign-in can see and that is not archived.
-The ticket still names repositories, at most `GITHUB_ROUTE_REPOSITORIES_LIMIT`, named ones first, so
-Signal does not change. A repository that the owner makes later gets into the ticket when the socket
-connects again: each read of the GitHub catalog lets `GitHubRelay.noticeRepositories` reconnect once
-for a repository of a watched owner that the ticket does not name. An older account service ignores
-`owners`; an older host or client ignores the field and keeps the single repositories.
+A trigger can also watch all repositories of an owner (its `owners` field, one login a line) and leave
+some of them out (`excluded`, one `owner/name` a line); `workflows-github-owners-v1` gates both for a
+joined server. `githubWatchOf` joins the triggers into one `GitHubWatch`: a repository stays excluded
+only when each trigger of its owner leaves it out and no trigger names it. The host sends the optional
+`owners` and `excluded` lists in the route request, cut to `GITHUB_ROUTE_REPOSITORIES_LIMIT`,
+`GITHUB_ROUTE_OWNERS_LIMIT` and `GITHUB_ROUTE_EXCLUDED_LIMIT`, so a long watch cannot make the account
+service refuse the whole route. The account service adds each repository of the owner's App
+installation that the sign-in can see, that is not archived and that is not excluded. The ticket still
+names repositories, at most `GITHUB_ROUTE_REPOSITORIES_LIMIT`, named ones first, so Signal does not
+change. The workflow catalog leaves out archived repositories.
+
+A repository that the owner makes later gets into the ticket when the socket connects again.
+`GitHubRelay.noticeRepositories` reconnects for a repository of a watched owner that the ticket does not
+name. Each read of the GitHub catalog calls it, and so does an interval of 30 minutes while a trigger
+watches an owner, so a server where nobody opens the workflows also finds it. A repository that asked
+and is still not in the ticket asks again only after 6 hours. An older account service ignores `owners`
+and `excluded`; an older host or client ignores the fields and keeps the single repositories.
 
 `Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
 the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already

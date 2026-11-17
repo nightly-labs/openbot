@@ -16,7 +16,8 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
-  workflowGitHubOwnerWatch,
+  workflowGitHubRepositoryOwner,
+  workflowGitHubTriggerExcluded,
   workflowGitHubTriggerOwners,
   workflowGitHubTriggerRepositories,
   workflowListField,
@@ -276,6 +277,25 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
   return null;
 }
 
+/**
+ * When the event happened, as GitHub's ISO time, to find the newest of the events of many repositories:
+ * the time of its comment or review, else of its issue or pull request, as `recentEvents` sorts them.
+ * "" when the body has none.
+ */
+export function githubEventTime(body: unknown): string {
+  if (!isDynamicRecord(body)) return "";
+  const comment = record(body.comment);
+  const review = record(body.review);
+  const subject = record(body.issue) ?? record(body.pull_request) ?? record(body.check_suite);
+  return (
+    text(comment?.created_at) ??
+    text(review?.submitted_at) ??
+    text(subject?.created_at) ??
+    text(subject?.updated_at) ??
+    ""
+  );
+}
+
 /** Whether the filters of a trigger refuse the event. */
 export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts): boolean {
   const event = node.fields.event;
@@ -317,26 +337,69 @@ export function githubTriggerOwners(node: WorkflowNode): string[] {
   return workflowGitHubTriggerOwners(node.fields);
 }
 
+/** The repositories of its owners that a GitHub trigger leaves out; empty when it has none or is not one. */
+export function githubTriggerExcluded(node: WorkflowNode): string[] {
+  if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
+  return workflowGitHubTriggerExcluded(node.fields);
+}
+
 /** Whether a GitHub trigger watches something: a repository or an owner. */
 export function githubTriggerWatchesAny(node: WorkflowNode): boolean {
   return githubTriggerRepositories(node).length > 0 || githubTriggerOwners(node).length > 0;
 }
 
 /**
- * What a GitHub trigger watches, for the GitHub route: its repositories as `owner/name`, and its owners
- * as `owner/*`.
+ * What the GitHub route watches: single repositories as `owner/name`, owners whose repositories it all
+ * watches, and the repositories of those owners that it leaves out.
  */
-export function githubTriggerWatchValues(node: WorkflowNode): string[] {
-  return [...githubTriggerRepositories(node), ...githubTriggerOwners(node).map(workflowGitHubOwnerWatch)];
+export interface GitHubWatch {
+  repositories: string[];
+  owners: string[];
+  excluded: string[];
 }
 
-/** Whether a GitHub trigger watches the repository `owner/name`: by its name, or by its owner. */
+/**
+ * What the GitHub triggers watch together. A repository is left out only when each trigger that watches
+ * its owner leaves it out and no trigger names it. Names compare without case; the first spelling stays.
+ */
+export function githubWatchOf(nodes: readonly WorkflowNode[]): GitHubWatch {
+  const repositories = new Map<string, string>();
+  const owners = new Map<string, string>();
+  /** For each owner: the repositories that every trigger of that owner leaves out, so far. */
+  const excluded = new Map<string, Map<string, string>>();
+  for (const node of nodes) {
+    for (const name of githubTriggerRepositories(node))
+      if (!repositories.has(name.toLowerCase())) repositories.set(name.toLowerCase(), name);
+    const left = githubTriggerExcluded(node);
+    for (const owner of githubTriggerOwners(node)) {
+      const key = owner.toLowerCase();
+      const own = new Map(
+        left
+          .filter((name) => workflowGitHubRepositoryOwner(name).toLowerCase() === key)
+          .map((name) => [name.toLowerCase(), name]),
+      );
+      const before = excluded.get(key);
+      excluded.set(key, before ? new Map([...before].filter(([name]) => own.has(name))) : own);
+      if (!owners.has(key)) owners.set(key, owner);
+    }
+  }
+  return {
+    repositories: [...repositories.values()],
+    owners: [...owners.values()],
+    excluded: [...excluded.values()].flatMap((names) =>
+      [...names].filter(([name]) => !repositories.has(name)).map(([, name]) => name),
+    ),
+  };
+}
+
+/** Whether a GitHub trigger watches the repository `owner/name`: by its name, or by its owner when it does not leave it out. */
 export function githubTriggerWatches(node: WorkflowNode, fullName: string): boolean {
   const repository = fullName.toLowerCase();
-  const owner = repository.slice(0, Math.max(repository.indexOf("/"), 0));
+  const owner = workflowGitHubRepositoryOwner(repository);
+  if (githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository)) return true;
   return (
-    githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository) ||
-    githubTriggerOwners(node).some((name) => name.toLowerCase() === owner)
+    githubTriggerOwners(node).some((name) => name.toLowerCase() === owner) &&
+    !githubTriggerExcluded(node).some((name) => name.toLowerCase() === repository)
   );
 }
 

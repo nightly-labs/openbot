@@ -467,6 +467,13 @@ another model and any other value keep the model's own background. The capabilit
 client shows the Background chip only on a host that advertises it, because an older host ignores
 the field.
 
+`workflows-github-owners-v1` lets a GitHub trigger watch all repositories of a user or an organization.
+The trigger reads two more fields: `owners`, logins one a line, and `excluded`, `owner/name` repositories
+of those owners that it leaves out. The capability adds no route. A client offers "All repositories of
+<owner>" only on a host that advertises it, because an older host ignores `owners` and an owner-only
+trigger never starts there. A trigger that already has an owner keeps its row, so a person can turn it
+off.
+
 `workflows-media-size-v1` lets an image step have a size of its own. With `aspect` set to `custom`,
 the node reads two more fields, `width` and `height`: whole pixels from 64 to 4096. The host asks the
 model for the nearest aspect ratio it makes, at the smallest resolution that is at least the longer

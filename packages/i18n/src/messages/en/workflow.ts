@@ -279,6 +279,7 @@ export const messages = defineMessages("workflow", {
   "workflow.github.searchRepositories": "Search repositories",
   "workflow.github.allRepositories": "All repositories of {owner}",
   "workflow.github.allOf": "All of {owner}",
+  "workflow.github.allOfExcept": "All of {owner}, with exceptions",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues and pull requests",

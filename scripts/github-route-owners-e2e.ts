@@ -1,6 +1,7 @@
 // Checks how the account service picks the repositories of a GitHub route ticket, with the real
 // `GitHubInstallationTokens` and a fake GitHub API: a named repository is in the ticket; an owner adds each
-// repository of its installation that is not archived; an owner that the sign-in cannot see adds nothing;
+// repository of its installation that is not archived or excluded; an owner that the sign-in cannot see
+// adds nothing;
 // the named repositories come first and the ticket stops at `GITHUB_ROUTE_REPOSITORIES_LIMIT`; a request
 // without owners reads no installation that it does not need. No network is used.
 //
@@ -100,8 +101,8 @@ try {
     privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
     fetch: (input) => fakeGitHub(input),
   });
-  const routes = (names: string[], owners: string[]) =>
-    Effect.runPromise(tokens.repositoryRoutes("ghu_test", names, owners));
+  const routes = (names: string[], owners: string[], excluded: string[] = []) =>
+    Effect.runPromise(tokens.repositoryRoutes("ghu_test", names, owners, excluded));
   const names = (list: { fullName: string }[]) => list.map((route) => route.fullName);
 
   const named = await routes(["ana/notes"], []);
@@ -122,6 +123,15 @@ try {
     names(owned).sort().join() === "octo/api,octo/app" &&
       owned.every((route) => route.installationId === 1 && route.events),
     owned,
+  );
+
+  const left = await routes([], ["octo"], ["OCTO/api"]);
+  check("an excluded repository of an owner is not in the ticket", names(left).join() === "octo/app", left);
+  const leftNamed = await routes(["octo/api"], ["octo"], ["octo/api"]);
+  check(
+    "a named repository stays in the ticket when the owner excludes it",
+    names(leftNamed).sort().join() === "octo/api,octo/app",
+    leftNamed,
   );
 
   const unknown = await routes([], ["nobody"]);

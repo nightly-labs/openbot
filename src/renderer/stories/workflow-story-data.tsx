@@ -710,4 +710,5 @@ export const STORY_GITHUB: WorkflowGitHubCanvas = {
   opening: () => false,
   openItem: () => undefined,
   runLastEvent: () => undefined,
+  ownersSupported: () => true,
 };

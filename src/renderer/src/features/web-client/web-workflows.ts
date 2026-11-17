@@ -15,6 +15,7 @@ import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/rou
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import { WORKFLOWS_GITHUB_OWNERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-owners-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -286,6 +287,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       return keptPicture(fileId, file, null);
     },
     githubSupported,
+    githubOwnersSupported: () => githubSupported() && has(WORKFLOWS_GITHUB_OWNERS_CAPABILITY),
     mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),

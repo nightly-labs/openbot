@@ -295,6 +295,7 @@ export const messages = {
   "workflow.github.searchRepositories": "Szukaj repozytoriów",
   "workflow.github.allRepositories": "Wszystkie repozytoria {owner}",
   "workflow.github.allOf": "Wszystkie: {owner}",
+  "workflow.github.allOfExcept": "Wszystkie: {owner}, z wyjątkami",
   "workflow.github.events.issues": "Zgłoszenia",
   "workflow.github.events.pullRequests": "Pull requesty",
   "workflow.github.events.both": "Zgłoszenia i pull requesty",

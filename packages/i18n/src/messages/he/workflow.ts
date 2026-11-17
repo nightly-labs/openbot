@@ -275,6 +275,7 @@ export const messages = {
   "workflow.github.searchRepositories": "חיפוש מאגרים",
   "workflow.github.allRepositories": "כל המאגרים של {owner}",
   "workflow.github.allOf": "הכול של {owner}",
+  "workflow.github.allOfExcept": "הכול של {owner}, עם חריגים",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues ו-Pull requests",

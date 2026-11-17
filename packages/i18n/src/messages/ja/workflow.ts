@@ -275,6 +275,7 @@ export const messages = {
   "workflow.github.searchRepositories": "リポジトリを検索",
   "workflow.github.allRepositories": "{owner} のすべてのリポジトリ",
   "workflow.github.allOf": "{owner} のすべて",
+  "workflow.github.allOfExcept": "{owner} のすべて（例外あり）",
   "workflow.github.events.issues": "Issue",
   "workflow.github.events.pullRequests": "プルリクエスト",
   "workflow.github.events.both": "Issue とプルリクエスト",

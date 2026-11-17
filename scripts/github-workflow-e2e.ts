@@ -14,9 +14,10 @@
 // "Run with last event" starts a run with the newest matching item. A trigger with two repositories starts
 // on an event of the second one and its output comments there; a list that an older client left behind,
 // whose first line is not `repository`, is not watched; a waiting event of a repository that the user
-// removed does not start. A trigger that watches all repositories of an owner is watched as `owner/*`,
-// starts on a repository that the owner made later and comments there, does not start on another owner's
-// repository, and "Run with last event" reads the owner's repositories that the connection reaches.
+// removed does not start. A trigger that watches all repositories of an owner puts the owner in the
+// watch, starts on a repository that the owner made later and comments there, and does not start on
+// another owner's repository; a repository that it leaves out gets 404 and is in the watch as excluded;
+// "Run with last event" takes the newest event of the owner's repositories that the connection reaches.
 // No app, provider, account, Signal or network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
@@ -31,6 +32,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { EXTERNAL_EVENT_END } from "../src/backend/webhook-trigger";
+import type { GitHubWatch } from "../src/backend/workflows/github-matching";
 import type { WorkflowGitHubApi, WorkflowGitHubChange } from "../src/backend/workflows/workflow-github-api";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
@@ -49,7 +51,7 @@ const BOT = "openbotgit";
 
 interface Report {
   checks: string[];
-  watched?: string[];
+  watched?: GitHubWatch;
   history?: WorkflowGitHubHistory;
   changes?: WorkflowGitHubChange[];
   passed: boolean;
@@ -156,7 +158,7 @@ let service: WorkflowsHandle | null = null;
 
 try {
   await Effect.runPromise(database.initialize());
-  const watched: string[][] = [];
+  const watched: GitHubWatch[] = [];
   // The fake GitHub API: each change is kept; the first change on `acme/slow` and `acme/slowlabel` gets no answer.
   const changes: WorkflowGitHubChange[] = [];
   report.changes = changes;
@@ -188,11 +190,18 @@ try {
         ],
         people: ["ana", "ben"],
       }),
-    recentEvents: (repository) =>
-      Effect.succeed([
-        { event: "issue_comment", body: JSON.parse(comment(repository, 11, "dependabot[bot]", "Bot").body) },
-        { event: "issue_comment", body: JSON.parse(comment(repository, 12, "ana").body) },
-      ]),
+    // `octo/two` has the newest comment, so "Run with last event" of an owner takes it.
+    recentEvents: (repository) => {
+      const at = (body: string) => {
+        const parsed = JSON.parse(body);
+        parsed.comment.created_at = repository === "octo/two" ? "2026-02-01T00:00:00Z" : "2026-01-01T00:00:00Z";
+        return parsed;
+      };
+      return Effect.succeed([
+        { event: "issue_comment", body: at(comment(repository, 11, "dependabot[bot]", "Bot").body) },
+        { event: "issue_comment", body: at(comment(repository, 12, "ana").body) },
+      ]);
+    },
   };
   const runEnds = new Map<string, (end: WorkflowRunEnd) => void>();
   const ended = new Map<string, WorkflowRunEnd>();
@@ -208,9 +217,9 @@ try {
     runs: new WorkflowRunStore({ database }),
     github: new WorkflowGitHubStore({ database }),
     githubApp: () => BOT,
-    watchGitHub: (repositories) => watched.push(repositories),
+    watchGitHub: (watch) => watched.push(watch),
     githubApi,
-    githubRepositories: () => Effect.succeed(["acme/app", "octo/one", "octo/two"]),
+    githubReachableRepositories: () => Effect.succeed(["acme/app", "octo/one", "octo/two"]),
     delivery: () => null,
     turnAnswer: () => null,
     sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
@@ -248,10 +257,10 @@ try {
     workflows.create({ title: "Answer comments", graph: graphOf("acme/app", "approval", "notBot") }),
   );
   const chain = await run(workflows.create({ title: "Chain", graph: graphOf("acme/chain", "notify") }));
-  report.watched = watched.at(-1) ?? [];
+  report.watched = watched.at(-1) ?? { repositories: [], owners: [], excluded: [] };
   check(
     "the saved triggers set the watched repositories",
-    [...report.watched].sort().join() === "acme/app,acme/chain",
+    [...report.watched.repositories].sort().join() === "acme/app,acme/chain",
     watched,
   );
 
@@ -476,7 +485,7 @@ try {
       graph: withOwners(saying(lineOf("", [githubOutput({ action: "comment" })])), "Octo"),
     }),
   );
-  check("an owner is watched as `owner/*`", watched.at(-1)?.includes("Octo/*") === true, watched.at(-1));
+  check("an owner is in the watch", watched.at(-1)?.owners.includes("Octo") === true, watched.at(-1));
   const ownedRun = await startedRun(owned.summary.id, comment("octo/made-later", 3, "ana").body);
   const ownedEnd = await runEnd(ownedRun);
   const ownedPosted = changes.filter((change) => change.repository === "octo/made-later");
@@ -487,6 +496,39 @@ try {
   );
   const otherOwner = await send(comment("octopus/app", 1, "ana").body);
   check("a repository of another owner is not watched", otherOwner.status === 404, otherOwner);
+  // A repository that the owner trigger leaves out.
+  await run(
+    workflows.create({
+      title: "Owner but one",
+      graph: withOwners(
+        lineOf("", [{ id: "step", kind: "output", at: { x: 300, y: 0 }, fields: { target: "notify" } }]),
+        "gamma",
+      ),
+    }),
+  ).then(async (created) => {
+    const current = await run(workflows.get(created.summary.id));
+    await run(
+      workflows.saveGraph({
+        workflowId: created.summary.id,
+        baseRevision: current.revision,
+        graph: {
+          ...current.graph,
+          nodes: current.graph.nodes.map((node) =>
+            node.id === "trigger" ? { ...node, fields: { ...node.fields, excluded: "gamma/skip" } } : node,
+          ),
+        },
+      }),
+    );
+  });
+  check(
+    "a repository that an owner trigger leaves out is in the watch as excluded",
+    watched.at(-1)?.excluded.includes("gamma/skip") === true,
+    watched.at(-1),
+  );
+  const skipped = await send(comment("gamma/skip", 1, "ana").body);
+  check("an event of a repository that the owner trigger leaves out gets 404", skipped.status === 404, skipped);
+  const kept = await send(comment("gamma/keep", 1, "ana").body);
+  check("an event of another repository of the owner is saved", kept.status === 202, kept);
 
   const hold = await run(
     workflows.create({
@@ -677,8 +719,8 @@ try {
   const lastOwnerEnd = await runEnd(lastOwnerDetail.run.id);
   const lastOwnerItem = dependencies.github.runItem(lastOwnerDetail.run.id);
   check(
-    '"Run with last event" of an owner trigger reads the owner\'s repositories that the connection reaches',
-    lastOwnerEnd.status === "done" && lastOwnerItem?.repository === "octo/one" && lastOwnerItem.number === 12,
+    '"Run with last event" of an owner trigger takes the newest event of the owner\'s reached repositories',
+    lastOwnerEnd.status === "done" && lastOwnerItem?.repository === "octo/two" && lastOwnerItem.number === 12,
     { lastOwnerEnd, lastOwnerItem },
   );
 

@@ -1407,8 +1407,8 @@ graph, or ID.
   Signal checks GitHub's signature, reads only the installation and repository IDs, and passes the
   event to every computer that watches the repository, in transit only: it does not store or log it.
   When the Signal connection opens, the computer sends the account service its GitHub sign-in, the
-  repositories that its GitHub triggers watch, and the user or organization names of triggers that
-  watch all repositories of an owner. The account service asks GitHub which of them that sign-in can
+  repositories that its GitHub triggers watch, the user or organization names of triggers that
+  watch all repositories of an owner, and the repositories of those owners that the triggers leave out. The account service asks GitHub which of them that sign-in can
   see, signs a 5-minute route for those repositories, and stores neither the sign-in nor the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.

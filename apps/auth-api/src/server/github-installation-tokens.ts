@@ -1,5 +1,6 @@
 import {
   GITHUB_ROUTE_EVENTS,
+  GITHUB_ROUTE_EXCLUDED_LIMIT,
   GITHUB_ROUTE_OWNERS_LIMIT,
   GITHUB_ROUTE_REPOSITORIES_LIMIT,
   type GitHubRouteRepository,
@@ -242,7 +243,7 @@ export class GitHubInstallationTokens {
   }).bind(this);
 
   /**
-   * The repositories of `names`, and the repositories of `owners` that are not archived, that this user
+   * The repositories of `names`, and the repositories of `owners` that are not archived or `excluded`, that this user
    * can see through an installation of the app. A name that the user cannot see, or that no installation
    * holds, is not in the answer. The named repositories come first; the answer has at most
    * `GITHUB_ROUTE_REPOSITORIES_LIMIT` repositories.
@@ -252,9 +253,11 @@ export class GitHubInstallationTokens {
     userToken: string,
     names: readonly string[],
     owners: readonly string[] = [],
+    excluded: readonly string[] = [],
   ): Effect.fn.Return<GitHubRepositoryRoute[], GitHubInstallationTokensError> {
     const wanted = new Set(names.slice(0, GITHUB_ROUTE_REPOSITORIES_LIMIT).map((name) => name.toLowerCase()));
     const wantedOwners = new Set(owners.slice(0, GITHUB_ROUTE_OWNERS_LIMIT).map((owner) => owner.toLowerCase()));
+    const left = new Set(excluded.slice(0, GITHUB_ROUTE_EXCLUDED_LIMIT).map((name) => name.toLowerCase()));
     if (wanted.size === 0 && wantedOwners.size === 0) return [];
     const appId = yield* this.#readAppId();
     const user: Credential = { kind: "user", token: userToken };
@@ -279,7 +282,7 @@ export class GitHubInstallationTokens {
           if (wanted.delete(name)) {
             seen.add(name);
             named.push(route);
-          } else if (ownerWanted && !repository.archived && !full()) {
+          } else if (ownerWanted && !repository.archived && !left.has(name) && !full()) {
             seen.add(name);
             ofOwners.push(route);
           }

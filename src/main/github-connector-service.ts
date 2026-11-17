@@ -67,10 +67,13 @@ const githubInstallationsSchema = z.object({
 /** A repository of an installation, and whether that installation sends every event that triggers need. */
 interface InstallationRepository extends GitHubConnectorRepository {
   events: boolean;
+  archived: boolean;
 }
 const githubRepositoriesSchema = z.object({
   total_count: z.number(),
-  repositories: z.array(z.object({ full_name: z.string().min(1), private: z.boolean() })),
+  repositories: z.array(
+    z.object({ full_name: z.string().min(1), private: z.boolean(), archived: z.boolean().optional() }),
+  ),
 });
 
 export interface GitHubConnectorServiceOptions {
@@ -374,17 +377,20 @@ export class GitHubConnectorService {
       if (!token) return { connected: false, repositories: [] };
       if (this.#botTokens.due()) yield* this.#renewBotTokens().pipe(Effect.catch(() => Effect.void));
       const { repositories } = yield* this.#installationRepositories(token);
+      // An archived repository is read-only and sends no events, so a workflow cannot use it.
       return {
         connected: true,
-        repositories: repositories.map((repository) => {
-          const [owner = "", name = ""] = repository.fullName.split("/");
-          return {
-            fullName: repository.fullName,
-            private: repository.private,
-            canWrite: this.#botTokens.forRepository(owner, name) !== null,
-            events: repository.events,
-          };
-        }),
+        repositories: repositories
+          .filter((repository) => !repository.archived)
+          .map((repository) => {
+            const [owner = "", name = ""] = repository.fullName.split("/");
+            return {
+              fullName: repository.fullName,
+              private: repository.private,
+              canWrite: this.#botTokens.forRepository(owner, name) !== null,
+              events: repository.events,
+            };
+          }),
       };
     },
     (operation) => this.#owned(operation),
@@ -676,7 +682,12 @@ export class GitHubConnectorService {
         );
         if (page === 1) total += answer.total_count;
         for (const repository of answer.repositories) {
-          repositories.push({ fullName: repository.full_name, private: repository.private, events });
+          repositories.push({
+            fullName: repository.full_name,
+            private: repository.private,
+            archived: repository.archived === true,
+            events,
+          });
         }
         const listedAll = page * GITHUB_PAGE_SIZE >= answer.total_count || answer.repositories.length === 0;
         if (listedAll || repositories.length >= MAX_LISTED_REPOSITORIES) break;

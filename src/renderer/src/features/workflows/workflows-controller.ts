@@ -700,6 +700,7 @@ export function createWorkflowsController(
         host.workflows.githubRunLastEvent({ workflowId, nodeId, requestId: crypto.randomUUID() }),
       );
     },
+    ownersSupported: () => host.githubOwnersSupported(),
   };
 
   const props: WorkflowsControllerProps = {

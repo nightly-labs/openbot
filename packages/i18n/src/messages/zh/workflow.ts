@@ -278,6 +278,7 @@ export const messages = {
   "workflow.github.searchRepositories": "搜索仓库",
   "workflow.github.allRepositories": "{owner} 的所有仓库",
   "workflow.github.allOf": "{owner} 的全部",
+  "workflow.github.allOfExcept": "{owner} 的全部（有例外）",
   "workflow.github.events.issues": "议题",
   "workflow.github.events.pullRequests": "拉取请求",
   "workflow.github.events.both": "议题和拉取请求",

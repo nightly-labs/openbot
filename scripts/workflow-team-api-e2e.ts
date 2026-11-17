@@ -51,6 +51,7 @@ import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import { WORKFLOWS_GITHUB_OWNERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-owners-v1";
 import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CODECS,
@@ -1545,6 +1546,9 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      // The host lets a client watch all repositories of an owner only on protocol 9.
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_GITHUB_OWNERS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_GITHUB_OWNERS_CAPABILITY));
       const run = async (fields: WorkflowNode["fields"]) => {
         const before = { media: mediaRequests.length, size: sizeRequests.length };
         const workflow = await hostWorkflow(`Size ${JSON.stringify(fields)}`, {

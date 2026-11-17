@@ -10,6 +10,7 @@ import {
   WORKFLOW_PICTURE_TYPES,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
+import { WORKFLOWS_GITHUB_OWNERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-owners-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
@@ -82,6 +83,11 @@ export interface WorkflowHost {
    * when it advertises `workflows-github-v1`.
    */
   githubSupported(): boolean;
+  /**
+   * Whether a GitHub trigger can watch all repositories of an owner: this computer always, and a joined
+   * server only when it advertises `workflows-github-owners-v1`. An older host ignores the owners.
+   */
+  githubOwnersSupported(): boolean;
   /**
    * Whether the host runs image and video steps: this computer always, and a joined server only when
    * it advertises `workflows-media-v1`.
@@ -193,6 +199,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     return optionsCall;
   };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
+  const githubOwnersSupported = () =>
+    githubSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_GITHUB_OWNERS_CAPABILITY));
   const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
   const mediaAccountSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
@@ -342,6 +350,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       return keptPicture(fileId, file, mediaUrl(fileId));
     },
     githubSupported,
+    githubOwnersSupported,
     mediaSupported,
     mediaAccountSupported,
     mediaTransparentSupported,

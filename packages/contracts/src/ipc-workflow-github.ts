@@ -127,6 +127,25 @@ export function workflowGitHubTriggerOwners(fields: { readonly owners?: unknown 
   });
 }
 
+/** The owner of `owner/name`, or "" when the value has no "/". */
+export function workflowGitHubRepositoryOwner(fullName: string): string {
+  return fullName.slice(0, Math.max(fullName.indexOf("/"), 0));
+}
+
+/**
+ * The repositories of the trigger's owners that it leaves out, without repeats. `excluded` holds one
+ * `owner/name` a line. A name whose owner the trigger does not watch has no effect.
+ */
+export function workflowGitHubTriggerExcluded(fields: { readonly excluded?: unknown }): string[] {
+  const seen = new Set<string>();
+  return workflowListField(fields.excluded).filter((name) => {
+    const key = name.toLowerCase();
+    if (!isGitHubRepositoryName(name) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** The suffix of a watch value that names all repositories of an owner, as in `owner/*`. */
 export const WORKFLOW_GITHUB_OWNER_WATCH_SUFFIX = "/*";
 

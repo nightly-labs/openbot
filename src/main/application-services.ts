@@ -2616,9 +2616,9 @@ export async function createApplicationServices({
       github: new WorkflowGitHubStore({ database: store.database }),
       githubApp: () => githubAppConfig()?.slug ?? null,
       // The relay is made with the ingress socket, below; a graph changes only after start.
-      watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
+      watchGitHub: (watch) => githubRelay.setWatch(watch),
       githubApi: githubRest,
-      githubRepositories: () =>
+      githubReachableRepositories: () =>
         githubCatalog().pipe(Effect.map((catalog) => catalog.repositories.map((repository) => repository.fullName))),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
@@ -2831,6 +2831,11 @@ export async function createApplicationServices({
     account: centralAuth,
     githubToken: () => githubConnector.accessToken(),
     ingress: () => signalIngress,
+    reachableRepositories: () =>
+      githubConnector
+        .workflowCatalog()
+        .pipe(Effect.map((catalog) => catalog.repositories.map((repository) => repository.fullName))),
+    onTrimmed: (dropped) => logger.warn("The GitHub triggers watch more than the GitHub route holds.", dropped),
   });
   // A server on this computer has no account session: the desktop app makes the Marketplace reads that
   // adding an agent needs, and the start of a Slack or Discord connect.
@@ -3098,8 +3103,8 @@ export async function createApplicationServices({
         ),
   });
   await Effect.runPromise(
-    workflowRuntime.githubRepositories().pipe(
-      Effect.tap((repositories) => Effect.sync(() => githubRelay.setRepositories(repositories))),
+    workflowRuntime.githubWatch().pipe(
+      Effect.tap((watch) => Effect.sync(() => githubRelay.setWatch(watch))),
       Effect.catch((failure) =>
         Effect.sync(() => logger.warn("The GitHub triggers were not read.", { cause: String(failure.cause) })),
       ),

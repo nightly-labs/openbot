@@ -100,14 +100,16 @@ import {
 } from "./discord-matching";
 import {
   type GitHubEventFacts,
+  type GitHubWatch,
   githubEventFacts,
+  githubEventTime,
   githubFilterRefuses,
   githubTriggerMatches,
   githubTriggerOwners,
   githubTriggerRepositories,
   githubTriggerWatches,
   githubTriggerWatchesAny,
-  githubTriggerWatchValues,
+  githubWatchOf,
   withoutStaleGitHubRepositories,
   workflowGitHubPayload,
 } from "./github-matching";
@@ -177,7 +179,10 @@ const GITHUB_CHAIN_RUNS = 3;
 const GITHUB_CHAIN_WINDOW_MS = 10 * 60_000;
 /** How long a change that a GitHub output made is known as this workflow's own. */
 const GITHUB_SELF_WINDOW_MS = 60 * 60_000;
-/** The repositories of a trigger's owners that "Run with last event" asks GitHub about, one request each. */
+/**
+ * The repositories of a trigger's owners that "Run with last event" asks GitHub about, one request each.
+ * The ones of the trigger's newest events come first.
+ */
 const GITHUB_LAST_EVENT_OWNER_REPOSITORIES = 10;
 
 class WorkflowFailed extends Schema.TaggedError<WorkflowFailed>()("WorkflowFailed", {
@@ -344,15 +349,15 @@ export interface WorkflowsDependencies {
   github: WorkflowGitHubStore;
   /** The slug of the OpenBot GitHub App, whose bot makes the changes of GitHub outputs. */
   githubApp(): string | null;
-  /**
-   * What the saved GitHub triggers watch, after each change of them: repositories as `owner/name`, and
-   * all repositories of an owner as `owner/*`.
-   */
-  watchGitHub?: (repositories: string[]) => void;
+  /** What the saved GitHub triggers watch, after each change of them. */
+  watchGitHub?: (watch: GitHubWatch) => void;
   /** GitHub as OpenBot's bot; absent where this host has no GitHub connection to give. */
   githubApi?: WorkflowGitHubApi;
-  /** The repositories that the GitHub connection reaches, as `owner/name`, for the triggers that watch an owner. */
-  githubRepositories?: () => Effect.Effect<readonly string[], unknown>;
+  /**
+   * The repositories that the GitHub connection reaches, as `owner/name`, for "Run with last event" of
+   * a trigger that watches an owner.
+   */
+  githubReachableRepositories?: () => Effect.Effect<readonly string[], unknown>;
   now?: () => Date;
 }
 
@@ -437,8 +442,8 @@ interface WorkflowsShape {
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
   /** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
   githubLastEvent(input: WorkflowGitHubLastEventInput): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
-  /** The repositories that the saved GitHub triggers watch, for the GitHub route at start. */
-  githubRepositories(): Effect.Effect<string[], WorkflowFailed>;
+  /** What the saved GitHub triggers watch, for the GitHub route at start. */
+  githubWatch(): Effect.Effect<GitHubWatch, WorkflowFailed>;
   /**
    * Keeps a PNG, JPEG or WebP attachment draft as a picture of the host, with no owner agent, for an
    * asset step. Answers its file id. The draft goes away.
@@ -1722,9 +1727,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             }),
           );
 
-        const watchedRepositories = () => [
-          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerWatchValues(trigger.node))),
-        ];
+        const watchedRepositories = () => githubWatchOf(githubTriggers().map((trigger) => trigger.node));
 
         /** Tells the GitHub route which repositories the saved triggers watch. The change it follows stays. */
         const watchGitHub = () => {
@@ -1901,21 +1904,32 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         /**
-         * The repositories where "Run with last event" looks: the trigger's own, then the reached
-         * repositories of its owners. A connection that cannot list them leaves only the trigger's own.
+         * The repositories where "Run with last event" looks: the trigger's own, then reached repositories
+         * of its owners that it does not leave out. Those of the trigger's newest events come first, then
+         * the others by name. A connection that cannot list them leaves only the trigger's own.
          */
-        const lastEventRepositories = Effect.fn("Workflows.lastEventRepositories")(function* (trigger: WorkflowNode) {
+        const lastEventRepositories = Effect.fn("Workflows.lastEventRepositories")(function* (
+          workflowId: string,
+          trigger: WorkflowNode,
+        ) {
           const named = githubTriggerRepositories(trigger);
-          const owners = new Set(githubTriggerOwners(trigger).map((owner) => owner.toLowerCase()));
-          const reached = dependencies.githubRepositories;
-          if (owners.size === 0 || !reached) return named;
+          const reached = dependencies.githubReachableRepositories;
+          if (githubTriggerOwners(trigger).length === 0 || !reached) return named;
           const all = yield* reached().pipe(Effect.catch(() => Effect.succeed<readonly string[]>([])));
           const known = new Set(named.map((name) => name.toLowerCase()));
-          const ofOwners = all.filter(
-            (name) =>
-              !known.has(name.toLowerCase()) && owners.has(name.slice(0, Math.max(name.indexOf("/"), 0)).toLowerCase()),
+          const ofOwners = all.filter((name) => !known.has(name.toLowerCase()) && githubTriggerWatches(trigger, name));
+          const recent = yield* attempt(() =>
+            github
+              .history(workflowId)
+              .deliveries.filter((delivery) => delivery.nodeId === trigger.id && delivery.item)
+              .map((delivery) => delivery.item?.repository.toLowerCase() ?? ""),
           );
-          return [...named, ...ofOwners.slice(0, GITHUB_LAST_EVENT_OWNER_REPOSITORIES)];
+          const rank = (name: string) => {
+            const index = recent.indexOf(name.toLowerCase());
+            return index === -1 ? recent.length : index;
+          };
+          const ordered = [...ofOwners].sort((left, right) => rank(left) - rank(right));
+          return [...named, ...ordered.slice(0, GITHUB_LAST_EVENT_OWNER_REPOSITORIES)];
         });
 
         const githubLastEvent = Effect.fn("Workflows.githubLastEvent")(function* (input: WorkflowGitHubLastEventInput) {
@@ -1926,12 +1940,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const event = trigger?.fields.event;
           if (!trigger || !githubTriggerWatchesAny(trigger) || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
             return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
-          const repositories = yield* lastEventRepositories(trigger);
-          // GitHub is asked outside the lock: the other runs do not wait for it. The events of different
-          // repositories have no common time, so the first repository in the trigger's order with a
-          // matching event gives it. A repository that GitHub refuses is skipped while another one answers.
+          const repositories = yield* lastEventRepositories(input.workflowId, trigger);
+          // GitHub is asked outside the lock: the other runs do not wait for it. Each repository gives its
+          // newest matching event, and the newest of them all starts the run. A repository that GitHub
+          // refuses is skipped while another one answers.
           const bot = dependencies.githubApp();
           let facts: GitHubEventFacts | undefined;
+          let newest = "";
           let failure: string | null = null;
           for (const repository of repositories) {
             const answer = yield* api.recentEvents(repository, event).pipe(
@@ -1939,15 +1954,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               Effect.catch((error) => Effect.succeed({ recent: [], failure: error.message })),
             );
             failure = answer.failure ?? failure;
-            facts = answer.recent
-              .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
-              .find(
-                (candidate): candidate is GitHubEventFacts =>
-                  candidate !== null &&
-                  githubTriggerMatches(trigger, candidate) &&
-                  !githubFilterRefuses(trigger, candidate),
-              );
-            if (facts) break;
+            for (const candidate of answer.recent) {
+              const found = githubEventFacts(candidate.event, candidate.body, bot);
+              if (!found || !githubTriggerMatches(trigger, found) || githubFilterRefuses(trigger, found)) continue;
+              const at = githubEventTime(candidate.body);
+              if (!facts || at > newest) {
+                facts = found;
+                newest = at;
+              }
+              break;
+            }
           }
           if (!facts) return yield* refuse("refused", failure ?? sourceText("error.workflow.githubNoEvent"));
           const found = facts;
@@ -1984,7 +2000,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
-        const githubRepositories = Effect.fn("Workflows.githubRepositories")(function* () {
+        const githubWatch = Effect.fn("Workflows.githubWatch")(function* () {
           return yield* attempt(watchedRepositories);
         });
 
@@ -2186,7 +2202,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           githubOffline,
           githubHistory,
           githubLastEvent,
-          githubRepositories,
+          githubWatch,
           keepPicture,
           mediaProviders,
           mediaCredits,

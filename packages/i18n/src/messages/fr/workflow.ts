@@ -278,6 +278,7 @@ export const messages = {
   "workflow.github.searchRepositories": "Rechercher des dépôts",
   "workflow.github.allRepositories": "Tous les dépôts de {owner}",
   "workflow.github.allOf": "Tous de {owner}",
+  "workflow.github.allOfExcept": "Tous de {owner}, avec exceptions",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues et pull requests",

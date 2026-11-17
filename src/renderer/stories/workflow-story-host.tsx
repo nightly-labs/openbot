@@ -156,6 +156,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     slackWorkspaces: async () => [],
     agentLevels: async () => null,
     githubSupported: () => true,
+    githubOwnersSupported: () => true,
     mediaSupported: () => true,
     mediaAccountSupported: () => true,
     mediaTransparentSupported: () => true,

@@ -41,6 +41,11 @@ export interface WorkflowGitHubCanvas {
   openItem: (item: WorkflowGitHubItem) => void;
   /** Runs the workflow from a GitHub trigger with the newest item that matches it. */
   runLastEvent: (nodeId: string) => void;
+  /**
+   * Whether a trigger can watch all repositories of an owner: this computer always, and a joined server
+   * only when it advertises `workflows-github-owners-v1`. An older host ignores the owners.
+   */
+  ownersSupported: () => boolean;
 }
 
 export const EMPTY_GITHUB_HISTORY: WorkflowGitHubHistory = { deliveries: [], runs: [] };

@@ -275,6 +275,7 @@ export const messages = {
   "workflow.github.searchRepositories": "저장소 검색",
   "workflow.github.allRepositories": "{owner}의 모든 저장소",
   "workflow.github.allOf": "{owner} 전체",
+  "workflow.github.allOfExcept": "{owner} 전체(예외 있음)",
   "workflow.github.events.issues": "이슈",
   "workflow.github.events.pullRequests": "풀 리퀘스트",
   "workflow.github.events.both": "이슈 및 풀 리퀘스트",

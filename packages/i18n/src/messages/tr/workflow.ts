@@ -278,6 +278,7 @@ export const messages = {
   "workflow.github.searchRepositories": "Depolarda ara",
   "workflow.github.allRepositories": "{owner} hesabının tüm depoları",
   "workflow.github.allOf": "Tümü: {owner}",
+  "workflow.github.allOfExcept": "Tümü: {owner}, istisnalarla",
   "workflow.github.events.issues": "Sorunlar",
   "workflow.github.events.pullRequests": "Çekme istekleri",
   "workflow.github.events.both": "Sorunlar ve çekme istekleri",

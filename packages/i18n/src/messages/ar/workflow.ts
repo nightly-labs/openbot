@@ -305,6 +305,7 @@ export const messages = {
   "workflow.github.searchRepositories": "البحث في المستودعات",
   "workflow.github.allRepositories": "كل مستودعات {owner}",
   "workflow.github.allOf": "كل {owner}",
+  "workflow.github.allOfExcept": "كل {owner}، مع استثناءات",
   "workflow.github.events.issues": "المشكلات",
   "workflow.github.events.pullRequests": "طلبات السحب",
   "workflow.github.events.both": "المشكلات وطلبات السحب",

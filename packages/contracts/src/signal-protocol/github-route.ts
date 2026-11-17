@@ -40,6 +40,8 @@ export const GITHUB_SIGNATURE_PATTERN = /^sha256=[A-Fa-f0-9]{64}$/u;
 export const GITHUB_OWNER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/u;
 /** The owners whose repositories the GitHub triggers of one host can watch, besides single repositories. */
 export const GITHUB_ROUTE_OWNERS_LIMIT = 20;
+/** The repositories of the watched owners that the GitHub triggers of one host leave out. */
+export const GITHUB_ROUTE_EXCLUDED_LIMIT = 100;
 /** `owner/name`: up to 39 characters of owner and 100 of name, in the characters that GitHub allows. */
 export const GITHUB_REPOSITORY_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/u;
 
