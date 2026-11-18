@@ -14,7 +14,6 @@ import {
   type WorkflowMediaAspect,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaKind,
-  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
@@ -106,11 +105,16 @@ export function canvasAspects(value: unknown): WorkflowMediaAspect[] {
 
 /**
  * The lengths that a catalog model sends: each length that the service takes, in ascending order, so
- * the canvas can ask for any of them. A list longer than the wire limit keeps its short list.
+ * the canvas can ask for any of them. A list longer than the wire limit keeps the first and the last
+ * length and lengths at even steps between them, so the canvas still shows Custom.
  */
 export function catalogDurations(all: readonly number[]): number[] {
   const sorted = [...new Set(all)].sort((left, right) => left - right);
-  return sorted.length <= WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX ? sorted : workflowVideoLengthChoices(sorted);
+  const max = WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX;
+  if (sorted.length <= max) return sorted;
+  const step = (sorted.length - 1) / (max - 1);
+  const kept = new Set(Array.from({ length: max }, (_, place) => Math.round(place * step)));
+  return sorted.filter((_, index) => kept.has(index));
 }
 
 /** Each whole second from `min` to `max`. */

@@ -40,7 +40,7 @@ import {
   Type,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
@@ -222,15 +222,6 @@ function SizeChip(props: { size: WorkflowMediaSize; disabled: boolean; onChange:
 const CUSTOM_LENGTH = "custom" as const;
 type LengthChoice = `${number}` | typeof CUSTOM_LENGTH;
 
-/** The place in `lengths` of the length nearest to `seconds`. */
-function nearestLength(lengths: readonly number[], seconds: number): number {
-  return lengths.reduce(
-    (best, length, index) =>
-      Math.abs(length - seconds) < Math.abs((lengths[best] ?? seconds) - seconds) ? index : best,
-    0,
-  );
-}
-
 /**
  * The glass chip of a custom length. It opens a slider that moves through the lengths of the model,
  * so each stop is a length that the model makes. The chip follows the slider while the user drags it,
@@ -244,16 +235,17 @@ function LengthChip(props: {
 }) {
   const { t } = useText();
   const [dragged, setDragged] = createSignal<number | null>(null);
-  const sorted = () => [...new Set(props.lengths)].sort((left, right) => left - right);
-  const index = () => dragged() ?? nearestLength(sorted(), props.seconds);
+  const sorted = createMemo(() => [...new Set(props.lengths)].sort((left, right) => left - right));
+  // The specs already keep a length of the model, so `seconds` is one of the stops.
+  const index = () => dragged() ?? Math.max(sorted().indexOf(props.seconds), 0);
   const at = (place: number) => sorted()[place] ?? props.seconds;
   const seconds = (place: number) => t("workflow.video.seconds", { value: String(at(place)) });
   const commit = (place: number) => {
-    setDragged(place);
     if (at(place) !== props.seconds) props.onChange(at(place));
+    setDragged(null);
   };
   return (
-    <Popover.Root placement="top" gutter={6} onOpenChange={(open) => !open && setDragged(null)}>
+    <Popover.Root placement="top" gutter={6}>
       <Popover.Trigger
         class="wfn-chip"
         aria-label={t("workflow.video.lengthLabel", { value: seconds(index()) })}
@@ -273,6 +265,7 @@ function LengthChip(props: {
             minValue={0}
             maxValue={Math.max(sorted().length - 1, 1)}
             step={1}
+            disabled={props.disabled}
             formatValue={seconds}
             onChange={setDragged}
             onChangeEnd={commit}
@@ -471,17 +464,19 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const lengths = () => workflowVideoDurations(model());
   const lengthChoices = () => workflowVideoLengthChoices(lengths());
   const customLengthAllowed = () => lengthChoices().length < lengths().length;
-  const [customLength, setCustomLength] = createSignal(false);
+  /** The model on which the user chose Custom, so another model starts from its own short list. */
+  const [customLengthModel, setCustomLengthModel] = createSignal<string | null>(null);
+  const customLength = () => customLengthModel() === (model()?.id ?? "");
   /** A length that the short list does not show is a custom length, also after a reload. */
   const lengthIsCustom = () => customLengthAllowed() && (customLength() || !lengthChoices().includes(specs().duration));
   const chooseLength = (choice: LengthChoice) => {
     if (choice === CUSTOM_LENGTH) {
-      setCustomLength(true);
+      setCustomLengthModel(model()?.id ?? "");
       return;
     }
     const next = lengths().find((option) => String(option) === choice);
     if (next === undefined) return;
-    setCustomLength(false);
+    setCustomLengthModel(null);
     setDuration(next);
   };
   /** A Sunra or Higgsfield step shows what one file costs with its choices. */
@@ -766,7 +761,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     disabled={specsDisabled()}
                     onChange={(seconds) => {
                       // A slider stop on the short list keeps Custom, so the slider stays open.
-                      setCustomLength(true);
+                      setCustomLengthModel(model()?.id ?? "");
                       setDuration(seconds);
                     }}
                   />
