@@ -2556,7 +2556,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, and close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate, before submit_secret. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site.",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
         namedCard("agent-script"),
       );
     const withCode = pending.secret.withCode;
