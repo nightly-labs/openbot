@@ -132,7 +132,8 @@ interface BridgeRoute {
    * `signal` aborts when the client abandons the call: it sent `notifications/cancelled` (an MCP
    * client does this when its own timeout ends) or closed the response stream. Nothing reads the
    * result after that, so the owner must stop waiting for the user. `detachAfterMs` is set when the
-   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`.
+   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`. `subagent` is true for a
+   * call from a session that the client started itself: see `AppServerRequest.subagent`.
    */
   call: (
     params: {
@@ -145,6 +146,7 @@ interface BridgeRoute {
     },
     signal: AbortSignal,
     detachAfterMs: number | undefined,
+    subagent: boolean,
   ) => Effect.Effect<DynamicToolResult, ProviderClientOperationError>;
   /**
    * The calls still running, by JSON-RPC id. Each POST gets a new MCP server, so the POST that
@@ -450,6 +452,10 @@ export class LocalMcpBridge {
                 },
                 abandoned.signal,
                 progressToken === undefined ? LOCAL_MCP_UNEXTENDED_DETACH_MS : undefined,
+                // An OpenCode subagent names its own child session, which no member is. Its call goes to
+                // the parent's chat and turn, but the subagent runs in the background and can still wait
+                // after the parent's turn ends (#10657).
+                typeof caller === "string" && caller !== member.threadId,
               )
               .pipe(Effect.mapError(({ cause }) => mcpFailure(cause)));
           }).pipe(

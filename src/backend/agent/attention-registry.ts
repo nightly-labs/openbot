@@ -460,6 +460,11 @@ interface PendingBrowserTakeover {
   resolve: (result: DynamicToolResult) => void;
   /** The provider's call got `browserTakeoverWaitingResult`, and the card waits for the next call (#9689). */
   detached?: true;
+  /**
+   * A subagent asked for it, in the chat and turn of its parent agent (`AppServerRequest.subagent`). The
+   * subagent can still wait after the parent's turn ends, so that normal end keeps the card (#10657).
+   */
+  subagent?: true;
 }
 
 /** The answer to a detached takeover, kept for the next call of its turn for the same tab (#9689). */
@@ -1444,6 +1449,7 @@ export class AttentionRegistry {
       params,
       request: takeover,
       resolve: call.resolve,
+      ...(request.subagent ? { subagent: true as const } : {}),
     };
     this.#takeovers.set(requestId, pending);
     const show = Effect.gen({ self: this }, function* () {
@@ -2254,8 +2260,8 @@ export class AttentionRegistry {
    * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
    * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
    * the removal only from that event. A detached question stays when the turn `completed`: its answer
-   * starts the next turn. A subagent's question stays too: its subagent still waits for the answer.
-   * A Stop or a failure expires both.
+   * starts the next turn. A subagent's question and takeover stay too: its subagent still waits for the
+   * answer. A Stop or a failure expires them all.
    */
   clearForTurn(threadId: string, turnId: string, completed: boolean): void {
     for (const [requestId, pending] of this.#prompts) {
@@ -2273,9 +2279,10 @@ export class AttentionRegistry {
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
-      if (pending.params.threadId === threadId && pending.params.turnId === turnId) {
-        this.#resolveBrowserTakeover(requestId, pending, "cancel");
-      }
+      if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
+      // A detached card waits for the next call of its turn (#9689), which cannot come after the turn ends.
+      if (completed && pending.subagent && !pending.detached) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
     for (const [tabId, held] of this.#heldTakeoverResults) {
       if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(tabId);
@@ -2316,9 +2323,9 @@ export class AttentionRegistry {
 
   /**
    * Expires the detached questions of an agent, of one thread, or of both, and the subagent questions
-   * that outlived their turn. Call it when a task closes or is deleted, or when the agent is deleted:
-   * no message can reach them there, and a hidden question would block duplication and plan
-   * continuation.
+   * and takeovers that outlived their turn. Call it when a task closes or is deleted, or when the
+   * agent is deleted: no message can reach them there, and a hidden question would block duplication
+   * and plan continuation.
    */
   expireDetached(agentId: string | null, publicThreadId: string | null): void {
     let changed = false;
@@ -2330,6 +2337,13 @@ export class AttentionRegistry {
       changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
+    // Resolving a takeover emits its own runtime snapshot.
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.subagent) continue;
+      if (agentId !== null && pending.request.agentId !== agentId) continue;
+      if (publicThreadId !== null && pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
   }
 
   /**
