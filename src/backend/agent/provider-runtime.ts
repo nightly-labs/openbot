@@ -1738,7 +1738,12 @@ export class ProviderRuntime implements ProviderPort {
     for (const [provider, file] of this.#signInFiles) {
       const row = this.#status.providers?.find((candidate) => candidate.id === provider);
       if (row?.state !== "sign-in-required") continue;
-      if (this.#cliLogin.has(provider) || this.#providerConnectionCommands.has(provider)) continue;
+      if (
+        this.#cliLogin.has(provider) ||
+        this.#providerConnectionCommands.has(provider) ||
+        (provider === "codex" && this.#codexLogin.pending)
+      )
+        continue;
       const version = signInFileVersion(file.paths);
       if (version === file.seen) continue;
       file.seen = version;
@@ -3689,8 +3694,9 @@ export class ProviderRuntime implements ProviderPort {
             // No forced refresh. Codex processes of one sign-in folder share its single-use refresh
             // token, and a refresh at each start made processes that start together spend it twice:
             // OpenAI then ends the sign-in with "refresh token was already used" (#10372). Codex
-            // refreshes by itself when the token expires, and reads the folder again first. Codex
-            // 0.160.1 to 0.169.0 also ignore the result of a forced refresh in their answer.
+            // refreshes by itself when the token expires, and reads the folder again first. After a
+            // refresh that fails for good, Codex 0.160.1 and later answer with no account, while
+            // `codex login status` still reads the saved file as signed in.
             const response = yield* client
               .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
               .pipe(toProviderOperationFailed);
@@ -3992,7 +3998,21 @@ export class ProviderRuntime implements ProviderPort {
     const disposals = this.#disposals;
     const candidate = yield* this.#authenticateClient(provider, cli, {
       startTimeoutMs: this.#longStartWaitMs(provider),
-    });
+    }).pipe(
+      // The new copy runs, but its sign-in is gone, such as after a spent refresh token: Codex then
+      // answers with no account while the old process works on until its token ends. That is a
+      // signed-out account, as for a released provider above, not a failed update (#11713).
+      Effect.catchIf(
+        (failure) =>
+          failure.cause instanceof ProviderSignInError && failure.cause.message === this.#noAccountMessage(provider),
+        () => Effect.succeed(null),
+      ),
+    );
+    if (!candidate) {
+      // The update waited for the provider to be idle, so this stops no turn. The row names the new copy.
+      yield* this.#endSignedOutClient(provider, disposals, cli.version);
+      return;
+    }
     yield* this.#activateProviderClient(provider, candidate.client, cli, candidate.account, {
       notifyReady: false,
       disposals,
@@ -4068,15 +4088,16 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Stops the client that still runs on a credential that a Reconnect signed out, and reports the
-   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one.
+   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one. An
+   * update gives the `version` of its new copy.
    */
   readonly #endSignedOutClient = Effect.fn("ProviderRuntime.endSignedOutClient")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     disposals: number,
+    version = this.#cli.get(provider)?.version,
   ) {
     if (disposals !== this.#disposals || this.#hooks.isStopping()) return;
-    const version = this.#cli.get(provider)?.version;
     yield* this.#stopProviderClient(provider).pipe(Effect.ignore);
     this.#setProviderConnectionFailure(
       provider,
