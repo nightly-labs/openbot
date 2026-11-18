@@ -234,32 +234,58 @@ function tabAt(target: EventTarget | null): MenuTab | null {
 export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
   const [menuTab, setMenuTab] = createSignal<MenuTab | null>(null);
+  /** The focus when the menu opened, and the top row. The row itself cannot take the focus back. */
+  let menuReturn: { focus: Element | null; header: Element | null } | undefined;
+  const pick = (event: Event) => {
+    const tab = tabAt(event.target);
+    setMenuTab(tab);
+    menuReturn = {
+      focus: document.activeElement,
+      header: event.target instanceof Element ? event.target.closest(".side-panel-header") : null,
+    };
+    return tab;
+  };
   /** A right-click outside a tab opens no menu. */
   const pickMenuTab = (event: MouseEvent) => {
-    const tab = tabAt(event.target);
-    if (tab) setMenuTab(tab);
-    else event.preventDefault();
+    if (!pick(event)) event.preventDefault();
   };
   /** A long press opens the menu on touch screens. Outside a tab, the menu has no item. */
   const pickTouchMenuTab = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse") setMenuTab(tabAt(event.target));
+    if (event.pointerType !== "mouse") pick(event);
+  };
+  /** The tab of the menu while it is still open in the panel. A tab can close while its menu shows. */
+  const liveMenuTab = () => {
+    const tab = menuTab();
+    if (!tab) return null;
+    if ("pane" in tab) return props.panes.includes(tab.pane) ? tab : null;
+    if ("thread" in tab) return props.threads?.items.some((item) => item.id === tab.thread) ? tab : null;
+    return props.files?.items.some((item) => item.key === tab.file) ? tab : null;
   };
   const menuThread = () => {
-    const tab = menuTab();
+    const tab = liveMenuTab();
     return tab && "thread" in tab ? tab.thread : undefined;
   };
   const closeMenuTab = () => {
-    const tab = menuTab();
+    const tab = liveMenuTab();
     if (!tab) return;
     if ("pane" in tab) props.onClose(tab.pane);
     else if ("thread" in tab) props.threads?.onClose(tab.thread);
     else props.files?.onClose(tab.file);
   };
+  /** The focus goes back where it was, or to the selected tab when that element left with its tab. */
+  const returnFocus = (event: Event) => {
+    const back = menuReturn?.focus?.isConnected
+      ? menuReturn.focus
+      : menuReturn?.header?.querySelector(".side-panel-tab[data-selected] .side-panel-tab-select");
+    if (!(back instanceof HTMLElement)) return;
+    event.preventDefault();
+    back.focus();
+  };
   return (
     <ContextMenu.Root>
       <SidePanelTabRow {...props} onTabMenu={pickMenuTab} onTabMenuPress={pickTouchMenuTab} />
       <ContextMenu.Portal>
-        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")}>
+        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")} onCloseAutoFocus={returnFocus}>
           <Show when={menuThread()}>
             {(thread) => (
               <>
@@ -271,7 +297,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               </>
             )}
           </Show>
-          <Show when={menuTab()}>
+          <Show when={liveMenuTab()}>
             <ContextMenu.Item class="side-panel-menu-item" onSelect={closeMenuTab}>
               <X aria-hidden="true" />
               {t("conversation.threads.closeTab")}
