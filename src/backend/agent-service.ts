@@ -177,6 +177,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { AgentActivityController } from "./agent/agent-activity-controller";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, AgentRemovalFailed } from "./agent/agent-removal";
 import { AgentSettingsRefused } from "./agent/agent-settings-refused";
@@ -681,7 +682,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #boot: BootRecovery;
   readonly #deltas: DeltaBuffer;
   readonly #turn: TurnLifecycle;
-  readonly #agentActivity = new Map<string, AgentActivity>();
+  readonly #agentActivity = new AgentActivityController({
+    waitsForPerson: (agentId) => this.#attention.waitsFor(agentId).length > 0,
+    runsWork: (agentId) =>
+      this.#conversation.anyWorkingSnapshot(agentId) !== undefined || this.#turn.hasRunningSubagents(agentId),
+  });
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
   readonly #removal: AgentRemoval;
@@ -2377,23 +2382,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#attention.localAttention(agentId);
   }
 
-  getAgentActivity(agentId: string): AgentActivity {
-    const state = this.#agentActivityState(agentId);
-    const recorded = this.#agentActivity.get(agentId);
-    return recorded?.state === state ? recorded : { state, since: null };
-  }
-
-  #agentActivityState(agentId: string): AgentActivity["state"] {
-    if (this.#attention.waitsFor(agentId).length > 0) return "waiting";
-    if (this.#conversation.anyWorkingSnapshot(agentId) || this.#turn.hasRunningSubagents(agentId)) return "busy";
-    return "idle";
-  }
-
-  #recordAgentActivity(agentId: string): void {
-    const state = this.#agentActivityState(agentId);
-    const previous = this.#agentActivity.get(agentId);
-    if (previous?.state === state || (!previous && state === "idle")) return;
-    this.#agentActivity.set(agentId, { state, since: new Date().toISOString() });
+  getAgentActivity(agentId: string) {
+    return this.#agentActivity.read(agentId);
   }
 
   respondToLocalAttention(agentId: string, input: LocalAttentionResponse): Effect.Effect<void, AgentLifecycleFailed> {
@@ -7545,31 +7535,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
     // Observe work before an execution lane consumes its events.
-    switch (event.type) {
-      case "turn-started":
-      case "turn-completed":
-      case "prompt":
-      case "agent-input-resolved":
-      case "browser-takeover-resolved":
-        this.#recordAgentActivity(event.agentId);
-        break;
-      case "approval":
-        this.#recordAgentActivity(event.approval.agentId);
-        break;
-      case "browser-takeover-requested":
-        this.#recordAgentActivity(event.request.agentId);
-        break;
-      case "runtime-snapshot":
-        // Background subagents can finish after their parent turn.
-        for (const agentId of this.#agentActivity.keys()) this.#recordAgentActivity(agentId);
-        break;
-      case "agents-changed": {
-        const agentIds = new Set(event.agents.map((agent) => agent.id));
-        for (const agentId of this.#agentActivity.keys())
-          if (!agentIds.has(agentId)) this.#agentActivity.delete(agentId);
-        break;
-      }
-    }
+    this.#agentActivity.observe(event);
     // The account in use is not saved: a new reading, as at start, sets it again.
     if (event.type === "usage-changed") for (const provider of AGENT_PROVIDERS) this.#refreshPoolInUse(provider);
     this.#liveVoice?.observe(event);
@@ -7616,11 +7582,6 @@ const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
 /** Why `#usageLimitMove` changes an agent's model, when it is not the switch for a usage limit. */
 type ModelMove = "return" | "provider-error" | "next-turn";
-
-interface AgentActivity {
-  state: "idle" | "busy" | "waiting";
-  since: string | null;
-}
 
 /** The fields of an update that a queued `pendingRuntime` holds. */
 const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([

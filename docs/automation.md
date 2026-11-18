@@ -118,8 +118,8 @@ The agents that allow local scripts, with their routines and activity:
 ```
 
 - `waiting` means a turn needs a person to answer a question, decide on an approval, or finish a
-  browser takeover. This state takes priority if another thread still runs. A detached question
-  that does not block work does not count.
+  browser takeover. A takeover counts after OpenBot presents its card. This state takes priority
+  if another thread still runs. A detached question that does not block work does not count.
 - `busy` means a turn or a background subagent is running in any of the agent's threads.
 - `idle` means no turn or background subagent is running and no turn waits for a person. Queued
   work, including work held by a provider limit, can still exist.

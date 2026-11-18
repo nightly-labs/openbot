@@ -84,12 +84,13 @@ const browserLog: string[] = [];
 const submitted: string[] = [];
 /** When set, the fill fails with this error, as a page that the fill cannot complete. */
 let fillFailure: Error | undefined;
+let vaultRead: (() => Promise<string>) | undefined;
 
 function preparedSecret(): PreparedBrowserSecret {
   return {
     request: { method: "password", origin: "https://example.test", digits: 6 },
     agentScriptedOrigin: false,
-    vaultFillable: false,
+    vaultFillable: vaultRead !== undefined,
     withCode: false,
     submit: (secret) =>
       fillFailure
@@ -129,6 +130,12 @@ const registry = new AttentionRegistry({
   emit: (event) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},
+  passwordVault: {
+    connected: () => vaultRead !== undefined,
+    loginsFor: () =>
+      Effect.succeed([{ id: "openbot:e2e", title: "Test login", username: null, hasOneTimePassword: false }]),
+    secretFor: () => Effect.promise(() => vaultRead?.() ?? Promise.resolve(null)),
+  },
   lateAnswerTarget: () => ({}),
 });
 
@@ -147,7 +154,15 @@ function call(tool: "submit_secret" | "request_takeover", turnId: string, answer
         callId: `call-${id}`,
         namespace: "openbot_browser",
         tool,
-        arguments: { tabId: TAB },
+        arguments:
+          tool === "submit_secret"
+            ? {
+                tabId: TAB,
+                method: "password",
+                submission: "on_input",
+                targets: [{ kind: "ref", ref: "e1", revision: 1 }],
+              }
+            : { tabId: TAB },
       },
       ...(answerBeforeMs === undefined ? {} : { answerBeforeMs }),
     }),
@@ -188,6 +203,42 @@ await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
 try {
+  await step("a delayed automatic Vault fill does not require a person", async () => {
+    const started = Promise.withResolvers<void>();
+    const password = Promise.withResolvers<string>();
+    const shown = count("browser-takeover-requested");
+    vaultRead = () => {
+      started.resolve();
+      return password.promise;
+    };
+    const pending = call("submit_secret", "turn-autofill");
+    const unexpectedCard = AbortSignal.timeout(5_000);
+    try {
+      await Promise.race([
+        started.promise,
+        pending.then(() => assert.fail("The tool finished before it read the Vault.")),
+        new Promise<never>((_resolve, reject) => {
+          unexpectedCard.addEventListener("abort", () => reject(new Error("The Vault read did not start.")), {
+            once: true,
+          });
+        }),
+      ]);
+      assert.equal(count("browser-takeover-requested"), shown);
+      assert.deepEqual(registry.waitsFor(AGENT), [], "An automatic Vault read does not need a person.");
+    } finally {
+      password.resolve(VAULT_SECRET);
+      if (count("browser-takeover-requested") !== shown) registry.clearForTurn(THREAD, "turn-autofill", false);
+      await pending;
+      vaultRead = undefined;
+      submitted.length = 0;
+    }
+    assert.equal(answerOf(await pending).status, "completed");
+    assert.equal(count("browser-takeover-requested"), shown, "The fill completed without a card.");
+    assert.deepEqual(registry.waitsFor(AGENT), []);
+    events.length = 0;
+    browserLog.length = 0;
+  });
+
   await step("a password card stays open after its call gets the deadline answer", async () => {
     const shown = count("browser-takeover-requested");
     const first = answerOf(await call("submit_secret", "turn-1", DEADLINE_MS));
@@ -195,6 +246,7 @@ try {
     assert.equal(first.status, "waiting");
     assert.match(first.next ?? "", /Call submit_secret again now with tabId "tab-1"/);
     assert.equal(count("browser-takeover-requested"), shown + 1, "the card was shown once");
+    assert.deepEqual(registry.waitsFor(AGENT), ["browser"], "A published card requires a person.");
     assert.equal(count("browser-takeover-resolved"), 0, "the card was closed");
     assert.equal(openCards().length, 1);
     assert.equal(openCards()[0]?.secret?.method, "password", "the card lost its password form");
@@ -220,6 +272,7 @@ try {
     assert.equal(count("browser-takeover-resolved"), 1);
     assert.deepEqual(submitted, [SECRET]);
     assert.equal(openCards().length, 0);
+    assert.deepEqual(registry.waitsFor(AGENT), []);
     assert(!JSON.stringify(answer).includes(SECRET), "the agent got the secret");
     return answer;
   });
