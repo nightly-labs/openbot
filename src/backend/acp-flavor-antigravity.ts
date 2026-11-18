@@ -85,6 +85,9 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
   return null;
 }
 
+/** Go's text for a connection to Google that dropped. */
+const GEMINI_NETWORK_FAILURE = /\bconnection reset by peer\b|\bunexpected EOF\b/u;
+
 /**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
  * sign-in on 1.4.1 or later, so a limit often has no usage notice to explain it, and the raw Google
@@ -116,8 +119,18 @@ const GEMINI_REQUEST_FAILURES = [
   // Go's text when the connection to Google drops during a request, after the CLI's own retries. The
   // chat showed the Google URL and the IP addresses, and the user did not know that a new try helps
   // (#7374, #8042). Last, so that a status that Google sent keeps its own kind.
-  ["error.provider.antigravityNetwork", /\bconnection reset by peer\b|\bunexpected EOF\b/u],
+  ["error.provider.antigravityNetwork", GEMINI_NETWORK_FAILURE],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
+
+/**
+ * The message for a failure of `GEMINI_REQUEST_FAILURES`. A network failure names only its cause,
+ * such as "connection reset by peer": the rest of Go's text is a URL and IP addresses.
+ */
+function geminiRequestFailureText(key: (typeof GEMINI_REQUEST_FAILURES)[number][0], text: string): string {
+  if (key === "error.provider.antigravityNetwork")
+    return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
+  return sourceText(key, { detail: shownFailureDetail(text) });
+}
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */
 function geminiTurnFailure(answer: string): string {
@@ -129,7 +142,7 @@ function geminiTurnFailure(answer: string): string {
   // The server's text names its harness and a WebSocket close code, which the user cannot act on.
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text)) return sourceText("error.provider.antigravityConnectionLost");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
+  return key ? geminiRequestFailureText(key, text) : shownFailureDetail(text);
 }
 
 /** Only a failure the server answered with: a local failure is not Google's to explain. */
@@ -137,7 +150,7 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
+  return key ? geminiRequestFailureText(key, reason) : detail;
 }
 
 /** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */

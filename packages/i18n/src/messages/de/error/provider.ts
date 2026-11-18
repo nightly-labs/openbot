@@ -279,7 +279,7 @@ export const messages = {
   "error.provider.antigravityRequestRejected":
     "Gemini hat diese Anfrage abgelehnt. Wähle ein anderes Modell und sende deine Nachricht erneut. Wenn es wieder fehlschlägt, starte einen neuen Chat.\n{detail}",
   "error.provider.antigravityNetwork":
-    "Die Verbindung zu Gemini wurde unterbrochen, bevor die Antwort fertig war. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und sende deine Nachricht dann erneut.\n{detail}",
+    "Gemini hat die Verbindung zu Google verloren. Sende deine Nachricht erneut. ({cause})",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
   "error.provider.antigravityRemoteWindowsSignIn":

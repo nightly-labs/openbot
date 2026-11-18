@@ -272,7 +272,7 @@ export const messages = {
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
   "error.provider.antigravityNetwork":
-    "回答が完了する前に Gemini との接続が切れました。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、メッセージをもう一度送信してください。\n{detail}",
+    "Gemini と Google の接続が切れました。メッセージをもう一度送信してください。({cause})",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
