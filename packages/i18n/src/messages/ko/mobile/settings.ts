@@ -128,6 +128,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "투명한 말풍선",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "에이전트 말풍선과 색이 없는 말풍선 뒤로 배경이 비쳐 보입니다. 배경이 없으면 말풍선은 항상 불투명합니다.",
+  "mobile.settings.appearance.tab.colors": "색상",
+  "mobile.settings.appearance.tab.chat": "채팅",
+  "mobile.settings.appearance.preview.routines": "루틴 실행 3회",
+  "mobile.settings.appearance.preview.thinking": "4초 동안 생각함",
+  "mobile.settings.appearance.preview.memory": "기억 1개 저장됨",
   "mobile.settings.appearance.backdrop.title": "배경",
   "mobile.settings.appearance.backdrop.footer":
     "이 휴대폰의 홈과 채팅 뒤에 표시돼요. 에이전트가 대신 설정할 수도 있고, 채팅에서 실행 취소를 누르면 이전 배경으로 돌아가요.",

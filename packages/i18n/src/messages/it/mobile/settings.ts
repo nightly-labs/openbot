@@ -130,6 +130,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Bolle trasparenti",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Le bolle dell’agente e le bolle senza colore lasciano vedere lo sfondo. Senza sfondo, le bolle sono sempre piene.",
+  "mobile.settings.appearance.tab.colors": "Colori",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 esecuzioni di routine",
+  "mobile.settings.appearance.preview.thinking": "Ha pensato per 4 secondi",
+  "mobile.settings.appearance.preview.memory": "1 ricordo salvato",
   "mobile.settings.appearance.backdrop.title": "Sfondo",
   "mobile.settings.appearance.backdrop.footer":
     "Appare dietro la Home e le tue chat su questo telefono. Un agente può impostarne uno per te; Annulla nella chat ripristina quello precedente.",

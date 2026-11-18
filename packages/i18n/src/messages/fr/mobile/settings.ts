@@ -131,6 +131,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Bulles transparentes",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Les bulles de l’agent et les bulles sans couleur laissent voir l’arrière-plan. Sans arrière-plan, les bulles restent toujours opaques.",
+  "mobile.settings.appearance.tab.colors": "Couleurs",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 exécutions de routine",
+  "mobile.settings.appearance.preview.thinking": "A réfléchi 4 secondes",
+  "mobile.settings.appearance.preview.memory": "1 souvenir enregistré",
   "mobile.settings.appearance.backdrop.title": "Arrière-plan",
   "mobile.settings.appearance.backdrop.footer":
     "S’affiche derrière l’accueil et vos chats sur ce téléphone. Un agent peut en choisir un pour vous. Annuler dans le chat remet l’ancien.",

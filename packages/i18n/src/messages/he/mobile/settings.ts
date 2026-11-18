@@ -127,6 +127,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "בועות שקופות",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "בועות של הסוכן ובועות בלי צבע מראות דרכן את הרקע. בלי רקע, הבועות תמיד אטומות.",
+  "mobile.settings.appearance.tab.colors": "צבעים",
+  "mobile.settings.appearance.tab.chat": "צ'אט",
+  "mobile.settings.appearance.preview.routines": "3 הרצות של שגרה",
+  "mobile.settings.appearance.preview.thinking": "חשב 4 שניות",
+  "mobile.settings.appearance.preview.memory": "נשמר זיכרון אחד",
   "mobile.settings.appearance.backdrop.title": "רקע",
   "mobile.settings.appearance.backdrop.footer":
     "מוצג מאחורי מסך הבית והצ'אטים שלך בטלפון הזה. סוכן יכול להגדיר רקע בשבילך; ביטול בצ'אט מחזיר את הקודם.",

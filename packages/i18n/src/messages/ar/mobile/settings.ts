@@ -142,6 +142,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "فقاعات شفافة",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "تُظهر فقاعات الوكيل والفقاعات غير الملوّنة الخلفية من خلالها. بدون خلفية، تبقى الفقاعات مصمتة دائمًا.",
+  "mobile.settings.appearance.tab.colors": "الألوان",
+  "mobile.settings.appearance.tab.chat": "الدردشة",
+  "mobile.settings.appearance.preview.routines": "3 تشغيلات روتينية",
+  "mobile.settings.appearance.preview.thinking": "فكّر لمدة 4 ثوانٍ",
+  "mobile.settings.appearance.preview.memory": "حُفظت ذكرى واحدة",
   "mobile.settings.appearance.backdrop.title": "الخلفية",
   "mobile.settings.appearance.backdrop.footer":
     "تظهر خلف الشاشة الرئيسية ودردشاتك على هذا الهاتف. يمكن لوكيل تعيينها لك، ويعيد «تراجع» في الدردشة الخلفية السابقة.",

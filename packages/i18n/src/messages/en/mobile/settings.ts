@@ -128,6 +128,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.seeThroughBubbles": "See-through bubbles",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Agent bubbles and bubbles with no color let the backdrop show through. With no backdrop, bubbles are always solid.",
+  "mobile.settings.appearance.tab.colors": "Colors",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 routine runs",
+  "mobile.settings.appearance.preview.thinking": "Thought for 4 seconds",
+  "mobile.settings.appearance.preview.memory": "Saved 1 memory",
   "mobile.settings.appearance.backdrop.title": "Backdrop",
   "mobile.settings.appearance.backdrop.footer":
     "Shows behind Home and your chats on this phone. An agent can set one for you; Undo in the chat puts the old one back.",

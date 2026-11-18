@@ -129,6 +129,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Saydam balonlar",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Ajan balonlarının ve renksiz balonların arkasından arka plan görünür. Arka plan yoksa balonlar her zaman opaktır.",
+  "mobile.settings.appearance.tab.colors": "Renkler",
+  "mobile.settings.appearance.tab.chat": "Sohbet",
+  "mobile.settings.appearance.preview.routines": "3 rutin çalıştırması",
+  "mobile.settings.appearance.preview.thinking": "4 saniye düşündü",
+  "mobile.settings.appearance.preview.memory": "1 anı kaydedildi",
   "mobile.settings.appearance.backdrop.title": "Arka plan",
   "mobile.settings.appearance.backdrop.footer":
     "Bu telefonda Ana ekranın ve sohbetlerinizin arkasında görünür. Bir ajan sizin için ayarlayabilir; sohbetteki Geri al eskisini geri getirir.",

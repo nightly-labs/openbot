@@ -389,6 +389,16 @@ respective media or identity roles. Do not replace these with foreground/backgro
 - Favor composition and shared variants over copying styled JSX between screens.
 - Keep status and instructional copy evidence-based. Do not introduce badges, alerts, or lifecycle requirements that cannot be derived from the actual session, connectivity, or persistence implementation.
 
+### Appearance settings
+
+Settings › Appearance is a Studio: a live preview of a chat (`AppearancePreview`), then four tabs
+(`UsageSegments`): Theme (theme, text size, app icon), Colors (message color, bubble style, chat
+background), Backdrop (scene, strength, See-through bubbles) and Chat (reply details, routine
+collapse, full visuals). Each tab holds the sections of one topic, so the page stays short. The
+preview follows every setting, the text size too, so add a new appearance setting to a tab and to
+the preview when it changes how a chat looks. The preview and the tabs scroll with the page: a
+sticky header would stick under the native bar.
+
 ### Backdrop
 
 The backdrop of Settings › Appearance (`features/settings/model/chat-backdrop.ts`) is the desktop
@@ -421,7 +431,7 @@ window backdrop in the Ambient look: a quiet layer, not a wallpaper.
   base, so nothing shows through it and a chat with no backdrop looks as before. The card of a table
   out of a bubble does the same (`useSolidChatFill` in `chat-bubble-fill.tsx`). The See-through
   bubbles switch in the Backdrop section of Settings › Appearance brings back the translucent fill,
-  only while a backdrop shows; the backdrop preview shows it. Do not add glass to bubbles.
+  only while a backdrop shows; the Appearance preview shows it. Do not add glass to bubbles.
 
 ## Development workflow
 

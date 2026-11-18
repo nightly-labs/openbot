@@ -3,19 +3,15 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
 import Ban from "lucide-react-native/icons/ban";
 import ImageIcon from "lucide-react-native/icons/image";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
-import { useCSSVariable, useUniwind } from "uniwind";
-import { ChatBackdropLayer, useChatBackdropBase } from "@/features/chat/components/chat-backdrop-layer";
+import { useCSSVariable } from "uniwind";
 import { ChatBackdropSceneView } from "@/features/chat/components/chat-backdrop-scene";
 import { HtmlPage } from "@/features/chat/components/html-page";
-import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import {
@@ -27,13 +23,7 @@ import {
   saveChatBackdrop,
   useChatBackdrop,
 } from "@/features/settings/model/chat-backdrop";
-import {
-  mixColor,
-  PLAIN_BUBBLE_SHARE,
-  saveMessageColor,
-  tintedMessageColor,
-  useMessageColor,
-} from "@/features/settings/model/message-color";
+import { saveMessageColor, useMessageColor } from "@/features/settings/model/message-color";
 import { PauseSlider } from "@/features/voice/components/pause-slider";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -48,8 +38,6 @@ const SCENE_LABELS = {
 
 /** The size of the round picture of each choice. */
 const DOT = 28;
-/** The height of the preview: a question and the start of a reply. */
-const PREVIEW_HEIGHT = 196;
 
 /** The file extension of a picked photo, from its name or type. */
 function photoExtension(asset: ImagePicker.ImagePickerAsset): string {
@@ -70,64 +58,12 @@ function Dot({ children }: { children: ReactNode }) {
 }
 
 /**
- * A short chat over the backdrop, so the strength, the bubble color and See-through bubbles show
- * before the reader opens a chat. It uses the same layer as the chat.
- */
-function BackdropPreview({ active }: { active: boolean }) {
-  const { t } = useText();
-  const dark = useUniwind().theme === "dark";
-  const mode = useMessageColor((state) => state.mode);
-  const customColor = useMessageColor((state) => state.customColor);
-  const style = useMessageColor((state) => state.style);
-  const pageColor = useChatBackdrop((state) =>
-    state.choice === "agent" ? state.agentPage?.bubbles?.yours : undefined,
-  );
-  const [surface, control] = useCSSVariable(["--openbot-bg-surface", "--openbot-bg-control"]);
-  const seeThrough = useMessageColor((state) => state.seeThrough);
-  const background = String(useThemeColor("background"));
-  const backdropBase = useChatBackdropBase();
-  const base = backdropBase ?? background;
-  // A bubble with no color and an agent bubble, as the chat draws them: solid on the backdrop base, or
-  // see-through. With no backdrop, bubbles are always solid.
-  const plain =
-    seeThrough && backdropBase !== null
-      ? `${String(control)}99`
-      : (mixColor(base, String(control), PLAIN_BUBBLE_SHARE) ?? String(control));
-  // A sample agent color: the violet preset of the desktop picker.
-  const solid = pageColor ?? (mode === "custom" ? customColor : "#b474f4");
-  const bubble =
-    mode === "none" && !pageColor ? plain : style === "tint" ? tintedMessageColor(solid, String(surface), dark) : solid;
-  return (
-    <View
-      className="mx-4 my-3 overflow-hidden rounded-3xl border border-border bg-background"
-      style={{ height: PREVIEW_HEIGHT, borderCurve: "continuous" }}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <ChatBackdropLayer variant="preview" active={active} />
-      <View className="flex-1 justify-end gap-2 p-4">
-        <View className="max-w-[80%] self-end rounded-2xl px-3 py-2" style={{ backgroundColor: bubble }}>
-          <Typography type="body-sm" style={{ color: readableOn(bubble) }}>
-            {t("mobile.settings.appearance.backdrop.previewQuestion")}
-          </Typography>
-        </View>
-        <View className="max-w-[85%] self-start rounded-2xl px-3 py-2" style={{ backgroundColor: plain }}>
-          <Typography type="body-sm" className="text-foreground">
-            {t("mobile.settings.appearance.backdrop.previewAnswer")}
-          </Typography>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/**
  * Settings › Appearance › Backdrop: the scene behind Home and the chats on this phone, as the desktop
- * window backdrop. It shows a preview, the choices and how strong the scene is.
+ * window backdrop: the choices, how strong the scene is and See-through bubbles. The preview at the
+ * top of Appearance (`AppearancePreview`) shows them.
  */
 export function ChatBackdropSection({ dark }: { dark: boolean }) {
   const { t } = useText();
-  const focused = useIsFocused();
   const ready = useChatBackdrop((state) => state.ready);
   const choice = useChatBackdrop((state) => state.choice);
   const strength = useChatBackdrop((state) => state.strength);
@@ -235,7 +171,6 @@ export function ChatBackdropSection({ dark }: { dark: boolean }) {
         title={t("mobile.settings.appearance.backdrop.title")}
         footer={error ?? t("mobile.settings.appearance.backdrop.footer")}
       >
-        <BackdropPreview active={focused} />
         {options.map((option) => (
           <SettingsRow
             key={option.id}

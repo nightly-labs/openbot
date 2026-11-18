@@ -134,6 +134,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Burbujas transparentes",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Las burbujas del agente y las burbujas sin color dejan ver el fondo. Sin fondo, las burbujas son siempre opacas.",
+  "mobile.settings.appearance.tab.colors": "Colores",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 ejecuciones de rutina",
+  "mobile.settings.appearance.preview.thinking": "Pensó durante 4 segundos",
+  "mobile.settings.appearance.preview.memory": "1 recuerdo guardado",
   "mobile.settings.appearance.backdrop.title": "Fondo",
   "mobile.settings.appearance.backdrop.footer":
     "Se muestra detrás de Inicio y de tus chats en este teléfono. Un agente puede elegir uno por ti; Deshacer en el chat recupera el anterior.",

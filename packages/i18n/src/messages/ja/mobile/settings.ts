@@ -130,6 +130,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "透ける吹き出し",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "エージェントの吹き出しと色のない吹き出しから背景が透けて見えます。背景がないときは、吹き出しは常に不透明です。",
+  "mobile.settings.appearance.tab.colors": "カラー",
+  "mobile.settings.appearance.tab.chat": "チャット",
+  "mobile.settings.appearance.preview.routines": "ルーティンの実行 3 回",
+  "mobile.settings.appearance.preview.thinking": "4 秒間考えました",
+  "mobile.settings.appearance.preview.memory": "記憶を 1 件保存しました",
   "mobile.settings.appearance.backdrop.title": "背景",
   "mobile.settings.appearance.backdrop.footer":
     "このスマートフォンのホームとチャットの後ろに表示されます。エージェントが設定することもでき、チャットの「元に戻す」で前の背景に戻せます。",

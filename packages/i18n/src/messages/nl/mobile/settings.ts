@@ -129,6 +129,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Doorzichtige ballonnen",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Agentballonnen en ballonnen zonder kleur laten de achtergrond doorschijnen. Zonder achtergrond zijn ballonnen altijd dekkend.",
+  "mobile.settings.appearance.tab.colors": "Kleuren",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 routineruns",
+  "mobile.settings.appearance.preview.thinking": "4 seconden nagedacht",
+  "mobile.settings.appearance.preview.memory": "1 herinnering opgeslagen",
   "mobile.settings.appearance.backdrop.title": "Achtergrond",
   "mobile.settings.appearance.backdrop.footer":
     "Staat achter Home en je chats op deze telefoon. Een agent kan er een voor je instellen; met Ongedaan maken in de chat komt de oude terug.",

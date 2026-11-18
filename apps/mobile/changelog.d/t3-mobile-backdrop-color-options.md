@@ -11,5 +11,7 @@
 
 ### Changed
 
+- Settings › Appearance is shorter: a live preview of a chat, then four tabs (Theme, Colors, Backdrop
+  and Chat) with the settings of each topic.
 - Chat bubbles are now solid, so a backdrop does not show through them. To get the old see-through
   bubbles over a backdrop, turn on See-through bubbles in Settings › Appearance › Backdrop.

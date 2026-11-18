@@ -131,6 +131,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Balões transparentes",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Os balões do agente e os balões sem cor deixam ver o fundo. Sem fundo, os balões são sempre opacos.",
+  "mobile.settings.appearance.tab.colors": "Cores",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 execuções de rotina",
+  "mobile.settings.appearance.preview.thinking": "Pensou por 4 segundos",
+  "mobile.settings.appearance.preview.memory": "1 memória salva",
   "mobile.settings.appearance.backdrop.title": "Fundo",
   "mobile.settings.appearance.backdrop.footer":
     "Aparece atrás do Início e dos seus chats neste celular. Um agente pode definir um para você; Desfazer no chat traz o anterior de volta.",

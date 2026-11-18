@@ -139,6 +139,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Przezroczyste dymki",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Przez dymki agenta i dymki bez koloru widać tło. Bez tła dymki są zawsze nieprzezroczyste.",
+  "mobile.settings.appearance.tab.colors": "Kolory",
+  "mobile.settings.appearance.tab.chat": "Czat",
+  "mobile.settings.appearance.preview.routines": "3 uruchomienia rutyny",
+  "mobile.settings.appearance.preview.thinking": "Myślał przez 4 sekundy",
+  "mobile.settings.appearance.preview.memory": "Zapisano 1 wspomnienie",
   "mobile.settings.appearance.backdrop.title": "Tło",
   "mobile.settings.appearance.backdrop.footer":
     "Widać je za ekranem głównym i czatami na tym telefonie. Agent może je dla ciebie ustawić; Cofnij w czacie przywraca poprzednie.",

@@ -124,6 +124,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "透明气泡",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "助手气泡和没有颜色的气泡会透出背景。没有背景时，气泡始终不透明。",
+  "mobile.settings.appearance.tab.colors": "颜色",
+  "mobile.settings.appearance.tab.chat": "聊天",
+  "mobile.settings.appearance.preview.routines": "3 次例行任务运行",
+  "mobile.settings.appearance.preview.thinking": "思考了 4 秒",
+  "mobile.settings.appearance.preview.memory": "已保存 1 条记忆",
   "mobile.settings.appearance.backdrop.title": "背景",
   "mobile.settings.appearance.backdrop.footer":
     "显示在此手机的主页和聊天后面。助手可以为你设置背景；在聊天中点“撤销”可恢复之前的背景。",

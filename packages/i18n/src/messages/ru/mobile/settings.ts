@@ -139,6 +139,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Прозрачные пузыри",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Сквозь пузыри агента и пузыри без цвета виден фон. Без фона пузыри всегда непрозрачные.",
+  "mobile.settings.appearance.tab.colors": "Цвета",
+  "mobile.settings.appearance.tab.chat": "Чат",
+  "mobile.settings.appearance.preview.routines": "3 запуска рутины",
+  "mobile.settings.appearance.preview.thinking": "Думал 4 секунды",
+  "mobile.settings.appearance.preview.memory": "Сохранено 1 воспоминание",
   "mobile.settings.appearance.backdrop.title": "Фон",
   "mobile.settings.appearance.backdrop.footer":
     "Показывается за главным экраном и чатами на этом телефоне. Агент может установить его за вас; «Отменить» в чате вернёт прежний.",

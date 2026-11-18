@@ -134,6 +134,11 @@ export const messages = {
   "mobile.settings.appearance.seeThroughBubbles": "Durchsichtige Blasen",
   "mobile.settings.appearance.seeThroughBubblesNote":
     "Agentenblasen und Blasen ohne Farbe lassen den Hintergrund durchscheinen. Ohne Hintergrund sind Blasen immer deckend.",
+  "mobile.settings.appearance.tab.colors": "Farben",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 Routinenläufe",
+  "mobile.settings.appearance.preview.thinking": "4 Sekunden nachgedacht",
+  "mobile.settings.appearance.preview.memory": "1 Erinnerung gespeichert",
   "mobile.settings.appearance.backdrop.title": "Hintergrund",
   "mobile.settings.appearance.backdrop.footer":
     "Erscheint auf diesem Telefon hinter dem Startbildschirm und deinen Chats. Ein Agent kann ihn für dich festlegen; „Rückgängig“ im Chat stellt den alten wieder her.",
