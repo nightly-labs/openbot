@@ -19,7 +19,7 @@
  * - `account-cap`: an account with 300 active sites gets no more on its pool or plan servers, but its
  *   custom-limit server still gets sites.
  * - `replace-retry`: two failed replaces of a site fill the upload slots. A third replace of that site frees
- *   them and publishes; the uploads of new sites keep their slots (#11929).
+ *   the oldest one and publishes; the uploads of new sites keep their slots (#11929).
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -463,11 +463,16 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       retry.ok,
       retry.ok ? retry.upload.uploadId : `${retry.status} ${retry.code}: ${retry.message}`,
     );
-    const [stale] = failed;
+    // One free slot is enough, so only the oldest replace is closed.
+    const [stale, newer] = failed;
     if (stale?.ok) {
       const put = await account.put(stale.upload, stale.body);
       const code = put.ok ? "accepted" : errorSchema.parse(await put.json()).error.code;
-      record("replace-retry", "the older replace is closed", code === "upload_expired", code);
+      record("replace-retry", "the oldest replace is closed", code === "upload_expired", code);
+    }
+    if (newer?.ok) {
+      const put = await account.put(newer.upload, newer.body);
+      record("replace-retry", "the newer replace stays open", put.ok, String(put.status));
     }
     if (retry.ok) {
       expectPublished("replace-retry", "the third replace publishes", await account.finish(retry.upload, retry.body));
