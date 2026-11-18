@@ -4,10 +4,13 @@ import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+
+const logger = createOpenBotLogger("team-webrtc-bridge");
 
 export type TeamWebRtcChannel = "rpc" | "events" | "files" | "desktop";
 
@@ -34,7 +37,11 @@ interface TeamWebRtcBridgeEvents {
     },
   ];
   connected: [peerId: string, binding?: { localFingerprint: string; remoteFingerprint: string }];
-  disconnected: [peerId: string];
+  /**
+   * The peer closed. `bridgeLost`: the hidden window is gone, so each peer that it had closed
+   * together, also a host peer. The next `start` loads a new window.
+   */
+  disconnected: [peerId: string, bridgeLost?: boolean];
   /**
    * A host child peer stopped getting ICE consent answers, as when iOS suspends the phone app. The
    * peer stays open: the phone can come back on it. `pathRestored` follows when it does.
@@ -57,6 +64,8 @@ interface TeamWebRtcBridgeOptions {
   developmentUrl?: string | null | undefined;
   preloadPath?: string;
   iceTransportPolicy?: "all" | "relay";
+  /** True once the app quits. A quit can close the window with no teardown, as at a Windows session end. */
+  quitting?: () => boolean;
 }
 
 // The envelope the hidden peer window posts back, not the Signal protocol - it is one flat bag
@@ -131,6 +140,12 @@ type BridgeCommand =
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
+// After the hidden window is lost, the first new window loads at once. A window that is lost again
+// within `LOSS_RESET_AFTER_MS` makes the next load wait, and the wait doubles up to `LOSS_DELAY_LIMIT_MS`.
+// Without it, a renderer that stops at each load would load a new one in a tight loop.
+const LOSS_DELAY_MS = 2_000;
+const LOSS_DELAY_LIMIT_MS = 5 * 60_000;
+const LOSS_RESET_AFTER_MS = 10 * 60_000;
 
 export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   readonly #options: TeamWebRtcBridgeOptions;
@@ -141,6 +156,11 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   #scope = Scope.makeUnsafe();
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #iceServers = new Map<string, RemoteDesktopIceServer[]>();
+  // The peers of the window now. When the window is lost, each one gets `disconnected`.
+  readonly #peers = new Set<string>();
+  // The losses of the window in a row, and when the last one occurred.
+  #losses = 0;
+  #lostAt = 0;
 
   constructor(options: TeamWebRtcBridgeOptions = {}) {
     super();
@@ -173,6 +193,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     },
   ) {
     yield* this.start();
+    this.#peers.add(input.peerId);
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
   }).bind(this);
 
@@ -203,6 +224,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   }).bind(this);
 
   readonly disconnect = Effect.fn("TeamWebRtcBridge.disconnect")(function* (this: TeamWebRtcBridge, peerId: string) {
+    this.#peers.delete(peerId);
     if (this.#port) yield* this.#command({ type: "disconnect", peerId });
   }).bind(this);
 
@@ -210,6 +232,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     this: TeamWebRtcBridge,
     peerId: string,
   ) {
+    this.#peers.delete(peerId);
     if (this.#port) yield* this.#command({ type: "disconnect-peer", peerId });
   }).bind(this);
 
@@ -282,16 +305,50 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   #reset(message: string): void {
     this.#port?.close();
     this.#port = null;
-    this.#window?.destroy();
+    // Cleared before `destroy`: the `closed` event of this window must not read as a loss.
+    const window = this.#window;
     this.#window = null;
+    if (window && !window.isDestroyed()) window.destroy();
     this.#iceServers.clear();
+    this.#peers.clear();
     for (const pending of this.#pending.values()) {
       Deferred.doneUnsafe(pending, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
     }
     this.#pending.clear();
   }
 
+  // The renderer of the hidden window stopped, or the window closed, and the bridge did not ask for
+  // it. Each Signal socket and peer of the window is gone, and no message tells it. Without this, the
+  // bridge kept the dead port: each command waited for its timeout, and the host stayed `online`
+  // with no Signal registration until the app restarted.
+  #lose(window: BrowserWindow, reason: string): void {
+    if (this.#window !== window) return;
+    // A stop or a quit ends the window as expected. The pending commands, such as the `close` of the
+    // stop, still fail at once, but nothing connects again.
+    if (this.#stopping || this.#options.quitting?.()) {
+      this.#ready = null;
+      this.#reset(sourceText("error.remote.bridgeStopped"));
+      return;
+    }
+    const peers = [...this.#peers];
+    const now = Date.now();
+    this.#losses = now - this.#lostAt > LOSS_RESET_AFTER_MS ? 1 : this.#losses + 1;
+    this.#lostAt = now;
+    logger.warn(`The Team WebRTC bridge window is gone (${reason}); ${peers.length} peers closed.`);
+    this.#ready = null;
+    this.#reset(sourceText("error.remote.bridgeStopped"));
+    for (const peerId of peers) this.emit("disconnected", peerId, true);
+  }
+
+  #lossDelay(): number {
+    if (this.#losses < 2) return 0;
+    const delay = Math.min(LOSS_DELAY_MS * 2 ** (this.#losses - 2), LOSS_DELAY_LIMIT_MS);
+    return Math.max(0, this.#lostAt + delay - Date.now());
+  }
+
   readonly #start = Effect.fn("TeamWebRtcBridge.load")(function* (this: TeamWebRtcBridge) {
+    const delay = this.#lossDelay();
+    if (delay > 0) yield* Effect.sleep(delay);
     const window = yield* remoteDecode(
       () =>
         new BrowserWindow({
@@ -306,12 +363,18 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         }),
     );
     this.#window = window;
-    yield* remoteDecode(() => window.webContents.setWindowOpenHandler(() => ({ action: "deny" })));
+    yield* remoteDecode(() => {
+      window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      window.webContents.on("render-process-gone", (_event, details) => this.#lose(window, details.reason));
+      window.on("closed", () => this.#lose(window, "closed"));
+    });
     yield* remoteCall(() =>
       this.#options.developmentUrl
         ? window.loadURL(new URL("team-webrtc.html", `${this.#options.developmentUrl}/`).toString())
         : window.loadURL("openbot-app://app/team-webrtc.html"),
     );
+    if (this.#window !== window)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeDidNotStart")) });
     const { port1, port2 } = yield* remoteDecode(() => new MessageChannelMain());
     this.#port = port1;
     const ready = Deferred.makeUnsafe<void>();
@@ -393,6 +456,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       return;
     }
     if (!message.peerId) return;
+    if (message.type === "peer-disconnected") this.#peers.delete(message.peerId);
+    else this.#peers.add(message.peerId);
     if (
       message.type === "incoming-peer" &&
       message.hostId &&

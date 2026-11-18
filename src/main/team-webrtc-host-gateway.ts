@@ -38,6 +38,10 @@ const SIGNAL_MOVE_LIMIT_MS = 10 * 60_000;
 // app show it (#3749). The host stays `online`: a restart would drop the devices that are connected
 // now. It is longer than the reconnect backoff, so a Signal restart does not cause it.
 const SIGNAL_LOST_REPORT_AFTER_MS = 3 * 60_000;
+// When the bridge window is lost, the host registers again on a new window after this time. Each
+// attempt that fails doubles the time, up to `SIGNAL_MOVE_LIMIT_MS`. The bridge also waits before it
+// loads a window that is lost again and again.
+const BRIDGE_RECOVERY_AFTER_MS = 1_000;
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -65,11 +69,20 @@ class HostSignal extends Context.Service<
             if (id === peerId)
               Deferred.doneUnsafe(ready, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
           };
+          // The bridge window is gone, and with it the socket that this attempt waits on.
+          const onDisconnected = (id: string, bridgeLost = false) => {
+            if (id === peerId && bridgeLost)
+              Deferred.doneUnsafe(
+                ready,
+                Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeStopped")) })),
+              );
+          };
           return yield* Effect.acquireUseRelease(
             Effect.sync(() => {
               // Local Signal can answer before the bridge command resolves.
               bridge.on("signalReady", onReady);
               bridge.on("error", onError);
+              bridge.on("disconnected", onDisconnected);
             }),
             () =>
               Effect.gen(function* () {
@@ -96,12 +109,16 @@ class HostSignal extends Context.Service<
                         new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.signalTimeout")) }),
                       ),
                   }),
+                  // A failed attempt must not connect later with its old ticket, as after a long wait of
+                  // the bridge for a new window.
+                  Effect.onError(() => Fiber.interrupt(connecting)),
                 );
               }),
             () =>
               Effect.sync(() => {
                 bridge.off("signalReady", onReady);
                 bridge.off("error", onError);
+                bridge.off("disconnected", onDisconnected);
               }),
           );
         }),
@@ -140,6 +157,15 @@ export class TeamWebRtcHostGateway {
   // The account service refused a Signal ticket for good. No move or renewal is sent until the next start, which
   // registers the host again and gets a new machine token.
   #signalRenewalRefused = false;
+  #bridgeRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  // The registrations on a new bridge window that failed since the window was lost.
+  #bridgeRecoveryFailures = 0;
+  // Set when the bridge window is lost, and cleared when Signal accepts the host again. A recovery
+  // that already registered the host on the new window makes the bridge recovery unnecessary.
+  #bridgeRecoveryNeeded = false;
+  // The losses of the bridge window. A move or a recovery that fails after a loss leaves the outcome
+  // to the bridge recovery: it does not report a failure.
+  #bridgeLosses = 0;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
@@ -184,6 +210,8 @@ export class TeamWebRtcHostGateway {
     this.#signalHomed = ticketNamesSignalHome(input.ticket);
     this.#signalMoves = 0;
     this.#signalRenewalRefused = false;
+    this.#bridgeRecoveryFailures = 0;
+    this.#bridgeRecoveryNeeded = false;
     this.#localApiPort = input.localApiPort;
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
@@ -220,8 +248,11 @@ export class TeamWebRtcHostGateway {
       this.#signalUrl = null;
       this.#signalMoves = 0;
       this.#signalRenewalRefused = false;
+      this.#bridgeRecoveryFailures = 0;
+      this.#bridgeRecoveryNeeded = false;
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
+      this.#cancelBridgeRecovery();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
       if (this.#signalRecovery) yield* Fiber.interrupt(this.#signalRecovery);
       yield* this.#clearPeers();
@@ -305,8 +336,9 @@ export class TeamWebRtcHostGateway {
     fiber.addObserver(() => this.#operations.delete(fiber));
   };
 
-  readonly #onDisconnected = (peerId: string): void => {
-    if (peerId === this.#hostId) {
+  readonly #onDisconnected = (peerId: string, bridgeLost = false): void => {
+    if (peerId === this.#hostId && bridgeLost) this.#onBridgeLost();
+    else if (peerId === this.#hostId) {
       this.#signalEnded = true;
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
@@ -350,6 +382,9 @@ export class TeamWebRtcHostGateway {
     this.#signalMoves = 0;
     this.#cancelSignalMove();
     this.#cancelSignalLostReport();
+    this.#bridgeRecoveryNeeded = false;
+    this.#bridgeRecoveryFailures = 0;
+    this.#cancelBridgeRecovery();
     if (this.#signalLostReported) {
       this.#signalLostReported = false;
       logger.info("Host Signal socket is ready again.");
@@ -423,11 +458,12 @@ export class TeamWebRtcHostGateway {
     // A move that succeeds but does not make the socket ready also counts: the next close starts a
     // longer time.
     this.#signalMoves += 1;
+    const losses = this.#bridgeLosses;
     const fiber = this.#runtime.runFork(
       this.#recoverSignal(hostId, this.#signalUrl ?? undefined).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
-            if (this.#hostId !== hostId) return;
+            if (this.#hostId !== hostId || this.#bridgeLosses !== losses) return;
             const refused = this.#noteRenewalRefused(cause);
             if (this.#signalEnded) {
               this.#options.onSignalRecoveryFailure?.(
@@ -468,16 +504,96 @@ export class TeamWebRtcHostGateway {
       (code !== "authentication_required" && code !== "session_revoked")
     )
       return;
+    const losses = this.#bridgeLosses;
     const fiber = this.#runtime.runFork(
       this.#recoverSignal(peerId).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
-            if (this.#hostId !== peerId) return;
+            if (this.#hostId !== peerId || this.#bridgeLosses !== losses) return;
             this.#noteRenewalRefused(cause);
             this.#options.onSignalRecoveryFailure?.(
               cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
               `recovery failed after ${this.#lastSignalEnd ?? "a Signal error"}`,
             );
+          }),
+        ),
+      ),
+    );
+    this.#signalRecovery = fiber;
+    fiber.addObserver(() => {
+      if (this.#signalRecovery === fiber) this.#signalRecovery = null;
+    });
+  };
+
+  // The bridge window is gone with the host's Signal socket. The bridge already sent `disconnected`
+  // for each device peer. A start that runs now fails with the window and reports its own failure.
+  #onBridgeLost(): void {
+    this.#bridgeLosses += 1;
+    this.#bridgeRecoveryNeeded = true;
+    this.#lastSignalEnd = "bridge lost";
+    this.#cancelSignalMove();
+    if (this.#connecting) return;
+    if (!this.#options.renewSignal || this.#signalRenewalRefused) {
+      logger.warn("The bridge window of the host Signal socket is gone; the host cannot register again.");
+      this.#options.onSignalRecoveryFailure?.(
+        new Error(sourceText("error.remote.signalRecoveryFailed")),
+        "bridge lost",
+      );
+      return;
+    }
+    logger.warn("The bridge window of the host Signal socket is gone; the host registers again.");
+    this.#scheduleSignalLostReport();
+    this.#scheduleBridgeRecovery();
+  }
+
+  #scheduleBridgeRecovery(): void {
+    if (this.#bridgeRecoveryTimer !== null || !this.#hostId) return;
+    this.#bridgeRecoveryTimer = setTimeout(this.#recoverBridge, this.#bridgeRecoveryDelay());
+  }
+
+  #bridgeRecoveryDelay(): number {
+    return Math.min(BRIDGE_RECOVERY_AFTER_MS * 2 ** this.#bridgeRecoveryFailures, SIGNAL_MOVE_LIMIT_MS);
+  }
+
+  #cancelBridgeRecovery(): void {
+    if (this.#bridgeRecoveryTimer !== null) clearTimeout(this.#bridgeRecoveryTimer);
+    this.#bridgeRecoveryTimer = null;
+  }
+
+  // A new ticket and a new registration: the old registration closed with the window. `bridge.start`
+  // in `HostSignal.connect` loads the new window.
+  readonly #recoverBridge = (): void => {
+    this.#bridgeRecoveryTimer = null;
+    const hostId = this.#hostId;
+    if (!hostId || !this.#bridgeRecoveryNeeded) return;
+    if (this.#connecting || this.#signalRecovery) {
+      this.#scheduleBridgeRecovery();
+      return;
+    }
+    const fiber = this.#runtime.runFork(
+      this.#recoverSignal(hostId).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            if (this.#hostId !== hostId) return;
+            this.#bridgeRecoveryFailures = 0;
+            logger.info("The host is registered with Signal again on a new bridge window.");
+          }),
+        ),
+        Effect.catch(({ cause }) =>
+          Effect.sync(() => {
+            if (this.#hostId !== hostId) return;
+            if (this.#noteRenewalRefused(cause)) {
+              this.#options.onSignalRecoveryFailure?.(
+                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+                "registration refused after bridge lost",
+              );
+              return;
+            }
+            this.#bridgeRecoveryFailures += 1;
+            logger.warn(
+              `Host registration on a new bridge window failed; the host tries again in ${Math.round(this.#bridgeRecoveryDelay() / 1000)} s.`,
+            );
+            this.#scheduleBridgeRecovery();
           }),
         ),
       ),
