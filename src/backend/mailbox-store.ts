@@ -2589,13 +2589,22 @@ export class MailboxStore {
     if (!start?.turnId) return null;
     const agentId = start.recipientAgentId;
     const sourceTurnIds = this.#sourceTurnIds();
+    const add = <T>(map: Map<string, T[]>, key: string, value: T) => {
+      const list = map.get(key);
+      if (list) list.push(value);
+      else map.set(key, [value]);
+    };
     const deliveriesOf = new Map<string, StoredDelivery[]>();
-    for (const delivery of this.#state.deliveries)
-      deliveriesOf.set(delivery.messageId, [...(deliveriesOf.get(delivery.messageId) ?? []), delivery]);
+    for (const delivery of this.#state.deliveries) add(deliveriesOf, delivery.messageId, delivery);
     const answersTo = new Map<string, StoredMessage[]>();
-    for (const message of this.#state.messages)
-      if (isAnswer(message))
-        answersTo.set(message.replyToMessageId, [...(answersTo.get(message.replyToMessageId) ?? []), message]);
+    // An agent's messages that want no answer, by the turn that sent them.
+    const updatesFrom = new Map<string, StoredMessage[]>();
+    for (const message of this.#state.messages) {
+      if (isAnswer(message)) add(answersTo, message.replyToMessageId, message);
+      const turnId = sourceTurnIds.get(message.id);
+      if (message.sender.kind === "agent" && message.expectsReply === false && turnId)
+        add(updatesFrom, `${message.sender.agentId}:${turnId}`, message);
+    }
     const read: { turnId: string; createdAt: string }[] = [];
     // A run that resumed after a usage limit has a new turn id. Its earlier turns can have sent a request.
     const turns = new Set([start.turnId, ...(start.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
@@ -2611,11 +2620,22 @@ export class MailboxStore {
         found = true;
         for (const sent of deliveriesOf.get(request.id) ?? []) {
           if (sent.recipientAgentId === agentId) continue;
-          const answers = (answersTo.get(request.id) ?? []).filter(
-            (answer) => answer.sender.kind === "agent" && answer.sender.agentId === sent.recipientAgentId,
-          );
+          const teammate = sent.recipientAgentId;
+          // A message to this agent from the teammate's turn for the request answers it too: OpenBot then
+          // sends the teammate's answer no more (`TurnLifecycle.#sendsResult`).
+          const teammateTurns = sent.turnId
+            ? [sent.turnId, ...(sent.resumeAfterUsageLimit?.previousTurnIds ?? [])]
+            : [];
+          const answers = new Set([
+            ...(answersTo.get(request.id) ?? []).filter(
+              (answer) => answer.sender.kind === "agent" && answer.sender.agentId === teammate,
+            ),
+            ...teammateTurns
+              .flatMap((turnId) => updatesFrom.get(`${teammate}:${turnId}`) ?? [])
+              .filter((update) => deliveriesOf.get(update.id)?.some((read) => read.recipientAgentId === agentId)),
+          ]);
           // A teammate whose turn failed or stopped sends no answer; one that completed sends it as its turn ends.
-          if (answers.length === 0 && (isActiveDelivery(sent) || sent.status === "completed")) waiting = true;
+          if (answers.size === 0 && (isActiveDelivery(sent) || sent.status === "completed")) waiting = true;
           for (const answer of answers)
             for (const delivery of deliveriesOf.get(answer.id) ?? []) {
               if (delivery.recipientAgentId !== agentId) continue;

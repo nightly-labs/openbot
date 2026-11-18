@@ -109,6 +109,8 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         let again = false;
         /** The wait for the next pending attempt. */
         let timer: Fiber.Fiber<void> | null = null;
+        /** When the first run that waits for a teammate's answer stops waiting, from the last sweep. */
+        let waitEndsAt: string | null = null;
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineResultFailed({ cause }) });
@@ -172,9 +174,14 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         const recordAnswers = (since: string, at: string): Set<string> => {
           const changed = new Set<string>();
           const waitedSince = new Date(Date.parse(at) - TEAMMATE_ANSWER_WAIT_MS).toISOString();
+          waitEndsAt = null;
           for (const run of store.runsWithoutDelivery(since)) {
             const turns = run.deliveryId ? dependencies.runTurns(run.deliveryId) : null;
-            if (turns?.waiting && run.endedAt > waitedSince) continue;
+            if (turns?.waiting && run.endedAt > waitedSince) {
+              const endsAt = new Date(Date.parse(run.endedAt) + TEAMMATE_ANSWER_WAIT_MS).toISOString();
+              if (!waitEndsAt || endsAt < waitEndsAt) waitEndsAt = endsAt;
+              continue;
+            }
             let output: string | null = null;
             for (const turnId of turns?.turnIds ?? []) {
               output = dependencies.turnAnswer(run.agentId, turnId);
@@ -246,7 +253,10 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
          */
         const schedule = Effect.fn("RoutineResults.schedule")(function* (shortest: number) {
           const previous = timer;
-          const next = store.nextAttemptAt();
+          const attemptAt = store.nextAttemptAt();
+          // A run that waits for a teammate's answer is sent when its wait ends, also with no other event.
+          const next =
+            attemptAt && waitEndsAt ? (attemptAt < waitEndsAt ? attemptAt : waitEndsAt) : (attemptAt ?? waitEndsAt);
           const delay = next ? Math.max(shortest, Date.parse(next) - now().getTime()) : null;
           // The wait lets go of itself before it sweeps, so the sweep's own `schedule` does not stop it.
           timer =
