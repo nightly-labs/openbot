@@ -30,7 +30,7 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 interface DriverCase {
   provider: AgentProviderId;
   /** The form of the missing-session error that this provider's CLI gives. */
-  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "kimi" | "devin" | "hermes" | "mistral";
+  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "cline" | "kimi" | "devin" | "hermes" | "mistral";
   /** The agent's own form of a model set, when it differs from the configuration option. */
   modelSet?: "kimi" | "mistral";
   /** Why the sign-in case does not apply, when it does not. */
@@ -41,7 +41,7 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "opencode", missing: "opencode" },
   { provider: "antigravity", missing: "antigravity" },
   { provider: "cursor", missing: "cursor" },
-  { provider: "cline", missing: "protocol" },
+  { provider: "cline", missing: "cline" },
   { provider: "kimi", missing: "kimi", modelSet: "kimi" },
   { provider: "devin", missing: "devin" },
   // GitHub Copilot CLI 1.0.105 refuses a signed-out session with `-32000`, as the fake does. Its

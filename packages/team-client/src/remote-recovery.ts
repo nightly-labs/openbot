@@ -88,6 +88,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.channelNotOpen",
       "error.remote.signalOffline",
       "error.remote.mobileUpdateRequired",
+      "error.team.hostUpdateRequired",
       "error.remote.hostBusy",
       "error.remote.signalPermissionDenied",
       "error.remote.signalProtocolError",

@@ -30,10 +30,13 @@ export const messages = {
   "billing.status.paused": "Pausiert",
   "billing.otherServers": "Andere Server",
   "billing.action.menu": "Tarifaktionen für {server}",
-  "billing.action.change": "Tarif ändern",
+  "billing.action.addStorage": "Speicher hinzufügen",
   "billing.action.cancel": "Tarif kündigen",
   "billing.action.renew": "Tarif verlängern",
   "billing.action.updatePayment": "Zahlungsmethode aktualisieren",
+  "billing.storage.title": "Mehr Speicher für {server}",
+  "billing.storage.add": "{size} hinzufügen",
+  "billing.storage.failed": "Der Speicher konnte nicht hinzugefügt werden.",
   "billing.lifecycle.cancelRenewal": "Verlängerung kündigen",
   "billing.lifecycle.cancelTitle": "Verlängerung für {name} kündigen?",
   "billing.lifecycle.cancelDescription":
@@ -210,4 +213,10 @@ export const messages = {
     other:
       "Deine Lizenz hat {count} Nutzer, das Maximum. Kontaktiere uns für eine größere Lizenz. Neue Personen können deinen Servern nicht beitreten.",
   },
+  "billing.details.country": "Rechnungsland",
+  "billing.details.countryPlaceholder": "Land wählen",
+  "billing.details.vatId": "EU-USt-IdNr. (optional)",
+  "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
+  "billing.details.countryMissing": "Wähle dein Rechnungsland.",
+  "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
 } as const satisfies PartialTranslation<typeof source>;

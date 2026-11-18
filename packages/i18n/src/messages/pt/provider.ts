@@ -111,9 +111,14 @@ export const messages = {
   "provider.picker.download": "Download de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Estes modelos não funcionam com “Espaço de trabalho” no Windows e no Linux. Para usá-los, altere “Permissões” nas configurações do agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} executa seus endpoints personalizados. Os modelos deles estão na aba Personalizado.",
+  "provider.picker.showCustomModels": "Ver modelos",
   "provider.picker.museNoModels":
     "O Muse não enviou modelos para esta conta. O Muse pode não estar disponível no país onde este agente é executado. Escolha um modelo de outro provedor.",
   "provider.picker.customEmpty":
@@ -141,6 +146,8 @@ export const messages = {
   "provider.picker.selectEffort": "Selecionar esforço",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} pronto",
+  "provider.picker.modelSourceProvider": "Usa {name} das configurações do {cli}",
+  "provider.picker.modelSourceCatalog": "Usa uma lista de modelos das configurações do {cli}",
   "provider.status.signInRequired": "Login necessário",
   "provider.model.free": "Grátis",
   "provider.model.new": "Novo",
@@ -206,6 +213,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Não foi possível reconectar.",
   "provider.account.add": "Adicionar conta",
   "provider.account.addLabel": "Adicionar outra conta de {name}",
+  "provider.account.addWithCode": "Adicionar conta com código",
   "provider.account.count": { one: "{count} conta", other: "{count} contas" },
   "provider.account.numbered": "Conta {number}",
   "provider.account.apiKey": "Chave de API",
@@ -256,6 +264,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
   "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alguns modelos precisam de uma parte que esta versão não tem. Baixe a versão do OpenBot para usá-los.",
   "provider.settings.useInstalledVersion": "Usar a instalada",
   "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",
@@ -279,6 +289,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Padrão do Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokens",
   "provider.settings.compactWindowLoadFailed": "Não foi possível carregar o tamanho de compactação deste servidor.",
+  "provider.settings.environment": "Ambiente",
+  "provider.settings.environmentVariables": "Variáveis",
+  "provider.settings.environmentDescription":
+    "Chaves de API, URLs base e outras configurações que cada processo do {name} recebe. Uma mudança vale quando os turnos atuais terminam.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, com OPENAI_API_KEY como chave, envia as solicitações de modelo do ChatGPT para esse endereço.",
+  "provider.settings.environmentShellNote": "Os comandos que os agentes executam podem ler esses valores.",
+  "provider.settings.environmentAdd": "Adicionar variável",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valor",
+  "provider.settings.environmentSaved": "Salva",
+  "provider.settings.environmentSensitive": "Sensível",
+  "provider.settings.environmentNameLabel": "Nome da variável {index}",
+  "provider.settings.environmentValueLabel": "Valor de {name}",
+  "provider.settings.environmentSensitiveLabel": "Manter {name} em segredo",
+  "provider.settings.environmentRemoveLabel": "Remover {name}",
+  "provider.settings.environmentUnnamed": "variável {index}",
+  "provider.settings.environmentPending":
+    "Salvar reinicia o {name} quando os turnos atuais terminam. Valores sensíveis ficam no servidor.",
+  "provider.settings.environmentDone": "Salvo. O {name} reinicia quando os turnos atuais terminam.",
+  "provider.settings.environmentDiscard": "Descartar",
+  "provider.settings.environmentSave": "Salvar",
+  "provider.settings.environmentLoadFailed": "Não foi possível carregar as variáveis do {name}.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece no seletor de modelos.",

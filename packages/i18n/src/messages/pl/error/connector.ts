@@ -18,15 +18,27 @@ export const messages = {
     "OpenBot nie mógł zainstalować 1Password CLI. Sprawdź połączenie z internetem i spróbuj ponownie.",
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI nie jest zalogowane. Włącz jego integrację w aplikacji 1Password, a potem połącz ponownie.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot nie może połączyć się z aplikacją 1Password. Otwórz 1Password i odblokuj je. W Settings > Developer sprawdź, czy opcja „Integrate with 1Password CLI” jest włączona. Potem spróbuj ponownie.",
   "error.connector.onePasswordCliFailed": "Błąd 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Twoje konto 1Password nie pozwala Ci utworzyć udostępnionego sejfu ani konta usługi. Poproś właściciela lub administratora konta o to uprawnienie albo o token konta usługi, a potem kliknij „Użyj tokenu”.",
   "error.connector.onePasswordUnexpected": "1Password wysłał nieoczekiwaną odpowiedź: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password nie zaakceptował tokenu konta usługi.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot nie mógł połączyć się z 1Password. Sprawdź połączenie z internetem i spróbuj ponownie.",
+  "error.connector.onePasswordRateLimited":
+    "1Password otrzymał zbyt wiele żądań. Poczekaj kilka minut i spróbuj ponownie.",
   "error.connector.onePasswordNoVault":
     "Konto usługi nie może odczytać żadnego sejfu. Daj mu dostęp do sejfu i spróbuj ponownie.",
   "error.connector.onePasswordFileUnreadable": "Nie można odczytać pliku połączenia z 1Password.",
   "error.connector.onePasswordFileTooLarge": "Plik połączenia z 1Password jest za duży.",
   "error.connector.bitwardenFailed":
     "Nie udało się odczytać danych Bitwarden. Zainstaluj bw CLI, zaloguj się, odblokuj je i utwórz jeden folder o nazwie Shared with OpenBot. Połącz ponownie z nowym kluczem sesji.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot nie może znaleźć Bitwarden CLI. Zainstaluj bw, sprawdź, czy działa w nowym terminalu, a potem połącz ponownie.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden musi mieć dokładnie jeden folder o nazwie Shared with OpenBot. Utwórz go lub usuń dodatkowy folder, a potem połącz ponownie.",
   "error.connector.bitwardenHostInput":
     "Wpisz adres serwera HTTPS, client_id i client_secret klucza API oraz hasło główne.",
   "error.connector.bitwardenHostFailed":
@@ -42,6 +54,8 @@ export const messages = {
     "Nie udało się zainstalować Proton Pass CLI. Sprawdź połączenie sieciowe, a potem połącz ponownie.",
   "error.connector.protonPassPlan":
     "Twój plan Proton nie pozwala na Proton Pass CLI. Zmień plan, a potem połącz ponownie.",
+  "error.connector.protonPassPlanMissing":
+    "Twój plan Proton nie obejmuje Proton Pass CLI. Potrzebny jest plan Proton, który obejmuje Pass Plus. Zmień plan, a potem połącz ponownie.",
   "error.connector.protonPassExpired": "Dostęp do Proton Pass wygasł. Połącz ponownie.",
   "error.connector.protonPassKeyInvalid": "Wpisz klucz dostępu Proton Pass, który zaczyna się od pst_.",
   "error.connector.protonPassExtraPassword": "Dodatkowe hasło jest nieprawidłowe. Wpisz je ponownie.",

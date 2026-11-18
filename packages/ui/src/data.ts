@@ -28,6 +28,7 @@ import type {
   QueueDeliveryStatus,
   RoutineConversationEvent,
   RoutineRunConversationEvent,
+  SettingLinkId,
   SkillConversationEvent,
   SkillSuggestionEvent,
   VideoGenerationInfo,
@@ -172,6 +173,8 @@ export type ChatActionMarkerModel =
     }
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** The agent showed a setting. The chat shows a card that opens it. */
+  | { kind: "setting-link"; settingId: SettingLinkId; timestamp: string }
   /** A memory review asks to save a skill from the chat. The chat shows a card to save it. */
   | (SkillSuggestionEvent & { kind: "skill-suggestion"; timestamp: string })
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
@@ -182,7 +185,17 @@ export type ChatActionMarkerModel =
    */
   | { kind: "server-install"; name: string | null; expiresAt: number; timestamp: string }
   /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
-  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
+  | {
+      kind: "feedback-sent";
+      /** The thank-you card, for its Remove action. */
+      messageId: string;
+      title: string;
+      number: number;
+      url: string;
+      /** True after the user took the report off GitHub. */
+      withdrawn: boolean;
+      timestamp: string;
+    }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */
@@ -237,6 +250,8 @@ export interface AgentMessage {
   /** The person who wrote a `you` message. Absent on the reader's own older messages. */
   senderMember?: ConversationMessageSender | undefined;
   replyToMessageId?: string | null | undefined;
+  /** Set on a message that joined a turn that was already running (`ConversationMessage.steered`). */
+  steered?: true | undefined;
   attachments?: AttachmentSummary[] | undefined;
   /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
   voiceRecording?: AttachmentSummary | undefined;
@@ -339,10 +354,10 @@ export interface AgentProfile {
   preview: string;
 }
 
-/** The agent fields that the composer, the queue, rich text and the browser dock read. */
+/** The agent fields that the composer, the queue, rich text, the browser dock and the agent dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl" | "chatColor"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */
@@ -362,3 +377,9 @@ export type ComposerBrowserTab = Pick<BrowserTab, "id" | "title" | "url">;
 
 /** A side thread of the agent that the composer can tag. Its id is the task id. */
 export type ComposerThread = Pick<AgentTask, "id" | "title" | "state" | "outcome" | "progress" | "error">;
+
+/** A message in a side thread that has the `@` query. `body` is the stored message text. */
+export interface ComposerThreadMessageMatch {
+  threadId: string;
+  body: string;
+}

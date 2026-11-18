@@ -40,6 +40,7 @@ import {
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { isHistoryExtentRoute, withPageHistoryExtent } from "./history-extent-v1";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
+import { withConversationMemoryChanges } from "./memory-changes-v1";
 import { decodeMessageClientId } from "./message-client-id-v1";
 import { decodeProfileV8Request, decodeProfileV8Response } from "./profile-v8";
 import { withConversationPromptMultiSelect } from "./prompt-multi-select-v1";
@@ -221,7 +222,8 @@ export function decodeTeamProtocolV8CurrentHttpRequest(
  * message carry its `videoGeneration`. `usageTertiary` is the negotiated usage-tertiary-v1 capability:
  * only then does a usage limit carry its `tertiary` window. `agentPendingRuntime` is the negotiated
  * agent-pending-runtime-v1 capability: only then does an agent of the agent list carry its
- * `pendingRuntime`. Without them the output is the released projection.
+ * `pendingRuntime`. `memoryChanges` is the negotiated memory-changes-v1 capability: only then does a
+ * conversation message carry its `memoryChanges`. Without them the output is the released projection.
  */
 export function encodeTeamProtocolV8CurrentHttpResponse(
   method: string,
@@ -237,6 +239,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     videoGeneration?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
+    memoryChanges?: boolean;
   } = {},
 ): string {
   const {
@@ -247,6 +250,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     videoGeneration,
     usageTertiary,
     agentPendingRuntime,
+    memoryChanges,
     ...frozen
   } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
@@ -258,7 +262,17 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
   const withVideo = videoGeneration && isConversationRoute(method, path);
   const withPending = agentPendingRuntime && isAgentListRoute(method, path);
-  if (!withUsage && !withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo && !withPending)
+  const withMemory = memoryChanges && isConversationRoute(method, path);
+  if (
+    !withUsage &&
+    !withExtent &&
+    !withBlocks &&
+    !withSubagents &&
+    !withMultiSelect &&
+    !withVideo &&
+    !withPending &&
+    !withMemory
+  )
     return encoded;
   let output: TeamProtocolV8BaseJsonValue = JSON.parse(encoded);
   if (withUsage) output = withUsageTertiary(output, value, true);
@@ -268,6 +282,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   if (withMultiSelect) output = withConversationPromptMultiSelect(output, value);
   if (withVideo) output = withConversationVideoGeneration(output, value);
   if (withPending) output = withAgentPendingRuntimes(output, value, true);
+  if (withMemory) output = withConversationMemoryChanges(output, value);
   return JSON.stringify(output);
 }
 
@@ -334,8 +349,8 @@ function encodeFrozenResponse(
 /**
  * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
  * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, a
- * video request only under video-generation-v1, and a third usage window only under
- * usage-tertiary-v1, so a present one is always kept.
+ * video request only under video-generation-v1, memory changes only under memory-changes-v1, and a
+ * third usage window only under usage-tertiary-v1, so a present one is always kept.
  */
 export function decodeTeamProtocolV8CurrentHttpResponse(
   method: string,
@@ -350,9 +365,12 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
   // The conversation page route carries all three.
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;
   if (!isConversationRoute(method, path)) return withExtent;
-  return withConversationVideoGeneration(
-    withConversationPromptMultiSelect(
-      withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+  return withConversationMemoryChanges(
+    withConversationVideoGeneration(
+      withConversationPromptMultiSelect(
+        withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+        value,
+      ),
       value,
     ),
     value,

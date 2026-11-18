@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isSecretName, type LogValue, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { isSecretName, type LogValue, redactText, registerSecretValue, toSecretSafeValue } from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -32,6 +32,9 @@ export function redactMcpValues(text: string, values: Iterable<string>, rules = 
 /**
  * The same for a record that a provider sends, such as a notification or a history item.
  *
+ * The record is the agent's own chat, so an email address stays, as `redactSecrets` keeps it: the
+ * user wrote it or needs to read it (#9988).
+ *
  * The shared rules run first, so a key such as `refresh_token` is redacted before a known value can
  * change its name. Then each string, key and number is masked on its own. Masking the serialized
  * record instead would cut a JSON literal out of it when a known value is `true` or `null`.
@@ -48,13 +51,21 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
     if (value === null || typeof value !== "object") return value;
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [maskValues(key, known), mask(entry)]));
   };
-  return mask(toLogValue(record));
+  return mask(toSecretSafeValue(record));
 }
+
+/**
+ * Setting words that are never a credential. A provider gets them as values, such as the GitHub
+ * connection's `useHttpPath=true`, and masking them changed `QA_READY=true` in an agent's answer to
+ * `QA_READY=•••`, so a workflow condition took the wrong branch (#10680). Shorter words, such as
+ * `yes`, `no`, `on` and `off`, are under the length limit already.
+ */
+const CONFIG_LITERALS = new Set(["true", "false", "null", "none"]);
 
 function maskValues(text: string, values: Iterable<string>): string {
   let result = text;
   for (const value of values) {
-    if (value.length < 4) continue;
+    if (value.length < 4 || CONFIG_LITERALS.has(value.toLowerCase())) continue;
     result = result.split(value).join(MASK);
   }
   return result;

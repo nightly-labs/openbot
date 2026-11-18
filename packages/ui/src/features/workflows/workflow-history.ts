@@ -128,16 +128,38 @@ export function createCanvasHistory(options: {
   apply: (snapshot: CanvasSnapshot) => void;
   beforeCommit: () => void;
 }) {
-  let past: CanvasSnapshot[] = [];
-  let future: CanvasSnapshot[] = [];
+  /** A snapshot, and the count of rebases before it was saved. */
+  type Entry = { snapshot: CanvasSnapshot; at: number };
+  let past: Entry[] = [];
+  let future: Entry[] = [];
+  /**
+   * The rebases that a snapshot gets only when undo or redo reaches it, from rebase number `first` on.
+   * A rebase merges whole graphs, so a change of each snapshot at once stops the canvas.
+   */
+  let rebases: ((snapshot: CanvasSnapshot) => CanvasSnapshot)[] = [];
+  let first = 0;
+  const entry = (snapshot: CanvasSnapshot): Entry => ({ snapshot, at: first + rebases.length });
+  const take = (saved: Entry) =>
+    rebases.slice(saved.at - first).reduce((snapshot, change) => change(snapshot), saved.snapshot);
+  /** Drops the rebases that no snapshot needs. */
+  const prune = () => {
+    const oldest = Math.min(
+      first + rebases.length,
+      ...past.map((saved) => saved.at),
+      ...future.map((saved) => saved.at),
+    );
+    rebases = rebases.slice(oldest - first);
+    first = oldest;
+  };
   /** While above 0, changes join the step that is open, so one action is one undo. */
   let joined = 0;
   const [steps, setSteps] = createSignal({ undo: 0, redo: 0 });
   const count = () => setSteps({ undo: past.length, redo: future.length });
   /** Puts a snapshot on the undo stack, and clears redo. */
   const push = (snapshot: CanvasSnapshot) => {
-    past = [...past, snapshot].slice(-HISTORY_LIMIT);
+    past = [...past, entry(snapshot)].slice(-HISTORY_LIMIT);
     future = [];
+    prune();
     count();
   };
   return {
@@ -151,23 +173,33 @@ export function createCanvasHistory(options: {
     undo: () => {
       const saved = past.at(-1);
       if (!saved) return;
-      future = [...future, options.capture()];
+      future = [...future, entry(options.capture())];
       past = past.slice(0, -1);
-      options.apply(saved);
+      options.apply(take(saved));
+      prune();
       count();
     },
     redo: () => {
       const saved = future.at(-1);
       if (!saved) return;
-      past = [...past, options.capture()];
+      past = [...past, entry(options.capture())];
       future = future.slice(0, -1);
-      options.apply(saved);
+      options.apply(take(saved));
+      prune();
       count();
     },
     clear: () => {
       past = [];
       future = [];
+      prune();
       count();
+    },
+    /**
+     * Changes each snapshot of both stacks, as when the edits of another device merge into the canvas:
+     * undo then takes back only the edits of this device.
+     */
+    rebase: (change: (snapshot: CanvasSnapshot) => CanvasSnapshot) => {
+      if (past.length > 0 || future.length > 0) rebases = [...rebases, change];
     },
     /** Joins the next changes to the open step. The returned function ends the join. */
     join: () => {

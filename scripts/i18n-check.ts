@@ -35,6 +35,8 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".e
 const RELEASED_SOURCE_KEYS = new Set([
   "error.agent.noStartingModel",
   "error.provider.cliBusyUpdate",
+  // Hosts before #8071 send it for a provider that stopped starting.
+  "error.provider.startStopped",
   // Hosts before side threads send these for the agent-tasks-v1 routes.
   "error.backend.taskNotFound",
   "error.backend.taskStillRunning",
@@ -51,6 +53,10 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelRoutingUnreadable",
   // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
   "error.backend.recipientHidden",
+  // A host from v0.57.0 to v0.73.0 sends this when a custom endpoint refuses a turn.
+  "error.provider.customEndpointKeyRefused",
+  // Hosts up to v0.73.0 send this when the Proton plan does not include the Proton Pass CLI.
+  "error.connector.protonPassPlan",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

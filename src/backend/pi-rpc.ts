@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { StringDecoder } from "node:string_decoder";
 import type { KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { RequestTimeoutError } from "./agent-client";
@@ -19,6 +20,9 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 
 const PI_RECORD_LIMIT_BYTES = 256 * 1024 * 1024;
+
+/** The wait of a request that gives none. */
+export const PI_REQUEST_TIMEOUT_MS = 30_000;
 const logger = createOpenBotLogger("provider-runtime");
 
 /** A JSON object with a string `type`, or null for any other line. */
@@ -31,6 +35,17 @@ function piRecord(line: string): DynamicRecord | null {
   }
   return isDynamicRecord(value) && typeof value.type === "string" ? value : null;
 }
+
+/**
+ * Pi in RPC mode exits with code 1 when one of the user's extensions does not load (#9399). Its
+ * stderr names the extension and the cause, and then gives a hint for the terminal, `pi -ne`, as
+ * its last line. Only the line with the cause tells the user what to remove or update.
+ */
+const PI_EXTENSION_FAILURE = /^(?:Error:\s*)?(Failed to load extension\b.*)$/u;
+const PI_EXTENSION_FAILURE_DETAIL_LIMIT = 500;
+
+/** Pi exited with no cause that OpenBot can name. The message has only the exit code or signal. */
+export class PiProcessClosedError extends Error {}
 
 /** Owns one Pi RPC process and its correlated requests. Session policy belongs to the client. */
 export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [string]; exit: [Error] }> {
@@ -60,12 +75,25 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
     endProcessGroupOnExit(child);
     const decoder = new StringDecoder("utf8");
     let buffered = "";
-    const diagnostics = createDiagnosticStream({ redact: this.redact, emit: (line) => this.emit("diagnostic", line) });
+    // Redacted before it is kept: the stream gives only redacted records.
+    let extensionFailure: string | null = null;
+    const diagnostics = createDiagnosticStream({
+      redact: this.redact,
+      emit: (line) => {
+        extensionFailure ??= PI_EXTENSION_FAILURE.exec(line.trim())?.[1] ?? null;
+        this.emit("diagnostic", line);
+      },
+    });
     let failed = false;
     const fail = (error: Error) => {
       if (failed) return;
       failed = true;
-      const safe = new Error(this.redact(error.message));
+      const message = this.redact(error.message);
+      // A stop that OpenBot asked for is not an unexpected exit.
+      const safe =
+        error instanceof PiProcessClosedError && !this.#stopping
+          ? new PiProcessClosedError(message)
+          : new Error(message);
       for (const resume of this.#pending.values()) resume(Effect.fail(providerFailure(safe)));
       this.#pending.clear();
       if (!this.#stopping) this.emit("exit", safe);
@@ -76,7 +104,15 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
     child.once("error", fail);
     child.once("close", (code, signal) => {
       diagnostics.flush();
-      fail(new Error(`Pi process closed (${signal ?? code ?? "unknown"}).`));
+      fail(
+        extensionFailure !== null && code !== 0 && signal === null
+          ? new Error(
+              sourceText("error.provider.piExtensionFailed", {
+                detail: extensionFailure.slice(0, PI_EXTENSION_FAILURE_DETAIL_LIMIT),
+              }),
+            )
+          : new PiProcessClosedError(`Pi process closed (${signal ?? code ?? "unknown"}).`),
+      );
       if (this.#child === child) this.#child = null;
     });
     let skippedLine = false;
@@ -128,13 +164,21 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
       );
   }
 
-  readonly request = Effect.fn("PiRpc.request")(function* (this: PiRpc, command: DynamicRecord, timeoutMs = 30_000) {
+  readonly request = Effect.fn("PiRpc.request")(function* (
+    this: PiRpc,
+    command: DynamicRecord,
+    /** `null`: no limit. Pi's exit still ends the request. */
+    timeoutMs: number | null = PI_REQUEST_TIMEOUT_MS,
+  ) {
     const id = randomUUID();
     return yield* Effect.callback<DynamicRecord, ProviderClientOperationError>((resume) => {
-      const timer = setTimeout(() => {
-        this.#pending.delete(id);
-        resume(Effect.fail(providerFailure(new RequestTimeoutError("Pi", String(command.type)))));
-      }, timeoutMs);
+      const timer =
+        timeoutMs === null
+          ? undefined
+          : setTimeout(() => {
+              this.#pending.delete(id);
+              resume(Effect.fail(providerFailure(new RequestTimeoutError("Pi", String(command.type)))));
+            }, timeoutMs);
       this.#pending.set(id, (result) => {
         clearTimeout(timer);
         resume(result);
