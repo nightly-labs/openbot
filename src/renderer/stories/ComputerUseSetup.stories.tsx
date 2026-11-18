@@ -61,6 +61,19 @@ export const Ready: Story = {
   ),
 };
 
+/** macOS reports both grants but refuses the Accessibility calls (#10658), so OpenBot must restart. */
+export const RestartRequired: Story = {
+  render: () => (
+    <MockedSetup
+      state={{
+        status: "restart-required",
+        permissions: permissions(["screen-recording", "accessibility"]),
+        message: null,
+      }}
+    />
+  ),
+};
+
 export const Loading: Story = {
   render: () => <MockedSetup loading />,
 };

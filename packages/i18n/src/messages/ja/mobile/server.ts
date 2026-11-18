@@ -1610,7 +1610,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "コピー先",
   "mobile.server.transfer.copyNoAgents": "このサーバーにはエージェントがありません。",
   "mobile.server.transfer.copyNotMoved":
-    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
   "mobile.server.transfer.copying": "コピー中…",
   "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",

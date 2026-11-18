@@ -252,7 +252,10 @@ It saves no referrer, IP address or identifier. A later visit does not change it
 after 90 days. When you sign in on the web, or open the page after a desktop checkout in the same
 browser, the browser sends it to the account service. The account service keeps the first one that
 it gets on your account and sends it to OpenPanel with your account ID. To remove it from a
-browser, clear the site data of openbot.run. When you choose a language on the website, it saves
+browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
+with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
+you pay on the web, the web client sends the code to the account service, which gives it to Stripe
+for that Checkout page. It is not sent to analytics. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a

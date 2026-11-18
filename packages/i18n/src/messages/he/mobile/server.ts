@@ -2096,7 +2096,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "אל",
   "mobile.server.transfer.copyNoAgents": "אין סוכנים בשרת הזה.",
   "mobile.server.transfer.copyNotMoved":
-    "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+    "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "mobile.server.transfer.copySubmit": {
     one: "העתקת סוכן אחד",
     two: "העתקת שני סוכנים",

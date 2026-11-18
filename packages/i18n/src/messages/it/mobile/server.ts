@@ -1632,7 +1632,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "A",
   "mobile.server.transfer.copyNoAgents": "Questo server non ha agenti.",
   "mobile.server.transfer.copyNotMoved":
-    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
   "mobile.server.transfer.copying": "Copia in corso…",
   "mobile.server.transfer.copyFailed": "La copia non è terminata.",

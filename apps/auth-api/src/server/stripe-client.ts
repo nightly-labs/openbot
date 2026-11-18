@@ -27,19 +27,22 @@ export type StripeFetch = (input: string, init: RequestInit) => Promise<Response
 
 /**
  * A Stripe request failed. The message holds only Stripe's error `type` and `code`, never the key, the
- * request body or Stripe's own message, which can repeat customer data.
+ * request body or Stripe's own message, which can repeat customer data. `param` is the name of the
+ * refused request parameter, never its value.
  */
 export class StripeRequestError extends Schema.TaggedError<StripeRequestError>()("StripeRequestError", {
   status: Schema.Number,
   type: Schema.NullOr(Schema.String),
   code: Schema.NullOr(Schema.String),
+  param: Schema.NullOr(Schema.String),
   message: Schema.String,
 }) {
-  constructor(status: number, type: string | null, code: string | null) {
+  constructor(status: number, type: string | null, code: string | null, param: string | null = null) {
     super({
       status,
       type,
       code,
+      param,
       message: `Stripe request failed with ${status} (${type ?? "unknown"}${code ? `/${code}` : ""}).`,
     });
   }
@@ -51,7 +54,11 @@ const CurrencyOptions = Schema.optional(
   Schema.Record(Schema.String, Schema.Struct({ unit_amount: Schema.optional(Schema.NullOr(Schema.Int)) })),
 );
 const stripeErrorSchema = Schema.Struct({
-  error: Schema.Struct({ type: Schema.optional(Schema.String), code: Schema.optional(Schema.String) }),
+  error: Schema.Struct({
+    type: Schema.optional(Schema.String),
+    code: Schema.optional(Schema.String),
+    param: Schema.optional(Schema.String),
+  }),
 });
 const sessionSchema = Schema.Struct({ id: Schema.String, url: Schema.NullOr(Schema.String) });
 const customerSchema = Schema.Struct({ id: Schema.String, deleted: Schema.optional(Schema.Boolean) });
@@ -74,6 +81,7 @@ const customerTaxSchema = Schema.Struct({
 const taxRateListSchema = Schema.Struct({
   data: Schema.Array(Schema.Struct({ id: Schema.String, metadata: Metadata })),
 });
+const promotionCodeListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) });
 
 /** The session metadata that records the VAT decision of a Checkout page (`billing-tax.ts`), for the webhook check. */
 export const VAT_METADATA = {
@@ -198,6 +206,28 @@ export function isBillingCurrency(value: unknown): value is BillingCurrency {
 /** True when the Price can be paid in `currency`: its base currency, or one of its currency options. */
 export function priceHasCurrency(price: StripePrice, currency: BillingCurrency): boolean {
   return price.currency.toLowerCase() === currency || price.currency_options?.[currency] !== undefined;
+}
+
+/** The Checkout form with this promotion code. Stripe refuses a page with both a discount and the code field. */
+function withPromotionCode(body: URLSearchParams, promotionCodeId: string): URLSearchParams {
+  const form = new URLSearchParams(body);
+  form.delete("allow_promotion_codes");
+  form.set("discounts[0][promotion_code]", promotionCodeId);
+  return form;
+}
+
+/**
+ * Stripe refused the promotion code for this order: another currency names the `discounts` parameter, and
+ * the other restrictions give a `coupon_` or `promotion_code_` error code, such as
+ * `promotion_code_amount_insufficient` or `coupon_applies_to_nothing`.
+ */
+function isRefusedPromotionCode(error: StripeRequestError | StripeTransportError): boolean {
+  if (error._tag !== "StripeRequestError" || error.status !== 400) return false;
+  return (
+    error.param?.startsWith("discounts") === true ||
+    error.code?.startsWith("coupon_") === true ||
+    error.code?.startsWith("promotion_code_") === true
+  );
 }
 
 export class StripeClient {
@@ -487,6 +517,8 @@ export class StripeClient {
       tax: CheckoutTax | null;
       /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
       trialEndSeconds?: number;
+      /** The code of a discount link (`promotion-code.ts`). Absent: the buyer can type a code in Checkout. */
+      promotionCode?: string;
       successUrl: string;
       cancelUrl: string;
       nowSeconds: number;
@@ -547,9 +579,32 @@ export class StripeClient {
       for (const [key, value] of Object.entries(input.metadata ?? {})) body.set(`${prefix}[${key}]`, value);
     }
     for (const [key, value] of Object.entries(input.sessionMetadata ?? {})) body.set(`metadata[${key}]`, value);
-    const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
+    const create = (form: URLSearchParams) =>
+      this.#requestEffect("POST", "/v1/checkout/sessions", form, checkoutSessionSchema);
+    // The code of a discount link is optional: when Stripe cannot find it, the page has the code field.
+    const promotionCodeId = input.promotionCode
+      ? yield* this.#activePromotionCodeId(input.promotionCode).pipe(Effect.orElseSucceed(() => null))
+      : null;
+    const session = yield* promotionCodeId
+      ? // A code whose restrictions this order does not meet (a first order only, a minimum amount, other
+        // products or another currency) gives the page with the code field instead.
+        create(withPromotionCode(body, promotionCodeId)).pipe(
+          Effect.catchIf(isRefusedPromotionCode, () => create(body)),
+        )
+      : create(body);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
+  }).bind(this);
+
+  /** The ID of the active promotion code with this code, or null when Stripe has none. */
+
+  readonly #activePromotionCodeId = Effect.fn("StripeClient.activePromotionCodeId")(function* (
+    this: StripeClient,
+    code: string,
+  ): Effect.fn.Return<string | null, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ code, active: "true", limit: "1" });
+    const codes = yield* this.#requestEffect("GET", `/v1/promotion_codes?${query}`, null, promotionCodeListSchema);
+    return codes.data[0]?.id ?? null;
   }).bind(this);
 
   /**
@@ -796,6 +851,7 @@ export class StripeClient {
         response.status,
         Option.isSome(parsed) ? (parsed.value.error.type ?? null) : null,
         Option.isSome(parsed) ? (parsed.value.error.code ?? null) : null,
+        Option.isSome(parsed) ? (parsed.value.error.param ?? null) : null,
       );
     }
     return yield* Schema.decodeUnknownEffect(schema)(value).pipe(

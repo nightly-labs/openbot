@@ -1647,7 +1647,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Para",
   "mobile.server.transfer.copyNoAgents": "Este servidor não tem agentes.",
   "mobile.server.transfer.copyNotMoved":
-    "Os canais deles e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
+    "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
   "mobile.server.transfer.copying": "Copiando…",
   "mobile.server.transfer.copyFailed": "A cópia não terminou.",

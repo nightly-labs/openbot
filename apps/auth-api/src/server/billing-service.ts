@@ -255,6 +255,8 @@ export interface CheckoutRequest {
    * subscription (`LicenseService.splitOrder`).
    */
   license?: LicenseOrder;
+  /** The code of a discount link. Only the web client sends one. */
+  promotionCode?: string;
 }
 
 class BillingDependencies extends Context.Service<
@@ -499,6 +501,7 @@ export class BillingService {
                   sessionMetadata: orderMetadata,
                 }
               : {}),
+          ...(request.promotionCode ? { promotionCode: request.promotionCode } : {}),
           // Stripe puts the session ID in the URL. The desktop return page sends it with the first
           // website visit of the browser, so that the saved checkout names the account.
           successUrl:

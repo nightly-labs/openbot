@@ -1604,7 +1604,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Naar",
   "mobile.server.transfer.copyNoAgents": "Deze server heeft geen agents.",
   "mobile.server.transfer.copyNotMoved":
-    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+    "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
   "mobile.server.transfer.copying": "Kopiëren…",
   "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
