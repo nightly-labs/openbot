@@ -85,8 +85,8 @@ function failure(): PasswordVaultError {
 /** A failed host sign-in step. Its text names the input to check, and the log shows the step. */
 function stepFailure(
   key: "error.connector.bitwardenHostSignInFailed" | "error.connector.bitwardenHostUnlockFailed",
-): () => PasswordVaultError {
-  return () => new PasswordVaultError({ cause: new Error(sourceText(key)) });
+): PasswordVaultError {
+  return new PasswordVaultError({ cause: new Error(sourceText(key)) });
 }
 function cliMissing(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
@@ -528,7 +528,7 @@ export class BitwardenConnectorService implements PasswordVault {
         yield* this.#call(session, ["login", "--apikey"], {
           BW_CLIENTID: record.clientId,
           BW_CLIENTSECRET: record.clientSecret,
-        }).pipe(Effect.mapError(stepFailure("error.connector.bitwardenHostSignInFailed")));
+        }).pipe(Effect.mapError(() => stepFailure("error.connector.bitwardenHostSignInFailed")));
       }
       const unlock = this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
         BW_PASSWORD: record.masterPassword,
@@ -541,9 +541,9 @@ export class BitwardenConnectorService implements PasswordVault {
             return unlock;
           },
         ),
-        Effect.mapError(stepFailure("error.connector.bitwardenHostUnlockFailed")),
+        Effect.mapError(() => stepFailure("error.connector.bitwardenHostUnlockFailed")),
       )).trim();
-      if (!key) return yield* stepFailure("error.connector.bitwardenHostUnlockFailed")();
+      if (!key) return yield* stepFailure("error.connector.bitwardenHostUnlockFailed");
       registerSecretValue(key);
       session.env = { ...env, BW_SESSION: key };
       yield* this.#openFolder(session);
