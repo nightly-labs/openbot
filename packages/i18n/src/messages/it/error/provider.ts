@@ -371,6 +371,8 @@ export const messages = {
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.codexAudioRefused":
+    "Il modello non ha accettato l'audio in questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Riprova.",
   "error.provider.imageTooSmall":
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo piccola. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooLarge":
