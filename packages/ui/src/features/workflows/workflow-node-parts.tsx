@@ -702,7 +702,7 @@ export function resultTime(format: AppFormat, at: string): string {
  * image step shows each image; a text step shows the number of each result. The arrows move to the
  * result before or after the one on view. A step with one result shows nothing. When there are more
  * results than fit, the list scrolls so that the result on view is in the middle, clear of the faded
- * edges.
+ * edges. A wheel or a trackpad over the list scrolls it.
  */
 function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string | undefined) | undefined }) {
   const board = useBoard();
@@ -728,6 +728,29 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
       });
     },
   );
+  // A wheel or a trackpad scrolls the row while the row can move that way. At an end of the row, and
+  // for a pinch, the canvas pans or zooms as before.
+  const scrollOnWheel = (event: WheelEvent) => {
+    if (!items || event.ctrlKey || event.metaKey) return;
+    const unit =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? items.clientWidth
+          : 1;
+    const rightToLeft = getComputedStyle(items).direction === "rtl";
+    // A sideways swipe moves the row as the browser does. A vertical wheel moves it toward the end of
+    // the row, which is on the left in a right-to-left language.
+    const sideways = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
+    const step = (sideways ? event.deltaX : rightToLeft ? -event.deltaY : event.deltaY) * unit;
+    // In a right-to-left language, scrollLeft goes from 0 at the start to a negative value at the end.
+    const end = items.scrollWidth - items.clientWidth;
+    const [min, max] = rightToLeft ? [-end, 0] : [0, end];
+    if (step === 0 || (step > 0 ? items.scrollLeft >= max - 1 : items.scrollLeft <= min + 1)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    items.scrollLeft += step;
+  };
   return (
     <Show when={list().length > 1}>
       <fieldset class="wfn-strip" aria-label={t("workflow.node.result.list")}>
@@ -740,7 +763,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
         >
           <ChevronLeft />
         </Button>
-        <span ref={items} class="wfn-strip-list">
+        <span ref={items} class="wfn-strip-list" onWheel={scrollOnWheel}>
           <For each={list()}>
             {(result, at) => (
               <Hint
