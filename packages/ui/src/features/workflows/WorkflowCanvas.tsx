@@ -128,6 +128,7 @@ import {
   type WfnHandle,
   type WfnPoint,
   type WfnPortType,
+  type WfnRunStatus,
   type WfnSize,
   type WfnStretch,
 } from "./workflow-board";
@@ -362,6 +363,8 @@ const BUILD_STEP = 620;
 const BUILD_LINGER = 900;
 const BUILD_FADE = 240;
 const FIT_MARGIN = 64;
+/** The run states that a collapsed group shows for its members, most important first. */
+const FOLDED_STATUS: readonly WfnRunStatus[] = ["failed", "approval", "running"];
 /**
  * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
  * the results strip takes under a node with its gap.
@@ -1770,13 +1773,18 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** The members of a group that have an output of a type. */
   const typeMembers = (entry: CanvasGroup, type: WfnPortType) =>
     entry.members.filter((id) => canvas.outputs(id).includes(type));
-  const groupTypes = (entry: CanvasGroup) => outputTypes(entry.members.map((id) => canvas.outputs(id)));
+  /** The output types of each group, once for all the ports and lines that read them. */
+  const typesOfGroups = createMemo(
+    () => new Map(nodeGroups().map((entry) => [entry.id, outputTypes(entry.members.map((id) => canvas.outputs(id)))])),
+  );
+  const groupTypes = (entry: CanvasGroup) => typesOfGroups().get(entry.id) ?? [];
   /** How many members of a group connect to the same input: by `<group>><node>:<type>`. */
   const groupFeeds = createMemo(() => {
     const counts = new Map<string, number>();
     for (const edge of canvas.edges()) {
       const entry = groupIndex().get(edge.from);
-      if (!entry || edge.branch !== undefined) continue;
+      // A named input, as the first frame of a video, takes one source: its line stays on the member.
+      if (!entry || edge.branch !== undefined || canvas.slots(edge).length > 0) continue;
       const key = `${entry.id}>${edge.to}:${edge.type}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -1847,6 +1855,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(members);
     board.pressPort(first, "out", type);
   };
+  /** The run state that a collapsed group shows for its hidden members: a failure first, then a wait. */
+  const foldedStatus = (entry: CanvasGroup): WfnRunStatus | undefined => {
+    if (!entry.folded) return undefined;
+    const states = entry.members.map(statusOf);
+    return FOLDED_STATUS.find((status) => states.includes(status));
+  };
   const stackPictures = (entry: CanvasGroup) =>
     entry.members.flatMap((id) => assetPicture(board, id) ?? []).slice(0, STACK_PICTURES);
   const isWhole = (entry: CanvasGroup) => {
@@ -1860,9 +1874,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return entry && isWhole(entry) ? entry : undefined;
   });
   /** Puts nodes in a new group. A group that keeps only one member ends. */
+  /** The last group that the selection was, for the toolbar while it closes. */
+  const heldGroup = createMemo((last?: CanvasGroup) => selectedGroup() ?? last);
   const groupNodes = (ids: readonly string[], name = "") => {
     const members = ids.filter((id) => !board.isRemoved(id));
-    if (members.length < 2 || frozen()) return;
+    // A group that is already all of the selection stays as it is, with its name.
+    if (members.length < 2 || frozen() || selectedGroup()) return;
     const left = nodeGroups().flatMap((entry) => {
       const rest = entry.members.filter((id) => !members.includes(id));
       return rest.length === 1 ? rest : [];
@@ -1882,7 +1899,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const renameGroup = (entry: CanvasGroup, name: string) => {
     if (frozen()) return;
-    canvas.patchFields(groupPatch(entry, GROUP_FIELDS.name, name || undefined), `${entry.id}:${GROUP_FIELDS.name}`);
+    // The burst is `<node id>:<field>` of the first member, so a sync keeps it while the member stays.
+    canvas.patchFields(
+      groupPatch(entry, GROUP_FIELDS.name, name || undefined),
+      `${entry.members[0]}:${GROUP_FIELDS.name}`,
+    );
   };
   const foldText = (entry: CanvasGroup) =>
     t(entry.folded ? "workflow.canvas.group.expand" : "workflow.canvas.group.collapse");
@@ -2400,20 +2421,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   /** Moves the camera so a node is in the centre of the view, and selects it. */
   const showNode = (id: string) => {
-    const at = positions[id];
+    // A member of a collapsed group does not show: the view goes to the stack card and selects the group.
+    const entry = groupIndex().get(id);
     const element = slot(id);
-    if (!at || !element) return;
+    const at = positions[id];
+    const box = entry?.folded
+      ? frameOf(entry)
+      : at && element && { ...at, width: element.offsetWidth, height: element.offsetHeight };
+    if (!box) return;
     const { width, height } = view();
     const scale = clampScale(Math.max(target().scale, 0.75));
     glideTo(
       {
         scale,
-        x: width / 2 - (at.x + element.offsetWidth / 2) * scale,
-        y: height / 2 - (at.y + element.offsetHeight / 2) * scale,
+        x: width / 2 - (box.x + box.width / 2) * scale,
+        y: height / 2 - (box.y + box.height / 2) * scale,
       },
       "flight",
     );
-    canvas.select([id]);
+    canvas.select(entry?.folded ? entry.members : [id]);
   };
 
   /** Pans the least distance that shows a whole node, with a margin. */
@@ -2446,7 +2472,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const order = live()
       .flatMap((node) => {
         const at = positions[node.id];
-        return at ? [{ id: node.id, at }] : [];
+        // The members of a collapsed group do not show, so they cannot take the focus.
+        return at && (node.id === id || !groupIndex().get(node.id)?.folded) ? [{ id: node.id, at }] : [];
       })
       .sort((a, b) => a.at.x - b.at.x || a.at.y - b.at.y)
       .map((node) => node.id);
@@ -3461,6 +3488,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         selected={isWhole(entry())}
                         ports={framePorts(entry())}
                         pictures={stackPictures(entry())}
+                        status={foldedStatus(entry())}
                         readOnly={frozen()}
                         onRename={(name) => renameGroup(entry(), name)}
                         onEndRename={() => canvas.endTyping()}
@@ -3576,21 +3604,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                           />
                         }
                       >
-                        {(entry) => (
-                          <>
-                            <ToolAction
-                              text={foldText(entry())}
-                              icon={<FoldIcon folded={entry().folded} />}
-                              onClick={() => foldGroup(entry(), !entry().folded)}
-                            />
-                            <ToolAction
-                              text={t("workflow.canvas.group.ungroup")}
-                              keys={["⇧", MOD_KEY, "G"]}
-                              icon={<Ungroup />}
-                              onClick={() => ungroup(entry().members)}
-                            />
-                          </>
-                        )}
+                        {(entry) => {
+                          // Solid can run this once more after the group ends: read the held group then.
+                          const shown = () => heldGroup() ?? entry();
+                          return (
+                            <>
+                              <ToolAction
+                                text={foldText(shown())}
+                                icon={<FoldIcon folded={shown().folded} />}
+                                onClick={() => foldGroup(shown(), !shown().folded)}
+                              />
+                              <ToolAction
+                                text={t("workflow.canvas.group.ungroup")}
+                                keys={["⇧", MOD_KEY, "G"]}
+                                icon={<Ungroup />}
+                                onClick={() => ungroup(shown().members)}
+                              />
+                            </>
+                          );
+                        }}
                       </Show>
                       <ToolAction
                         text={t("workflow.node.toolbar.duplicate")}

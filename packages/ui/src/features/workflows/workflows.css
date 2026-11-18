@@ -1191,6 +1191,19 @@
   box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
 }
 
+/* A collapsed group shows the run state of its hidden members on the stack card, as a node card does. */
+.wfn-frame[data-folded][data-status="running"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+}
+
+.wfn-frame[data-folded][data-status="approval"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-warning) 64%, transparent);
+}
+
+.wfn-frame[data-folded][data-status="failed"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-danger) 64%, transparent);
+}
+
 /* A collapsed group is a stack card: a pile of the pictures of its members. */
 .wfn-frame[data-folded] {
   display: grid;

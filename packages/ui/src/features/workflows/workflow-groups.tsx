@@ -11,7 +11,14 @@
 import { Button, Image as ImageIcon, Input, Layers } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
-import { PORT_NAME, type WfnFieldPatch, type WfnFields, type WfnFieldValue, type WfnPortType } from "./workflow-board";
+import {
+  PORT_NAME,
+  type WfnFieldPatch,
+  type WfnFields,
+  type WfnFieldValue,
+  type WfnPortType,
+  type WfnRunStatus,
+} from "./workflow-board";
 import type { Box } from "./workflow-ink";
 import { PortIcon } from "./workflow-node-parts";
 
@@ -154,6 +161,8 @@ export function GroupFrame(props: {
   ports: readonly GroupPort[];
   /** Up to three pictures of the members, for the stack card. */
   pictures: readonly string[];
+  /** The run state of the hidden members of a collapsed group: failed, approval or running. */
+  status?: WfnRunStatus | undefined;
   readOnly: boolean;
   onRename: (name: string) => void;
   onEndRename: () => void;
@@ -176,6 +185,7 @@ export function GroupFrame(props: {
       data-wfn-group={props.group.id}
       data-folded={props.group.folded ? "" : undefined}
       data-selected={props.selected ? "" : undefined}
+      data-status={props.status}
       aria-label={name()}
       style={{
         left: `${props.box.x}px`,

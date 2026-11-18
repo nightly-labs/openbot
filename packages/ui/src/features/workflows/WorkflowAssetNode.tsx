@@ -78,18 +78,24 @@ function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefin
   return preview(file.id);
 }
 
-/** The file of an asset node: by its id, else by its name for a graph saved before the id. */
+/**
+ * The file of an asset node by its id, so two files with one name stay apart. A graph saved before the
+ * id finds it by name.
+ */
+function findFile(board: WfnBoard, fileId: string, name: string): StoredFileRow | undefined {
+  const files = libraryFiles(board);
+  return (
+    (fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
+    (name ? files.find((candidate) => candidate.name === name) : undefined) ??
+    (fileId ? hostPicture(board, fileId, name) : undefined)
+  );
+}
+
+/** The file of an asset node, from its fields. */
 function assetFile(board: WfnBoard, id: string): StoredFileRow | undefined {
   const fileId = board.field(id, "fileId");
   const name = board.field(id, "file");
-  const files = libraryFiles(board);
-  return (
-    (typeof fileId === "string" && fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
-    (typeof name === "string" && name ? files.find((candidate) => candidate.name === name) : undefined) ??
-    (typeof fileId === "string" && fileId
-      ? hostPicture(board, fileId, typeof name === "string" ? name : "")
-      : undefined)
-  );
+  return findFile(board, typeof fileId === "string" ? fileId : "", typeof name === "string" ? name : "");
 }
 
 /** The thumbnail address of the picture of an asset node, or undefined when it has no picture to show. */
@@ -350,16 +356,7 @@ export function AssetNode(props: { id: string; file?: string }) {
     asString,
   );
   const [fileId] = useField(() => props.id, "fileId", "", asString);
-  /** The file by its id, so two files with one name stay apart. A graph saved before the id finds it by name. */
-  const file = () => {
-    const files = libraryFiles(board);
-    const id = fileId();
-    return (
-      (id ? files.find((candidate) => candidate.id === id) : undefined) ??
-      files.find((candidate) => candidate.name === fileName()) ??
-      (id ? hostPicture(board, id, fileName()) : undefined)
-    );
-  };
+  const file = () => findFile(board, fileId(), fileName());
   const setFile = (next: StoredFileRow) => board.setFields(props.id, { file: next.name, fileId: next.id });
   /** Files from the computer stay on this computer, so a host that cannot read them does not offer them. */
   const uploads = () => board.features()?.uploads !== false;

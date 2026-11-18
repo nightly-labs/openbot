@@ -1637,7 +1637,13 @@ export function createBoard(options: BoardOptions) {
         </For>
         <For each={state.edges}>
           {(edge) => (
-            <Show when={edge.branch !== undefined && !showsActions(edge.id) ? ends(edge) : undefined}>
+            <Show
+              when={
+                edge.branch !== undefined && leads(edge, targets(edge)[0]) && !showsActions(edge.id)
+                  ? ends(edge)
+                  : undefined
+              }
+            >
               {(line) => {
                 const spot = () => line().turn ?? line().middle;
                 return (
@@ -1657,7 +1663,11 @@ export function createBoard(options: BoardOptions) {
         </For>
         <For each={state.edges}>
           {(edge) => (
-            <Show when={!showsActions(edge.id) ? options.loops?.().get(edge.id) : undefined}>
+            <Show
+              when={
+                leads(edge, targets(edge)[0]) && !showsActions(edge.id) ? options.loops?.().get(edge.id) : undefined
+              }
+            >
               {(loop) => (
                 <Show when={ends(edge)}>
                   {(line) => (
@@ -1703,6 +1713,8 @@ export function createBoard(options: BoardOptions) {
     },
     /** The fields of a node, to copy it. */
     fields: (id: string): WfnFields => ({ ...state.fields[id] }),
+    /** The named inputs that a connection fills, as the first frame of a video. */
+    slots: (edge: WfnEdge) => slotsOf(edge),
     /**
      * Changes the fields of several nodes as one change. Each change of one `burst` of typing joins the
      * same change; give it as `<node id>:<field>`.
