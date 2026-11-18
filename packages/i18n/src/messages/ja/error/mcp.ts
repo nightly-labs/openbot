@@ -21,6 +21,7 @@ export const messages = {
     "このサーバーはサインインアプリに対応していません。ホストの OpenBot をアップデートしてください。",
   "error.mcp.redirectRelayed": "OpenBot がサインインをサーバーに送信しました。このウィンドウは閉じてかまいません。",
   "error.mcp.relayEnded": "このサインインは終了しました。もう一度開始してください。",
+  "error.mcp.signInLinkNotReady": "サインインページはまだ開いていません。少し待ってからもう一度お試しください。",
   "error.mcp.relayNoState":
     "サーバーのサインインページは戻り先アドレスを保護していないため、OpenBot はこのコンピューターでは開きません。",
   "error.mcp.relayAddressInvalid":

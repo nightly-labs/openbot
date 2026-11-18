@@ -2347,6 +2347,9 @@ export const IPC_ENDPOINTS = {
       "servers:mcp:complete-sign-in-relay",
     ),
     cancelMcpSignIn: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:cancel-sign-in"),
+    // A browser can start and show nothing. Main copies the page of the sign-in that waits on this
+    // computer, so the user can open it in another browser; the window never holds the address.
+    copyMcpSignInLink: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:copy-sign-in-link"),
     signOutMcpServer: scopedRequest<SignOutMcpServerInput, McpSignInState[], "required">()("servers:mcp:sign-out"),
     listMcpSignIns: scopedQuery<McpSignInState[], "required">()("servers:mcp:list-sign-ins"),
     // The OAuth app an administrator registered for a saved http row, and the exact callback address.

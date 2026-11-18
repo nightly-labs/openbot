@@ -38,6 +38,11 @@ export interface MarketplaceCalls {
   openUrl: (url: string) => Promise<void>;
   /** A sign-in that a joined server relays to this computer's browser. Absent: this client cannot take one. */
   signInRelay?: MarketplaceSignInRelay | undefined;
+  /**
+   * Copies the page of a sign-in that waits in this computer's browser. Absent: this client signs in
+   * only on a joined server, whose page is not in this computer's browser.
+   */
+  copySignInLink?: ((url: string, serverId: string) => Promise<void>) | undefined;
   /** Asks macOS on this computer for Automation access to Apple apps. Absent: this client cannot. */
   macAutomation?: SkillsPort["macAutomation"]["request"] | undefined;
   /**
@@ -88,6 +93,7 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
       paste: (url, address, serverId) => port.agent.completeMcpSignInRelay({ url, address }, serverId),
       hostTab: (url, serverId) => port.agent.mcpSignInPage({ url }, serverId),
     },
+    copySignInLink: (url, serverId) => port.agent.copyMcpSignInLink({ url }, serverId),
     macAutomation: (targets) => port.macAutomation.request(targets),
   };
 }

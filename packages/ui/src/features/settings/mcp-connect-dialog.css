@@ -136,7 +136,8 @@
   margin-top: 0;
 }
 
-.integration-wizard-body > .mcp-sign-in-relay-open {
+/* The copy button of a sign-in in this computer's browser keeps the width of its words too. */
+.integration-wizard-body > :is(.mcp-sign-in-relay-open, .mcp-sign-in-copy) {
   justify-self: start;
 }
 

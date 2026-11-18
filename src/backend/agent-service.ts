@@ -2838,6 +2838,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#mcp.cancelSignIn(input.url);
   }
 
+  mcpSignInLink(input: CancelMcpSignInInput): string | null {
+    return this.#mcp.signInLink(input.url);
+  }
+
   signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {
     return this.#mcp
       .signOut(input)
