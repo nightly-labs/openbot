@@ -14,7 +14,9 @@
 // own routine in either call order (#9856), and that a routine that its own run paused says which run
 // until the next change of the routine, also after a restart (#10048), and that the routine prompt
 // says that a request to a teammate is not a failure (#10928), and that a stop that the user asked
-// for is not a failure, which Test and script runs do not get (#11578).
+// for is not a failure, which Test and script runs do not get (#11578). A run whose turn fails with no
+// error keeps a reason that says so, with one failed marker also after a later queue change, and
+// list_routines gives each routine its newest run with that reason (#11627).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,6 +31,7 @@ import {
   type RoutineRun,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -94,7 +97,8 @@ const replyCalls = (...items: FakeCall[]) => `<<REPLY${JSON.stringify(items)}REP
  * result, then answers:
  * `FAILED_ANSWER` after a call, `Relay report <<CALLS...CALLS>>` for an input with `<<NEXT...NEXT>>`
  * (so the next agent of a flow gets the calls), and "All good." otherwise. An input with
- * `PROVIDER-FAIL` ends the turn failed with an error and no answer. `EMPTY-ANSWER` does the same with
+ * `PROVIDER-FAIL` ends the turn failed with an error and no answer. `SILENT-FAIL` ends it failed with
+ * no error at all. `EMPTY-ANSWER` does the same with
  * the `empty_answer` cause, as Grok does when the model sends only its reasoning. `QUIET-HANG` sends
  * nothing after its calls until a `turn/interrupt`, as Grok does while it tries such a reply again
  * (#8629). `QUIET-LOOP` calls \`routine_no_update\` again after each result until a \`turn/interrupt\`, as
@@ -133,6 +137,7 @@ const finish = (turn) => {
     write({ method: "error", params: { threadId, turnId, error: { message: ${JSON.stringify(PROVIDER_ERROR)} }, willRetry: false } });
     return write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "failed" } } });
   }
+  if (turn.silentFail) return write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "failed" } } });
   if (turn.quietHang) return;
   if (turn.emptyAnswer) {
     write({ method: "error", params: { threadId, turnId, message: ${JSON.stringify(NO_ANSWER_ERROR)}, causeCode: "empty_answer" } });
@@ -193,7 +198,7 @@ const answer = (message) => {
       const textOnly = task.includes("TEAMMATE-REQUEST-TEXT");
       const turnCalls = named ? JSON.parse(named[1]) : task.includes("TEAMMATE-REQUEST-NOREPLY") ? [] : textOnly ? [requestReply] : requestReply ? [{ tool: "routine_no_update", arguments: {} }, requestReply, { tool: "routine_no_update", arguments: {} }] : task.includes("TEAMMATE-QUIET") ? [{ tool: "routine_no_update", arguments: {} }] : [];
       const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : textOnly ? "The result went to the teammate." : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
-      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), loops: 0 });
+      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), silentFail: task.includes("SILENT-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), loops: 0 });
     }
     case "turn/interrupt": {
       log({ method: "turn/interrupt", threadId: params.threadId, turnId: params.turnId });
@@ -424,6 +429,7 @@ try {
   );
   const plain = createRoutine(checker.id, "Plain check", "Check the build.");
   const broken = createRoutine(checker.id, "Broken check", "Check the disk. PROVIDER-FAIL");
+  const silent = createRoutine(checker.id, "Silent check", "Check the disk. SILENT-FAIL");
   const quietFailed = createRoutine(
     checker.id,
     "Quiet failed",
@@ -715,12 +721,36 @@ try {
       brokenRun.run.error === PROVIDER_ERROR,
     brokenRun.run,
   );
+  const silentRun = await settledRun(
+    "Silent check",
+    await runCauseEffect(agents.testRoutine({ agentId: checker.id, routineId: silent.id })),
+  );
+  const NO_REASON = sourceText("error.backend.routineRunFailedNoReason");
+  pass(
+    "A turn that fails with no error fails the run with a reason that says so",
+    silentRun.delivery.status === "failed" && silentRun.run.status === "failed" && silentRun.run.error === NO_REASON,
+    silentRun.run,
+  );
 
   // A later queue change reconciles every delivery of the queue again.
-  const laterReceipt = await runCauseEffect(agents.sendMessage({ agentId: checker.id, text: "Anything else?" }));
+  const laterReceipt = await runCauseEffect(
+    agents.sendMessage({ agentId: checker.id, text: `Anything else? ${calls(listRoutines)}` }),
+  );
   const laterId = laterReceipt.deliveries[0]?.id;
   assert.ok(laterId);
   await waitFor("the later chat turn", () => ended(mailbox.getDelivery(laterId)?.delivery.status));
+  const silentTransitions = (await runCauseEffect(agents.readConversation(checker.id))).messages
+    .map(routineRunConversationEvent)
+    .filter((event) => event?.runId === silentRun.run.id && event.status === "failed");
+  pass("The run with no error has one failed marker", silentTransitions.length === 1, silentTransitions);
+  const laterList = toolResults(mailbox.getDelivery(laterId)?.delivery.turnId ?? null, "list_routines")[0]?.result;
+  const listed = JSON.parse(laterList?.contentItems.find((item) => item.text.includes("Silent check"))?.text ?? "{}");
+  const silentListed = listed.routines?.find((routine: { name: string }) => routine.name === "Silent check");
+  pass(
+    "list_routines gives the newest run with its reason",
+    silentListed?.lastRun?.status === "failed" && silentListed.lastRun.reason === NO_REASON,
+    silentListed?.lastRun ?? laterList,
+  );
   const healthAfter = agents
     .listRoutineRuns({ agentId: checker.id, routineId: health.id })
     .find((run) => run.id === healthRun.run.id);
