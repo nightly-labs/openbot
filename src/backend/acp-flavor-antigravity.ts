@@ -281,11 +281,15 @@ const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises a
 /**
  * Google's answer, in the CLI's log, for a tool schema that its `parameters` format refuses. It has one
  * entry for each field, such as `GenerateContentRequest.tools[20].function_declarations[0].parameters
- * .properties[tags].items: missing field` or `….properties[revisions].enum[3]: cannot be empty`. It
- * names the tool only by its place in the request, which the log does not map to a name (#7482).
+ * .properties[tags].items: missing field` or `….properties[revisions].enum[3]: cannot be empty`. A
+ * field that Google takes only in a schema of one type, such as `items` on a `string`, gives
+ * `….properties[situacoes].items: field predicate failed: $type == Type.ARRAY` (#11746). It names the
+ * tool only by its place in the request, which the log does not map to a name (#7482).
  */
 const GOOGLE_REFUSED_FIELD =
-  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty)/gu;
+  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty|field predicate failed: \$type == Type\.\w+)/gu;
+/** The type that Google asks for in a `field predicate failed` reason of `GOOGLE_REFUSED_FIELD`. */
+const GOOGLE_FIELD_TYPE = /^field predicate failed: \$type == Type\.(\w+)$/u;
 /** One step of the field path in `GOOGLE_REFUSED_FIELD`: a key, and a property name or an index. */
 const GOOGLE_FIELD_STEP = /\.(\w+)(?:\[([^\]]*)\])?/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
@@ -398,8 +402,9 @@ function folderNames(folder: string): string[] {
 }
 
 /**
- * Whether `parameters` has the field that Google refused at `path`: a missing key, or an empty value.
- * An index in a step reads an array, and a property name reads an object.
+ * Whether `parameters` has the field that Google refused at `path`: a missing key, an empty value, or
+ * a key in a schema of a type other than the one that Google asks for. An index in a step reads an
+ * array, and a property name reads an object.
  */
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
@@ -410,8 +415,9 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
   const last = steps.pop();
   if (!last) return false;
   const missing = reason === "missing field";
+  const type = GOOGLE_FIELD_TYPE.exec(reason)?.[1]?.toLowerCase();
   let node = parameters;
-  for (const { key, index } of missing ? steps : [...steps, last]) {
+  for (const { key, index } of missing || type ? steps : [...steps, last]) {
     if (!isRecord(node)) return false;
     const value = Object.hasOwn(node, key) ? node[key] : undefined;
     if (index === undefined) node = value;
@@ -422,6 +428,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
     // Google asks for `items` only in an array. A field of another type with the same name is not refused.
     return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+  }
+  if (type) {
+    if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;
+    // The field is refused only beside another type. A schema of the asked type with the same field is accepted.
+    return node.type !== type && !(Array.isArray(node.type) && node.type.includes(type));
   }
   return node === "" || (Array.isArray(node) && node.length === 0);
 }
