@@ -1,8 +1,7 @@
 import SharedFilePreviewPanel from "@openbot/ui/features/conversation/FilePreviewPanel";
 import type { ComponentProps } from "@solidjs/web";
-import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
+import { readSidePanelWidth, resetSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 
-const PANEL_STORAGE_KEY = "openbot:browser-panel-width";
 const WRAP_LINES_STORAGE_KEY = "openbot:file-preview-wrap-lines";
 
 export default function FilePreviewPanel(
@@ -14,9 +13,9 @@ export default function FilePreviewPanel(
   return (
     <SharedFilePreviewPanel
       {...props}
-      readWidth={(fallback, min, max) => readPanelWidth(PANEL_STORAGE_KEY, fallback, min, max)}
-      onResetWidth={() => window.localStorage.removeItem(PANEL_STORAGE_KEY)}
-      onResizeEnd={(width) => savePanelWidth(PANEL_STORAGE_KEY, width)}
+      readWidth={readSidePanelWidth}
+      onResetWidth={resetSidePanelWidth}
+      onResizeEnd={saveSidePanelWidth}
       readWrapLines={() => window.localStorage.getItem(WRAP_LINES_STORAGE_KEY) === "true"}
       onWrapLinesChange={(wrap) => window.localStorage.setItem(WRAP_LINES_STORAGE_KEY, String(wrap))}
     />

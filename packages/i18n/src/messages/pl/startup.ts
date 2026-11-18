@@ -20,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "Pobierz OpenBot",
   "startup.newerDataGuide": "Otwórz przewodnik",
   "startup.newerDataQuit": "Zakończ",
+  "startup.newerDataLoopTitle": "Najnowszy OpenBot się nie otworzył",
+  "startup.newerDataLoopBody":
+    "Nowsza wersja OpenBot zapisała Twoje dane, a ta wersja ({version}) nie może ich otworzyć. OpenBot {loopVersion} kilka razy z rzędu zatrzymał się przed otwarciem, więc nie zostanie zainstalowany ponownie.\n\nZainstaluj wersję nowszą niż {loopVersion}, gdy będzie dostępna. Aby uzyskać pomoc, otwórz przewodnik.\n\nTwoje lokalne dane nie zostały zresetowane ani nadpisane.",
+  "startup.newerDataReleases": "Pokaż wydania",
   "startup.recoveryWindowTitle": "Odzyskiwanie OpenBot",
   "startup.recoveryTitle": "OpenBot się nie otworzył",
   "startup.recoveryBody": {
@@ -31,8 +35,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "Spróbuj ponownie albo zainstaluj ostatnią wersję, która się otwierała. Aby uzyskać pomoc, wyeksportuj diagnostykę i wyślij plik ze zgłoszeniem.",
+  "startup.recoveryHintLatest":
+    "OpenBot nie znalazł wcześniejszej wersji, która może otworzyć Twoje dane. Spróbuj ponownie albo zainstaluj najnowszą wersję. Aby uzyskać pomoc, wyeksportuj diagnostykę i wyślij plik ze zgłoszeniem.",
   "startup.recoveryRetry": "Spróbuj ponownie",
   "startup.recoveryPreviousVersion": "Pobierz poprzednią wersję",
+  "startup.recoveryLatestVersion": "Pobierz najnowszą wersję",
   "startup.recoveryExportDiagnostics": "Eksportuj diagnostykę",
   "startup.recoveryOpenDataFolder": "Otwórz folder danych",
   "startup.recoveryQuit": "Zakończ",

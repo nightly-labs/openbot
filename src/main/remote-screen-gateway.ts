@@ -80,6 +80,8 @@ interface RemoteScreenGatewayOptions {
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
+  // Read for a Windows host only: true when this computer's session has no screen to capture.
+  sessionDisconnected?: (() => boolean) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -548,6 +550,12 @@ export class RemoteScreenGateway {
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing")),
       });
     }
+    // Sunshine runs in this session. Without this, the stream fails with only a capture error.
+    if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {
+      return yield* new RemoteWorkflowError({
+        cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
+      });
+    }
     if (this.#testSessionId)
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
@@ -903,7 +911,10 @@ export class RemoteScreenGateway {
       };
       client.once("close", close);
       upstream.once("close", close);
-      upstream.once("error", () => client.close(1011, "Moonlight stream failed"));
+      // `ws` throws an `error` that has no listener, and a bad frame or a write to a dropped viewer can
+      // send more than one. Each socket keeps a listener, so the error ends the stream, not the main process.
+      client.on("error", () => client.close(1011, "Moonlight stream failed"));
+      upstream.on("error", () => client.close(1011, "Moonlight stream failed"));
     });
   }
 

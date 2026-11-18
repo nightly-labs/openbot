@@ -47,7 +47,9 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import type { BillingSales } from "./billing-sales";
+import { checkoutTax } from "./billing-tax";
 import type { LicenseEmailInput } from "./email-templates";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { SmtpLicenseMessage } from "./smtp-email-delivery";
@@ -66,6 +68,7 @@ import {
   subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  VAT_METADATA,
 } from "./stripe-client";
 
 /** Prices change only when `stripe-bootstrap.ts` runs, so each isolate reads the price once in this time. */
@@ -157,6 +160,8 @@ export interface LicenseServiceOptions {
   secretKey: string;
   /** A license bought before this time is free until then, in milliseconds since the epoch. */
   trialEnd?: number | null;
+  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
+  countryRequired?: boolean;
   now: () => number;
   /** The Stripe customer of the account. Server plans and the license use the same customer. */
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, BillingError | BillingOperationError>;
@@ -177,6 +182,11 @@ export interface LicenseServiceOptions {
    * the webhook answers.
    */
   onLicenseEmail?: (message: SmtpLicenseMessage) => void;
+  /**
+   * Runs once for each license that starts, ends, or cancels or resumes its renewal, with the email of
+   * its account. It must not throw or wait.
+   */
+  onPurchase?: (purchase: BillingPurchase) => void;
 }
 
 class LicenseDependencies extends Context.Service<
@@ -196,19 +206,23 @@ export class LicenseService {
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #trialEnd: number | null;
+  readonly #countryRequired: boolean;
   readonly #now: () => number;
   readonly #onLicenseChanged: LicenseServiceOptions["onLicenseChanged"] | null;
   readonly #onLicenseEmail: LicenseServiceOptions["onLicenseEmail"] | null;
+  readonly #onPurchase: ((purchase: BillingPurchase) => void) | null;
 
   constructor(options: LicenseServiceOptions) {
     this.#secretKey = options.secretKey;
     this.#trialEnd = options.trialEnd ?? null;
+    this.#countryRequired = options.countryRequired ?? false;
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#sales = options.sales ?? null;
     this.#onLicenseChanged = options.onLicenseChanged ?? null;
     this.#onLicenseEmail = options.onLicenseEmail ?? null;
+    this.#onPurchase = options.onPurchase ?? null;
     this.#layer = Layer.succeed(LicenseDependencies, {
       database: options.database,
       stripe: options.stripe,
@@ -306,6 +320,8 @@ export class LicenseService {
       request: Required<LicenseCheckoutRequest>,
       target: LicenseReturnTarget,
       origin: string,
+      /** The code of a discount link. Only the web client sends one. */
+      promotionCode: string | null = null,
     ): Effect.fn.Return<string, BillingError | BillingOperationError, LicenseDependencies> {
       const dependencies = yield* LicenseDependencies;
       const plan: LicensePlan = {
@@ -327,6 +343,7 @@ export class LicenseService {
       if (locked && locked !== request.currency)
         return yield* new BillingError(409, "license_currency", sourceText("error.billing.licenseCurrency"));
       const customerId = yield* this.#ensureCustomer(user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
       const returnUrl = licenseReturnUrl(origin, target);
       const trialEnd = this.trialEnd();
       const session = yield* this.#stripeCall(() =>
@@ -336,8 +353,10 @@ export class LicenseService {
           currency: request.currency,
           userId: user.id,
           quantity: request.users,
+          tax,
           metadata: licenseMetadata(plan),
           ...(trialEnd === null ? {} : { trialEndSeconds: Math.floor(trialEnd / 1_000) }),
+          ...(promotionCode ? { promotionCode } : {}),
           successUrl: returnUrl,
           cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
           nowSeconds: Math.floor(dependencies.now() / 1_000),
@@ -626,6 +645,7 @@ export class LicenseService {
         ? Math.max(ordered.trialEndSeconds, nowSeconds + 3_600)
         : Math.floor(periodEnd / 1_000);
       const customerId = subscriptionCustomerId(subscription);
+      const vatTreatmentMark = subscription.metadata[VAT_METADATA.treatment];
       const listed = yield* this.#stripeCall(() => dependencies.stripe.listCustomerSubscriptions(customerId));
       const readAt = dependencies.now();
       const license =
@@ -640,11 +660,16 @@ export class LicenseService {
                 currency,
                 anchorSeconds,
                 trial: ordered !== null,
+                automaticTax: subscription.automatic_tax?.enabled === true,
+                taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),
                   [LICENSE_METADATA.orderSubscription]: subscription.id,
+                  // Only a subscription with a VAT treatment sends it, so the retry of an older split keeps
+                  // the body of its idempotency key.
+                  ...(vatTreatmentMark === undefined ? {} : { [VAT_METADATA.treatment]: vatTreatmentMark }),
                 },
               },
               `license-split:${subscription.id}`,
@@ -933,6 +958,28 @@ export class LicenseService {
           ...(reactivated === undefined ? {} : { reactivated }),
           ...(change.endReason ? { endReason: change.endReason } : {}),
         });
+        const event = purchaseEvent(change.action);
+        if (event) {
+          yield* reportPurchase(
+            { database: dependencies.database, now: dependencies.now, send: this.#onPurchase },
+            subscription.id,
+            ownerId,
+            {
+              event,
+              periodEnd: subscriptionEnd(subscription),
+              cancelRequest: subscription.canceled_at ?? null,
+              ...(change.endReason ? { endReason: change.endReason } : {}),
+              product: "license",
+              tier: plan.tier,
+              users,
+              bundle: plan.bundle,
+              interval: plan.interval,
+              currency,
+              amount: licensePeriodAmount(plan, users, currency),
+              trial: subscription.status === "trialing",
+            },
+          );
+        }
       }
       // A `past_due` license stops giving its users at its period end with no change to its row. The lapse
       // sweep reads it after that time, so the view at the previous write's time is the one to compare.

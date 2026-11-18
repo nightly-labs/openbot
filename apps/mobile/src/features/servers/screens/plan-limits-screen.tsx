@@ -1,4 +1,4 @@
-import type { PlanLimitWindow } from "@openbot/team-client/plan-limits";
+import { type PlanLimitWindow, usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -49,6 +49,8 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
   const [success, warning, danger] = useCSSVariable(["--openbot-success", "--openbot-warning", "--openbot-danger"]);
   const fill = { neutral: success, warning, critical: danger }[window.tone];
   const resetsAt = planLimitResetDate(window);
+  // The amount left at an even pace, as on desktop. A fill that ends before the mark runs out before the reset.
+  const pace = usagePaceRemainingPercent(window.durationMins, window.resetsAt, Date.now());
   return (
     <View className="gap-1.5 px-4 py-3">
       <View className="flex-row items-baseline justify-between gap-3">
@@ -59,13 +61,21 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
           {t("mobile.server.planLimits.left", { percent: window.remainingPercent })}
         </Typography.Paragraph>
       </View>
-      <View className="h-1.5 overflow-hidden rounded-full">
-        {/* The track of the desktop rings: the text colour, faint. */}
-        <View className="absolute inset-0" style={{ backgroundColor: track, opacity: 0.15 }} />
-        <View
-          className="h-full rounded-full"
-          style={{ width: `${window.remainingPercent}%`, backgroundColor: String(fill) }}
-        />
+      <View className="h-1.5 justify-center">
+        <View className="h-full overflow-hidden rounded-full">
+          {/* The track of the desktop rings: the text colour, faint. */}
+          <View className="absolute inset-0" style={{ backgroundColor: track, opacity: 0.15 }} />
+          <View
+            className="h-full rounded-full"
+            style={{ width: `${window.remainingPercent}%`, backgroundColor: String(fill) }}
+          />
+        </View>
+        {pace === null ? null : (
+          <View
+            className="absolute h-2.5 w-0.5 rounded-full"
+            style={{ start: `${pace}%`, marginStart: -1, backgroundColor: track }}
+          />
+        )}
       </View>
       {resetsAt ? (
         <Typography.Paragraph type="body-xs" className="text-grouped-secondary">

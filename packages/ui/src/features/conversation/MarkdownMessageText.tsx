@@ -1,12 +1,19 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
@@ -34,11 +41,16 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
    * text, with no highlight, toolbar or live preview.
    */
   excerpt?: boolean | undefined;
+  /**
+   * The text of a file, not a message. A message can name one folder for the file names after it;
+   * a file names its paths from the workspace, so its folder paths change no other path (#8536).
+   */
+  document?: boolean | undefined;
 };
 
 type MarkdownContentProps = Omit<
   MarkdownMessageTextProps,
-  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter"
+  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter" | "document"
 > & {
   fileDirectory: FileDirectoryContext | null;
 };
@@ -84,6 +96,14 @@ interface MathToken extends Tokens.Generic {
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
+    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",
@@ -267,7 +287,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   });
   // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
   // `content` object and run their reads again. Only a new directory changes it.
-  const fileDirectory = createMemo(() => messageFileDirectory(props.body), {
+  const fileDirectory = createMemo(() => (props.document === true ? null : messageFileDirectory(props.body)), {
     equals: (previous, next) => previous?.path === next?.path && previous?.kind === next?.kind,
   });
   const contentProps = createMemo(
@@ -552,16 +572,8 @@ function MarkdownList(props: {
   });
   const list = () => (
     <For each={renderedItems()}>
-      {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
-          <Show when={renderedItem.item.task}>
-            <Checkbox
-              class="message-markdown-checkbox"
-              checked={renderedItem.item.checked === true}
-              disabled
-              aria-label={renderedItem.item.text}
-            />
-          </Show>
+      {(renderedItem, index) => {
+        const blocks = () => (
           <MarkdownBlocks
             tokens={renderedItem.item.tokens.filter((child) => child.type !== "checkbox")}
             content={props.content}
@@ -572,8 +584,24 @@ function MarkdownList(props: {
               tailAfter()[index()],
             )}
           />
-        </li>
-      )}
+        );
+        return (
+          <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
+            <Show when={renderedItem.item.task}>
+              <Checkbox
+                class="message-markdown-checkbox"
+                checked={renderedItem.item.checked === true}
+                disabled
+                aria-label={renderedItem.item.text}
+              />
+            </Show>
+            {/* A task item is a row. One body keeps its text, code and nested lists in one column. */}
+            <Show when={renderedItem.item.task} fallback={blocks()}>
+              <div class="message-markdown-task-body">{blocks()}</div>
+            </Show>
+          </li>
+        );
+      }}
     </For>
   );
 
@@ -596,7 +624,12 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   );
   const { t } = useText();
   return (
-    <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
+    <ScrollEdges
+      axis="x"
+      class="message-table-frame message-markdown-table-frame"
+      viewClass="message-markdown-table-scroll"
+      label={t("chat.table.data")}
+    >
       <table
         class="message-markdown-table"
         style={`--message-markdown-table-columns: ${headers().length}`}
@@ -633,7 +666,7 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
           </For>
         </tbody>
       </table>
-    </section>
+    </ScrollEdges>
   );
 }
 
@@ -1335,9 +1368,10 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
 /** The shared and workspace paths that a link target can open as a chip. */
 function linkFileTargets(href: string): { shared: string | null; workspace: string | null } {
   const fileUrl = fileUrlPath(href);
-  // The shared-file resolver does not decode, and the workspace resolver does.
+  // A link target is percent-encoded, such as `a%20b.md`. The shared-file resolver does not decode, so
+  // the shared target is decoded here once; the workspace resolver decodes by itself (#12104).
   return {
-    shared: sharedFileTarget(fileUrl === null ? href : decodedFileUrlPath(fileUrl)),
+    shared: sharedFileTarget(decodedFileUrlPath(fileUrl ?? href)),
     workspace: workspaceFileTarget(fileUrl ?? href),
   };
 }

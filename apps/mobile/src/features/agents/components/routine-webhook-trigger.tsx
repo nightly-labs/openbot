@@ -7,6 +7,7 @@ import {
 import type { EventFilter } from "@openbot/contracts/ipc-events";
 import * as Clipboard from "expo-clipboard";
 import { Button, Typography } from "heroui-native";
+import Bot from "lucide-react-native/icons/bot";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -117,6 +118,7 @@ export function RoutineWebhookTrigger({
   onFiltersChange,
   onSecretDismiss,
   onRotate,
+  agentSecret,
 }: {
   /** The first row of the card: the picker that changes the trigger. */
   header: ReactNode;
@@ -132,6 +134,11 @@ export function RoutineWebhookTrigger({
   onSecretDismiss: () => void;
   /** Makes a new secret. Left out, the action is hidden. */
   onRotate?: () => void;
+  /**
+   * Gives a new secret to the routine's agent, which keeps it as an API key. Left out, the action is
+   * hidden: the host cannot do it, or the routine has no single agent.
+   */
+  agentSecret?: { agentName: string; pending: boolean; give: () => void } | undefined;
 }) {
   const { t } = useText();
   const { copied, copy } = useCopy();
@@ -193,19 +200,45 @@ export function RoutineWebhookTrigger({
               >
                 {copyIcon("secret")}
               </IconAction>
-            ) : onRotate ? (
-              <IconAction
-                label={t("mobile.agent.webhook.rotate")}
-                disabled={disabled || rotatePending}
-                onPress={() =>
-                  Alert.alert(t("mobile.agent.webhook.rotateTitle"), t("mobile.agent.webhook.rotateBody"), [
-                    { text: t("common.cancel"), style: "cancel" },
-                    { text: t("mobile.agent.webhook.rotateConfirm"), style: "destructive", onPress: onRotate },
-                  ])
-                }
-              >
-                <RefreshCw size={18} color={muted} />
-              </IconAction>
+            ) : onRotate || agentSecret ? (
+              <View className="flex-row">
+                {agentSecret ? (
+                  <IconAction
+                    label={t("mobile.agent.webhook.giveToAgent", { name: agentSecret.agentName })}
+                    disabled={disabled || rotatePending || agentSecret.pending}
+                    onPress={() =>
+                      Alert.alert(
+                        t("mobile.agent.webhook.giveTitle", { name: agentSecret.agentName }),
+                        t("mobile.agent.webhook.giveBody", { name: agentSecret.agentName }),
+                        [
+                          { text: t("common.cancel"), style: "cancel" },
+                          {
+                            text: t("mobile.agent.webhook.giveConfirm"),
+                            style: "destructive",
+                            onPress: agentSecret.give,
+                          },
+                        ],
+                      )
+                    }
+                  >
+                    <Bot size={18} color={muted} />
+                  </IconAction>
+                ) : null}
+                {onRotate ? (
+                  <IconAction
+                    label={t("mobile.agent.webhook.rotate")}
+                    disabled={disabled || rotatePending || agentSecret?.pending === true}
+                    onPress={() =>
+                      Alert.alert(t("mobile.agent.webhook.rotateTitle"), t("mobile.agent.webhook.rotateBody"), [
+                        { text: t("common.cancel"), style: "cancel" },
+                        { text: t("mobile.agent.webhook.rotateConfirm"), style: "destructive", onPress: onRotate },
+                      ])
+                    }
+                  >
+                    <RefreshCw size={18} color={muted} />
+                  </IconAction>
+                ) : null}
+              </View>
             ) : null
           }
         >

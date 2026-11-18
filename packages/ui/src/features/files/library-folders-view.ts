@@ -5,15 +5,30 @@ import {
   libraryFolderPath,
 } from "@openbot/contracts/ipc";
 
-/** The place in the Library that the page shows. `removed`: the files of agents that the server no longer has. */
+/**
+ * The place in the Library that the page shows. `recent`: the files of the last days. `unsorted`: the
+ * files that are in no folder. `removed`: the files of agents that the server no longer has.
+ */
 export type LibraryLocation =
   | { kind: "all" }
+  | { kind: "recent" }
+  | { kind: "unsorted" }
   | { kind: "removed" }
   | { kind: "agent"; agentId: string }
   | { kind: "folder"; agentId: string; folderId: string };
 
 export const ALL_FILES: LibraryLocation = { kind: "all" };
+export const RECENT_FILES: LibraryLocation = { kind: "recent" };
+export const UNSORTED_FILES: LibraryLocation = { kind: "unsorted" };
 export const REMOVED_AGENTS: LibraryLocation = { kind: "removed" };
+
+/** How old a file of "Recent" can be. */
+const RECENT_MS = 7 * 86_400_000;
+
+/** The file is from the last seven days. */
+export function isRecentFile(createdAt: string, now: Date): boolean {
+  return now.getTime() - Date.parse(createdAt) < RECENT_MS;
+}
 
 export function sameLocation(a: LibraryLocation, b: LibraryLocation): boolean {
   if (a.kind !== b.kind) return false;
@@ -22,10 +37,17 @@ export function sameLocation(a: LibraryLocation, b: LibraryLocation): boolean {
   return true;
 }
 
-/** The key of the folder list of an agent in the set of collapsed rows. A folder uses its id. */
+/**
+ * The key of the folder list of an agent in the set of collapsed rows, and of the agent in the
+ * favorites. A folder uses its id.
+ */
 export function agentKey(agentId: string): string {
   return `agent:${agentId}`;
 }
+
+/** The keys of the sections of the side panel in the set of collapsed rows. */
+export const FAVORITES_SECTION = "section:favorites";
+export const AGENTS_SECTION = "section:agents";
 
 /** The element id of the folder list under a row. */
 export function branchId(key: string): string {

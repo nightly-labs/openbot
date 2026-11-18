@@ -328,16 +328,18 @@ export function stopSubagents(state: SubagentState, now: string, turnIds?: Reado
 
 /**
  * Ends the subagents in a stored list that still run. `background` keeps a background subagent,
- * which works on after its turn. Returns true when the list changed.
+ * which works on after its turn. `keep` names more subagents that work on, by id. Returns true when
+ * the list changed.
  */
 export function stopRunningSubagents(
   subagents: ConversationSubagent[] | undefined,
   now: string,
-  { background }: { background: boolean },
+  { background, keep }: { background: boolean; keep?: ReadonlySet<string> },
 ): boolean {
   let changed = false;
   for (const subagent of subagents ?? [])
-    if (background || !subagent.background) changed = endSubagent(subagent, "stopped", now) || changed;
+    if ((background || !subagent.background) && !keep?.has(subagent.id))
+      changed = endSubagent(subagent, "stopped", now) || changed;
   return changed;
 }
 
@@ -413,6 +415,22 @@ export function foldCodexChildItem(
   const subagents = current.map((subagent) => ({ ...subagent, steps: [...subagent.steps] }));
   const subagent = subagents[index];
   return subagent && pushSubagentStep(subagent, step) ? subagents : null;
+}
+
+/**
+ * Ends a Codex subagent whose own turn ended after its parent turn: no `wait` of the parent reports
+ * it then. Returns the new list, or null when the subagent no longer runs.
+ */
+export function endCodexChild(
+  current: readonly ConversationSubagent[],
+  childThreadId: string,
+  turnStatus: string | null,
+  now: string,
+): ConversationSubagent[] | null {
+  const subagents = current.map((subagent) => ({ ...subagent, steps: [...subagent.steps] }));
+  const subagent = subagents.find((candidate) => candidate.id === childThreadId);
+  const status = turnStatus === "failed" ? "failed" : turnStatus === "interrupted" ? "stopped" : "completed";
+  return subagent && endSubagent(subagent, status, now) ? subagents : null;
 }
 
 /** The step that a Codex thread item shows, or null for an item that is not work of the subagent. */

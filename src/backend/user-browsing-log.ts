@@ -1,8 +1,8 @@
-import { readFile, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Result, Schema, Semaphore } from "effect";
-import { isEmptyStoredFile, parseStoredJson, setAsideDamagedFile, writeJsonFileAtomically } from "./atomic-json-file";
-import { isMissingFileError } from "./file-errors";
+import { Effect, Schema, Semaphore } from "effect";
+import { writeJsonFileAtomically } from "./atomic-json-file";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
 const logger = createOpenBotLogger("user-browsing");
 
@@ -39,11 +39,10 @@ const StoredLog = Schema.Struct({
   agents: Schema.Array(Schema.Struct({ agentId: Schema.String, steps: Schema.Array(StoredStep) })),
 });
 type StoredLog = typeof StoredLog.Type;
-const decodeStored = Schema.decodeUnknownSync(StoredLog);
-
-class UserBrowsingReadFailed extends Schema.TaggedError<UserBrowsingReadFailed>()("UserBrowsingReadFailed", {
-  cause: Schema.Defect(),
-}) {}
+const USER_BROWSING_FORMAT: VersionedJsonFormat<StoredLog> = {
+  current: 1,
+  releases: { 1: Schema.decodeUnknownSync(StoredLog) },
+};
 
 /** `text` on one line, at most `limit` characters. */
 export function stepText(text: string, limit = USER_BROWSING_TEXT_CHARACTERS): string {
@@ -91,6 +90,8 @@ export function stepPlace(url: string): { host: string; path: string } | null {
  */
 export class UserBrowsingLog {
   readonly #path: string;
+  /** The path, or the fallback file while the path holds the file of a newer release. */
+  #writePath: string;
   readonly #now: () => number;
   readonly #steps = new Map<string, UserBrowsingStep[]>();
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -98,6 +99,7 @@ export class UserBrowsingLog {
 
   constructor(path: string, now: () => number = Date.now) {
     this.#path = path;
+    this.#writePath = path;
     this.#now = now;
   }
 
@@ -115,30 +117,12 @@ export class UserBrowsingLog {
   readonly #read = Effect.fn("UserBrowsingLog.read")(function* (this: UserBrowsingLog) {
     if (this.#loaded) return;
     this.#loaded = true;
-    const read = yield* Effect.result(
-      Effect.tryPromise({
-        try: () => readFile(this.#path, "utf8"),
-        catch: (cause) => new UserBrowsingReadFailed({ cause }),
-      }),
-    );
-    if (Result.isFailure(read)) {
-      if (!isMissingFileError(read.failure.cause))
-        logger.warn("Could not read the browsing steps.", { error: read.failure.cause });
-      return;
-    }
-    if (isEmptyStoredFile(read.success)) return;
-    const stored = yield* Effect.result(
-      Effect.try({
-        try: () => parseStoredJson(this.#path, read.success, decodeStored),
-        catch: (cause) => new UserBrowsingReadFailed({ cause }),
-      }),
-    );
-    if (Result.isFailure(stored)) {
-      logger.warn("The browsing steps are damaged. They start empty.", { error: stored.failure.cause });
-      yield* setAsideDamagedFile(this.#path);
-      return;
-    }
-    for (const agent of stored.success.agents) this.#steps.set(agent.agentId, [...agent.steps]);
+    const loaded = yield* readVersionedJsonFile(this.#path, USER_BROWSING_FORMAT);
+    this.#writePath = loaded.writePath;
+    if (loaded.state === "damaged") logger.warn("The browsing steps are damaged. They start empty.");
+    else if (loaded.state === "unreadable") logger.warn("Could not read the browsing steps.");
+    else if (loaded.state === "kept") logger.warn("A newer version wrote the browsing steps file. It stays unchanged.");
+    for (const agent of loaded.value?.agents ?? []) this.#steps.set(agent.agentId, [...agent.steps]);
   }).bind(this);
 
   /** Adds one step. A page that is the same as the step before it is not added again. */
@@ -194,7 +178,10 @@ export class UserBrowsingLog {
           Effect.uninterruptible(
             Effect.suspend(() => {
               this.#steps.clear();
-              return Effect.tryPromise(() => rm(this.#path, { force: true }));
+              // The user turned the setting off, so the file of a newer version goes too.
+              return Effect.tryPromise(() =>
+                Promise.all([rm(this.#path, { force: true }), rm(this.#writePath, { force: true })]),
+              );
             }),
           ),
         ),
@@ -241,7 +228,7 @@ export class UserBrowsingLog {
               version: 1,
               agents: [...this.#steps].map(([agentId, steps]) => ({ agentId, steps })),
             };
-            return writeJsonFileAtomically(this.#path, stored, { createDirectory: true });
+            return writeJsonFileAtomically(this.#writePath, stored, { createDirectory: true });
           }),
         ),
       )

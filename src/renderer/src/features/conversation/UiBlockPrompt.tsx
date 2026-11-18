@@ -10,6 +10,7 @@ import {
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
+  uiConfirmAnswersWithPreview,
 } from "@openbot/contracts/ui-blocks";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -33,6 +34,8 @@ export interface UiBlockPromptProps {
    * in the history, which only shows its stored state.
    */
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
+  /** The host reads an edited confirm preview (`ui-block-preview-edit-v1`), so the card can edit it. */
+  canEditPreview?: boolean | undefined;
   /** The answer went through and the card shows it. */
   onAnswered?: (() => void) | undefined;
   /** Gets the card's element, and undefined once the card is gone. */
@@ -92,7 +95,7 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
  * reads both alike. A skip answers every question with nothing.
  */
 export function UiBlockPrompt(props: UiBlockPromptProps) {
-  const { t, format, errorMessage } = useText();
+  const { t, format, errorMessage, sourceText } = useText();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   // What this client sent, shown frozen until the host's stored state replaces it.
@@ -103,6 +106,8 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
   // The host stores the outcome with English list commas; draw it again in the reader's language.
   const state = (): UiBlockState => {
     const current = stored();
+    // Only the host gives a closed block an outcome, as English source text, such as "Closed by a new message".
+    if (current.status === "closed" && current.outcome) return { ...current, outcome: sourceText(current.outcome) };
     if (current.status !== "answered" || !current.response) return current;
     const outcome = uiBlockOutcomeText(props.block.spec, current.response, format.list);
     return outcome.trim() ? { ...current, outcome } : current;
@@ -132,10 +137,10 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  function respond(response: UiBlockResponse): void {
+  function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    void send(uiBlockAnswersFromResponse(spec, response), {
+    void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
@@ -214,6 +219,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           scope={apiKeyRequest()?.scope}
           keyPlaceholder={apiKeyRequest()?.placeholder}
           status={state().status}
+          closedOutcome={state().outcome}
           saved={props.block.vault?.saved}
           values={state().response?.values}
           error={error()}
@@ -235,6 +241,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
+        canEditPreview={props.canEditPreview}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (

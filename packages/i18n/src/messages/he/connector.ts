@@ -312,6 +312,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot ב-{host} לא יכול לקבל הודעות Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת ולהשאיר את OpenBot פתוח.",
   "connector.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. יש לחבר מחדש או לנתק את הצ'אט.",
+  "connector.telegram.helpNotLinked": 'הצ\'אט הזה לא מקושר לשרת הזה. בחרו "חיבור מחדש" כדי לקשר אותו.',
   "connector.telegram.retryAt": "Telegram ביקש מ-OpenBot להמתין. הוא ינסה שוב ב-{time}.",
   "connector.telegram.pause": "השהיה",
   "connector.telegram.resume": "המשך",
@@ -395,6 +396,8 @@ export const messages = {
   "connector.whatsapp.helpLoggedOut": "WhatsApp הסיר את המחשב הזה מהמכשירים המקושרים. יש לקשר את המספר שוב.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp הסיר את השרת הזה מהמכשירים המקושרים. יש לקשר את המספר שוב.",
   "connector.whatsapp.helpError": "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. יש לחבר מחדש או לנתק את המספר.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot לא מצליח לקרוא את המפתחות השמורים של המספר הזה. יש לקשר את המספר שוב.",
   "connector.whatsapp.retryAt": "WhatsApp ביקש מ-OpenBot להמתין. הוא ינסה שוב ב-{time}.",
   "connector.whatsapp.pause": "השהיה",
   "connector.whatsapp.resume": "המשך",
@@ -409,10 +412,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "מספר אישי",
   "connector.whatsapp.ownNumberDescription":
-    "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר שמיועד רק ל-OpenBot.",
+    "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "connector.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. יש לכבות כדי לשלוח רק את התשובה.",
+  "connector.whatsapp.statusReactions": "תגובות סטטוס",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
   "connector.whatsapp.orchestratorTitle": "מתזמר WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים ועונה ב-WhatsApp.",
@@ -427,9 +433,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "יש לבחור את המספר ואז לקשר את השרת הזה מ-WhatsApp בטלפון.",
   "connector.whatsapp.kindLabel": "מספר",
   "connector.whatsapp.kindPersonal": "המספר האישי שלי",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ ולאנשים שאישרת.",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ ולאנשים שאישרת. אנשים אחרים לא מקבלים תשובה.",
   "connector.whatsapp.kindDedicated": "מספר רק עבור OpenBot",
-  "connector.whatsapp.kindDedicatedDescription": "אנשים לא מוכרים מקבלים קוד שיש למסור לך. את האישור נותנים כאן.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot משיב מהמספר הזה לכל אדם לא מוכר עם קוד שיש למסור לך. את האישור נותנים כאן.",
   "connector.whatsapp.methodLabel": "אופן הקישור",
   "connector.whatsapp.methodQr": "קוד QR",
   "connector.whatsapp.methodCode": "קוד צימוד",
@@ -492,7 +500,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, הרשימה מציגה את מספר הטלפון.",
   "connector.whatsapp.add": "הוספה",
   "connector.whatsapp.groupTitle": "הוספת קבוצה",
-  "connector.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "connector.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "connector.whatsapp.groupSearch": "חיפוש קבוצות",
   "connector.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",
@@ -651,9 +660,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "המפתח של Proton Pass פג תוקף",
   "connector.protonPass.expiredDescription": "סוכנים לא יכולים להתחבר עם פרטי הכניסה המשותפים עד להתחברות מחדש.",
   "connector.protonPass.reconnect": "חיבור מחדש",
-  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית בתשלום",
+  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית עם Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI עובד רק עם תוכנית בתשלום של Proton. יש לשנות את התוכנית ואז להתחבר שוב.",
+    "Proton Pass CLI דורש תוכנית Proton שכוללת Pass Plus. תוכניות בתשלום אחרות, כמו Mail Plus, לא כוללות אותו. יש לשנות את התוכנית ואז להתחבר שוב.",
   "connector.protonPass.vaultTitle": "כספת משותפת",
   "connector.protonPass.vaultDescription":
     "סוכנים יכולים להתחבר עם פרטי הכניסה שבכספת הזו. כדי לשתף פרטי כניסה, יש להעביר אותם אליה.",
