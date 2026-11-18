@@ -119,6 +119,19 @@ function LibraryGrid(props: {
   };
   const observer = new ResizeObserver(measure);
   onCleanup(() => observer.disconnect());
+  /**
+   * The tiles that came near the visible part of the grid. Only these show their picture: a joined
+   * server sends each picture whole, two at a time, so a picture out of view made the picked one wait.
+   * The browser's own lazy loading measures from the window, so it loaded almost the whole grid.
+   */
+  const [near, setNear] = createSignal<ReadonlySet<string>>(new Set());
+  const tiles = new Map<Element, string>();
+  let nearby: IntersectionObserver | undefined;
+  onCleanup(() => nearby?.disconnect());
+  const watch = (element: Element, id: string) => {
+    tiles.set(element, id);
+    nearby?.observe(element);
+  };
   // Pixels of scroll for one pixel of thumb travel.
   const ratio = () =>
     scroller ? (scroller.scrollHeight - scroller.clientHeight) / (scroller.clientHeight - thumb.size) : 0;
@@ -161,6 +174,16 @@ function LibraryGrid(props: {
           scroller = element;
           fades.adopt(element);
           observer.observe(element);
+          nearby = new IntersectionObserver(
+            (entries) => {
+              const shown = entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target);
+              if (shown.length === 0) return;
+              for (const target of shown) nearby?.unobserve(target);
+              setNear((ids) => new Set([...ids, ...shown.flatMap((target) => tiles.get(target) ?? [])]));
+            },
+            { root: element, rootMargin: "160px 0px" },
+          );
+          for (const tile of tiles.keys()) nearby.observe(tile);
         }}
         class={["wfn-library-scroll", fades.classes()]}
         onScroll={measure}
@@ -178,8 +201,10 @@ function LibraryGrid(props: {
                   aria-pressed={file.id === props.selected ? "true" : "false"}
                   onClick={() => props.onPick(file)}
                 >
-                  <span class="wfn-library-thumb">
-                    <AssetThumb file={file} />
+                  <span class="wfn-library-thumb" ref={(element) => watch(element, file.id)}>
+                    <Show when={near().has(file.id)}>
+                      <AssetThumb file={file} />
+                    </Show>
                   </span>
                   <span class="wfn-library-name">{file.name}</span>
                 </Button>
@@ -242,6 +267,11 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
   const board = useBoard();
   const { t } = useText();
   const [filter, setFilter] = createSignal<AssetFilter>("recent");
+  /**
+   * The tabs that the person opened. The tabs keep each panel in the page for the slide, so a grid that
+   * was never opened would load all its pictures, and on a joined server the picked one waited behind them.
+   */
+  const [opened, setOpened] = createSignal<ReadonlySet<AssetFilter>>(new Set(["recent"]));
   const [query, setQuery] = createSignal("");
   return (
     <>
@@ -265,7 +295,9 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
         value={filter()}
         onChange={(value) => {
           const next = ASSET_FILTERS.find((option) => option.value === value);
-          if (next) setFilter(next.value);
+          if (!next) return;
+          setFilter(next.value);
+          setOpened((tabs) => new Set([...tabs, next.value]));
         }}
       >
         <SlidingTabs.List class="wfn-library-tabs" aria-label={t("workflow.asset.files")}>
@@ -277,12 +309,14 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
           <For each={ASSET_FILTERS}>
             {(option) => (
               <SlidingTabs.Content value={option.value}>
-                <LibraryGrid
-                  files={assetsMatching(board, option.value, query())}
-                  query={query()}
-                  selected={props.selected}
-                  onPick={props.onPick}
-                />
+                <Show when={opened().has(option.value)}>
+                  <LibraryGrid
+                    files={assetsMatching(board, option.value, query())}
+                    query={query()}
+                    selected={props.selected}
+                    onPick={props.onPick}
+                  />
+                </Show>
               </SlidingTabs.Content>
             )}
           </For>
