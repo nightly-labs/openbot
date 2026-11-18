@@ -14,6 +14,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isAgentProvider,
   isFreeOpencodeModel,
+  isFreeOpencodeModelName,
   isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -99,6 +100,14 @@ function openRouterLabNames(options: readonly ClientAgentModelOption[]): Map<str
   return names;
 }
 
+/** OpenCode and custom agent models are named `<service>/<model>`. Other models have no service. */
+export function splitServiceName(provider: string, fullName: string): { service: string; name: string } {
+  const separator = provider === "opencode" || provider === "acp" ? fullName.indexOf("/") : -1;
+  return separator < 0
+    ? { service: "", name: fullName }
+    : { service: fullName.slice(0, separator), name: fullName.slice(separator + 1) };
+}
+
 /** Free tier first; id says nothing about locality. */
 function modelTier(model: PickerModel): 0 | 1 {
   return model.free ? 0 : 1;
@@ -150,10 +159,8 @@ export function pickerModels(
           variants: [],
         };
       }
-      // OpenCode and custom agent models are named `<service>/<model>`; the service is the group.
-      const separator = model.provider === "opencode" || model.provider === "acp" ? model.name.indexOf("/") : -1;
-      let service = separator < 0 ? "" : model.name.slice(0, separator);
-      let name = separator < 0 ? model.name : model.name.slice(separator + 1);
+      // The service is the group.
+      let { service, name } = splitServiceName(model.provider, model.name);
       // A custom agent can serve several providers. Its id holds them as `<agent>/<provider>/<model>`
       // even when its display name does not, so the provider segment of the id is the group.
       if (model.provider === "acp") {
@@ -166,10 +173,14 @@ export function pickerModels(
         if (inner >= 0 && (!provider || name.slice(0, inner) === provider)) name = name.slice(inner + 1);
       }
       // A Pi endpoint model is `<endpoint id>/<model>` with Pi's plain name: the endpoint is the group.
+      let piEndpointModel = false;
       if (model.provider === "pi") {
         const separator = model.id.indexOf("/");
         const endpoint = separator > 0 ? piEndpointNames.get(model.id.slice(0, separator)) : undefined;
-        if (endpoint) service = endpoint;
+        if (endpoint) {
+          service = endpoint;
+          piEndpointModel = true;
+        }
       }
       // OpenRouter serves hundreds of models, so its tab has one group per lab.
       if (model.provider === "openrouter") {
@@ -191,10 +202,12 @@ export function pickerModels(
         provider: model.provider,
         name,
         service,
-        // Free-tier label only; shared with catalog order so badge and default agree.
+        // Free-tier label only; shared with catalog order so badge and default agree. A saved endpoint
+        // has no price (Pi gets cost 0 for each of its models), so on Pi, as on OpenCode, its name says it.
         free:
           (model.provider === "opencode" && isFreeOpencodeModel(model.id, name)) ||
-          (model.provider === "openrouter" && model.id.endsWith(":free")),
+          (model.provider === "openrouter" && model.id.endsWith(":free")) ||
+          (piEndpointModel && isFreeOpencodeModelName(name)),
         variants: variants.has(model.id)
           ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
           : [],

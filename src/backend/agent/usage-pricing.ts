@@ -129,6 +129,13 @@ const PRICES: Readonly<Record<string, Price>> = {
     short: { input: 2, cached: 0.1, output: 10 },
     change: { on: "2026-12-01", short: { input: 4, cached: 0.2, output: 20 } },
   },
+  // Verified 2026-11-18: Gemini 4 Hydrogen lists no long-context rate, no cache-write rate (implicit
+  // caching only) and no dated change.
+  "antigravity:gemini-4-hydrogen": {
+    source: GEMINI,
+    verified: "2026-11-18",
+    short: { input: 1.5, cached: 0.075, output: 7.5 },
+  },
   "antigravity:gemini-3.8-flash": {
     source: GEMINI,
     verified: ANTIGRAVITY_VERIFIED,

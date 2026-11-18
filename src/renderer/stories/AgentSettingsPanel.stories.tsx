@@ -115,7 +115,7 @@ export const SteersWhileWorking: Story = { args: { agent: { ...STORY_AGENT, busy
 export const SteerUnsupportedProvider: Story = {
   args: {
     defaultBusyMessageMode: "steer",
-    runtimeSettings: { provider: "opencode", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
+    runtimeSettings: { provider: "cursor", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
   },
 };
 /** An agent on a remote host: the setting belongs to that host, so the row is hidden. */

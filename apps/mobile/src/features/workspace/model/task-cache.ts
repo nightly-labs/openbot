@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentTask,
   AgentTasksSnapshot,
   ConversationMessage,
   ConversationSnapshot,
@@ -31,6 +32,48 @@ function withTaskDelta(conversation: ConversationSnapshot, delta: TaskDelta): Co
           at === index ? { ...message, text: message.text + delta.delta, status: "streaming" as const } : message,
         );
   return { ...conversation, revision: delta.revision, messages };
+}
+
+interface PendingTaskDeltas {
+  queryClient: QueryClient;
+  queryKey: ReturnType<typeof queryKeys.agentTaskConversation>;
+  deltas: TaskDelta[];
+}
+
+/** The streamed text that waits for the next frame, by conversation. */
+const pendingTaskDeltas = new Map<string, PendingTaskDeltas>();
+let taskDeltaFlushWaits = false;
+
+/**
+ * Writes the streamed text of one frame in one change, as the store of the agent's own chat does.
+ * A host sends many deltas in the time of one frame, and each write renders the open thread again.
+ */
+function flushTaskDeltas(): void {
+  taskDeltaFlushWaits = false;
+  const pending = [...pendingTaskDeltas.values()];
+  pendingTaskDeltas.clear();
+  for (const { queryClient, queryKey, deltas } of pending) {
+    // A task that did not load its conversation reads it whole when it opens.
+    queryClient.setQueryData<ConversationSnapshot>(
+      queryKey,
+      (stored) => stored && deltas.reduce(withTaskDelta, stored),
+    );
+  }
+}
+
+function queueTaskDelta(queryClient: QueryClient, scope: QueryScope, serverId: string, delta: TaskDelta): void {
+  const queryKey = queryKeys.agentTaskConversation(scope, serverId, delta.taskId);
+  const id = JSON.stringify(queryKey);
+  const pending = pendingTaskDeltas.get(id);
+  // Another query client is another session: its text does not go to this one.
+  if (pending && pending.queryClient === queryClient) pending.deltas.push(delta);
+  else {
+    if (pending) flushTaskDeltas();
+    pendingTaskDeltas.set(id, { queryClient, queryKey, deltas: [delta] });
+  }
+  if (taskDeltaFlushWaits) return;
+  taskDeltaFlushWaits = true;
+  requestAnimationFrame(flushTaskDeltas);
 }
 
 /**
@@ -81,18 +124,26 @@ export function applyTaskEvent(
         queryKey: queryKeys.agentThreadReads(scope, serverId, event.snapshot.agentId),
       });
   } else if (event.type === "agent-task-conversation") {
+    // The text that waits for the next frame is older than this snapshot or in it: it goes in first,
+    // and a delta that the snapshot already has changes nothing.
+    if (pendingTaskDeltas.size) flushTaskDeltas();
     // A delta raises the revision, so an older snapshot loses.
     queryClient.setQueryData<ConversationSnapshot>(
       queryKeys.agentTaskConversation(scope, serverId, event.taskId),
       (stored) => (stored && event.snapshot.revision < stored.revision ? stored : event.snapshot),
     );
   } else if (event.type === "agent-task-conversation-delta") {
-    // A task that did not load its conversation reads it whole when it opens.
-    queryClient.setQueryData<ConversationSnapshot>(
-      queryKeys.agentTaskConversation(scope, serverId, event.taskId),
-      (stored) => stored && withTaskDelta(stored, event),
-    );
+    queueTaskDelta(queryClient, scope, serverId, event);
   }
+}
+
+/** Adds a task that this phone started to the cached list, so it shows before its list event arrives. */
+export function addStartedTask(queryClient: QueryClient, scope: QueryScope, serverId: string, task: AgentTask): void {
+  queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, task.agentId), (stored) =>
+    stored && !stored.tasks.some((entry) => entry.id === task.id)
+      ? { ...stored, tasks: [task, ...stored.tasks] }
+      : stored,
+  );
 }
 
 /** True when `threadId` is the thread of a task of the agent that the phone has read. */

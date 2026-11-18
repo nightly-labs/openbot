@@ -26,6 +26,7 @@ import type { AboveAppsSupport } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
+import { relaunchApp } from "./linux-appimage-relaunch";
 
 const logger = createOpenBotLogger("main");
 
@@ -269,9 +270,7 @@ export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* 
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
   logger.info(`The ${feature} shows above other apps, so OpenBot starts again on XWayland.`);
-  // An AppImage mounts itself for each start, and the mount of this process goes away with it.
-  const execPath = process.env.APPIMAGE;
-  app.relaunch(execPath ? { execPath, args: process.argv.slice(1) } : { args: process.argv.slice(1) });
+  relaunchApp(app, process.argv.slice(1));
   app.quit();
 });
 

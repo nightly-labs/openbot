@@ -91,6 +91,41 @@ function browserFocused(): boolean {
   return Boolean(record && record.until > Date.now());
 }
 
+/** The chat of a notification: the agent's own chat, or a channel. Reading the chat closes its notifications. */
+export type WebNotificationChat = { agentId: string } | { channelId: string };
+
+/** The shown notifications of each chat, by host, as on desktop. */
+const chatNotifications = new Map<string, Set<Notification>>();
+
+function chatKey(hostId: string, chat: WebNotificationChat): string {
+  return "channelId" in chat ? `${hostId}\nchannel:${chat.channelId}` : `${hostId}\nagent:${chat.agentId}`;
+}
+
+function trackChatNotification(hostId: string, chat: WebNotificationChat, notification: Notification): void {
+  const key = chatKey(hostId, chat);
+  const shown = chatNotifications.get(key) ?? new Set<Notification>();
+  chatNotifications.set(key, shown);
+  shown.add(notification);
+  // A chat that the user does not open keeps only its newest notifications.
+  for (const oldest of shown) {
+    if (shown.size <= REQUEST_NOTIFICATION_LIMIT) break;
+    shown.delete(oldest);
+  }
+  notification.addEventListener("close", () => {
+    shown.delete(notification);
+    if (shown.size === 0 && chatNotifications.get(key) === shown) chatNotifications.delete(key);
+  });
+}
+
+/** Closes the shown notifications of a chat that the user read. A read comes only while the user looks at the chat. */
+export function closeWebChatNotifications(hostId: string, chat: WebNotificationChat): void {
+  const key = chatKey(hostId, chat);
+  const shown = chatNotifications.get(key);
+  if (!shown) return;
+  chatNotifications.delete(key);
+  for (const notification of shown) notification.close();
+}
+
 /** The shown notifications that wait for an answer, by request, as on desktop. */
 const requestNotifications = new Map<string, Notification>();
 /** As many as the desktop keeps. */
@@ -151,6 +186,11 @@ export function showWebAgentNotification(options: {
       notification.close();
       options.onOpen(content.agentId, content.channelId);
     });
+    // A notification of a side thread stays: reading the agent's own chat does not show that thread.
+    const ownThreadId = options.agents.find((agent) => agent.id === content.agentId)?.threadId ?? null;
+    if (content.channelId) trackChatNotification(options.hostId, { channelId: content.channelId }, notification);
+    else if (ownThreadId === null || ownThreadId === content.threadId)
+      trackChatNotification(options.hostId, { agentId: content.agentId }, notification);
   } catch {
     // Some mobile browsers show notifications only from a service worker.
   }
@@ -180,6 +220,7 @@ export function showWebChannelNotifications(options: {
         notification.close();
         options.onOpen(reply.channelId);
       });
+      trackChatNotification(options.hostId, { channelId: reply.channelId }, notification);
     } catch {
       // As above.
     }

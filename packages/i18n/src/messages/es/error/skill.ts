@@ -52,6 +52,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Esta habilidad local no tiene la revisión {revision}. Su última revisión es {latest}.",
   "error.skill.localNameTaken": "Ya existe una habilidad local con este nombre. Modifícala en su lugar.",
+  "error.skill.localNameClash":
+    'Este nombre y la habilidad local "{name}" se convierten en "{slug}". Para cambiar esa habilidad, modifícala. Para añadir una habilidad nueva, cambia las letras latinas o los dígitos de este nombre.',
   "error.skill.localKeepName": "Mantén el nombre de la habilidad al modificarla.",
   "error.skill.localRelativeFolder":
     "Usa una carpeta de habilidades relativa dentro del espacio de trabajo del agente actual.",

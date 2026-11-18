@@ -1,4 +1,4 @@
-import type { AgentModelOption } from "@openbot/contracts/ipc";
+import type { AgentModelOption, ProviderModelSource } from "@openbot/contracts/ipc";
 import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -6,11 +6,7 @@ import type { AgentClient, AgentProvider } from "./../agent-client";
 import { providerCheckTimeoutMs } from "../disk-restore";
 import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
-import {
-  BUILT_IN_PROVIDER_DRIVERS,
-  type BuiltInProviderDriver,
-  type ProviderClientContext,
-} from "./../provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, type BuiltInProviderDriver } from "./../provider-drivers";
 import {
   compareModelVersions,
   FALLBACK_MODELS,
@@ -31,10 +27,11 @@ export interface ModelCatalogOptions {
   client(provider: AgentProvider): AgentClient | undefined;
   /** True while the provider's row says that the user must sign in. */
   isSignedOut(provider: AgentProvider): boolean;
-  credentials: ProviderClientContext;
   requestTimeoutMs: number;
   /** Keeps a failed model list on the provider row. */
   recordProviderError(provider: AgentProvider, error: unknown): void;
+  /** The settings that the provider's running process read at its start changed, so its list is old. */
+  startSettingsChanged(provider: AgentProvider): Effect.Effect<void>;
 }
 
 /**
@@ -44,6 +41,10 @@ export interface ModelCatalogOptions {
 export class ModelCatalog {
   readonly #options: ModelCatalogOptions;
   #models = structuredClone(FALLBACK_MODELS);
+  /** The source of each provider whose CLI settings give its models from elsewhere (`ProviderModelCatalog.source`). */
+  readonly #sources = new Map<AgentProvider, ProviderModelSource>();
+  /** The last `startSettings` that each client gave (`ProviderModelCatalog.source`). */
+  readonly #startSettings = new WeakMap<AgentClient, string>();
 
   constructor(options: ModelCatalogOptions) {
     this.#options = options;
@@ -52,6 +53,45 @@ export class ModelCatalog {
   list(): AgentModelOption[] {
     return structuredClone(this.#models);
   }
+
+  /** Where the provider's models come from, when its CLI settings say that it is not its own list. */
+  source(provider: AgentProvider): ProviderModelSource | undefined {
+    const source = this.#sources.get(provider);
+    return source ? structuredClone(source) : undefined;
+  }
+
+  /**
+   * Reads the source again from the client that lists the models, and answers whether it changed. A
+   * failed read clears the source: a wrong "Uses Ollama" line is worse than none, and with none the
+   * picker shows the version line as before. A client that another one replaced during the read
+   * changes nothing: the new client reads its own source.
+   */
+  readonly #readSource = Effect.fn("ModelCatalog.readSource")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    client: AgentClient,
+    catalog: ProviderModelCatalog,
+  ) {
+    if (!catalog.source) return false;
+    const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
+    if (this.#options.client(provider) !== client) return false;
+    if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
+    const source = Result.isSuccess(result) ? result.success.source : null;
+    const startSettings = Result.isSuccess(result) ? result.success.startSettings : null;
+    if (startSettings !== null) {
+      // The first read of a client is near its start, so it gives the settings that its process read.
+      const atStart = this.#startSettings.get(client);
+      this.#startSettings.set(client, startSettings);
+      if (atStart !== undefined && atStart !== startSettings) {
+        logger.info("A provider's model settings changed while it ran.", { provider });
+        yield* this.#options.startSettingsChanged(provider);
+      }
+    }
+    const before = JSON.stringify(this.#sources.get(provider) ?? null);
+    if (source) this.#sources.set(provider, source);
+    else this.#sources.delete(provider);
+    return JSON.stringify(source) !== before;
+  });
 
   /**
    * Reads the models that one client serves, in the catalogue's order, and how many the CLI listed.
@@ -62,7 +102,6 @@ export class ModelCatalog {
     this: ModelCatalog,
     client: AgentClient,
     catalog: ProviderModelCatalog = {},
-    hasStoredKey = false,
     timeoutMs?: number,
   ) {
     const serverModels = new Map<string, ModelListResponse["data"][number]>();
@@ -121,10 +160,6 @@ export class ModelCatalog {
       const name = modelDisplayName(
         catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
       );
-      // Decided here, on the resolved name, so the catalog and the picker's Free badge cannot
-      // disagree about what costs money. With no key stored the same models can only come
-      // from the user's own sign-in, which does buy them.
-      if (hasStoredKey && catalog.usableWithStoredKey?.(server.model, name) === false) continue;
       models.push({
         provider: client.provider,
         id: server.model,
@@ -148,14 +183,17 @@ export class ModelCatalog {
   });
 
   /**
-   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one, and
-   * which providers' 5 s `model/list` timed out.
+   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
+   * which providers' 5 s `model/list` timed out, with the cause, and which providers' `model/list`
+   * failed. A timeout is not recorded here: the caller reads the list again with `relist`, which keeps
+   * its own failure, or records the cause when no second read follows.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
    * process now running serves, so its id is absent from the set and no caller may treat it as proof.
    */
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
+    const timeouts = new Map<AgentProvider, unknown>();
     const discovered = yield* Effect.forEach(
       BUILT_IN_PROVIDER_DRIVERS,
       ({ id: provider, catalog = {} }) =>
@@ -167,33 +205,44 @@ export class ModelCatalog {
           // client in the map has an account: activation refreshes the catalog before it marks the
           // provider available, so the old status alone does not mean signed out.
           if (catalog.hiddenWhenSignedOut && signedOut && !client)
-            return { provider, models: [], fresh: false, timedOut: false };
-          if (!client) return { provider, models: previous, fresh: false, timedOut: false };
-          // Read once per pass, not per model: a stored key cannot change inside one refresh, and
-          // a model is unusable only because OpenBot is what put that key in the environment.
-          const hasStoredKey = Boolean(this.#options.credentials.apiKey(provider));
+            return { provider, models: [], fresh: false, timedOut: false, failed: false };
+          if (!client) return { provider, models: previous, fresh: false, timedOut: false, failed: false };
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
-            const { models: sorted, listed } = yield* this.read(client, catalog, hasStoredKey);
+            // The source comes from the settings, not from the list, so both reads run at once.
+            const [{ models: sorted, listed }, sourceChanged] = yield* Effect.all(
+              [this.read(client, catalog), this.#readSource(provider, client, catalog)],
+              { concurrency: "unbounded" },
+            );
             // For a provider with a fallback, a successful but empty response is no more useful to
             // the picker than a timeout: it must not erase the built-in free tier on first
             // discovery. It is not a fresh catalog, so callers must not treat it as proof that
             // this process serves it.
-            // A response that the stored-key filter emptied is a real answer: restoring the last
-            // catalog would bring back the models that the key cannot use.
             logger.info("A provider listed its models.", {
               provider,
               count: sorted.length,
               durationMs: Math.round(performance.now() - startedAt),
             });
             if (catalog.fallback && listed === 0) {
-              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false };
+              return {
+                provider,
+                models: catalog.fallback(previous),
+                fresh: false,
+                timedOut: false,
+                failed: false,
+                sourceChanged,
+              };
             }
-            return { provider, models: sorted, fresh: true, timedOut: false };
+            return { provider, models: sorted, fresh: true, timedOut: false, failed: false, sourceChanged };
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
-              this.#options.recordProviderError(provider, failure.cause);
+              // A slow list already had the full request timeout, so a second read gains nothing.
+              const timedOut = timeout && !catalog.slowList;
+              // A slow start that the second read of the caller repairs is no error: before, the row of a
+              // working provider showed "Error" with the timeout of the first read (#9945, #3436).
+              if (timedOut) timeouts.set(provider, failure.cause);
+              else this.#options.recordProviderError(provider, failure.cause);
               logger.warn("A provider did not list its models.", {
                 provider,
                 durationMs: Math.round(performance.now() - startedAt),
@@ -203,8 +252,9 @@ export class ModelCatalog {
                 provider,
                 models: catalog.fallback?.(previous) ?? previous,
                 fresh: false,
-                // A slow list already had the full request timeout, so a second read gains nothing.
-                timedOut: timeout && !catalog.slowList,
+                timedOut,
+                // The list that stays can be the list of a CLI that an update replaced (#8321).
+                failed: !timeout,
               });
             }),
           );
@@ -214,7 +264,10 @@ export class ModelCatalog {
     this.#models = discovered.flatMap((entry) => entry.models);
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
-      timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
+      timedOut: timeouts,
+      failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
+      /** True when a provider's model source changed, so the provider rows must go out again. */
+      sourceChanged: discovered.some((entry) => "sourceChanged" in entry && entry.sourceChanged),
     };
   });
 
@@ -223,18 +276,27 @@ export class ModelCatalog {
    * fresh. Only a fresh list replaces the provider's models, so a failed read cannot put an older
    * list back over a fresh one. A client that another one replaced during the read changes nothing:
    * the activation of the new client reads its own list.
+   *
+   * `quiet`: a read that the user did not cause. A failed one goes only to the log, and the provider
+   * row keeps the list that it has, with no error. An empty one is not fresh: a running CLI that lists
+   * no model for a moment must not empty the picker. `onQuietFailure` runs only when a quiet read
+   * fails, not when it is empty or its client was replaced.
    */
-  readonly relist = Effect.fn("ModelCatalog.relist")(function* (this: ModelCatalog, provider: AgentProvider) {
+  readonly relist = Effect.fn("ModelCatalog.relist")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    options: { quiet?: boolean; onQuietFailure?: () => void } = {},
+  ) {
     const client = this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
     if (!client) return false;
-    const hasStoredKey = Boolean(this.#options.credentials.apiKey(provider));
     const startedAt = performance.now();
-    const result = yield* Effect.result(this.read(client, catalog, hasStoredKey, this.#options.requestTimeoutMs));
+    const result = yield* Effect.result(this.read(client, catalog, this.#options.requestTimeoutMs));
     if (this.#options.client(provider) !== client) return false;
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {
-      this.#options.recordProviderError(provider, result.failure.cause);
+      if (!options.quiet) this.#options.recordProviderError(provider, result.failure.cause);
+      else options.onQuietFailure?.();
       logger.warn("A provider did not list its models.", {
         provider,
         durationMs,
@@ -244,7 +306,9 @@ export class ModelCatalog {
     }
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
-    if (catalog.fallback && listed === 0) return false;
+    if ((catalog.fallback || options.quiet) && listed === 0) return false;
+    yield* this.#readSource(provider, client, catalog);
+    if (this.#options.client(provider) !== client) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),

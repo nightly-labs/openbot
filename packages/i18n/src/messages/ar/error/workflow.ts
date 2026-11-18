@@ -15,13 +15,23 @@ export const messages = {
   "error.workflow.agentMissing": "اختر وكيلًا لهذه الخطوة.",
   "error.workflow.handoffFailed": "تعذّر على OpenBot إرسال هذه الخطوة إلى وكيلها.",
   "error.workflow.agentStepEnded": "أُزيلت رسالة الوكيل لهذه الخطوة قبل أن يجيب.",
+  "error.workflow.agentStepStopped": "توقّف الوكيل قبل أن يجيب عن هذه الخطوة. شغّل الخطوة مرة أخرى.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
+  "error.workflow.modelTimedOut":
+    "لم يُجب النموذج في الوقت المحدد. اختر جهدًا أقل أو نموذجًا أسرع لهذه الخطوة، ثم شغّلها مرة أخرى.",
+  "error.workflow.modelToolUse":
+    "حاول النموذج استخدام أداة، لكن هذه الخطوة لا تجيب إلا بنص. شغّل الخطوة مرة أخرى، أو اختر نموذجًا آخر لها.",
+  "error.workflow.modelUnavailable": "نموذج هذه الخطوة غير متاح. اختر نموذجًا آخر لهذه الخطوة.",
+  "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.providerOffline":
+    "تعذّر على OpenBot الوصول إلى المزوّد. تحقّق من الاتصال بالإنترنت، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
   "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
   "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",
   "error.workflow.pictureType": "استخدم صورة بتنسيق PNG أو JPEG أو WebP.",
   "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
+  "error.workflow.mediaEmptyRequest": "اكتب وصفًا، أو شغّل الخطوات التي قبل هذه الخطوة حتى يصل نص أو صورة.",
   "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",
   "error.workflow.stepMissing": "لم تعد هذه الخطوة موجودة.",
   "error.workflow.nodeMissing": "هذه الخطوة ليست في سير العمل.",
@@ -74,4 +84,14 @@ export const messages = {
   "error.workflow.sunraFailed": "تعذّر على Sunra إنشاء الملف: {reason}",
   "error.workflow.sunraTimeout":
     "لم يُنهِ Sunra الملف في الوقت المحدد. راجع مشروع OpenBot على sunra.ai قبل تشغيل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldSignIn": "سجّل الدخول إلى Higgsfield في «التطبيقات» لاستخدام نماذج Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "لا يحتوي حسابك في Higgsfield على أرصدة كافية. أضف أرصدة من higgsfield.ai/pricing، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "يحتاج نموذج Higgsfield هذا إلى خطة Higgsfield. اختر خطة من higgsfield.ai/pricing، أو اختر نموذجًا آخر.",
+  "error.workflow.higgsfieldBlocked":
+    "لم ينشئ Higgsfield الملف لأن فحص المحتوى أوقفه. غيّر الموجّه أو صور الإدخال، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldFailed": "تعذّر على Higgsfield إنشاء الملف: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "لم ينهِ Higgsfield الملف في الوقت المحدد. راجع سجلّك على higgsfield.ai قبل أن تشغّل الخطوة مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

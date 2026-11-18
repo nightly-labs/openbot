@@ -60,9 +60,12 @@ export function createOutboxFiles(scope: string): OutboxStorage | null {
             .at(-1)
             ?.replace(/[^a-zA-Z0-9]/gu, "") || "bin";
         const fileName = `${Crypto.randomUUID()}.${extension}`;
-        await FileSystem.writeAsStringAsync(`${directory}${fileName}`, file.base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+        // A large file stays on disk: the copy does not read it into memory.
+        if (file.file) await FileSystem.copyAsync({ from: file.file.ref, to: `${directory}${fileName}` });
+        else
+          await FileSystem.writeAsStringAsync(`${directory}${fileName}`, file.base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
         stored.push({
           id: file.id,
           name: file.name,

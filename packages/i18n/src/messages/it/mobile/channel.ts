@@ -42,6 +42,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Impossibile ripristinare questo canale. Riprova.",
   "mobile.channel.chat.fallbackName": "Canale",
   "mobile.channel.chat.deletedNotice": "Canale eliminato. Solo anteprima.",
+  "mobile.channel.chat.waitBusy": "In attesa - {name} sta lavorando in {channel}",
+  "mobile.channel.chat.waitFull": "In attesa - {name} inizia quando termina un'attività in corso",
   "mobile.channel.records.connect": "Connettiti al server per modificare questo canale.",
   "mobile.channel.records.loadFailed": "Impossibile caricare le impostazioni del canale.",
   "mobile.channel.records.gone": "Questo elemento non è più disponibile.",
@@ -81,6 +83,33 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "Questo interrompe il canale. La sua cronologia resta in «Canali eliminati», solo per l'anteprima. Puoi ripristinarlo da lì. Gli agenti membri vengono mantenuti.",
   "mobile.channel.form.delete": "Elimina canale",
+  "mobile.channel.newConversation.title": "Nuova conversazione",
+  "mobile.channel.newConversation.starting": "Avvio della nuova conversazione…",
+  "mobile.channel.newConversation.footer":
+    "I membri dimenticano i messaggi precedenti. Le impostazioni del canale restano.",
+  "mobile.channel.newConversation.confirmTitle": "Avviare una nuova conversazione in {name}?",
+  "mobile.channel.newConversation.confirmBody":
+    "I membri dimenticano i messaggi precedenti di questo canale. I messaggi restano visibili sopra un divisore. Membri, istruzioni, ricordi e routine non cambiano.",
+  "mobile.channel.newConversation.confirm": "Avvia nuova conversazione",
+  "mobile.channel.newConversation.failed": "Impossibile avviare una nuova conversazione",
+  "mobile.channel.newConversation.failedBody": "L'host non ha potuto iniziare una nuova conversazione.",
+  "mobile.channel.compact.title": "Compatta contesto",
+  "mobile.channel.compact.compacting": "Avvio della compattazione…",
+  "mobile.channel.compact.footer":
+    "I membri conservano un breve riepilogo della sessione del canale e usano meno token.",
+  "mobile.channel.compact.started": "Compattazione avviata. I provider dei membri accorciano il contesto sull’host.",
+  "mobile.channel.compact.failed": "Impossibile compattare il contesto del canale",
+  "mobile.channel.compact.failedBody": "L’host non è riuscito a compattare il contesto.",
+  "mobile.channel.deleteHistory.title": "Elimina cronologia",
+  "mobile.channel.deleteHistory.deleting": "Eliminazione della cronologia…",
+  "mobile.channel.deleteHistory.footer":
+    "I messaggi vengono eliminati e i membri li dimenticano. La configurazione del canale resta.",
+  "mobile.channel.deleteHistory.confirmTitle": "Eliminare la cronologia di {name}?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Tutti i messaggi e i file di questo canale vengono eliminati da OpenBot e i membri li dimenticano. Non puoi annullare. Membri, istruzioni, memorie, routine e attività non cambiano.",
+  "mobile.channel.deleteHistory.confirm": "Elimina cronologia",
+  "mobile.channel.deleteHistory.failed": "Impossibile eliminare la cronologia",
+  "mobile.channel.deleteHistory.failedBody": "L'host non ha potuto eliminare la cronologia.",
   "mobile.channel.form.unavailable": "Connettiti a un server desktop che supporta i canali per apportare modifiche.",
   "mobile.channel.form.invalidName": "Inserisci un nome di canale valido.",
   "mobile.channel.picture.title": "Immagine del canale",

@@ -1,8 +1,8 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
-import { SOFTWARE_RENDERING_ATTRIBUTE } from "@openbot/ui/document-rendering";
 import { createSignal, flush, onSettled } from "solid-js";
 import { appPort } from "./app-port";
 import type { AppProps } from "./app-providers";
+import { setDrawsOnCpu } from "./motion-preference";
 import { createSimpleContext } from "./simple-context";
 
 /**
@@ -43,8 +43,9 @@ const Platform = createSimpleContext({
           .getAppInfo()
           .then((info) => {
             infoFromHost = true;
-            // Turns off backdrop blur and moving avatars, which cost the most on the CPU.
-            if (info.softwareRendering) document.documentElement.setAttribute(SOFTWARE_RENDERING_ATTRIBUTE, "");
+            // Turns off backdrop blur and moving avatars, which cost the most on the CPU, unless the
+            // user turned them on in Settings.
+            if (info.softwareRendering) setDrawsOnCpu(true);
             setAppInfo(info);
           })
           .catch(() =>

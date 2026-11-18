@@ -9,9 +9,9 @@ import {
 } from "@openbot/telemetry";
 import { errorReference } from "@openbot/user-errors";
 import { Effect } from "effect";
-import * as Application from "expo-application";
 import { randomUUID } from "expo-crypto";
 import { Alert, type AlertButton, Platform } from "react-native";
+import { nativeApplicationVersion } from "@/shared/lib/native-application";
 import { currentText } from "@/shared/lib/text";
 
 const storage: ReportStorage = {
@@ -56,7 +56,7 @@ export function mobileReportQueue(): ReportQueue | undefined {
     {
       surface: "mobile",
       platform: Platform.OS,
-      app_version: Application.nativeApplicationVersion ?? "unknown",
+      app_version: nativeApplicationVersion() ?? "unknown",
       event_schema_version: ANALYTICS_GENERATIONS.mobile,
     },
     Date.now,
