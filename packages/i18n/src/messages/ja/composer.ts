@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "キュー内のメッセージを編集中です。実行するには編集を保存するかキャンセルしてください。",
   "composer.queueEdit.cancel": "編集をキャンセル",
+  "composer.feedbackFix.body":
+    "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
+  "composer.feedbackFix.cancel": "キャンセル",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.imageInput.body":
+    "{model} はテキストのみを受け取るため、添付した画像を見られません。このモデルが画像を読める場合は、画像をオンにしてください。",
+  "composer.imageInput.label": "{model} の画像をオンにする",
+  "composer.imageInput.pending": "オンにしています…",
+  "composer.imageInput.action": "画像をオン",
   "composer.usageLimit.credits":
     "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
   "composer.usageLimit.creditsResets":

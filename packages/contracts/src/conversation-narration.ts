@@ -21,3 +21,20 @@ export function isNarrationItemId(id: string | undefined, provider: AgentProvide
   if (NARRATION_ITEM_ID.test(id)) return true;
   return provider === "codex" && CODEX_MESSAGE_ITEM_ID.test(id);
 }
+
+/** The letters and digits of a text; spaces, marks and symbols are not content. */
+const CONTENT_CHARACTER = /[\p{L}\p{N}]/gu;
+
+/**
+ * Whether a finished note of a turn shows as a progress update. A note with fewer than two letters or
+ * digits is filler: a model wrote "x" before each step of a routine run, and the chat filled with them
+ * (#10567). A note that repeats the text of a note the turn already showed adds nothing either.
+ * `shown` holds the texts that the turn showed: keep one set for each turn. A note that shows is
+ * added to it. A note that does not show stays in the turn's steps.
+ */
+export function showsNarration(text: string, shown: Set<string>): boolean {
+  const key = text.replace(/\s+/gu, " ").trim();
+  if ((key.match(CONTENT_CHARACTER)?.length ?? 0) < 2 || shown.has(key)) return false;
+  shown.add(key);
+  return true;
+}

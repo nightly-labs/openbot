@@ -6,6 +6,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Clock from "lucide-react-native/icons/clock";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
 import { memo, type ReactNode, useState } from "react";
@@ -193,21 +194,10 @@ function ChatQueueCard({
               {preview}
             </Typography.Paragraph>
           </Pressable>
-          <CardAction
-            accessibilityLabel={t("mobile.chat.queue.editNext")}
-            disabled={locked || editedElsewhere || !queue.canEdit}
-            onPress={() => {
-              if (!next) return;
-              void haptics.selection();
-              router.push({ pathname: "/queued-messages/edit", params: { chat: queue.chatId, deliveryId: next.id } });
-            }}
-          >
-            <Pencil color={foreground} size={18} strokeWidth={2} />
-          </CardAction>
           {queue.activeTurnId ? (
             <CardAction
               accessibilityLabel={t(queue.steers ? "mobile.chat.queue.steerNext" : "mobile.chat.queue.sendNowNext")}
-              disabled={locked || editedElsewhere}
+              disabled={locked || editedElsewhere || queue.steerRefused}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();
@@ -220,6 +210,37 @@ function ChatQueueCard({
                   {t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}
                 </Typography.Paragraph>
               </View>
+            </CardAction>
+          ) : null}
+          <CardAction
+            accessibilityLabel={t("mobile.chat.queue.editNext")}
+            disabled={locked || editedElsewhere || !queue.canEdit}
+            onPress={() => {
+              if (!next) return;
+              void haptics.selection();
+              router.push({ pathname: "/queued-messages/edit", params: { chat: queue.chatId, deliveryId: next.id } });
+            }}
+          >
+            <Pencil color={foreground} size={18} strokeWidth={2} />
+          </CardAction>
+          {queue.canRunAsThread ? (
+            <CardAction
+              accessibilityLabel={t("mobile.chat.queue.runNextInNewThread")}
+              disabled={locked || editedElsewhere || Boolean(locks?.heldForEdit)}
+              onPress={() => {
+                if (!next) return;
+                void haptics.selection();
+                void queue.runAsThread(next).then((task) => {
+                  void haptics.notification(task ? "success" : "error");
+                  if (task)
+                    router.push({
+                      pathname: "/task/[taskId]",
+                      params: { taskId: task.id, agentId: task.agentId, serverId: queue.serverId },
+                    });
+                });
+              }}
+            >
+              <GitBranch color={foreground} size={18} strokeWidth={2} />
             </CardAction>
           ) : null}
           <CardAction

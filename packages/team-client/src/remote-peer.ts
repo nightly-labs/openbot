@@ -19,7 +19,7 @@ import {
   decodeTeamProtocolV8CurrentEvent,
   decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV8WebRtcHttpRequest,
+  encodeTeamProtocolV9WebRtcHttpRequest,
   TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
@@ -27,6 +27,7 @@ import {
   type TeamProtocolV2Json,
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
@@ -42,7 +43,7 @@ import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contract
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
-import { base64UrlToBytes, bytesToBase64Url } from "./base64";
+import { base64ToBytes, base64UrlToBytes, bytesToBase64Url } from "./base64";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 
 /** `reference` is the code a user can copy, such as `signal/host_busy`. It never holds server text. */
@@ -76,9 +77,11 @@ const SIGNAL_RATE_LIMIT_MS = 60_000;
 const peerCall = <A>(operation: () => Promise<A> | A) =>
   Effect.tryPromise({ try: async () => operation(), catch: peerError });
 const peerDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: peerError });
+/** A device file that the native side cannot read was moved, deleted or changed after it was selected. */
+const deviceFileError = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
 
 import { createRemoteFileReceiver } from "./file-download";
-import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
+import { createRemoteFileSender, FileTransferError, type RemoteFileUpload } from "./file-upload";
 import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from "./sync-profile";
 
 export type { RemoteFileUpload } from "./file-upload";
@@ -190,11 +193,20 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
     return null;
   const maxBytes = value.maxBytes;
   if (!(maxBytes === undefined || isNumber(maxBytes))) return null;
+  const file = value.file;
+  let source: RemoteFileUpload["file"];
+  if (file !== undefined) {
+    if (!isDynamicRecord(file)) return null;
+    const { ref, size } = file;
+    if (!isString(ref) || !isNumber(size)) return null;
+    source = { ref, size };
+  }
   return {
     name: value.name,
     mimeType: value.mimeType,
     base64: value.base64,
     ...(maxBytes === undefined ? {} : { maxBytes }),
+    ...(source === undefined ? {} : { file: source }),
   };
 }
 
@@ -350,6 +362,13 @@ export interface RemoteTeamPeerActions {
   /** The platform reported that the network came back. A consumer that waits to retry can retry now. */
   onNetworkRestored?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
+  /**
+   * The SHA-256 digest, as 64 lowercase hex characters, of the device file of an upload in progress
+   * (`RemoteFileUpload.file`). Only a client that sends device files has it.
+   */
+  digestUploadFile?: (ref: string) => Promise<string>;
+  /** Bytes of the device file of an upload in progress, as Base64. */
+  readUploadFile?: (part: { ref: string; offset: number; length: number }) => Promise<string>;
 }
 interface ActionsRef {
   current: RemoteTeamPeerActions;
@@ -608,6 +627,23 @@ export function createRemoteTeamPeer(
         return sendPayload(state, "files", data);
       }),
     () => createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size))),
+    {
+      digest: (ref) =>
+        peerCall(() => {
+          const digest = actions.current.digestUploadFile;
+          if (!digest) throw new Error("This client cannot read device files.");
+          return digest(ref);
+        }).pipe(Effect.mapError(deviceFileError)),
+      read: (ref, offset, length) =>
+        peerCall(() => {
+          const read = actions.current.readUploadFile;
+          if (!read) throw new Error("This client cannot read device files.");
+          return read({ ref, offset, length });
+        }).pipe(
+          Effect.flatMap((base64) => peerDecode(() => base64ToBytes(base64))),
+          Effect.mapError(deviceFileError),
+        ),
+    },
   );
   const downloads = createRemoteFileReceiver((data) =>
     Effect.suspend(() => {
@@ -1825,7 +1861,9 @@ export function createRemoteTeamPeer(
           const status = frame.result.status;
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
-            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol.maximum;
+            // The highest protocol that both sides speak. A host that this client refuses keeps its maximum.
+            const host = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol;
+            state.hostProtocol = teamWebRtcClientProtocol(host).protocol ?? host.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({
@@ -2013,7 +2051,7 @@ export function createRemoteTeamPeer(
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV8WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV9WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),

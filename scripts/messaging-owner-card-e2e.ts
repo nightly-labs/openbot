@@ -237,6 +237,7 @@ const agents = new AgentService({
           comment: false,
         };
       }),
+    withdraw: () => Effect.die(new Error("No report is removed in this check.")),
   },
 });
 

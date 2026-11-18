@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Edytujesz wiadomość z kolejki. Zapisz lub anuluj edycję, aby mogła zostać wysłana.",
   "composer.queueEdit.cancel": "Anuluj edycję",
+  "composer.feedbackFix.body":
+    "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
+  "composer.feedbackFix.cancel": "Anuluj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Zaktualizuj {provider} na komputerze, na którym działa, aby kontynuować.",
   "composer.update.pending": "Aktualizowanie…",
   "composer.update.action": "Zaktualizuj",
+  "composer.imageInput.body":
+    "{model} dostaje tylko tekst, więc nie widzi załączonych obrazów. Jeśli ten model umie czytać obrazy, włącz dla niego obrazy.",
+  "composer.imageInput.label": "Włącz obrazy dla {model}",
+  "composer.imageInput.pending": "Włączanie…",
+  "composer.imageInput.action": "Włącz obrazy",
   "composer.usageLimit.credits": "Wykorzystano cały limit planu {provider}. Agenci używają teraz Twoich kredytów.",
   "composer.usageLimit.creditsResets":
     "Wykorzystano cały limit planu {provider}. Agenci używają Twoich kredytów do odnowienia: {reset}.",

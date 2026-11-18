@@ -1,5 +1,6 @@
 import { isUpdateActivePhase } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
 import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
@@ -7,12 +8,17 @@ import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
+import { WorkflowsPage } from "../../lazy-views";
 import { usePlatform } from "../../platform";
 import { useChannels } from "../channels/channels-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { serverHasStorage } from "../files/storage-usage";
 import { useServerActions } from "../servers/server-actions";
-import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  activeServerHasProviderSettings,
+  serverCanAdminister,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -27,7 +33,7 @@ import { useWindowPage } from "./window-page-context";
 
 /**
  * The page rail of the desktop window. Agents, Routines, Workflows, Schedule, Usage, Library,
- * Providers, Marketplace and Settings change the page in the card. The menu of the open server is below Settings,
+ * Providers, CRM, Marketplace and Settings change the page in the card. The menu of the open server is below Settings,
  * so it shows on each page.
  */
 export function WorkspacePageRail(props: { hidden: boolean }) {
@@ -81,6 +87,20 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
     if (!server || !activeServerHasProviderSettings(server)) return undefined;
     return (button: HTMLElement) => openServerSettings(server.id, button, "providers");
   };
+  /**
+   * Only an owner or admin reads the CRM, an older joined server has no CRM routes, and the CRM shows
+   * only while Server Settings > Experimental turns it on.
+   */
+  const crmShown = () => serverCanAdminister(activeServer(), CRM_CAPABILITY) && usage.crmEnabled() === true;
+  /** The CRM button of the page rail. A named function, not a ternary prop. */
+  function crmRailAction(): ((button: HTMLElement) => void) | undefined {
+    return crmShown() ? windowPage.openCrm : undefined;
+  }
+  /** The Connectors item of the CRM button's right-click menu, where the CRM button shows. */
+  function crmConnectorsAction(): ((button: HTMLElement) => void) | undefined {
+    if (!crmShown()) return undefined;
+    return (button) => windowPage.openCrm(button, true);
+  }
   const current = (): PageRailPage | null => {
     const page = windowPage.page();
     if (page === "agents") return layout.sidebarView();
@@ -110,12 +130,15 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onRoutines={() => showSidebarView("routines")}
       // A joined server without workflows shows its notice on the page.
       onWorkflows={() => windowPage.openWorkflows(null)}
+      onPreloadWorkflows={() => void WorkflowsPage.preload()}
       onSchedule={windowPage.openSchedule}
       onTasks={tasksAvailable() ? windowPage.openTasks : undefined}
       onUsage={windowPage.openUsage}
       // An older joined server has no storage routes, so it has no Library.
       onLibrary={serverHasStorage(activeServer()) ? windowPage.openLibrary : undefined}
       onProviders={openProviders()}
+      onCrm={crmRailAction()}
+      onCrmConnectors={crmConnectorsAction()}
       onMarketplace={() => {
         windowPage.leavePricing();
         setSkillsMarketplaceOpen(true);

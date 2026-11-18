@@ -126,9 +126,14 @@ export const messages = {
   "provider.picker.download": "Téléchargement de {name}",
   "provider.picker.search": "Rechercher des modèles",
   "provider.picker.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
+  "provider.picker.showCustomModels": "Voir les modèles",
   "provider.picker.museNoModels":
     "Muse n’a envoyé aucun modèle pour ce compte. Muse n’est peut-être pas disponible dans le pays où cet agent s’exécute. Choisissez un modèle d’un autre fournisseur.",
   "provider.picker.customEmpty":
@@ -156,6 +161,8 @@ export const messages = {
   "provider.picker.selectEffort": "Choisir l’effort",
   "provider.picker.custom": "Personnalisé",
   "provider.picker.cliReady": "{cli} prêt",
+  "provider.picker.modelSourceProvider": "Utilise {name} depuis vos paramètres {cli}",
+  "provider.picker.modelSourceCatalog": "Utilise une liste de modèles depuis vos paramètres {cli}",
   "provider.status.signInRequired": "Connexion requise",
   "provider.model.free": "Gratuit",
   "provider.model.new": "Nouveau",

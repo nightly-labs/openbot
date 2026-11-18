@@ -129,9 +129,13 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.workspaceOnlyUnavailable":
+    "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
+  "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
     "Muse 没有为此账号返回任何模型。Muse 可能在此智能体运行的国家或地区不可用。请选择其他提供商的模型。",
   "provider.picker.customEmpty":
@@ -158,6 +162,8 @@ export const messages = {
   "provider.picker.selectEffort": "选择强度",
   "provider.picker.custom": "自定义",
   "provider.picker.cliReady": "{cli} 已就绪",
+  "provider.picker.modelSourceProvider": "使用 {cli} 设置中的 {name}",
+  "provider.picker.modelSourceCatalog": "使用 {cli} 设置中的模型列表",
   "provider.status.signInRequired": "需要登录",
   "provider.model.free": "免费",
   "provider.model.new": "新",

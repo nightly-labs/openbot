@@ -20,6 +20,16 @@
 // The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
 // or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
 // with the ask of its provider; a video and a step without the field do not.
+// The host advertises `workflows-media-size-v1` to a protocol 9 peer. An image step with `aspect`
+// "custom" asks the model for the nearest aspect ratio and keeps the file that the host cropped to its
+// width and height; a failed crop keeps the model's file, and a video or a side out of range is not cropped.
+// An image step with `aspect` "4:5" or "5:4" asks the model for that ratio; a video model without them gets
+// its first ratio.
+// An image step with no description runs from its text input; with no description, no text and no
+// picture it fails with "mediaEmptyRequest" and never reaches the media maker.
+// The host advertises `workflows-media-catalog-v1` to a protocol 9 peer. A member reads the live models
+// of the signed-in services and the price of a step's choices; a bad price request is refused. A step
+// with a model that only the live list has reaches the media maker with its id at the service.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -30,7 +40,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentAccessChange, WorkflowDetail, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import type {
+  AgentAccessChange,
+  WorkflowDetail,
+  WorkflowGraph,
+  WorkflowMediaCatalogModel,
+  WorkflowMediaPriceRequest,
+  WorkflowNode,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -50,6 +67,12 @@ import {
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CODECS,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -98,8 +121,29 @@ let sunraSignedIn = false;
 let higgsfieldSignedIn = false;
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
-/** Whether each media request asks for a transparent image, and its prompt, in order. */
-const mediaRequests: { transparent: boolean; prompt: string }[] = [];
+/** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
+const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+/** The model id at the provider and the catalog id of each media request, in order. */
+const mediaModels: { model: string; catalogId: string }[] = [];
+/** Each price request that reached the host's price read, in order. */
+const priceRequests: WorkflowMediaPriceRequest[] = [];
+/** A Higgsfield model that only the live list has, as the host's catalog read gives it after the sign-in. */
+const LIVE_MODEL: WorkflowMediaCatalogModel = {
+  id: "higgsfield-kling3_0_e2e",
+  provider: "higgsfield",
+  providerModel: "kling3_0_e2e",
+  name: "Kling 3.0 e2e",
+  maker: "Kuaishou",
+  kinds: ["video"],
+  aspects: ["16:9", "9:16", "1:1"],
+  durations: [5, 10],
+  resolutions: ["720p", "1080p"],
+  transparent: false,
+};
+const LIVE_PRICE = 22.5;
+/** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
+const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
+let sizeFails = false;
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -312,6 +356,14 @@ async function startHost(): Promise<Host> {
       // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
+      // The app crops the file with Electron's image decoder, which this check does not load. The stand-in
+      // keeps a new file id, as the app does.
+      sizePicture: (attachmentId, size) => {
+        sizeRequests.push({ attachmentId, ...size });
+        return sizeFails
+          ? Effect.fail({ message: "The e2e crop failed." })
+          : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
+      },
       mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
       // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
       // quota after the sign-in. No Sunra or Higgsfield call is made.
@@ -320,12 +372,24 @@ async function startHost(): Promise<Host> {
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
         }),
+      // As the app answers: the live Higgsfield list after the sign-in. No Sunra or Higgsfield call is made.
+      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
+      mediaPrice: (request) =>
+        Effect.sync(() => {
+          priceRequests.push(request);
+          return { credits: higgsfieldSignedIn && request.model === LIVE_MODEL.id ? LIVE_PRICE : null };
+        }),
       // A step with an account goes to the real agent service, which must refuse an account that this
       // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
       // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
-        mediaRequests.push({ transparent: request.specs.transparent, prompt: request.prompt });
+        mediaModels.push({ model: request.model, catalogId: request.catalogId });
+        mediaRequests.push({
+          transparent: request.specs.transparent,
+          prompt: request.prompt,
+          aspect: request.specs.aspect,
+        });
         if (request.account === null) return Effect.succeed("e2e-media-file");
         return agents.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
@@ -1509,6 +1573,209 @@ try {
       assert.equal(solid.transparent, false);
       assert.doesNotMatch(solid.prompt, /transparent background/);
       return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
+    },
+  );
+
+  await step(
+    "custom size, 4:5 and 5:4: the host advertises workflows-media-size-v1; the model gets the nearest aspect and the step keeps the cropped file",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = { media: mediaRequests.length, size: sizeRequests.length };
+        const workflow = await hostWorkflow(`Size ${JSON.stringify(fields)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before.media];
+        assert.ok(request, "the step reached the media maker");
+        return { output: done.output, aspect: request.aspect, sizes: sizeRequests.slice(before.size) };
+      };
+      const wide = await run({ model: "gpt-image", aspect: "custom", width: 1600, height: 900 });
+      assert.equal(wide.aspect, "16:9");
+      assert.deepEqual(wide.sizes, [{ attachmentId: "e2e-media-file", width: 1600, height: 900 }]);
+      assert.equal(wide.output, "e2e-media-file-1600x900");
+      const tall = await run({ model: "grok-imagine", aspect: "custom", width: 700, height: 1300 });
+      assert.equal(tall.aspect, "9:16");
+      assert.equal(tall.output, "e2e-media-file-700x1300");
+      sizeFails = true;
+      const failed = await run({ model: "gpt-image", aspect: "custom", width: 800, height: 800 }).finally(() => {
+        sizeFails = false;
+      });
+      assert.equal(failed.sizes.length, 1);
+      assert.equal(failed.output, "e2e-media-file");
+      const video = await run({ model: "grok-imagine", media: "video", aspect: "custom", width: 1600, height: 900 });
+      assert.deepEqual(video.sizes, []);
+      assert.equal(video.output, "e2e-media-file");
+      const tooLarge = await run({ model: "gpt-image", aspect: "custom", width: 5000, height: 900 });
+      assert.deepEqual(tooLarge.sizes, []);
+      assert.equal(tooLarge.output, "e2e-media-file");
+      const post = await run({ model: "gpt-image", aspect: "4:5" });
+      assert.equal(post.aspect, "4:5");
+      assert.deepEqual(post.sizes, []);
+      const postVideo = await run({ model: "grok-imagine", media: "video", aspect: "4:5" });
+      assert.equal(postVideo.aspect, "1:1");
+      const postSize = await run({ model: "gpt-image", aspect: "custom", width: 1080, height: 1350 });
+      assert.equal(postSize.aspect, "4:5");
+      assert.equal(postSize.output, "e2e-media-file-1080x1350");
+      const print = await run({ model: "grok-imagine", aspect: "5:4" });
+      assert.equal(print.aspect, "5:4");
+      const printVideo = await run({ model: "grok-imagine", media: "video", aspect: "5:4" });
+      assert.equal(printVideo.aspect, "1:1");
+      const printSize = await run({ model: "gpt-image", aspect: "custom", width: 1350, height: 1080 });
+      assert.equal(printSize.aspect, "5:4");
+      assert.equal(printSize.output, "e2e-media-file-1350x1080");
+      return { wide, tall, failed, video, tooLarge, post, postVideo, postSize, print, printVideo, printSize };
+    },
+  );
+
+  await step(
+    "empty media request: a step with no description runs from its input, and fails with no input",
+    async () => {
+      const run = async (title: string, input: string) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(title, {
+          nodes: [
+            { ...promptNode, fields: { text: input } },
+            { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        return { done, requests: mediaRequests.slice(before) };
+      };
+      const fromInput = await run("No description, text input", "A red kite over a beach.");
+      assert.equal(fromInput.done.status, "done", JSON.stringify(fromInput.done.error));
+      assert.equal(fromInput.requests.length, 1);
+      assert.match(fromInput.requests[0]?.prompt ?? "", /A red kite over a beach\./);
+      const empty = await run("No description, empty input", "");
+      assert.equal(empty.done.status, "failed");
+      assert.equal(empty.done.error, sourceText("error.workflow.mediaEmptyRequest"), JSON.stringify(empty.done.error));
+      assert.equal(empty.requests.length, 0, "an empty request never reaches the media maker");
+      return { fromInput: fromInput.done.status, empty: empty.done.error };
+    },
+  );
+
+  await step(
+    "media catalog: the host advertises workflows-media-catalog-v1; a member reads the live models and a price, and a step runs a model that only the live list has",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      const catalogCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog);
+      assert.ok(catalogCodec, "No workflows-media-catalog-v1 codec for catalog.");
+      const priceCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.price);
+      assert.ok(priceCodec, "No workflows-media-catalog-v1 codec for price.");
+      const raw = async (route: string, body: unknown, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const catalog = async () => {
+        catalogCodec.request({});
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, {});
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        catalogCodec.response(response.status, response.body);
+        return response.body;
+      };
+      const ask: WorkflowMediaPriceRequest = {
+        model: LIVE_MODEL.id,
+        kind: "video",
+        aspect: "16:9",
+        duration: 10,
+        resolution: "1080p",
+        transparent: false,
+      };
+      const price = async (request: WorkflowMediaPriceRequest) => {
+        priceCodec.request(request);
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, request);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        priceCodec.response(response.status, response.body);
+        return response.body;
+      };
+      higgsfieldSignedIn = false;
+      const signedOut = await catalog();
+      assert.deepEqual(signedOut, { models: [] });
+      const priceSignedOut = await price(ask);
+      assert.deepEqual(priceSignedOut, { credits: null });
+      higgsfieldSignedIn = true;
+      try {
+        const signedIn = await catalog();
+        assert.deepEqual(signedIn, { models: [LIVE_MODEL] });
+        const before = priceRequests.length;
+        const priceSignedIn = await price(ask);
+        assert.deepEqual(priceSignedIn, { credits: LIVE_PRICE });
+        assert.deepEqual(priceRequests.slice(before), [ask], "the request reached the host's price read unchanged");
+        // A bad request is refused before it reaches the price read.
+        const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
+        assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
+        assert.equal(priceRequests.length, before + 1);
+        // A step with the live model reaches the media maker with its id at Higgsfield and its catalog id.
+        const beforeModels = mediaModels.length;
+        const workflow = await hostWorkflow("Live Higgsfield model", {
+          nodes: [
+            promptNode,
+            {
+              id: "image",
+              kind: "image",
+              at: at(300),
+              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 10, resolution: "1080p" },
+            },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        assert.deepEqual(mediaModels.slice(beforeModels), [
+          { model: LIVE_MODEL.providerModel, catalogId: LIVE_MODEL.id },
+        ]);
+        const old = await raw(
+          WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
+          {},
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return {
+          signedOut,
+          signedIn,
+          priceSignedOut,
+          priceSignedIn,
+          badPrice: badPrice.status,
+          step: done.status,
+          old: old.status,
+        };
+      } finally {
+        higgsfieldSignedIn = false;
+      }
     },
   );
 

@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 
 /** A delivery the runtime can send: its place and the text, which a quiet run never has. */
@@ -84,19 +85,13 @@ export class RoutineResultStore {
   ): RoutineResultDestination | null {
     const db = this.#database.connection;
     if (!destination) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
+      withTransaction(db, () => {
         db.prepare("DELETE FROM routine_result_destinations WHERE routine_id = ?").run(routineId);
         db.prepare(
           `UPDATE routine_result_deliveries SET status = 'failed', reason = 'stopped', next_attempt_at = NULL,
              updated_at = ? WHERE routine_id = ? AND status = 'pending'`,
         ).run(now, routineId);
-        db.exec("COMMIT");
-      } catch (error) {
-        // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
+      });
       return null;
     }
     db.prepare(

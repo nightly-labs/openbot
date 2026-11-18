@@ -152,6 +152,7 @@ interface HostServiceOptions {
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
+  crm?: ForwardedApiOptions["crm"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
@@ -524,6 +525,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
+      ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
       ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
       ...(options.agentNotificationLevels === undefined
@@ -2230,6 +2232,18 @@ export class HostService extends EventEmitter<HostEvents> {
     const member = this.#options.store.getMember(personId);
     if (!member || member.disabled) return "none";
     return this.#api.agentLevel(member, agentId);
+  }
+
+  /**
+   * Whether an active member who is not an owner or admin can see `agentId`. Such a member reads the
+   * agent's chat and can add a routine to it, so the CRM tools refuse the agent.
+   */
+  agentVisibleToMembers(agentId: string): boolean {
+    return this.#options.store
+      .listMembers()
+      .some(
+        (member) => member.role === "member" && !member.disabled && this.#api.agentLevel(member, agentId) !== "none",
+      );
   }
 
   /**

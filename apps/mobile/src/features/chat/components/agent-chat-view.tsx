@@ -35,6 +35,7 @@ import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { useAgentBackdrops } from "./use-agent-backdrops";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useComposerContextMeter } from "./use-context-usage";
@@ -94,6 +95,13 @@ export function MobileChatView({
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
+  useAgentBackdrops({
+    serverId: agent.serverId,
+    agentId: agent.id,
+    messages: conversation?.messages,
+    memberId,
+    accountUserId,
+  });
   const projected = useMemo(
     () =>
       withQuestionContext(
@@ -415,6 +423,7 @@ export function MobileChatView({
   const threadsShown = threadMenu !== undefined;
   const swipeForward = useMemo(() => {
     const params = { agentId: agent.id, serverId: agent.serverId };
+    if (swipeAction === "off") return null;
     if (swipeAction === "threads")
       return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
     return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;

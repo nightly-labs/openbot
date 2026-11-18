@@ -36,7 +36,9 @@ import {
 import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  Extrapolation,
   FadeInDown,
+  interpolate,
   Keyframe,
   ReduceMotion,
   type SharedValue,
@@ -47,7 +49,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatAppSuggestion } from "@/features/chat/components/chat-app-suggestion";
@@ -84,7 +86,15 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
-import { useMessageColor } from "@/features/settings/model/message-color";
+import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
+import {
+  MEMBER_BUBBLE_SHARE,
+  mixColor,
+  PLAIN_BUBBLE_SHARE,
+  tintedMessageColor,
+  useMessageColor,
+} from "@/features/settings/model/message-color";
 import { useRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
@@ -102,9 +112,12 @@ import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
+import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
+import { useChatBackdropBase } from "./chat-backdrop-layer";
+import { ChatSolidSurfaceProvider } from "./chat-bubble-fill";
 import { ChatFileActionsContext, type OpenMessageFile, useMessageFileOpener } from "./chat-file-actions";
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
@@ -113,7 +126,14 @@ import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } fro
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
-import { type ChatSwipeGesture, ChatSwipeGestureContext } from "./chat-swipe-gesture";
+import {
+  type ChatSwipeGesture,
+  ChatSwipeGestureContext,
+  type ChatTimeReveal,
+  ChatTimeRevealContext,
+  ChatTimesMountedContext,
+  MESSAGE_TIME_WIDTH,
+} from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
 import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
@@ -200,8 +220,11 @@ function ChatBubble({
   animateSize,
   className,
   style,
+  fill,
 }: PropsWithChildren<{
   agent: boolean;
+  /** The solid fill of an agent bubble, or unset for the see-through fill. */
+  fill: string | undefined;
   collapsed?: boolean;
   /** Off when Settings turns reply animation off: the background takes each new size at once. */
   animateSize: boolean;
@@ -251,8 +274,13 @@ function ChatBubble({
           // A new view when the setting changes, so a filled background keeps no animated size.
           key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className="absolute left-0 top-0 bg-control/60"
-          style={[BUBBLE_CORNER, sized ? null : StyleSheet.absoluteFill, background]}
+          className={fill ? "absolute left-0 top-0" : "absolute left-0 top-0 bg-control/60"}
+          style={[
+            BUBBLE_CORNER,
+            sized ? null : StyleSheet.absoluteFill,
+            fill ? { backgroundColor: fill } : null,
+            background,
+          ]}
         />
       ) : null}
       {children}
@@ -262,6 +290,8 @@ function ChatBubble({
 
 interface ChatMessageListProps {
   target: ChatTarget;
+  /** The color under the messages: the chat background, or the base color of the backdrop. */
+  bubbleSurface: string;
   /**
    * The swipe away from Back of an agent's chat. It attaches to the list, and a bubble that replies
    * with a swipe in the same direction blocks it. Keep it for the life of the list: a change mounts
@@ -406,6 +436,13 @@ interface MessageRowShared {
   attachmentTint: AttachmentTint | undefined;
   /** The colors of code in the user's bubble, unset with the same setting. */
   bubbleTone: BubbleTone | undefined;
+  /**
+   * Solid bubbles: the fill of a bubble with no color, the control fill mixed onto the surface. Unset
+   * with see-through bubbles, which keep the translucent fill.
+   */
+  plainBubbleFill: string | undefined;
+  /** Solid bubbles: the surface that a member color mixes onto. Unset with see-through bubbles. */
+  solidBubbleSurface: string | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
   animationActive: boolean;
@@ -719,6 +756,8 @@ const MessageRow = memo(function MessageRow({
     foreground,
     userForeground,
     userBubbleStyle,
+    plainBubbleFill,
+    solidBubbleSurface,
     firstMessageStyle,
     replySession,
     markRevealed,
@@ -808,11 +847,12 @@ const MessageRow = memo(function MessageRow({
         <ChatBubble
           key={key}
           agent={message.author === "agent"}
+          fill={plainBubbleFill}
           collapsed={waiting}
           animateSize={shared.textReveal}
           className={
             message.author === "user"
-              ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
+              ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor || plainBubbleFill ? "" : "bg-control/60"}`
               : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
           }
           style={[
@@ -825,15 +865,28 @@ const MessageRow = memo(function MessageRow({
               : undefined,
             message.author === "user"
               ? memberColor
-                ? { backgroundColor: `${memberColor}38` }
-                : userBubbleStyle
+                ? {
+                    backgroundColor:
+                      (solidBubbleSurface && mixColor(solidBubbleSurface, memberColor, MEMBER_BUBBLE_SHARE)) ||
+                      `${memberColor}38`,
+                  }
+                : (userBubbleStyle ?? (plainBubbleFill ? { backgroundColor: plainBubbleFill } : undefined))
               : undefined,
           ]}
         >
           {children}
         </ChatBubble>
       ) : null,
-    [message, waiting, shared.textReveal, shared.listWidth, userBubbleStyle, memberColor],
+    [
+      message,
+      waiting,
+      shared.textReveal,
+      shared.listWidth,
+      userBubbleStyle,
+      memberColor,
+      plainBubbleFill,
+      solidBubbleSurface,
+    ],
   );
   // A table out of the user's bubble is as wide as the widest bubble and on its side.
   const sentTable = useCallback(
@@ -855,9 +908,9 @@ const MessageRow = memo(function MessageRow({
   );
   const rendered =
     message.kind === "routine" ? (
-      <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+      <RoutineMarkerRow key={message.id} message={message} />
     ) : message.kind === "routine-run-group" ? (
-      <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
+      <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "app-suggestion" ? (
@@ -1169,18 +1222,99 @@ function FocusHighlight({ rowId, color, shown }: { rowId: string; color: string;
 
 const RowContext = createContext<RowContextValue | null>(null);
 
+const MESSAGE_TIME = { hour: "numeric", minute: "2-digit" } as const;
+
+/**
+ * The time of a message, at the middle height of the message, so each time is level with its own
+ * bubble. It comes in from past the end of the chat with the swipe, fading in, and stops at the end
+ * of the screen once it is in; the bubbles can move on past that. A screen reader reads the time in
+ * the actions sheet.
+ */
+function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const mounted = useContext(ChatTimesMountedContext);
+  return mounted ? <MessageTimeLabel createdAt={createdAt} reveal={reveal} /> : null;
+}
+
+function MessageTimeLabel({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const { format } = useText();
+  const label = useMemo(() => {
+    const at = messageTime(createdAt);
+    return Number.isNaN(at) ? null : format.date(new Date(at), MESSAGE_TIME);
+  }, [createdAt, format]);
+  const style = useAnimatedStyle(() => {
+    const distance = reveal.get();
+    return {
+      opacity: interpolate(distance, [MESSAGE_TIME_WIDTH * 0.25, MESSAGE_TIME_WIDTH], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateX: Math.max(0, MESSAGE_TIME_WIDTH - distance) * END_X }],
+    };
+  });
+  if (!label) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="absolute top-0 bottom-0 items-end justify-center"
+      // The time ends 12 pt before the edge of the screen, inside the side padding of the list.
+      style={[{ end: -(LIST_PADDING - 12), width: MESSAGE_TIME_WIDTH }, style]}
+    >
+      <Typography.Paragraph type="body-xs" numberOfLines={1} className="text-muted">
+        {label}
+      </Typography.Paragraph>
+    </Animated.View>
+  );
+}
+
+/**
+ * A message bubble and its time. Only the bubble moves with the swipe that shows the times: the day
+ * label, the steps row, markers and dividers of the chat stay in place.
+ */
+function MessageWithTime({
+  createdAt,
+  reveal,
+  children,
+}: PropsWithChildren<{ createdAt: string | undefined; reveal: SharedValue<number> }>) {
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: -reveal.get() * END_X }] }));
+  return (
+    <View>
+      <Animated.View style={moved}>{children}</Animated.View>
+      {createdAt ? <MessageTime createdAt={createdAt} reveal={reveal} /> : null}
+    </View>
+  );
+}
+
 /**
  * `item` is the row as the list holds it. The list keeps its rows while only their content changes
  * (see `useListRows`), so the row reads its message from the context.
  */
 function ChatRow({ item }: { item: VisibleMessage }) {
   const row = useContext(RowContext);
+  const timeReveal = useContext(ChatTimeRevealContext);
   if (!row) return null;
   const message = row.rowsById.get(item.id) ?? item;
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
   const day = row.dayLabels.get(message.id);
+  const messageRow =
+    message.kind === "thinking" ? null : (
+      <MessageRow
+        message={message}
+        isFirstUser={message.id === row.firstUserId}
+        source={
+          message.kind === "message" && message.replyToMessageId
+            ? row.messagesById.get(message.replyToMessageId)
+            : undefined
+        }
+        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+        upload={row.upload?.messageId === message.id ? row.upload : undefined}
+        outbox={row.outboxStatuses?.get(message.id)}
+        selecting={message.id === row.selectingMessageId}
+        arriving={row.arrivals.has(message.id)}
+        revealed={row.revealedIds.has(message.id)}
+        shared={row.shared}
+      />
+    );
   return (
     <Animated.View
       style={[ROW_STYLE, response ? row.responseStyle : undefined]}
@@ -1205,23 +1339,12 @@ function ChatRow({ item }: { item: VisibleMessage }) {
           onPress={openTurn ? () => openTurn(turn.turnId) : undefined}
         />
       ) : null}
-      {message.kind === "thinking" ? null : (
-        <MessageRow
-          message={message}
-          isFirstUser={message.id === row.firstUserId}
-          source={
-            message.kind === "message" && message.replyToMessageId
-              ? row.messagesById.get(message.replyToMessageId)
-              : undefined
-          }
-          questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-          upload={row.upload?.messageId === message.id ? row.upload : undefined}
-          outbox={row.outboxStatuses?.get(message.id)}
-          selecting={message.id === row.selectingMessageId}
-          arriving={row.arrivals.has(message.id)}
-          revealed={row.revealedIds.has(message.id)}
-          shared={row.shared}
-        />
+      {message.kind === "message" && timeReveal ? (
+        <MessageWithTime createdAt={message.createdAt} reveal={timeReveal.offset}>
+          {messageRow}
+        </MessageWithTime>
+      ) : (
+        messageRow
       )}
       {row.branchDivider?.rowId === message.id ? (
         <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
@@ -1358,6 +1481,7 @@ const NO_IDS: ReadonlySet<string> = new Set();
 const NO_CHANNELS: readonly { id: string; name: string }[] = [];
 
 export const ChatMessageList = memo(function ChatMessageList({
+  bubbleSurface,
   upload,
   outboxStatuses,
   target,
@@ -1429,6 +1553,13 @@ export const ChatMessageList = memo(function ChatMessageList({
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
+  // How far the bubbles move to show the message times. A swipe on a message bubble sets it.
+  const timeOffset = useSharedValue(0);
+  const [timesMounted, setTimesMounted] = useState(false);
+  const timeReveal = useMemo<ChatTimeReveal>(
+    () => ({ offset: timeOffset, mount: () => setTimesMounted(true) }),
+    [timeOffset],
+  );
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
@@ -1507,14 +1638,35 @@ export const ChatMessageList = memo(function ChatMessageList({
   const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
   const messageColorMode = useMessageColor((state) => state.mode);
   const customMessageColor = useMessageColor((state) => state.customColor);
-  const userBubbleColor =
-    messageColorMode === "custom"
+  const messageColorStyle = useMessageColor((state) => state.style);
+  // A page that an agent set as the backdrop can bring the color of the reader's bubbles, as on desktop.
+  const backdropBubbleColor = useChatBackdrop((state) =>
+    state.choice === "agent" ? state.agentPage?.bubbles?.yours : undefined,
+  );
+  const [themeSurface, controlFill] = useCSSVariable(["--openbot-bg-surface", "--openbot-bg-control"]);
+  // See-through bubbles apply only over a backdrop. With no backdrop, bubbles are always solid.
+  const seeThroughSetting = useMessageColor((state) => state.seeThrough);
+  const backdropShown = useChatBackdropBase() !== null;
+  const seeThrough = seeThroughSetting && backdropShown;
+  // Solid bubbles take the look of the see-through fill on the surface under them, so a chat with no
+  // backdrop looks as before, and a backdrop does not show through a bubble.
+  const solidBubbleSurface = seeThrough ? undefined : bubbleSurface;
+  const plainBubbleFill = seeThrough
+    ? undefined
+    : (mixColor(bubbleSurface, String(controlFill), PLAIN_BUBBLE_SHARE) ?? String(controlFill));
+  const dark = useUniwind().theme === "dark";
+  const solidBubbleColor =
+    backdropBubbleColor ??
+    (messageColorMode === "custom"
       ? customMessageColor
       : avatarHeadColor(
           target.kind === "agent" ? target.avatarSeed : target.id,
           target.kind === "agent" ? target.avatarHue : null,
           target.kind === "agent" ? target.avatarColor : null,
-        );
+        ));
+  // Tint mixes a part of the color into the bubble surface, as the desktop Tint does.
+  const userBubbleColor =
+    messageColorStyle === "tint" ? tintedMessageColor(solidBubbleColor, String(themeSurface), dark) : solidBubbleColor;
   // A channel has no one agent color for the reader's messages.
   const coloredMessages = messageColorMode === "custom" || (messageColorMode === "agent" && target.kind === "agent");
   // Dark text on a light color and white text on a dark one, so the text stays readable.
@@ -1533,11 +1685,18 @@ export const ChatMessageList = memo(function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
+  const rowShown = useChatRowShown(turnSummaries);
   const visibleMessages = useMemo(
     () =>
       groupRoutineRunMarkers(
         groupExchangeMarkers(
-          messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+          // The row that the chat opens at and the row before a branch line stay, also when a
+          // setting hides their kind.
+          messages.filter(
+            (message) =>
+              rowShown(message) ||
+              (message.kind !== "thinking" && (message.id === focusMessageId || message.id === branchDivider?.afterId)),
+          ),
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
@@ -1546,7 +1705,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+    [messages, rowShown, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(
@@ -1729,6 +1888,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       foreground,
       userForeground,
       userBubbleStyle: coloredMessages ? userBubbleStyle : undefined,
+      plainBubbleFill,
+      solidBubbleSurface,
       attachmentTint: coloredMessages ? { color: userBubbleColor, foreground: userForeground } : undefined,
       bubbleTone: coloredMessages ? bubbleTone(userForeground) : undefined,
       firstMessageStyle: motion.firstMessageStyle,
@@ -1770,6 +1931,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       userBubbleStyle,
       userBubbleColor,
       coloredMessages,
+      plainBubbleFill,
+      solidBubbleSurface,
       motion.firstMessageStyle,
       screenReaderEnabled,
       animationActive,
@@ -1896,6 +2059,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       highlightColor,
     ],
   );
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
       (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
@@ -1909,7 +2073,9 @@ export const ChatMessageList = memo(function ChatMessageList({
         (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
     );
     // One run of text, as desktop shows it: the row clamps the label, and blank lines would fill it.
-    const latestStep = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
+    // With the thinking display off, the row says only that the agent thinks.
+    const latestStep =
+      showThinking && !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
     // A progress update shows as a message, so the row does not say it again.
     const thinkingDetail = latestStep && !latestStep.progress ? latestStep.text.replace(/\s+/gu, " ").trim() : null;
     const activityLabel =
@@ -2161,24 +2327,30 @@ export const ChatMessageList = memo(function ChatMessageList({
         !accessibilityHidden && (historyState !== "ready" || motion.historyVisible) ? "auto" : "no-hide-descendants"
       }
     >
-      <ChatImageViewerProvider serverId={target.serverId} images={images}>
-        {/* The history hides only once it is ready: a loading list shows what it has. */}
-        <ChatTagActionsContext value={openTaggedTab}>
-          <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
-            <RoutineGroupsContext value={routineGroupsState}>
-              <KeptOpenContext value={replySession.keptOpen}>
-                <RowContext value={rowContext}>
-                  <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                    <ListHeaderContext value={listHeader}>
-                      <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                    </ListHeaderContext>
-                  </ChatSwipeGestureContext>
-                </RowContext>
-              </KeptOpenContext>
-            </RoutineGroupsContext>
-          </HistoryShownContext>
-        </ChatTagActionsContext>
-      </ChatImageViewerProvider>
+      <ChatSolidSurfaceProvider surface={solidBubbleSurface}>
+        <ChatImageViewerProvider serverId={target.serverId} images={images}>
+          {/* The history hides only once it is ready: a loading list shows what it has. */}
+          <ChatTagActionsContext value={openTaggedTab}>
+            <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
+              <RoutineGroupsContext value={routineGroupsState}>
+                <KeptOpenContext value={replySession.keptOpen}>
+                  <RowContext value={rowContext}>
+                    <ChatSwipeGestureContext value={swipeGesture ?? null}>
+                      <ChatTimeRevealContext value={timeReveal}>
+                        <ChatTimesMountedContext value={timesMounted}>
+                          <ListHeaderContext value={listHeader}>
+                            <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                          </ListHeaderContext>
+                        </ChatTimesMountedContext>
+                      </ChatTimeRevealContext>
+                    </ChatSwipeGestureContext>
+                  </RowContext>
+                </KeptOpenContext>
+              </RoutineGroupsContext>
+            </HistoryShownContext>
+          </ChatTagActionsContext>
+        </ChatImageViewerProvider>
+      </ChatSolidSurfaceProvider>
       {messageFiles.sheet}
     </Animated.View>
   );

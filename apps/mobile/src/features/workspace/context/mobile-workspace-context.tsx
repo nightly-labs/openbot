@@ -13,6 +13,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -36,6 +37,7 @@ import {
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -53,6 +55,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
@@ -77,8 +80,8 @@ import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sideba
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
@@ -110,6 +113,7 @@ import type {
   RemoteLargeDownload,
   RemoteTeamEvent,
 } from "@openbot/team-client/remote-peer";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -153,6 +157,7 @@ import { NotificationAvatarSync } from "@/features/push-notifications/notificati
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { forgetAgentBackdrops, retainAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
@@ -290,6 +295,8 @@ export type {
 } from "@/features/workspace/model/workspace-types";
 
 const NO_IDS: string[] = [];
+/** A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`). */
+const createOperationId = retryOperationIds(() => Crypto.randomUUID());
 const NO_AGENTS: MobileAgent[] = [];
 /** The longest that the servers which are not selected wait for the selected one on a return to the app. */
 const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
@@ -604,6 +611,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryClient.removeQueries({ queryKey });
       }
       forgetDrawerSnapshots(serverIds);
+      forgetAgentBackdrops(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       hostColors.current = withoutKeys(hostColors.current, serverIds);
@@ -638,6 +646,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
         // Also the copies of servers that the account left while the app was closed.
         void workspaceCache?.retain([...available]).catch(() => undefined);
+        retainAgentBackdrops([...available]);
         for (const host of hosts) removedServers.current.delete(host.hostId);
         keepHosts(hosts);
       }
@@ -1284,8 +1293,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         "connection",
         `${serverId} host OpenBot ${compatibility.appVersion}, protocol ${compatibility.protocol.minimum}-${compatibility.protocol.maximum}, capabilities: ${compatibility.capabilities.join(" ")}`,
       );
-      if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
+      // The host range is compared with the protocols that this app speaks, so a host that raised its
+      // minimum still connects, and the side that is too old is named.
+      const negotiated = teamWebRtcClientProtocol(compatibility.protocol);
+      if (negotiated.update === "client_update_required") {
         throw new Error(sourceText("error.remote.mobileUpdateRequired"));
+      }
+      if (negotiated.update === "host_update_required") {
+        throw new Error(sourceText("error.team.hostUpdateRequired"));
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
@@ -2162,7 +2177,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const serverId = currentActiveServer().id;
         const firstTask = input.firstTask?.trim() ?? "";
         const welcome = hasCapability(serverCapabilities.current, serverId, AGENT_WELCOME_CAPABILITY);
-        const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
+        const body = {
           name: input.name,
           description: input.description,
           avatarSeed: input.avatarSeed,
@@ -2183,6 +2198,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
                 ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
               }
             : {}),
+        };
+        const operation = hasCapability(serverCapabilities.current, serverId, AGENT_CREATE_OPERATION_CAPABILITY)
+          ? createOperationId([serverId, body])
+          : null;
+        const created = await request(
+          "POST",
+          TEAM_API_ROUTES.agents.all,
+          decodeAgent,
+          operation ? { ...body, operationId: operation.id } : body,
+        ).catch((error: unknown) => {
+          operation?.failed();
+          throw error;
         });
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== created.id),
@@ -2639,6 +2666,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageMcpServers: managesMcp,
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
+        macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
+        canEditUiBlockPreview: (serverId) => hasCapability(capabilities, serverId, UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
         canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),

@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import type { AgentModelOption } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { ModelCatalog } from "../src/backend/agent/model-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -165,6 +166,7 @@ try {
     isSignedOut: () => false,
     requestTimeoutMs: 20_000,
     recordProviderError: () => undefined,
+    startSettingsChanged: () => Effect.void,
   });
   const { models } = await runCauseEffect(catalog.read(client, driver.catalog, 20_000));
   const modelOf = (agent: AgentId): AgentModelOption => {

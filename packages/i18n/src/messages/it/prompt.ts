@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Completa il passaggio su {host}",
   "prompt.browser.cancelled": "Annullato",
   "prompt.browser.reload":
-    "Completa l'accesso, poi ricarica la pagina del browser prima di scegliere «Ho finito». L'ispezione della pagina resta bloccata finché non viene ricaricata.",
+    "OpenBot non è riuscito a finire di inserire la password o il codice. Controlla la pagina e inserisci ciò che manca. Completa l'accesso, poi ricarica la pagina del browser prima di scegliere «Ho finito». L'ispezione della pagina resta bloccata finché non viene ricaricata.",
   "prompt.browser.continuing": "{name} sta continuando.",
   "prompt.browser.cancelledBody": "Il passaggio nel browser è stato annullato.",
   "prompt.browser.pendingBody":
     "Apri la pagina per completare l'accesso, la verifica o il consenso. Poi lascia continuare {name}.",
   "prompt.browser.openPage": "Apri {title}",
+  "prompt.browser.openFailed": "Impossibile aprire la pagina nella finestra principale. Riprova.",
   "prompt.browser.done": "Ho finito",
   "prompt.browser.pageFallback": "Pagina del browser",
   "prompt.browser.hostFallback": "il browser",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Accesso a {host} annullato",
   "prompt.browser.signInBlocked.body":
     "Accedi su questo computer. OpenBot invia solo l’accesso a {host} a {server}, e {name} continua.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} non accetta un accesso dal server. Apri questa chat nell’app desktop di OpenBot sul tuo computer e accedi da lì. Poi {name} continua.",
   "prompt.browser.signInBlocked.cancelledBody": "L’accesso è stato annullato.",
   "prompt.browser.signInBlocked.waiting": "In attesa dell’accesso",
   "prompt.browser.signInBlocked.waitingButton": "In attesa dell’accesso…",

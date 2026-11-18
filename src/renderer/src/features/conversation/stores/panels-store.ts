@@ -6,6 +6,7 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
@@ -30,6 +31,11 @@ import { conversationOwnerId } from "./composer-store";
 // Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
 
+/** A setting card asks the agent settings to show one row. */
+export interface AgentSettingRowRequest extends AgentSettingReveal {
+  agentId: string;
+}
+
 export interface RoutineSettingsRequest {
   agentId: string;
   /** Null starts a new routine. */
@@ -45,6 +51,8 @@ interface SidePanelFile {
   name: string;
   folder: boolean;
   source: SidebarFilePreview["source"];
+  /** The last read of the tab's file failed. See `fileTabReadFailed`. */
+  unavailable: boolean;
 }
 
 /** The panes and files of one agent's side panel. The panel keeps them while it is closed. */
@@ -130,6 +138,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (deps.props.agent?.id !== agentId) return;
     setInstructionsSettingsRequest({ agentId });
     setActiveRightPanel("settings", agentId);
+  }
+  const [agentSettingRowRequest, setAgentSettingRowRequest] = createSignal<AgentSettingRowRequest | null>(null);
+  let agentSettingRowNonce = 0;
+  /** Opens the settings of the chat's agent at one row, as a setting card asks. Each call shows the row again. */
+  function openAgentSettingRow(agentId: string, settingId: AgentSettingLinkId): void {
+    if (deps.props.agent?.id !== agentId) return;
+    agentSettingRowNonce += 1;
+    setAgentSettingRowRequest({ agentId, settingId, nonce: agentSettingRowNonce });
+    setActiveRightPanel("settings", agentId);
+  }
+  /** The panel showed the row, so the request does not show it again when the panel mounts again. */
+  function handleAgentSettingRowRequest(nonce: number): void {
+    setAgentSettingRowRequest((current) => (current?.nonce === nonce ? null : current));
   }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
   let routineSettingsRequestNonce = 0;
@@ -224,6 +245,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
       setInstructionsSettingsRequest(null);
+      setAgentSettingRowRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
@@ -327,6 +349,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
+      fileTabReadFailed(place);
     }
   }
 
@@ -387,7 +410,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             // The fallback is for the conversation that was open at the click.
             if (fallback) {
               if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
-            } else deps.setComposerError(filePreviewError(error, path), target);
+            } else {
+              deps.setComposerError(filePreviewError(error, path), target);
+              fileTabReadFailed(place);
+            }
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -448,7 +474,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             if (!attachment || !canPreviewAttachment(attachment)) {
               if (next) {
                 if (current()) next();
-              } else deps.setComposerError(filePreviewError(error, path), target);
+              } else {
+                deps.setComposerError(filePreviewError(error, path), target);
+                fileTabReadFailed(place);
+              }
               return;
             }
             // The attachment is of the conversation that was open at the click.
@@ -481,6 +510,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         (error) => {
           if (generation !== deps.currentFilePreviewGeneration()) return;
           deps.setComposerError(filePreviewError(error, path), target);
+          fileTabReadFailed(place);
         },
       );
   }
@@ -512,6 +542,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       name: file.directory?.name ?? file.preview?.name ?? key,
       folder: source.kind === "workspace-folder",
       source,
+      unavailable: false,
     };
     updateSidePanel(ownerAgentId, (state) => {
       const files = [...state.files];
@@ -524,6 +555,23 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     });
     deps.setSidebarFilePreview(file);
     setActiveRightPanel("file-preview", ownerAgentId);
+  }
+
+  /** The file tab whose file the last tab read opens. A newer read makes an older one drop its result. */
+  let openingFileTab: { ownerAgentId: string; key: string } | null = null;
+  function setFileTabUnavailable(ownerAgentId: string, key: string, unavailable: boolean) {
+    updateSidePanel(ownerAgentId, (state) => ({
+      ...state,
+      files: state.files.map((item) => (item.key === key ? { ...item, unavailable } : item)),
+    }));
+  }
+  /**
+   * A read of a file tab failed. The tab stays and is not selected; while it has the focus, its X can
+   * close it (`side-panel.css`). Only a failed read does this, so a click while the file reads selects it.
+   */
+  function fileTabReadFailed(place: FileTabPlace) {
+    if (place === "open" && openingFileTab)
+      setFileTabUnavailable(openingFileTab.ownerAgentId, openingFileTab.key, true);
   }
 
   /** Shows the file of a tab. The shown file shows at once; another file is read again. */
@@ -539,6 +587,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setActiveRightPanel("file-preview", ownerAgentId);
       return;
     }
+    openingFileTab = { ownerAgentId, key };
+    // A new read clears the last failure, so a second click while the file reads selects the tab again.
+    if (tab.unavailable) setFileTabUnavailable(ownerAgentId, key, false);
     const source = tab.source;
     if (source.kind === "attachment") void previewAttachment(source.attachment, "open");
     else if (source.kind === "shared") openSharedFile(source.path, "open");
@@ -716,6 +767,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSkillSettings,
     instructionsSettingsRequest,
     openInstructionsSettings,
+    agentSettingRowRequest,
+    openAgentSettingRow,
+    handleAgentSettingRowRequest,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,

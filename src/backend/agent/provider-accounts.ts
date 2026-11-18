@@ -22,7 +22,7 @@ import { Cause, Deferred, Effect, Exit, Fiber, Schema, type Scope } from "effect
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
-import type { AccountReadResult } from "./../protocol";
+import { type AccountReadResult, CLAUDE_CLI_API_KEY_ACCOUNT_TYPE } from "./../protocol";
 import { ProviderSignInError } from "../provider-client-effects";
 import {
   isKeyAccountSupport,
@@ -37,7 +37,7 @@ import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { type CliCodeLogin, type CliCodePrompt, pasteCodeLoginSupported, startCliCodeLogin } from "./cli-code-login";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSignInProcess, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -52,6 +52,14 @@ export class ProviderAccountFailed extends Schema.TaggedError<ProviderAccountFai
 
 function accountFailure(text: string): ProviderAccountFailed {
   return new ProviderAccountFailed({ cause: new Error(text) });
+}
+
+/**
+ * The message of a connected account whose CLI bills an API key of the user's own, not the plan
+ * (#10192). The account rows carry it to the provider settings of each client; null for other accounts.
+ */
+export function ownApiKeyNotice(account: AccountReadResult["account"] | undefined): string | null {
+  return account?.type === CLAUDE_CLI_API_KEY_ACCOUNT_TYPE ? sourceText("status.provider.claudeOwnApiKey") : null;
 }
 
 /** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
@@ -195,7 +203,11 @@ export class ProviderAccounts {
   }
 
   /** The rows of a connected provider that can hold more than one account; its own sign-in first. */
-  rows(provider: AgentProviderId, defaultEmail: string | null): ProviderAccountStatus[] | undefined {
+  rows(
+    provider: AgentProviderId,
+    defaultEmail: string | null,
+    defaultMessage: string | null,
+  ): ProviderAccountStatus[] | undefined {
     if (!this.#support(provider)) return undefined;
     return [
       {
@@ -203,7 +215,7 @@ export class ProviderAccounts {
         label: this.#store.defaultLabel(provider),
         email: defaultEmail,
         state: "connected",
-        message: null,
+        message: defaultMessage,
       },
       // With no claude.ai account, the own sign-in runs on the key too: one row is enough.
       ...this.#store
@@ -294,6 +306,11 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
+    else {
+      // A Reconnect can sign in to another login, or fail after a sign-out: the old reading is not its usage.
+      this.#usage.delete(account.id);
+      this.#usageGate(account.id).reset();
+    }
     if (code) {
       this.#codeResults.delete(account.id);
       this.#codeSignIns.add(account.id);
@@ -350,7 +367,7 @@ export class ProviderAccounts {
                 ...this.environment(account),
                 ...browser,
               },
-              stdio: "ignore",
+              stdio: command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
               shell: false,
               windowsHide: process.platform === "win32",
               windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -358,7 +375,10 @@ export class ProviderAccounts {
           ),
           (child) => stopProcessTree(child).pipe(Effect.ignore),
         );
-        yield* waitForSuccessfulProcess(child, command.timeoutMs);
+        // A known reason is a safe message, which the account row shows as it is.
+        yield* waitForSignInProcess(child, command).pipe(
+          Effect.mapError((error) => (error.cause instanceof ProviderSignInError ? error.cause : error)),
+        );
       }),
     ).pipe(
       Effect.andThen(this.#check(account, true)),
@@ -737,7 +757,8 @@ export class ProviderAccounts {
   }
 
   /**
-   * The usage of each connected account of a provider that reports usage. Each account's gate decides
+   * The usage of each account of a provider that reports usage: a connected account's reading, and the
+   * kept reading of an account in a check or after a failed one. Each connected account's gate decides
    * when it is read again; until then, or when a read fails, the kept reading answers. A read takes an
    * agent's process or a short check.
    */
@@ -750,8 +771,18 @@ export class ProviderAccounts {
     if (!this.#support(provider)) return limits;
     for (const account of this.#store.list(provider)) {
       // A key has no plan, so no usage to read.
-      if (isKeyAccount(account) || this.#states.get(account.id)?.state !== "connected") continue;
+      if (isKeyAccount(account)) continue;
       const kept = () => this.#usage.get(account.id)?.limit ?? null;
+      const state = this.#states.get(account.id)?.state;
+      // A check that runs reads the usage itself, and a failed check, such as a refused usage read, keeps
+      // the account from a read. Until a check connects it again, the last reading keeps its row, unless a
+      // window of the reading has reset (#11239).
+      if (state === "checking" || state === "error") {
+        const reading = kept();
+        if (reading && !usageWindowResetSince(reading, 0)) limits.push(reading);
+        continue;
+      }
+      if (state !== "connected") continue;
       const limit = yield* this.#usageGate(account.id)
         .run({
           read: this.#readUsage(account, model),
@@ -893,10 +924,13 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization }))
+          if (email && this.#loginTaken(provider, account.id, { email, organization })) {
+            // The folder holds another login now, so the kept reading is not the account's.
+            this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
+          }
           // The reading comes first: a usage request for a connected account uses it and starts no client.
           const reading = this.#host
             .readUsage(client, defaultUsageModel(provider))
@@ -919,7 +953,7 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, organization, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
           // After the connected state, so a slow list does not delay it; the end of the sign-in still

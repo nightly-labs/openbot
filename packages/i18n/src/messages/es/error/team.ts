@@ -74,15 +74,21 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexión no admite colores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
+  "error.team.routinePauseReasonsUnsupported": "Esta conexión no puede mostrar por qué una rutina está en pausa.",
+  "error.team.activeQueuesUnsupported": "Esta conexión no puede mostrar las colas de todos los agentes.",
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",
+  "error.team.threadRequestsUnsupported":
+    "Esta conexión no puede mostrar las solicitudes de un hilo lateral a otros agentes.",
   "error.team.hostTurnLimitsUnsupported":
     "Esta conexión no puede mostrar ni cambiar los límites de hilos del servidor.",
   "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
+  "error.team.providerModelSourceUnsupported":
+    "Esta conexión no puede mostrar de dónde vienen los modelos de un proveedor.",
   "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",

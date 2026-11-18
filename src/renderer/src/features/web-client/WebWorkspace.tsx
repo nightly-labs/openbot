@@ -50,6 +50,7 @@ import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/a
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -63,6 +64,7 @@ import { CONTEXT_COMPACT_CAPABILITY } from "@openbot/contracts/team-protocol/con
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -79,6 +81,7 @@ import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -100,7 +103,6 @@ import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
-import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -212,6 +214,7 @@ import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
 import {
   AgentUsagePanel,
+  CrmScreen,
   RoutineFlowsCanvas,
   ScheduleView,
   ServerLibrary,
@@ -235,7 +238,7 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
-import { agentErrorDetails, claimErrorToast, readableAgentError } from "../agents/agent-error-text";
+import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -265,6 +268,7 @@ import {
 } from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
+import { createCrmEnabled } from "../crm/crm-enabled";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
 import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt";
@@ -309,6 +313,7 @@ import type { HostModelVisibilityCalls } from "../settings/provider-model-visibi
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
 import { createCommunityCardVisibility } from "../sidebar/community-card";
 import { createSidebarAlertCards, SidebarAlertCards } from "../sidebar/SidebarAlertCards";
+import { ServerUpgradeOffer } from "../sidebar/server-upgrade-offer";
 import { isReaderAuthor } from "../team/reader-identity";
 import type { ServerVaultOptions } from "../vault/ServerVaultPanel";
 import { createVaultStore } from "../vault/stores/vault-store";
@@ -321,6 +326,7 @@ import {
   SettingsPageFrame,
   SettingsSearchField,
 } from "../window/SettingsPageFrame";
+import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -339,6 +345,7 @@ import { createWebChatHistory, type WebChatHistoryEntry } from "./web-chat-histo
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebConversationView } from "./web-conversation-view";
+import { webCrmHost } from "./web-crm";
 import { createWebFileSaver } from "./web-file-download";
 import { webGitHubConnectorPort } from "./web-github-connector";
 import { createWebHostedServers } from "./web-hosted-server-state";
@@ -407,7 +414,7 @@ async function reportedFailure(send: () => Promise<unknown>, options: PromptAnsw
 }
 
 /** The pages of the connected host that cover the conversation. */
-type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library";
+type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library" | "crm";
 
 type WebWorkspaceProps = {
   accountId: string;
@@ -748,6 +755,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
   const [hostPage, setHostPage] = createSignal<{ view: HostPageView; trigger: HTMLElement | null } | null>(null);
+  /** The server whose CRM page opens its connectors. The page takes it once. */
+  const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
   /** A server at its site limit offers the server plans, which have more sites, to its owner. */
   function canOfferServerPlans(): boolean {
     return (
@@ -776,6 +785,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   function closeHostPage() {
     const trigger = hostPage()?.trigger;
     setHostPage(null);
+    setCrmConnectorsRequest(undefined);
     queueMicrotask(() => {
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     });
@@ -1300,7 +1310,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (unsupported) setHostPage(null);
     },
   );
-  const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest);
+  const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest, {
+    canAdminister: () => serverRoleCanAdminister(server()),
+    hostTab: () =>
+      workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
+      workspace.state.capabilities.includes(TEAM_BROWSER_VIEW_CAPABILITY),
+  });
   // The host's connectors, for an owner or admin. The web client has no computer of its own.
   const connectorTarget = createMemo(() => remoteAdminServer(server(), CONNECTORS_CAPABILITY));
   const githubPort = webGitHubConnectorPort(() => hostRequest());
@@ -1364,6 +1379,43 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (id) void openServerSettings(id, button, "providers");
     };
   }
+  /** Only an owner or admin reads the CRM, on a host with `crm-v1`. */
+  const crmAllowed = () =>
+    canAdministerServer(workspace.state.host?.role) && workspace.state.capabilities.includes(CRM_CAPABILITY);
+  const crmHost = webCrmHost({ request: () => hostRequest(), onHostEvent: workspace.onHostEvent });
+  const crmServerId = createMemo(() => (crmAllowed() ? server()?.id : undefined));
+  /** The Server Settings > Experimental switch. A new host object for each server, so a switch reads it again. */
+  const crmSwitch = createCrmEnabled(createMemo(() => (crmServerId() === undefined ? undefined : { ...crmHost })));
+  const crmEnabled = crmSwitch.enabled;
+  /** The CRM shows only while an owner or admin has it on in Server Settings > Experimental. */
+  const crmSupported = () => crmAllowed() && crmEnabled() === true;
+  // As the Library: a member, or an older host, has no CRM button. The page also closes when the CRM is off.
+  createEffect(
+    () => page() === "crm" && workspace.state.status === "online" && (!crmAllowed() || crmEnabled() === false),
+    (unsupported) => {
+      if (unsupported) setHostPage(null);
+    },
+  );
+  /** The CRM button of the page rail. A named function, not a ternary prop. */
+  function crmRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!crmSupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (!id) return;
+      setCrmConnectorsRequest(undefined);
+      void openHostPage(id, "crm", button);
+    };
+  }
+  /** The Connectors item of the CRM button's right-click menu. A named function, not a ternary prop. */
+  function crmConnectorsAction(): ((button: HTMLElement) => void) | undefined {
+    if (!crmSupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (!id) return;
+      setCrmConnectorsRequest(id);
+      void openHostPage(id, "crm", button);
+    };
+  }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
   function workflowsRailAction(): (() => void) | undefined {
     if (!workflowsSupported()) return undefined;
@@ -1379,9 +1431,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
-  const webWhatsApp = webHostWhatsApp(hostRequest, () =>
-    workspace.state.capabilities.includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY),
-  );
+  const webWhatsApp = webHostWhatsApp(hostRequest, (capability) => workspace.state.capabilities.includes(capability));
   const whatsappPort = hostWhatsAppPort(
     () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
     () => webWhatsApp,
@@ -1808,9 +1858,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return agentId ? workspace.deleteMessage(agentId, messageId) : Promise.resolve();
   };
   /** Pin and Unpin on the host. A host without `message-pins-v1` has none. */
-  const agentMessagePins = () => {
+  const messagePinsSupported = createMemo(() => workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY));
+  // One object while the capability stays: a new object reads the pinned list again.
+  const agentMessagePins = createMemo(() => {
     const { listPinnedMessages: list, setMessagePinned: set } = workspace.runtime;
-    if (!list || !set || !workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY)) return undefined;
+    if (!list || !set || !messagePinsSupported()) return undefined;
     return {
       list,
       set,
@@ -1819,7 +1871,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           if (event.type === "message-pins-changed" && event.agentId === agentId) changed();
         }),
     };
-  };
+  });
   /** The Delete action of the open agent's chat. A host without `message-delete-v1` has none. */
   const agentDeleteMessageAction = () => (messageDeleteSupported() ? deleteOpenAgentMessage : undefined);
   const hostServerAuditCalls: HostServerAuditCalls = {
@@ -2031,14 +2083,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   );
   // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
   // the last. An error with no agent is a toast, once per text in 30 seconds. The host redacts the
-  // message before it sends it.
+  // message before it sends it. The end of the agent's turn removes a retry notice.
+  const retryNotices = createRetryNotices();
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type !== "error") return;
       const serverId = server()?.id;
+      if (event.type === "turn-completed") {
+        if (!serverId) return;
+        const key = composerDraftKey({ agentId: event.agentId, serverId });
+        retryNotices.clearAtTurnEnd(key, controller.setConversationErrors, controller.setConversationErrorRuns);
+        return;
+      }
+      if (event.type !== "error") return;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
         const message = readableAgentError(event.message);
+        retryNotices.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         // The general sentence hides the cause, so the user can copy it into a report (#6410).
         const details = agentErrorDetails(event.message, message);
@@ -2348,14 +2408,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     );
   };
-  createEffect(
+  // The conversation changes with each message, and an effect runs again each time its key is computed.
+  // The memo compares the key, so only another agent or turn reads the waits again.
+  const waitsKey = createMemo(
     () => ({
       agentId: workspace.state.selectedId ?? null,
       turnId: workspace.conversation()?.page?.activeTurnId ?? null,
       supported: workspace.state.capabilities.includes(AGENT_WAITS_CAPABILITY),
     }),
-    ({ agentId, supported }) => loadSelectedWaits(agentId, supported),
+    {
+      equals: (before, after) =>
+        before.agentId === after.agentId && before.turnId === after.turnId && before.supported === after.supported,
+    },
   );
+  createEffect(waitsKey, ({ agentId, supported }) => loadSelectedWaits(agentId, supported));
   const visibleWaits = () => {
     const snapshot = selectedWaits();
     return snapshot && snapshot.agentId === workspace.state.selectedId ? snapshot.waits : undefined;
@@ -2947,6 +3013,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
+          <WindowBackdrop pages="srcdoc" />
           {/* As on desktop: the page rail sits at the left of the frame. */}
           <div class="app-window web-app-window">
             <PageRail
@@ -2971,8 +3038,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 if (id) void openHostPage(id, "schedule", button);
               }}
               onWorkflows={workflowsRailAction()}
+              onPreloadWorkflows={() => void WorkflowsCanvas.preload()}
               onLibrary={libraryRailAction()}
               onProviders={providersRailAction()}
+              onCrm={crmRailAction()}
+              onCrmConnectors={crmConnectorsAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
@@ -3048,7 +3118,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               page={
                 <Show
                   when={
-                    page() === "usage" || page() === "schedule" || page() === "workflows" || page() === "library"
+                    page() === "usage" ||
+                    page() === "schedule" ||
+                    page() === "workflows" ||
+                    page() === "library" ||
+                    page() === "crm"
                       ? server()
                       : undefined
                   }
@@ -3061,6 +3135,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           open={page() === "marketplace"}
                           onOpenChange={setMarketplaceOpen}
                           calls={marketplaceCalls}
+                          browserRuntime={workspace.runtime.browser}
                           connectors={connectors}
                           server={server()}
                           agents={workspace.shownAgents()}
@@ -3165,16 +3240,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       <Match when={page() === "workflows"}>
                         {/* Keyed: the page reads the workflows of one server, as on desktop. */}
                         <Show when={target().id} keyed>
-                          <Loading>
-                            <WorkflowsCanvas
-                              host={workflowHost}
-                              admin={canAdministerServer(workspace.state.host?.role)}
-                              agents={workspace.profiles()}
-                              models={models()}
-                              status={providerAdmin.status()}
-                              self={account().name ?? undefined}
-                            />
-                          </Loading>
+                          {(serverId) => (
+                            <Loading>
+                              <WorkflowsCanvas
+                                host={workflowHost}
+                                serverId={serverId}
+                                admin={canAdministerServer(workspace.state.host?.role)}
+                                agents={workspace.profiles()}
+                                models={models()}
+                                status={providerAdmin.status()}
+                                self={account().name ?? undefined}
+                              />
+                            </Loading>
+                          )}
                         </Show>
                       </Match>
                       <Match when={page() === "library"}>
@@ -3191,6 +3269,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 onOpenUrl={(url) => void openWebLink(url)}
                                 mediaSource={runtime.attachmentMedia}
                                 opensFiles={false}
+                              />
+                            </Loading>
+                          )}
+                        </Show>
+                      </Match>
+                      <Match when={page() === "crm"}>
+                        {/* Keyed: the page reads the CRM of one server, as on desktop. */}
+                        <Show when={target().id} keyed>
+                          {(serverId) => (
+                            <Loading>
+                              <CrmScreen
+                                serverId={serverId}
+                                host={crmHost}
+                                agents={workspace.profiles()}
+                                connectors={{
+                                  requested: () => crmConnectorsRequest() === serverId,
+                                  taken: () => setCrmConnectorsRequest(undefined),
+                                }}
                               />
                             </Loading>
                           )}
@@ -3409,6 +3505,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRefreshServers={workspace.retryHosts}
                     resume={hostedServers.addServer()?.resume}
                     license={licenseCalls}
+                    billingDetails={billingCalls}
                     onOpenUrl={(url) => window.open(url, "_blank", "noopener")}
                     onClose={hostedServers.closeAddServer}
                     onOpenServer={(serverId) => {
@@ -3551,6 +3648,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         }}
                         browserProfiles={browserProfileSettings()}
                         vault={vaultSettings()}
+                        crm={crmHost}
                         // The providers of the host are its own, so there is no sign-in here.
                         instanceTransfer={instanceTransferSettings()}
                         // Any member imports into a host with `agent-import-v1`.
@@ -3599,8 +3697,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onContactUs={licenseContactUs(() => window.location.assign(HOSTED_SERVER_CONTACT_URL))}
                         startBuying={licenseStart() !== null}
                         startOrder={licenseStart()?.order ?? undefined}
+                        billingDetails={billingCalls}
                       />
                     }
+                  />
+                  {/* The larger storage tier of an almost full hosted server, as on desktop. */}
+                  <ServerUpgradeOffer
+                    billing={billingCalls}
+                    card={alertCards.storageCard.card()}
+                    server={server()}
+                    blocked={serverSettings.state.open || billingOpen() || accountSettingsOpen()}
+                    onFreeUpSpace={(serverId) => void openServerSettings(serverId, null, "storage")}
                   />
                   <ChannelCreateOverlay />
                   <GlobalSearchOverlay

@@ -85,12 +85,24 @@ const RELAY_INSTRUCTIONS =
   SUMMARY_RULES +
   "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
   "do not shorten it, and do not change its form.";
+/** The longest agent name that the voice gets, in characters. */
+const VOICE_NAME_LIMIT = 80;
 /**
  * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
  * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
+ * The voice model also ignores Codex's prompt on a ChatGPT login, so this message gives it the agent's name:
+ * without the name, it says that it is ChatGPT (#9825). OpenAI ends the user's turn at a short pause, and
+ * each request goes to the chat as a message: so the voice waits for the rest of a sentence that stops in
+ * the middle, and does not give the agent the parts as separate requests (#9960).
  */
-const RELAY_VOICE_RULE =
+const relayVoiceRule = (name: string) =>
+  (name
+    ? `You are the voice of my agent "${name}". When I ask who you are, you are ${name}. ` +
+      "Never say that you are ChatGPT, Codex or another OpenAI assistant. "
+    : "") +
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
+  "When I stop in the middle of a sentence to think, wait silently for the rest, " +
+  "and then give the complete request to the agent in one piece. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
   "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
@@ -112,6 +124,25 @@ const summaryPrompt = (answer: string) =>
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 /** What the relay gets for a request that the agent answered in the same turn as an earlier request. */
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
+/**
+ * How Codex gives each voice request to the relay: `<realtime_delegation>`, an optional `<source>`, then
+ * `<input>` with the request, and `<transcript_delta>` with the call. Codex escapes `&`, `<` and `>` in
+ * the text. The relay model sometimes copies all of it into `ask_agent`, and the chat then shows the tags.
+ */
+const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+
+/**
+ * The request in a copied Codex wrapper, or the text as it is. Only a complete `<input>` with text counts:
+ * Codex also saves the call in wrappers with an empty `<input>`, and such a request must not get lost.
+ */
+function relayRequest(text: string): string {
+  const input = RELAY_DELEGATION.exec(text)?.[1]
+    ?.replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .trim();
+  return input || text;
+}
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -241,6 +272,11 @@ export class LiveVoice {
     owner: LiveVoiceOwner | null = null,
   ) {
     const agent = yield* liveStep(() => this.#hooks.agent(input.agentId));
+    // One line without quotes, so that the name cannot change the rule around it.
+    const name = this.#hooks
+      .redact(agent.name.replace(/["\s]+/g, " ").trim())
+      .slice(0, VOICE_NAME_LIMIT)
+      .trim();
     const key = owner?.memberId ?? null;
     for (const session of [...this.#sessions.values()])
       if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
@@ -343,7 +379,7 @@ export class LiveVoice {
       // The voice model answers small questions itself, and ignores Codex's prompt settings on a ChatGPT login.
       // A control message in the conversation makes it give each request to the agent.
       yield* relay.client
-        .request("thread/realtime/appendText", { threadId, text: RELAY_VOICE_RULE }, decodeRecordResponse)
+        .request("thread/realtime/appendText", { threadId, text: relayVoiceRule(name) }, decodeRecordResponse)
         .pipe(toLiveVoiceFailed);
       return answer;
     }).pipe(
@@ -434,7 +470,8 @@ export class LiveVoice {
       session.client.respondError(request.id, { code: -32601, message: "Live voice answers only ask_agent." });
       return;
     }
-    const text = getString(getRecord(params, "arguments"), "request")?.trim();
+    const asked = getString(getRecord(params, "arguments"), "request")?.trim();
+    const text = asked && relayRequest(asked);
     if (!text) {
       session.client.respond(request.id, toolResult({ success: false, text: "The request is empty." }));
       return;

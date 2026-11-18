@@ -56,6 +56,7 @@ export const messages = {
   "app.rail.usage": "שימוש",
   "app.rail.library": "ספרייה",
   "app.rail.providers": "ספקים",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "חנות",
   "app.rail.settings": "הגדרות",
   "app.rail.settingsNotice": "הגדרות. {notice}",
@@ -111,6 +112,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "חיפוש בהגדרות…",
   "app.settingsPage.results": "תוצאות חיפוש בהגדרות",
   "app.settingsPage.noResults": "אין הגדרות תואמות.",
+  "app.settingsPage.marketplaceApps": "מחברים ושרתי MCP",
   "app.settingsPage.resultCount": {
     one: "הגדרה תואמת אחת.",
     two: "שתי הגדרות תואמות.",

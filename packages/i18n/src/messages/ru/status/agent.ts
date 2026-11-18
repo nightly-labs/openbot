@@ -15,6 +15,7 @@ export const messages = {
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
+  "status.agent.settingShown": "Показан параметр: {setting}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",
   "status.agent.channelMemberRemoved": "Агент {agent} удалил {member} из канала. Запрос: {person}.",
   "status.agent.channelInstructionsChanged": "Агент {agent} изменил инструкции канала. Запрос: {person}.",
@@ -37,11 +38,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Последние ошибки в чате:",
   "status.agent.feedbackSameAs": "Добавляется к issue #{issue}",
   "status.agent.feedbackSent": "Отправлено команде OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Удалено с GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Удалить отчёт #{issue} с GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Этот отчёт больше никто не увидит на GitHub. Это нельзя отменить. Чтобы исправить отчёт, агент может отправить исправленный.",
+  "status.agent.feedbackWithdrawing": "Удаление отчёта с GitHub…",
   "status.agent.serverInstallCommand":
     "Создать одноразовую команду, которая устанавливает OpenBot на другой компьютер как сервер {name} и подключает его к вашему аккаунту. Агент запускает её там.",
   "status.agent.serverInstallCard": "Команда установки для сервера {name}",
   "status.agent.browserProfileNamed":
     "Перенести {agents} в профиль браузера {profile}. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.commitCoAuthorOff": "Больше не добавлять OpenBot как соавтора в коммиты всех агентов.",
+  "status.agent.commitCoAuthorOn": "Снова добавлять OpenBot как соавтора в коммиты всех агентов.",
   "status.agent.browserProfileNew":
     "Создать новый профиль браузера {profile} и перенести в него {agents}. В нём нет входов в аккаунты. Их открытые вкладки закроются.",
   "status.agent.browserProfileShared":
@@ -69,6 +77,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Обновление памяти…",
   "status.agent.skillUsing": "Использование навыка {name}…",
+  "status.agent.backdropSetting": "Изменение фона…",
   "status.agent.skillReading": "Чтение навыка…",
   "status.agent.toolStepFailed": "Шаг инструмента завершился ошибкой; просмотр результата и выбор следующего действия…",
   "status.agent.toolResultReviewing": "Просмотр последнего результата инструмента…",

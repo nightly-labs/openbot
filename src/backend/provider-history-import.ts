@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import { generatedMediaKind } from "./agent/image-generation";
 import {
   isNoUpdateAnswer,
@@ -33,7 +33,10 @@ interface ProviderHistoryImportDatabase {
   }): { state: string; createdAt: string };
   stageProviderHistoryFragment(input: { sessionId: string; fragment: ProviderHistoryFragment }): {
     turnImported: boolean;
+    rewroteItems: boolean;
+    compactedItems: boolean;
   };
+  dropCompactedProviderHistoryItems(sessionId: string, turnId: string): void;
   stagedProviderHistoryItems(input: {
     sessionId: string;
     turnId: string;
@@ -50,6 +53,7 @@ interface ProviderHistoryImportDatabase {
     /** Highest staged item included in this normalized page. */
     throughItemIndex?: number;
     complete: boolean;
+    compact?: boolean;
     detail?: unknown;
   }): void;
 }
@@ -82,10 +86,11 @@ export interface ProviderHistoryImportInput {
    */
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   /**
-   * Whether the agent answered this teammate request with its own `send_message` reply in the turn that
-   * ran it, so the turn can have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   * Whether this teammate request has its result: the agent's own `send_message` reply in the turn that
+   * ran it (#7465), or the turn's answer that OpenBot sent when the turn ended (#8021). The turn can
+   * then have ended quiet, as at the turn completion. Left out, it cannot.
    */
-  hasOwnReplyFrom?(deliveryId: string): boolean;
+  requestAnswered?(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -112,6 +117,11 @@ interface ProviderHistoryPartial {
  * transaction.
  * It never writes a full conversation snapshot and never deletes a message missing from a page.
  * A completed turn that an earlier import committed, and that did not change, is not imported again.
+ *
+ * A Codex or Claude turn keeps only item hashes after its import. When one of its items changes, the
+ * turn imports only after a read wrote each of its items in full again: in the same read when the
+ * change is in its first fragment, else in the next read. Until then the import stays `active`, so
+ * the next start reads a retired session again. It never imports from a hash.
  */
 export function importProviderHistory(
   input: ProviderHistoryImportInput,
@@ -131,15 +141,34 @@ export function importProviderHistory(
     let turns = 0;
     let messages = 0;
     let providerCovered = false;
+    // A compacted turn that changed and waits for the next read to import it.
+    let turnWaits = false;
+    const seenTurns = new Set<string>();
+    // Compacted turns whose first fragment in this read wrote its items in full, so this read writes
+    // each item of the turn that the provider still sends in full.
+    const rewrittenTurns = new Set<string>();
     const consume: ProviderHistoryConsumer = (fragment) =>
       Effect.gen(function* () {
         const staged = yield* providerSync(() =>
           input.database.stageProviderHistoryFragment({ sessionId: input.sessionId, fragment }),
         );
+        if (!seenTurns.has(fragment.turnId)) {
+          seenTurns.add(fragment.turnId);
+          if (staged.rewroteItems) rewrittenTurns.add(fragment.turnId);
+        }
         if (!fragment.complete) return true;
         providerCovered = true;
         // An earlier import committed this turn, and staging found no change since then.
         if (staged.turnImported) return true;
+        if (staged.compactedItems) {
+          // An earlier fragment of this read kept hashes; the next read writes them in full.
+          if (!rewrittenTurns.has(fragment.turnId)) {
+            turnWaits = true;
+            return true;
+          }
+          // This read wrote each item that the provider still sends, so these are gone from it.
+          yield* providerSync(() => input.database.dropCompactedProviderHistoryItems(input.sessionId, fragment.turnId));
+        }
         // ACP replay has stable item IDs only inside the provider transcript. It has no stable
         // OpenBot turn ID, so normalizing it into the conversation projection would duplicate a
         // live turn after release and reload. Keep the bounded raw records for handoff and reads;
@@ -188,9 +217,57 @@ export function importProviderHistory(
           }),
         ),
       );
+    // A waiting turn keeps the import `active`, so the next start reads a retired session again.
     if (providerCovered)
-      yield* providerSync(() => input.database.markProviderHistoryImportState(input.sessionId, "complete"));
+      yield* providerSync(() =>
+        input.database.markProviderHistoryImportState(input.sessionId, turnWaits ? "active" : "complete"),
+      );
     return { turns, messages };
+  });
+}
+
+/**
+ * Whether a start reads the history of a retired session. It does not when the last read ended
+ * complete after the session was retired: the session has no new turns, and no turn waits.
+ */
+export function retiredSessionNeedsHistoryRead(
+  imported: { state: string; updatedAt: string } | null,
+  retiredAt: string,
+): boolean {
+  return imported?.state !== "complete" || imported.updatedAt < retiredAt;
+}
+
+/** The bound of one compaction batch is in the store; this pause lets other work run between them. */
+const COMPACTION_PAUSE = Duration.millis(5);
+
+export interface ProviderHistoryCompactionResult {
+  rows: number;
+  bytes: number;
+  batches: number;
+}
+
+/**
+ * Compacts the imported Codex and Claude items of a database from before compaction, one small
+ * transaction at a time. A new import compacts its turn itself, so this has work only once.
+ */
+export function compactImportedProviderHistory(
+  database: {
+    compactImportedProviderHistory(afterRowId: number): { lastRowId: number | null; rows: number; bytes: number };
+  },
+  pause: Duration.Duration = COMPACTION_PAUSE,
+): Effect.Effect<ProviderHistoryCompactionResult, ProviderClientOperationError> {
+  return Effect.gen(function* () {
+    const result = { rows: 0, bytes: 0, batches: 0 };
+    let afterRowId = 0;
+    for (;;) {
+      const batch = yield* providerSync(() => database.compactImportedProviderHistory(afterRowId));
+      if (batch.lastRowId === null) return result;
+      result.rows += batch.rows;
+      result.bytes += batch.bytes;
+      result.batches += 1;
+      afterRowId = batch.lastRowId;
+      yield* Effect.sleep(pause);
+    }
   });
 }
 
@@ -295,6 +372,7 @@ function importCompletedTurn(
           messages: reconciled,
           ...(last === undefined ? {} : { throughItemIndex: last.itemIndex }),
           complete,
+          compact: input.provider === "codex" || input.provider === "claude",
           detail: {
             provider: input.provider,
             externalSessionId: input.externalSessionId,
@@ -357,7 +435,7 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(delivery, (request) => input.hasOwnReplyFrom?.(request.id) === true)) ||
+              quietTeammateTurnDelivery(delivery, (request) => input.requestAnswered?.(request.id) === true)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);

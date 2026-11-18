@@ -134,9 +134,13 @@ export const messages = {
   "provider.picker.download": "Загрузка {name}",
   "provider.picker.search": "Поиск моделей",
   "provider.picker.noMatches": "Моделей по вашему запросу не найдено.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Эти модели не работают с режимом «Рабочее пространство» в Windows и Linux. Чтобы использовать их, измените «Доступ» в настройках агента.",
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.endpointModelsInCustom": "{name} запускает ваши эндпоинты. Их модели — на вкладке «Свой».",
+  "provider.picker.showCustomModels": "Показать модели",
   "provider.picker.museNoModels":
     "Muse не прислал моделей для этой учётной записи. Возможно, Muse недоступен в стране, где работает этот агент. Выберите модель другого провайдера.",
   "provider.picker.customEmpty":
@@ -164,6 +168,8 @@ export const messages = {
   "provider.picker.selectEffort": "Выбрать уровень усилий",
   "provider.picker.custom": "Свой",
   "provider.picker.cliReady": "{cli} готов",
+  "provider.picker.modelSourceProvider": "Использует {name} из настроек {cli}",
+  "provider.picker.modelSourceCatalog": "Использует список моделей из настроек {cli}",
   "provider.status.signInRequired": "Нужно войти",
   "provider.model.free": "Бесплатно",
   "provider.model.new": "Новая",

@@ -32,6 +32,8 @@ export const messages = {
   "error.workflow.pictureMissing": "Изображения больше нет на сервере. Отправьте его снова.",
   "error.workflow.pictureType": "Используйте изображение PNG, JPEG или WebP.",
   "error.workflow.mediaInputMissing": "Изображение из предыдущего шага недоступно. Запустите этот шаг снова.",
+  "error.workflow.mediaEmptyRequest":
+    "Напишите описание или запустите предыдущие шаги, чтобы пришёл текст или изображение.",
   "error.workflow.mediaInputNotImage": "Этот шаг принимает только изображения, не видео. Удалите связь от видео.",
   "error.workflow.stepMissing": "Этого шага больше нет.",
   "error.workflow.nodeMissing": "Этого шага нет в рабочем процессе.",

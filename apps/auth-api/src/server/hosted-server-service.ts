@@ -313,6 +313,8 @@ export interface CheckoutReturn {
   origin: string;
   /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
+  /** The code of a discount link. Only the web client sends one. */
+  promotionCode?: string;
 }
 
 /** The answer to a free pool machine that asks for a server. The claim signs OpenBot on that machine in. */
@@ -1708,6 +1710,7 @@ export class HostedServerService {
         target: returnTo.target,
         origin: returnTo.origin,
         ...(returnTo.entryPoint ? { entryPoint: returnTo.entryPoint } : {}),
+        ...(returnTo.promotionCode ? { promotionCode: returnTo.promotionCode } : {}),
         ...(license ? { license } : {}),
       })
       .pipe(Effect.mapError(hostedFailure));
@@ -2132,7 +2135,7 @@ export class HostedServerService {
   /** A server on boat must move to a pool machine by hand later (docs/hosted-servers.md#move-a-server-from-boat). */
   #alertBoatStart(row: HostedServerRow, reason: string): Effect.Effect<void, never, HostedServerDependencies> {
     return this.#alertPool(
-      `A ${row.plan} server (${row.currency}, ${row.server_id.slice(0, 8)}) starts on boat: ${reason}.`,
+      `⛵ **Boat start** · ${row.plan} server · ${row.currency} · ${row.server_id.slice(0, 8)} · ${reason}`,
     );
   }
 
@@ -2165,7 +2168,7 @@ export class HostedServerService {
       ),
     );
     if (free === null || free > LOW_POOL_FREE) return;
-    yield* this.#alertPool(`Pool ${location} ${product}: ${free} free machine${free === 1 ? "" : "s"} left.`);
+    yield* this.#alertPool(`${free === 0 ? "🔴" : "🟠"} **Pool** ${location} ${product} · ${free} free left`);
   });
 
   /** Sends an operator message after the current work, as analytics does. */
@@ -2222,7 +2225,7 @@ export class HostedServerService {
     });
     const current = yield* this.#requireRow(row.server_id);
     yield* this.#alertPool(
-      `A ${row.plan} server (${row.server_id.slice(0, 8)}) did not start on pool machine ${hostId}. Prepare the machine again.`,
+      `🛠️ **Pool start lost** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId} · prepare it again`,
     );
     if (current.observed_state !== "awaiting_payment") return false;
     yield* this.#provision(current, false, `pool machine ${hostId} did not start it`);

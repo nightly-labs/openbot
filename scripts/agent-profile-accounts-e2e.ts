@@ -11,13 +11,17 @@
 // second account lists is listed and accepted for that account only (#6109), that a delete stops the
 // process that the agent runs on with the second account, and that list_models names a saved custom
 // endpoint, where the user changes it and why it lists no model, without its base URL or key (#6471).
+// It also asserts that update_profile with avatarHue keeps the agent's photo and its file, and that only
+// avatarSeed removes them (#10431), and that with Pool accounts on an agent that names an account, also
+// "default", keeps it while null gives it to the pool (#10661).
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import type { z } from "zod";
 import type {
@@ -216,6 +220,8 @@ const report: {
   calls: { name: string; turnId: string; success: boolean | null; text: string }[];
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
+  /** The agent's pin after it names the second account, "default" and null with Pool accounts on. */
+  pool?: { second: string | null; default: string | null; null: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -295,8 +301,16 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends a chat message that makes the fake call the tool, and returns the tool result it logged. */
-async function callTool(name: string, agentId: string, tool: string, args: Partial<ProfileToolArgs> = {}) {
+/**
+ * Sends a chat message that makes the fake call the tool, and returns the tool result it logged. A refused
+ * call can also send fields that the tool does not take, as a model does.
+ */
+async function callTool(
+  name: string,
+  agentId: string,
+  tool: string,
+  args: Partial<ProfileToolArgs> | DynamicRecord = {},
+) {
   const receipt = await runCauseEffect(
     agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` }),
   );
@@ -523,6 +537,35 @@ try {
       refused(badId, "Use an account id from list_models"),
     [unknownAccount, unknownBackupAccount, unknownBackupModel, badId].map((call) => call.text).join("\n"),
   );
+  // A field that the tool does not take gets the fields that its object takes, never the name that the
+  // call sent, so the agent can correct the call (#10024).
+  const extraBackupField = await callTool("extra backupModels field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    name: "Renamed",
+    backupModels: { models: [{ provider: "codex", model: MODEL }], automatic: true, order: [] },
+  });
+  const extraEntryField = await callTool("extra backup entry field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: true, order: [{ provider: "codex", model: MODEL, effortLevel: "high" }] },
+  });
+  const extraToolField = await callTool("extra update_profile field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    fallbackModels: [MODEL],
+  });
+  const entryFields = "Each backupModels.order entry takes only: provider, model, providerAccountId.";
+  pass(
+    "A field that update_profile does not take is refused with the fields that its object takes",
+    refused(
+      extraBackupField,
+      `Remove unsupported profile fields. backupModels takes only: automatic, order. ${entryFields}`,
+    ) &&
+      refused(extraEntryField, `Remove unsupported profile fields. ${entryFields}`) &&
+      refused(extraToolField, "Remove unsupported profile fields. update_profile takes only: agentId, name,") &&
+      [extraBackupField, extraEntryField, extraToolField].every(
+        (call) => !call.text.includes("effortLevel") && !call.text.includes("fallbackModels"),
+      ),
+    [extraBackupField, extraEntryField, extraToolField].map((call) => call.text).join("\n"),
+  );
   const afterFailures = storedAgent(worker.id);
   pass(
     "A refused request changes nothing, the name in the same call included",
@@ -629,6 +672,79 @@ try {
   pass(
     "The delete removes the workspace and the record",
     report.deletedAgent.workspaceRemoved && !store.list().some((candidate) => candidate.id === worker.id),
+  );
+
+  // 8b. With Pool accounts on, an account that an agent names stays: also the provider's own sign-in
+  // as "default". Only null gives the agent back to the pool (#10661).
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [] }));
+  const pooled = await create("Pooled");
+  await waitFor("the pooled agent's first turn to end", () => idle(pooled.id));
+  const pinnedSecond = await callTool("pin the second account", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: second.id,
+  });
+  const pinSecond = storedAgent(pooled.id).pinnedAccountId;
+  const pinnedDefault = await callTool("pin the own sign-in", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: "default",
+  });
+  const afterDefault = storedAgent(pooled.id);
+  const pooledAgain = await callTool("give the account to the pool", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: null,
+  });
+  const afterNull = storedAgent(pooled.id);
+  report.pool = {
+    second: pinSecond ?? null,
+    default: afterDefault.pinnedAccountId ?? null,
+    null: afterNull.pinnedAccountId ?? null,
+  };
+  pass(
+    "With Pool accounts on, an agent that names an account keeps it, also the own sign-in",
+    pinnedSecond.success &&
+      pinSecond === second.id &&
+      pinnedDefault.success &&
+      afterDefault.providerAccountId === undefined &&
+      afterDefault.pinnedAccountId === "default",
+    `${pinnedSecond.text}\n${pinnedDefault.text}`,
+  );
+  pass(
+    "With Pool accounts on, a null account gives the agent to the pool",
+    pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
+    pooledAgain.text,
+  );
+  await runCauseEffect(accounts.setPool("codex", null));
+
+  // 9. A color keeps the agent's photo and its file. Only a generated face removes them (#10431).
+  const photoSource = join(root, "photo.png");
+  await copyFile(resolve(import.meta.dirname, "../apps/auth-api/public/apple-touch-icon.png"), photoSource);
+  const photo = await callTool("set photo", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarPath: photoSource,
+  });
+  const photoUrl = storedAgent(coordinator.id).avatarUrl;
+  const photoFile = store.resolveAvatar(coordinator.id)?.path ?? "";
+  pass("update_profile sets a photo", photo.success && photoUrl !== null && existsSync(photoFile), photo.text);
+  const color = await callTool("set color", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarHue: 0,
+  });
+  pass(
+    "update_profile with avatarHue keeps the photo and its file",
+    color.success &&
+      storedAgent(coordinator.id).avatarHue === 0 &&
+      storedAgent(coordinator.id).avatarUrl === photoUrl &&
+      existsSync(photoFile),
+    color.text,
+  );
+  const face = await callTool("set generated face", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarSeed: storedAgent(coordinator.id).avatarSeed,
+  });
+  pass(
+    "update_profile with avatarSeed removes the photo and its file",
+    face.success && storedAgent(coordinator.id).avatarUrl === null && !existsSync(photoFile),
+    face.text,
   );
   report.passed = true;
 } catch (error) {

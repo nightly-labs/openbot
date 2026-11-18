@@ -57,6 +57,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
     startSectionDragging,
     stopSidebarDragging,
     visibleSectionIds,
+    layoutDraggable,
   } = useSidebarScope();
   const { t } = useText();
   const editing = () => {
@@ -99,7 +100,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
               variant: "ghost",
               class: "sidebar-section-toggle sidebar-section-drag-handle",
             })}
-            draggable={!layoutMutable() || props.compact ? "false" : "true"}
+            draggable={!layoutDraggable() || props.compact ? "false" : "true"}
             title={!layoutMutable() ? t("sidebar.section.layoutUnsupported") : undefined}
             aria-expanded={collapsed() ? "false" : "true"}
             aria-controls={`sidebar-section-body-${headerProps.sectionId}`}

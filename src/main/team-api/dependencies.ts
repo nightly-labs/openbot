@@ -75,6 +75,7 @@ import type {
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
+import type { CrmPeopleOperations } from "../../backend/crm/crm-handle";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import type { RoutineFlowsHandle } from "../../backend/routine-flows/routine-flows";
@@ -121,6 +122,7 @@ type TeamApiAgentMethods = Pick<
   | "generateProfile"
   | "askSideQuestion"
   | "saveSkillSuggestion"
+  | "withdrawFeedback"
   | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"
@@ -169,6 +171,7 @@ type TeamApiAgentMethods = Pick<
   | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
+  | "listActiveQueues"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"
@@ -274,6 +277,7 @@ export interface TeamApiConnectors {
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
   >;
 }
 
@@ -342,7 +346,10 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
-/** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
+/**
+ * `routine-run-place-v1` and `routine-pause-reasons-v1`: the routine records of each agent, of every
+ * trigger kind.
+ */
 export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
 
 /**
@@ -471,6 +478,8 @@ export type TeamApiWorkflows = Pick<
   | "keepPicture"
   | "mediaProviders"
   | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**
@@ -479,6 +488,12 @@ export type TeamApiWorkflows = Pick<
      */
     github?: WorkflowGitHubDirectory;
   };
+
+/**
+ * Its presence is what `#protocolSupport` advertises `crm-v1` on. Only owners and admins use it; see
+ * `crm-v1.ts` for the grant.
+ */
+export type TeamApiCrm = CrmPeopleOperations;
 
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {
@@ -771,6 +786,7 @@ export interface TeamApiOptions {
   instanceTransfer?: TeamApiInstanceTransfer;
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
+  crm?: TeamApiCrm;
   hiddenAgents?: TeamApiHiddenAgents;
   routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;

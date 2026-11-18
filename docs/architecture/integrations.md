@@ -560,6 +560,19 @@ because there is no status post to reply to. The released `whatsapp-connector-v1
 carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
 hides the switch while the host does not have the capability. Only protocol 9 peers get it.
 
+The optional capability `whatsapp-status-reactions-v1`
+([`whatsapp-status-reactions-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-status-reactions-v1.ts),
+host route [`route-whatsapp-status-reactions.ts`](../../src/main/team-api/route-whatsapp-status-reactions.ts))
+reads and sets, for each WhatsApp number, whether OpenBot puts status reactions on a message: 👀 when
+it arrives, then ✅, ❌ or 🫡 when the request ends. The setting is on by default and is kept with the
+number's connection values, so it needs no migration. `MessagingService` reads it at each reaction,
+so with the setting off a WhatsApp message gets no reaction, and the posts do not change. A removal
+still goes out, so a request that started before the setting went off loses its 👀 at its end. In a
+quiet chat of a personal number, a failed or stopped request then shows nothing to the other person. With both this setting and “Working on it…”
+off, only the answer shows that OpenBot read the message. A client reads this list and merges it into
+the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
+have the capability. Only protocol 9 peers get it.
+
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
 pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
@@ -636,7 +649,7 @@ user removes it there.
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
-Team API adapters are permanent (see [Team API compatibility](team-api.md)). Worked example:
+Team API adapters stay while a release in the support window speaks them (see [Team API compatibility](team-api.md)). Worked example:
 `sign-in-relay-v1`, which follows `mcp-sign-in-app-v1`.
 
 1. **Frozen codec.** Add `packages/contracts/src/team-protocol/<name>-v1.ts`. Build each route with

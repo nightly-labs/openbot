@@ -414,10 +414,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Numer prywatny",
   "connector.whatsapp.ownNumberDescription":
-    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Wyłącz dla numeru tylko dla OpenBot.",
+    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "connector.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
+    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Żądanie, które czeka na wcześniejsze, też dostaje wiadomość o oczekiwaniu. Wyłącz, aby wysyłać tylko odpowiedź.",
+  "connector.whatsapp.statusReactions": "Reakcje stanu",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reaguje 👀, gdy przychodzi wiadomość, i ✅, gdy odpowiedź jest gotowa. Wyłącz, aby nie wysyłać reakcji.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Ten agent odbiera wiadomości do OpenBot ze wszystkich twoich połączonych numerów. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i odpowiada w WhatsApp.",
@@ -434,10 +437,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Numer",
   "connector.whatsapp.kindPersonal": "Mój numer prywatny",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz.",
+    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz. Inne osoby nie dostają odpowiedzi.",
   "connector.whatsapp.kindDedicated": "Numer tylko dla OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Nieznane osoby dostają kod, który mają ci przekazać. Zatwierdzasz je tutaj.",
+    "OpenBot odpowiada z tego numeru każdej nieznanej osobie kodem, który ma ci przekazać. Zatwierdzasz je tutaj.",
   "connector.whatsapp.methodLabel": "Sposób połączenia",
   "connector.whatsapp.methodQr": "Kod QR",
   "connector.whatsapp.methodCode": "Kod parowania",

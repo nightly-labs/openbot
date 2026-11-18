@@ -120,9 +120,14 @@ export const messages = {
   "provider.picker.download": "{name} のダウンロード",
   "provider.picker.search": "モデルを検索",
   "provider.picker.noMatches": "検索に一致するモデルはありません。",
+  "provider.picker.workspaceOnlyUnavailable":
+    "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.endpointModelsInCustom":
+    "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
+  "provider.picker.showCustomModels": "モデルを表示",
   "provider.picker.museNoModels":
     "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
@@ -150,6 +155,8 @@ export const messages = {
   "provider.picker.selectEffort": "推論の強さを選択",
   "provider.picker.custom": "カスタム",
   "provider.picker.cliReady": "{cli} 準備完了",
+  "provider.picker.modelSourceProvider": "{cli} の設定にある {name} を使用",
+  "provider.picker.modelSourceCatalog": "{cli} の設定にあるモデル一覧を使用",
   "provider.status.signInRequired": "サインインが必要",
   "provider.model.free": "無料",
   "provider.model.new": "新着",

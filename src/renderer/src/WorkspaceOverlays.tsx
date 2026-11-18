@@ -34,6 +34,7 @@ import { useConnectors } from "./features/connectors/connectors-context";
 import { appendDraftText, EMPTY_DRAFT } from "./features/conversation/composer-draft";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { composerDraftKey } from "./features/conversation/conversation-keys";
+import { desktopCrmHost } from "./features/crm/crm-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { desktopProviderDetectionCalls } from "./features/custom-providers/custom-providers-port";
@@ -208,7 +209,7 @@ export function SkillsMarketplace() {
       marketplaceListing={pendingMarketplaceListing()}
       onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
-      macOS={platform.appInfo()?.platform === "darwin"}
+      macOS={platform.appInfo() ? platform.appInfo()?.platform === "darwin" : undefined}
       mcpToolRuntimeNote={mcpRuntimeNote()}
       mcpSignInRequest={pendingMcpSignIn()}
       onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
@@ -353,6 +354,7 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      billingDetails={appPort().billing}
       thisComputer
       pricingPage={windowPage.pricing}
       onOpenUrl={(url) => void appPort().openUrl(url)}
@@ -1017,6 +1019,7 @@ function ServerSettings() {
               : undefined
           }
           vault={vault()}
+          crm={desktopCrmHost(server().id)}
         />
       )}
     </Show>

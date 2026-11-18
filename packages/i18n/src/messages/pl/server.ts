@@ -309,6 +309,12 @@ export const messages = {
   "server.settings.group.agents": "Agenci",
   "server.settings.group.people": "Osoby",
   "server.settings.group.server": "Serwer",
+  "server.settings.experimentalTitle": "Eksperymentalne",
+  "server.settings.experimentalDescription": "Włącz funkcje, które nie są jeszcze gotowe.",
+  "server.settings.experimentalFeatures": "Funkcje",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Pokaż stronę CRM właścicielom i administratorom, pozwól agentom czytać CRM i synchronizuj Stripe. Po wyłączeniu dane zostają.",
   "server.settings.agentDefaultsTitle": "Ustawienia domyślne agentów",
   "server.settings.threadsCard": "Wątki i strefa czasowa",
   "server.settings.memoryTitle": "Pamięć",
@@ -347,7 +353,7 @@ export const messages = {
     "Wybierz, co mogą robić agenci na tym serwerze, gdy nie ustawisz tego dla agenta.",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
-    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
+    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "server.settings.timezoneAutomatic": "Automatycznie ({zone})",
   "server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
   "server.settings.turnLimit": "Wątki jednocześnie",

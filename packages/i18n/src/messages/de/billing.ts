@@ -213,4 +213,10 @@ export const messages = {
     other:
       "Deine Lizenz hat {count} Nutzer, das Maximum. Kontaktiere uns für eine größere Lizenz. Neue Personen können deinen Servern nicht beitreten.",
   },
+  "billing.details.country": "Rechnungsland",
+  "billing.details.countryPlaceholder": "Land wählen",
+  "billing.details.vatId": "EU-USt-IdNr. (optional)",
+  "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
+  "billing.details.countryMissing": "Wähle dein Rechnungsland.",
+  "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
 } as const satisfies PartialTranslation<typeof source>;

@@ -56,6 +56,7 @@ export const messages = {
   "app.rail.usage": "Uso",
   "app.rail.library": "Biblioteca",
   "app.rail.providers": "Proveedores",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Ajustes",
   "app.rail.settingsNotice": "Ajustes. {notice}",
@@ -107,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Buscar ajustes…",
   "app.settingsPage.results": "Resultados de búsqueda de ajustes",
   "app.settingsPage.noResults": "No hay ajustes que coincidan.",
+  "app.settingsPage.marketplaceApps": "Conectores y servidores MCP",
   "app.settingsPage.resultCount": {
     one: "{count} ajuste coincidente.",
     other: "{count} ajustes coincidentes.",

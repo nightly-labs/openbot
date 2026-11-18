@@ -27,6 +27,7 @@ export const messages = {
     "Войдите в аккаунт {name}. OpenBot получит инструменты, доступные этому аккаунту, но не пароль.",
   "mcp.signIn.waiting": "Ожидание браузера…",
   "mcp.signIn.continue": "Перейти к {name}",
+  "mcp.signIn.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
   "mcp.test.connected": {
     one: "Подключено · {count} инструмент",
     few: "Подключено · {count} инструмента",

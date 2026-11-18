@@ -136,9 +136,13 @@ export const messages = {
   "provider.picker.download": "تنزيل {name}",
   "provider.picker.search": "البحث في النماذج",
   "provider.picker.noMatches": "لا توجد نماذج تطابق بحثك.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
+  "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
     "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
@@ -165,6 +169,8 @@ export const messages = {
   "provider.picker.selectEffort": "اختيار الجهد",
   "provider.picker.custom": "مخصص",
   "provider.picker.cliReady": "{cli} جاهز",
+  "provider.picker.modelSourceProvider": "يستخدم {name} من إعدادات {cli}",
+  "provider.picker.modelSourceCatalog": "يستخدم قائمة نماذج من إعدادات {cli}",
   "provider.status.signInRequired": "تسجيل الدخول مطلوب",
   "provider.model.free": "مجاني",
   "provider.model.new": "جديد",

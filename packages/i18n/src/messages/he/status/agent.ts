@@ -14,6 +14,7 @@ export const messages = {
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
+  "status.agent.settingShown": "הציג הגדרה: {setting}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
   "status.agent.channelMemberRemoved": "{agent} הסיר את {member} מהערוץ. {person} ביקש זאת.",
   "status.agent.channelInstructionsChanged": "{agent} שינה את הוראות הערוץ. {person} ביקש זאת.",
@@ -36,11 +37,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
   "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
   "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "הוסר מ-GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "הסרת הדיווח #{issue} מ-GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "אף אחד לא יוכל לראות את הדיווח הזה ב-GitHub. אי אפשר לבטל את הפעולה. כדי לתקן אותו, הסוכן יכול לשלוח דיווח מתוקן.",
+  "status.agent.feedbackWithdrawing": "מסיר את הדיווח שלך מ-GitHub…",
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
   "status.agent.browserProfileNamed":
     "העבר את {agents} לפרופיל הדפדפן {profile}. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.commitCoAuthorOff": "להפסיק להוסיף את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
+  "status.agent.commitCoAuthorOn": "להוסיף שוב את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
   "status.agent.browserProfileNew":
     "צור את פרופיל הדפדפן החדש {profile} והעבר אליו את {agents}. אין בו התחברויות. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.browserProfileShared":
@@ -67,6 +75,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "מעדכן את הזיכרונות שלו…",
   "status.agent.skillUsing": "משתמש במיומנות {name}…",
+  "status.agent.backdropSetting": "משנה את הרקע…",
   "status.agent.skillReading": "קורא מיומנות…",
   "status.agent.toolStepFailed": "שלב בכלי נכשל; בודק את התוצאה ומחליט מה לנסות עכשיו…",
   "status.agent.toolResultReviewing": "בודק את התוצאה האחרונה של הכלי…",

@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "{host} で手順を完了してください",
   "prompt.browser.cancelled": "キャンセル済み",
   "prompt.browser.reload":
-    "サインインを完了し、ブラウザーのページを再読み込みしてから「完了しました」を選んでください。ページが再読み込みされるまで、ページの検査はブロックされます。",
+    "OpenBot はパスワードまたはコードの入力を完了できませんでした。ページを確認し、足りない部分を入力してください。サインインを完了し、ブラウザーのページを再読み込みしてから「完了しました」を選んでください。ページが再読み込みされるまで、ページの検査はブロックされます。",
   "prompt.browser.continuing": "{name} が続行しています。",
   "prompt.browser.cancelledBody": "ブラウザーの手順はキャンセルされました。",
   "prompt.browser.pendingBody":
     "ページを開いて、サインイン、確認、または同意を完了してください。その後、{name} に続行させてください。",
   "prompt.browser.openPage": "{title} を開く",
+  "prompt.browser.openFailed": "メインウィンドウでページを開けませんでした。もう一度お試しください。",
   "prompt.browser.done": "完了しました",
   "prompt.browser.pageFallback": "ブラウザーのページ",
   "prompt.browser.hostFallback": "ブラウザー",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} へのサインインはキャンセルされました",
   "prompt.browser.signInBlocked.body":
     "このコンピュータでサインインしてください。OpenBot は {host} のサインインだけを {server} に送信し、{name} が続行します。",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} はサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。その後、{name} が続行します。",
   "prompt.browser.signInBlocked.cancelledBody": "サインインはキャンセルされました。",
   "prompt.browser.signInBlocked.waiting": "サインインを待っています",
   "prompt.browser.signInBlocked.waitingButton": "サインインを待っています…",

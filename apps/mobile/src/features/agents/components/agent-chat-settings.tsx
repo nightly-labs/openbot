@@ -2,11 +2,14 @@ import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import Bell from "lucide-react-native/icons/bell";
-import { useState } from "react";
+import FoldVertical from "lucide-react-native/icons/fold-vertical";
+import SquarePen from "lucide-react-native/icons/square-pen";
+import Trash2 from "lucide-react-native/icons/trash";
+import { type ReactNode, useState } from "react";
 import { Alert } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { NOTIFICATION_LEVEL_KEYS } from "@/features/push-notifications/components/server-notification-settings";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { effectiveServerLevel, useSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { serverNotificationSetting, usePushNotificationPreference } from "@/features/settings/model/push-notifications";
@@ -53,11 +56,39 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
 }
 
 /**
+ * Puts an action row in its own section with `footer` under it, or, in a group of the Advanced page,
+ * in a `SettingsGroupRow` with the text inside the row.
+ */
+function ActionRowFrame({
+  grouped,
+  footer,
+  children,
+}: {
+  grouped: boolean;
+  footer: string;
+  children: (description: string | undefined) => ReactNode;
+}) {
+  return grouped ? (
+    <SettingsGroupRow>{children(footer)}</SettingsGroupRow>
+  ) : (
+    <SettingsSection footer={footer}>{children(undefined)}</SettingsSection>
+  );
+}
+
+/**
  * Starts a new chat with the agent after the user confirms, as on desktop. The agent forgets the
  * messages before it and keeps its setup. The host refuses while the agent works, and its reason
- * shows in the alert.
+ * shows in the alert. `grouped`: a row of a group on the Advanced page.
  */
-export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function AgentNewChatSection({
+  agent,
+  available,
+  grouped = false,
+}: {
+  agent: MobileAgent;
+  available: boolean;
+  grouped?: boolean;
+}) {
   const { t } = useText();
   const { startNewChat } = useMobileWorkspaceActions();
   const [starting, setStarting] = useState(false);
@@ -82,25 +113,30 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
   }
 
   return (
-    <SettingsSection footer={t("mobile.agent.newChat.footer")}>
-      <SettingsRow
-        disabled={!available || starting}
-        onPress={() =>
-          Alert.alert(
-            t("mobile.agent.newChat.confirmTitle", { name: agent.name }),
-            t("mobile.agent.newChat.confirmBody"),
-            [
-              { text: t("common.cancel"), style: "cancel" },
-              { text: t("mobile.agent.newChat.confirm"), onPress: start },
-            ],
-          )
-        }
-      >
-        <Typography.Paragraph>
-          {t(starting ? "mobile.agent.newChat.starting" : "mobile.agent.newChat.title")}
-        </Typography.Paragraph>
-      </SettingsRow>
-    </SettingsSection>
+    <ActionRowFrame grouped={grouped} footer={t("mobile.agent.newChat.footer")}>
+      {(description) => (
+        <SettingsRow
+          description={description}
+          disabled={!available || starting}
+          disclosure={false}
+          leading={<RowIcon icon={SquarePen} tone="accent" />}
+          onPress={() =>
+            Alert.alert(
+              t("mobile.agent.newChat.confirmTitle", { name: agent.name }),
+              t("mobile.agent.newChat.confirmBody"),
+              [
+                { text: t("common.cancel"), style: "cancel" },
+                { text: t("mobile.agent.newChat.confirm"), onPress: start },
+              ],
+            )
+          }
+        >
+          <Typography.Paragraph className="text-accent">
+            {t(starting ? "mobile.agent.newChat.starting" : "mobile.agent.newChat.title")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      )}
+    </ActionRowFrame>
   );
 }
 
@@ -152,8 +188,13 @@ export function AgentCompactSection({
 
   return (
     <SettingsSection footer={t(started ? "mobile.agent.compact.started" : "mobile.agent.compact.footer")}>
-      <SettingsRow disabled={!available || requesting || compacting} onPress={compact}>
-        <Typography.Paragraph>
+      <SettingsRow
+        disabled={!available || requesting || compacting}
+        disclosure={false}
+        leading={<RowIcon icon={FoldVertical} tone="accent" />}
+        onPress={compact}
+      >
+        <Typography.Paragraph className="text-accent">
           {t(
             compacting
               ? "mobile.chat.context.labelCompacting"
@@ -164,5 +205,65 @@ export function AgentCompactSection({
         </Typography.Paragraph>
       </SettingsRow>
     </SettingsSection>
+  );
+}
+
+/**
+ * "Delete history" of the agent's own chat after the user confirms, as on desktop
+ * (`chat-history-v1`). The messages and their files go, and the agent forgets them; side threads,
+ * profile, memories and workspace stay. Only for a person with `manage` on the agent. The host
+ * refuses while the agent works, and its reason shows in the alert. A row of a group on the
+ * Advanced page.
+ */
+export function AgentDeleteHistoryRow({ agent, available }: { agent: MobileAgent; available: boolean }) {
+  const { t } = useText();
+  const { deleteAgentHistory, loadLatestMessages, conversationStore } = useMobileWorkspaceActions();
+  const [deleting, setDeleting] = useState(false);
+
+  function remove(): void {
+    setDeleting(true);
+    deleteAgentHistory(agent.id, agent.serverId)
+      .then(() => {
+        void haptics.notification("success");
+        // A window around a search result keeps the messages that the empty latest page does not
+        // name, so the chat reads its latest page again.
+        if (conversationStore.get(agent.id)) void loadLatestMessages(agent.id, agent.serverId).catch(() => undefined);
+      })
+      .catch((cause: unknown) => {
+        void haptics.notification("error");
+        const text = currentText();
+        showFailureAlert(
+          cause,
+          "agent",
+          text.t("mobile.agent.deleteHistory.failed"),
+          text.errorMessage(cause, text.t("mobile.agent.deleteHistory.failedBody")),
+        );
+      })
+      .finally(() => setDeleting(false));
+  }
+
+  return (
+    <SettingsGroupRow>
+      <SettingsRow
+        description={t("mobile.agent.deleteHistory.footer")}
+        disabled={!available || deleting}
+        disclosure={false}
+        leading={<RowIcon icon={Trash2} tone="danger" />}
+        onPress={() =>
+          Alert.alert(
+            t("mobile.agent.deleteHistory.confirmTitle", { name: agent.name }),
+            t("mobile.agent.deleteHistory.confirmBody"),
+            [
+              { text: t("common.cancel"), style: "cancel" },
+              { text: t("mobile.agent.deleteHistory.confirm"), style: "destructive", onPress: remove },
+            ],
+          )
+        }
+      >
+        <Typography.Paragraph className="text-danger-text">
+          {t(deleting ? "mobile.agent.deleteHistory.deleting" : "mobile.agent.deleteHistory.title")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsGroupRow>
   );
 }

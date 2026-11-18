@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Você está editando uma mensagem na fila. Salve ou cancele a edição para permitir a execução.",
   "composer.queueEdit.cancel": "Cancelar edição",
+  "composer.feedbackFix.body":
+    "Corrigindo o relato #{number}. Envie a solicitação ou cancele para manter o relato como está.",
+  "composer.feedbackFix.cancel": "Cancelar",
   "composer.providerWait.offlineTitle": "Sem conexão com a internet",
   "composer.providerWait.offline": "{provider} não pode responder até que este computador volte a ficar online.",
   "composer.providerWait.silent": "{provider} não envia nada há {duration}.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Atualize {provider} no computador em que ele é executado para continuar.",
   "composer.update.pending": "Atualizando…",
   "composer.update.action": "Atualizar",
+  "composer.imageInput.body":
+    "{model} recebe apenas texto, então não vê as imagens que você anexa. Se este modelo lê imagens, ative as imagens para ele.",
+  "composer.imageInput.label": "Ativar imagens para {model}",
+  "composer.imageInput.pending": "Ativando…",
+  "composer.imageInput.action": "Ativar imagens",
   "composer.usageLimit.credits": "Você usou todo o limite do plano {provider}. Seus agentes agora usam seus créditos.",
   "composer.usageLimit.creditsResets":
     "Você usou todo o limite do plano {provider}. Seus agentes usam seus créditos até a renovação em {reset}.",

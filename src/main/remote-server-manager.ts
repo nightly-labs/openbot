@@ -99,6 +99,7 @@ import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protoco
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   decodeThreadMessageSearchResponse,
@@ -118,6 +119,7 @@ import {
   hostedStartStep,
   WAKE_RECONNECT_STATES,
 } from "@openbot/team-client/hosted-server-wake";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { Deferred, Effect, Exit, Layer, Result, Scope, Semaphore } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import { ComputerActivityReport } from "./computer-activity-report";
@@ -335,7 +337,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #allowLocalDevelopmentInvites: boolean;
   readonly #inviteLinks: InviteLinkOptions;
   readonly #appVersion: string | null;
-  #duplicateOperationIds = new Map<string, string>();
+  // A duplicate whose answer got lost sends its id again and gets the first copy.
+  #duplicateIds = retryOperationIds(randomUUID);
   /** When Signal first missed each host that restarts into an update. */
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
@@ -457,6 +460,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
+      hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -1843,25 +1847,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       agentId: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<DuplicateAgentResult, RemoteWorkflowError, RemoteRequest> {
-      const key = `${serverId}\0${agentId}`;
-      const operationId = this.#duplicateOperationIds.get(key) ?? randomUUID();
-      this.#duplicateOperationIds.set(key, operationId);
-      return yield* Effect.gen({ self: this }, function* () {
-        const result = yield* this.request(
-          serverId,
-          TEAM_API_ROUTES.agent.duplicate(agentId),
-          decodeDuplicateAgentResultFromHost,
-          { method: "POST", body: { operationId }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
-        );
-        this.#duplicateOperationIds.delete(key);
-        return result;
-      }).pipe(
+      const duplicate = this.#duplicateIds([serverId, agentId]);
+      return yield* this.request(
+        serverId,
+        TEAM_API_ROUTES.agent.duplicate(agentId),
+        decodeDuplicateAgentResultFromHost,
+        { method: "POST", body: { operationId: duplicate.id }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
+      ).pipe(
         Effect.catch(({ cause: error }) =>
-          Effect.gen({ self: this }, function* () {
-            if (error instanceof RemoteRequestError && error.status >= 400 && error.status < 500) {
-              this.#duplicateOperationIds.delete(key);
-            }
-            return yield* new RemoteWorkflowError({ cause: error });
+          Effect.suspend(() => {
+            // The host refused the request, so it made no copy: a retry is a new duplicate.
+            if (!(error instanceof RemoteRequestError && error.status >= 400 && error.status < 500)) duplicate.failed();
+            return Effect.fail(new RemoteWorkflowError({ cause: error }));
           }),
         ),
       );
@@ -2412,6 +2409,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
       part: { uploadId: string; index: number; sha256: string },
       bytes: Uint8Array,
+      /** The bytes of this part that the host has confirmed. Only the WebRTC transport reports them. */
+      onProgress?: (sent: number) => void,
     ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk, server.apiUrl);
@@ -2424,6 +2423,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: Buffer.from(bytes) },
         true,
         INSTANCE_TRANSFER_PART_TIMEOUT_MS,
+        undefined,
+        onProgress,
       );
       yield* this.#rejectHostError(response, url);
     },
@@ -2677,11 +2678,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       attachmentId: string,
       serverId = this.#store.activeServerId,
       preview = false,
-      // The size that the message names. With it, the download reports its bytes and can be stopped.
+      // The size that the message names. With it, the download reports its bytes. Only a click, not a
+      // preview, can be stopped.
       size?: number,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
+      const stoppable = progress !== undefined && !preview;
       const load = this.#attachments.get(
         server.id,
         attachmentId,
@@ -2706,13 +2709,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
                 name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
                 mimeType: response.headers.get("content-type") ?? "application/octet-stream",
               };
-            }).pipe((download) => (progress ? this.#stoppable(server.id, attachmentId, download) : download)),
+            }).pipe((download) => (stoppable ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
       );
       // A click can wait for a load that a preview or a ZIP started. Its stop then ends only its wait.
       // A click that starts the load stops the load itself, above, so the callers that wait get an error.
-      return yield* progress ? this.#stoppable(server.id, attachmentId, load) : load;
+      return yield* stoppable ? this.#stoppable(server.id, attachmentId, load) : load;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

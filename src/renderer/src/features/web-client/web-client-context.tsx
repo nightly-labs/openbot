@@ -22,6 +22,7 @@ import type {
   HostedServerSleep,
   HostedServerStart,
   MemberChatColorEntry,
+  ProviderModelSourceEntry,
   QueueSnapshot,
   RespondToApprovalInput,
   RespondToPromptInput,
@@ -30,7 +31,12 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { canAdministerServer, openExchangesOutside } from "@openbot/contracts/ipc";
+import { canAdministerServer, openExchangesOutside, withModelSources } from "@openbot/contracts/ipc";
+import {
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_LIMIT,
+  type AgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -80,6 +86,7 @@ import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
+import { deleteCachedWorkflows, keepCachedWorkflows } from "../workflows/workflow-cache";
 import {
   agentPictureMark,
   deleteSavedAgentPictures,
@@ -124,6 +131,8 @@ interface WebConversation {
 const LATEST_PAGE_SIZE = 50;
 /** The recently opened agents whose latest page a new page reads after the open one. */
 const PRELOADED_AGENTS = 3;
+/** While events stream, at most one event read of the unread state starts in this time. */
+const EVENT_READS_INTERVAL_MS = 1_000;
 
 /**
  * Releases the older pages of a conversation that is not open. Only the open conversation gets new
@@ -342,6 +351,15 @@ export function createWebWorkspace(
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
   /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
   const queueRevisions = new Map<string, number>();
+  /**
+   * The agents whose queue came from `agent-active-queues-v1`: only the open work, which the agent row
+   * needs. The open chat needs the finished deliveries too, so opening one of these agents reads its full
+   * queue.
+   */
+  const partialQueues = new Set<string>();
+  /** The agents that wait for the next list read, and the generation of the list read in flight. */
+  const queueListPending = new Set<string>();
+  let queueListRunning: number | null = null;
   const readWrites = new Map<string, Promise<void>>();
   /** The conversation reads in flight by agent, and the deltas that wait for them to finish. */
   const conversationReads = new Map<string, number>();
@@ -450,6 +468,31 @@ export function createWebWorkspace(
         () => wholeApprovalReads.delete(key),
       );
     }
+  }
+  /**
+   * The last status event and model sources of the open host. A released status event carries no
+   * source (#9956), so each one goes out with the last sources of that host, and the sources are read
+   * again after it. A changed source sends the status again.
+   */
+  let hostStatus: AgentStatus | null = null;
+  let hostSources: { hostId: string | null; sources: ProviderModelSourceEntry[] } = { hostId: null, sources: [] };
+  let sourceRead = 0;
+  function applyHostStatus(status: AgentStatus): void {
+    hostStatus = status;
+    const current = hostId;
+    hooks.onStatus?.(withModelSources(status, hostSources.hostId === current ? hostSources.sources : []));
+    if (!runtime.modelSources) return;
+    const read = ++sourceRead;
+    runtime
+      .modelSources()
+      .then((sources) => {
+        if (disposed || read !== sourceRead || current !== hostId || !hostStatus) return;
+        const previous = hostSources.hostId === current ? hostSources.sources : [];
+        hostSources = { hostId: current, sources };
+        if (JSON.stringify(previous) !== JSON.stringify(sources))
+          hooks.onStatus?.(withModelSources(hostStatus, sources));
+      })
+      .catch(() => undefined);
   }
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -582,7 +625,7 @@ export function createWebWorkspace(
           });
         // The host sends it at connect and after each change (`host-appearance-v1`).
         if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
-        if (event.type === "status") hooks.onStatus?.(event.status);
+        if (event.type === "status") applyHostStatus(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
@@ -707,17 +750,18 @@ export function createWebWorkspace(
           });
         if (event.type === "agents-changed") {
           reconcileAgents(event.agents);
-          for (const agent of event.agents) if (!state.queues[agent.id]) loadQueue(agent.id);
+          loadQueues(event.agents.flatMap((agent) => (state.queues[agent.id] ? [] : [agent.id])));
         }
         if (event.type === "queue-changed") {
           const { snapshot } = event;
           queueRevisions.set(snapshot.agentId, (queueRevisions.get(snapshot.agentId) ?? 0) + 1);
+          partialQueues.delete(snapshot.agentId);
           setState((draft) => {
             draft.queues[snapshot.agentId] = snapshot;
           });
         }
         if (event.type === "queue-invalidated" && state.agents.some((agent) => agent.id === event.agentId))
-          loadQueue(event.agentId);
+          loadQueues([event.agentId]);
         if (event.type === "sidebar-layout-changed")
           setState((draft) => {
             if (event.layout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = event.layout;
@@ -735,7 +779,7 @@ export function createWebWorkspace(
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A changed chat can change the unread count of any agent, and the host tells a read on another
         // device only with an invalidation.
-        if (event.type === "conversation" || event.type === "conversation-invalidated") loadReads();
+        if (event.type === "conversation" || event.type === "conversation-invalidated") loadReadsSoon();
         // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
@@ -1052,12 +1096,16 @@ export function createWebWorkspace(
         const hosts = await runtime.listHosts();
         markRemoteSync("hosts");
         if (disposed) return;
-        // A server that left the list takes its frame with it.
+        // A server that left the list takes its frame, pictures and cached workflows with it.
         deleteRemoteWorkspaceFrames(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
         void deleteSavedAgentPictures(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
+        keepCachedWorkflows(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
@@ -1197,6 +1245,7 @@ export function createWebWorkspace(
     if (hostId) {
       deleteRemoteWorkspaceFrame(props.accountId, hostId);
       void deleteSavedServerPictures(props.accountId, hostId);
+      deleteCachedWorkflows(hostId);
     }
     generation += 1;
     selectedId = null;
@@ -1489,7 +1538,7 @@ export function createWebWorkspace(
         current,
       );
       // The other queues only give the sidebar its marks.
-      for (const agent of agents) if (agent.id !== first?.id) loadQueue(agent.id);
+      loadQueues(agents.flatMap((agent) => (agent.id === first?.id ? [] : [agent.id])));
     } catch (error) {
       if (disposed || current !== generation) return;
       setState((draft) => {
@@ -1763,6 +1812,7 @@ export function createWebWorkspace(
           const revision = queueRevisions.get(id) ?? 0;
           const queue = await runtime.queue(id);
           if (disposed || load.generation !== generation || (queueRevisions.get(id) ?? 0) !== revision) continue;
+          partialQueues.delete(id);
           setState((draft) => {
             draft.queues[id] = queue;
           });
@@ -1771,6 +1821,60 @@ export function createWebWorkspace(
         if (load.generation === generation) report(error);
       } finally {
         if (queueLoads.get(id) === load) queueLoads.delete(id);
+      }
+    })();
+  }
+  /**
+   * Reads the queues of the agent rows. A host with `agent-active-queues-v1` gives the open work of all
+   * of them in one read; the open chat, an agent that the answer did not carry, and an older host get a
+   * full read of each queue. Calls during a list read wait for one more list read.
+   */
+  function loadQueues(ids: readonly string[]): void {
+    if (ids.length === 0) return;
+    if (!state.capabilities.includes(AGENT_ACTIVE_QUEUES_CAPABILITY)) {
+      for (const id of ids) loadQueue(id);
+      return;
+    }
+    for (const id of ids) queueListPending.add(id);
+    if (queueListRunning === generation) return;
+    const current = generation;
+    queueListRunning = current;
+    void (async () => {
+      try {
+        while (queueListPending.size > 0 && !disposed && current === generation) {
+          const pending = [...queueListPending];
+          queueListPending.clear();
+          const listed = pending.filter((id) => id !== selectedId).slice(0, AGENT_ACTIVE_QUEUES_LIMIT);
+          const inList = new Set(listed);
+          for (const id of pending) if (!inList.has(id)) loadQueue(id);
+          if (listed.length === 0) continue;
+          const revisions = new Map(listed.map((id) => [id, queueRevisions.get(id) ?? 0]));
+          let answer: AgentActiveQueues;
+          try {
+            answer = await runtime.activeQueues(listed);
+          } catch {
+            // The full read of each queue reports its own failure.
+            if (!disposed && current === generation) for (const id of listed) loadQueue(id);
+            continue;
+          }
+          if (disposed || current !== generation) return;
+          const fresh = answer.queues.filter(
+            (queue) =>
+              queue.agentId !== selectedId &&
+              revisions.has(queue.agentId) &&
+              (queueRevisions.get(queue.agentId) ?? 0) === revisions.get(queue.agentId),
+          );
+          for (const queue of fresh) partialQueues.add(queue.agentId);
+          if (fresh.length > 0)
+            setState((draft) => {
+              for (const queue of fresh) draft.queues[queue.agentId] = queue;
+            });
+          for (const id of answer.omitted) if (revisions.has(id)) loadQueue(id);
+          // The user opened this agent during the read: its chat needs the full queue.
+          if (selectedId && revisions.has(selectedId)) loadQueue(selectedId);
+        }
+      } finally {
+        if (queueListRunning === current) queueListRunning = null;
       }
     })();
   }
@@ -1786,6 +1890,7 @@ export function createWebWorkspace(
   async function select(id: string) {
     const current = generation;
     selectedId = id;
+    if (partialQueues.has(id)) loadQueue(id);
     if (state.status === "online" && state.host)
       saveRemoteWorkspaceFrame(props.accountId, state.host.hostId, { selectedAgentId: id });
     setState((draft) => {
@@ -1832,6 +1937,9 @@ export function createWebWorkspace(
   }
   let readsLoad: { generation: number; promise: Promise<void> } | null = null;
   let pendingReads = false;
+  /** When the last read started, and the event read that waits for its interval. */
+  let readsStartedAt = 0;
+  let readsTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Reads the unread state of every agent chat. Event bursts coalesce: a call during a read schedules
    * one more read. A failed read keeps the counts that this tab has.
@@ -1843,6 +1951,7 @@ export function createWebWorkspace(
     const promise = (async () => {
       while (pendingReads && !disposed && current === generation) {
         pendingReads = false;
+        readsStartedAt = Date.now();
         const value = await runtime.conversationReads().catch(() => null);
         if (!value || disposed || current !== generation) continue;
         setState((draft) => {
@@ -1857,6 +1966,23 @@ export function createWebWorkspace(
   }
   function loadReads(): void {
     void readReads();
+  }
+  /**
+   * Reads the unread state after an event. Each read costs the host a query for each agent, so while
+   * events stream at most one read starts in `EVENT_READS_INTERVAL_MS`. The waiting read starts after
+   * the last event, so no change is lost.
+   */
+  function loadReadsSoon(): void {
+    if (readsTimer) return;
+    const wait = readsStartedAt + EVENT_READS_INTERVAL_MS - Date.now();
+    if (wait <= 0) {
+      loadReads();
+      return;
+    }
+    readsTimer = setTimeout(() => {
+      readsTimer = null;
+      loadReads();
+    }, wait);
   }
   async function resync() {
     const current = generation;
@@ -1886,7 +2012,7 @@ export function createWebWorkspace(
         draft.agentColors = agentColors;
       });
       receiveChatColors(chatColors);
-      for (const agent of agents) loadQueue(agent.id);
+      loadQueues(agents.map((agent) => agent.id));
       loadReads();
       if (!selectedId && agents[0]) await select(agents[0].id);
       await refresh();
@@ -2121,6 +2247,8 @@ export function createWebWorkspace(
     return () => {
       disposed = true;
       generation += 1;
+      if (readsTimer) clearTimeout(readsTimer);
+      readsTimer = null;
       recovery.dispose();
       hostLifecycle.dispose();
       focusUse.dispose();

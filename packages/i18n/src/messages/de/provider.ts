@@ -121,9 +121,14 @@ export const messages = {
   "provider.picker.download": "Download von {name}",
   "provider.picker.search": "Modelle suchen",
   "provider.picker.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
   "provider.picker.olderModelsList": "Ältere {name}-Modelle",
   "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} führt deine eigenen Endpunkte aus. Ihre Modelle sind im Tab Benutzerdefiniert.",
+  "provider.picker.showCustomModels": "Modelle zeigen",
   "provider.picker.museNoModels":
     "Muse hat für dieses Konto keine Modelle gesendet. Muse ist im Land, in dem dieser Agent läuft, möglicherweise nicht verfügbar. Wähle ein Modell eines anderen Anbieters.",
   "provider.picker.customEmpty":
@@ -151,6 +156,8 @@ export const messages = {
   "provider.picker.selectEffort": "Aufwand auswählen",
   "provider.picker.custom": "Benutzerdefiniert",
   "provider.picker.cliReady": "{cli} bereit",
+  "provider.picker.modelSourceProvider": "Nutzt {name} aus deinen {cli}-Einstellungen",
+  "provider.picker.modelSourceCatalog": "Nutzt eine Modellliste aus deinen {cli}-Einstellungen",
   "provider.status.signInRequired": "Anmeldung erforderlich",
   "provider.model.free": "Kostenlos",
   "provider.model.new": "Neu",

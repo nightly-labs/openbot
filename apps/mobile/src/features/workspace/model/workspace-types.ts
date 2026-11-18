@@ -138,6 +138,7 @@ import type {
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SharedTable,
   SidebarLayoutAction,
@@ -741,6 +742,8 @@ export interface MobileWorkspaceContextValue {
   setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   /** Needs `whatsapp-working-message-v1`. A number carries `workingMessage` only on such a host. */
   setWhatsAppWorkingMessage: (input: SetWhatsAppWorkingMessageInput, serverId: string) => Promise<void>;
+  /** Needs `whatsapp-status-reactions-v1`. A number carries `statusReactions` only on such a host. */
+  setWhatsAppStatusReactions: (input: SetWhatsAppStatusReactionsInput, serverId: string) => Promise<void>;
   /**
    * How this user reaches the OpenBot update of an online host: an owner or admin through
    * `host-update-v1`, any member through `host-member-update-v1`. Null when neither applies.
@@ -793,6 +796,10 @@ export interface MobileWorkspaceContextValue {
    * opens the browser sign-in of an MCP server, and the host keeps the grant.
    */
   canRelayMcpSignIn: (serverId: string) => boolean;
+  /** The host is not a Mac (`mac-apps-limit-v1`), so an app that drives Apple apps does not run there. */
+  macAppsUnavailable: (serverId: string) => boolean;
+  /** The host reads an edited confirm preview (`ui-block-preview-edit-v1`), so the card can edit it. */
+  canEditUiBlockPreview: (serverId: string) => boolean;
   /** The relayed browser sign-ins of MCP servers on one host. Refuses a host without `sign-in-relay-v1`. */
   mcpSignInRelay: (serverId: string) => McpSignInRelay;
   /** The http servers that the host holds a sign-in for. Empty for a host without `mcp-sign-in-v1`. */
@@ -1060,6 +1067,16 @@ export interface MobileWorkspaceContextValue {
    * messages stay. The host refuses while the chat or task works, or when its provider cannot compact.
    */
   compactContext: (agentId: string, serverId: string, taskId?: string) => Promise<void>;
+  /**
+   * True when the host advertises `chat-history-v1`: "Delete history" of an agent's own chat, and
+   * "New conversation", "Compact context" and "Delete history" of a channel.
+   */
+  canDeleteChatHistory: (serverId: string) => boolean;
+  /**
+   * Deletes the messages of the agent's own chat, and the agent forgets them. Side threads, profile,
+   * memories and workspace stay. Needs `manage` on the agent; the host refuses while the chat works.
+   */
+  deleteAgentHistory: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -1094,6 +1111,8 @@ export interface MobileWorkspaceContextValue {
   searchFiles: (query: string, serverId: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /** True when the host advertises `agent-tasks-v1`. A member who can message an agent can use its tasks. */
   canUseTasks: (serverId: string) => boolean;
+  /** True when the host advertises `agent-queue-task-v1`: a queued message of the agent's chat can run in a new thread. */
+  canRunQueuedMessageAsTask: (serverId: string) => boolean;
   /** True when the host advertises `agent-threads-v1`: a member who can message an agent can rename and delete its threads. */
   canEditThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-reads-v1`: the host keeps the person's read mark of each thread. */
@@ -1154,6 +1173,11 @@ export interface MobileWorkspaceContextValue {
     input: { agentId: string; text: string; attachmentDraftIds?: string[]; clientMessageId: string },
     serverId: string,
   ) => Promise<AgentTask>;
+  /**
+   * Moves a message that waits in the queue of the agent's own chat into a new thread, where it
+   * starts beside the chat. Needs `canRunQueuedMessageAsTask`.
+   */
+  runQueuedMessageAsTask: (input: { agentId: string; deliveryId: string }, serverId: string) => Promise<AgentTask>;
   /** Steers the running turn of the task, or queues the message in the task. */
   sendAgentTaskMessage: (
     input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
@@ -1273,10 +1297,12 @@ export type MobileWorkspaceCapabilityCheck =
   | "attachmentSupport"
   | "canStartNewChat"
   | "canCompactContext"
+  | "canDeleteChatHistory"
   | "canChooseNewAgentModel"
   | "canInstallAgentTemplate"
   | "canSearchFiles"
   | "canUseTasks"
+  | "canRunQueuedMessageAsTask"
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
@@ -1329,6 +1355,8 @@ type ServerCheckKey =
   | "canManageProviders"
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
+  | "macAppsUnavailable"
+  | "canEditUiBlockPreview"
   | "canManageMcpAccess"
   | "canAddMarketplaceAgents"
   | "canUpdateMarketplaceAgents"

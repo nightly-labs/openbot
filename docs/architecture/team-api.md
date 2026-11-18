@@ -506,6 +506,16 @@ client reads both and puts the models on their account: the model picker of that
 them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
 keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
 
+The optional `provider-model-source-v1` capability (protocol 9 only) adds
+`POST /v1/providers/model-sources` (empty request). It lists, for each provider whose own settings give
+its models from another source than the provider's own list, that source: `{ kind: "provider", name }`
+for a model provider such as Ollama, or `{ kind: "catalog" }` for a model list file. Today only Codex
+reports it, from `model_provider` and `model_catalog_json` in `config/read` (#9956). The path, address
+and key of the source stay on the host. Every member reads it: it says no more than the model list. The
+released status routes carry no source, so the desktop remote branch and the web client read both and
+put the source on its status row. A client that fails to read it shows no source.
+`src/main/team-api/route-agents.ts` owns it.
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are
@@ -537,6 +547,18 @@ host. A stale order and an order with channel work get 409 and the host's messag
 released `agent-tasks-changed` event. That event has no full queue, so a client reads the list again
 when the waiting messages of a thread change. `src/main/team-api/route-agent-thread-queue.ts` owns
 them. Without the capability a client shows the waiting messages of a thread without their actions.
+
+The optional `agent-thread-requests-v1` capability (protocol 9 only) adds
+`POST /v1/agent-thread-requests/list` (`agentId`). It gives, for each side thread of the agent that has
+one, the requests that the agent sent from that thread to other agents and whose answer has not come
+back yet: the message id, the agent it went to, and its state (`queued`, `starting` or `running`). The
+thread shows them as "Waiting for replies", as the agent's own chat does. A member who can send the
+agent a message can use it: a visible agent (else 404) and `chat` on it (else 403). The released
+`agent-tasks-changed` event has no requests, so a client reads the list again when a thread becomes
+idle (a turn can have sent a request), when a thread with requests changes its state (an answer or a
+note for a failed request starts the thread), and on each event while a request is `queued` (it can
+start or be cancelled with no change of the thread's state). `src/main/team-api/route-agent-thread-requests.ts` owns it. Without the
+capability a thread shows no requests.
 
 The optional `agent-usage-limit-v1` capability (protocol 9 only) adds `POST /v1/agent-usage-limit/list`
 (empty body) and `POST /v1/agent-usage-limit/switch` (`agentId`, `provider`, `model`,
@@ -618,4 +640,4 @@ that host.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
-Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.
+Protocol support follows the support window in the root `AGENTS.md`: the releases of the last 60 days. A protocol that no release in the window speaks can be deleted. The PR that deletes it raises the minimum protocol and, when old apps must update, the minimum app version; a CI check refuses a minimum app version that is less than 60 days old. The PR also includes a changelog entry and tests for the old-client/new-host and new-client/old-host directions.

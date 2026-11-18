@@ -1,23 +1,31 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ConversationMessage, isQueuedAgentReply, type QueueDelivery } from "@openbot/contracts/ipc";
+import {
+  type AgentTask,
+  type ConversationMessage,
+  isQueuedAgentReply,
+  type QueueDelivery,
+  routineRunsTurn,
+} from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { type MobileTextKey, sourceText } from "@openbot/i18n/mobile";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useAgentWaits } from "@/features/workspace/components/use-agent-activity";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
+import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
 import { type AwaitingReply, awaitingReplies } from "../model/awaiting-replies";
 import {
-  readQueueAttachment,
+  queueAttachmentUpload,
   removeQueueAttachment,
   restoredQueueAttachments,
   writeQueueAttachment,
@@ -58,10 +66,12 @@ export function useChatQueue(
 ) {
   const workspace = useMobileWorkspaceReader();
   const canEditQueue = useMobileWorkspaceSelector((current) => current.canEditQueue(serverId));
+  const canRunAsThread = useMobileWorkspaceSelector((current) => current.canRunQueuedMessageAsTask(serverId));
   const text = useText();
   const { session } = useMobileSession();
   const storageKey = `queue-edit.${session?.user.id}.${serverId}.${agentId}`;
   const queryClient = useQueryClient();
+  const queryScope = useQueryScope();
   const queryKey = useMemo(() => queryKeys.chatQueue(serverId, agentId), [serverId, agentId]);
   const query = useQuery({
     queryKey,
@@ -323,10 +333,11 @@ export function useChatQueue(
         await uploadChatAttachments(files, {
           upload: async (file) => {
             const stored = edit.addedAttachments.find((item) => item.id === file.id);
-            return workspace().uploadAttachment(
-              agentId,
-              stored ? { ...file, base64: await readQueueAttachment(edit.editId, stored) } : file,
-              serverId,
+            const upload = stored ? await queueAttachmentUpload(edit.editId, stored, file) : file;
+            return withUploadCancel(
+              upload,
+              () => cancelled.current,
+              () => workspace().uploadAttachment(agentId, upload, serverId),
             );
           },
           // Once Save can reach the host, these IDs must survive an uncertain response.
@@ -398,9 +409,13 @@ export function useChatQueue(
         (query.error ? text.errorMessage(query.error, text.t("mobile.chat.queue.loadFailed")) : null),
       loading: online && query.isPending,
       canEdit: canEditQueue,
+      /** True when the host can move a queued message into a new thread, as desktop's "Run in new thread". */
+      canRunAsThread,
       online,
       activeTurnId,
       steers,
+      /** A routine run's turn takes no steer, so a queued message waits for the next turn. */
+      steerRefused: steers && routineRunsTurn(query.data?.deliveries, activeTurnId),
       begin,
       save,
       refresh,
@@ -443,7 +458,7 @@ export function useChatQueue(
         }),
       steer: (delivery: QueueDelivery) =>
         run(async () => {
-          if (!activeTurnId) return;
+          if (!activeTurnId || routineRunsTurn(query.data?.deliveries, activeTurnId)) return;
           await workspace().changeQueue(agentId, serverId, "steer", {
             deliveryId: delivery.id,
             expectedTurnId: activeTurnId,
@@ -462,6 +477,17 @@ export function useChatQueue(
           if (activeTurnRef.current !== turnId) return;
           await workspace().interruptTurn(agentId, turnId, serverId);
         }),
+      // As on desktop: the message leaves the queue and starts in a new thread beside the chat. The
+      // answer is the new thread, or null when the move did not succeed.
+      runAsThread: async (delivery: QueueDelivery): Promise<AgentTask | null> => {
+        const started: { task: AgentTask | null } = { task: null };
+        const done = await run(async () => {
+          started.task = await workspace().runQueuedMessageAsTask({ agentId, deliveryId: delivery.id }, serverId);
+        });
+        const task = done ? started.task : null;
+        if (task) addStartedTask(queryClient, queryScope, serverId, task);
+        return task;
+      },
       moveFirst: (delivery: QueueDelivery) =>
         run(async () => {
           // The host checks the order against every queued delivery, so the answers the sheet does
@@ -489,6 +515,7 @@ export function useChatQueue(
       query.error,
       query.isPending,
       canEditQueue,
+      canRunAsThread,
       online,
       activeTurnId,
       steers,
@@ -501,6 +528,8 @@ export function useChatQueue(
       serverId,
       clearEdit,
       text,
+      queryClient,
+      queryScope,
     ],
   );
 }

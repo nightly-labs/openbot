@@ -33,7 +33,6 @@ import {
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
@@ -109,7 +108,6 @@ import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
-  decodeAgentStatusFromHost,
   decodeHostDefaultProviderFromHost,
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
@@ -138,6 +136,7 @@ import {
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString } from "./validation";
 
@@ -202,7 +201,7 @@ export function providerAdminIpcHandlers({
   /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
-    return runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost));
+    return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
   }
 
   /**
@@ -349,6 +348,9 @@ export function providerAdminIpcHandlers({
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
     await stopRelay(key);
+    // Two quick starts both pass the stop above before either one runs its flow. The later start stops
+    // the flow of the earlier one here, so no flow runs on the host that the status and cancel cannot reach.
+    while (relayed.has(key)) await stopRelay(key);
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
     const start = post(path, decodeSignInRelayFlow, body);
@@ -607,9 +609,7 @@ export function providerAdminIpcHandlers({
       ),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
-        return runCauseEffect(
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
-        );
+        return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
       }),
       getApiKeyState: scopedHandler(parseProviderId, {
         local: (provider) => ({ provider, status: credentials.status(provider) }),

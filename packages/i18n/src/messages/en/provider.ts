@@ -129,9 +129,13 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
     "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
@@ -159,6 +163,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.selectEffort": "Select effort",
   "provider.picker.custom": "Custom",
   "provider.picker.cliReady": "{cli} ready",
+  "provider.picker.modelSourceProvider": "Uses {name} from your {cli} settings",
+  "provider.picker.modelSourceCatalog": "Uses a model list from your {cli} settings",
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.new": "New",

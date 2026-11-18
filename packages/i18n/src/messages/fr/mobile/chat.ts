@@ -139,6 +139,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "FICHIER",
   "mobile.chat.attachment.tooLargeForMobile":
     "Ce fichier dépasse la limite mobile de {limit}. Ouvrez-le sur l’ordinateur.",
+  "mobile.chat.backdrop.agentSet": "{name} a défini l’arrière-plan",
+  "mobile.chat.backdrop.undo": "Annuler",
+  "mobile.chat.backdrop.dismiss": "Fermer",
   "mobile.chat.attachment.sharingUnavailable": "Le partage de fichiers n’est pas disponible sur cet appareil.",
   "mobile.chat.attachment.unavailable": "La pièce jointe n’est pas disponible. Réessayez.",
   "mobile.chat.attachment.openFailed": "Impossible d’ouvrir la pièce jointe",
@@ -182,7 +185,7 @@ export const messages = {
     "{name} : l’ordinateur hôte n’accepte pas ces fichiers. Mettez OpenBot à jour sur cet ordinateur pour les joindre.",
   "mobile.chat.attachment.nameTooLong": "Choisissez un fichier dont le nom est plus court.",
   "mobile.chat.attachment.damaged": "La pièce jointe est endommagée. Sélectionnez-la de nouveau.",
-  "mobile.chat.attachment.tooLarge": "{name} dépasse 10 Mo.",
+  "mobile.chat.attachment.tooLarge": "{name} dépasse {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Autorisez l’accès à l’appareil photo dans Réglages pour prendre une photo.",
   "mobile.chat.composer.send": "Envoyer le message",
@@ -202,9 +205,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Annuler la réponse",
   "mobile.chat.composer.messageAgent": "Message à {name}",
   "mobile.chat.composer.pasteFailed": "Impossible de joindre le texte collé",
-  "mobile.chat.composer.cancelDictation": "Annuler la dictée",
   "mobile.chat.voice.listening": "Écoute…",
-  "mobile.chat.voice.continue": "Continuer la dictée",
   "mobile.chat.liveVoice.start": "Démarrer une conversation vocale",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Démarrage",
@@ -374,7 +375,11 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "Prise de contrôle du navigateur",
   "mobile.chat.browserSecret.takeoverBody":
     "Terminez cette étape dans le navigateur de l’ordinateur qui exécute OpenBot.",
-  "mobile.chat.browserSecret.takeoverReload": "Rechargez ensuite la page avant de choisir « J’ai terminé ».",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Connectez-vous sur votre ordinateur",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Ce site n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot n’a pas pu finir de saisir le mot de passe ou le code. Saisissez sur la page ce qui manque. Rechargez ensuite la page avant de choisir « J’ai terminé ».",
   "mobile.chat.browserSecret.takeoverFailed": "La demande n’a pas pu aboutir.",
   "mobile.chat.browserSecret.done": "J’ai terminé",
   "mobile.chat.browserSecret.submitOnce":
@@ -543,6 +548,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Arrêter l’agent et envoyer maintenant le prochain message en attente",
   "mobile.chat.queue.deleteNext": "Supprimer le prochain message en attente",
   "mobile.chat.queue.moveFirst": "Placer en premier",
+  "mobile.chat.queue.runInNewThread": "Exécuter dans un nouveau fil",
+  "mobile.chat.queue.runNextInNewThread": "Exécuter le prochain message en file d’attente dans un nouveau fil",
   "mobile.chat.queue.deleteTitle": "Supprimer le message en file d’attente ?",
   "mobile.chat.queue.deleteMessage": "L’agent ne le recevra jamais.",
   "mobile.chat.queue.keep": "Conserver",

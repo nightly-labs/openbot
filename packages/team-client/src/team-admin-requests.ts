@@ -38,6 +38,7 @@ import {
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
   isWhatsAppGroupList,
+  isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type MessagingWorkspaceInput,
   type ProviderEnvironment,
@@ -54,6 +55,7 @@ import {
   type SetMessagingEnabledInput,
   type SetOwnServerNotificationLevelInput,
   type SetWhatsAppOwnNumberInput,
+  type SetWhatsAppStatusReactionsInput,
   type SetWhatsAppWorkingMessageInput,
   type SidebarPin,
   type SidebarPinsSnapshot,
@@ -62,6 +64,7 @@ import {
   type WhatsAppLinkState,
   type WhatsAppOverview,
   type WhatsAppSenderInput,
+  type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
@@ -107,6 +110,7 @@ import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
@@ -399,7 +403,12 @@ import {
   routinesOnceUnsupported,
   saveOnceEventRoutine,
 } from "./routines-once";
-import { type TeamApiRequest, withRoutineRunPlaces } from "./team-api-requests";
+import {
+  listRoutinePauseReasons,
+  type TeamApiRequest,
+  withRoutinePauseReasons,
+  withRoutineRunPlaces,
+} from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
   cause: Schema.Defect(),
@@ -578,7 +587,9 @@ export function getEventStatus(request: TeamApiRequest): Effect.Effect<EventStat
 /**
  * With `recovery`, for a host with `routine-recovery-v1`, the routines carry `missedPolicy`. With
  * `runPlaces`, for a host with `routine-run-place-v1`, the routines of an agent carry `runIn`. With
- * `once`, for a host with `routines-once-v1`, the list adds the `once` routines of the owner.
+ * `once`, for a host with `routines-once-v1`, the list adds the `once` routines of the owner. With
+ * `pauseReasons`, for a host with `routine-pause-reasons-v1`, a paused routine of an agent carries
+ * `pausedByRun`.
  */
 export function listEventRoutines(
   request: TeamApiRequest,
@@ -586,8 +597,9 @@ export function listEventRoutines(
   recovery = false,
   runPlaces = false,
   once = false,
+  pauseReasons = false,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
-  const routines = listReleasedEventRoutines(request, input, recovery, runPlaces);
+  const routines = listReleasedEventRoutines(request, input, recovery, runPlaces, pauseReasons);
   if (!once) return routines;
   const onceRoutines = adminCall(() => listOnceEventRoutines(onceSend(request), input.owner));
   return Effect.all([routines, onceRoutines], { concurrency: "unbounded" }).pipe(
@@ -600,16 +612,18 @@ function listReleasedEventRoutines(
   input: ListEventRoutinesInput,
   recovery: boolean,
   runPlaces: boolean,
+  pauseReasons: boolean,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines;
   const routines = adminCall(() => request("POST", path, decodeEventRoutines, eventBody(input)));
   const { owner } = input;
-  if (!runPlaces || owner.kind !== "agent") return routines;
-  const places = adminCall(() =>
-    request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId: owner.id }),
-  );
-  return Effect.all([routines, places], { concurrency: "unbounded" }).pipe(
-    Effect.map(([list, entries]) => withRoutineRunPlaces(list, entries)),
+  if (owner.kind !== "agent" || (!runPlaces && !pauseReasons)) return routines;
+  const places = runPlaces
+    ? adminCall(() => request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId: owner.id }))
+    : Effect.succeed([]);
+  const reasons = pauseReasons ? adminCall(() => listRoutinePauseReasons(request, owner.id)) : Effect.succeed([]);
+  return Effect.all([routines, places, reasons], { concurrency: "unbounded" }).pipe(
+    Effect.map(([list, entries, paused]) => withRoutinePauseReasons(withRoutineRunPlaces(list, entries), paused)),
   );
 }
 
@@ -2531,4 +2545,31 @@ export function whatsappConnectorSetWorkingMessage(
   input: SetWhatsAppWorkingMessageInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, ignoreResponse, { ...input }));
+}
+
+/**
+ * The status reaction setting of each WhatsApp number of the host (`whatsapp-status-reactions-v1`).
+ * Merge it into the overview with `withWhatsAppStatusReactions`.
+ */
+export function whatsappConnectorStatusReactions(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppStatusReactionsList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_STATUS_REACTIONS_ROUTES.list,
+      (value) => {
+        if (!isWhatsAppStatusReactionsList(value)) throw new Error("Invalid WhatsApp status reactions response.");
+        return value;
+      },
+      {},
+    ),
+  );
+}
+
+export function whatsappConnectorSetStatusReactions(
+  request: TeamApiRequest,
+  input: SetWhatsAppStatusReactionsInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, ignoreResponse, { ...input }));
 }

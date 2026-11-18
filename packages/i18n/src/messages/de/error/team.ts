@@ -76,9 +76,13 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.chatColorsUnsupported": "Diese Verbindung unterstützt keine Chatfarben.",
   "error.team.routineRunPlaceUnsupported": "Diese Verbindung kann nicht ändern, wo eine Routine läuft.",
+  "error.team.routinePauseReasonsUnsupported": "Diese Verbindung kann nicht zeigen, warum eine Routine pausiert ist.",
+  "error.team.activeQueuesUnsupported": "Diese Verbindung kann die Warteschlangen aller Agenten nicht anzeigen.",
   "error.team.routinesOnceUnsupported": "Diese Verbindung kann keine Routinen speichern, die einmal laufen.",
   "error.team.routineRunCommandUnsupported": "Diese Verbindung kann den Ausführungsbefehl einer Routine nicht liefern.",
   "error.team.threadQueueUnsupported": "Diese Verbindung kann die Warteschlange eines Nebenthreads nicht anzeigen.",
+  "error.team.threadRequestsUnsupported":
+    "Diese Verbindung kann die Anfragen eines Nebenthreads an andere Agenten nicht anzeigen.",
   "error.team.hostTurnLimitsUnsupported":
     "Diese Verbindung kann die Thread-Limits des Servers nicht anzeigen oder ändern.",
   "error.team.usageLimitUnsupported":
@@ -86,6 +90,8 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Diese Verbindung kann keine Hermes-Profile vom Server importieren.",
   "error.team.providerDetectionUnsupported":
     "Diese Verbindung kann die Modellserver und Agenten des Servers nicht finden.",
+  "error.team.providerModelSourceUnsupported":
+    "Diese Verbindung kann nicht zeigen, woher die Modelle eines Anbieters kommen.",
   "error.team.routineFlowStopUnsupported": "Diese Verbindung kann keinen Routinelauf stoppen.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.libraryFoldersUnsupported": "Diese Verbindung unterstützt keine Bibliotheksordner.",

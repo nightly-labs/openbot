@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "ファイル",
   "conversation.threads.new": "新しいスレッド",
   "conversation.threads.all": "すべてのスレッド",
+  "conversation.threads.allUnread": "すべてのスレッド、新しい返信あり",
   "conversation.threads.open": "開いているスレッド",
   "conversation.threads.current": "スレッド: {title}",
   "conversation.threads.actions": "スレッドの操作",

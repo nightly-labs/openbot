@@ -4,6 +4,7 @@ import {
   PLAN_CONTINUATION_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -12,7 +13,12 @@ import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
 import { LineTooLongError } from "../jsonl";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import { providerSync } from "../provider-client-effects";
-import { importProviderHistory } from "../provider-history-import";
+import {
+  compactImportedProviderHistory,
+  importProviderHistory,
+  retiredSessionNeedsHistoryRead,
+} from "../provider-history-import";
+import { compactThreadEvents } from "../thread-event-compaction-run";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
@@ -26,6 +32,9 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 
 type UnresolvedDelivery = DeliveryContext["delivery"];
 
+const logger = createOpenBotLogger("provider-history");
+const eventLogger = createOpenBotLogger("thread-event-compaction");
+
 export interface BootRecoveryHooks {
   /** The channel and messaging threads. A channel thread names its channel: its turns run in their own lane. */
   executionThreads?(): Array<{ id: string; threadId: string; channelId?: string }>;
@@ -34,6 +43,8 @@ export interface BootRecoveryHooks {
   deliveryThreadId?(deliveryId: string): string | null;
   /** Tells the external conversation of a delivery that the recovery settled it. */
   deliverySettled?(deliveryId: string, terminal: "completed" | "failed" | "interrupted"): void;
+  /** Whether this task is still open, so the note for a stopped teammate request can go to its thread. */
+  taskOpen(taskId: string): boolean;
   /**
    * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
    * routine, whose record is gone. A Test, script or webhook run cannot.
@@ -76,7 +87,12 @@ export interface BootRecoveryOptions {
  *   provider exit that cut the agent's text fails the delivery instead, so
  *   the chat says that the answer is not complete (#9729).
  * - `backfillProviderHistory` merges provider-side turns that happened while
- *   OpenBot was down into the persisted conversation.
+ *   OpenBot was down into the persisted conversation. Then it compacts, in small
+ *   transactions, the imported Codex and Claude items that a release before
+ *   compaction kept in full.
+ * - `compactThreadEvents` then removes, also in small transactions, the message
+ *   copies that a replay does not need from the thread events of a release
+ *   before #8166 and #8794.
  *
  * Reads the store/mailbox/provider and writes the database plus in-memory
  * snapshots; delivery to the renderer goes through `mailboxSync` and
@@ -103,6 +119,10 @@ export class BootRecovery {
    * process has no rollout for.
    */
   readonly #unreadableHistory = new Set<string>();
+  /** The imported items of earlier releases are compacted once per process. */
+  #historyCompacted = false;
+  /** The old thread events are compacted once per process too. */
+  #threadEventsCompacted = false;
 
   constructor(options: BootRecoveryOptions) {
     this.#store = options.store;
@@ -326,6 +346,28 @@ export class BootRecovery {
       // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
     }
+    // No turn sends a result for these requests now, so the agent that asked gets a note and does not
+    // wait with no end (#11561). The drains after the recovery start it.
+    if (!continuation) {
+      for (const id of deliveryIds) {
+        const requesterId = yield* this.#mailbox
+          .answerFailedRequest(
+            id,
+            (taskId) => this.#hooks.taskOpen(taskId),
+            (agentId) => this.#store.list().some((agent) => agent.id === agentId),
+            true,
+          )
+          .pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("failed_request_answer_failed", failure.cause, delivery.recipientAgentId);
+                return null;
+              }),
+            ),
+          );
+        if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+      }
+    }
     // The agent's own chat shows the error above its composer and the failed turn, as other failed turns do.
     if (ownChat && !continuation) {
       this.#hooks.emitError("agent_error", reason, ownChat.agent.id);
@@ -431,10 +473,11 @@ export class BootRecovery {
       // was retired before its last complete import has no new turns, so it is not read again.
       const active = this.#store.database.activeProviderSession(publicThreadId, agent.provider);
       for (const session of this.#store.database.listProviderSessions(publicThreadId)) {
-        if (session.state === "inactive") {
-          const imported = this.#store.database.providerHistoryImport(session.id);
-          if (imported?.state === "complete" && imported.updatedAt >= session.updatedAt) continue;
-        }
+        if (
+          session.state === "inactive" &&
+          !retiredSessionNeedsHistoryRead(this.#store.database.providerHistoryImport(session.id), session.updatedAt)
+        )
+          continue;
         // The active session is in the folder of the agent's provider account. An account change
         // retires the sessions, so a retired one can be in the folder of an earlier account.
         const client =
@@ -472,7 +515,8 @@ export class BootRecovery {
               const run = requestId ? this.#mailbox.routineDeliveryOfRequest(agent.id, requestId) : null;
               return run !== null && this.#hooks.quietRunDelivery(run.delivery.id);
             },
-            hasOwnReplyFrom: (deliveryId) => this.#mailbox.hasOwnReplyFrom(deliveryId),
+            requestAnswered: (deliveryId) =>
+              this.#mailbox.hasOwnReplyFrom(deliveryId) || this.#mailbox.hasSentResultFor(deliveryId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(
@@ -492,6 +536,46 @@ export class BootRecovery {
         );
       }
     }
+    if (this.#historyCompacted) return;
+    this.#historyCompacted = true;
+    yield* compactImportedProviderHistory(this.#store.database).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          if (result.rows > 0) logger.info("Compacted imported provider history.", toLogValue(result));
+        }),
+      ),
+      // The next start tries again; a failure here loses no data.
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#historyCompacted = false;
+          logger.warn("Could not compact imported provider history.", toLogValue(failure.cause));
+        }),
+      ),
+    );
+  });
+
+  readonly compactThreadEvents = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
+    if (this.#threadEventsCompacted) return;
+    this.#threadEventsCompacted = true;
+    yield* compactThreadEvents(this.#store.database).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          // Counts, sizes and error names only: an event payload holds message text.
+          if (result.rewritten > 0 || Object.keys(result.failedThreads).length > 0)
+            eventLogger.info("Compacted old thread events.", toLogValue(result));
+        }),
+      ),
+      // The next start tries again; a failure here loses no data.
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#threadEventsCompacted = false;
+          const cause = failure.cause;
+          eventLogger.warn("Could not compact old thread events.", {
+            name: cause instanceof Error ? cause.name : typeof cause,
+          });
+        }),
+      ),
+    );
   });
 
   #refreshBackfilledConversation(agentId: string, threadId: string): void {

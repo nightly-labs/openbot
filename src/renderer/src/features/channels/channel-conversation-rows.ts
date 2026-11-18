@@ -292,6 +292,23 @@ export function waitingChannelPrompt(
 }
 
 /**
+ * The last question in the host's list that a member's thread in this channel waits on.
+ * The view shows it when the page has no row for it: a turn that the provider started with no task
+ * copies no rows to the channel, and the channel showed "Needs you" with no question (#10178). An
+ * older host does not name the threads, so the view shows the saved rows only.
+ */
+export function liveChannelPrompt<Request extends { agentId: string; threadId: string }>(
+  page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly Request[],
+): Request | undefined {
+  if (page.channel.archived || !threads) return undefined;
+  return waiting.findLast((request) =>
+    threads.some((thread) => thread.agentId === request.agentId && thread.threadId === request.threadId),
+  );
+}
+
+/**
  * Whether a request of an agent belongs to this channel. A host with channel-attention-v1 names the
  * thread of each member. An older host does not, so a request of a member whose task runs here is
  * taken as the channel's, as the channel view took it before.

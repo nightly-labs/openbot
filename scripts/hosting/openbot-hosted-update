@@ -4,6 +4,9 @@
 #   openbot-hosted-update stage   openbot-update.timer. Downloads a newer release, checks it against
 #                                 the release manifest, copies it to /opt/OpenBot/staged, and installs
 #                                 the packages that it needs. OpenBot keeps running.
+#   openbot-hosted-update check   openbot-update.timer, each hour. Runs `stage` about each 6 hours.
+#                                 When OpenBot stopped its start loop, it runs `stage`, and starts
+#                                 OpenBot again, after `apply` when a release is staged.
 #   openbot-hosted-update boot    openbot-update-apply.service, at boot before openbot.service. Runs
 #                                 `apply` when the disk of the server is complete. After a boat wake,
 #                                 boat restores the disk for some minutes, and OpenBot does not wait
@@ -49,6 +52,14 @@ BOAT_USER=user
 BOAT_PRE_STOP=/home/$BOAT_USER/.boat/pre-stop
 # boat does not save the paths in this file. It must be in the home of `user`.
 BOAT_IGNORE=/home/$BOAT_USER/.boatignore
+# OpenBot exits with this status when it stops its start loop (src/main/server-start-halt.ts), and
+# `RestartPreventExitStatus=` of openbot.service does not start it again.
+START_LOOP_STATUS=78
+# The time of the last `stage` of `check` that succeeded. In /run, so the first `check` after a boot stages.
+STAGE_STAMP=/run/openbot-update.staged
+# `check` runs each hour for the start loop, and `stage` only after this time: a release reaches the
+# servers in about 6 hours, as before.
+STAGE_INTERVAL_MINUTES=360
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
@@ -203,6 +214,51 @@ stage_release() {
 
 recover() {
   rm -rf "$SCRATCH"/openbot-update.*
+}
+
+# Succeeds when OpenBot stopped its start loop and systemd does not start it again. Only the state
+# of the unit is read, never a file of the service user. Exit 78 leaves the unit `failed`; `openbot
+# stop` clears that state, so a server that an admin stopped is `inactive` and stays stopped.
+start_loop_stopped() {
+  [ "$(systemctl show --property=ActiveState --value openbot.service 2>/dev/null)" = failed ] || return 1
+  [ "$(systemctl show --property=ExecMainStatus --value openbot.service 2>/dev/null)" = "$START_LOOP_STATUS" ]
+}
+
+# Succeeds when no `stage` of `check` succeeded in the last `STAGE_INTERVAL_MINUTES`.
+stage_due() {
+  [ -z "$(find "$STAGE_STAMP" -mmin "-$STAGE_INTERVAL_MINUTES" 2>/dev/null)" ]
+}
+
+# Each hour: `stage` when it is due or when OpenBot stopped its start loop, and then a start when
+# OpenBot stopped its start loop, with the staged release when there is one. A hosted owner has no
+# shell and a failure can be temporary, so each timer run tries once more. `stage` runs in a
+# subshell with errexit on, so a failed stage does not stop the start; `check` then exits with its
+# status, and the next run stages again. Do not write `(stage) || ...`: Bash ignores `set -e` on the
+# left of `||`, also in the subshell, and a stage that failed half way then writes `staged.ready`.
+check() {
+  local staged=0 stopped=0
+  if start_loop_stopped; then stopped=1; fi
+  if [ "$stopped" -eq 1 ] || stage_due; then
+    set +e
+    (
+      set -e
+      stage
+    )
+    staged=$?
+    set -e
+    if [ "$staged" -eq 0 ]; then touch "$STAGE_STAMP"; fi
+  fi
+  # Again: a `sudo openbot restart` during the stage started OpenBot.
+  if start_loop_stopped; then
+    if [ -n "$(staged_version)" ]; then
+      echo "OpenBot stopped its start loop. Installing the staged release and starting OpenBot."
+      apply
+    else
+      echo "OpenBot stopped its start loop. Starting OpenBot again."
+    fi
+    systemctl start --no-block openbot.service
+  fi
+  return "$staged"
 }
 
 set_state() {
@@ -519,7 +575,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   wait_for_restore
   case ${1:-} in
     stage) stage ;;
+    check) check ;;
     apply) apply ;;
-    *) fail "usage: $0 boot|stage|apply|request|trigger" ;;
+    *) fail "usage: $0 boot|stage|check|apply|request|trigger" ;;
   esac
 fi

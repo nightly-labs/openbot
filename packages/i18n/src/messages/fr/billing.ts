@@ -220,4 +220,10 @@ export const messages = {
     other:
       "Votre licence a {count} utilisateurs, le maximum. Contactez-nous pour une licence plus grande. Les nouvelles personnes ne peuvent pas rejoindre vos serveurs.",
   },
+  "billing.details.country": "Pays de facturation",
+  "billing.details.countryPlaceholder": "Choisir un pays",
+  "billing.details.vatId": "N° de TVA UE (facultatif)",
+  "billing.details.vatIdInvalid": "Ce n’est pas un numéro de TVA du pays choisi.",
+  "billing.details.countryMissing": "Choisissez votre pays de facturation.",
+  "billing.details.saveFailed": "Impossible d’enregistrer les informations de facturation",
 } as const satisfies PartialTranslation<typeof source>;

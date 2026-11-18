@@ -30,9 +30,10 @@ import {
   type AttachmentDownloads,
   type AttachmentMediaSource,
 } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
-import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { type ChangeMarkerActions, ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -219,6 +220,8 @@ export interface AgentThreadViewProps {
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
    */
   onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
+  /** The actions of a skill or instruction change line. An instruction change has View, not Undo. */
+  changeMarkerActions?: ChangeMarkerActions | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -291,6 +294,11 @@ export interface AgentThreadViewProps {
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
   /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
+  /**
+   * The "Use as backdrop" action of a message, or undefined when the message has nothing that can go
+   * behind the window. Missing where the host has no backdrop.
+   */
+  backdropAction?: ((message: AgentMessage) => (() => void) | undefined) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
@@ -310,6 +318,8 @@ export interface AgentThreadViewProps {
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
    */
   queue?: AgentThreadQueue | undefined;
+  /** The agents that the thread asked and that have not answered yet, as the agent's own chat shows them. */
+  awaiting?: readonly AwaitingReplyItem[] | undefined;
   /**
    * The actions for text selected in the thread. Quote puts the text in this message box, and a send
    * goes to this thread. Without it, selected text has no actions.
@@ -555,6 +565,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (message.body.trim() === "") return marker;
     return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
   };
+  /** A skill or instruction change line, which shows as a marker with its actions, as in the agent's own chat. */
+  const changeMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
+  };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
     const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
@@ -597,7 +612,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const pinned = pins.isPinned(message.id);
     return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
   }
-  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, and Delete. */
+  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, Use as backdrop, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -608,6 +623,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
       pin: pinAction(message),
+      onUseAsBackdrop: props.backdropAction?.(message),
       onDelete: deleteAction(message),
     };
   }
@@ -835,7 +851,22 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
+                  <Show when={message().kind !== "thinking" && changeMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onOpenSkill={props.changeMarkerActions?.onOpenSkill}
+                          onOpenInstructions={props.changeMarkerActions?.onOpenInstructions}
+                        />
+                      </article>
+                    )}
+                  </Show>
+                  <Show
+                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                  >
                     <Show
                       when={card()}
                       fallback={
@@ -932,6 +963,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 body={task().error || t("conversation.threads.view.failedBody")}
               />
             )}
+          </ComposerStackCard>
+          <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
+            {(items) => <AwaitingReplies items={items()} onOpenAgent={props.onSelectAgent} />}
           </ComposerStackCard>
           <Show when={props.queue}>
             {(queue) => (

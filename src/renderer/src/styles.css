@@ -24,6 +24,7 @@
 @import "@openbot/ui/features/sidebar/sidebar-views.css";
 @import "@openbot/ui/features/sidebar/sidebar-working-badge.css";
 @import "@openbot/ui/features/sidebar/sidebar-felt-badges.css";
+@import "@openbot/ui/features/sidebar/sidebar-filter.css";
 @import "@openbot/ui/features/sidebar/sidebar-tooltips.css";
 @import "@openbot/ui/features/agent-dock/agent-dock.css";
 @import "./features/agent-dock/agent-dock.css";
@@ -54,6 +55,7 @@
 @import "@openbot/ui/features/usage/usage-machine-meter.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
+@import "@openbot/ui/features/agents/agent-picker.css";
 @import "@openbot/ui/features/tasks/tasks.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";
@@ -65,6 +67,7 @@
 @import "@openbot/ui/features/window/page-rail.css";
 @import "./features/window/window.css";
 @import "./features/files/library.css";
+@import "./features/crm/crm-page.css";
 @import "@openbot/ui/features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
@@ -95,7 +98,9 @@
 @import "@openbot/ui/features/github-star/github-star-toast.css";
 @import "@openbot/ui/features/social-follow/social-follow-toast.css";
 @import "@openbot/ui/features/updates/whats-new.css";
+@import "@openbot/ui/features/updates/update-required.css";
 @import "@openbot/ui/features/billing/billing.css";
+@import "@openbot/ui/features/crm/crm.css";
 @import "@openbot/ui/styles/reference-chip.css";
 @import "@openbot/ui/skill-preview.css";
 /* After the page styles: the transparent window replaces their backgrounds. */

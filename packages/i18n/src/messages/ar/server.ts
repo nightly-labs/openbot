@@ -332,6 +332,12 @@ export const messages = {
   "server.settings.group.agents": "الوكلاء",
   "server.settings.group.people": "الأشخاص",
   "server.settings.group.server": "الخادم",
+  "server.settings.experimentalTitle": "تجريبي",
+  "server.settings.experimentalDescription": "شغّل ميزات لم تكتمل بعد.",
+  "server.settings.experimentalFeatures": "الميزات",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "اعرض صفحة CRM للمالكين والمسؤولين، واسمح للوكلاء بقراءة CRM، وزامن Stripe. عند إيقافه تبقى البيانات.",
   "server.settings.agentDefaultsTitle": "الإعدادات الافتراضية للوكلاء",
   "server.settings.threadsCard": "السلاسل والمنطقة الزمنية",
   "server.settings.memoryTitle": "الذاكرة",
@@ -409,7 +415,7 @@ export const messages = {
   "server.settings.agentsDescription": "اختر ما يمكن أن يفعله الوكلاء على هذا الخادم عندما لا تحدده لوكيل.",
   "server.settings.timezone": "المنطقة الزمنية",
   "server.settings.timezoneDescription":
-    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
+    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "server.settings.timezoneAutomatic": "تلقائي ({zone})",
   "server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
   "server.settings.turnLimit": "السلاسل في الوقت نفسه",

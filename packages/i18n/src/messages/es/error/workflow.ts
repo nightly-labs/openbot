@@ -32,6 +32,8 @@ export const messages = {
   "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
   "error.workflow.pictureType": "Usa una imagen PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing": "Una imagen de un paso anterior no está disponible. Ejecuta ese paso de nuevo.",
+  "error.workflow.mediaEmptyRequest":
+    "Escribe una descripción o ejecuta los pasos anteriores para que llegue un texto o una imagen.",
   "error.workflow.mediaInputNotImage": "Este paso solo acepta imágenes, no vídeos. Quita la conexión desde el vídeo.",
   "error.workflow.stepMissing": "Este paso ya no existe.",
   "error.workflow.nodeMissing": "Este paso no está en el flujo de trabajo.",

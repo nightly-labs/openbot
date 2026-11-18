@@ -353,6 +353,12 @@ export const messages = defineMessages("server", {
   "server.settings.group.agents": "Agents",
   "server.settings.group.people": "People",
   "server.settings.group.server": "Server",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Turn on features that are not complete yet.",
+  "server.settings.experimentalFeatures": "Features",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Show the CRM page to owners and admins, let agents read the CRM, and sync Stripe. When you turn it off, the data stays.",
   "server.settings.agentDefaultsTitle": "Agent defaults",
   "server.settings.threadsCard": "Threads and timezone",
   "server.settings.memoryTitle": "Memory",
@@ -431,7 +437,7 @@ export const messages = defineMessages("server", {
     "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
-    "New routines use this timezone when the message does not give the sender's timezone.",
+    "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
   "server.settings.turnLimit": "Threads at the same time",

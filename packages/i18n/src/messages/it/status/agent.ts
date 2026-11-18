@@ -15,6 +15,7 @@ export const messages = {
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",
   "status.agent.marketplaceSuggested": "Ha suggerito un'app del Marketplace: {app}.",
+  "status.agent.settingShown": "Ha mostrato un'impostazione: {setting}.",
   "status.agent.channelMemberAdded": "{agent} ha aggiunto {member} al canale. Lo ha chiesto {person}.",
   "status.agent.channelMemberRemoved": "{agent} ha rimosso {member} dal canale. Lo ha chiesto {person}.",
   "status.agent.channelInstructionsChanged": "{agent} ha modificato le istruzioni del canale. Lo ha chiesto {person}.",
@@ -41,11 +42,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Errori recenti nella chat:",
   "status.agent.feedbackSameAs": "Si aggiunge alla issue #{issue}",
   "status.agent.feedbackSent": "Inviato al team di OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Rimosso da GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Rimuovi la segnalazione #{issue} da GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Nessuno potrà più vedere questa segnalazione su GitHub. Non puoi annullare l’operazione. Per correggerla, l’agente può inviare una segnalazione corretta.",
+  "status.agent.feedbackWithdrawing": "Rimozione della segnalazione da GitHub…",
   "status.agent.serverInstallCommand":
     "Crea un comando monouso che installa OpenBot su un altro computer come server {name} e lo collega al tuo account. L'agente lo esegue lì.",
   "status.agent.serverInstallCard": "Comando di installazione per il server {name}",
   "status.agent.browserProfileNamed":
     "Sposta {agents} nel profilo del browser {profile}. Ricevono i suoi accessi e cookie. Le loro schede aperte si chiudono.",
+  "status.agent.commitCoAuthorOff": "Non aggiungere più OpenBot come coautore nei commit di tutti gli agenti.",
+  "status.agent.commitCoAuthorOn": "Aggiungere di nuovo OpenBot come coautore nei commit di tutti gli agenti.",
   "status.agent.browserProfileNew":
     "Crea il nuovo profilo del browser {profile} e sposta {agents} lì. Non ha accessi. Le loro schede aperte si chiudono.",
   "status.agent.browserProfileShared":
@@ -71,6 +79,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Aggiornamento delle sue memorie…",
   "status.agent.skillUsing": "Uso della skill {name}…",
+  "status.agent.backdropSetting": "Modifica dello sfondo…",
   "status.agent.skillReading": "Lettura di una skill…",
   "status.agent.toolStepFailed":
     "Un passaggio dello strumento è fallito; analisi del risultato e scelta del prossimo tentativo…",

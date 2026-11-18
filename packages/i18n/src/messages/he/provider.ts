@@ -116,9 +116,14 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
+  "provider.picker.showCustomModels": "הצגת מודלים",
   "provider.picker.museNoModels":
     "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
@@ -146,6 +151,8 @@ export const messages = {
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
+  "provider.picker.modelSourceProvider": "משתמש ב-{name} מהגדרות {cli}",
+  "provider.picker.modelSourceCatalog": "משתמש ברשימת מודלים מהגדרות {cli}",
   "provider.status.signInRequired": "נדרשת התחברות",
   "provider.model.free": "חינם",
   "provider.model.new": "חדש",

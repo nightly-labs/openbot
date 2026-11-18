@@ -14,6 +14,7 @@ export const messages = {
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
+  "status.agent.settingShown": "عرض إعدادًا: {setting}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",
   "status.agent.channelMemberRemoved": "أزال {agent} العضو {member} من القناة. بطلب من {person}.",
   "status.agent.channelInstructionsChanged": "غيّر {agent} تعليمات القناة. بطلب من {person}.",
@@ -37,11 +38,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
   "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
   "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "أُزيل من GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "إزالة البلاغ #{issue} من GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "لن يتمكن أحد من رؤية هذا البلاغ على GitHub بعد الآن. لا يمكنك التراجع عن ذلك. لتصحيحه، يمكن للوكيل إرسال بلاغ مصحَّح.",
+  "status.agent.feedbackWithdrawing": "جارٍ إزالة بلاغك من GitHub…",
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",
   "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",
   "status.agent.browserProfileNamed":
     "انقل {agents} إلى ملف تعريف المتصفح {profile}. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.commitCoAuthorOff": "إيقاف إضافة OpenBot كمؤلف مشارك في إيداعات جميع الوكلاء.",
+  "status.agent.commitCoAuthorOn": "إضافة OpenBot مجددًا كمؤلف مشارك في إيداعات جميع الوكلاء.",
   "status.agent.browserProfileNew":
     "أنشئ ملف تعريف المتصفح الجديد {profile} وانقل {agents} إليه. لا يحتوي على أي تسجيل دخول. تُغلق علاماتهم المفتوحة.",
   "status.agent.browserProfileShared":
@@ -72,6 +80,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "جارٍ تحديث ذكرياته…",
   "status.agent.skillUsing": "جارٍ استخدام المهارة {name}…",
+  "status.agent.backdropSetting": "جارٍ تغيير الخلفية…",
   "status.agent.skillReading": "جارٍ قراءة مهارة…",
   "status.agent.toolStepFailed": "فشلت خطوة أداة؛ جارٍ مراجعة النتيجة وتحديد ما يجب تجربته بعد ذلك…",
   "status.agent.toolResultReviewing": "جارٍ مراجعة آخر نتيجة أداة…",

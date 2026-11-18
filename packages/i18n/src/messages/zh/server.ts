@@ -316,6 +316,12 @@ export const messages = {
   "server.settings.group.agents": "助手",
   "server.settings.group.people": "人员",
   "server.settings.group.server": "服务器",
+  "server.settings.experimentalTitle": "实验性",
+  "server.settings.experimentalDescription": "开启尚未完成的功能。",
+  "server.settings.experimentalFeatures": "功能",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "向所有者和管理员显示 CRM 页面，允许智能体读取 CRM，并同步 Stripe。关闭后数据仍会保留。",
   "server.settings.agentDefaultsTitle": "助手默认值",
   "server.settings.threadsCard": "话题与时区",
   "server.settings.memoryTitle": "记忆",
@@ -352,7 +358,8 @@ export const messages = {
   "server.settings.agents": "助手",
   "server.settings.agentsDescription": "选择在你未单独设置时，此服务器上的助手可以做什么。",
   "server.settings.timezone": "时区",
-  "server.settings.timezoneDescription": "当消息未提供发送者时区时，新创建的自动化任务使用该时间。",
+  "server.settings.timezoneDescription":
+    "当消息未提供发送者时区时，新创建的自动化任务使用该时间。在服务器上，浏览器也会在下次重启后使用该时区。",
   "server.settings.timezoneAutomatic": "自动（{zone}）",
   "server.settings.timezoneLoadFailed": "无法加载服务器时区。",
   "server.settings.turnLimit": "同时运行的话题数",

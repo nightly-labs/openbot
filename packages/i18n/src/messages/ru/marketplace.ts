@@ -115,6 +115,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}: установка не завершена",
   "marketplace.app.partialDescription": "Часть приложений или навыков не установлена. «Переподключить» установит их.",
   "marketplace.app.notConnected": "Не подключено",
+  "marketplace.app.paused": "Приостановлено",
   "marketplace.app.custom": "Сервер MCP",
   "marketplace.app.githubTagline": "Репозитории, задачи и пул-реквесты",
   "marketplace.app.onePasswordTagline": "Вход на сайты с общими учётными данными",
@@ -161,6 +162,7 @@ export const messages = {
     "На {host} работает старая версия OpenBot, которая не может подключать приложения. Обновите OpenBot на {host} или попросите владельца обновить его.",
   "marketplace.app.blocked.member":
     "Подключать приложения на {host} может только владелец или администратор. Попросите одного из них подключить {name} или обновить OpenBot на {host}, чтобы участники могли подключать приложения.",
+  "marketplace.app.blocked.mac": "{name} работает только на Mac, где запущен OpenBot.",
   "marketplace.app.connectAgain": "Подключить снова",
   "marketplace.app.automation.askOnInstall": "Запросить доступ у macOS при установке",
   "marketplace.app.automation.title": "Доступ к приложениям Apple",
@@ -416,8 +418,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "Что сказано в моих заметках о решениях по этому проекту?",
   "marketplace.plugin.obsidian.prompt.save": "Сохраните это решение как новую заметку в моём хранилище.",
   "marketplace.plugin.obsidian.prompt.log": "Добавьте сводку сегодняшней работы в мою заметку «Журнал работы».",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'В Obsidian откройте Settings > Local REST API. Скопируйте API-ключ и включите "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "В Obsidian откройте Settings > Local REST API и скопируйте API-ключ.",
   "marketplace.plugin.resend.tagline": "Транзакционная почта",
   "marketplace.plugin.resend.description":
     "Resend позволяет агентам отправлять транзакционные письма и проверять доставку через один API. Ключ API из панели Resend передаётся локальному серверу в одной переменной окружения.",

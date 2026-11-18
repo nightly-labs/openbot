@@ -23,6 +23,7 @@ export const messages = {
   "mcp.signIn.description": "登录你的 {name} 账号。OpenBot 会获得该账号可访问的工具，且不会接触密码。",
   "mcp.signIn.waiting": "正在等待浏览器…",
   "mcp.signIn.continue": "前往 {name}",
+  "mcp.signIn.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
   "mcp.test.connected": { one: "已连接 · {count} 个工具", other: "已连接 · {count} 个工具" },
   "mcp.status.testing": "测试中…",
   "mcp.status.failed": "失败",

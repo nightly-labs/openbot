@@ -2592,6 +2592,11 @@ export function authApiRateLimit(error: unknown): { code: string; retryAfterSeco
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
 }
 
+/** The error code that the account service sent, such as `feedback_not_yours`, or null for another failure. */
+export function authApiErrorCode(error: unknown): string | null {
+  return error instanceof AuthApiError ? error.code : null;
+}
+
 /**
  * A client error that the same request cannot change, such as a machine token that the account service
  * no longer accepts (401). A timeout and a rate limit can pass later.
@@ -2658,6 +2663,9 @@ const INTERCEPTED_TLS_CODES = new Set([
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
   "CERT_UNTRUSTED",
   "ERR_TLS_CERT_ALTNAME_INVALID",
+  // Chromium's names for the same failures, when the app sends the requests through `net.fetch`.
+  "ERR_CERT_AUTHORITY_INVALID",
+  "ERR_CERT_COMMON_NAME_INVALID",
 ]);
 
 function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
@@ -2716,7 +2724,8 @@ function authApiIssue(error: AuthApiError): CentralAuthIssue {
 
 /**
  * Why the account service did not answer: no network, no answer in time, or a 5xx. The errno of a
- * network failure is a fixed token, such as `ECONNREFUSED`, so it can go in the reference.
+ * network failure is a fixed token, such as `ECONNREFUSED` or Chromium's `ERR_CONNECTION_REFUSED`, so
+ * it can go in the reference.
  */
 function serviceUnavailableText(error: unknown): { message: string; reference: string | null } {
   if (error instanceof AuthApiError) {

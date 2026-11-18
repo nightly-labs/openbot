@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Vous modifiez un message en attente. Enregistrez ou annulez la modification pour permettre son exécution.",
   "composer.queueEdit.cancel": "Annuler",
+  "composer.feedbackFix.body":
+    "Correction du rapport #{number}. Envoyez la demande, ou annulez pour garder le rapport tel quel.",
+  "composer.feedbackFix.cancel": "Annuler",
   "composer.providerWait.offlineTitle": "Pas de connexion Internet",
   "composer.providerWait.offline":
     "{provider} ne peut pas répondre tant que cet ordinateur n’est pas de nouveau en ligne.",
@@ -21,6 +24,11 @@ export const messages = {
   "composer.update.manual": "Mettez à jour {provider} sur l’ordinateur qui l’exécute pour continuer.",
   "composer.update.pending": "Mise à jour…",
   "composer.update.action": "Mettre à jour",
+  "composer.imageInput.body":
+    "{model} reçoit uniquement du texte et ne voit donc pas les images que vous joignez. Si ce modèle peut lire des images, activez les images pour lui.",
+  "composer.imageInput.label": "Activer les images pour {model}",
+  "composer.imageInput.pending": "Activation…",
+  "composer.imageInput.action": "Activer les images",
   "composer.usageLimit.credits":
     "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent maintenant vos crédits.",
   "composer.usageLimit.creditsResets":

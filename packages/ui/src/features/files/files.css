@@ -1335,6 +1335,7 @@
   grid-column: 1;
   flex-direction: column;
   border-inline-end: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
 }
 
 .library-side-search {
@@ -1382,98 +1383,91 @@
   line-height: 18px;
 }
 
-.library-tree,
-.library-tree-folders {
+/* The views, the favorites and the agents scroll below the search field. */
+.library-side-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  overflow-y: auto;
+  padding: var(--openbot-space-1) 8px var(--openbot-space-4);
+}
+
+.library-side-list,
+.library-branch {
   display: flex;
   flex-direction: column;
-  gap: var(--openbot-space-0-5);
+  gap: 1px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* A row is 8px wider than the search field on each side. Thus the arrow of a row starts at the start
-   edge of the search field, and the button at the end of a row ends at its end edge. The fill of a row
-   that is current, or that has the pointer, goes into this space. */
-.library-tree {
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--openbot-space-1) calc(11px - var(--openbot-space-2)) var(--openbot-space-3);
-}
-
-/* The folders of a row close as a section of the sidebar does: the row of the grid goes to zero. */
-.library-branch {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition:
-    grid-template-rows var(--openbot-duration-normal) var(--openbot-ease-out),
-    opacity var(--openbot-duration-fast) ease-out;
-}
-
-.library-branch[data-collapsed] {
-  opacity: 0;
-  grid-template-rows: 0fr;
-}
-
-.library-tree-folders {
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* The space above the first folder is a margin, not a padding of the list: a closed list has no height. */
-.library-tree-folders > li:first-child {
-  margin-block-start: var(--openbot-space-0-5);
-}
-
-/* A flex row has the height of its button. Each row starts with a 20px column for the arrow, also a
-   row that has no folders: thus the avatars and the icons of one level are in one line. Each level of
-   folders starts 20px after the level above. */
+/* Each level of folders starts 18px after the level above. The end of a row keeps space for its count,
+   and for its buttons while the pointer or the focus is on it. */
 .library-row {
-  --library-row-start: calc(var(--openbot-space-2) - 1px);
-  --library-row-arrow: 20px;
-  --library-row-indent: calc(var(--library-depth, 0) * 20px);
-  --library-row-action: 0px;
+  --library-row-start: 8px;
+  --library-row-step: 18px;
+  --library-row-indent: calc(var(--library-depth, 0) * var(--library-row-step));
+  --library-row-end: 8px;
 
   position: relative;
   display: flex;
+  min-width: 0;
 }
 
-/* The end of a row keeps one 26px column for its button: the "+" of an agent, and the menu of a folder
-   while the pointer or the focus is on its row. */
-.library-tree > li > .library-row:has(> .library-row-action),
-.library-tree-folders .library-row:is(:hover, :focus-within, :has(> .library-row-action[data-expanded])) {
-  --library-row-action: 26px;
+.library-row[data-count] {
+  --library-row-end: 36px;
 }
 
-/* A row has the height of a section header of the sidebar. Its name gets all the space between the
-   avatar and the button at the end. */
+/* The actions show on hover, but not during a drag: the counts stay, so the user can compare folders. */
+html:not(.library-dragging) .library-row[data-actions]:is(:hover, :focus-within) {
+  --library-row-end: 60px;
+}
+
 .library-side .ui-button.library-row-main {
   width: 100%;
   min-width: 0;
-  height: 32px;
+  height: 30px;
   justify-content: flex-start;
   gap: var(--openbot-space-2);
-  padding-inline: calc(var(--library-row-start) + var(--library-row-arrow) + var(--library-row-indent))
-    calc(var(--openbot-space-2) + var(--library-row-action));
+  padding-inline: calc(var(--library-row-start) + var(--library-row-indent)) var(--library-row-end);
   border-radius: var(--openbot-radius-md);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
+  font-weight: 400;
+}
+
+.library-side .ui-button.library-row-main:hover {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
 }
 
 .library-side .ui-button.library-row-main[aria-current="page"] {
   background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
 }
 
-/* An icon is in the middle of the 20px column of the avatars. */
-.library-row-main > svg,
-.library-row-edit > svg {
+/* The avatars and the icons of one level are in one 20px column. */
+.library-row-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+}
+
+.library-row-icon > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  flex: 0 0 auto;
-  margin-inline: var(--openbot-space-0-5);
-  color: var(--openbot-text-muted);
+}
+
+.library-row-main[aria-current="page"] .library-row-icon {
+  color: var(--openbot-text-primary);
 }
 
 .library-row-avatar.agent-avatar {
@@ -1483,51 +1477,35 @@
   height: 20px;
 }
 
-.library-side .library-tree-folders .ui-button.library-row-main {
-  color: var(--openbot-text-secondary);
-  font-weight: 400;
-}
-
-.library-side .library-tree-folders .ui-button.library-row-main[aria-current="page"] {
-  color: var(--openbot-text-primary);
-}
-
-/* The arrow is the first control of the row. Its icon starts at the start edge of the search field, or
-   below the avatar or the icon of the level above. It points right when the folders are hidden and
-   down when they show. */
+/* A row with folders: the pointer or the focus on the row puts the arrow over its icon. It points right
+   when the folders are hidden and down when they show. */
 .library-side .ui-button.library-row-toggle {
   position: absolute;
   z-index: 1;
-  top: var(--openbot-space-1-5);
+  top: 5px;
   width: 20px;
   height: 20px;
   min-width: 0;
   padding: 0;
-  inset-inline-start: calc(var(--openbot-space-1-5) + var(--library-row-indent));
-  color: var(--openbot-text-muted);
+  border-radius: var(--openbot-radius-xs);
+  inset-inline-start: calc(var(--library-row-start) + var(--library-row-indent) + 1px);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-secondary);
+  opacity: 0;
 }
 
-/* The click area is larger than the button: the full height of the row, from the start of the row to
-   the avatar or the icon. The values start at the inner edge of the 1px border. */
-.library-row-toggle::before {
-  position: absolute;
-  content: "";
-  inset-block: -7px;
-  inset-inline: calc(-7px - var(--library-row-indent)) -3px;
+.library-row:is(:hover, :focus-within) .library-row-toggle,
+.library-side .ui-button.library-row-toggle:focus-visible {
+  opacity: 1;
 }
 
-/* A button with aria-expanded gets the fill of an open menu button. The arrow is not a menu button. */
-.library-side .ui-button.library-row-toggle:not(:hover, :focus-visible) {
-  background: transparent;
-}
-
-.library-side .ui-button.library-row-toggle:is(:hover, :focus-visible) {
+.library-side .ui-button.library-row-toggle:hover {
   color: var(--openbot-text-primary);
 }
 
 .library-row-toggle > svg {
-  width: var(--openbot-icon-md);
-  height: var(--openbot-icon-md);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
@@ -1535,16 +1513,47 @@
   transform: rotate(90deg);
 }
 
-.library-side .ui-button.library-row-action {
+.library-row-count {
   position: absolute;
-  top: var(--openbot-space-1);
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  inset-inline-end: 10px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* The buttons of a row take the place of its count while the pointer or the focus is on the row. */
+.library-row-actions {
+  position: absolute;
+  top: 3px;
+  display: flex;
+  gap: 2px;
+  inset-inline-end: 4px;
+  opacity: 0;
+}
+
+.library-row:is(:hover, :focus-within) .library-row-actions,
+.library-row-actions:has([data-expanded]) {
+  opacity: 1;
+}
+
+html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-row-actions) .library-row-count {
+  opacity: 0;
+}
+
+.library-side .ui-button.library-row-action {
   width: 24px;
   height: 24px;
-  inset-inline-end: var(--openbot-space-1);
+  min-width: 0;
+  padding: 0;
   color: var(--openbot-text-muted);
 }
 
-.library-side .ui-button.library-row-action:is(:hover, :focus-visible, [data-expanded]) {
+.library-side .ui-button.library-row-action:is(:hover, :focus-visible, [data-expanded], [aria-pressed="true"]) {
   color: var(--openbot-text-primary);
 }
 
@@ -1553,40 +1562,57 @@
   height: var(--openbot-icon-sm);
 }
 
-/* The menu of a folder shows when the pointer or the focus is on its row. */
-.library-tree-folders .library-row-action {
-  opacity: 0;
+.library-row-owner.agent-avatar {
+  --agent-avatar-optical-offset: calc(18px * -0.14);
+
+  width: 18px;
+  height: 18px;
+  margin: 3px;
 }
 
-.library-tree-folders .library-row:is(:hover, :focus-within) .library-row-action,
-.library-tree-folders .library-row-action[data-expanded] {
-  opacity: 1;
+.library-row-star {
+  color: var(--openbot-text-secondary);
 }
 
+/* The name field of a row starts at the indent of the folder, with the same space before the icon as
+   after the name. It is a small field in the 30px of the row, so it does not touch the rows near it.
+   The icon and the name stay at their positions: the field border is in the place of the 1px border of
+   the row button. */
 .library-row-edit {
   display: flex;
   min-width: 0;
-  height: 32px;
+  height: var(--openbot-control-sm);
   flex: 1;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding-inline: calc(var(--library-row-start) + var(--library-row-arrow) + var(--library-row-indent) + 1px)
-    var(--openbot-space-2);
+  margin-block: calc((30px - var(--openbot-control-sm)) / 2);
+  margin-inline-start: var(--library-row-indent);
+  padding-inline: var(--library-row-start);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  transition: border-color var(--openbot-duration-hover) ease;
 }
 
-/* The icon and the name stay at their positions when the field opens: the row button has a 1px border
-   that this row does not have. */
+.library-row-edit:focus-within {
+  border-color: var(--openbot-border-focus);
+}
+
 .library-side .library-row-input {
+  height: 100%;
   min-width: 0;
   flex: 1;
-  margin-inline-start: -7px;
-  padding-inline: var(--openbot-space-1-5);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: var(--openbot-text-md);
 }
 
 /* A drag. The row that takes the drop has the tint of a drop target of the sidebar. A line shows the
    position that a folder gets between two folders. */
-.library-side .library-row[data-drop="into"] > .ui-button.library-row-main {
+.library-row[data-drop="into"] > .ui-button.library-row-main {
   background: var(--openbot-accent-soft);
   color: var(--openbot-text-primary);
   outline: 1px solid var(--openbot-accent-strong);
@@ -1601,23 +1627,174 @@
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-accent-text);
   content: "";
-  inset-inline: calc(var(--library-row-start) + var(--library-row-arrow) + var(--library-row-indent) + 1px)
-    var(--openbot-space-2);
+  inset-inline: calc(var(--library-row-start) + var(--library-row-indent)) var(--openbot-space-2);
   pointer-events: none;
 }
 
-/* The line before a row is in the space between that row and the row above. */
 .library-row[data-drop="before"]::before {
-  top: calc(var(--openbot-space-0-5) * -1);
+  top: -1px;
 }
 
 .library-row[data-drop="after"]::after {
-  bottom: 0;
+  bottom: -1px;
+}
+
+/* The folders of a row and the rows of a section close as a section of the sidebar does: the row of
+   the grid goes to zero. */
+.library-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--openbot-duration-normal) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) ease-out;
+}
+
+.library-collapse[data-collapsed] {
+  opacity: 0;
+  grid-template-rows: 0fr;
+}
+
+.library-collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The line of an open folder list is below the icon of the row above it. */
+.library-branch {
+  position: relative;
+  padding-top: 1px;
+}
+
+.library-branch::before {
+  position: absolute;
+  top: 2px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--openbot-border);
+  content: "";
+  inset-inline-start: calc(8px + (var(--library-depth, 1) - 1) * 18px + 10px);
+}
+
+.library-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-section-head {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: var(--openbot-space-1);
+}
+
+.library-side .ui-button.library-section-toggle {
+  height: 24px;
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-1-5);
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.library-side .ui-button.library-section-toggle:hover {
+  background: transparent;
+  color: var(--openbot-text-primary);
+}
+
+/* The arrow of a section shows while the pointer is on its head, and always when the section is closed. */
+.library-section-chevron {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  opacity: 0;
+  transition:
+    transform var(--openbot-duration-fast) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) ease;
+}
+
+.library-section-head:hover .library-section-chevron,
+.library-section-toggle:focus-visible .library-section-chevron,
+.library-section-toggle[aria-expanded="false"] .library-section-chevron {
+  opacity: 1;
+}
+
+.library-section-toggle[aria-expanded="false"] .library-section-chevron {
+  transform: rotate(-90deg);
+}
+
+.library-side .ui-button.library-section-action {
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-muted);
+}
+
+.library-side .ui-button.library-section-action:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.library-section-action > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The picker of all agents, after the agents with the newest files. */
+.library-side .ui-button.library-side-more {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  margin-top: 1px;
+  padding-inline: 8px;
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-weight: 400;
+}
+
+.library-side-more > svg {
+  width: 20px;
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+}
+
+.library-side .ui-button.library-side-more:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
 }
 
 .library-row[data-dragging],
-.library-shell .library-tile[data-dragging] {
+.library-shell .library-tile[data-dragging],
+.library-folder-card[data-dragging] {
   opacity: 0.4;
+}
+
+/* The rows and the folders that cannot take the dragged item fade, so the places that can take it
+   are clear before the pointer gets to them. */
+.library-row,
+.library-folder-card {
+  transition: opacity var(--openbot-duration-fast) ease;
+}
+
+.library-row[data-drop-off],
+.library-folder-card[data-drop-off] {
+  opacity: 0.4;
+}
+
+/* The place that took a drop flashes once, so the user sees where the item went. */
+@keyframes library-landed {
+  from {
+    background-color: var(--openbot-accent-soft);
+  }
+}
+
+.library-row[data-landed] > .ui-button.library-row-main {
+  animation: library-landed 900ms ease-out;
 }
 
 /* The pointer moves across rows that are not the target. Only the target has a fill. */
@@ -1630,8 +1807,338 @@ html.library-dragging .library-row:not([data-drop="into"]) > .ui-button.library-
   background: transparent;
 }
 
-html.library-dragging .library-tree-folders .library-row .library-row-action:not([data-expanded]) {
+html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle) {
   opacity: 0;
+}
+
+/* The folders of the place, above the type chips and the files: the chips filter only the files. Each
+   tile is a folder with a tab. Its newest files stick out of it and rise while the pointer is on it. */
+.library-folder-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--openbot-space-4) var(--openbot-space-3);
+  margin: 0 0 var(--openbot-space-1);
+  padding: 0;
+  list-style: none;
+}
+
+.library-folder-card {
+  --library-card-back: var(--openbot-bg-surface);
+  --library-card-front: var(--openbot-bg-surface-raised);
+  /* Solid tints: the tab and the back overlap, so a see-through tint would show a darker band. */
+  --library-card-drop-back: color-mix(in srgb, var(--openbot-accent) 14%, var(--openbot-bg-surface));
+  --library-card-drop-front: color-mix(in srgb, var(--openbot-accent) 18%, var(--openbot-bg-surface-raised));
+
+  position: relative;
+  min-width: 0;
+}
+
+.library-folder-card .ui-button.library-folder-card-main,
+.library-folder-card-edit {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 164px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0;
+  padding: 14px 0 0;
+  border-radius: var(--openbot-radius-card);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: normal;
+}
+
+/* The 1px border of the button, so a rename does not move the folder. */
+.library-folder-card-edit {
+  border: 1px solid transparent;
+}
+
+/* The back of the folder and its tab. */
+.library-folder-card-main::before,
+.library-folder-card-main::after,
+.library-folder-card-edit::before,
+.library-folder-card-edit::after {
+  position: absolute;
+  background: var(--library-card-back);
+  content: "";
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.library-folder-card-main::before,
+.library-folder-card-edit::before {
+  inset: 14px 0 0;
+  border-radius: 0 var(--openbot-radius-card) var(--openbot-radius-card);
+}
+
+.library-folder-card-main::after,
+.library-folder-card-edit::after {
+  top: 0;
+  width: 42%;
+  height: 22px;
+  border-radius: var(--openbot-radius-card) var(--openbot-radius-card) 0 0;
+  inset-inline-start: 0;
+}
+
+/* In a right-to-left page the tab is at the start, so the round corner of the back moves too. */
+.library-folder-card-main:dir(rtl)::before,
+.library-folder-card-edit:dir(rtl)::before {
+  border-radius: var(--openbot-radius-card) 0 var(--openbot-radius-card) var(--openbot-radius-card);
+}
+
+.library-folder-card-art {
+  position: absolute;
+  z-index: 1;
+  height: 96px;
+  inset: 30px var(--openbot-space-3) auto;
+  color: var(--openbot-text-muted);
+}
+
+.library-folder-card-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  display: grid;
+  width: 56%;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--openbot-bg-canvas);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control-active);
+  transform: translateX(-50%);
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.library-folder-card-sheet:first-child {
+  z-index: 2;
+}
+
+.library-folder-card-sheet:nth-child(2) {
+  transform: translateX(-88%) rotate(-7deg);
+}
+
+.library-folder-card-sheet:nth-child(3) {
+  transform: translateX(-12%) rotate(7deg);
+}
+
+.library-folder-card-sheet > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.library-folder-card-sheet > .files-file-visual.library-folder-card-badge {
+  width: 40px;
+  height: 40px;
+  font-size: var(--openbot-text-sm);
+}
+
+/* The front of the folder, over the lower part of the files. */
+.library-folder-card-front {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-width: 0;
+  height: 60px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: 0 var(--openbot-space-3);
+  border-top: 2px solid var(--openbot-bg-canvas);
+  border-radius: var(--openbot-radius-card);
+  background: var(--library-card-front);
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+/* With no owner, the end of the front keeps the space of the menu button. */
+.library-folder-card-front:not(:has(.library-folder-card-owner)) {
+  padding-inline-end: calc(var(--openbot-space-3) + 24px);
+}
+
+.library-folder-card-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.library-folder-card-name {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.library-folder-card-detail {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The name field takes the line of the name, so the front and the detail line do not move. Its text
+   starts at the start of the name, and it has the same space at its two ends: the menu button does not
+   show during a rename. With the agent picture, the gap of the front is between them. */
+.library-folder-card-front:has(.library-folder-card-input):not(:has(.library-folder-card-owner)) {
+  padding-inline-end: var(--openbot-space-3);
+}
+
+.library-folder-card .library-folder-card-input {
+  width: calc(100% + (var(--openbot-space-1-5) + 1px) * 2);
+  min-width: 0;
+  margin-block: calc((1lh - var(--openbot-control-sm)) / 2);
+  margin-inline-start: calc(var(--openbot-space-1-5) * -1 - 1px);
+  padding-inline: var(--openbot-space-1-5);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: inherit;
+}
+
+.library-folder-card-text:has(+ .library-folder-card-owner) > .library-folder-card-input {
+  width: calc(100% + var(--openbot-space-1-5) + 1px);
+}
+
+.library-folder-card-owner.agent-avatar {
+  --agent-avatar-optical-offset: calc(20px * -0.14);
+
+  width: 20px;
+  height: 20px;
+  flex: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+/* The menu is at the end of the front, in the place of the agent. */
+.library-folder-card .ui-button.library-folder-card-menu {
+  position: absolute;
+  z-index: 4;
+  bottom: 16px;
+  inset-inline-end: calc(var(--openbot-space-3) - 4px);
+  color: var(--openbot-text-muted);
+  opacity: 0;
+}
+
+html:not(.library-dragging) .library-folder-card:is(:hover, :focus-within) .library-folder-card-menu,
+.library-folder-card .library-folder-card-menu[data-expanded] {
+  opacity: 1;
+}
+
+/* During a rename the tile has no menu, so the agent stays. */
+.library-folder-card:has(.library-folder-card-menu[data-expanded]) .library-folder-card-owner,
+html:not(.library-dragging)
+  .library-folder-card:is(:hover, :focus-within):has(.library-folder-card-menu)
+  .library-folder-card-owner {
+  opacity: 0;
+}
+
+.library-folder-card .ui-button.library-folder-card-menu:is(:hover, :focus-visible, [data-expanded]) {
+  color: var(--openbot-text-primary);
+}
+
+/* A drop into the folder: all of the folder takes the tint, and its files rise as on hover. */
+.library-folder-card:not(.library-folder-card-new)[data-drop="into"] {
+  --library-card-back: var(--library-card-drop-back);
+  --library-card-front: var(--library-card-drop-front);
+}
+
+@keyframes library-landed-back {
+  from {
+    background-color: var(--library-card-drop-back);
+  }
+}
+
+@keyframes library-landed-front {
+  from {
+    background-color: var(--library-card-drop-front);
+  }
+}
+
+.library-folder-card[data-landed] .library-folder-card-main::before,
+.library-folder-card[data-landed] .library-folder-card-main::after {
+  animation: library-landed-back 900ms ease-out;
+}
+
+.library-folder-card[data-landed] .library-folder-card-front {
+  animation: library-landed-front 900ms ease-out;
+}
+
+/* The tile that takes dragged files into a new folder. It has the outline of a folder, not a fill. */
+.library-folder-card-new {
+  --library-card-front: transparent;
+}
+
+.library-folder-card-new .library-folder-card-edit::before {
+  border: 1px dashed var(--openbot-border-strong);
+  background: transparent;
+}
+
+.library-folder-card-new .library-folder-card-edit::after {
+  display: none;
+}
+
+.library-folder-card-new .library-folder-card-art {
+  display: grid;
+  place-items: center;
+}
+
+.library-folder-card-new-icon {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+.library-folder-card.library-folder-card-new .library-folder-card-front {
+  justify-content: center;
+  border-top: 0;
+  padding-inline-end: var(--openbot-space-3);
+}
+
+.library-folder-card-new .library-folder-card-name {
+  color: var(--openbot-text-secondary);
+}
+
+.library-folder-card-new[data-drop="into"] .library-folder-card-edit::before {
+  border-style: solid;
+  border-color: var(--openbot-accent-strong);
+  background: var(--openbot-accent-soft);
+}
+
+.library-folder-card-new[data-drop="into"] :is(.library-folder-card-art, .library-folder-card-name) {
+  color: var(--openbot-accent-text);
+}
+
+/* During a drag, only the folder that takes the drop changes: the other folders keep still. */
+.library-folder-card[data-drop="into"] .library-folder-card-sheet:first-child {
+  transform: translate(-50%, -8px);
+}
+
+.library-folder-card[data-drop="into"] .library-folder-card-sheet:nth-child(2) {
+  transform: translate(-96%, -4px) rotate(-10deg);
+}
+
+.library-folder-card[data-drop="into"] .library-folder-card-sheet:nth-child(3) {
+  transform: translate(-4%, -4px) rotate(10deg);
+}
+
+@media (hover: hover) {
+  .library-folder-card .ui-button.library-folder-card-main:hover {
+    background: transparent;
+    color: inherit;
+  }
+
+  html:not(.library-dragging) .library-folder-card-main:hover .library-folder-card-sheet:first-child {
+    transform: translate(-50%, -8px);
+  }
+
+  html:not(.library-dragging) .library-folder-card-main:hover .library-folder-card-sheet:nth-child(2) {
+    transform: translate(-96%, -4px) rotate(-10deg);
+  }
+
+  html:not(.library-dragging) .library-folder-card-main:hover .library-folder-card-sheet:nth-child(3) {
+    transform: translate(-4%, -4px) rotate(10deg);
+  }
+
+  html:not(.library-dragging) .library-folder-card:not(.library-folder-card-new):hover {
+    --library-card-front: var(--openbot-bg-control-active);
+  }
 }
 
 /* The label that follows the pointer. It is on the body, so it is above the window. */
@@ -1641,11 +2148,10 @@ html.library-dragging .library-tree-folders .library-row .library-row-action:not
   top: 0;
   left: 0;
   display: flex;
-  max-width: 240px;
-  height: 28px;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  padding-inline: var(--openbot-space-2);
+  max-width: 280px;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-surface-raised);
@@ -1654,11 +2160,45 @@ html.library-dragging .library-tree-folders .library-row .library-row-action:not
   pointer-events: none;
 }
 
-.library-drag-chip > svg {
+/* The label has the accent while the pointer is on a place that takes the drop. */
+.library-drag-chip[data-drop] {
+  border-color: var(--openbot-accent-strong);
+}
+
+.library-drag-chip-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.library-drag-chip-line > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
+}
+
+/* The second line names the place that takes the drop, or says why the place cannot take it. */
+.library-drag-chip-to,
+.library-drag-chip-to > svg {
+  color: var(--openbot-accent-text);
+}
+
+.library-drag-chip-why {
+  color: var(--openbot-text-secondary);
+}
+
+.library-drag-chip[data-blocked] {
+  border-color: var(--openbot-danger);
+}
+
+.library-drag-chip-why > svg {
+  color: var(--openbot-danger);
+}
+
+.library-drag-chip-arrow:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 /* A folder in the Move menu starts after the folder that holds it. */
@@ -1789,9 +2329,20 @@ html.library-dragging .library-tree-folders .library-row .library-row-action:not
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .library-branch,
-  .library-row-toggle > svg {
+  .library-collapse,
+  .library-row-toggle > svg,
+  .library-section-chevron,
+  .library-folder-card-sheet,
+  .library-row,
+  .library-folder-card {
     transition: none;
+  }
+
+  .library-row[data-landed] > .ui-button.library-row-main,
+  .library-folder-card[data-landed] .library-folder-card-main::before,
+  .library-folder-card[data-landed] .library-folder-card-main::after,
+  .library-folder-card[data-landed] .library-folder-card-front {
+    animation: none;
   }
 }
 

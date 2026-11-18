@@ -32,6 +32,7 @@ export const messages = {
   "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
   "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
   "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",
+  "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
   "error.workflow.mediaInputNotImage":
     "このステップは画像のみを受け取り、動画は受け取れません。動画からの接続を削除してください。",
   "error.workflow.stepMissing": "このステップはもう存在しません。",

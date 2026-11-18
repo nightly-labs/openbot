@@ -87,6 +87,8 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
+/** What tar and the system write for ENOSPC, when the failure has no error code. */
+const DISK_FULL_OUTPUT = /no space left on device|not enough space on the disk/iu;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -249,6 +251,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #systemVersions = new Map<ManagedProviderId, string>();
   /** Providers whose installed CLI lacks a part that some models need (#9139). */
   readonly #incompleteSystemClis = new Set<ManagedProviderId>();
+  /**
+   * Runtimes whose newest copy in the store failed its check at start, so no checked copy runs. The
+   * next update check downloads each one again, once, so it is not left "not installed" (#10909).
+   */
+  readonly #rejected = new Set<ManagedRuntimeId>();
   /** The latest upstream release of each provider CLI, as the last check found it. */
   readonly #latest = new Map<ManagedProviderId, RuntimeSpec>();
   /** What each running download installs, so a cancel removes the right partial file. */
@@ -329,7 +336,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
       yield* runtimeIO(async () => await mkdir(this.#root, { recursive: true }));
       yield* this.#removeAbandonedStagingEffect();
-      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime), {
+      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime, true), {
         concurrency: "unbounded",
         discard: true,
       });
@@ -598,6 +605,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         );
         this.#updateInstalled = false;
       }
+      // A copy that failed its check at start is downloaded again, once, unless the provider runs
+      // nothing from the store here. The changed copy itself never runs (#10909).
+      const repairs = PROVIDERS.filter(
+        (provider) =>
+          this.#rejected.has(provider) &&
+          this.#statuses[provider].phase === "not-downloaded" &&
+          this.#cliInUse(provider) &&
+          !configuredCliPath(provider),
+      );
+      this.#rejected.clear();
+      yield* Effect.forEach(
+        this.#stopping ? [] : repairs,
+        (provider) => Effect.ignore(this.#startDownload(provider, target)),
+        { discard: true },
+      );
       this.#revision += 1;
       this.emit("status", this.getStatus());
       const now = Date.now();
@@ -977,11 +999,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #inspectEffect(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+  /** `atStart`: a copy that fails its check is downloaded again by the first update check. */
+  #inspectEffect(
+    runtime: ManagedRuntimeId,
+    atStart = false,
+  ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       if (!this.#target) return this.#statuses[runtime];
       const pinned = runtimeSpec(runtime, this.#target, this.#lock);
-      const installed = yield* this.#newestInstalledEffect(pinned);
+      const { installed, rejected } = yield* this.#newestInstalledEffect(pinned);
+      if (atStart && !installed && rejected) this.#rejected.add(runtime);
       this.#statuses[runtime] = installed
         ? readyStatus(installed)
         : { ...emptyStatus(), version: yield* this.#previousVersionEffect(pinned) };
@@ -995,10 +1022,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * That is the pinned version, checked against the lock, or a newer upstream release, checked
    * against the record its install wrote. A directory with neither is an older pin this build has no
    * hashes for; `#previousVersion` still lends it out until an update replaces it.
+   *
+   * `rejected`: the pinned version, or a newer one with its install record, is in the store but
+   * failed its check, for example after a file in it changed. It does not run, and the log keeps
+   * the reason.
    */
 
-  #newestInstalledEffect(pinned: RuntimeSpec): Effect.Effect<string | null, ProviderRuntimeFailure> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string | null, ProviderRuntimeFailure> {
+  #newestInstalledEffect(
+    pinned: RuntimeSpec,
+  ): Effect.Effect<{ installed: string | null; rejected: boolean }, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<
+      { installed: string | null; rejected: boolean },
+      ProviderRuntimeFailure
+    > {
       const targetRoot = dirname(this.#installRoot(pinned));
       const entries = yield* runtimeIO(async () => await readdir(targetRoot, { withFileTypes: true }).catch(() => []));
       const versions = entries
@@ -1006,14 +1042,34 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .map((entry) => entry.name)
         // Of two builds that the release does not order, the pinned one comes first.
         .sort((a, b) => compareReleases(b, a) || Number(b === pinned.version) - Number(a === pinned.version));
+      let rejected = false;
       for (const version of versions) {
         const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
         const installRoot = join(targetRoot, version);
-        if (!(yield* this.#verifiesUnlessUnchangedEffect(installRoot, spec))) continue;
+        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+          Effect.as(null),
+          Effect.catch((error) => Effect.succeed(error)),
+        );
+        if (failure) {
+          // Only a copy that this build can check counts: the pinned version, or a newer one with the
+          // record of its install. An older pin, or the pin of a newer build, has no hashes here.
+          const checkable =
+            version === pinned.version ||
+            (!olderVersion(version, pinned.version) && (yield* pathExists(join(installRoot, INSTALL_RECORD))));
+          if (checkable) {
+            rejected = true;
+            logger.warn("Provider runtime check failed.", {
+              runtime: pinned.runtime,
+              version,
+              cause: logCause(failure.cause),
+            });
+          }
+          continue;
+        }
         yield* this.#stampInUseEffect(pinned.runtime, installRoot);
-        return version;
+        return { installed: version, rejected };
       }
-      return null;
+      return { installed: null, rejected };
     });
   }
 
@@ -1243,7 +1299,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
 
       return yield* this.#installEffect(spec, partialPath);
-    }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.mapError(diskFullFailure));
   }
 
   /** Answers whether this instance committed the install, or adopted the one it found. */
@@ -1432,13 +1488,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   #verifiesEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean, ProviderRuntimeFailure> {
     return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
-      Effect.as(true),
-      Effect.catch(() => Effect.succeed(false)),
-    );
-  }
-
-  #verifiesUnlessUnchangedEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean> {
-    return verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );
@@ -1819,9 +1868,13 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
-        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
-      )).stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1850,6 +1903,25 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * A disk that fills during the download or the install. The space check runs before both, but it
+ * cannot see every write, so the failure itself also names the cause: a Retry on the same disk fails
+ * in the same way, and "Try again" does not tell the user to free space (#10191). tar reports a full
+ * disk in its output, not as an error code. The log keeps the original failure.
+ */
+function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  const diskFull = (error: unknown, depth: number): boolean =>
+    error instanceof Error &&
+    (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
+      DISK_FULL_OUTPUT.test(error.message) ||
+      ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
+      (depth < 3 && diskFull(error.cause, depth + 1)));
+  if (!diskFull(cause, 0)) return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.diskSpace"), { cause }) });
 }
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */

@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "יש להשלים את השלב ב-{host}",
   "prompt.browser.cancelled": "בוטל",
   "prompt.browser.reload":
-    "יש להשלים את ההתחברות ואז לטעון מחדש את דף הדפדפן לפני שבוחרים ב-״סיימתי״. בדיקת הדף נשארת חסומה עד שהדף נטען מחדש.",
+    "OpenBot לא הצליח להשלים את הזנת הסיסמה או הקוד. יש לבדוק את הדף ולהזין את מה שחסר. יש להשלים את ההתחברות ואז לטעון מחדש את דף הדפדפן לפני שבוחרים ב-״סיימתי״. בדיקת הדף נשארת חסומה עד שהדף נטען מחדש.",
   "prompt.browser.continuing": "{name} ממשיך.",
   "prompt.browser.cancelledBody": "שלב הדפדפן בוטל.",
   "prompt.browser.pendingBody":
     "יש לפתוח את הדף כדי להשלים התחברות, אימות או הסכמה. לאחר מכן אפשר לתת ל-{name} להמשיך.",
   "prompt.browser.openPage": "פתיחת {title}",
+  "prompt.browser.openFailed": "לא ניתן היה לפתוח את הדף בחלון הראשי. יש לנסות שוב.",
   "prompt.browser.done": "סיימתי",
   "prompt.browser.pageFallback": "דף דפדפן",
   "prompt.browser.hostFallback": "הדפדפן",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "ההתחברות אל {host} בוטלה",
   "prompt.browser.signInBlocked.body":
     "יש להתחבר במחשב הזה. OpenBot שולח אל {server} רק את ההתחברות אל {host}, ו-{name} ממשיך.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם. לאחר מכן {name} ממשיך.",
   "prompt.browser.signInBlocked.cancelledBody": "ההתחברות בוטלה.",
   "prompt.browser.signInBlocked.waiting": "ממתין להתחברות",
   "prompt.browser.signInBlocked.waitingButton": "ממתין להתחברות…",

@@ -306,6 +306,12 @@ export const messages = {
   "server.settings.group.agents": "Agentes",
   "server.settings.group.people": "Personas",
   "server.settings.group.server": "Servidor",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Activa funciones que aún no están terminadas.",
+  "server.settings.experimentalFeatures": "Funciones",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Muestra la página del CRM a propietarios y administradores, permite que los agentes lean el CRM y sincroniza Stripe. Al desactivarlo, los datos se conservan.",
   "server.settings.agentDefaultsTitle": "Predeterminados de agentes",
   "server.settings.threadsCard": "Hilos y zona horaria",
   "server.settings.memoryTitle": "Memoria",
@@ -344,7 +350,7 @@ export const messages = {
     "Elige qué pueden hacer los agentes de este servidor cuando no lo configuras para un agente.",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
-    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
+    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
   "server.settings.turnLimit": "Hilos a la vez",

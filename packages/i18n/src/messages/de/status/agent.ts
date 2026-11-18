@@ -15,6 +15,7 @@ export const messages = {
     "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
   "status.agent.modelReturnedAfterError": "Nach dem Anbieterfehler zurück zu {model} gewechselt.",
   "status.agent.marketplaceSuggested": "Eine Marketplace-App wurde vorgeschlagen: {app}.",
+  "status.agent.settingShown": "Eine Einstellung wurde gezeigt: {setting}.",
   "status.agent.channelMemberAdded": "{agent} hat {member} zum Kanal hinzugefügt. {person} hat darum gebeten.",
   "status.agent.channelMemberRemoved": "{agent} hat {member} aus dem Kanal entfernt. {person} hat darum gebeten.",
   "status.agent.channelInstructionsChanged":
@@ -39,11 +40,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Letzte Fehler im Chat:",
   "status.agent.feedbackSameAs": "Wird zu Issue #{issue} hinzugefügt",
   "status.agent.feedbackSent": "An das OpenBot-Team gesendet: {title}",
+  "status.agent.feedbackWithdrawn": "Von GitHub entfernt: {title}",
+  "status.agent.feedbackWithdrawCommand": "Bericht #{issue} von GitHub entfernen",
+  "status.agent.feedbackWithdrawReason":
+    "Niemand kann diesen Bericht auf GitHub mehr sehen. Das kannst du nicht rückgängig machen. Zum Korrigieren kann der Agent einen korrigierten Bericht senden.",
+  "status.agent.feedbackWithdrawing": "Dein Bericht wird von GitHub entfernt…",
   "status.agent.serverInstallCommand":
     "Einen einmaligen Befehl erstellen, der OpenBot auf einem anderen Computer als Server {name} installiert und bei deinem Konto anmeldet. Der Agent führt ihn dort aus.",
   "status.agent.serverInstallCard": "Installationsbefehl für den Server {name}",
   "status.agent.browserProfileNamed":
     "{agents} in das Browser-Profil {profile} verschieben. Sie erhalten seine Anmeldungen und Cookies. Ihre offenen Tabs werden geschlossen.",
+  "status.agent.commitCoAuthorOff": "OpenBot nicht mehr als Mitautor in die Commits aller Agenten eintragen.",
+  "status.agent.commitCoAuthorOn": "OpenBot wieder als Mitautor in die Commits aller Agenten eintragen.",
   "status.agent.browserProfileNew":
     "Das neue Browser-Profil {profile} erstellen und {agents} dorthin verschieben. Es hat keine Anmeldungen. Ihre offenen Tabs werden geschlossen.",
   "status.agent.browserProfileShared":
@@ -69,6 +77,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Erinnerungen werden aktualisiert…",
   "status.agent.skillUsing": "Fähigkeit {name} wird verwendet…",
+  "status.agent.backdropSetting": "Hintergrund wird geändert…",
   "status.agent.skillReading": "Fähigkeit wird gelesen…",
   "status.agent.toolStepFailed":
     "Ein Tool-Schritt ist fehlgeschlagen; das Ergebnis wird geprüft und entschieden, was als Nächstes versucht wird…",

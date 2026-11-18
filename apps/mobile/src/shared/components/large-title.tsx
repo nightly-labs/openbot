@@ -10,6 +10,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,6 +44,12 @@ const VERTICAL_BAR_TITLE_INSET = 20;
 const DUO_BAR_ITEM_CENTER_FROM_BOTTOM = 35;
 /** The Material 3 small top app bar puts its title on the 72 dp line, after the navigation button. */
 const ANDROID_BAR_TITLE_INSET = 72;
+/**
+ * The room of each more bar button at one side: a 44 pt glass item next to the first one in its iOS
+ * capsule, or one more 48 dp Material icon button.
+ */
+const IOS_BAR_BUTTON_WIDTH = 46;
+const ANDROID_BAR_BUTTON_WIDTH = 48;
 /** The fade under the solid Android bar, where the content goes under it. */
 const ANDROID_FADE = 32;
 
@@ -190,6 +197,7 @@ export function LargeTitleBar({
   insetRight = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   surface = "canvas",
   blurTarget,
+  androidSurfaceWithTitle = false,
   children,
 }: PropsWithChildren<{
   scroll: LargeTitleScroll;
@@ -201,6 +209,12 @@ export function LargeTitleBar({
   surface?: "canvas" | "sheet";
   /** Android: the scrolling content, in an `AndroidBlurTarget`, that blurs under the bar. */
   blurTarget?: RefObject<ViewInstance | null>;
+  /**
+   * Android: the bar surface (the blur, or the solid bar) comes in step by step, with the scroll, while
+   * the big title fades out under the bar, so the small title always reads over it. Before that the
+   * bar has no surface, such as over the backdrop of Home. Off, the surface always shows.
+   */
+  androidSurfaceWithTitle?: boolean;
 }>) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
@@ -225,6 +239,20 @@ export function LargeTitleBar({
   const androidFadeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrolled.get(), [0, ANDROID_FADE], [0, 1], Extrapolation.CLAMP),
   }));
+  // With `androidSurfaceWithTitle`, the bar surface comes in over the same 24 pt of scroll in which the
+  // big title fades out under the bar, so the small title has its surface when it shows. Else it is full.
+  const surfaceProgress = useDerivedValue(() => {
+    if (!androidSurfaceWithTitle) return 1;
+    const height = titleHeight.get();
+    if (height <= 0) return 0;
+    return interpolate(
+      scrolled.get(),
+      [height - TITLE_BOTTOM_PADDING - TITLE_FADE, height - TITLE_BOTTOM_PADDING],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+  }, [androidSurfaceWithTitle]);
+  const solidBarStyle = useAnimatedStyle(() => ({ opacity: surfaceProgress.get() }));
   // The scroll crosses the line on the UI thread; React learns of it only at the crossing. React then
   // owns the style, so a later render cannot put back a stale first-render opacity.
   useAnimatedReaction(
@@ -239,9 +267,21 @@ export function LargeTitleBar({
   return (
     <>
       {isAndroid && ANDROID_BLUR && blurTarget ? (
-        <AndroidHeaderBlur target={blurTarget} height={scroll.headerHeight} surface={surface} shape="screen" />
+        <AndroidHeaderBlur
+          target={blurTarget}
+          height={scroll.headerHeight}
+          surface={surface}
+          shape="screen"
+          progress={surfaceProgress}
+        />
       ) : isAndroid ? (
-        <>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            { position: "absolute", top: 0, left: 0, right: 0, height: scroll.headerHeight + ANDROID_FADE },
+            solidBarStyle,
+          ]}
+        >
           <View
             pointerEvents="none"
             className={surface === "sheet" ? "bg-sheet" : "bg-background"}
@@ -256,7 +296,7 @@ export function LargeTitleBar({
           >
             <SheetScrollEdgeEffect surface={surface} style={{ flex: 1 }} />
           </Animated.View>
-        </>
+        </Animated.View>
       ) : (
         <SheetScrollEdgeEffect
           surface={surface}
@@ -312,8 +352,15 @@ export function LargeTitleScrollView({
   title,
   caption,
   contentContainerClassName,
+  barButtonsRight = 1,
   children,
-}: PropsWithChildren<{ title: string; caption?: string; contentContainerClassName?: string }>) {
+}: PropsWithChildren<{
+  title: string;
+  caption?: string;
+  contentContainerClassName?: string;
+  /** The number of bar buttons at the right: the small title stops before them. */
+  barButtonsRight?: number;
+}>) {
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
   const blurTarget = useRef<ViewInstance>(null);
@@ -339,7 +386,16 @@ export function LargeTitleScrollView({
           <View className={contentContainerClassName}>{children}</View>
         </Animated.ScrollView>
       </AndroidBlurTarget>
-      <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
+      <LargeTitleBar
+        scroll={scroll}
+        title={title}
+        surface="sheet"
+        blurTarget={blurTarget}
+        insetRight={
+          (isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET) +
+          Math.max(0, barButtonsRight - 1) * (isAndroid ? ANDROID_BAR_BUTTON_WIDTH : IOS_BAR_BUTTON_WIDTH)
+        }
+      />
     </View>
   );
 }

@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
   "composer.queueEdit.cancel": "Bewerking annuleren",
+  "composer.feedbackFix.body":
+    "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
+  "composer.feedbackFix.cancel": "Annuleren",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.imageInput.body":
+    "{model} krijgt alleen tekst en ziet de afbeeldingen die je bijvoegt dus niet. Als dit model afbeeldingen kan lezen, zet afbeeldingen ervoor aan.",
+  "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
+  "composer.imageInput.pending": "Aanzetten…",
+  "composer.imageInput.action": "Afbeeldingen aan",
   "composer.usageLimit.credits":
     "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
   "composer.usageLimit.creditsResets":

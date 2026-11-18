@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Completa el paso en {host}",
   "prompt.browser.cancelled": "Cancelado",
   "prompt.browser.reload":
-    "Completa el inicio de sesión y vuelve a cargar la página del navegador antes de elegir «He terminado». La inspección de la página permanece bloqueada hasta que se vuelva a cargar.",
+    "OpenBot no pudo terminar de escribir la contraseña o el código. Revisa la página y escribe lo que falta. Completa el inicio de sesión y vuelve a cargar la página del navegador antes de elegir «He terminado». La inspección de la página permanece bloqueada hasta que se vuelva a cargar.",
   "prompt.browser.continuing": "{name} está continuando.",
   "prompt.browser.cancelledBody": "El paso del navegador se canceló.",
   "prompt.browser.pendingBody":
     "Abre la página para completar el inicio de sesión, la verificación o el consentimiento. Después, permite que {name} continúe.",
   "prompt.browser.openPage": "Abrir {title}",
+  "prompt.browser.openFailed": "No se pudo abrir la página en la ventana principal. Inténtalo de nuevo.",
   "prompt.browser.done": "He terminado",
   "prompt.browser.pageFallback": "Página del navegador",
   "prompt.browser.hostFallback": "el navegador",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Inicio de sesión en {host} cancelado",
   "prompt.browser.signInBlocked.body":
     "Inicia sesión en este ordenador. OpenBot envía solo el inicio de sesión de {host} a {server}, y {name} continúa.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} no acepta un inicio de sesión desde el servidor. Abre este chat en la aplicación de escritorio de OpenBot en tu ordenador e inicia sesión allí. Después, {name} continúa.",
   "prompt.browser.signInBlocked.cancelledBody": "El inicio de sesión se canceló.",
   "prompt.browser.signInBlocked.waiting": "Esperando el inicio de sesión",
   "prompt.browser.signInBlocked.waitingButton": "Esperando el inicio de sesión…",
