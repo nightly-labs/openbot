@@ -234,6 +234,10 @@ export const messages = {
   "sidebar.storage.body": "Занято {used} из {total} на {server}.",
   "sidebar.storage.fullBody": "Занято {used} из {total} на {server}. Агенты могут не сохранить файлы.",
   "sidebar.storage.meterLabel": "Занятое место на {server}",
+  "sidebar.storage.bodyThisComputer": "Занято {used} из {total} на этом компьютере.",
+  "sidebar.storage.fullBodyThisComputer":
+    "Занято {used} из {total} на этом компьютере. Агенты могут не сохранить файлы.",
+  "sidebar.storage.meterLabelThisComputer": "Занятое место на этом компьютере",
   "sidebar.storage.used": "Занято {percent}",
   "sidebar.storage.freeUpSpace": "Освободить место",
   "sidebar.storage.dismiss": "Скрыть, пока хранилище не заполнится",

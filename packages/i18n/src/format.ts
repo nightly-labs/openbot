@@ -30,12 +30,17 @@ export interface AppFormat {
   fileSize: (bytes: number) => string;
   /** `bytes` in the unit that `fileSize` writes `total` in, without the unit: "148.0" of "412.0 MB". */
   fileSizeAmount: (bytes: number, total: number) => string;
+  /**
+   * Decimal units, as macOS, a phone and the label of a drive count a disk: a 245 GB disk shows
+   * 245.0 GB, not 228.2 GB. The plan storage of a hosted server counts in binary units: use `fileSize`.
+   */
+  diskSize: (bytes: number) => string;
 }
 
-/** The unit that `fileSize` writes `bytes` in, as a power of 1024: 0 is bytes, 4 is terabytes. */
-function fileSizeExponent(bytes: number): number {
+/** The unit that a size writes `bytes` in, as a power of `base`: 0 is bytes, 4 is terabytes. */
+function fileSizeExponent(bytes: number, base = 1024): number {
   let exponent = 0;
-  while (exponent < 4 && bytes >= 1024 ** (exponent + 1)) exponent += 1;
+  while (exponent < 4 && bytes >= base ** (exponent + 1)) exponent += 1;
   return exponent;
 }
 
@@ -107,10 +112,19 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
   const oneDecimal = (value: number) =>
     numberFormat(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
   // Bytes and kilobytes are whole numbers, written with no locale digits, as before.
-  const fileSizeAmount = (bytes: number, exponent: number) => {
+  const fileSizeAmount = (bytes: number, exponent: number, base = 1024) => {
     if (exponent === 0) return String(bytes);
-    if (exponent === 1) return String(Math.round(bytes / 1024));
-    return oneDecimal(bytes / 1024 ** exponent);
+    if (exponent === 1) return String(Math.round(bytes / base));
+    return oneDecimal(bytes / base ** exponent);
+  };
+  const sizeText = (bytes: number, base: number) => {
+    const exponent = fileSizeExponent(bytes, base);
+    const size = fileSizeAmount(bytes, exponent, base);
+    if (exponent === 0) return t("format.fileSize.bytes", { size });
+    if (exponent === 1) return t("format.fileSize.kilobytes", { size });
+    if (exponent === 2) return t("format.fileSize.megabytes", { size });
+    if (exponent === 3) return t("format.fileSize.gigabytes", { size });
+    return t("format.fileSize.terabytes", { size });
   };
 
   const format: AppFormat = {
@@ -133,16 +147,9 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
       const last = items.at(-1) ?? "";
       return t("format.list.last", { items: items.slice(0, -1).join(t("format.list.separator")), last });
     },
-    fileSize: (bytes) => {
-      const exponent = fileSizeExponent(bytes);
-      const size = fileSizeAmount(bytes, exponent);
-      if (exponent === 0) return t("format.fileSize.bytes", { size });
-      if (exponent === 1) return t("format.fileSize.kilobytes", { size });
-      if (exponent === 2) return t("format.fileSize.megabytes", { size });
-      if (exponent === 3) return t("format.fileSize.gigabytes", { size });
-      return t("format.fileSize.terabytes", { size });
-    },
+    fileSize: (bytes) => sizeText(bytes, 1024),
     fileSizeAmount: (bytes, total) => fileSizeAmount(bytes, fileSizeExponent(total)),
+    diskSize: (bytes) => sizeText(bytes, 1000),
   };
   // A language that is not loaded yet formats with English words, and the next call after the load
   // makes the format again.

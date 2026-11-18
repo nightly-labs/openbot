@@ -131,7 +131,15 @@ export function createStorageCard(server: () => ServerSummary | undefined, port:
       if (!level || freeBytes === null || totalBytes === null) return null;
       dismissals();
       if (level === "low" && readDismissed(current.serverId)) return null;
-      return { level, serverId: current.serverId, freeBytes, totalBytes };
+      const selected = server();
+      return {
+        level,
+        serverId: current.serverId,
+        freeBytes,
+        totalBytes,
+        hostedPlan: plan !== null,
+        thisComputer: selected?.kind === "local" || selected?.thisComputer === true,
+      };
     }),
     /** Reads the disk again, for example after Server settings freed up space. */
     refresh: () => {

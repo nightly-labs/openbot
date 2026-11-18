@@ -89,6 +89,7 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
             key={metric}
             metrics={metrics}
             metric={metric}
+            hostedPlan={planGb !== null}
             onPress={metric === "disk" ? openStorage : undefined}
           />
         ))}
@@ -100,10 +101,12 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
 function MachineMetricItem({
   metrics,
   metric,
+  hostedPlan,
   onPress,
 }: {
   metrics: MachineMetrics;
   metric: MachineMetric;
+  hostedPlan: boolean;
   onPress: (() => void) | undefined;
 }) {
   const text = useText();
@@ -111,7 +114,7 @@ function MachineMetricItem({
   const tone = machineMetricTone(percent, machineAlertLevel(DEFAULT_MACHINE_ALERT_SETTINGS, metric));
   const name = text.t(METRIC_LABELS[metric]);
   const percentText = percent === null ? text.t("mobile.server.machine.unknown") : text.format.percent(percent / 100);
-  const detail = metricDetail(metrics, metric, text);
+  const detail = metricDetail(metrics, metric, hostedPlan, text);
   // The sizes do not fit beside the ring in a third of the row; the label reads them.
   const content = (
     <>
@@ -152,8 +155,16 @@ function MachineMetricItem({
   );
 }
 
-/** "4 cores", or "5.1 GB of 7.6 GB" for memory and disk. */
-function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, format }: MobileText): string {
+/**
+ * "4 cores", or "5.1 GB of 7.6 GB" for memory and disk. A disk shows decimal units, as the phone counts
+ * it, except the disk of a hosted plan, which counts in binary units.
+ */
+function metricDetail(
+  metrics: MachineMetrics,
+  metric: MachineMetric,
+  hostedPlan: boolean,
+  { t, format }: MobileText,
+): string {
   // A container limit can be part of a core, such as 1.5.
   if (metric === "cpu") {
     const cores = metrics.cpuMillicores / 1000;
@@ -165,7 +176,8 @@ function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, forma
   if (metric === "disk") {
     const { diskUsedBytes: used, diskTotalBytes: total } = metrics;
     if (used === null || total === null) return t("mobile.server.machine.unknown");
-    return t("mobile.server.machine.sizeDetail", { used: format.fileSize(used), total: format.fileSize(total) });
+    const size = hostedPlan ? format.fileSize : format.diskSize;
+    return t("mobile.server.machine.sizeDetail", { used: size(used), total: size(total) });
   }
   const { memoryTotalBytes: total, memoryAvailableBytes: free } = metrics;
   if (total === null || free === null) return t("mobile.server.machine.unknown");

@@ -15,6 +15,8 @@ import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } f
 
 export interface UsageMachineMeterProps {
   metrics: MachineMetrics;
+  /** The disk is the storage of a hosted plan, so its sizes show in binary units, as the plan counts. */
+  hostedPlan?: boolean;
   /** Opens Server settings › Storage, where the disk is managed. */
   onOpenStorage: () => void;
 }
@@ -85,14 +87,14 @@ export function UsageMachineMeter(props: UsageMachineMeterProps) {
                 data-tone={metricTone(props.metrics, "disk")}
                 aria-label={t("usage.machine.openStorage", {
                   percent: percentText(props.metrics, "disk"),
-                  detail: detail(props.metrics, "disk"),
+                  detail: detail(props.metrics, "disk", props.hostedPlan),
                 })}
                 onClick={() => {
                   setOpen(false);
                   props.onOpenStorage();
                 }}
               >
-                <MetricDetail metrics={props.metrics} metric="disk" inButton />
+                <MetricDetail metrics={props.metrics} metric="disk" hostedPlan={props.hostedPlan} inButton />
               </Button>
             </footer>
           </Popover.Content>
@@ -122,7 +124,12 @@ function metricTone(metrics: MachineMetrics, metric: MachineMetric): MachineMetr
  * The name, the percentage, the bar and the size of one metric. In the Storage button the bar is
  * hidden from screen readers: the button label names the disk use.
  */
-function MetricDetail(props: { metrics: MachineMetrics; metric: MachineMetric; inButton?: boolean }): JSX.Element {
+function MetricDetail(props: {
+  metrics: MachineMetrics;
+  metric: MachineMetric;
+  hostedPlan?: boolean | undefined;
+  inButton?: boolean;
+}): JSX.Element {
   const { t } = useText();
   const percentText = useMetricPercentText();
   const detail = useMachineMetricDetail();
@@ -148,7 +155,7 @@ function MetricDetail(props: { metrics: MachineMetrics; metric: MachineMetric; i
         aria-hidden={props.inButton ? "true" : undefined}
         getValueLabel={() => t("files.machine.used", { percent: percentText(props.metrics, props.metric) })}
       />
-      <span class="usage-machine-detail-size">{detail(props.metrics, props.metric)}</span>
+      <span class="usage-machine-detail-size">{detail(props.metrics, props.metric, props.hostedPlan)}</span>
     </>
   );
 }
