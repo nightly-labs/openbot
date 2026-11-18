@@ -106,6 +106,7 @@ export const messages = {
     "Diese Anfrage überschreitet die Kontextgrenze für die Zuweisung. Wähle ein Mitglied oder sende eine kürzere Anfrage.",
   "error.backend.channelTaskMemberRequired": "Wähle ein Mitglied für diese Aufgabe.",
   "error.backend.channelTaskStopped": "Gestoppt. Setze diese Aufgabe fort oder weise sie neu zu.",
+  "error.backend.channelTaskFailed": "Der Agent konnte diese Aufgabe nicht abschließen.",
   "error.backend.channelRoutingUnreadable":
     "Die Leitung konnte diese Nachricht nicht zuweisen. Weise sie einem Mitglied zu.",
   "error.backend.channelRoutingFailed": "Die Zuweisung ist fehlgeschlagen. Wähle ein Mitglied oder versuche es erneut.",

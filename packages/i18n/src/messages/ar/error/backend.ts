@@ -95,6 +95,7 @@ export const messages = {
   "error.backend.channelRoutingTooLong": "يتجاوز هذا الطلب حد سياق التوجيه. اختر عضوًا أو أرسل طلبًا أقصر.",
   "error.backend.channelTaskMemberRequired": "اختر عضوًا لهذه المهمة.",
   "error.backend.channelTaskStopped": "متوقفة. تابع هذه المهمة أو أعد تعيينها.",
+  "error.backend.channelTaskFailed": "تعذر على الوكيل إكمال هذه المهمة.",
   "error.backend.channelRoutingUnreadable": "تعذّر على الوكيل الرئيسي توجيه هذه الرسالة. أعد تعيينها لعضو.",
   "error.backend.channelRoutingFailed": "فشل التوجيه. اختر عضوًا أو حاول مرة أخرى.",
   "error.backend.channelLeadTimedOut": "لم يُجب الوكيل الرئيسي للقناة في الوقت المحدد. اختر عضوًا أو حاول مرة أخرى.",

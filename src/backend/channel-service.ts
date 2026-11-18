@@ -3224,7 +3224,7 @@ export class ChannelService {
           // Without it, the channel showed only this sentence and the reason was in the agent's chat.
           error:
             state === "failed"
-              ? (deliveryError ?? "The agent could not complete this task.")
+              ? (deliveryError ?? sourceText("error.backend.channelTaskFailed"))
               : state === "interrupted"
                 ? sourceText("error.backend.channelTaskStopped")
                 : // The owner of a routine's request reported that the run failed (`routine_report_failure`).

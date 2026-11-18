@@ -93,6 +93,7 @@ export const messages = {
   "error.backend.channelRoutingTooLong": "הבקשה הזו חורגת ממגבלת הקשר הניתוב. יש לבחור חבר או לשלוח בקשה קצרה יותר.",
   "error.backend.channelTaskMemberRequired": "יש לבחור חבר למשימה הזו.",
   "error.backend.channelTaskStopped": "נעצרה. אפשר להמשיך או להקצות מחדש את המשימה הזו.",
+  "error.backend.channelTaskFailed": "הסוכן לא הצליח להשלים את המשימה הזו.",
   "error.backend.channelRoutingUnreadable": "המוביל לא הצליח לנתב את ההודעה הזו. יש להקצות אותה מחדש לחבר.",
   "error.backend.channelRoutingFailed": "הניתוב נכשל. יש לבחור חבר או לנסות שוב.",
   "error.backend.channelLeadTimedOut": "מוביל הערוץ לא ענה בזמן. יש לבחור חבר או לנסות שוב.",

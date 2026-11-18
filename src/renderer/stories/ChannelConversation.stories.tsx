@@ -1,4 +1,5 @@
 import { CHANNEL_ASSIGNMENT_LIMIT_ERROR } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { createSignal, onCleanup } from "solid-js";
@@ -132,7 +133,7 @@ const stoppedTask = (agentId: string, long = false) => ({
           ...[chief.id, sales.id, research.id].filter((id) => id !== agentId).slice(0, agentId === chief.id ? 1 : 2),
         ],
       }
-    : { error: "The agent could not complete this task." }),
+    : { error: sourceText("error.backend.channelTaskFailed") }),
 });
 
 const longHistory = (length: number): AgentMessage[] =>

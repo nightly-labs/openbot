@@ -101,6 +101,7 @@ export const messages = {
     "Bu istek yönlendirme bağlamı sınırını aşıyor. Bir üye seçin veya daha kısa bir istek gönderin.",
   "error.backend.channelTaskMemberRequired": "Bu görev için bir üye seçin.",
   "error.backend.channelTaskStopped": "Durduruldu. Bu göreve devam edin veya yeniden atayın.",
+  "error.backend.channelTaskFailed": "Ajan bu görevi tamamlayamadı.",
   "error.backend.channelRoutingUnreadable": "Lider bu mesajı yönlendiremedi. Bir üyeye yeniden atayın.",
   "error.backend.channelRoutingFailed": "Yönlendirme başarısız oldu. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadTimedOut": "Kanal lideri zamanında yanıt vermedi. Bir üye seçin veya tekrar deneyin.",
