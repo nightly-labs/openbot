@@ -1889,8 +1889,13 @@ const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0]
 const releasedSession = (sessionId: string | undefined) =>
   releasedHolders.some((holder) => holder.kind === "session" && holder.sessionId === sessionId);
 
+// The tabs of the host, and the tabs that people hold. Only the check of the tabs of a closed agent
+// sets them.
+let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> = [];
+let userControlHolds: [string, Parameters<Parameters<TeamApiBrowser["releaseUserControlRefused"]>[0]>[1]][] = [];
+
 const browser: TeamApiBrowser = {
-  listTabs: unused("listTabs"),
+  listTabs: () => browserTabs,
   getControlState: unused("getControlState"),
   open: unused("open"),
   activate: unused("activate"),
@@ -1911,10 +1916,18 @@ const browser: TeamApiBrowser = {
   releaseUserControlHeldBy: (holder) => {
     releasedHolders.push(holder);
   },
+  releaseUserControlRefused: (refused) => {
+    record(
+      "releaseUserControlRefused",
+      userControlHolds
+        .filter(([tabId, holder]) => refused(tabId, holder))
+        .map(([tabId, holder]) => `${tabId}:${holder.kind === "member" ? holder.memberId : "local"}`),
+    );
+  },
   close: unused("close"),
   capturePreview: unused("capturePreview"),
   setVisible: unused("setVisible"),
-  getDisplayState: unused("getDisplayState"),
+  getDisplayState: () => ({ tabs: browserTabs, activeTabId: null }),
   loadUrl: unused("loadUrl"),
   // Only the browser-profiles tab route asks. `tab-private` holds an administrator's MCP sign-in.
   isPrivate: (tabId) => tabId === "tab-private",
@@ -6522,6 +6535,68 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The tabs of an agent that the roles close to a member ----
+  {
+    const tab = (id: string, ownerAgentId: string) => ({
+      id,
+      title: id,
+      url: "https://shop.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId,
+    });
+    browserTabs = [tab("tab-ada", "agent-ada"), tab("tab-oc", "agent-oc")];
+    const ids = (reply: Reply) => list(reply.body).map((entry) => field(entry, "id"));
+    const opensBefore = callsOf("open").length;
+    const teachesBefore = callsOf("startTeach").length;
+    accessLevels = { revision: 93, everyone: { "agent-ada": "none" }, roles: [] };
+    const memberTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    const adminTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: adaToken });
+    const teach = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-ada" },
+      capabilities: [BROWSER_TEACH_CAPABILITY],
+    });
+    const open = await call("POST", TEAM_API_ROUTES.browser.open, {
+      token: bobToken,
+      json: { url: "https://shop.example/", ownerThreadId: null, ownerAgentId: "agent-ada" },
+    });
+    // The access change ends Bob's hold of the closed agent's tab, not his other hold or the holds of others.
+    userControlHolds = [
+      ["tab-ada", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-oc", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-ada", { kind: "member", memberId: adaId, sessionId: "ada-session" }],
+      ["tab-ada", { kind: "local" }],
+    ];
+    const notifyAccess = () => {
+      for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    };
+    notifyAccess();
+    const releasedOnClose = callsOf("releaseUserControlRefused").at(-1);
+    accessLevels = { revision: 94, everyone: {}, roles: [] };
+    notifyAccess();
+    const releasedOnOpen = callsOf("releaseUserControlRefused").at(-1);
+    userControlHolds = [];
+    const reopened = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    browserTabs = [];
+    check(
+      "when the roles close an agent to a member, the host gives back only that member's hold of the agent's tab; when they open it again, no hold",
+      isDeepStrictEqual(releasedOnClose, [[`tab-ada:${bobId}`]]) && isDeepStrictEqual(releasedOnOpen, [[]]),
+      { releasedOnClose, releasedOnOpen },
+    );
+    check(
+      "a member does not see or use a tab of an agent at none, and cannot open one for it; an admin sees it; the member sees it again when the access opens",
+      isDeepStrictEqual(ids(memberTabs), ["tab-oc"]) &&
+        isDeepStrictEqual(ids(adminTabs), ["tab-ada", "tab-oc"]) &&
+        errorIs(teach, 404, sourceText("error.backend.browserTabNotFound")) &&
+        errorIs(open, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("open").length === opensBefore &&
+        callsOf("startTeach").length === teachesBefore &&
+        isDeepStrictEqual(ids(reopened), ["tab-ada", "tab-oc"]),
+      [summary(memberTabs), summary(adminTabs), summary(teach), summary(open), summary(reopened)],
     );
   }
 
