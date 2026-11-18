@@ -367,9 +367,15 @@ export function useAttachmentFile(
       null,
     [serverId, attachmentId, attachmentName, attachmentType, attachmentSize],
   );
+  // A copy kept from an earlier start shows before the host answers, also without a connection: until
+  // then, this phone does not know the capabilities of the host.
+  const previewKept = useMemo(
+    () => previewSize !== undefined && keptPreview(serverId, attachmentId, previewSize) !== null,
+    [serverId, attachmentId, previewSize],
+  );
   const wantsPreview =
     previewSize !== undefined &&
-    hostPreviews &&
+    (hostPreviews || previewKept) &&
     !local &&
     !pending &&
     !originalKept &&
@@ -383,6 +389,8 @@ export function useAttachmentFile(
       const copySize = previewSize ?? "small";
       const kept = keptPreview(serverId, attachment.id, copySize);
       if (kept) return kept;
+      // The kept copy is gone, and this phone does not know yet if the host makes copies.
+      if (!hostPreviews) return null;
       try {
         const data = await downloadAttachmentPreview(serverId, attachment.id, copySize);
         return await keepPreview(serverId, attachment.id, copySize, data);
