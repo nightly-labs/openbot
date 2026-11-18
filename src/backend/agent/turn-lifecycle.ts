@@ -2500,6 +2500,8 @@ export class TurnLifecycle {
       if (
         ownLane &&
         outcome === "failed" &&
+        // An external conversation is not shown in the app, and it tells its sender itself (#11303).
+        !this.#hooks.inMessagingLane(agentId, publicThreadId) &&
         provider !== undefined &&
         failure === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) })
       )

@@ -593,17 +593,13 @@ function SingleChatActionMarker(
           </Show>
           <Show when={props.marker.kind === "sign-in-failure" && props.onSignInProvider && props.marker}>
             {(marker) => (
-              <Button
-                variant="ghost"
-                type="button"
-                class="chat-action-target"
-                onClick={() => props.onSignInProvider?.(marker().provider)}
-              >
-                <MarkerIcon>
-                  <LogIn aria-hidden="true" />
-                </MarkerIcon>
-                <span class="chat-action-target-name">{t("provider.action.signIn")}</span>
-              </Button>
+              <ActionTarget
+                available
+                actionLabel={t("provider.action.signIn")}
+                name={t("provider.action.signIn")}
+                icon={LogIn}
+                onOpen={() => props.onSignInProvider?.(marker().provider)}
+              />
             )}
           </Show>
           <Show when={instructionsChange(props.marker, props.instructions, props.onOpenInstructions)}>

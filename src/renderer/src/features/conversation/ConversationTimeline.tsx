@@ -681,7 +681,8 @@ export function ConversationTimeline() {
   const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
   /**
    * Only the newest note of an expired sign-in offers Sign in: a later message shows the sign-in worked.
-   * OpenCode signs in with a key in settings, so its note has no button, as above the composer.
+   * The agent must still use that provider. OpenCode signs in with a key in settings, so its note has no
+   * button, as above the composer.
    */
   const signInAction = (message: AgentMessage | undefined) => {
     const signIn = props.onSignInProvider;
@@ -689,6 +690,7 @@ export function ConversationTimeline() {
     return signIn &&
       marker?.kind === "sign-in-failure" &&
       marker.provider !== "opencode" &&
+      marker.provider === props.agent?.provider &&
       props.messages.at(-1)?.id === message?.id
       ? (provider: AgentProviderId) => void signIn(provider)
       : undefined;
