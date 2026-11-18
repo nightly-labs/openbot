@@ -10,6 +10,7 @@ import type {
   QueueDelivery,
   RoutineRun,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
@@ -76,6 +77,20 @@ export function routineStatusForDelivery({ status, error }: Pick<QueueDelivery, 
     case "cancelled":
       return "cancelled";
   }
+}
+
+/**
+ * The reason a run that fails keeps. A provider can end a turn as failed and send no error; the run
+ * then showed "Routine failed" with no reason anywhere (#11627). A run that failed already keeps the
+ * reason it has, so a run that failed before this change keeps its row and its finish time.
+ */
+export function failedRunReason(
+  error: string | null,
+  current: { status: string; error: string | null },
+): string | null {
+  if (error?.trim()) return error;
+  if (current.status === "failed") return current.error;
+  return sourceText("error.backend.routineRunFailedNoReason");
 }
 
 export type DeliveryInputItem =

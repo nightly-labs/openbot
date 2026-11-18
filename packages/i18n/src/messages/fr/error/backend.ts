@@ -131,6 +131,8 @@ export const messages = {
   "error.backend.memoryGone": "Ce souvenir n’existe plus.",
   "error.backend.routineGone": "Cette routine n’existe plus.",
   "error.backend.routineRunGone": "Cette exécution de la routine n’existe plus.",
+  "error.backend.routineRunFailedNoReason":
+    "L’exécution s’est arrêtée sur une erreur, sans raison indiquée. Ouvrez l’exécution pour voir ce que l’agent a fait.",
   "error.backend.turnNotStarted": "Le fournisseur n’a pas démarré ce tour.",
   "error.backend.routineResultConnectionOff":
     "Cette connexion de messagerie est désactivée ou supprimée. Choisissez un autre emplacement.",

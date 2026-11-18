@@ -131,6 +131,8 @@ export const messages = {
   "error.backend.memoryGone": "このメモリーはもう存在しません。",
   "error.backend.routineGone": "このルーティンはもう存在しません。",
   "error.backend.routineRunGone": "このルーティンの実行はもう存在しません。",
+  "error.backend.routineRunFailedNoReason":
+    "実行はエラーで停止しましたが、理由は届いていません。実行を開いて、エージェントが何をしたかを確認してください。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
