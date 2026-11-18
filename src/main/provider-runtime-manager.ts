@@ -1211,7 +1211,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         if (installed) yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
         return yield* result.failure;
       }
-      if (download) yield* this.#removePartialEffect(spec);
+      // Also the archives of other versions, such as one that a failed update kept and that no Retry used.
+      if (download) yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
       // This instance runs the version now. Its stamp is also what lets `removeDownload` remove an
       // install it made itself: the install leaves the directory with a time no stamp recorded.
       yield* this.#stampInUseEffect(spec.runtime, this.#installRoot(spec));
@@ -1619,6 +1620,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return `${this.#partialPath(spec)}.json`;
   }
 
+  /**
+   * Removes the partial downloads of each version of a runtime for a target. The download root
+   * belongs to this profile, and one runtime downloads one version at a time. A file that does not
+   * go stays: the copy runs, and a later removal tries again.
+   */
+  #removeRuntimePartialsEffect(runtime: ManagedRuntimeId, target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const prefix = `${runtime}-${target}-`;
+      const downloads = yield* runtimeIO(async () => await readdir(this.#downloadRoot()).catch(() => []));
+      yield* Effect.forEach(
+        downloads.filter((name) => name.startsWith(prefix) && /\.partial(?:\.json)?$/u.test(name)),
+        (name) => runtimeIO(() => rm(join(this.#downloadRoot(), name), { force: true })).pipe(Effect.ignore),
+        { concurrency: "unbounded", discard: true },
+      );
+    }).pipe(Effect.ignore);
+  }
+
   #removePartialEffect(spec: RuntimeSpec): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.all(
       [
@@ -1820,13 +1838,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           }),
         { concurrency: "unbounded" },
       );
-      const prefix = `${provider}-${target}-`;
-      const downloads = yield* runtimeIO(async () => await readdir(this.#downloadRoot()).catch(() => []));
-      yield* Effect.forEach(
-        downloads.filter((name) => name.startsWith(prefix) && /\.partial(?:\.json)?$/u.test(name)),
-        (name) => runtimeIO(() => rm(join(this.#downloadRoot(), name), { force: true })).pipe(Effect.ignore),
-        { concurrency: "unbounded", discard: true },
-      );
+      yield* this.#removeRuntimePartialsEffect(provider, target);
       const status = yield* this.#inspectEffect(provider).pipe(
         Effect.catch(() => Effect.succeed(this.#statuses[provider])),
       );

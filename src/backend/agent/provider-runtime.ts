@@ -4004,13 +4004,8 @@ export class ProviderRuntime implements ProviderPort {
       ),
     );
     if (!candidate) {
-      // The update waited for the provider to be idle, so this stops no turn.
-      yield* this.#stopProviderClient(provider);
-      this.#setProviderConnectionFailure(
-        provider,
-        new ProviderSignInError({ message: this.#signInRequiredMessage(provider) }),
-        cli.version,
-      );
+      // The update waited for the provider to be idle, so this stops no turn. The row names the new copy.
+      yield* this.#endSignedOutClient(provider, disposals, cli.version);
       return;
     }
     yield* this.#activateProviderClient(provider, candidate.client, cli, candidate.account, {
@@ -4088,15 +4083,16 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Stops the client that still runs on a credential that a Reconnect signed out, and reports the
-   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one.
+   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one. An
+   * update gives the `version` of its new copy.
    */
   readonly #endSignedOutClient = Effect.fn("ProviderRuntime.endSignedOutClient")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     disposals: number,
+    version = this.#cli.get(provider)?.version,
   ) {
     if (disposals !== this.#disposals || this.#hooks.isStopping()) return;
-    const version = this.#cli.get(provider)?.version;
     yield* this.#stopProviderClient(provider).pipe(Effect.ignore);
     this.#setProviderConnectionFailure(
       provider,

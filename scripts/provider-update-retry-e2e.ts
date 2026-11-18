@@ -2,7 +2,8 @@
 // fake download and no network. The first update downloads and installs the package, but the new copy
 // does not connect, as when it answers too late. The failed install is removed, so a broken copy does
 // not start at the next launch, and the row shows Retry. The Retry installs the copy again from the
-// archive of the first try, without a second download, and the archive goes once the copy runs.
+// archive of the first try, without a second download. Once the copy runs, the archives of each
+// version go.
 // `bun run test:provider-update-retry`. Writes .openbot-build/provider-update-retry-e2e/report.json.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -114,7 +115,7 @@ function codexPhase(phase: string): Promise<ProviderRuntimeSnapshot> {
   });
 }
 
-const archiveKept = () => readdirSync(downloads).some((name) => name.startsWith("codex-") && name.endsWith(".partial"));
+const archiveKept = () => readdirSync(downloads).some((name) => name.startsWith("codex-") && name.includes(".partial"));
 const installRoot = join(store, "codex", "linux-x64", VERSION);
 
 try {
@@ -132,7 +133,10 @@ try {
     archiveKept: archiveKept(),
   };
 
-  // 2. Retry: the archive of the first try installs the copy again, with no download.
+  // 2. Retry: the archive of the first try installs the copy again, with no download. An archive of
+  //    an older version, which a failed update kept and no Retry used, goes too.
+  writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial"), "old");
+  writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial.json"), "{}");
   const ready = codexPhase("ready");
   await runCauseEffect(manager.download("codex"));
   const done = await ready;
