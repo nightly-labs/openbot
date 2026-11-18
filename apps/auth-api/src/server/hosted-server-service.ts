@@ -319,6 +319,8 @@ export interface CheckoutReturn {
   origin: string;
   /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
+  /** The code of a discount link. Only the web client sends one. */
+  promotionCode?: string;
 }
 
 /** The answer to a free pool machine that asks for a server. The claim signs OpenBot on that machine in. */
@@ -1722,6 +1724,7 @@ export class HostedServerService {
         target: returnTo.target,
         origin: returnTo.origin,
         ...(returnTo.entryPoint ? { entryPoint: returnTo.entryPoint } : {}),
+        ...(returnTo.promotionCode ? { promotionCode: returnTo.promotionCode } : {}),
         ...(license ? { license } : {}),
         ...(earlyStartAt != null ? { earlyStartAt } : {}),
       })
