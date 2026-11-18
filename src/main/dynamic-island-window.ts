@@ -96,6 +96,8 @@ export class DynamicIslandWindowController {
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** X11: the parts of each window that the island renderer reported last. */
   readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
+  /** X11: the shape that each window has now. Chromium applies it again after a move or a resize. */
+  readonly #appliedShapes = new WeakMap<BrowserWindow, string>();
   /** macOS: for each display whose panel has the keyboard, the OpenBot window that had it before. */
   readonly #keyboardReturn = new Map<number, BrowserWindow | null>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
@@ -270,10 +272,18 @@ export class DynamicIslandWindowController {
   #applyShape(displayId: number, window: BrowserWindow): void {
     if (this.#interactiveDisplays.has(displayId) || this.#collapseTimers.has(displayId)) {
       const { width, height } = window.getBounds();
-      window.setShape([{ x: 0, y: 0, width, height }]);
+      this.#setShape(window, [{ x: 0, y: 0, width, height }]);
       return;
     }
-    window.setShape(this.#inputRegions.get(displayId) ?? []);
+    this.#setShape(window, this.#inputRegions.get(displayId) ?? []);
+  }
+
+  /** Only a change goes to X11: each shape request also wakes the main thread (#11666). */
+  #setShape(window: BrowserWindow, shape: Rectangle[]): void {
+    const key = JSON.stringify(shape);
+    if (this.#appliedShapes.get(window) === key) return;
+    this.#appliedShapes.set(window, key);
+    window.setShape(shape);
   }
 
   /** On X11 the island stays below the top panel of the desktop, as the clock and the tray do. */
@@ -470,7 +480,7 @@ export class DynamicIslandWindowController {
     }
     if (this.#options.windowKind === "x11") {
       // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
-      window.setShape([]);
+      this.#setShape(window, []);
     } else {
       letPointerThrough(this.#options.pointerForwarding, window, true);
     }
