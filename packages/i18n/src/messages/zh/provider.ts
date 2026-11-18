@@ -310,6 +310,7 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 你自己安装的",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · 由 OpenBot 下载",
+  "provider.settings.installedVersionIncomplete": "部分模型需要此版本缺少的组件。下载 OpenBot 的版本即可使用它们。",
   "provider.settings.useInstalledVersion": "使用已安装的版本",
   "provider.settings.useDownloadedVersion": "使用 OpenBot 的版本",
   "provider.settings.update": "更新",

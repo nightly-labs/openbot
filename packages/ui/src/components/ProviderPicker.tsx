@@ -100,6 +100,11 @@ export interface ProviderPickerOption {
   /** The other CLI the user can run instead: theirs while OpenBot's copy runs, or the newer copy. */
   otherCliVersion?: string | undefined;
   /**
+   * The version of the user's own CLI that runs while it lacks a part that some models need and
+   * OpenBot's copy, offered in its place, is not downloaded (#9139).
+   */
+  incompleteCliVersion?: string | undefined;
+  /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
    * wrong one.
