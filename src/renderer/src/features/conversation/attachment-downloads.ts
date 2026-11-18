@@ -7,7 +7,10 @@ import type {
 import type { AttachmentDownloadState, AttachmentDownloads } from "@openbot/ui/features/conversation/AttachmentCards";
 import { createStore, onCleanup } from "solid-js";
 
-/** The bridge calls of attachment downloads. Without `stop` and `subscribe`, a card shows no download state. */
+/**
+ * The bridge calls of attachment downloads. Without `subscribe`, a card shows no download state.
+ * Without `stop`, the card shows the progress but cannot stop the download.
+ */
 export interface AttachmentDownloadCalls {
   open(input: OpenAttachmentInput): Promise<void>;
   stop?: ((attachmentId: string) => Promise<void>) | undefined;
@@ -38,7 +41,8 @@ export function createAttachmentDownloads<Target>(options: {
   onError: (error: unknown, target: Target) => void;
 }): { downloads: AttachmentDownloads; open(attachment: AttachmentSummary, action: FileAction): void } {
   const [tracked, setTracked] = createStore<Record<string, TrackedDownload>>({});
-  const unsubscribe = options.calls().subscribe?.((progress) => {
+  const initial = options.calls();
+  const unsubscribe = initial.subscribe?.((progress) => {
     const key = downloadKey(progress.serverId, progress.attachmentId);
     setTracked((draft) => {
       const state = draft[key]?.state;
@@ -59,7 +63,8 @@ export function createAttachmentDownloads<Target>(options: {
     // The running download delivers the file; a second click does not start another. A different
     // action shares the download, and the card keeps the state of the first one.
     if (running?.state.phase === "downloading" && running.action === action) return;
-    const shows = serverId !== LOCAL_SERVER_ID && calls.stop !== undefined && running?.state.phase !== "downloading";
+    const shows =
+      serverId !== LOCAL_SERVER_ID && calls.subscribe !== undefined && running?.state.phase !== "downloading";
     if (shows) {
       setTracked((draft) => {
         draft[key] = { action, state: { phase: "downloading", received: 0, total: attachment.size } };
@@ -86,12 +91,15 @@ export function createAttachmentDownloads<Target>(options: {
 
   const downloads: AttachmentDownloads = {
     state: (attachmentId) => tracked[downloadKey(options.serverId(), attachmentId)]?.state,
-    stop: (attachment) => {
-      void options
-        .calls()
-        .stop?.(attachment.id)
-        .catch((error: unknown) => options.onError(error, options.target()));
-    },
+    // A client that cannot stop a download, such as the browser, shows its progress without a stop button.
+    stop: initial.stop
+      ? (attachment) => {
+          void options
+            .calls()
+            .stop?.(attachment.id)
+            .catch((error: unknown) => options.onError(error, options.target()));
+        }
+      : undefined,
     retry: (attachment) =>
       open(attachment, tracked[downloadKey(options.serverId(), attachment.id)]?.action ?? "download"),
   };
