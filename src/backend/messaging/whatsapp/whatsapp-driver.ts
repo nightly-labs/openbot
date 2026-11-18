@@ -289,7 +289,7 @@ class WhatsAppAdapter implements MessagingAdapter {
 
   /**
    * One message: the file with the text as its caption, so that the text cannot go missing while the
-   * file arrives. Null when they must go apart: the text is too long, or the file cannot be sent.
+   * file arrives. Null when they must go apart: the text is too long, or the message could not go.
    */
   readonly postFileWithText = Effect.fnUntraced(function* (
     this: WhatsAppAdapter,
@@ -297,14 +297,21 @@ class WhatsAppAdapter implements MessagingAdapter {
     markdown: string,
     file: MessagingAnswerFile,
   ) {
-    yield* this.#checkPlace(target.platformChannelId);
     const chunks = whatsAppChunks(markdown);
     const caption = chunks.length === 1 ? (chunks[0] ?? "") : "";
     if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
     // An unreadable file goes apart, so the text is still posted and the result names the file.
     const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!content) return null;
-    return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) });
+    // WhatsApp can have a post that it did not confirm. Any other failure sent nothing: the text and the
+    // file then go apart, which gives the text its own chance and the failure its own reason.
+    return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) }).pipe(
+      Effect.catch((failure) =>
+        failure.cause instanceof Error && failure.cause.message === "not_confirmed"
+          ? Effect.fail(failure)
+          : Effect.succeed(null),
+      ),
+    );
   });
 
   /** The message of a file: an image shows in the chat, any other file is a document. Null when it cannot go. */

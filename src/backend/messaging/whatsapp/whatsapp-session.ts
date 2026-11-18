@@ -566,8 +566,10 @@ export class WhatsAppSession {
 
   async #sendNow(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions): Promise<WAMessage> {
     let messageId = options?.messageId;
+    // One deadline for all attempts: a post sent again does not wait longer for a socket.
+    const deadline = this.#now() + SEND_DEADLINE_MS;
     for (let attempt = 1; ; attempt += 1) {
-      const socket = await this.#openSocket();
+      const socket = await this.#openSocket(deadline);
       const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
       if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
       // The id is known before the send, so an echo that arrives first is already an own post.
@@ -588,7 +590,9 @@ export class WhatsAppSession {
           continue;
         }
         // The server takes the message first and refuses it in its ack, so a refused post is not sent.
-        if (typeof result === "object" && result.error) throw new WhatsAppRefusedError(result.error);
+        // A refused copy does not show that the first one was lost.
+        if (typeof result === "object" && result.error)
+          throw attempt > 1 ? new Error("not_confirmed") : new WhatsAppRefusedError(result.error);
         if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
         return sent;
       } finally {
@@ -616,8 +620,7 @@ export class WhatsAppSession {
   }
 
   /** The open socket, waiting for it up to the send deadline. */
-  async #openSocket(): Promise<WhatsAppSocket> {
-    const deadline = this.#now() + SEND_DEADLINE_MS;
+  async #openSocket(deadline: number): Promise<WhatsAppSocket> {
     for (;;) {
       const socket = this.socket();
       if (socket) return socket;

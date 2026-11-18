@@ -1907,7 +1907,7 @@ export class MessagingService {
       const captioned = yield* Effect.result(live.adapter.postFileWithText(target, text, single));
       if (Result.isFailure(captioned))
         return {
-          error: `${refusal(captioned.failure)} The post can be in the place already. Do not post it again only because of this error.`,
+          error: refusal(captioned.failure),
           failure: "unknown" as const,
         };
       if (captioned.success) {
@@ -2630,6 +2630,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
+  [
+    "not_confirmed",
+    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+  ],
 ]);
 
 const DISCORD_NOT_LINKED =
