@@ -448,7 +448,8 @@ export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
       });
       const cost = isDynamicRecord(answer.cost) ? answer.cost : null;
       const credits = cost?.credits_exact ?? cost?.credits;
-      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : null;
+      // An answer without a price fails, so the cache does not keep it: it can come from a short fault.
+      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : yield* mediaFailed();
     }),
   ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

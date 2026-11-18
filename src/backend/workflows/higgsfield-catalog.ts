@@ -139,8 +139,16 @@ function videoDurations(item: DynamicRecord, duration: DynamicRecord | undefined
   return min !== null && max !== null ? range(min, max) : [];
 }
 
+/** A readable name from a model id: "soul_cinema_studio" is "Soul Cinema Studio". */
+const idName = (id: string) =>
+  id
+    .split(/[_-]+/u)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ") || id;
+
 /** The canvas name of a resolution option: "2k" is "2K", "720p" stays. */
-const canvasResolution = (value: string) => value.replace(/k$/u, "K");
+export const canvasResolution = (value: string) => value.replace(/k$/u, "K");
 
 /** The resolution parameter of a model: `resolution`, or `quality` when its options are sizes. */
 function resolutionChoice(parameters: readonly DynamicRecord[]) {
@@ -252,7 +260,8 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
         }
       : {}),
   };
-  const name = text(item.name).trim().slice(0, 160) || id;
+  // A model with no name, such as `soul_cinema_studio`, shows its id as words: "Soul Cinema Studio".
+  const name = text(item.name).trim().slice(0, 160) || idName(id);
   const maker = text(item.provider_name).trim().slice(0, 120) || "Higgsfield";
   return {
     model: {

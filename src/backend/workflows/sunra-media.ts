@@ -193,7 +193,7 @@ const download = (url: string, kind: WorkflowMediaKind) =>
 function sunraChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: SunraPlan): McpToolArguments {
   return {
     aspect_ratio: specs.aspect,
-    ...(specs.resolution ? { resolution: specs.resolution } : {}),
+    ...(specs.resolution ? { resolution: plan.resolutions?.[specs.resolution] ?? specs.resolution } : {}),
     ...(kind === "video" ? { duration: specs.duration } : {}),
     ...(kind === "image" && plan.transparent && specs.transparent ? { background: "transparent" } : {}),
   };
@@ -361,9 +361,10 @@ export interface SunraPriceRequest {
 }
 
 /**
- * What one file costs with the choices of the step, in credits, or null when Sunra gives no price.
- * `estimate_cost` only asks for the price and spends no credits. Sunra quotes the Personal account
- * only, so a Team sign-in gets no price. The quote sends no picture.
+ * What one file costs with the choices of the step, in credits, or null for a Team sign-in: Sunra
+ * quotes the Personal account only. `estimate_cost` only asks for the price and spends no credits.
+ * The quote sends no picture. An answer without a price fails, so the cache does not keep it: it
+ * can come from a short Sunra fault.
  */
 export const readSunraPrice = Effect.fn("readSunraPrice")(function* (signIn: SunraSignIn, request: SunraPriceRequest) {
   return yield* Effect.scoped(
@@ -377,7 +378,7 @@ export const readSunraPrice = Effect.fn("readSunraPrice")(function* (signIn: Sun
         count: 1,
         ...sunraChoices(request.kind, request.specs, request.plan),
       });
-      return quotedCredits(answer);
+      return quotedCredits(answer) ?? (yield* mediaFailed());
     }),
   ).pipe(Effect.timeoutOrElse({ duration: SUNRA_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

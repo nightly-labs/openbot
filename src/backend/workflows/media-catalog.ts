@@ -261,7 +261,7 @@ export class WorkflowMediaCatalogCache {
     const shared = Deferred.makeUnsafe<number | null>();
     this.#quotes.set(key, shared);
     const credits = yield* quote.pipe(
-      // A service that gives no price, such as Sunra for a Team, is kept as no price.
+      // Sunra for a Team gives no price, which is kept as no price. An answer without a price fails.
       Effect.tap((value) => Effect.sync(() => this.#keepPrice(key, value))),
       // A failed quote is not kept, so the next change of a choice asks again.
       Effect.catch((failure) =>

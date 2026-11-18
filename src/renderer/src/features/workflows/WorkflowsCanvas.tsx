@@ -3,6 +3,7 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
   workflowCatalogMediaModel,
+  workflowCatalogProvider,
 } from "@openbot/contracts/ipc";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
@@ -12,8 +13,9 @@ import {
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { noteMediaStepEnded } from "./workflow-media-credits";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
@@ -78,6 +80,31 @@ export function WorkflowsCanvas(props: {
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
   };
   readMediaProviders();
+  // A Sunra or Higgsfield step spends credits, so the rail reads them again when one ends: in a run, or
+  // alone. A fast step can show as ended in the first view after its start, so each end that this
+  // canvas did not see before counts. The ends of a workflow at its first view are only remembered.
+  const seenEnds = new Set<string>();
+  const seenWorkflows = new Set<string>();
+  createEffect(
+    () => workflows.props.runs,
+    (view) => {
+      const workflow = untrack(() => workflows.detail());
+      if (!workflow) return;
+      const first = !seenWorkflows.has(workflow.summary.id);
+      seenWorkflows.add(workflow.summary.id);
+      let ended = false;
+      for (const step of [...view.runs.flatMap((run) => run.steps), ...view.soloSteps]) {
+        if (step.endedAt === null || step.workflowId !== workflow.summary.id) continue;
+        const end = `${step.id}:${step.attempt}:${step.endedAt}`;
+        if (seenEnds.has(end)) continue;
+        seenEnds.add(end);
+        if (first) continue;
+        const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
+        if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
+      }
+      if (ended) noteMediaStepEnded();
+    },
+  );
   window.addEventListener("focus", readMediaProviders);
   onCleanup(() => {
     disposed = true;

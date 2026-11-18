@@ -8,7 +8,7 @@
 
 import type { WorkflowMediaCatalogModel, WorkflowMediaKind } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { canvasAspects, catalogDurations, numbers, strings, text } from "./higgsfield-catalog";
+import { canvasAspects, canvasResolution, catalogDurations, numbers, strings, text } from "./higgsfield-catalog";
 
 /** How the host sends the pictures and the background of a step to one Sunra model. */
 export interface SunraPlan {
@@ -22,6 +22,8 @@ export interface SunraPlan {
   end: boolean;
   /** Whether an image takes `background` "transparent". */
   transparent: boolean;
+  /** The Sunra value of each canvas resolution: the canvas shows "2K" for Sunra's "2k". */
+  resolutions?: Readonly<Record<string, string>>;
 }
 
 /** A canvas model of the catalog with its plan, which stays on the host. */
@@ -75,7 +77,10 @@ export function sunraCatalogEntry(item: DynamicRecord): SunraCatalogEntry | null
   if (kind === "video" && durations.length === 0) return null;
   const listed = strings(item.supported_resolutions).filter((value) => value.length <= 16);
   const fallback = text(item.default_resolution);
-  const resolutions = listed.includes(fallback) ? [fallback, ...listed.filter((value) => value !== fallback)] : listed;
+  const ordered = listed.includes(fallback) ? [fallback, ...listed.filter((value) => value !== fallback)] : listed;
+  const values = new Map<string, string>();
+  for (const value of ordered) if (!values.has(canvasResolution(value))) values.set(canvasResolution(value), value);
+  const resolutions = [...values.keys()].slice(0, 16);
   const transparent = kind === "image" && capabilities.has("transparent-background");
   const takesReferences = kind === "image" ? capabilities.has("image-editing") : capabilities.has("reference-images");
   return {
@@ -88,7 +93,7 @@ export function sunraCatalogEntry(item: DynamicRecord): SunraCatalogEntry | null
       kinds: [kind],
       aspects,
       durations,
-      resolutions: resolutions.slice(0, 16),
+      resolutions,
       transparent,
     },
     plan: {
@@ -101,6 +106,7 @@ export function sunraCatalogEntry(item: DynamicRecord): SunraCatalogEntry | null
       start: kind === "video" && capabilities.has("image-to-video"),
       end: kind === "video" && capabilities.has("end-frame"),
       transparent,
+      resolutions: Object.fromEntries(resolutions.map((name) => [name, values.get(name) ?? name])),
     },
   };
 }
