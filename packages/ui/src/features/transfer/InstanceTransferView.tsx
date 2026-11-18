@@ -4,6 +4,7 @@ import type {
   InstanceTransferPreview,
   InstanceTransferResult,
   InstanceTransferSummary,
+  InstanceTransferUploadProgress,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -22,6 +23,7 @@ import {
   ItemGroup,
   Lock,
   Monitor,
+  Progress,
   Settings,
   SlidingTabs,
   Sparkles,
@@ -30,7 +32,7 @@ import {
   Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -39,6 +41,9 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 export type InstanceTransferScreen = "home" | "export" | "import";
 export type InstanceExportPhase = "options" | "exporting" | "saved";
 export type InstanceImportPhase = "idle" | "reading" | "review" | "importing" | "done";
+
+/** The bytes of a file that the client has sent to a joined server. */
+export type TransferUploadState = Pick<InstanceTransferUploadProgress, "sent" | "total">;
 
 export interface InstanceExportOptions {
   agentIds: string[];
@@ -74,6 +79,8 @@ export interface InstanceTransferViewProps {
   preview: InstanceTransferPreview | null;
   result: InstanceTransferResult | null;
   importError: string | null;
+  /** While `reading`: the bytes sent to a joined server. Null before the first part, and on this computer. */
+  importProgress?: TransferUploadState | null | undefined;
   onChoose: () => void;
   /** `includeServerPreferences`: only where `fullCopyAvailable`; the file's preferences replace this server's. */
   onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
@@ -434,6 +441,7 @@ function ExportSaved(props: {
 
 function ImportScreen(props: InstanceTransferViewProps) {
   const { t } = useText();
+  const uploading = () => (props.importPhase === "reading" ? props.importProgress : null);
   return (
     <>
       <Show when={props.importPhase === "idle" || (props.importPhase === "reading" && !props.preview)}>
@@ -446,13 +454,14 @@ function ImportScreen(props: InstanceTransferViewProps) {
           <Button
             type="button"
             loading={props.importPhase === "reading"}
-            loadingLabel={t("settings.transfer.import.reading")}
+            loadingLabel={t(uploadLabel(uploading(), "settings.transfer.import.reading"))}
             onClick={() => props.onChoose()}
           >
             <Upload class="files-button-icon" aria-hidden="true" />
             {t("settings.transfer.import.choose")}
           </Button>
         </div>
+        <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
       </Show>
       {/* Keyed, so a newly chosen file starts with every agent selected again. */}
       <Show when={props.importPhase !== "idle" && props.importPhase !== "done" && props.preview} keyed>
@@ -790,6 +799,93 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
       <ChevronLeft aria-hidden="true" />
       {t("settings.transfer.back")}
     </Button>
+  );
+}
+
+/** The label of a busy button while a file goes to a joined server, or `fallback` before the first part. */
+function uploadLabel<Fallback extends string>(progress: TransferUploadState | null | undefined, fallback: Fallback) {
+  if (!progress) return fallback;
+  return progress.sent < progress.total ? "settings.transfer.upload.sending" : "settings.transfer.upload.serverReading";
+}
+
+/** The speed of the bytes that arrived in this time gives the time left. */
+const TIME_LEFT_WINDOW_MS = 30_000;
+/** No time left before the upload has sent for this long: the first parts give no stable speed. */
+const TIME_LEFT_FIRST_MS = 3_000;
+
+/**
+ * The seconds until the server has the whole file, from the speed of the last 30 seconds, or null.
+ * The last report before those 30 seconds stays, so a client that reports once for each 8 MB part
+ * on a slow connection also gets an estimate. The clock moves the estimate between reports, so an
+ * upload that stops gets a longer time. When no bytes arrive for 30 seconds, or for two times the
+ * usual time between reports, it has none, and when bytes arrive again it measures from there. A
+ * resumed upload measures from its first report, so the parts that the server already had do not
+ * count as speed.
+ */
+function createSecondsLeft(progress: () => TransferUploadState) {
+  const samples: { at: number; sent: number }[] = [];
+  const [now, setNow] = createSignal(Date.now());
+  const timer = setInterval(() => {
+    const { sent, total } = untrack(progress);
+    if (sent < total) setNow(Date.now());
+  }, 1000);
+  onCleanup(() => clearInterval(timer));
+  return createMemo(() => {
+    const { sent, total } = progress();
+    if (samples.at(-1)?.sent !== sent) {
+      const at = Date.now();
+      const latest = samples.at(-1);
+      const previous = samples.at(-2);
+      // Bytes after a stop: the speed from before the stop is not the speed now.
+      if (latest && previous && at - latest.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * (latest.at - previous.at)))
+        samples.length = 0;
+      samples.push({ at, sent });
+    }
+    const time = Math.max(now(), samples.at(-1)?.at ?? 0);
+    while (samples.length > 2 && time - (samples[1]?.at ?? time) >= TIME_LEFT_WINDOW_MS) samples.shift();
+    const first = samples[0];
+    const last = samples.at(-1);
+    const before = samples.at(-2);
+    if (!first || !last || sent >= total) return null;
+    const usualGap = before ? last.at - before.at : 0;
+    if (time - last.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * usualGap)) return null;
+    const elapsed = time - first.at;
+    const bytesPerMs = (last.sent - first.sent) / elapsed;
+    if (elapsed < TIME_LEFT_FIRST_MS || !(bytesPerMs > 0)) return null;
+    return (total - sent) / bytesPerMs / 1000;
+  });
+}
+
+function timeLeftText(t: AppTranslate, seconds: number): string {
+  if (seconds < 60) return t("settings.transfer.upload.etaSoon");
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return t("settings.transfer.upload.etaMinutes", { minutes });
+  return t("settings.transfer.upload.etaHours", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+}
+
+/** How much of the file a joined server has. After the last byte, the server reads the file. */
+export function TransferUploadProgress(props: { progress: TransferUploadState }) {
+  const { t, format } = useText();
+  const secondsLeft = createSecondsLeft(() => props.progress);
+  const percent = () =>
+    props.progress.total > 0 ? Math.min(100, Math.floor((props.progress.sent / props.progress.total) * 100)) : 0;
+  return (
+    <div class="instance-transfer-upload">
+      <Progress
+        class="instance-transfer-upload-bar"
+        value={percent()}
+        aria-label={t("settings.transfer.upload.label")}
+      />
+      <p class="instance-transfer-upload-status">
+        {t("settings.transfer.upload.sent", {
+          sent: format.fileSizeAmount(props.progress.sent, props.progress.total),
+          total: format.fileSize(props.progress.total),
+        })}
+      </p>
+      <Show when={secondsLeft()}>
+        {(seconds) => <p class="instance-transfer-upload-status">{timeLeftText(t, seconds())}</p>}
+      </Show>
+    </div>
   );
 }
 

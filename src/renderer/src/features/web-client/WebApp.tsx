@@ -36,12 +36,16 @@ import { StaticI18nProvider } from "../../i18n-context";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
+import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
+import { keepCachedWorkflows } from "../workflows/workflow-cache";
 import { WebLanguageStep } from "./WebLanguageStep";
+import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
 import { createWebAppearancePreference } from "./web-appearance-preference";
 import { takeWebAppStart, WEB_APP_BILLING_PARAM, type WebAppStart } from "./web-billing";
+import { syncWebChatBackground } from "./web-chat-background";
 import type { WebRuntimeFactory } from "./web-client-context";
 import { takeHostingReturn } from "./web-hosted-servers";
 import { createWebLanguagePreference } from "./web-language-preference";
@@ -167,7 +171,16 @@ function takeStartLink(): WebAppStart | null {
   return start;
 }
 
+/** The browser client. Its chat bubbles take the colors of the backdrop page that shows. */
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
+  return (
+    <WindowBackdropBubbles>
+      <WebAppContent {...props} />
+    </WindowBackdropBubbles>
+  );
+}
+
+function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   // This component renders the text provider, so it reads the text of the last provider that rendered.
   const text = currentText();
   const [state, setState] = createStore<{
@@ -225,6 +238,20 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     (initialHostingReturn ? { outcome: initialHostingReturn.paid ? "completed" : "cancelled", kind: "plan" } : null);
   /** Shown after the first session check, because its 401 resets the login state. */
   let companySignInReturnError = takeCompanySignInError();
+  /**
+   * A link or a return in the address opens the web client directly. The address no longer holds
+   * it, so a phone screen in front of it would lose an invitation, and a return comes back from a
+   * flow that the user started in the browser.
+   */
+  const addressHadLink =
+    agentTemplateId() !== null ||
+    inviteUrl() !== null ||
+    pluginSlug() !== null ||
+    marketplaceListing() !== null ||
+    startLink() !== null ||
+    initialBillingReturn !== null ||
+    initialHostingReturn !== null ||
+    companySignInReturnError !== null;
   const [workspace, setWorkspace] = createSignal<typeof WebWorkspace>();
   /** Sets the account when the workspace code is ready to show it. */
   async function showAccount(account: CentralAuthUser) {
@@ -248,6 +275,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     if (ended) {
       deleteRemoteWorkspaceFrames(null);
       void deleteSavedAgentPictures(null);
+      keepCachedWorkflows(null);
     }
     sessionGeneration += 1;
     setState((draft) => {
@@ -518,8 +546,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const consentAgents = createOnboardingTeam(onboardingSessionSeed(), 3);
   const languagePreference = createWebLanguagePreference();
   const appearancePreference = createWebAppearancePreference();
+  // The chat background of each scheme; leaving `/app` removes it.
+  onSettled(() => syncWebChatBackground());
   // The sign-in starts in the browser language; its language button opens the wheel to change it.
   const [languageWheelOpen, setLanguageWheelOpen] = createSignal(false);
+  // On a phone the web client first points to the phone app, unless the address opened a link.
+  const [phoneAppShown, setPhoneAppShown] = createSignal(!addressHadLink && phoneAppScreenWanted());
   return (
     <StaticI18nProvider
       locale={resolveLocale(languagePreference.language(), navigator.language)}
@@ -528,7 +560,10 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       <NotificationObserver onShown={reportNotification}>
         <div class="web-app">
           <Toaster onToastShown={reportNotification} />
-          <Show when={state.loaded}>
+          <Show when={state.loaded && phoneAppShown()}>
+            <WebPhoneAppScreen variant={variant} onContinue={() => setPhoneAppShown(false)} />
+          </Show>
+          <Show when={state.loaded && !phoneAppShown()}>
             <Show
               keyed
               when={state.account?.id}

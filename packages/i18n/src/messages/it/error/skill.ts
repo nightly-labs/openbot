@@ -52,6 +52,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Questa skill locale non ha la revisione {revision}. La sua ultima revisione è {latest}.",
   "error.skill.localNameTaken": "Esiste già una skill locale con questo nome. Rivedila invece di crearne una nuova.",
+  "error.skill.localNameClash":
+    'Questo nome e la skill locale "{name}" diventano entrambi "{slug}". Per cambiare quella skill, rivedila. Per aggiungere una nuova skill, cambia le lettere latine o le cifre di questo nome.',
   "error.skill.localKeepName": "Quando rivedi la skill, lascia il nome invariato.",
   "error.skill.localRelativeFolder": "Usa una cartella skill relativa dentro il workspace dell'agente attuale.",
   "error.skill.localSourceOutside": "L'origine della skill deve trovarsi dentro il workspace dell'agente.",

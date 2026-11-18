@@ -1,17 +1,25 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("status.agent", {
+  // `{address}` is in a code span, so the card links only to the whole page.
+  "status.agent.mcpSignInPage": "{name} asks you to sign in on `{address}`. [Sign in]({url}), then choose Continue.",
+  "status.agent.mcpSignInPageDoneDetail": "The agent tries the request again.",
+  "status.agent.mcpSignInPageDecline": "Don't sign in",
+  "status.agent.mcpSignInPageDeclineDetail": "The request stops.",
   "status.agent.claudeWriteOutside":
     "Write {path}, outside the agent's workspace, the shared folder and the temporary folders.",
   "status.agent.contextCleared": "Context cleared. A new chat starts here.",
   "status.agent.instructionsChanged": "Updated its instructions",
   "status.agent.modelSwitchedForLimit": "Usage limit reached. Switched to {model}.",
   "status.agent.modelReturnedAfterLimit": "Usage limit ended. Switched back to {model}.",
+  "status.agent.routineSkippedRunOpen": "Skipped: the last run had not finished",
+  "status.agent.routineSkippedUsageLimit": "Skipped: usage limit reached",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
+  "status.agent.settingShown": "Showed a setting: {setting}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
   "status.agent.channelMemberRemoved": "{agent} removed {member} from the channel. {person} asked for it.",
   "status.agent.channelInstructionsChanged": "{agent} changed the channel instructions. {person} asked for it.",
@@ -30,15 +38,32 @@ export const messages = defineMessages("status.agent", {
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
   "status.agent.reportProblem":
     "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
+  "status.agent.reportPhoneProblem":
+    "This becomes a public GitHub issue, with the app version, your system, and the version, system and support log of your phone. Your name is not shown.",
   "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
   "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
   "status.agent.feedbackSameAs": "Adds to issue #{issue}",
   "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.feedbackWithdrawn": "Removed from GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remove report #{issue} from GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Everyone loses access to this report on GitHub. You cannot undo this. To fix it, the agent can send a corrected report.",
+  "status.agent.feedbackWithdrawing": "Removing your report from GitHub…",
   "status.agent.serverInstallCommand":
     "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
   "status.agent.serverInstallCard": "Install command for the server {name}",
+  "status.agent.browserProfileNamed":
+    "Move {agents} to the browser profile {profile}. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.commitCoAuthorOff": "Stop adding OpenBot as a co-author to the commits of all agents.",
+  "status.agent.commitCoAuthorOn": "Add OpenBot as a co-author to the commits of all agents again.",
+  "status.agent.browserProfileNew":
+    "Make the new browser profile {profile} and move {agents} to it. It has no sign-ins. Their open tabs close.",
+  "status.agent.browserProfileShared":
+    "Move {agents} to the shared browser profile. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.browserProfileOwn": "Give {agents} each a browser profile of its own. Their open tabs close.",
   "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
+  "status.agent.deleteAgents": "Delete {agents} with their chats and files. You cannot undo this.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
     "Fill the one-time Link card {card} on {site}. You approved this payment in Link for {merchant}.",
@@ -57,6 +82,7 @@ export const messages = defineMessages("status.agent", {
   },
   "status.agent.memoriesUpdating": "Updating its memories…",
   "status.agent.skillUsing": "Using the skill {name}…",
+  "status.agent.backdropSetting": "Changing the backdrop…",
   "status.agent.skillReading": "Reading a skill…",
   "status.agent.toolStepFailed": "A tool step failed; reviewing the result and deciding what to try next…",
   "status.agent.toolResultReviewing": "Reviewing the latest tool result…",
@@ -95,7 +121,9 @@ export const messages = defineMessages("status.agent", {
   "status.agent.mcpServerEnable": "Turn on the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerDisable": "Turn off the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerRemove": "Remove the MCP server {name} and its sign-in from every agent on this server.",
-  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Server settings, MCP.",
+  "status.agent.mcpToolCall": "Run the tool {tool} of the MCP server {name}.",
+  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Marketplace, Apps, {name}.",
+  "status.agent.uiBlockClosedByMessage": "Closed by a new message",
   "status.agent.vaultAdded": "Saved to Vault: {name}",
   "status.agent.vaultUpdated": "Changed in Vault: {name}",
   "status.agent.vaultDeleted": "Deleted from Vault: {name}",
@@ -125,6 +153,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
+  "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
 });

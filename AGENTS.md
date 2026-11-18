@@ -27,7 +27,12 @@ and state which default you set aside. Do not argue by citing this file.
 
 - **Migrations are irreversible.** No backup of `openbot.db` is made before an upgrade. Preserve all
   user data and support every shipped source schema. Never assume a backup exists.
-- **Released Team API adapters are permanent.** Do not change a shipped wire protocol's meaning.
+- **Team API support window.** Hosts and clients support the releases of the last 2 months (60 days);
+  mobile has at least 2 months. Do not change the meaning of a wire protocol that a release in the
+  window speaks. A peer outside the window gets "update required", and its adapter, capabilities and
+  fixtures can be deleted. The minimum app version does not move by itself: the PR that needs it raises
+  it, and CI refuses a minimum that is less than 60 days old. Decided by the developer on 2026-11-17
+  (plan 011).
 - **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
   policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
@@ -44,6 +49,9 @@ adding a module or moving ownership between workspaces.
   phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
   values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
   on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
+  (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
+  removal delete it too.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
@@ -71,11 +79,12 @@ windows, its OS dialogs or its native notifications.
   gate, for a feature that can work on a server. When a part must stay local, write the reason at
   the gate and in the PR.
 - Gate the client on the host capability. Hide the action while the host does not have it; do not
-  show an action that then fails. An older host keeps working without the feature.
+  show an action that then fails. A host in the support window keeps working without the feature.
 - Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
   local IPC path.
-- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
-  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+- A server installs a staged release at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. A hosted server, and a server with the automatic
+  update switch on, also installs it when idle. When a feature needs the new host, the release
   notes say that the server must also be on the new version.
 
 ## Effect
@@ -117,6 +126,22 @@ UI, styles, and behavior unless the user requests a design change. Native mobile
 tokens and contracts; it does not render SolidJS DOM components.
 
 Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
+
+## Phone screens
+
+Phones use the native app (`apps/mobile`). The desktop renderer, the web client and `packages/ui`
+are designed for a computer screen only.
+
+- Do not design, style, write stories or take screenshots for these surfaces at a phone width, and
+  do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
+  The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
+  and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+- On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
+  links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
+  (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;
+  do not add to it.
+- Put a phone feature in `apps/mobile`. [Joined servers](#joined-servers) says when one is needed.
+- The public site (`apps/auth-api` pages other than `/app`) stays responsive: phone visitors read it.
 
 ## Interface text
 
@@ -168,7 +193,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
-- Migrations and the separate latest schema for new databases.
+- Migrations, which also build each new database.
 - Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 

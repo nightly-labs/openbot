@@ -1,4 +1,4 @@
-// The OpenCode rules that OpenBot sets only where the user's own config is silent.
+// The OpenCode settings that OpenBot sets only where the user's own config is silent.
 //
 // OpenCode 2.2.6 merges its config layers in this order: the global folder, the `OPENCODE_CONFIG`
 // file, the project's `opencode.json`, and then `OPENCODE_CONFIG_CONTENT`. Permission rules form one
@@ -8,11 +8,12 @@
 // them. A rule in the user's global config comes before them, so a rule that a global name or pattern
 // matches is left out of the file. The global catch-all `"*"` only sets how OpenCode asks for tools.
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Option, Schema } from "effect";
+import { openCodeDatabasePath, readOpenCodeDatabase } from "./opencode-usage";
 
 const logger = createOpenBotLogger("opencode-agent-defaults");
 
@@ -38,6 +39,19 @@ const OPENCODE_SKILL_DEFAULTS = { report: "deny", opencode: "deny" } as const sa
   Record<string, OpenCodeAction>
 >;
 
+/**
+ * The answer "Allow search via …" to the question that OpenCode 2 asks before its first web search.
+ * OpenCode fails the search with "Web search cancelled" when nobody answers in a minute, and an agent
+ * in a Slack, Discord, Telegram or WhatsApp chat cannot show the question, so each search there
+ * failed (#11315). The `websearch` setting, which OpenCode reads since 2.0.0, gives the answer, and a
+ * later config layer, such as the project's, still wins. A setting beats the answer that OpenCode
+ * saved, so OpenBot leaves it out when an answer is saved.
+ */
+const OPENCODE_WEB_SEARCH_DEFAULT = { provider: "random" } as const;
+
+/** The key under which OpenCode 2 saves that answer in its `kv` table. */
+const WEB_SEARCH_ANSWER_KEY = "websearch:provider";
+
 /** The global config files that OpenCode reads, in its own order. */
 const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"] as const;
 
@@ -50,6 +64,8 @@ const DEFAULTS_FILE = "openbot-agent-defaults.json";
 interface UserRules {
   readonly tools: string[];
   readonly skills: string[];
+  /** The global config sets `websearch`. */
+  readonly webSearch: boolean;
 }
 
 /** True when an OpenCode wildcard pattern (`*` and `?`) matches the whole name. */
@@ -131,6 +147,7 @@ type PermissionRules = typeof PermissionRules.Type;
 // agent the user starts.
 const UserConfig = Schema.Struct({
   ...PermissionRules.fields,
+  websearch: Schema.optional(Schema.Unknown),
   agent: Schema.optional(Schema.Record(Schema.String, PermissionRules)),
   agents: Schema.optional(Schema.Record(Schema.String, PermissionRules)),
 });
@@ -178,7 +195,7 @@ function globalConfigFolders(env: NodeJS.ProcessEnv, home: string): string[] {
  * then OpenBot cannot know what the user set, and adds no rule.
  */
 function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
-  const rules: { tools: string[]; skills: string[] } = { tools: [], skills: [] };
+  const rules: { tools: string[]; skills: string[]; webSearch: boolean } = { tools: [], skills: [], webSearch: false };
   for (const folder of globalConfigFolders(env, home)) {
     for (const name of GLOBAL_CONFIG_FILES) {
       const file = join(folder, name);
@@ -196,6 +213,7 @@ function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
         return null;
       }
       collectRules(config.value, rules);
+      if (config.value.websearch !== undefined) rules.webSearch = true;
       for (const agent of [...Object.values(config.value.agent ?? {}), ...Object.values(config.value.agents ?? {})])
         collectRules(agent, rules);
     }
@@ -211,15 +229,37 @@ function readTextOrNull(file: string): string | null {
   }
 }
 
-/** One layer under OpenCode's `permission` key. */
-interface DefaultsLayer {
-  readonly permission: Partial<typeof OPENCODE_AGENT_DEFAULTS> & {
-    readonly skill?: Partial<typeof OPENCODE_SKILL_DEFAULTS>;
-  };
+/**
+ * Whether OpenCode's database holds an answer to the web search question, or null when OpenBot cannot
+ * read it. A database or a `kv` table that does not exist yet holds none.
+ */
+function hasWebSearchAnswer(env: NodeJS.ProcessEnv, home: string): boolean | null {
+  const path = openCodeDatabasePath(env, home);
+  if (!path || !existsSync(path)) return false;
+  try {
+    return readOpenCodeDatabase(path, (database) => {
+      if (!database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'kv'").get()) return false;
+      return database.prepare("SELECT 1 FROM kv WHERE key = ?").get(WEB_SEARCH_ANSWER_KEY) !== undefined;
+    });
+  } catch (cause) {
+    logger.warn("OpenBot could not read OpenCode's web search answer.", toLogValue(cause));
+    return null;
+  }
 }
 
-/** The rules that no pattern of the user's global config matches, or null when there are none. */
-function defaultsLayer(rules: UserRules): DefaultsLayer | null {
+/** One config layer: rules under OpenCode's `permission` key, and the web search answer. */
+interface DefaultsLayer {
+  readonly permission?: Partial<typeof OPENCODE_AGENT_DEFAULTS> & {
+    readonly skill?: Partial<typeof OPENCODE_SKILL_DEFAULTS>;
+  };
+  readonly websearch?: typeof OPENCODE_WEB_SEARCH_DEFAULT;
+}
+
+/**
+ * The rules that no pattern of the user's global config matches, and the web search answer when
+ * `webSearch` asks for it. Null when there is nothing to set.
+ */
+function defaultsLayer(rules: UserRules, webSearch: boolean): DefaultsLayer | null {
   const named = (patterns: readonly string[], name: string) => patterns.some((pattern) => matches(pattern, name));
   const tools: Partial<typeof OPENCODE_AGENT_DEFAULTS> = Object.fromEntries(
     Object.entries(OPENCODE_AGENT_DEFAULTS).filter(([tool]) => !named(rules.tools, tool)),
@@ -227,8 +267,12 @@ function defaultsLayer(rules: UserRules): DefaultsLayer | null {
   const skill: Partial<typeof OPENCODE_SKILL_DEFAULTS> = Object.fromEntries(
     Object.entries(OPENCODE_SKILL_DEFAULTS).filter(([id]) => !named(rules.skills, id)),
   );
-  if (Object.keys(tools).length === 0 && Object.keys(skill).length === 0) return null;
-  return { permission: { ...tools, ...(Object.keys(skill).length > 0 ? { skill } : {}) } };
+  const hasRules = Object.keys(tools).length > 0 || Object.keys(skill).length > 0;
+  if (!hasRules && !webSearch) return null;
+  return {
+    ...(hasRules ? { permission: { ...tools, ...(Object.keys(skill).length > 0 ? { skill } : {}) } } : {}),
+    ...(webSearch ? { websearch: OPENCODE_WEB_SEARCH_DEFAULT } : {}),
+  };
 }
 
 /**
@@ -236,16 +280,20 @@ function defaultsLayer(rules: UserRules): DefaultsLayer | null {
  * the other layers, so a change to the user's config reaches the next process.
  *
  * A user who sets `OPENCODE_CONFIG` keeps that file, and OpenBot then adds no rule. Without a folder of
- * its own, OpenBot also adds none.
+ * its own, OpenBot also adds none. Only OpenCode 2 gets the web search answer: OpenCode 1 has no web
+ * search question, and OpenCode 1.0 refuses a config key that it does not know.
  */
 export function openCodeAgentDefaultsEnv(
   stateDirectory: string | undefined,
   env: NodeJS.ProcessEnv,
+  cliVersion: string,
   home = homedir(),
 ): Record<string, string> {
   if (!stateDirectory || env.OPENCODE_CONFIG?.trim()) return {};
   const rules = readUserRules(env, home);
-  const layer = rules && defaultsLayer(rules);
+  const webSearch =
+    Number.parseInt(cliVersion, 10) >= 2 && rules?.webSearch === false && hasWebSearchAnswer(env, home) === false;
+  const layer = rules && defaultsLayer(rules, webSearch);
   if (!layer) return {};
   const folder = join(stateDirectory, "opencode");
   const file = join(folder, DEFAULTS_FILE);

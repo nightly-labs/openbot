@@ -4,6 +4,7 @@ import type {
   RoutineFields,
   RoutineLimitPolicy,
   RoutineMissedPolicy,
+  RoutinePausedByRun,
   RoutineRunFields,
   RoutineRunPlace,
   RoutineRunSource,
@@ -11,6 +12,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import {
+  isRoutinePausedByRun,
   isRoutineSchedule,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_COUNT_LIMIT,
@@ -198,8 +200,13 @@ export class RoutineStore {
   ) {}
 
   protected get routineColumns(): string {
-    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
-            ${this.tables.runInColumn ? "run_in, " : ""}created_at, updated_at`;
+    const { routineTable, eventPrefix, ownerColumn, runInColumn } = this.tables;
+    // The event of the routine's last change, when a run of its own paused it (`markPausedByRun`).
+    return `routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
+            ${runInColumn ? "run_in, " : ""}created_at, updated_at,
+            (SELECT payload_json FROM orchestration_events
+             WHERE sequence = ${routineTable}.last_event_sequence AND event_type = '${eventPrefix}.paused-by-run')
+              AS paused_by_run`;
   }
 
   protected get runColumns(): string {
@@ -226,7 +233,7 @@ export class RoutineStore {
       this.database.connection
         .prepare(
           `SELECT ${this.routineColumns}
-           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?
+           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}
            ORDER BY updated_at DESC, routine_id`,
         )
         .all(ownerId),
@@ -237,7 +244,8 @@ export class RoutineStore {
     const row = this.database.connection
       .prepare(
         `SELECT ${this.routineColumns}
-         FROM ${this.tables.routineTable} WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?`,
+         FROM ${this.tables.routineTable}
+         WHERE routine_id = ? AND ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}`,
       )
       .get(routineId, ownerId);
     return isDynamicRecord(row) ? this.#record(row) : null;
@@ -246,6 +254,15 @@ export class RoutineStore {
   /** The released routine API sees only routines that a schedule starts. */
   get #hasSchedule(): string {
     return `EXISTS (SELECT 1 FROM ${this.tables.triggerTable} WHERE routine_id = ${this.tables.routineTable}.routine_id)`;
+  }
+
+  /**
+   * A routine with no trigger row of either kind cannot run, and reading it would fail. Leave it
+   * out, as `#hasSchedule` does for the released API, so that it does not stop the whole list.
+   */
+  get #hasTrigger(): string {
+    return `(${this.#hasSchedule} OR EXISTS (SELECT 1 FROM ${this.tables.webhookTable}
+             WHERE routine_id = ${this.tables.routineTable}.routine_id))`;
   }
 
   protected getRoutine(ownerId: string, routineId: string): OwnedRoutine | null {
@@ -816,6 +833,34 @@ export class RoutineStore {
   }
 
   /**
+   * Records that a scheduled run of the routine paused it. The event becomes the routine's last event,
+   * so the lists give the reason until the next change of the routine, such as a resume or an edit.
+   * Nothing is recorded when the routine is active again. No migration: the reason is read back from
+   * `orchestration_events` through the routine's `last_event_sequence`.
+   */
+  markPausedByRun(routineId: string, pausedByRun: RoutinePausedByRun): void {
+    const { commandPrefix, eventPrefix, routineAggregate, routineTable } = this.tables;
+    this.database.dispatch(
+      `${commandPrefix}:paused-by-run:${routineId}:${randomUUID()}`,
+      [
+        {
+          aggregateType: routineAggregate,
+          aggregateId: routineId,
+          eventType: `${eventPrefix}.paused-by-run`,
+          payload: { scheduledFor: pausedByRun.scheduledFor },
+        },
+      ],
+      (db, sequences) => {
+        db.prepare(`UPDATE ${routineTable} SET last_event_sequence = ? WHERE routine_id = ? AND active = 0`).run(
+          sequences[0] ?? 0,
+          routineId,
+        );
+        return null;
+      },
+    );
+  }
+
+  /**
    * Pauses a routine whose one-time trigger has run. The trigger keeps its time, so the routine
    * shows when it ran, and the routine resumes only with a new time.
    */
@@ -852,14 +897,95 @@ export class RoutineStore {
   }
 
   /**
+   * Records the due occurrences from `due` through `scheduledFor` that the scheduler did not start,
+   * with the reason as source text, and moves the trigger. A skip for the same reason that follows
+   * the last one with no occurrence between them extends that record, so a long run does not fill
+   * the history with one entry for each occurrence.
+   */
+  protected skipOccurrenceRow(
+    routine: OwnedRoutine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
+    const { runTable, ownerColumn } = this.tables;
+    const { schedule } = routine.trigger;
+    const { count } = missedOccurrences(schedule, routine.timezone, due, scheduledFor);
+    const latest = this.database.connection
+      .prepare(
+        `SELECT run_id, trigger_id, status, error, missed_count, scheduled_for, missed_until FROM ${runTable}
+         WHERE routine_id = ? AND ${ownerColumn} = ? ORDER BY created_at DESC, run_id DESC LIMIT 1`,
+      )
+      .get(routine.id, routine.ownerId);
+    if (
+      isDynamicRecord(latest) &&
+      isString(latest.run_id) &&
+      latest.trigger_id === routine.trigger.id &&
+      latest.status === "cancelled" &&
+      latest.error === reason &&
+      typeof latest.missed_count === "number" &&
+      isString(latest.scheduled_for) &&
+      nextRoutineOccurrence(
+        schedule,
+        routine.timezone,
+        new Date(isString(latest.missed_until) ? latest.missed_until : latest.scheduled_for),
+      ).getTime() === due.getTime()
+    ) {
+      this.#extendSkipped(routine, latest.run_id, latest.missed_count + count, scheduledFor, nextRunAt);
+      return;
+    }
+    this.#recordMissed(routine, { first: due, until: scheduledFor, count }, nextRunAt, reason);
+  }
+
+  #extendSkipped(routine: OwnedRoutine, runId: string, count: number, until: Date, nextRunAt: Date): void {
+    const { commandPrefix, eventPrefix, routineAggregate, runAggregate, triggerTable, runTable } = this.tables;
+    const triggerId = routine.trigger.id;
+    const missedCount = Math.min(count, MISSED_WALK_LIMIT);
+    const missedUntil = until.toISOString();
+    const next = nextRunAt.toISOString();
+    this.database.dispatch(
+      `${commandPrefix}-trigger:skipped:${triggerId}:${missedUntil}`,
+      [
+        {
+          aggregateType: runAggregate,
+          aggregateId: routine.id,
+          eventType: `${eventPrefix}.run-missed`,
+          payload: { runId, triggerId, until: missedUntil, count: missedCount },
+        },
+        {
+          aggregateType: routineAggregate,
+          aggregateId: routine.id,
+          eventType: `${eventPrefix}.trigger-advanced`,
+          payload: { triggerId, nextRunAt: next },
+        },
+      ],
+      (db, sequences) => {
+        const timestamp = new Date().toISOString();
+        db.prepare(
+          `UPDATE ${runTable} SET missed_count = ?, missed_until = ?, updated_at = ?, last_event_sequence = ?
+           WHERE run_id = ?`,
+        ).run(missedCount, missedUntil, timestamp, sequences[0] ?? 0, runId);
+        db.prepare(
+          `UPDATE ${triggerTable} SET next_run_at = ?, updated_at = ?, last_event_sequence = ?
+           WHERE trigger_id = ? AND routine_id = ?`,
+        ).run(next, timestamp, sequences[1] ?? 0, triggerId, routine.id);
+        return null;
+      },
+    );
+  }
+
+  /**
    * Records the skipped occurrences on one cancelled run and moves the trigger in one transaction, so
    * a crash cannot record them twice. The run is never queued: it only fills the history. A null
-   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead.
+   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead. `reason`
+   * is why the scheduler skipped them; null means that OpenBot was closed.
    */
   #recordMissed(
     routine: OwnedRoutine,
     skipped: { first: Date; until: Date; count: number },
     nextRunAt: Date | null,
+    reason: string | null = null,
   ): void {
     const {
       commandPrefix,
@@ -877,7 +1003,7 @@ export class RoutineStore {
     const until = skipped.count > 1 ? skipped.until.toISOString() : null;
     const next = nextRunAt?.toISOString() ?? null;
     this.database.dispatch(
-      `${commandPrefix}-trigger:missed:${triggerId}:${scheduledFor}`,
+      `${commandPrefix}-trigger:${reason ? "skipped" : "missed"}:${triggerId}:${scheduledFor}`,
       [
         {
           aggregateType: runAggregate,
@@ -905,7 +1031,7 @@ export class RoutineStore {
           `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
              status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', NULL, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', ?, ?, ?, ?, ?, ?)`,
         ).run(
           runId,
           routine.id,
@@ -914,6 +1040,7 @@ export class RoutineStore {
           scheduledFor,
           routine.name,
           routine.instruction,
+          reason,
           skipped.count,
           until,
           timestamp,
@@ -1116,16 +1243,18 @@ export class RoutineStore {
     const missedPolicy = requiredStringColumn(row, "missed_policy");
     if (!isOneOf(ROUTINE_MISSED_POLICIES, missedPolicy))
       throw new Error("The stored routine missed-run policy is invalid.");
+    const active = requiredNumberColumn(row, "active") === 1;
     return {
       id: requiredStringColumn(row, "routine_id"),
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
       name: requiredStringColumn(row, "name"),
       instruction: requiredStringColumn(row, "instruction"),
-      active: requiredNumberColumn(row, "active") === 1,
+      active,
       timezone: requiredStringColumn(row, "timezone"),
       limitPolicy,
       missedPolicy,
       ...this.#runIn(row),
+      ...(active ? {} : pausedByRunColumn(row)),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };
@@ -1162,10 +1291,13 @@ export class RoutineStore {
     };
   }
 
-  /** The limit counts routines of every trigger kind. */
+  /** The limit counts routines of every trigger kind, but not a routine that the lists leave out. */
   #assertBelowLimit(ownerId: string): void {
     const row = this.database.connection
-      .prepare(`SELECT COUNT(*) AS count FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?`)
+      .prepare(
+        `SELECT COUNT(*) AS count FROM ${this.tables.routineTable}
+         WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}`,
+      )
       .get(ownerId);
     if (isDynamicRecord(row) && requiredNumberColumn(row, "count") >= this.tables.limit) {
       throw new RoutineInputError(this.tables.limitMessage);
@@ -1387,4 +1519,19 @@ function isRoutineRunStatus(value: string): value is RoutineRunStatus {
     value === "interrupted" ||
     value === "cancelled"
   );
+}
+
+/**
+ * Why a paused routine is paused: the payload of its last event, when a run of its own paused it. A
+ * query that does not read the column, or a payload that cannot be read, gives no reason.
+ */
+function pausedByRunColumn(row: DynamicRecord): { pausedByRun?: RoutinePausedByRun } {
+  const payload = row.paused_by_run;
+  if (typeof payload !== "string") return {};
+  try {
+    const value = JSON.parse(payload);
+    return isRoutinePausedByRun(value) ? { pausedByRun: { scheduledFor: value.scheduledFor } } : {};
+  } catch {
+    return {};
+  }
 }

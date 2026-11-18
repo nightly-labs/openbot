@@ -2,7 +2,8 @@
 // on a temporary profile with a fake Codex app-server. The current message names its turns in
 // `<<TURNS[...]TURNS>>`: each element is one turn of the thread. "ok" answers. "fail" starts a
 // compaction and fails with Codex's text for a refused connection. "stall" starts a compaction and
-// then sends nothing, as Codex 0.167.0 did when the connection stopped answering.
+// then sends nothing, as Codex 0.167.0 did when the connection stopped answering. "loop" compacts
+// again after each step, as Codex does when a compaction leaves the session above its own limit (#8985).
 // Checks:
 //   1. A compaction that fails on the connection continues the turn once, with a note and not the
 //      message again. No error shows, and the request completes.
@@ -10,6 +11,8 @@
 //      continues once. Without the deadline, the turn showed "Compacting context" until a Stop.
 //   3. A second failure in the same request does not continue again. The error shows in plain words,
 //      not Codex's text.
+//   4. A turn that compacts again and again with no growth is stopped after its third compaction. It
+//      does not continue, and the error says what to do.
 // No provider, account or network is used. `bun run test:codex-midturn-compaction`.
 // Writes .openbot-build/codex-midturn-compaction-e2e/report.json.
 import assert from "node:assert/strict";
@@ -17,6 +20,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { AGENT_PROVIDERS, type AgentEvent, PLAN_CONTINUATION_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -45,7 +49,7 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-type FakeTurn = "ok" | "fail" | "stall";
+type FakeTurn = "ok" | "fail" | "stall" | "loop";
 const turns = (...list: FakeTurn[]) => `<<TURNS${JSON.stringify(list)}TURNS>>`;
 
 const FAKE_CODEX = `#!/usr/bin/env node
@@ -65,6 +69,8 @@ let count = 0;
 const scripts = new Map();
 /** The turns that stall in a compaction, until a \`turn/interrupt\`. */
 const stalled = new Set();
+/** The turns that compact again after each step, until a \`turn/interrupt\` or 20 compactions. */
+const looping = new Set();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
   throw error;
@@ -93,12 +99,38 @@ const run = (threadId, turnId, kind) => {
     compaction(threadId, turnId);
     return stalled.add(turnId);
   }
+  if (kind === "loop") {
+    let left = 20;
+    looping.add(turnId);
+    const again = () => {
+      if (!looping.has(turnId)) return;
+      if (left-- === 0) {
+        looping.delete(turnId);
+        return finish(threadId, turnId);
+      }
+      const item = { type: "contextCompaction", id: "compact-" + turnId + "-" + left };
+      write({ method: "item/started", params: { threadId, turnId, item } });
+      log({ method: "compaction", threadId, turnId });
+      setTimeout(() => {
+        if (!looping.has(turnId)) return;
+        write({ method: "item/completed", params: { threadId, turnId, item } });
+        // The compaction leaves 60% of the window, which is still above this fake's own limit.
+        const usage = { total: { totalTokens: 60000 }, last: { totalTokens: 60000 }, modelContextWindow: 100000 };
+        write({ method: "thread/tokenUsage/updated", params: { threadId, turnId, tokenUsage: usage } });
+        setTimeout(again, 10);
+      }, 10);
+    };
+    return again();
+  }
+  finish(threadId, turnId);
+};
+function finish(threadId, turnId) {
   setTimeout(() => {
     const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
     write({ method: "item/completed", params: { threadId, turnId, item } });
     write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
   }, 20);
-};
+}
 const answer = (message) => {
   const params = message.params || {};
   switch (message.method) {
@@ -132,6 +164,7 @@ const answer = (message) => {
     case "turn/interrupt": {
       log({ method: "interrupt", threadId: params.threadId, turnId: params.turnId, stalled: stalled.has(params.turnId) });
       stalled.delete(params.turnId);
+      looping.delete(params.turnId);
       write({ id: message.id, result: {} });
       return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
     }
@@ -196,7 +229,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
 }
 
 interface LoggedEntry {
-  method: "turn" | "interrupt";
+  method: "turn" | "interrupt" | "compaction";
   threadId: string;
   turnId: string;
   note?: boolean;
@@ -274,6 +307,7 @@ async function request(name: string, script: FakeTurn[]) {
     deliveryError: mailbox.getDelivery(deliveryId)?.delivery.error ?? null,
     turns: entries.filter((entry) => entry.method === "turn").map(({ kind, note }) => ({ kind, note })),
     interrupts: entries.filter((entry) => entry.method === "interrupt").map(({ stalled }) => ({ stalled })),
+    compactions: entries.filter((entry) => entry.method === "compaction").length,
     continuationTexts: entries
       .filter((entry) => entry.method === "turn" && entry.note)
       .map((entry) => entry.text ?? ""),
@@ -286,6 +320,7 @@ async function request(name: string, script: FakeTurn[]) {
 
 const continuesLine = sourceText("status.agent.compactionContinues");
 const plainError = sourceText("error.agent.compactionConnectionLost");
+const loopError = sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName("codex") });
 
 try {
   await runCauseEffect(service.initialize());
@@ -329,6 +364,17 @@ try {
     ]);
     assert.deepEqual(result.errors, [plainError], "The error is not the plain text.");
     assert.equal(result.deliveryError, plainError);
+    return result;
+  });
+
+  await check("a turn that compacts again and again is stopped and does not continue", async () => {
+    const result = await request("Looping", ["loop", "ok"]);
+    assert.equal(result.status, "failed", "The request did not fail.");
+    assert.equal(result.compactions, 3, "OpenBot did not stop the loop at its third compaction.");
+    assert.equal(result.interrupts.length, 1, "OpenBot did not stop the turn once.");
+    assert.deepEqual(result.turns, [{ kind: "loop", note: false }], "The stopped turn continued.");
+    assert.deepEqual(result.errors, [loopError], "The error is not the plain text.");
+    assert.equal(result.deliveryError, loopError);
     return result;
   });
 

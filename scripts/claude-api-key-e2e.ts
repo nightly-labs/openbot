@@ -222,7 +222,7 @@ try {
     "the added account got the key or another folder",
   );
 
-  const rowIds = () => accounts.rows("claude", null)?.map((row) => row.id) ?? [];
+  const rowIds = () => accounts.rows("claude", null, null)?.map((row) => row.id) ?? [];
   assert.deepEqual(rowIds(), ["default", CLAUDE_API_KEY_ACCOUNT_ID, added.id], "the key account row is missing");
   defaultUsesApiKey = true;
   assert.deepEqual(rowIds(), ["default", added.id], "the key account row shows while the own sign-in uses the key");
@@ -251,6 +251,10 @@ try {
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
       connectProviderAccountKey: unused("connectProviderAccountKey"),
+      startProviderAccountCodeLogin: unused("startProviderAccountCodeLogin"),
+      submitProviderAccountCodeLogin: unused("submitProviderAccountCodeLogin"),
+      providerAccountCodeLoginStatus: unused("providerAccountCodeLoginStatus"),
+      cancelProviderAccountSignIn: unused("cancelProviderAccountSignIn"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
       setProviderAccountPool: unused("setProviderAccountPool"),

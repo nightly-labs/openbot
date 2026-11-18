@@ -1,7 +1,8 @@
 // The Workflows page of the joined server in the browser client. The host serves the workflows
 // through `workflows-v1`, and the GitHub catalog, options, history and last-event runs through
-// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. The targets of an
-// output use the same capabilities as on desktop.
+// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. It gives the live
+// Sunra and Higgsfield models and a price for a step through `workflows-media-catalog-v1`. The targets
+// of an output use the same capabilities as on desktop.
 
 import {
   type AgentEvent,
@@ -19,7 +20,16 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -45,12 +55,16 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import {
+  decodeRemoteHiggsfieldCredits,
+  decodeRemoteHiggsfieldProviders,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
@@ -127,7 +141,15 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => effect(options.request())).pipe(Effect.mapError((error) => error.cause)));
-  const connectionOptions = () => run(listRoutineResultOptions);
+  /** The places, Telegram chats and Slack workspaces read the connections at the same time, so they share one call. */
+  let optionsCall: ReturnType<typeof readOptions> | undefined;
+  const readOptions = () => run(listRoutineResultOptions);
+  const connectionOptions = () => {
+    optionsCall ??= readOptions().finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
 
   return {
     workflows: {
@@ -156,15 +178,39 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
-      // A host without `workflows-sunra-v1` does not run the Sunra models.
-      mediaProviders: async () =>
-        has(WORKFLOWS_SUNRA_CAPABILITY)
-          ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-          : { sunra: false },
-      mediaCredits: async () =>
-        has(WORKFLOWS_SUNRA_CAPABILITY)
-          ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-          : { sunra: null },
+      // A host without `workflows-sunra-v1` does not run the Sunra models, and a host without
+      // `workflows-higgsfield-v1` does not run the Higgsfield models.
+      mediaProviders: async () => {
+        const [sunra, higgsfield] = await Promise.all([
+          has(WORKFLOWS_SUNRA_CAPABILITY)
+            ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+            : { sunra: false },
+          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+            : { higgsfield: false },
+        ]);
+        return { ...sunra, ...higgsfield };
+      },
+      mediaCredits: async () => {
+        const [sunra, higgsfield] = await Promise.all([
+          has(WORKFLOWS_SUNRA_CAPABILITY)
+            ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+            : { sunra: null },
+          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+            : { higgsfield: null },
+        ]);
+        return { ...sunra, ...higgsfield };
+      },
+      // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
+      mediaCatalog: async () =>
+        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+          : { models: [] },
+      mediaPrice: async (input) =>
+        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+          : { credits: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -259,6 +305,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
+    mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     mediaUrl(attachmentId, kind) {
       const media = options.attachmentMedia;
       if (!media) return undefined;

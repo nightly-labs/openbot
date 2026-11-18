@@ -159,6 +159,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaSupported: () => true,
     mediaAccountSupported: () => true,
     mediaTransparentSupported: () => true,
+    mediaSizeSupported: () => true,
     pictures: async () => [],
     // A story keeps the picture only in the page: its preview is a blob address.
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),

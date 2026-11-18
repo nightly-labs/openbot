@@ -16,8 +16,8 @@ The gate fires if the release diff touches any file that prints. Four deliberate
 - **Both revisions, unioned.** Searching `HEAD` alone means *removing* a version guard removes the
   file from the result, hiding the change most worth auditing. The tag alone misses an owner the
   release adds, and the tag side carries the pre-rename filename you need to spot a rename.
-- **`z.literal` is a second spelling** — `remote-desktop-secret-store.ts` pins its version by schema
-  and matches no comparison operator. Widen the pattern when you meet a third spelling rather than
+- **`z.literal` is a second spelling** — a store that pins its version by schema
+  (`z.literal(1)`) matches no comparison operator. Widen the pattern when you meet a third spelling rather than
   trusting this one.
 - **No `\b`** — `git grep -E` is POSIX ERE, where it matches nothing and the list comes back empty.
 - **`-i`** — a prefixed field such as `layoutVersion !== 2` (`sidebar-layout-store.ts`) has a

@@ -1,4 +1,4 @@
-import { redactText } from "@openbot/logging";
+import { maskIdentifiers, redactText } from "@openbot/logging";
 
 export type SupportLogLevel = "info" | "warn" | "error";
 export type SupportLogSource = "app" | "network" | "connection" | "console";
@@ -56,6 +56,68 @@ export function supportLogValue(value: unknown): string {
 
 export function formatSupportLogEntry(entry: SupportLogEntry): string {
   return `${new Date(entry.time).toISOString()} ${entry.level.toUpperCase().padEnd(5)} ${entry.source.padEnd(10)} ${entry.message}`;
+}
+
+/** The most lines of the log that a report about the phone app takes. */
+const EXCERPT_LINES = 60;
+
+/** A request line, such as `<server> GET /v1/agents -> 200 (12 ms)`. A peer route also has an arrow. */
+const REQUEST_LINE = /^(?:\S+ |unknown server )?(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \S+ -> /u;
+/** A shorter server ID, such as `local`, can also be a word of a message. */
+const SERVER_ID_LENGTH = 8;
+
+/**
+ * The server IDs of connection lines, each with the name that a public report shows in its place:
+ * `server-1`, `server-2`. Each connection line starts with the ID of its server. An ID points to one
+ * user, but a report with two servers must still tell them apart.
+ */
+function serverNames(entries: readonly SupportLogEntry[]): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const entry of entries) {
+    if (entry.source !== "connection") continue;
+    const id = /^(\S+) /u.exec(entry.message)?.[1];
+    if (id && id !== "unknown" && !names.has(id)) names.set(id, `server-${names.size + 1}`);
+  }
+  return names;
+}
+
+/** One message as a public report shows it: no server ID, no address, no host name of the user, no record ID. */
+function publicMessage(message: string, servers: ReadonlyMap<string, string>): string {
+  let text = message;
+  for (const [id, name] of servers) {
+    if (text.startsWith(`${id} `)) text = `${name}${text.slice(id.length)}`;
+    if (id.length >= SERVER_ID_LENGTH) text = text.replaceAll(id, name);
+  }
+  // The capability list of the host is long, and its version and protocol say the same.
+  return maskIdentifiers(text.replace(/, capabilities: .*$/u, ""));
+}
+
+/**
+ * The lines that a bug report about the phone app takes from the log, oldest first: the last
+ * warnings and errors, and the connection and app events between them. A request that got an answer
+ * is most of the log and says little, so it is left out. The report is a public GitHub issue, so it
+ * has nothing that points to the user: each line was redacted when it was added, a console line is
+ * left out because a library can write any value there, and `publicMessage` masks the rest. The text
+ * is at most `maxLength` characters, and empty when the log has no such line.
+ */
+export function supportLogExcerpt(entries: readonly SupportLogEntry[], maxLength: number): string {
+  const taken: SupportLogEntry[] = [];
+  for (let index = entries.length - 1; index >= 0 && taken.length < EXCERPT_LINES; index -= 1) {
+    const entry = entries[index];
+    if (!entry || entry.source === "console") continue;
+    const event = entry.source === "connection" || entry.source === "app";
+    if (entry.level === "info" && (!event || REQUEST_LINE.test(entry.message))) continue;
+    taken.push(entry);
+  }
+  taken.reverse();
+  const servers = serverNames(taken);
+  const lines = taken.map((entry) =>
+    formatSupportLogEntry({ ...entry, message: publicMessage(entry.message, servers) }),
+  );
+  // The oldest lines go first when the text is too long.
+  let length = lines.reduce((sum, line) => sum + line.length + 1, 0);
+  while (length > maxLength) length -= (lines.shift()?.length ?? 0) + 1;
+  return lines.join("\n");
 }
 
 type StoredEntry = Omit<SupportLogEntry, "id">;
@@ -213,7 +275,8 @@ export function createSupportLog(
 
 /**
  * The support log of this phone. It stays in memory and in the app cache, which the system does not
- * back up. Only the user moves it off the phone, from Settings > Support.
+ * back up. Only the user moves it off the phone: from Settings > Support, or with Send on a bug
+ * report about the phone app, which takes `supportLogExcerpt`.
  */
 export const supportLog = createSupportLog();
 

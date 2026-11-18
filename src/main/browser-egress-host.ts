@@ -13,6 +13,8 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 interface BrowserEgressHostEvents {
   /** A member's computer came online or went offline. */
   changed: [];
+  /** A member's computer opened a new connection, so it can answer again. It comes before `changed`. */
+  connected: [membershipId: string];
 }
 
 interface EgressPeer {
@@ -140,6 +142,7 @@ export class BrowserEgressHost extends EventEmitter<BrowserEgressHostEvents> {
         },
       });
       peer.mux = mux;
+      if (peer.membershipId !== null) this.emit("connected", peer.membershipId);
       this.emit("changed");
     } else if (!usable && peer.mux) {
       this.#closeMux(peer);

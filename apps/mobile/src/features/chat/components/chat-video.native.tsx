@@ -7,29 +7,46 @@ import { useThemeColor } from "heroui-native/hooks";
 import Play from "lucide-react-native/icons/play";
 import VideoOff from "lucide-react-native/icons/video-off";
 import { useEffect, useState } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, useWindowDimensions, View } from "react-native";
+import Animated, { type CSSTransitionProperties, cubicBezier } from "react-native-reanimated";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { supportLog } from "@/features/support/model/support-log";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { playbackTime } from "../model/playback-time";
+import { shareTypeOptions } from "../model/share-file-type";
 import { knownImageDimensions, rememberImageDimensions } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
-import { useMediaFile } from "./use-media-file";
+import { useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
+import { VideoDownloadRing } from "./video-download-ring";
 import { VideoViewer } from "./video-viewer";
 
 const PLAY_OFFSET = { transform: [{ translateX: 1.5 }] };
+// Digits of one width, so the text does not move as the numbers change.
+const TABULAR = { fontVariant: ["tabular-nums" as const] };
+// The percent leaves fast; the play button comes in a little after it, so the two do not overlap.
+const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
+const SWAP_OUT: CSSTransitionProperties = {
+  transitionProperty: ["opacity", "transform"],
+  transitionDuration: 160,
+  transitionTimingFunction: EASE_OUT,
+};
+const SWAP_IN: CSSTransitionProperties = { ...SWAP_OUT, transitionDuration: 200, transitionDelay: 80 };
 
 // The width reserved while the shape is still unknown: a screen recording from a desktop.
 const UNKNOWN_RATIO = 16 / 9;
 // A poster outlives its card, so a chat that scrolls back does not decode the video again.
 const MAX_POSTERS = 24;
 const POSTER_PIXELS = 720;
+// How long the poster waits for the player to load the file.
+const POSTER_WAIT_MS = 8000;
 
 interface VideoPoster {
   thumbnail: VideoThumbnail;
-  /** In seconds. */
-  duration: number;
+  /** In seconds. Null when the player gave no length. */
+  duration: number | null;
 }
 
 const posters = new Map<string, VideoPoster>();
@@ -61,34 +78,72 @@ function useVideoPoster(key: string, uri: string | null) {
     const player = createVideoPlayer(uri);
     player.muted = true;
     let released = false;
+    let frameStarted = false;
+    let lengthKnown = false;
+    let thumbnail: VideoThumbnail | null = null;
+    let duration: number | null = null;
     const release = () => {
       if (released) return;
       released = true;
+      clearTimeout(timer);
       loaded.remove();
-      failed.remove();
+      status.remove();
       player.release();
     };
-    // A file the device cannot decode gives no `sourceLoad`, only an error status.
-    const failed = player.addListener("statusChange", ({ status }) => {
-      if (status !== "error") return;
+    // No poster is not a failure: the card plays without one. The support log keeps the reason.
+    const fail = (reason: string) => {
+      supportLog.add("warn", "app", `Video poster: ${reason}`);
       if (active) setMissing(true);
       release();
-    });
-    const loaded = player.addListener("sourceLoad", ({ duration }) => {
-      void player
-        .generateThumbnailsAsync(0, { maxWidth: POSTER_PIXELS, maxHeight: POSTER_PIXELS })
-        .then(([thumbnail]) => {
-          if (!thumbnail) throw new Error("The video has no frame.");
-          const next = { thumbnail, duration };
-          rememberPoster(key, next);
-          if (active) setPoster(next);
+    };
+    // The frame shows as soon as it is ready. The length joins it when the player gives it.
+    const show = () => {
+      if (!thumbnail) return;
+      const next = { thumbnail, duration };
+      if (active) setPoster(next);
+      // Only a poster with its final length is kept: a card that comes back reads the file again.
+      if (!lengthKnown) return;
+      rememberPoster(key, next);
+      release();
+    };
+    const takeFrame = () => {
+      if (frameStarted || released) return;
+      frameStarted = true;
+      player
+        // An array, not one number: Android converts only an array to its list of times.
+        .generateThumbnailsAsync([0], { maxWidth: POSTER_PIXELS, maxHeight: POSTER_PIXELS })
+        .then(([frame]) => {
+          if (!frame) throw new Error("The video has no frame.");
+          thumbnail = frame;
+          show();
         })
-        // No poster is not a failure: the card plays without one.
-        .catch(() => {
-          if (active) setMissing(true);
-        })
-        .finally(release);
+        .catch((error: unknown) => fail(`no frame (${error instanceof Error ? error.message : "unknown error"})`));
+    };
+    /** The length in seconds, or 0 when the player gives none. */
+    const setLength = (seconds: number) => {
+      if (lengthKnown || released) return;
+      lengthKnown = true;
+      clearTimeout(timer);
+      duration = seconds > 0 ? seconds : null;
+      if (thumbnail) show();
+      else takeFrame();
+    };
+    // Android reads the frame from the file, not from the player, so it starts before the player loads.
+    if (Platform.OS === "android") takeFrame();
+    // A file the device cannot decode gives no `sourceLoad`, only an error status.
+    const status = player.addListener("statusChange", ({ status: next }) => {
+      // On Android the frame still comes from the file, without the length.
+      if (next === "error") {
+        if (Platform.OS === "android") setLength(0);
+        else fail("the player cannot read the file");
+      } else if (next === "readyToPlay") setLength(player.duration);
     });
+    const loaded = player.addListener("sourceLoad", (event) => setLength(event.duration));
+    // A player with no view can stay unloaded on Android. The frame then shows without the length.
+    const timer = setTimeout(() => {
+      if (Platform.OS === "android") setLength(0);
+      else fail(`the player did not load in ${POSTER_WAIT_MS} ms`);
+    }, POSTER_WAIT_MS);
     return () => {
       active = false;
       release();
@@ -151,6 +206,22 @@ export function ChatVideoAttachment({
   }, [attachment.id, posterWidth, posterHeight]);
   const frame = attachmentFrame(poster?.thumbnail ?? knownImageDimensions(attachment.id), maxWidth, unknownRatio);
   const failed = Boolean(query.error);
+  const reducedMotion = useReducedMotion();
+  const live = useMediaDownloadedBytes(serverId, attachment.id);
+  // The count clears when the download ends, a moment before the query gives the file. The card keeps
+  // the last count until then, so it does not go back to 0%.
+  const [lastReceived, setLastReceived] = useState<number | null>(null);
+  if (live !== null && live !== lastReceived) setLastReceived(live);
+  const received = live ?? (uri || failed ? null : lastReceived);
+  // The download view shows only once the host sends the file: a file already on the phone, or one
+  // that waits for another download, shows the play button.
+  const downloads = lastReceived !== null;
+  const loading = !uri && !failed && received !== null;
+  const progress = uri ? 1 : received !== null && attachment.size > 0 ? Math.min(1, received / attachment.size) : 0;
+  const percent = Math.floor(progress * 100);
+  // Every byte is on the phone; the file is still handed over and written. A spinner, not a frozen 100%.
+  const finishing = loading && received !== null && received >= attachment.size;
+  const swapScale = (shown: boolean) => (shown || reducedMotion ? 1 : 0.9);
 
   async function share() {
     if (!uri) return;
@@ -158,7 +229,7 @@ export function ChatVideoAttachment({
     await runFileAction(
       async () => {
         if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { mimeType: attachment.mimeType, dialogTitle: attachment.name });
+        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
       },
       t("mobile.chat.attachment.openFailed"),
       text,
@@ -199,8 +270,18 @@ export function ChatVideoAttachment({
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("mobile.chat.video.play", { name: attachment.name })}
-          accessibilityValue={poster ? { text: playbackTime(poster.duration, format) } : undefined}
+          accessibilityLabel={
+            loading
+              ? t("mobile.chat.video.loading", { name: attachment.name })
+              : t("mobile.chat.video.play", { name: attachment.name })
+          }
+          accessibilityValue={
+            loading
+              ? { min: 0, max: 100, now: percent }
+              : poster?.duration
+                ? { text: playbackTime(poster.duration, format) }
+                : undefined
+          }
           accessibilityState={{ disabled: !uri, busy: query.isFetching }}
           disabled={!uri}
           onPress={() => {
@@ -234,14 +315,42 @@ export function ChatVideoAttachment({
                   onLoad={() => setPosterLoaded(true)}
                 />
               ) : null}
+              {downloads ? (
+                <VideoDownloadRing width={frame.width} height={frame.height} progress={progress} done={!loading} />
+              ) : null}
               <View pointerEvents="none" className="items-center justify-center" style={FILL}>
-                <View className="size-14 items-center justify-center rounded-full bg-black/50">
+                {/* While the file downloads, the circle of the play button shows how much has arrived. */}
+                <Animated.View
+                  className="absolute size-14 items-center justify-center rounded-full bg-black/50"
+                  style={{ opacity: loading ? 1 : 0, transform: [{ scale: swapScale(loading) }], ...SWAP_OUT }}
+                >
+                  {finishing ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Typography.Paragraph type="body-sm" className="font-semibold text-white" style={TABULAR}>
+                      {format.percent(percent / 100)}
+                    </Typography.Paragraph>
+                  )}
+                </Animated.View>
+                <Animated.View
+                  className="size-14 items-center justify-center rounded-full bg-black/50"
+                  style={{ opacity: loading ? 0 : 1, transform: [{ scale: swapScale(!loading) }], ...SWAP_IN }}
+                >
                   {/* Moved right by its own weight, so the triangle looks centred in the circle. A transform,
                       because React Native moves a left margin to the right in a right-to-left layout. */}
                   <Play size={26} color="white" fill="white" style={PLAY_OFFSET} />
-                </View>
+                </Animated.View>
               </View>
-              {poster ? (
+              {loading && received !== null && !finishing ? (
+                <View pointerEvents="none" className="absolute right-2 bottom-2 rounded-full bg-black/60 px-2 py-0.5">
+                  <Typography.Paragraph type="body-xs" className="font-semibold text-white" style={TABULAR}>
+                    {t("mobile.chat.video.downloaded", {
+                      received: format.fileSizeAmount(received, attachment.size),
+                      total: format.fileSize(attachment.size),
+                    })}
+                  </Typography.Paragraph>
+                </View>
+              ) : poster?.duration ? (
                 <View pointerEvents="none" className="absolute right-2 bottom-2 rounded-full bg-black/60 px-2 py-0.5">
                   <Typography.Paragraph type="body-xs" className="font-semibold text-white">
                     {playbackTime(poster.duration, format)}

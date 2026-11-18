@@ -14,6 +14,8 @@ import { contextBridge } from "electron";
  * - On macOS, Electron shows no passkey dialog, so a passkey sign-in waited with nothing on screen
  *   until the site's time limit (#6507). Such a request now fails at once, as when a person cancels
  *   Chrome's dialog, and the site offers its other sign-in methods.
+ * - On a Linux server with no GPU, WebGL names SwiftShader, as only headless Chrome does. It names a
+ *   laptop GPU instead.
  *
  * Electron serializes this function into the page, so it must use nothing from outside its body.
  * Each replaced function reads as native code through `Function.prototype.toString`.
@@ -24,6 +26,8 @@ function matchChromePageValues(): void {
   const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
   const onMac = navigator.userAgent.includes("Macintosh");
+  // Only a Linux server renders WebGL on SwiftShader, so other systems keep the native `getParameter`.
+  const onLinux = navigator.userAgent.includes("Linux");
   // The window frame and toolbar of a Chrome window with no bookmarks bar.
   const frameWidth = onWindows ? 16 : 0;
   const toolbarHeight = onWindows ? 87 : 85;
@@ -68,7 +72,7 @@ function matchChromePageValues(): void {
       if (typeof error === "object" && error !== null && "stack" in error && typeof error.stack === "string") {
         const lines = error.stack.split("\n");
         const trap = lines.findIndex(
-          (line, index) => index > 0 && /^\s+at Object\.apply \(<anonymous>:\d+:\d+\)$/.test(line),
+          (line, index) => index > 0 && /^\s+at Object\.(?:apply|setPrototypeOf) \(<anonymous>:\d+:\d+\)$/.test(line),
         );
         if (trap > 0) {
           lines.splice(trap, 1);
@@ -80,7 +84,33 @@ function matchChromePageValues(): void {
     }
   };
 
+  // Replaces a native function with a Proxy that calls `apply`. A native function cannot get a
+  // prototype chain that holds itself ("Cyclic __proto__ value"), but V8 stops that check at a
+  // Proxy, and bot checks use the difference to find a replaced function. The trap does the check.
+  const nativeProxy = <Method extends (...args: never[]) => unknown>(
+    realm: typeof globalThis,
+    method: Method,
+    apply: NonNullable<ProxyHandler<Method>["apply"]>,
+  ): Method => {
+    const proxy: Method = new Proxy(method, {
+      apply,
+      setPrototypeOf: (inner, prototype: object | null) => {
+        for (let next = prototype, depth = 0; next !== null && depth < 10_000; depth += 1) {
+          if (next === proxy || next === inner) {
+            const error = new realm.TypeError("Cyclic __proto__ value");
+            removeTrapFrame(error);
+            throw error;
+          }
+          next = Object.getPrototypeOf(next);
+        }
+        return Reflect.setPrototypeOf(inner, prototype);
+      },
+    });
+    return proxy;
+  };
+
   const wrapGetter = <Owner extends typeof globalThis | HTMLIFrameElement, Key extends keyof Owner & string>(
+    realm: typeof globalThis,
     owner: Owner,
     key: Key,
     fix: (value: Owner[Key]) => Owner[Key],
@@ -88,17 +118,15 @@ function matchChromePageValues(): void {
     const descriptor = Object.getOwnPropertyDescriptor(owner, key);
     const get = descriptor?.get;
     if (!descriptor || !get) return;
-    const wrapped = new Proxy(get, {
-      apply: (method, self: unknown) => {
-        let value: Owner[Key];
-        try {
-          value = method.call(self);
-        } catch (error) {
-          removeTrapFrame(error);
-          throw error;
-        }
-        return fix(value);
-      },
+    const wrapped = nativeProxy(realm, get, (method, self: unknown) => {
+      let value: Owner[Key];
+      try {
+        value = method.call(self);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
+      return fix(value);
     });
     natives.set(wrapped, `get ${key}`);
     Object.defineProperty(owner, key, { ...descriptor, get: wrapped });
@@ -133,26 +161,56 @@ function matchChromePageValues(): void {
     const prototype = target.CredentialsContainer.prototype;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, "get");
     if (!descriptor || typeof descriptor.value !== "function") return;
-    const get = new Proxy(prototype.get, {
-      apply: (method, self: unknown, args: [CredentialRequestOptions?]) => {
-        if (self instanceof target.CredentialsContainer && opensPasskeyDialog(args[0])) {
-          return target.Promise.reject(
-            new target.DOMException(
-              "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.",
-              "NotAllowedError",
-            ),
-          );
-        }
+    const get = nativeProxy(target, prototype.get, (method, self: unknown, args: [CredentialRequestOptions?]) => {
+      if (self instanceof target.CredentialsContainer && opensPasskeyDialog(args[0])) {
+        return target.Promise.reject(
+          new target.DOMException(
+            "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.",
+            "NotAllowedError",
+          ),
+        );
+      }
+      try {
+        return method.apply(self, args);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
+    });
+    natives.set(get, "get");
+    Object.defineProperty(prototype, "get", { ...descriptor, value: get });
+  };
+
+  // A server has no GPU, so its WebGL runs on SwiftShader (#6404). Chrome does that only when it runs
+  // headless or for automation, and bot checks (DataDome, rebrowser) block the agent for it. On such
+  // a computer, WebGL gives the GPU name of a common Linux laptop. The rendering does not change.
+  const debugVendor = 0x9245; // WEBGL_debug_renderer_info.UNMASKED_VENDOR_WEBGL
+  const debugRenderer = 0x9246; // WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL
+  const laptopGpu = {
+    [debugVendor]: "Google Inc. (Intel)",
+    [debugRenderer]: "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL 4.6)",
+  };
+  const replaceSoftwareGpuName = (target: typeof globalThis): void => {
+    for (const context of [target.WebGLRenderingContext, target.WebGL2RenderingContext]) {
+      const prototype = context?.prototype;
+      const descriptor = prototype && Object.getOwnPropertyDescriptor(prototype, "getParameter");
+      if (!descriptor || typeof descriptor.value !== "function") continue;
+      const getParameter = nativeProxy(target, prototype.getParameter, (method, self: unknown, args: [number]) => {
+        let value: unknown;
         try {
-          return method.apply(self, args);
+          value = method.apply(self, args);
         } catch (error) {
           removeTrapFrame(error);
           throw error;
         }
-      },
-    });
-    natives.set(get, "get");
-    Object.defineProperty(prototype, "get", { ...descriptor, value: get });
+        const name = args[0];
+        if (typeof value !== "string" || (name !== debugVendor && name !== debugRenderer)) return value;
+        const renderer = name === debugRenderer ? value : method.call(self, debugRenderer);
+        return typeof renderer === "string" && /SwiftShader/i.test(renderer) ? laptopGpu[name] : value;
+      });
+      natives.set(getParameter, "getParameter");
+      Object.defineProperty(prototype, "getParameter", { ...descriptor, value: getParameter });
+    }
   };
 
   const chromeValues = (target: typeof globalThis) => {
@@ -227,25 +285,24 @@ function matchChromePageValues(): void {
     if (existing && "loadTimes" in existing && typeof existing.loadTimes === "function") return;
 
     const functionPrototype = target.Function.prototype;
-    const maskedToString = new Proxy(functionPrototype.toString, {
-      apply: (method, self: unknown) => {
-        if (typeof self === "object" && self !== null && nativesRequest in self) {
-          Object.defineProperty(self, nativesRequest, { value: natives });
-          return "";
-        }
-        const name = typeof self === "function" ? natives.get(self) : undefined;
-        if (name !== undefined) return `function ${name}() { [native code] }`;
-        try {
-          return method.call(self);
-        } catch (error) {
-          removeTrapFrame(error);
-          throw error;
-        }
-      },
+    const maskedToString = nativeProxy(target, functionPrototype.toString, (method, self: unknown) => {
+      if (typeof self === "object" && self !== null && nativesRequest in self) {
+        Object.defineProperty(self, nativesRequest, { value: natives });
+        return "";
+      }
+      const name = typeof self === "function" ? natives.get(self) : undefined;
+      if (name !== undefined) return `function ${name}() { [native code] }`;
+      try {
+        return method.call(self);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
     });
     natives.set(maskedToString, "toString");
     Object.defineProperty(functionPrototype, "toString", { value: maskedToString });
     if (onMac) refusePasskeyDialogs(target);
+    if (onLinux) replaceSoftwareGpuName(target);
 
     const chrome = existing ?? {};
     for (const [key, value] of Object.entries(chromeValues(target))) {
@@ -263,18 +320,18 @@ function matchChromePageValues(): void {
         return target[key];
       }
     };
-    wrapGetter(target, "outerWidth", (value) =>
+    wrapGetter(target, target, "outerWidth", (value) =>
       value < innerSize("innerWidth") ? innerSize("innerWidth") + frameWidth : value,
     );
-    wrapGetter(target, "outerHeight", (value) =>
+    wrapGetter(target, target, "outerHeight", (value) =>
       value <= innerSize("innerHeight") ? innerSize("innerHeight") + toolbarHeight : value,
     );
     for (const key of ["screenX", "screenY", "screenLeft", "screenTop"] as const) {
-      wrapGetter(target, key, (value) => (value <= -10_000 ? 0 : value));
+      wrapGetter(target, target, key, (value) => (value <= -10_000 ? 0 : value));
     }
     // A page can read a new frame's window before the frame's own document, and this preload,
     // load. That window gets the same values here.
-    wrapGetter(target.HTMLIFrameElement.prototype, "contentWindow", (value) => {
+    wrapGetter(target, target.HTMLIFrameElement.prototype, "contentWindow", (value) => {
       if (isGlobal(value)) {
         try {
           install(value);

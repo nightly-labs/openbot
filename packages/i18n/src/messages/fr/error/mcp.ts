@@ -8,10 +8,15 @@ export const messages = {
   "error.mcp.redirectRefused": "La connexion a été refusée. Revenez à OpenBot, puis réessayez.",
   "error.mcp.redirectNoSignIn": "Aucune connexion n’attend cette réponse. Elle est peut-être terminée.",
   "error.mcp.redirectSignedIn": "OpenBot est connecté. Vous pouvez fermer cette fenêtre.",
+  "error.mcp.redirectNotSaved": "La connexion n’a pas abouti. Revenez dans OpenBot pour en voir la raison.",
   "error.mcp.signInFileUnreadable": "Impossible de lire le fichier de connexion MCP.",
   "error.mcp.signInFileTooLarge": "Le fichier de connexion MCP est trop volumineux.",
   "error.mcp.unsupported": "Ce serveur ne prend pas en charge les serveurs MCP.",
   "error.mcp.signInOnHost": "La connexion à un serveur MCP ne fonctionne que dans OpenBot sur l’ordinateur hôte.",
+  "error.mcp.signInPageOnServer":
+    "Cette page de connexion s’ouvre uniquement sur le serveur. Demandez à un propriétaire ou à un administrateur du serveur de se connecter.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Cette page de connexion s’ouvre uniquement sur le serveur. Passez à ce serveur, puis choisissez à nouveau Se connecter.",
   "error.mcp.signInAppUnsupported":
     "Ce serveur ne prend pas en charge les apps de connexion. Mettez à jour OpenBot sur l’hôte.",
   "error.mcp.redirectRelayed": "OpenBot a envoyé la connexion au serveur. Vous pouvez fermer cette fenêtre.",

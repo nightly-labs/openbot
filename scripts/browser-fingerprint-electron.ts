@@ -59,7 +59,14 @@ const values: {
   keys?: Array<Pick<z.infer<typeof pageEventSchema>, "key" | "code" | "keyCode" | "shift">>;
   hiddenClick?: ClickValues;
   shownClick?: ClickValues;
+  webgl?: { real: Array<[string, string] | null>; tab: Array<[string, string] | null> };
 } = {};
+// On Linux, the GPU switches of a server (`configureLinuxGpu` in src/main/linux-gpu-mode.ts): CI has
+// no GPU, so WebGL runs on SwiftShader as on a server.
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+  app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+}
 const THREAD_ID = "fixture-thread";
 const TURN_ID = "fixture-turn";
 
@@ -214,6 +221,122 @@ async function main(): Promise<void> {
         `A replaced function shows its trap in the stack: ${stacks.join(" | ")}`,
       );
       recordCase("replaced-function-errors-have-native-stacks");
+
+      // V8 stops its cyclic-prototype check at a Proxy, so a bot check that gives a function a
+      // prototype that inherits from itself finds a replaced function when no error comes.
+      const cyclic = await page(
+        contents,
+        `[
+          Function.prototype.toString,
+          Object.getOwnPropertyDescriptor(window, 'outerWidth').get,
+          Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get,
+          WebGLRenderingContext.prototype.getParameter,
+        ].map((method) => {
+          const prototype = Object.getPrototypeOf(method);
+          let result;
+          try {
+            Object.setPrototypeOf(method, Object.create(method));
+            result = 'no error';
+          } catch (error) {
+            result = error instanceof TypeError ? error.message : 'not a TypeError';
+            if (String(error.stack).includes('at Object.setPrototypeOf (<anonymous>:')) result += ' (trap frame)';
+          }
+          Object.setPrototypeOf(method, prototype);
+          return Object.getPrototypeOf(method) === prototype ? result : result + ' (not restored)';
+        })`,
+        z.array(z.string()),
+      );
+      assert.deepEqual(cyclic, Array(4).fill("Cyclic __proto__ value"));
+      recordCase("replaced-functions-refuse-cyclic-prototypes");
+
+      // A server renders WebGL on SwiftShader, which bot checks read as headless Chrome. A window
+      // with no tab preload shows the real renderer.
+      const readGpu = `(() => ['webgl', 'webgl2'].map((kind) => {
+        const gl = document.createElement('canvas').getContext(kind);
+        const info = gl?.getExtension('WEBGL_debug_renderer_info');
+        return info ? [gl.getParameter(info.UNMASKED_VENDOR_WEBGL), gl.getParameter(info.UNMASKED_RENDERER_WEBGL)] : null;
+      }))()`;
+      const gpuSchema = z.array(z.tuple([z.string(), z.string()]).nullable());
+      const plain = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } });
+      try {
+        await plain.loadURL(`${origin}/plain`);
+        values.webgl = {
+          real: await page(plain.webContents, readGpu, gpuSchema),
+          tab: await page(contents, readGpu, gpuSchema),
+        };
+      } finally {
+        plain.destroy();
+      }
+      const getParameterSource = await page(
+        contents,
+        "[WebGLRenderingContext, WebGL2RenderingContext].map((context) => context.prototype.getParameter.toString())",
+        z.array(z.string()),
+      );
+      assert.deepEqual(getParameterSource, Array(2).fill("function getParameter() { [native code] }"));
+      const { real, tab } = values.webgl;
+      if (process.platform === "linux") {
+        // The server GPU switches above keep WebGL on a computer with no GPU.
+        assert(
+          real.every((names) => names !== null),
+          "A Linux server has no WebGL.",
+        );
+      }
+      assert(
+        tab.every((names) => names === null || !/SwiftShader/i.test(names.join())),
+        `An agent tab names SwiftShader: ${JSON.stringify(tab)}`,
+      );
+      real.forEach((names, index) => {
+        if (names && !/SwiftShader/i.test(names.join())) {
+          assert.deepEqual(tab[index], names, "An agent tab changed the name of a real GPU.");
+        }
+      });
+      recordCase("software-webgl-names-a-gpu");
+    }
+
+    {
+      // While the DevTools Runtime domain is on, Chromium formats each console argument, and a page
+      // sees that through `Error.prepareStackTrace`. The agent's evaluate must not turn it on.
+      await call("evaluate", {
+        tabId,
+        expression: `(() => {
+          // V8 formats a stack only when something reads it, so a call here is DevTools reading it.
+          let reads = 0;
+          const error = new Error('probe');
+          Error.prepareStackTrace = (formatted) => {
+            if (formatted === error) reads += 1;
+            return String(formatted);
+          };
+          console.debug(error);
+          delete Error.prepareStackTrace;
+          window.__consoleReads = reads;
+          return reads;
+        })()`,
+      });
+      assert.equal(
+        await page(contents, "window.__consoleReads", z.number()),
+        0,
+        "The agent's evaluate lets DevTools read the page's console arguments.",
+      );
+      recordCase("agent-evaluate-leaves-console-unread");
+
+      const failed = await Effect.runPromise(
+        host.handleDynamicTool({
+          namespace: "openbot_browser",
+          tool: "evaluate",
+          arguments: { tabId, expression: "(() => { throw new Error('page failure') })()" },
+          ownerAgentId: "fixture-agent",
+          threadId: THREAD_ID,
+          turnId: TURN_ID,
+          callId: `fingerprint-${++sequence}`,
+        } satisfies DynamicToolCallParams),
+      );
+      const failure = failed.contentItems.find((content) => content.type === "inputText");
+      assert.equal(failed.success, false, "A page error in evaluate was reported as a success.");
+      assert(
+        failure?.type === "inputText" && failure.text.includes("page failure"),
+        "The evaluate error does not hold the page's message.",
+      );
+      recordCase("agent-evaluate-reports-page-errors");
     }
 
     {

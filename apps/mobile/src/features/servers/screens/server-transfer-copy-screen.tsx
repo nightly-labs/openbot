@@ -1,4 +1,6 @@
 import { AGENT_IMPORT_LIMITS, type RemoteInstanceTransferResult } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { copiedTransferUpload } from "@openbot/team-client/team-api-requests";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
@@ -22,8 +24,9 @@ type Phase = "idle" | "exporting" | "sending" | "applying";
 
 /**
  * Server settings › Transfer › Copy to another server. The phone downloads the chosen agents of this
- * server with their workspace files, and without chats or server settings, then sends that file to
- * the other server and applies all of its agents. It uses the routes of an export and an import, so a
+ * server with their workspace files and server settings, and without chats. It keeps only the
+ * settings of those agents, their routine flows and workflows (`copiedTransferUpload`), then sends that
+ * file to the other server and applies all of its agents. It uses the routes of an export and an import, so a
  * host needs no new route. The desktop does the same in main (`instanceTransfer.copy`).
  */
 export function ServerTransferCopyScreen() {
@@ -137,10 +140,13 @@ export function ServerTransferCopyScreen() {
     let token: string | null = null;
     try {
       // `instance-transfer-v1` sends the file with no warnings.
-      const upload = await downloadInstanceTransfer(
-        { agentIds: selected.map((agent) => agent.id), includeFiles: true, includeSettings: false },
-        serverId,
+      const upload = copiedTransferUpload(
+        await downloadInstanceTransfer(
+          { agentIds: selected.map((agent) => agent.id), includeFiles: true, includeSettings: true },
+          serverId,
+        ),
       );
+      if (!upload) throw new Error(sourceText("error.import.transferNotFile"));
       if (closed.current) return;
       setPhase("sending");
       const preview = await stageInstanceTransfer(upload, to.id, (fraction) => setProgress(Math.floor(fraction * 100)));
@@ -149,7 +155,7 @@ export function ServerTransferCopyScreen() {
       setPhase("applying");
       setProgress(null);
       const done = await applyInstanceTransfer(
-        { token, keys: preview.agents.map((agent) => agent.key), includeSettings: false },
+        { token, keys: preview.agents.map((agent) => agent.key), includeSettings: true },
         to.id,
       );
       // The host releases the token and the staged file when the apply starts. A failed apply can stop

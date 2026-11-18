@@ -107,6 +107,23 @@ export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreferenc
 export const BROWSER_TAKEOVER_REASONS = ["sign-in-blocked"] as const;
 export type BrowserTakeoverReason = (typeof BROWSER_TAKEOVER_REASONS)[number];
 
+/**
+ * Why OpenBot did not fill a saved login, so a password or code card asks the user:
+ * - `agent-script`: a script that the agent ran can still run in a page of this site.
+ * - `field-kind`: the agent's target is not a password field, or not a code field.
+ * - `login-choice`: several logins fit and the agent named none, or it named one that this site does not have.
+ * - `no-secret`: the login has no password, or no authenticator key.
+ * - `vault-unreadable`: the password manager could not be read.
+ */
+export const BROWSER_VAULT_SKIP_REASONS = [
+  "agent-script",
+  "field-kind",
+  "login-choice",
+  "no-secret",
+  "vault-unreadable",
+] as const;
+export type BrowserVaultSkipReason = (typeof BROWSER_VAULT_SKIP_REASONS)[number];
+
 export interface BrowserTakeoverRequest {
   requestId: string | number;
   agentId: string;
@@ -115,6 +132,8 @@ export interface BrowserTakeoverRequest {
   tabId: string;
   secret?: BrowserSecretRequest;
   reason?: BrowserTakeoverReason;
+  /** Set on a secret card when OpenBot did not fill a saved login, or could not read a password manager. */
+  vaultSkip?: BrowserVaultSkipReason;
 }
 
 export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeoverRequest {
@@ -126,7 +145,8 @@ export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeov
     isIdentifier(value.turnId) &&
     isIdentifier(value.tabId) &&
     (value.secret === undefined || isBrowserSecretRequest(value.secret)) &&
-    (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason))
+    (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason)) &&
+    (value.vaultSkip === undefined || isOneOf(BROWSER_VAULT_SKIP_REASONS, value.vaultSkip))
   );
 }
 

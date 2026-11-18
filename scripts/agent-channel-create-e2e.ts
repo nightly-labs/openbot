@@ -173,6 +173,8 @@ interface ChannelToolArgs {
   archived?: boolean;
   /** A key that list_channels does not know. */
   query?: string;
+  /** A key that create_channel does not take: the hue belongs in icon (#8627). */
+  hue?: number;
   /** save_api_key. */
   key?: string;
 }
@@ -375,6 +377,33 @@ try {
     icon: { name: "megaphone", hue: 31 },
   });
   pass("An unknown hue is refused", !badHue.success && channelCount() === 0, badHue.text);
+  // A model that copies a long id from list_agents can drop a character (#7306).
+  const miscopied = await callFromChat("create with a miscopied member id", lead.id, "create_channel", {
+    name: "launch",
+    memberAgentIds: [lead.id, tester.id.slice(0, -1)],
+  });
+  pass(
+    "A miscopied member id names the near agent and creates no channel",
+    !miscopied.success &&
+      miscopied.text.includes(tester.id) &&
+      miscopied.text.includes(tester.name) &&
+      channelCount() === 0,
+    miscopied.text,
+  );
+  const misplacedHue = await callFromChat("create with a hue outside icon", lead.id, "create_channel", {
+    name: "launch",
+    memberAgentIds: [lead.id],
+    hue: 30,
+  });
+  pass(
+    "A field that create_channel does not take is refused with the fields that it takes",
+    !misplacedHue.success &&
+      misplacedHue.text.includes("Remove the fields that create_channel does not take. It takes: name,") &&
+      misplacedHue.text.includes("icon") &&
+      !misplacedHue.text.includes("profile") &&
+      channelCount() === 0,
+    misplacedHue.text,
+  );
 
   // 2. Create a channel with members and an icon. The lead is the first member.
   const created = await callFromChat("create", lead.id, "create_channel", {
@@ -399,6 +428,12 @@ try {
       !made.imageUrl &&
       !made.archived,
     JSON.stringify(made),
+  );
+  const listed = await callFromChat("list", lead.id, "list_channels", {});
+  pass(
+    "list_channels shows the instructions of the new channel",
+    listed.success && listed.text.includes('"instructions":"Ship the release."'),
+    listed.text,
   );
   pass(
     "list_channels shows the new channel",

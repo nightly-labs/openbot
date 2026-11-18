@@ -270,7 +270,7 @@ function isDraft(value: unknown): value is BrowserDockPresentation["draft"] {
  * The answers of a question card: no entry when the user cancels, and no answer for a skipped question. Main
  * checks them again when the main renderer sends them on.
  */
-function isPromptAnswers(value: unknown): value is Record<string, string[]> {
+export function isPromptAnswers(value: unknown): value is Record<string, string[]> {
   if (!isDynamicRecord(value)) return false;
   const entries = Object.entries(value);
   if (entries.length > INPUT_LIMITS.promptQuestions) return false;

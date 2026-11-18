@@ -153,7 +153,7 @@
   min-height: 0;
   overflow-y: auto;
   outline: 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 /* The rows of the shared action menu, for options rather than menu items. Only the pointer and the
    keyboard paint a row: nothing is highlighted the moment the menu opens. */

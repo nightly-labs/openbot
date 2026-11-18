@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "עובד על זה…",
-  "status.messaging.queued": "בהמתנה: OpenBot עובד על בקשה אחרת. התשובה תגיע לכאן.",
+  "status.messaging.queued": "בהמתנה לסיום בקשה קודמת. התשובה תגיע לכאן.",
   "status.messaging.busy": "יותר מדי בקשות ממתינות. אפשר לנסות שוב מאוחר יותר.",
   "status.messaging.failed": "OpenBot לא הצליח לסיים את הבקשה הזו. הפרטים נמצאים במארח OpenBot.",
   "status.messaging.noAnswer": "OpenBot סיים בלי תשובה כתובה.",
@@ -48,6 +48,10 @@ export const messages = {
     "👋 *OpenBot מחובר*\n\nאפשר לכתוב כאן כדי לשאול את הסוכנים. WhatsApp Orchestrator עונה, או מעביר את העבודה לסוכן המתאים.\n\nיש לשלוח *stop* כדי לעצור בקשה.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot מחובר*\n\nהאנשים שאישרת ב-OpenBot יכולים עכשיו לכתוב למספר הזה. אדם חדש מקבל קוד: יש לאשר אותו ב-OpenBot תחת בקשות.\n\nיש לשלוח *stop* כדי לעצור בקשה.",
+  "status.messaging.whatsappOtherOpenBot":
+    "OpenBot נוסף מקושר למספר הוואטסאפ הזה, ולכן ייתכן שיתקבלו שתי תשובות. כדי לתקן זאת, יש לפתוח את 'מכשירים מקושרים' בוואטסאפ בטלפון ולהתנתק מה-OpenBot שאינו בשימוש.",
+  "status.messaging.whatsappPaused":
+    "OpenBot הפסיק לענות כאן למשך 10 דקות: הגיעו יותר מדי הודעות בזמן קצר. אם OpenBot נוסף מקושר למספר הזה, יש לפתוח את 'מכשירים מקושרים' בוואטסאפ בטלפון ולהתנתק מה-OpenBot שאינו בשימוש.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "עונה ב-WhatsApp ושואל את הצוות",
 } as const satisfies PartialTranslation<typeof source>;

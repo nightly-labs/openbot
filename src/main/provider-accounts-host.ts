@@ -20,6 +20,10 @@ export interface ProviderAccountsHostDependencies {
     | "updateAgent"
     | "signInProviderAccountOnHost"
     | "connectProviderAccountKey"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "renameProviderAccount"
     | "removeProviderAccount"
     | "setProviderAccountPool"
@@ -113,12 +117,12 @@ export class ProviderAccountsHost {
   }).bind(this);
 
   /** The sign-in it replaces ends first, so that account does not stay connecting where no cancel reaches it. */
-  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab") {
+  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab", atHost = false) {
     return this.#pages.interrupt(provider).pipe(
       Effect.andThen(
         this.#pages.start(
           provider,
-          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage),
+          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage, atHost),
           (exit) => resultOf(provider, exit),
           mode,
         ),
@@ -127,9 +131,12 @@ export class ProviderAccountsHost {
     );
   }
 
-  /** Starts the sign-in with no tab: the page address waits for a client to open it (`provider-account-relay-v1`). */
-  startRelay(provider: AgentProviderId, accountId: string | null) {
-    return this.startSignIn(provider, accountId, "relay");
+  /**
+   * Starts the sign-in with no tab: the page address waits for a client to open it (`provider-account-relay-v1`).
+   * `atHost`: the client is at this computer (`ProviderRuntime.signInProviderAccountOnHost`).
+   */
+  startRelay(provider: AgentProviderId, accountId: string | null, atHost = false) {
+    return this.startSignIn(provider, accountId, "relay", atHost);
   }
 
   /** The page address of a relayed sign-in, and how it ended. */
@@ -144,6 +151,30 @@ export class ProviderAccountsHost {
   /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
   connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
     return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
+  }
+
+  /**
+   * Starts the code sign-in of an account (`provider-account-code-v1`): a new account when
+   * `accountId` is null. The provider's CLI gives the page and the code; no tab opens on this host.
+   */
+  startCodeSignIn(provider: AgentProviderId, accountId: string | null) {
+    return this.#dependencies.service.startProviderAccountCodeLogin(provider, accountId);
+  }
+
+  /** Types the code of a `paste` sign-in into the provider's CLI. The code is a credential. */
+  submitCodeSignIn(provider: AgentProviderId, accountId: string, code: string): void {
+    this.#dependencies.service.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** How the code sign-in of the account ended; `result` is null while it runs. */
+  codeSignInStatus(provider: AgentProviderId, accountId: string) {
+    const { result } = this.#dependencies.service.providerAccountCodeLoginStatus(provider, accountId);
+    return { result: result && { error: result.error?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null } };
+  }
+
+  /** Stops the code sign-in: a new account goes, another one shows as signed out. */
+  cancelCodeSignIn(provider: AgentProviderId, accountId: string) {
+    return this.#dependencies.service.cancelProviderAccountSignIn(provider, accountId).pipe(Effect.asVoid);
   }
 
   /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */

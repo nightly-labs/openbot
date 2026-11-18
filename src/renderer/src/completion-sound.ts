@@ -1,4 +1,5 @@
 import type { AgentEvent, ClientAgentSummary } from "@openbot/contracts/ipc";
+import { teammateTurnCompleted } from "@openbot/team-client/agent-notifications";
 import { TASK_SOUND_CHOICES, type TaskSoundChoice } from "@openbot/ui/features/settings/app-settings";
 import { play, unlock } from "cuelume";
 
@@ -50,6 +51,8 @@ function shouldPlayCompletionSound(event: AgentEvent, agents: NotificationAgent[
   // A quiet routine run posted nothing, so it has no reply to announce. A turn that continues its
   // plan is not the end of the request.
   if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet || event.continues) return false;
+  // Work between agents stays in the chat and does not call the user (see `teammateTurnCompleted`).
+  if (teammateTurnCompleted(event)) return false;
   return agents.some((agent) => agent.id === event.agentId && agent.notifications);
 }
 

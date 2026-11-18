@@ -237,6 +237,9 @@ export function ServerLibraryScreen() {
             }}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
+            // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
+            // crash with "The specified child already has a parent". iOS does not clip by default.
+            removeClippedSubviews={false}
             onScroll={scroll.onScroll}
             refreshControl={
               available && query.data ? (

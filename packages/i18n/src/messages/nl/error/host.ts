@@ -19,6 +19,7 @@ export const messages = {
   "error.host.publishFailed": "Deze OpenBot kon niet worden gepubliceerd.",
   "error.host.mobileConnectPublishFailed": "Deze OpenBot kon niet worden gepubliceerd voor Mobile Connect.",
   "error.host.mobileConnectHostChanged": "De host voor Mobile Connect is gewijzigd. Probeer het opnieuw.",
+  "error.host.mobileConnectHostMismatch": "Je account heeft een andere sleutel voor deze server. Probeer het opnieuw.",
   "error.host.noServer": "Deze computer heeft geen server om te wijzigen.",
   "error.host.identityLocalOnly":
     "De naam en het logo van de server kun je alleen wijzigen op de computer waarop de server draait.",

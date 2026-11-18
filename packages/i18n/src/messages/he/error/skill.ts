@@ -49,6 +49,8 @@ export const messages = {
   "error.skill.localNotFound": "המיומנות המקומית הזו לא קיימת. יש לבדוק את המזהה שלה ברשימת המיומנויות המקומיות.",
   "error.skill.localRevisionNotFound": "למיומנות המקומית הזו אין גרסה {revision}. הגרסה האחרונה שלה היא {latest}.",
   "error.skill.localNameTaken": "כבר קיימת מיומנות מקומית בשם הזה. יש לערוך אותה במקום זאת.",
+  "error.skill.localNameClash":
+    'השם הזה והמיומנות המקומית "{name}" הופכים שניהם ל-"{slug}". כדי לשנות את המיומנות הזו, יש לערוך אותה. כדי להוסיף מיומנות חדשה, יש לשנות את האותיות הלטיניות או הספרות בשם הזה.',
   "error.skill.localKeepName": "יש להשאיר את שם המיומנות ללא שינוי בעת עריכתה.",
   "error.skill.localRelativeFolder": "יש להשתמש בתיקיית מיומנות יחסית בתוך סביבת העבודה של הסוכן הנוכחי.",
   "error.skill.localSourceOutside": "מקור המיומנות חייב להיות בתוך סביבת העבודה של הסוכן.",

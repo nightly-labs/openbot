@@ -51,7 +51,18 @@ interface AgentDatabaseClose {
   databasePath: string;
 }
 
-export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose;
+/**
+ * `PRAGMA quick_check` of `openbot.db` after a stop that did not close it. The check reads every page,
+ * minutes on a large file, so the main process asks a host of its own for it. Only the main process
+ * sends it; no agent request can carry it.
+ */
+interface AgentDatabaseIntegrityCheck {
+  kind: "integrity-check";
+  id: number;
+  databasePath: string;
+}
+
+export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose | AgentDatabaseIntegrityCheck;
 
 /**
  * A request before the supervisor numbers it. Spelled as a union of two `Omit`s rather than
@@ -71,10 +82,11 @@ export interface AgentDatabaseRows {
 
 /**
  * Why a statement did not run. Never an `Error`: its stack quotes absolute paths, and every one of
- * these sentences is read by a model and may be read by the user.
+ * these sentences is read by a model and may be read by the user. `newer-schema`: a newer release of
+ * OpenBot made the file, and this build does not open it.
  */
 export interface AgentDatabaseFailure {
-  kind: "sqlite" | "not-authorized" | "size-limit" | "busy" | "missing" | "internal";
+  kind: "sqlite" | "not-authorized" | "size-limit" | "busy" | "missing" | "newer-schema" | "internal";
   message: string;
   sqliteCode?: number | undefined;
 }
@@ -115,9 +127,20 @@ export const AGENT_DATABASE_LIMITS = {
   maxPageCount: 65_536,
   statementDeadlineMs: 5_000,
   hostStartDeadlineMs: 15_000,
+  /** The first wait after a second failed start in a row. It doubles up to the maximum. */
+  hostStartRetryDelayMs: 30_000,
+  maxHostStartRetryDelayMs: 300_000,
   queueWaitMs: 20_000,
   busyTimeoutMs: 2_000,
 } as const;
+
+/**
+ * The schema version of the shared database, in `PRAGMA user_version`. A file of an earlier release
+ * has version 0 and is the same schema as version 1; the first write connection sets 1. The host does
+ * not open a file with a later version. Increase it only with a migration step in the host, and keep
+ * the copy in `agent-database-host.ts` the same.
+ */
+export const AGENT_DATABASE_SCHEMA_VERSION = 1;
 
 /** The reserved table that records which agent created each shared table. */
 export const AGENT_DATABASE_METADATA_TABLE = "openbot_metadata";
@@ -134,8 +157,10 @@ export const AGENT_DATABASE_METADATA_TABLE = "openbot_metadata";
 export interface AgentDatabaseHostProcess {
   send(request: AgentDatabaseRequest): void;
   onMessage(listener: (message: AgentDatabaseHostMessage) => void): void;
-  /** The host ended without being asked to. */
-  onExit(listener: () => void): void;
+  /** The host ended without being asked to. `code` is null when the transport does not give one. */
+  onExit(listener: (code: number | null) => void): void;
+  /** The end of what the host wrote to stderr, for the log when it does not start. */
+  recentOutput?(): string;
   /** End it now, whatever it is in the middle of. */
   kill(): void;
 }

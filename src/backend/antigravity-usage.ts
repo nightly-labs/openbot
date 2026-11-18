@@ -19,7 +19,9 @@
 // Gemini usage.
 //
 // Google names the groups and can give a model a group of its own, such as Gemini 4 Argon on some
-// plans (#3055). The reading carries every group, so the usage popover shows each one.
+// plans (#3055). The reading carries every group, so the usage popover shows each one. Google lists
+// no models for the Argon group: its description is a plan note, so the group's name names its model
+// (#9864). Google's JSON leaves a zero `remainingFraction` out, so a spent bucket has none.
 
 import { readFile } from "node:fs/promises";
 import { usageGroupForModel } from "@openbot/contracts/ipc";
@@ -72,7 +74,10 @@ const QuotaBucket = Schema.Struct({
   displayName: Schema.optional(Schema.String),
   resetTime: Schema.optional(Schema.String),
   remainingFraction: Schema.optional(Schema.Number),
+  remainingAmount: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
+  disabled: Schema.optional(Schema.Boolean),
 });
+type QuotaBucket = typeof QuotaBucket.Type;
 
 /** The `retrieveUserQuotaSummary` answer. Fields that OpenBot does not read are left out. */
 const AntigravityQuotaSummary = Schema.Struct({
@@ -101,7 +106,10 @@ type QuotaGroup = AccountRateLimitGroupResult & { primary: UsageWindow | null; s
 export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
   tokenFile: string;
   model: string | null;
+  /** The calls to Google. The app gives one that uses the computer's proxy settings (#11278). */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
 }) {
+  const send = options.fetch ?? fetch;
   const accessToken = yield* Effect.tryPromise(() => readFile(options.tokenFile, "utf8")).pipe(
     Effect.map(validAccessToken),
     Effect.orElseSucceed(() => null),
@@ -110,7 +118,7 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
   const testEndpoint = localTestUrl(process.env[DEV_CODE_ASSIST_URL]);
   const call = <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
     Effect.tryPromise(async (signal) => {
-      const response = await fetch(`${endpoint}:${method}`, {
+      const response = await send(`${endpoint}:${method}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -221,11 +229,12 @@ function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
       secondary: null,
     };
     for (const bucket of entry.buckets ?? []) {
-      if (bucket.remainingFraction === undefined) continue;
+      const remainingFraction = bucket.remainingFraction ?? omittedFraction(bucket);
+      if (remainingFraction === undefined) continue;
       const label = `${bucket.window ?? ""} ${bucket.displayName ?? ""}`;
       const resetsAt = bucket.resetTime ? Date.parse(bucket.resetTime) : Number.NaN;
       const window: UsageWindow = {
-        usedPercent: Math.max(0, Math.min(100, 100 - bucket.remainingFraction * 100)),
+        usedPercent: Math.max(0, Math.min(100, 100 - remainingFraction * 100)),
         windowDurationMins: /week/iu.test(label)
           ? WEEKLY_WINDOW_MINS
           : /\b5\s*-?\s*h|five.?hour/iu.test(label)
@@ -238,7 +247,20 @@ function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
     }
     groups.push(group);
   }
-  return groups;
+  // A group that lists no models while others do limits the model that it names, such as "Gemini 4
+  // Argon". When no group lists models, they stay empty: the Gemini group then covers every model.
+  if (!groups.some((group) => group.models.length > 0)) return groups;
+  return groups.map((group) => (group.models.length > 0 ? group : { ...group, models: [group.name] }));
+}
+
+/**
+ * The fraction of a bucket that has none. Google leaves a zero fraction out, so a bucket with a reset
+ * time and no amount is spent. A bucket that gives an amount instead, or that is turned off, has no
+ * fraction.
+ */
+function omittedFraction(bucket: QuotaBucket): number | undefined {
+  const resets = bucket.resetTime !== undefined && Number.isFinite(Date.parse(bucket.resetTime));
+  return resets && bucket.remainingAmount === undefined && bucket.disabled !== true ? 0 : undefined;
 }
 
 /** "Gemini Models" by name, else the first group whose name starts with Gemini. */

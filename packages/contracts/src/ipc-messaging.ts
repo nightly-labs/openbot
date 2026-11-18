@@ -36,6 +36,10 @@ export const MESSAGING_CONNECTION_STATES = [
   "relay_unavailable",
   // The OpenBot bot is no longer in the Telegram chat.
   "removed",
+  // Signal sends the events of this Slack workspace, Discord server or Telegram chat to another host,
+  // or to none: the account service links it to that host. Reconnect links it to this host again. An
+  // older client shows it as `error`.
+  "not_linked",
 ] as const;
 export type MessagingConnectionState = (typeof MESSAGING_CONNECTION_STATES)[number];
 
@@ -340,6 +344,12 @@ export interface WhatsAppAccount {
    * `whatsapp-working-message-v1`): the host then always posts them, and the client shows no switch.
    */
   workingMessage?: boolean;
+  /**
+   * False when the owner turned off the status reactions (👀, then ✅, ❌ or 🫡) on the person's
+   * message. Absent when the host cannot set it (a joined server without
+   * `whatsapp-status-reactions-v1`): the host then always reacts, and the client shows no switch.
+   */
+  statusReactions?: boolean;
   allowedSenders: WhatsAppSender[];
   pendingRequests: WhatsAppPairingRequest[];
 }
@@ -410,6 +420,16 @@ export interface WhatsAppWorkingMessageList {
   numbers: { workspaceId: string; workingMessage: boolean }[];
 }
 
+export interface SetWhatsAppStatusReactionsInput {
+  workspaceId: string;
+  statusReactions: boolean;
+}
+
+/** The status reaction setting of each linked number of a joined server (`whatsapp-status-reactions-v1`). */
+export interface WhatsAppStatusReactionsList {
+  numbers: { workspaceId: string; statusReactions: boolean }[];
+}
+
 /** Creates the WhatsApp Orchestrator, which every linked number shares. */
 export type AddWhatsAppOrchestratorInput = Omit<AddMessagingOrchestratorInput, "workspaceId">;
 
@@ -447,6 +467,7 @@ function isWhatsAppAccount(value: unknown): value is WhatsAppAccount {
     isIdentifier(value.workspaceId) &&
     isBoolean(value.ownNumber) &&
     (value.workingMessage === undefined || isBoolean(value.workingMessage)) &&
+    (value.statusReactions === undefined || isBoolean(value.statusReactions)) &&
     Array.isArray(value.allowedSenders) &&
     value.allowedSenders.length <= MESSAGING_LIMITS.allowedSenders &&
     value.allowedSenders.every(isWhatsAppSender) &&
@@ -515,6 +536,36 @@ export function withWhatsAppWorkingMessages(
     accounts: overview.accounts.map((account) => {
       const workingMessage = values.get(account.workspaceId);
       return workingMessage === undefined ? account : { ...account, workingMessage };
+    }),
+  };
+}
+
+export function isWhatsAppStatusReactionsList(value: unknown): value is WhatsAppStatusReactionsList {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.numbers) &&
+    value.numbers.length <= MESSAGING_LIMITS.connections &&
+    value.numbers.every(
+      (entry: unknown) => isDynamicRecord(entry) && isIdentifier(entry.workspaceId) && isBoolean(entry.statusReactions),
+    )
+  );
+}
+
+/**
+ * A joined server's WhatsApp numbers with the status reaction setting of each. `settings` is null
+ * for a host without `whatsapp-status-reactions-v1`: the accounts then carry no setting.
+ */
+export function withWhatsAppStatusReactions(
+  overview: WhatsAppOverview,
+  settings: WhatsAppStatusReactionsList | null,
+): WhatsAppOverview {
+  if (!settings) return overview;
+  const values = new Map(settings.numbers.map((entry) => [entry.workspaceId, entry.statusReactions]));
+  return {
+    ...overview,
+    accounts: overview.accounts.map((account) => {
+      const statusReactions = values.get(account.workspaceId);
+      return statusReactions === undefined ? account : { ...account, statusReactions };
     }),
   };
 }

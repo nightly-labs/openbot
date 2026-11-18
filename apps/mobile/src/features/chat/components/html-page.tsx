@@ -9,6 +9,11 @@ export interface HtmlPageProps {
    * is part of a reply: the caller makes it take no touches.
    */
   mode: "screen" | "chat";
+  /**
+   * In `chat` mode, gets the height of the page content in points each time it changes. With this
+   * set, the page can send the app a message; the view takes only a finite number from it.
+   */
+  onHeight?: (height: number) => void;
   /** The space that the floating header and the home indicator cover on the preview screen. */
   insets?: { top: number; bottom: number };
 }

@@ -77,6 +77,7 @@ import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contr
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { isAgentThreadRequests } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
@@ -93,6 +94,7 @@ export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remo
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
+export const decodeRemoteAgentThreadRequests = guardedDecoder(isAgentThreadRequests, "remote thread requests");
 export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");

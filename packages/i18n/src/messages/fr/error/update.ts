@@ -9,6 +9,7 @@ export const messages = {
   "error.update.restartFailed": "OpenBot n’a pas pu redémarrer pour installer la mise à jour.",
   "error.update.downloadStalled": "Le téléchargement de la mise à jour ne répond plus. Réessayez.",
   "error.update.installFailed": "Impossible d’installer la mise à jour. Quittez puis rouvrez OpenBot, et réessayez.",
+  "error.update.notInstalled": "Le dernier redémarrage n’a pas installé la mise à jour. Redémarrez pour réessayer.",
   "error.update.downloadFailed": "Impossible de télécharger la mise à jour. Réessayez.",
   "error.update.checkFailed": "Impossible de rechercher des mises à jour. Réessayez.",
   "error.update.checkStalled": "La recherche de mise à jour ne répond plus. Réessayez.",
@@ -29,6 +30,10 @@ export const messages = {
     "Impossible de vérifier les autres sessions OpenBot. Réessayez avant l’installation.",
   "error.update.readOnlyLocation":
     "OpenBot ne peut pas installer de mises à jour depuis cet emplacement. Quittez OpenBot. Dans le Finder, faites glisser OpenBot dans le dossier Applications (s’il y est déjà, sortez-le puis remettez-le). Ouvrez ensuite OpenBot et installez de nouveau la mise à jour.",
+  "error.update.appImageMissing":
+    "OpenBot ne peut pas installer la mise à jour, car son fichier AppImage a été déplacé, renommé ou remplacé. Quittez OpenBot, puis rouvrez le fichier AppImage.",
+  "error.update.appImageReadOnly":
+    "OpenBot ne peut pas installer de mises à jour dans le dossier de son fichier AppImage. Quittez OpenBot, déplacez le fichier AppImage dans un dossier de votre dossier personnel, puis ouvrez-le et installez à nouveau la mise à jour.",
   "error.update.remoteDisabled": "Les mises à jour des administrateurs du serveur sont désactivées sur cet ordinateur.",
   "error.update.restartStarted": "OpenBot redémarre déjà pour installer la mise à jour.",
   "error.update.alreadyRestarting": "OpenBot redémarre déjà.",

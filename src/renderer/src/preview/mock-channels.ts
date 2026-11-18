@@ -112,6 +112,9 @@ export function createMockChannels(
               createdAt: channels.get(input.channelId)?.createdAt ?? new Date().toISOString(),
             }
           : requireChannel(input.channelId);
+      // The service refuses to delete a channel while a task runs there.
+      if (input.type === "archive" && (tasks.get(input.channelId) ?? []).some((task) => task.state === "running"))
+        throw new Error(sourceText("error.backend.channelArchiveRunning"));
       // A browser member that left the channel turns the setting to no member, as the service does.
       channel = withBrowserMember({ ...channel, revision: channel.revision + 1 });
       if (input.type === "archive" || input.type === "restore") channel.archived = input.type === "archive";

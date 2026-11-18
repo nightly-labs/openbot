@@ -29,9 +29,12 @@ import {
   type ThreadItem,
 } from "../protocol";
 import {
+  GEMINI_INVALID_ARGUMENT,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isImageUnreadableDiagnostic,
+  isRequestBodyLimitDiagnostic,
   isUnreadableContentDiagnostic,
 } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
@@ -60,7 +63,12 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // (`codex-rs/core/src/session/mod.rs`). OpenBot changes the model on purpose: the user picked a
     // new one, or a backup model ran. The turn continues, but the red banner looked like a failure and
     // told the user to switch back (#8135).
-    message.startsWith("This session was recorded with model ")
+    message.startsWith("This session was recorded with model ") ||
+    // Codex sends this on each session start when the user's own or a project's `config.toml` sets
+    // `features.multi_agent` (`codex-rs/config/src/loader/mod.rs`). A session setting from OpenBot
+    // does not stop it, because Codex reads only those two layers. The chat works, but a red banner
+    // asked the user to edit the Codex file (#8763).
+    message.startsWith("`[features].multi_agent` is deprecated.")
   );
 }
 
@@ -139,6 +147,45 @@ function isForeignReasoningError(message: string): boolean {
 }
 
 /**
+ * Codex sends the Responses API `store: false` and an item ID for each history item. When the
+ * history refers to an item that OpenAI did not keep, OpenAI answers 404 "Item with id ... not found.
+ * Items are not persisted when `store` is set to false". Codex sends that history again on each turn,
+ * so each later turn failed the same way (#9809). Only a new session, given the OpenBot transcript,
+ * recovers. The text can come without the backticks.
+ */
+function isCodexUnstoredItem(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bItems are not persisted when `?store`? is set to false\b/i.test(message);
+}
+
+/**
+ * The ChatGPT backend that Codex uses can refuse a request with only the 24-byte body
+ * `{"detail":"Bad Request"}`. Codex compresses the request with zstd, and the backend refuses some
+ * compressed requests, often in a long chat with many images (openai/codex#60594). Codex sends the
+ * same history on each turn, so each later turn failed the same way, in about 2 seconds, until a new
+ * chat (#9915). A new session, given the OpenBot transcript, sends different bytes. Only the bare
+ * body matches: a `detail` that names a cause, such as "Instructions are not valid", does not.
+ * Codex sends a 400 of a turn as the body only. Its other form is `unexpected status 400 Bad
+ * Request: <body>, url: …`, with the cf-ray and request id after the url.
+ */
+function isCodexBareBadRequest(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "codex" &&
+    /^(?:[^{]*\b400 Bad Request:\s*)?\{\s*"detail"\s*:\s*"Bad Request"\s*\}(?:,\s*url:.*)?$/.test(message.trim())
+  );
+}
+
+/**
+ * Codex sends the `input_audio` of a tool result to a model whose catalog entry lists audio input.
+ * GPT-6.2 Sol does not take it, and OpenAI answers 400 "Audio input is not available." or "Audio
+ * input is not supported for this request." Codex keeps the item in the session and sends it on each
+ * turn, so each later turn failed the same way, a text-only one too (#11728, openai/codex#62212). A
+ * new session, given the OpenBot transcript, has no audio.
+ */
+function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bAudio input is not (?:available|supported)\b/i.test(message);
+}
+
+/**
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
@@ -154,6 +201,30 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
 }
 
 /**
+ * Google's generic 400 INVALID_ARGUMENT that names no field, through Antigravity. The CLI keeps the
+ * refused item in the session and sends it on each turn, so each later message failed with the same
+ * 400 until a new chat (#9593). An image that the agent's own tool opened gives this text, not
+ * "Unable to process input image". Gemini CLI's reports show the same text for other items in the
+ * history: an SVG in tool output, and a tool answer that does not match its call. A new session,
+ * given the OpenBot transcript, recovers. A cause outside the history, such as a tool schema, fails
+ * the one retry too, and the text then tells the user to choose another model (#7116).
+ */
+function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && GEMINI_INVALID_ARGUMENT.test(message);
+}
+
+/**
+ * Antigravity summarizes a session's history before each prompt. When the saved history has no
+ * steps that it can read, the summary fails, and so does each later prompt of that session, before
+ * the model runs (#10237). A new session, given the OpenBot transcript, recovers.
+ */
+function isClearedAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "antigravity" && /\bno renderable messages\b|\ball steps in trajectory are cleared\b/i.test(message)
+  );
+}
+
+/**
  * OpenCode 2.2.5 to 2.3.0 compacts a chat near its model's window with a summary from the model. A
  * weak local model can answer with a tool call or with no summary headings, and OpenCode then fails
  * the turn. The session stays too long, so each later turn compacts and fails again (#6006). Only a
@@ -165,6 +236,19 @@ function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): b
     /\bCompaction summary did not match the required template\b|\bCompaction produced no summary\b|\bCompaction summary reached the output token limit\b/i.test(
       message,
     )
+  );
+}
+
+/**
+ * OpenCode 2.2.5 to 2.3.0 can keep a media part of the chat as a local file or as text that is not
+ * image data, and then refuses to build each later request of the session, its compaction too. Each
+ * later turn failed in milliseconds, and a channel showed thousands of failures (#9994). Only a new
+ * session, given the OpenBot transcript, recovers.
+ */
+function isUnsendableOpenCodeMedia(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "opencode" &&
+    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b/i.test(message)
   );
 }
 
@@ -201,15 +285,25 @@ function isClaudeContextOverflow(provider: AgentProvider, message: string): bool
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
+  if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
+  if (isCodexBareBadRequest(provider, message))
+    return sourceText("error.provider.codexRequestRefused", { provider: providerLabel(provider) });
+  if (isCodexRefusedAudio(provider, message)) return sourceText("error.provider.codexAudioRefused");
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
     return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+  if (isImageUnreadableDiagnostic(message) || isUnsendableOpenCodeMedia(provider, message))
+    return sourceText("error.provider.imageUnreadable", { provider: providerLabel(provider) });
+  if (isRequestBodyLimitDiagnostic(message))
+    return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
+  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
@@ -514,12 +608,13 @@ function resultText(value: unknown, depth = 0): string | null {
  */
 const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
 
-/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
+/**
+ * Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool, or
+ * its `powershell` tool on a Windows computer with no bash that runs (#11209).
+ */
 function isShellCommand(item: ThreadItem): boolean {
-  return (
-    toolUsage(item)?.kind === "command" ||
-    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
-  );
+  const tool = item.type === "dynamicToolCall" && !getString(item, "namespace") ? getString(item, "tool") : undefined;
+  return toolUsage(item)?.kind === "command" || tool === "bash" || tool === "powershell";
 }
 
 /**
@@ -578,9 +673,13 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
+  // Its name has `set`, and the page reads as a change of the window, not of a file.
+  if (openBot === "set_backdrop") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
   // Its name has `send`, a word of the agent words below.
   if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
+  if (openBot === "withdraw_feedback")
+    return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackWithdrawing");
   const skill = getString(item, "name") === "Skill" ? getString(item, "skill") : null;
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {

@@ -15,6 +15,7 @@ import type {
   RemoteControlPolicy,
   RemoteDesktopSession,
   SendDirectMessageInput,
+  ServerAppearance,
   ServerSummary,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -130,6 +131,12 @@ export function createMockTeam(
   function emitRemoteDesktopSessions(sessionsValue: RemoteDesktopSession[]): void {
     remoteDesktopSessions = clone(sessionsValue);
     emit(remoteDesktopListeners, sessionsValue);
+  }
+
+  /** The look a host shows with no logo. Main tells the window with the server list, as here. */
+  function setServerAppearance(serverId: string, appearance: ServerAppearance | null): void {
+    servers = servers.map((server) => (server.id === serverId ? { ...server, appearance } : server));
+    emit(serverListeners, servers);
   }
 
   const serversApi: OpenBotDesktopApi["servers"] = {
@@ -364,7 +371,12 @@ export function createMockTeam(
       hostStatus = {
         ...hostStatus,
         ...(input.serverName === undefined ? {} : { serverName: input.serverName }),
+        ...(input.appearance === undefined ? {} : { appearance: input.appearance }),
       };
+      if (input.appearance !== undefined) {
+        const local = servers.find((server) => server.kind === "local");
+        if (local) setServerAppearance(local.id, input.appearance);
+      }
       emitHostStatus(hostStatus);
       return clone(hostStatus);
     },
@@ -523,6 +535,7 @@ export function createMockTeam(
     emitDirectTyping,
     emitInvite,
     emitHostStatus,
+    setServerAppearance,
     emitRemoteDesktopSessions,
     readDirectConversationSnapshot,
     updateDirectConversationSnapshot,

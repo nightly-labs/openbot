@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { HStack, Image, Menu, Picker, Text } from "@expo/ui/swift-ui";
 import {
   accessibilityLabel,
@@ -11,6 +11,7 @@ import {
   tint,
 } from "@expo/ui/swift-ui/modifiers";
 import { useCSSVariable } from "uniwind";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import type { SettingsPickerProps, SettingsSwitchProps } from "./settings-controls.types";
 
@@ -64,7 +65,7 @@ export function SettingsSwitch({ value, disabled, label, dark, onValueChange }: 
   const nativeLabelFont = useNativeLabelFont();
   return (
     <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme={dark ? "dark" : "light"}>
-      <Switch
+      <AppSwitch
         value={value}
         disabled={disabled}
         label={label}

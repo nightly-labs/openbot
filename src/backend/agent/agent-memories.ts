@@ -335,8 +335,11 @@ export class AgentMemories {
         return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
       const text = args.text.trim();
       if (!text) return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
+      // Give the numbers, so the agent can save a shorter memory on the next try (#10762).
       if (text.length > INPUT_LIMITS.agentMemoryText)
-        return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryTextTooLong")} A memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
+        );
       if (args.inclusion !== undefined && args.inclusion !== "essential" && args.inclusion !== "searchable")
         return openBotToolFailure("inclusion must be essential or searchable.");
       const site = isString(args.site) ? normalizeMemorySite(args.site) : undefined;
@@ -449,8 +452,12 @@ export class AgentMemories {
           `${sourceText("error.backend.memoryGone")} There is nothing to delete. Call list_memories if you need your current memory IDs.`,
         );
       const selection = this.#memories.getSelection(senderAgentId, current.id);
+      // Only the user deletes a memory that the user set: no text can prove that the user asked for
+      // it. Without a way forward, the agent told the user that it cannot be deleted at all (#8700).
       if (selection?.userControlled)
-        return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memorySelectionUserControlled")} You cannot delete it. If the user asked to delete it, tell them in one sentence to delete it in your Memories settings: Settings, Memories, then Delete on this memory. Do not try another memory tool.`,
+        );
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "forget",

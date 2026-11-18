@@ -60,7 +60,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "לנקות את יומן התמיכה?",
   "mobile.settings.support.clearBody": "הפעולה מסירה את כל האירועים מהיומן בטלפון הזה.",
   "mobile.settings.support.logFooter":
-    "היומן נשאר בטלפון הזה, ו-OpenBot אינו שולח אותו. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
+    "היומן נשאר בטלפון הזה. OpenBot שולח שורות ממנו רק עם דיווח על באג באפליקציית הטלפון שנשלח על ידך, וכרטיס הדיווח מציג אותן קודם. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
   "mobile.settings.support.saveFailed": "לא ניתן לשמור את קובץ היומן. אפשר לנסות שוב.",
   "mobile.settings.support.sharingUnavailable": "שיתוף אינו זמין בטלפון הזה.",
   "mobile.settings.support.newestFirst": "מהחדש לישן.",
@@ -121,19 +121,64 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "בהירות",
   "mobile.settings.appearance.messageColorFooter":
     "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
+  "mobile.settings.appearance.bubbleStyle": "סגנון הבועות",
+  "mobile.settings.appearance.bubbleStyleSolid": "מלא",
+  "mobile.settings.appearance.bubbleStyleTint": "גוון",
+  "mobile.settings.appearance.seeThroughBubbles": "בועות שקופות",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "בועות של הסוכן ובועות בלי צבע מראות דרכן את הרקע. בלי רקע, הבועות תמיד אטומות.",
+  "mobile.settings.appearance.tab.colors": "צבעים",
+  "mobile.settings.appearance.tab.chat": "צ'אט",
+  "mobile.settings.appearance.preview.routines": "3 הרצות של שגרה",
+  "mobile.settings.appearance.preview.thinking": "חשב 4 שניות",
+  "mobile.settings.appearance.preview.memory": "נשמר זיכרון אחד",
+  "mobile.settings.appearance.backdrop.title": "רקע",
+  "mobile.settings.appearance.backdrop.footer":
+    "מוצג מאחורי מסך הבית והצ'אטים שלך בטלפון הזה. סוכן יכול להגדיר רקע בשבילך; ביטול בצ'אט מחזיר את הקודם.",
+  "mobile.settings.appearance.backdrop.none": "ללא",
+  "mobile.settings.appearance.backdrop.pond": "בריכת קוי",
+  "mobile.settings.appearance.backdrop.jellyfish": "מדוזות",
+  "mobile.settings.appearance.backdrop.sunset": "שקיעה רטרו",
+  "mobile.settings.appearance.backdrop.snowfall": "שלג יורד",
+  "mobile.settings.appearance.backdrop.fireflies": "גחליליות",
+  "mobile.settings.appearance.backdrop.agentPage": "דף הסוכן",
+  "mobile.settings.appearance.backdrop.agentPageNote": "הוגדר על ידי סוכן",
+  "mobile.settings.appearance.backdrop.photo": "תמונה",
+  "mobile.settings.appearance.backdrop.photoChoose": "בחירה מהתמונות שלך",
+  "mobile.settings.appearance.backdrop.photoChange": "יש להקיש שוב כדי לבחור תמונה אחרת",
+  "mobile.settings.appearance.backdrop.strength": "עוצמת הרקע",
+  "mobile.settings.appearance.backdrop.calm": "עדין",
+  "mobile.settings.appearance.backdrop.vivid": "עז",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "רקע עדין שומר על תשובות ארוכות קריאות. בחלק העליון של מסך הבית רואים אותו הכי הרבה.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "אפשר לכתוב את הערת הגרסה?",
+  "mobile.settings.appearance.backdrop.previewAnswer": "הנה טיוטה: הרקע שסוכן מגדיר מוצג עכשיו גם בטלפון שלך.",
+  "mobile.settings.appearance.chatBackground": "רקע הצ'אט",
+  "mobile.settings.appearance.chatBackgroundDefault": "ברירת מחדל",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "הרקע מחליף את רקע הצ'אט. כדי להשתמש בצבע, יש לבחור ללא כרקע.",
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",
+  "mobile.settings.appearance.replyDetails": "פרטי תשובות",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "כבו פרט כדי להסתיר את השורה שלו בצ'אטים. הסוכן ממשיך לחשוב, להפעיל תת־סוכנים ולשמור זיכרונות.",
+  "mobile.settings.appearance.showThinking": "הצגת החשיבה של הסוכן",
+  "mobile.settings.appearance.showSubagents": "הצגת תת־סוכנים",
+  "mobile.settings.appearance.showMemoryChanges": "הצגת זיכרונות שנשמרו",
+  "mobile.settings.appearance.fullVisuals": "הצגת תצוגות חזותיות מלאות",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "תצוגה חזותית של סוכן מוצגת בצ׳אט בגובה המלא שלה. כשהאפשרות כבויה, תצוגה גבוהה נחתכת, ואפשר להקיש עליה כדי לראות את כולה.",
   "mobile.settings.animations.title": "אנימציות",
-  "mobile.settings.animations.footer":
-    "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",
-  "mobile.settings.animations.all": "אנימציות",
+  "mobile.settings.animations.fullMotion": "תנועה מלאה",
+  "mobile.settings.animations.reduced": "מופחתת",
+  "mobile.settings.animations.motionFooter":
+    "האפשרות „מופחתת“ מפחיתה תנועה בכל האפליקציה ומשאירה את האנימציות שלמטה כבויות. כשהפחתת תנועה מופעלת בהגדרות הטלפון, גם האפליקציה מפחיתה תנועה.",
   "mobile.settings.animations.agentFaces": "פרצופי סוכנים מונפשים",
   "mobile.settings.animations.agentFacesFooter":
     "תמונות הסוכנים מזיזות את הפרצוף בזמן שהסוכנים עובדים ונחים. כשהאפשרות כבויה, הפרצופים נשארים במקום, והדמויות במסכי הפתיחה והבית הריקים מפסיקות לרחף.",
-  "mobile.settings.animations.composerResize": "שדה הודעה קומפקטי",
-  "mobile.settings.animations.composerResizeFooter":
-    "שדה ההודעה הופך לסרגל קטן כשהמקלדת סגורה. כשהאפשרות כבויה, השדה נשאר בגודל מלא.",
   "mobile.settings.animations.textReveal": "אנימציה לתשובות",
   "mobile.settings.animations.textRevealFooter":
     "תשובה נכתבת מילה אחר מילה, והבועה שלה גדלה בצורה חלקה. כשהאפשרות כבויה, הטקסט מוצג כפי שהוא מגיע.",
@@ -225,6 +270,23 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.messageField": "שדה ההודעה",
+  "mobile.settings.conversations.compact": "קומפקטי",
+  "mobile.settings.conversations.fullSize": "גודל מלא",
+  "mobile.settings.conversations.compactFooter": "„קומפקטי“ הופך את שדה ההודעה לפס קטן כשהמקלדת סגורה.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "התנועה מופחתת באנימציות או בהגדרות הטלפון, ולכן שדה ההודעה נשאר בגודל מלא.",
+  "mobile.settings.conversations.media": "תמונות וקבצים",
+  "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeThreads": "שרשורים",
+  "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeOff": "כבוי",
+  "mobile.settings.conversations.swipeFooter":
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. אותה החלקה על הודעה מציגה את שעות ההודעות.",
+  "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
+  "mobile.settings.conversations.pullInfoFooter":
+    "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
   "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",
@@ -483,6 +545,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "לא ניתן לעצור את התהליך.",
   "mobile.settings.agents.processes.stopTitle": "לעצור את התוכנית הזו?",
   "mobile.settings.agents.processes.stopLabel": "עצירת תהליך {pid}",
+  "mobile.settings.quickActions.title": "תפריט סמל האפליקציה",
+  "mobile.settings.quickActions.footer":
+    "לחצו לחיצה ארוכה על סמל OpenBot כדי לראות את הפעולות. אפשר להפעיל עד {count}.",
+  "mobile.settings.quickActions.latestChat": "הצ׳אט האחרון",
+  "mobile.settings.quickActions.secondChat": "הצ׳אט הלפני אחרון",
   "mobile.settings.shortcuts.title": "קיצורים",
   "mobile.settings.shortcuts.agent": "סוכן",
   "mobile.settings.shortcuts.none": "ללא",
@@ -496,7 +563,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "בחירת סוכן",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot נעול",
   "mobile.settings.shortcuts.card.locked.action": "פתיחת OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message באפליקציית הקיצורים שולח לסוכן הזה. האפליקציה לא נפתחת.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message באפליקציית הקיצורים שולח לסוכן הזה. האפליקציה לא נפתחת. Open Agent פותח את הצ׳אט שלו.",
   "mobile.settings.shortcuts.send.sent": "נשלח",
   "mobile.settings.shortcuts.send.failed": "OpenBot לא הצליח לשלוח את זה.",
   "mobile.settings.shortcuts.send.unconfirmed": "אין תשובה מהשרת. ייתכן שההודעה בצ׳אט.",

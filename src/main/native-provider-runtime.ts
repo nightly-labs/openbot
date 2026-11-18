@@ -2,7 +2,7 @@ import { chmod, copyFile, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { NATIVE_VERSION_PARSERS } from "../backend/cli";
+import { COPILOT_ENV, NATIVE_VERSION_PARSERS } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import type { ProviderRuntimeDescriptor, ProviderStageContext } from "./provider-runtime-descriptors";
@@ -96,6 +96,7 @@ export function nativeProviderRuntime(
       }
     }),
     parseVersion: NATIVE_VERSION_PARSERS[runtime],
+    ...(runtime === "copilot" ? { versionEnvironment: COPILOT_ENV } : {}),
     // Antigravity 1.4.5 and earlier were the ACP server `agy_acp_server`, which OpenBot can no longer
     // start.
     ...(runtime === "antigravity" ? { legacyExecutableNames: ["agy_acp_server.par", "agy_acp_server.exe"] } : {}),

@@ -6,6 +6,7 @@ import {
   ONEPASSWORD_MARK_PATH,
   PROTON_MARK_PATH,
   SLACK_MARK_PATH,
+  STRIPE_MARK_PATH,
   TELEGRAM_MARK_PATH,
   WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
@@ -100,6 +101,15 @@ export function DiscordTile() {
   return (
     <BrandTile background="#5865F2">
       <path d={DISCORD_MARK_PATH} fill="#FFFFFF" />
+    </BrandTile>
+  );
+}
+
+/** Stripe's app icon: the white "S" on Stripe's purple. */
+export function StripeTile() {
+  return (
+    <BrandTile background="#635BFF">
+      <path d={STRIPE_MARK_PATH} fill="#FFFFFF" />
     </BrandTile>
   );
 }

@@ -7,7 +7,7 @@ import {
   type OpenBotDesktopApi,
   type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
-import { Alert, AlertContent, AlertDescription } from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, ItemGroup, SettingsSection } from "@openbot/ui";
 import type { RoleAgent } from "@openbot/ui/features/servers/ServerRoles";
 import {
   type AgentDefaultsAgent,
@@ -18,7 +18,9 @@ import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { serverHasAgentDefaults } from "./server-capabilities";
+import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
+import { ServerTurnLimitsSetting } from "./ServerTurnLimitsSetting";
+import { serverCanAdminister, serverHasAgentDefaults } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 /** The agent default calls of one server's host. The desktop reaches them through main. */
@@ -49,7 +51,10 @@ interface AgentsState {
 }
 
 export interface ServerAgentsSection {
-  /** True when this account changes the agent defaults of this server: the Agents tab shows then. */
+  /**
+   * True when this account changes the agent defaults, the timezone or the thread limits of this server:
+   * the Agent defaults section shows then.
+   */
   available: () => boolean;
   Panel: () => JSX.Element;
   /** The setting page, for the dialog header `Agents › Local scripts`. */
@@ -76,15 +81,17 @@ function showSaveFailure(error: unknown): void {
 }
 
 /**
- * Server Settings > Agents: the agent defaults of this computer or of a joined server
- * (`agent-defaults-v1`), and each agent's own value. An owner or admin of a joined server changes them.
+ * Server Settings > Agent defaults: the timezone and thread limits of the host (`host-timezone-v1`,
+ * `host-turn-limits-v1`), and the agent defaults of this computer or of a joined server
+ * (`agent-defaults-v1`) with each agent's own value. An owner or admin of a joined server changes them.
+ * Each part shows only when the host has its capability, so an older host shows the parts it supports.
  */
 export function createServerAgentsSection(
   host: ServerSettingsSectionHost,
   visible: () => boolean,
 ): ServerAgentsSection {
   const { t } = useText();
-  const { props, local } = host;
+  const { props, local, actionsAvailable, busy, run } = host;
   const calls = (): HostAgentDefaultsCalls => props.agentDefaults?.calls ?? window.openbot.agent;
   const [state, setState] = createStore<AgentsState>({
     overview: null,
@@ -101,7 +108,12 @@ export function createServerAgentsSection(
   /** A change failed while another was in flight: read again when the last one ends. */
   let reloadAfterWrites = false;
 
-  const available = () => Boolean(props.agentDefaults) && serverHasAgentDefaults(props.server);
+  const defaultsAvailable = () => Boolean(props.agentDefaults) && serverHasAgentDefaults(props.server);
+  const timezone = () =>
+    serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable() ? props.hostTimezone : undefined;
+  const turnLimits = () =>
+    serverCanAdminister(props.server, "host-turn-limits-v1") && actionsAvailable() ? props.hostTurnLimits : undefined;
+  const available = () => defaultsAvailable() || Boolean(timezone() || turnLimits());
 
   function load(serverId: string): void {
     const options = props.agentDefaults;
@@ -131,7 +143,7 @@ export function createServerAgentsSection(
     });
   }
 
-  const shown = () => props.open && visible() && available();
+  const shown = () => props.open && visible() && defaultsAvailable();
 
   // The host sends `agents-changed` after a change from another device, such as a phone, so the open
   // section reads again.
@@ -230,6 +242,44 @@ export function createServerAgentsSection(
   const scope = () => (local() ? "computer" : "server");
 
   function Panel() {
+    return (
+      <>
+        <Show when={!state.setting && (timezone() || turnLimits())}>
+          <SettingsSection title={t("server.settings.threadsCard")}>
+            <ItemGroup class="settings-modal-card">
+              <Show when={timezone()}>
+                {(options) => (
+                  <ServerTimezoneSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={turnLimits()}>
+                {(options) => (
+                  <ServerTurnLimitsSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
+        <Show when={defaultsAvailable()}>
+          <AgentDefaults />
+        </Show>
+      </>
+    );
+  }
+
+  function AgentDefaults() {
     return (
       <Show
         when={state.overview}

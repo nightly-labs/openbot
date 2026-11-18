@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "Приостановлено",
   "billing.otherServers": "Другие серверы",
   "billing.action.menu": "Действия с тарифом для {server}",
-  "billing.action.change": "Сменить тариф",
+  "billing.action.addStorage": "Добавить место",
   "billing.action.cancel": "Отменить тариф",
   "billing.action.renew": "Продлить тариф",
   "billing.action.updatePayment": "Обновить способ оплаты",
+  "billing.storage.title": "Больше места для {server}",
+  "billing.storage.add": "Добавить {size}",
+  "billing.storage.failed": "Не удалось добавить место.",
   "billing.lifecycle.cancelRenewal": "Отменить продление",
   "billing.lifecycle.cancelTitle": "Отменить продление для {name}?",
   "billing.lifecycle.cancelDescription":
@@ -232,4 +235,10 @@ export const messages = {
     other:
       "В вашей лицензии максимум пользователей: {count}. Свяжитесь с нами, чтобы получить лицензию больше. Новые люди не могут присоединиться к вашим серверам.",
   },
+  "billing.details.country": "Страна для счёта",
+  "billing.details.countryPlaceholder": "Выберите страну",
+  "billing.details.vatId": "Номер НДС ЕС (необязательно)",
+  "billing.details.vatIdInvalid": "Это не номер НДС выбранной страны.",
+  "billing.details.countryMissing": "Выберите страну для счёта.",
+  "billing.details.saveFailed": "Не удалось сохранить платёжные данные",
 } as const satisfies PartialTranslation<typeof source>;

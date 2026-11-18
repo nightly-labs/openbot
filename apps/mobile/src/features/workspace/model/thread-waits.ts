@@ -1,4 +1,4 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentPromptQuestion, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type MobileAgentWaitReason, WAIT_RANK } from "./agent-activity";
 
 /**
@@ -14,18 +14,34 @@ export interface MobileThreadWait {
   turnId: string;
   reason: MobileAgentWaitReason;
   task: boolean;
+  /** The questions of a question. A channel draws its card from them when it has no row for it. */
+  questions?: AgentPromptQuestion[];
 }
 
 /** True when `threadId` is the thread of a side thread of the agent that the phone knows. */
 export type IsTaskThread = (agentId: string, threadId: string) => boolean;
 
 function threadWait(
-  request: { requestId: string | number; agentId: string; threadId: string; turnId: string },
+  request: {
+    requestId: string | number;
+    agentId: string;
+    threadId: string;
+    turnId: string;
+    questions?: AgentPromptQuestion[];
+  },
   reason: MobileAgentWaitReason,
   isTaskThread: IsTaskThread,
 ): MobileThreadWait {
-  const { requestId, agentId, threadId, turnId } = request;
-  return { requestId, agentId, threadId, turnId, reason, task: isTaskThread(agentId, threadId) };
+  const { requestId, agentId, threadId, turnId, questions } = request;
+  return {
+    requestId,
+    agentId,
+    threadId,
+    turnId,
+    reason,
+    task: isTaskThread(agentId, threadId),
+    ...(questions ? { questions } : {}),
+  };
 }
 
 function sameRequest(left: MobileThreadWait, right: { requestId: string | number; agentId: string }) {

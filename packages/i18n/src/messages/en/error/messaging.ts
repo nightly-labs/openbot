@@ -17,11 +17,15 @@ export const messages = defineMessages("error.messaging", {
   "error.messaging.telegramUnsupported": "This computer cannot connect to Telegram.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot cannot reach Telegram on this computer. Sign in, give this computer a name, and try again.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot cannot connect to its service from this computer. Check the internet connection, VPN, proxy, or firewall, and try again.",
   "error.messaging.telegramServiceUnavailable": "OpenBot cannot connect Telegram now. Try again later.",
   // Errors of a linked WhatsApp number, which the host sends.
   "error.messaging.whatsappNotConnected": "This WhatsApp number is not connected.",
   "error.messaging.whatsappUnsupported": "This computer cannot connect to WhatsApp.",
   "error.messaging.whatsappTooManySenders": "A WhatsApp number can allow up to 200 contacts and groups.",
+  "error.messaging.whatsappNumberNotFound":
+    "This number has no WhatsApp account. Type it with its country code, such as +44 7700 900123.",
   "error.messaging.whatsappRequestEnded": "This request ended. Ask the person to write again for a new code.",
   // The agent gets this when a connected workspace has too many saved facts.
   "error.messaging.memoryLimit": "A connected workspace can have up to {limit} memories. Delete one first.",

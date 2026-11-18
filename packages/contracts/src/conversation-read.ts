@@ -21,6 +21,7 @@ import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "./ipc-conversation-messages";
 import { CONVERSATION_PLAN_ITEM_TYPE } from "./ipc-conversation-plan";
 import { CONVERSATION_SUBAGENTS_ITEM_TYPE } from "./ipc-conversation-subagents";
 import { MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX } from "./marketplace-suggestion-events";
+import { SETTING_LINK_ITEM_TYPE_PREFIX } from "./setting-links";
 import { SKILL_EVENT_ITEM_TYPE_PREFIX } from "./skill-conversation-events";
 
 /** Item types that never make a chat unread: the agent's own work, and messages between agents. */
@@ -45,6 +46,7 @@ export const READ_EXCLUDED_ITEM_TYPE_PREFIXES = [
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
 ] as const;
 

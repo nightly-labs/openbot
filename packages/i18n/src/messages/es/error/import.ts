@@ -93,7 +93,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: vuelve a introducir su clave de API en Ajustes.",
   "error.import.transferAgentEnv": "{name}: vuelve a introducir los valores de {names} en Ajustes.",
   "error.import.transferMcpValues":
-    "{name}: el servidor MCP se añade desactivado. Revisa su comando, vuelve a introducir sus valores y su dirección completa, y actívalo en los ajustes de MCP.",
+    "{name}: el servidor MCP se añade desactivado. Revisa su comando, vuelve a introducir sus valores y su dirección completa, y actívalo en Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name}: se quitaron de sus argumentos o de su dirección los valores que pueden contener un secreto. Vuelve a introducirlos en Ajustes.",
   "error.import.transferSharedKept":

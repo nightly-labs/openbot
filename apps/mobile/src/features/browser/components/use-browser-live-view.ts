@@ -30,10 +30,14 @@ export function useBrowserLiveView(
   tabId: string | null,
   active: boolean,
   onContextMenu: (menu: BrowserViewContextMenu) => void,
+  /** The page itself copied this text, such as with its "Copy" button, after a tap on the phone. */
+  onPageCopy: (text: string) => void,
 ) {
   const { openBrowserView } = useMobileWorkspaceActions();
   const contextMenu = useRef(onContextMenu);
   contextMenu.current = onContextMenu;
+  const pageCopy = useRef(onPageCopy);
+  pageCopy.current = onPageCopy;
   const image = useSharedValue<SkImage | null>(null);
   const [status, setStatus] = useState<BrowserLiveViewStatus>({ kind: "connecting" });
   const [frame, setFrame] = useState<Size | null>(null);
@@ -104,6 +108,7 @@ export function useBrowserLiveView(
         if (message.type === "cursor") setCursor(message.cursor);
         else if (message.type === "copied") selections.current.shift()?.(message.text);
         else if (message.type === "copyTooLarge") selections.current.shift()?.(null);
+        else if (message.type === "pageCopied") pageCopy.current(message.text);
         else contextMenu.current(message);
       } else {
         session.current = null;

@@ -11,13 +11,17 @@ import {
   forgetPendingThreadDeletes,
   type PendingThreadDelete,
   readPendingThreadDeletes,
+  readThreadsSeenThrough,
   readThreadTabs,
   type ThreadTabsByServer,
   takePendingThreadDelete,
+  writeThreadsSeenThrough,
   writeThreadTabs,
 } from "./thread-tabs-storage";
 
 const NO_TABS: AgentThreadTabs = { open: [], active: null, side: [] };
+/** The seen-through time of an agent that had no side thread when this device first showed it. */
+const BEFORE_ANY_THREAD = new Date(0).toISOString();
 /** The window that shows the Undo toast finishes the delete. Another window waits this much longer. */
 const OTHER_WINDOW_DELAY_MS = 5_000;
 
@@ -37,6 +41,8 @@ export interface AgentThreadTabsOptions {
 export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   const { serverId, activeAgentId, tasks } = options;
   const scopeIsCurrent = createScopeGuard();
+  /** The server of this state. On desktop the server scope makes the state again for each server. */
+  const ownServerId = untrack(serverId);
   const [tabsByServer, setTabsByServer] = createSignal<ThreadTabsByServer>(readThreadTabs());
   /** Agents with a new thread tab. A new thread that has no message is not kept after a restart. */
   const [drafts, setDrafts] = createSignal<ReadonlySet<string>>(new Set());
@@ -386,7 +392,16 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
   async function sendDraft(agentId: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
     const started = await tasks.startTask(agentId, text, attachmentDraftIds);
-    if (!started || !scopeIsCurrent()) return false;
+    if (!started) return false;
+    if (!scopeIsCurrent()) {
+      // The user left the server while its files loaded. The thread started there, and its tab waits there (#9123).
+      const stored = readThreadTabs();
+      const tabs = stored[ownServerId]?.[agentId] ?? NO_TABS;
+      const open = [...tabs.open.filter((entry) => entry !== started.id), started.id];
+      const active = tabs.active === DRAFT_THREAD_ID ? started.id : tabs.active;
+      writeThreadTabs({ ...stored, [ownServerId]: { ...stored[ownServerId], [agentId]: { ...tabs, open, active } } });
+      return true;
+    }
     seen.add(started.id);
     const stillOpen = activeId(agentId) === DRAFT_THREAD_ID;
     setDraft(agentId, false);
@@ -436,6 +451,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   /** Removes the tabs of a deleted agent. */
   function forgetAgent(agentId: string): void {
     forgetPendingThreadDeletes(serverId(), agentId);
+    writeThreadsSeenThrough(serverId(), agentId, null);
     setDraft(agentId, false);
     writeTabs(agentId, null);
   }
@@ -470,25 +486,32 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     },
   );
 
-  // A thread that the agent starts in this session gets a tab, but does not open.
+  // A thread that the agent starts, or that the user starts on another device, gets a tab here, but does
+  // not open. A thread that starts in this session always does, also in a second window. The device keeps
+  // the creation time of the newest thread that it has seen, so a thread that started while this device
+  // was off also gets a tab, and a tab that the user closed does not come back after a restart.
   createEffect(
     () => {
       const agentId = activeAgentId();
       if (!agentId) return null;
-      const added = (tasks.snapshot(agentId)?.tasks ?? [])
-        .filter(
-          (entry) =>
-            entry.origin === "agent" &&
-            entry.state !== "closed" &&
-            entry.createdAt >= sessionStart &&
-            !seen.has(entry.id),
-        )
-        .map((entry) => entry.id);
-      return added.length === 0 ? null : [agentId, ...added].join("\n");
+      const snapshot = tasks.snapshot(agentId);
+      if (!snapshot) return null;
+      const stored = readThreadsSeenThrough(serverId(), agentId);
+      // Only creation times of the host are kept, never the clock of this device, which can differ.
+      let newest = stored ?? BEFORE_ANY_THREAD;
+      const added: string[] = [];
+      for (const entry of snapshot.tasks) {
+        if (entry.createdAt > newest) newest = entry.createdAt;
+        const unseen = entry.createdAt >= sessionStart || (stored !== undefined && entry.createdAt > stored);
+        if (unseen && entry.state !== "closed" && !seen.has(entry.id)) added.push(entry.id);
+      }
+      return added.length === 0 && newest === stored ? null : [agentId, newest, ...added].join("\n");
     },
     (key) => {
       if (!key) return;
-      const [agentId = "", ...added] = key.split("\n");
+      const [agentId = "", newest = "", ...added] = key.split("\n");
+      writeThreadsSeenThrough(serverId(), agentId, newest);
+      if (added.length === 0) return;
       for (const id of added) seen.add(id);
       untrack(() => {
         const ids = openIds(agentId);

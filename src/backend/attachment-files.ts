@@ -262,6 +262,7 @@ export class AttachmentFiles {
               copied.size,
               targetPath,
               yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+              yield* heifSafeFileMimeType(name, targetPath),
             ),
             createdAt: new Date().toISOString(),
           });
@@ -280,7 +281,11 @@ export class AttachmentFiles {
           // A name with no known type is an opaque file, as it is after the message is sent: a sent
           // attachment takes its type from the name. A sender's image type would also make it an image
           // block, and a provider refuses types such as HEIC or TIFF.
-          const mimeType = options.voiceRecording || isSupportedAttachmentName(name) ? item.mimeType : undefined;
+          const mimeType = heifSafeMimeType(
+            name,
+            bytes,
+            options.voiceRecording || isSupportedAttachmentName(name) ? item.mimeType : undefined,
+          );
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
@@ -366,6 +371,7 @@ export class AttachmentFiles {
               copied.size,
               join(finalRoot, name),
               yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+              yield* heifSafeFileMimeType(name, targetPath),
             ),
           );
         }
@@ -735,6 +741,56 @@ function attachmentMetadata(
   const svg = mimeType.split(";", 1)[0]?.trim().toLowerCase() === "image/svg+xml";
   return { kind: previewKind === "image" && !svg ? "image" : "file", mimeType, previewKind };
 }
+
+/** HEIF brands of a still photo. AVIF uses the same container and stays an image. */
+const HEIF_BRANDS = new Set(["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "mif2", "msf1"]);
+/** Enough for the `ftyp` box of a photo, so an AVIF brand late in the list is also found. */
+const HEIF_HEADER_BYTES = 64;
+
+/** Whether the first bytes are a HEIF photo: an `ftyp` box with a HEIF brand and no AVIF brand. */
+function isHeifImage(header: Uint8Array): boolean {
+  const bytes = Buffer.from(header.subarray(0, HEIF_HEADER_BYTES));
+  if (bytes.length < 12 || bytes.toString("latin1", 4, 8) !== "ftyp") return false;
+  const end = Math.min(bytes.readUInt32BE(0), bytes.length);
+  const brands: string[] = [];
+  // The major brand is at 8. The compatible brands start at 16, after the minor version.
+  for (let offset = 8; offset + 4 <= end; offset += offset === 8 ? 8 : 4) {
+    brands.push(bytes.toString("latin1", offset, offset + 4));
+  }
+  return (
+    !brands.some((brand) => brand === "avif" || brand === "avis") && brands.some((brand) => HEIF_BRANDS.has(brand))
+  );
+}
+
+/**
+ * The type to store for an attachment. Some apps save a HEIF photo with a `.jpg` name, and no
+ * provider decodes HEIF, so the agent said that it could not process the image (#9752). Such a file
+ * is an opaque file, as a `.heic` name is: the agent gets its path and can convert it.
+ */
+function heifSafeMimeType(name: string, header: Uint8Array, mimeType?: string): string | undefined {
+  return attachmentMetadata(name, mimeType).kind === "image" && isHeifImage(header)
+    ? "application/octet-stream"
+    : mimeType;
+}
+
+/** {@link heifSafeMimeType} for a stored file. It reads the first bytes only of a file with an image type. */
+const heifSafeFileMimeType = Effect.fn("Attachments.heifSafeFileMimeType")(function* (
+  name: string,
+  path: string,
+): Effect.fn.Return<string | undefined, AttachmentOperationError> {
+  if (attachmentMetadata(name).kind !== "image") return undefined;
+  const header = yield* attachmentCall(async () => {
+    const file = await open(path, "r");
+    try {
+      const buffer = Buffer.alloc(HEIF_HEADER_BYTES);
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await file.close();
+    }
+  });
+  return heifSafeMimeType(name, header);
+});
 
 function attachmentPreviewUrl(id: string): string {
   return `openbot-attachment://file/${id}`;

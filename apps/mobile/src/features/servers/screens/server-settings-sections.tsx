@@ -5,7 +5,6 @@ import { Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
 import AppWindow from "lucide-react-native/icons/app-window";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
-import Blocks from "lucide-react-native/icons/blocks";
 import Bot from "lucide-react-native/icons/bot";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
@@ -40,7 +39,6 @@ import { canRestartServer } from "@/features/servers/model/server-settings-acces
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
-import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
@@ -148,19 +146,17 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
 }
 
 /**
- * The AI providers and MCP servers of the computer that runs the server. Its connectors are apps of the
+ * The AI providers of the computer that runs the server. Its connectors and MCP servers are apps of the
  * Marketplace, as on the desktop.
  */
 export function ServerAiSection({ serverId }: { serverId: string }) {
   const { t } = useText();
   const row = useServerRows(serverId);
   const providers = row((checks) => checks.canManageProviders(serverId));
-  const mcp = row((checks) => checks.canManageMcpServers(serverId));
-  if (providers === "hidden" && mcp === "hidden") return null;
+  if (providers === "hidden") return null;
   return (
     <SettingsSection title={t("mobile.server.settings.aiSection")}>
-      {providers === "hidden" ? null : <ServerProvidersRow serverId={serverId} disabled={providers === "disabled"} />}
-      {mcp === "hidden" ? null : <ServerMcpRow serverId={serverId} disabled={mcp === "disabled"} />}
+      <ServerProvidersRow serverId={serverId} disabled={providers === "disabled"} />
     </SettingsSection>
   );
 }
@@ -565,26 +561,6 @@ function ServerProvidersRow({ serverId, disabled }: { serverId: string; disabled
       onPress={() => router.push({ pathname: "/server-settings/providers", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.providers")}</Typography.Paragraph>
-    </SettingsRow>
-  );
-}
-
-/** The MCP servers row, for a user who manages the MCP servers of the host (`canManageMcpServers`). */
-function ServerMcpRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
-  const { t } = useText();
-  const { list } = useMcpServerList(serverId);
-  return (
-    <SettingsRow
-      leading={<RowIcon icon={Blocks} />}
-      trailing={
-        list.data ? (
-          <TrailingValue value={t("mobile.server.settings.mcpCount", { count: list.data.length })} />
-        ) : undefined
-      }
-      disabled={disabled}
-      onPress={() => router.push({ pathname: "/server-settings/mcp", params: { serverId } })}
-    >
-      <Typography.Paragraph>{t("mobile.server.settings.mcp")}</Typography.Paragraph>
     </SettingsRow>
   );
 }

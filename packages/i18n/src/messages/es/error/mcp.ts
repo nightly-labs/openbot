@@ -7,10 +7,15 @@ export const messages = {
   "error.mcp.redirectRefused": "Se rechazó el inicio de sesión. Vuelve a OpenBot e inténtalo de nuevo.",
   "error.mcp.redirectNoSignIn": "Ningún inicio de sesión está esperando esto. Es posible que haya terminado.",
   "error.mcp.redirectSignedIn": "OpenBot ha iniciado sesión. Puedes cerrar esta ventana.",
+  "error.mcp.redirectNotSaved": "El inicio de sesión no terminó. Vuelve a OpenBot para ver el motivo.",
   "error.mcp.signInFileUnreadable": "El archivo de inicio de sesión de MCP no se puede leer.",
   "error.mcp.signInFileTooLarge": "El archivo de inicio de sesión de MCP es demasiado grande.",
   "error.mcp.unsupported": "Este servidor no admite servidores MCP.",
   "error.mcp.signInOnHost": "Solo puedes iniciar sesión en un servidor MCP desde OpenBot en el equipo host.",
+  "error.mcp.signInPageOnServer":
+    "Esta página de inicio de sesión solo se abre en el servidor. Pide a un propietario o administrador del servidor que inicie sesión.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Esta página de inicio de sesión solo se abre en el servidor. Cambia a este servidor y luego elige Iniciar sesión otra vez.",
   "error.mcp.signInAppUnsupported": "Este servidor no admite apps de inicio de sesión. Actualiza OpenBot en el host.",
   "error.mcp.redirectRelayed": "OpenBot envió el inicio de sesión al servidor. Puedes cerrar esta ventana.",
   "error.mcp.relayEnded": "Este inicio de sesión terminó. Vuelve a iniciarlo.",

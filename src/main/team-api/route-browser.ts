@@ -13,6 +13,11 @@ import {
   BROWSER_PAGE_STATE_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageImport,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
+import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_SIGN_IN_ROUTES,
   decodeBrowserSignInImport,
@@ -186,7 +191,16 @@ export async function routeBrowser(
       throw new HttpError(400, sourceText("error.backend.browserSignInUnsupported"));
     const body = await readJson(request);
     const signIn = decodeBrowserSignInImport({ ...body, tabId: tabId(body) });
-    return json(200, { cookies: await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies)) });
+    const result = await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies));
+    return json(200, { cookies: result.cookies });
+  }
+  // Behind `browser-sign-in-storage-v1`: the same, and also the page storage of the site (#8686).
+  if (method === "POST" && url.pathname === BROWSER_SIGN_IN_STORAGE_ROUTES.import) {
+    if (!capabilities.has(BROWSER_SIGN_IN_STORAGE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserSignInUnsupported"));
+    const body = await readJson(request);
+    const signIn = decodeBrowserSignInStorageImport({ ...body, tabId: tabId(body) });
+    return json(200, await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies, signIn.storage)));
   }
 
   // Behind `browser-view`. The session is only the agreement about which tab and who is watching;

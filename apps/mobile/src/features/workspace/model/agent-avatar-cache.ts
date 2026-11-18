@@ -70,7 +70,39 @@ function savedImage(folderOf: () => Directory, url: string): string | null {
  * of the agent's photo go. When the phone cannot save it, the data URL comes back unchanged.
  */
 export function saveAgentAvatar(serverId: string, agentId: string, avatarUrl: string, dataUrl: string): string {
-  return saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
+  const uri = saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
+  if (uri !== dataUrl && savedAgentAvatarNotice === null)
+    savedAgentAvatarNotice = setTimeout(noticeSavedAgentAvatars, SAVED_NOTICE_DELAY_MS);
+  return uri;
+}
+
+/**
+ * A burst of saves, such as the photos of all agents at the first start, gives one notice. Each notice
+ * makes the workspace and the parts that give pictures to the system compute again.
+ */
+const SAVED_NOTICE_DELAY_MS = 1_000;
+let savedAgentAvatars = 0;
+let savedAgentAvatarNotice: ReturnType<typeof setTimeout> | null = null;
+const savedAgentAvatarListeners = new Set<() => void>();
+
+function noticeSavedAgentAvatars() {
+  savedAgentAvatarNotice = null;
+  savedAgentAvatars += 1;
+  for (const listener of savedAgentAvatarListeners) listener();
+}
+
+/**
+ * Tells the parts that give agent pictures to the system (notifications, the share extension, the
+ * shortcuts) that a new photo is on this phone, so they use it in place of the plush.
+ */
+export function subscribeSavedAgentAvatars(listener: () => void): () => void {
+  savedAgentAvatarListeners.add(listener);
+  return () => savedAgentAvatarListeners.delete(listener);
+}
+
+/** The count of photos saved in this session. It changes when a new photo is saved. */
+export function savedAgentAvatarCount() {
+  return savedAgentAvatars;
 }
 
 function saveImage(folderOf: () => Directory, url: string, dataUrl: string): string {
