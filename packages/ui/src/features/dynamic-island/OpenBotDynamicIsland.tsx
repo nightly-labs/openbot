@@ -81,6 +81,8 @@ export interface OpenBotDynamicIslandProps {
   notchSize?: DynamicIslandNotchSize | undefined;
   /** The build that draws the island. Its logo color tells a dev or preview build from a release. */
   variant?: AppVariant;
+  /** Animate all the time, not only while the pointer is on the island (the Always animate setting). */
+  alwaysAnimate?: boolean | undefined;
   /** The user-chosen compact width, as a percent of the default. The physical notch never shrinks. */
   widthPercent?: number;
   /** The user-chosen compact height, as a percent of the default. */
@@ -451,7 +453,8 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [hovered, setHovered] = createSignal(false);
   // The island is on screen all day, above every app. Work moves on it only while the pointer is on it:
   // an island that a click expanded stays open after the user goes back to another app.
-  const ambientMotion = hovered;
+  // The Always animate setting moves it all the time.
+  const ambientMotion = () => hovered() || props.alwaysAnimate === true;
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;
