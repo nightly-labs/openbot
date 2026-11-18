@@ -23,7 +23,8 @@
 /* Each line of a block takes its direction and its start side from its own text, so a Hebrew
    line after a line break aligns right in an English paragraph. A table cell keeps the table's
    direction, so its borders stay on the same side in each cell. */
-.message-markdown :is(p, li, .message-markdown-task-body, h1, h2, h3, h4, h5, h6, th, td) {
+.message-markdown :is(p, li, h1, h2, h3, h4, h5, h6, th, td),
+.message-markdown-task-body {
   unicode-bidi: plaintext;
 }
 
@@ -83,7 +84,8 @@
 }
 
 .message-markdown li + li,
-.message-markdown :is(li, .message-markdown-task-body) > :is(ul, ol) {
+.message-markdown li > :is(ul, ol),
+.message-markdown .message-markdown-task-body > :is(ul, ol) {
   margin-top: var(--openbot-space-1);
 }
 
