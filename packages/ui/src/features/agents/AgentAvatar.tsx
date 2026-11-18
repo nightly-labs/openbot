@@ -551,12 +551,13 @@ function createHeldActivity(value: () => AgentStepActivity | null, holdMs: numbe
   return shown;
 }
 
-/** An equal appearance must not notify: each prop of the plush wakes its animation loop. */
-function sameAppearance(
-  a: { shape: string; color: string; expression: string; state: string },
-  b: { shape: string; color: string; expression: string; state: string },
-): boolean {
-  return a.shape === b.shape && a.color === b.color && a.expression === b.expression && a.state === b.state;
+/**
+ * An equal appearance must not notify: each prop of the plush wakes its animation loop. It compares
+ * each field, so a field added to an appearance is compared too.
+ */
+function sameAppearance<T extends object>(a: T, b: T): boolean {
+  for (const key in a) if (a[key] !== b[key]) return false;
+  return true;
 }
 
 function avatarAnimationPhase(seed: string): number {
