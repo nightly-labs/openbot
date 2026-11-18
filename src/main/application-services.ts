@@ -3477,8 +3477,8 @@ export async function createApplicationServices({
         url,
         Date.now(),
       ),
-    // A server on this computer: only the desktop app here logs in as its password owner (`HostService.channelPersonIsRemote`).
-    atHost: (memberId) => localServerChild !== null && memberId === teamStore.getOwnerMemberId(),
+    // A server on this computer: only the desktop app here signs in with its owner password.
+    atHost: (sessionId) => localServerChild !== null && teamStore.isStoredOwnerSession(sessionId),
   });
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),

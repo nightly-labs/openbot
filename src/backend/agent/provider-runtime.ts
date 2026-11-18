@@ -204,13 +204,13 @@ function signInFileVersion(paths: readonly string[]): string {
 
 /**
  * Whether a sign-in that a host starts for a client (`signInProviderOnHost`) runs as one for a user
- * at another device. `atHost`: the user is at this computer, such as the owner of a server on this
- * computer. Only Gemini on Windows then signs in as a Connect here: its CLI opens the Google page on
- * this computer by itself, so OpenBot refuses it for another device (`googleSignInByOpenBot`), and
- * the user at this computer could not connect (#11677). Every other sign-in keeps its page.
+ * at another device. `atHost`: the user is at this computer, such as the desktop app that runs a
+ * server on this computer. Only Gemini on Windows then signs in as a Connect here: its CLI opens the
+ * Google page on this computer by itself, so `startAcpAuthentication` refuses it for another device,
+ * and the user at this computer could not connect (#11677). Every other sign-in keeps its page.
  */
 function fromAnotherDevice(provider: AgentProvider, atHost: boolean): boolean {
-  return !(atHost && provider === "antigravity" && !googleSignInByOpenBot(false));
+  return !(atHost && provider === "antigravity" && process.platform === "win32");
 }
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
