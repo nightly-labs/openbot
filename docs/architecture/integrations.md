@@ -426,6 +426,23 @@ also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
 offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
 loopback address has another port, and a server that compares ports refuses it.
 
+A server that registers only the clients it approved, and that approved OpenBot's own app, gets a
+**built-in client** (`BUILT_IN_MCP_CLIENTS` in
+[`mcp-oauth-provider.ts`](../../src/backend/mcp-oauth-provider.ts)), chosen by the issuer that
+discovery finds. Meta Ads (`https://www.facebook.com/ads`) is one: its registration endpoint answers
+"Dynamic registration is not available for this client", and it refuses every `http` redirect,
+loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secret. Its redirect is
+`https://openbot.run/oauth/mcp-callback`
+([`mcp-callback.ts`](../../apps/auth-api/src/routes/oauth/mcp-callback.ts)), which answers 302 to
+`http://127.0.0.1:28417/mcp-auth` with the query unchanged. So the grant still arrives at the MCP
+listener of the computer where the browser runs, and a joined server uses the
+[callback relay](#remote-sign-in-the-callback-relay) as before. The relay always names port 28417:
+when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
+replaces the built-in client and uses the loopback address. The Meta app must list the relay address
+in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
+App Review puts the app in Live mode. `bun run test:mcp-sign-in-https-relay` checks the Meta page
+and the relay.
+
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the
 MCP server ([`McpSignInAppSection.tsx`](../../src/renderer/src/features/servers/McpSignInAppSection.tsx)).
