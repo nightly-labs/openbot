@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "حدّث OpenBot على {name}",
   "server.compatibility.unsafeDataTitle": "أعاد المضيف بيانات غير آمنة",
   "server.compatibility.cannotConnectTitle": "تعذّر الاتصال بـ {name}",
+  "server.compatibility.safeModeTitle": "{name} لا يبدأ",
   "server.compatibility.updateClientDescription":
     "يدعم هذا التطبيق بروتوكولات أقدم فقط من المضيف. حدّث هذا التطبيق، ثم أعد المحاولة.",
   "server.compatibility.updateHostDescription":

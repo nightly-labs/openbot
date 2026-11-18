@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "OpenBot auf {name} aktualisieren",
   "server.compatibility.unsafeDataTitle": "Der Host hat unsichere Daten zurückgegeben",
   "server.compatibility.cannotConnectTitle": "Verbindung mit {name} nicht möglich",
+  "server.compatibility.safeModeTitle": "{name} startet nicht",
   "server.compatibility.updateClientDescription":
     "Diese App unterstützt nur ältere Protokolle als der Host. Aktualisiere diese App und versuche es erneut.",
   "server.compatibility.updateHostDescription":

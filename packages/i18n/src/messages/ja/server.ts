@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} の OpenBot を更新してください",
   "server.compatibility.unsafeDataTitle": "ホストが安全でないデータを返しました",
   "server.compatibility.cannotConnectTitle": "{name} に接続できません",
+  "server.compatibility.safeModeTitle": "{name} が起動しません",
   "server.compatibility.updateClientDescription":
     "このアプリはホストより古いプロトコルにのみ対応しています。このアプリを更新してから、もう一度お試しください。",
   "server.compatibility.updateHostDescription":

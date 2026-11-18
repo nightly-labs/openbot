@@ -46,6 +46,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "更新 {name} 上的 OpenBot",
   "server.compatibility.unsafeDataTitle": "主机返回了不安全的数据",
   "server.compatibility.cannotConnectTitle": "无法连接到 {name}",
+  "server.compatibility.safeModeTitle": "{name} 无法启动",
   "server.compatibility.updateClientDescription": "该应用支持的协议版本比主机更旧，请先更新该应用再重试。",
   "server.compatibility.updateHostDescription": "主机支持的协议版本比该应用更旧，请先更新主机再重试。",
   "server.compatibility.unsafeDataDescription":

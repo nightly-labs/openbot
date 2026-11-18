@@ -46,6 +46,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name}의 OpenBot 업데이트",
   "server.compatibility.unsafeDataTitle": "호스트가 안전하지 않은 데이터를 반환했어요",
   "server.compatibility.cannotConnectTitle": "{name}에 연결할 수 없어요",
+  "server.compatibility.safeModeTitle": "{name}이(가) 시작되지 않습니다",
   "server.compatibility.updateClientDescription":
     "이 앱은 호스트보다 오래된 프로토콜만 지원해요. 이 앱을 업데이트한 후 다시 시도해 주세요.",
   "server.compatibility.updateHostDescription":

@@ -44,6 +44,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "עדכון OpenBot ב-{name}",
   "server.compatibility.unsafeDataTitle": "המארח החזיר נתונים לא בטוחים",
   "server.compatibility.cannotConnectTitle": "לא ניתן להתחבר אל {name}",
+  "server.compatibility.safeModeTitle": "{name} לא מופעל",
   "server.compatibility.updateClientDescription":
     "האפליקציה הזו תומכת רק בפרוטוקולים ישנים יותר מהמארח. יש לעדכן את האפליקציה ולנסות שוב.",
   "server.compatibility.updateHostDescription":

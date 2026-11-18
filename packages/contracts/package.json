@@ -279,6 +279,7 @@
     "./team-protocol/host-turn-limits-v1": "./src/team-protocol/host-turn-limits-v1.ts",
     "./team-protocol/host-appearance-v1": "./src/team-protocol/host-appearance-v1.ts",
     "./team-protocol/host-restart-v1": "./src/team-protocol/host-restart-v1.ts",
+    "./team-protocol/server-safe-mode-v1": "./src/team-protocol/server-safe-mode-v1.ts",
     "./team-protocol/host-personality-v1": "./src/team-protocol/host-personality-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",

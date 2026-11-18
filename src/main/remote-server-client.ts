@@ -33,13 +33,18 @@ import {
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
+import {
   highestCommonTeamProtocol,
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
   teamProtocolUpdateDirection,
 } from "@openbot/contracts/team-protocol/v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Result } from "effect";
+import { Deferred, Effect, Option, Result } from "effect";
 import { decodeRemoteDesktopCapabilities } from "./remote-device-decoding";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import {
@@ -333,7 +338,8 @@ export class RemoteServerClient {
       !refresh &&
       (issue?.code === "client_update_required" ||
         issue?.code === "host_update_required" ||
-        issue?.code === "protocol_error")
+        issue?.code === "protocol_error" ||
+        issue?.code === "server_safe_mode")
     ) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteProtocolError(
@@ -368,6 +374,10 @@ export class RemoteServerClient {
       const compatibility = yield* server.transport === "webrtc-v2"
         ? this.#negotiateWebRtcCompatibilityEffect(server.id)
         : this.negotiateCompatibility(server.apiUrl);
+      // A server in safe mode answers only with its reason. It is not a usable connection, so it is not
+      // recorded as one: the failure records the host versions for the screen that shows the reason.
+      if (compatibility.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
+        return yield* this.#serverSafeModeError(server, compatibility);
       this.#connections.setCompatibility(server.id, compatibility);
       this.#connections.clearStaleIssue(server.id, issueAtStart);
       return compatibility;
@@ -380,6 +390,47 @@ export class RemoteServerClient {
       ),
     );
   }).bind(this);
+
+  /**
+   * The failure for a server in safe mode, with the reason that the host sends to each member. The
+   * read goes past `request`, which would ask for the compatibility again. A reason that cannot be
+   * read gives the general safe-mode sentence: the user still sees why the server does not answer.
+   */
+  readonly #serverSafeModeError = Effect.fn("RemoteClient.serverSafeModeError")(function* (
+    this: RemoteServerClient,
+    server: StoredRemoteServerView,
+    compatibility: ServerCompatibility,
+  ): Effect.fn.Return<never, RemoteWorkflowError> {
+    const reason = yield* server.transport === "webrtc-v2"
+      ? this.#hostRequestEffect(server.id, SERVER_SAFE_MODE_ROUTES.reason).pipe(
+          Effect.flatMap((value) => remoteDecode(() => decodeServerSafeModeReason(value))),
+          Effect.option,
+        )
+      : requestJson(server.apiUrl, SERVER_SAFE_MODE_ROUTES.reason, decodeServerSafeModeReason, {
+          token: this.#servers.token(server),
+          ...this.requestProtocol(compatibility),
+        }).pipe(Effect.option);
+    const message = Option.match(reason, {
+      onNone: () => sourceText("error.team.serverSafeMode"),
+      onSome: ({ reason, appVersion }) =>
+        reason === "newer_database"
+          ? sourceText("error.team.serverSafeModeNewerDatabase", { version: appVersion })
+          : sourceText("error.team.serverSafeModeStartFailed", { version: appVersion }),
+    });
+    return yield* new RemoteWorkflowError({
+      cause: new RemoteProtocolError(
+        "server_safe_mode",
+        message,
+        compatibility.hostAppVersion && compatibility.hostProtocol
+          ? {
+              appVersion: compatibility.hostAppVersion,
+              protocol: compatibility.hostProtocol,
+              capabilities: compatibility.capabilities,
+            }
+          : null,
+      ),
+    });
+  });
 
   /**
    * The one compatibility read after a WebRTC connect. It is the shared negotiation of

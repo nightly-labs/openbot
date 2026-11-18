@@ -372,6 +372,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:team-protocol-v10
 
+      - name: Run the server safe mode E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:server-safe-mode
+
       - name: Run the Team session revoke and reconnect E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-session-revoke
@@ -780,6 +784,7 @@ jobs:
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
             .openbot-build/team-protocol-v10-e2e/
+            .openbot-build/server-safe-mode-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
