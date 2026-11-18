@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "Baixar atualização. Nova atualização disponível.",
   "account.update.available": "Nova atualização disponível",
   "account.update.ready": "Atualização pronta",
+  "account.update.notInstalled": "Atualização não instalada",
   "account.update.progress": "Progresso do download da atualização",
   "account.login.connectingTitle": "Conectando ao OpenBot",
   "account.login.unavailableTitle": "Serviço indisponível",

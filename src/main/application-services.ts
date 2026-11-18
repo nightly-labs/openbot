@@ -454,7 +454,12 @@ import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
-import { macShipItDirectory, UPDATE_HANDOVER_FILE } from "./update-install-guard";
+import {
+  macShipItDirectory,
+  readNotInstalledUpdate,
+  UPDATE_HANDOVER_FILE,
+  UPDATE_INSTALL_RECORD_FILE,
+} from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
@@ -4525,6 +4530,10 @@ export async function createApplicationServices({
       ? {
           shipItDirectory: macShipItDirectory(),
           handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE),
+          installRecordPath: join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE),
+          notInstalledVersion: Effect.runSync(
+            readNotInstalledUpdate(join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE), app.getVersion()),
+          ),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
         }
       : {}),

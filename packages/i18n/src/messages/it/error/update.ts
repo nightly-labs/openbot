@@ -7,6 +7,7 @@ export const messages = {
   "error.update.restartFailed": "OpenBot non è riuscito a riavviarsi per installare l'aggiornamento.",
   "error.update.downloadStalled": "Il download dell'aggiornamento ha smesso di rispondere. Riprova.",
   "error.update.installFailed": "Impossibile installare l'aggiornamento. Chiudi e riapri OpenBot, poi riprova.",
+  "error.update.notInstalled": "L'ultimo riavvio non ha installato l'aggiornamento. Riavvia per riprovare.",
   "error.update.downloadFailed": "Impossibile scaricare l'aggiornamento. Riprova.",
   "error.update.checkFailed": "Impossibile cercare aggiornamenti. Riprova.",
   "error.update.checkStalled": "La ricerca di aggiornamenti ha smesso di rispondere. Riprova.",

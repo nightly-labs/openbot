@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "下载更新。有新的更新可用。",
   "account.update.available": "有新的更新",
   "account.update.ready": "更新已就绪",
+  "account.update.notInstalled": "更新未安装",
   "account.update.progress": "更新下载进度",
   "account.login.connectingTitle": "正在连接 OpenBot",
   "account.login.unavailableTitle": "服务不可用",

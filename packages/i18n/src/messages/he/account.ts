@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "הורדת העדכון. יש עדכון חדש.",
   "account.update.available": "יש עדכון חדש",
   "account.update.ready": "העדכון מוכן",
+  "account.update.notInstalled": "העדכון לא הותקן",
   "account.update.progress": "התקדמות הורדת העדכון",
   "account.login.connectingTitle": "מתחבר ל-OpenBot",
   "account.login.unavailableTitle": "השירות אינו זמין",

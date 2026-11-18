@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "업데이트 다운로드. 새 업데이트가 있어요.",
   "account.update.available": "새 업데이트가 있어요",
   "account.update.ready": "업데이트 준비 완료",
+  "account.update.notInstalled": "업데이트 설치 안 됨",
   "account.update.progress": "업데이트 다운로드 진행률",
   "account.login.connectingTitle": "OpenBot에 연결하는 중",
   "account.login.unavailableTitle": "서비스를 사용할 수 없어요",
