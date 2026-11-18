@@ -171,7 +171,7 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
   const changed = yield* syncSubscriptionTax(stripe, customerId, treatment);
   const vatChanges = changed.map(
     (subscription) =>
-      `VAT check: customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
+      `🧾 **VAT check** · customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
   );
   return { details: { country: request.country, vatId }, vatChanges };
 });
@@ -244,5 +244,5 @@ export function checkoutCountryMismatch(object: StripeEvent["data"]["object"]): 
   const paid = session.value.customer_details?.address?.country;
   if (!declared || !paid || declared === paid) return null;
   const treatment = session.value.metadata?.[VAT_METADATA.treatment] ?? "unknown";
-  return `VAT check: Checkout page ${session.value.id} took the VAT of ${declared} (${treatment}), but its billing address is in ${paid}. Check the VAT of its invoice.`;
+  return `🧾 **VAT check** · Checkout page ${session.value.id} took the VAT of ${declared} (${treatment}), but its billing address is in ${paid}. Check the VAT of its invoice.`;
 }

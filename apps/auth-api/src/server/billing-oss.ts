@@ -126,5 +126,5 @@ function euro(cents: number): string {
 }
 
 function ossAlertText(year: number, totalEur: number): string {
-  return `VAT limit: in ${year}, sales to consumers in other EU countries reached ${euro(totalEur)} (net). Above ${euro(OSS_LIMIT_EUR)} a year, OpenBot must charge the VAT of the buyer's country through the One Stop Shop, not Polish VAT. Register for OSS and change the VAT before the limit.`;
+  return `🧾 **VAT limit** · in ${year}, sales to consumers in other EU countries reached ${euro(totalEur)} (net). Above ${euro(OSS_LIMIT_EUR)} a year, OpenBot must charge the VAT of the buyer's country through the One Stop Shop, not Polish VAT. Register for OSS and change the VAT before the limit.`;
 }
