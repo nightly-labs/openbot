@@ -1,6 +1,6 @@
 import { isDynamicRecord } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional channel-isolation-v1 contract: the "Keep memories in this channel" setting of a

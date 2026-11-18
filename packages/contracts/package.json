@@ -122,6 +122,7 @@
     "./team-protocol/v1": "./src/team-protocol/v1.ts",
     "./team-protocol/v1-adapter": "./src/team-protocol/v1-adapter.ts",
     "./team-protocol/v2": "./src/team-protocol/v2.ts",
+    "./team-protocol/webrtc-framing": "./src/team-protocol/webrtc-framing.ts",
     "./team-protocol/v2-adapter": "./src/team-protocol/v2-adapter.ts",
     "./team-protocol/v3": "./src/team-protocol/v3.ts",
     "./team-protocol/v3-adapter": "./src/team-protocol/v3-adapter.ts",

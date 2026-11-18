@@ -321,6 +321,15 @@ web client speak 10. The mobile workspace speaks 10 too, for `server-safe-mode-v
 a host of protocols 1-9. The mobile share extension stays on 9. The
 `agent-event-scope` message has no length limit and always sends the full list.
 
+All WebRTC frames of protocols 1 to 10 use one framing (`webrtc-framing.ts`; the names keep the
+`V2` spelling, and `v2.ts` only re-exports it). The bodyless request frame of protocols 4 to 10 (a
+GET, a DELETE, the routine test POST and the remote viewer routes) is in
+`webrtc-bodyless-requests.ts`. Both are current code: deleting an old protocol does not delete them.
+`scripts/team-webrtc-wire-parity-e2e.ts --before=<ref>` compares their bytes with a base commit. On
+WebRTC, the host reads the protocol of an `http.request` from the capability markers. A request
+with no marker comes from a release before v0.7.0, and the host refuses it with status 426 and
+`client_update_required`, as the HTTP gate refuses a request with no protocol header.
+
 ### Server safe mode
 
 A server that stopped its start loop (see [hosted servers](../hosted-servers.md#start-loop)) keeps a
