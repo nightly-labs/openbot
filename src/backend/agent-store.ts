@@ -10,7 +10,6 @@ import {
   readlink,
   realpath,
   rename,
-  rm,
   rmdir,
   symlink,
   writeFile,
@@ -78,6 +77,7 @@ import { isEmptyStoredFile, parseStoredJson, writeFileAtomically } from "./atomi
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
 import { type OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { originalFs } from "./original-fs";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
@@ -184,6 +184,9 @@ const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
 const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
+
+// An agent workspace can hold `*.asar` files, and Electron's `fs` cannot remove a folder that holds one.
+const { rm } = originalFs.promises;
 
 // Windows answers `EBUSY` or `EPERM` while a file in the tree is still open: a provider process that
 // is exiting after its session closed, an antivirus scan or the search indexer. Node retries these
