@@ -36,9 +36,10 @@ export class TurnSlots {
   /**
    * Runs `check` with one read of each lane. Use it only for synchronous work that starts no turn:
    * a drain starts in a later microtask and asks `mayStart` again outside the round, so a read of
-   * the round can only delay a lane, never use too many slots. Without it, each `mayStart` of a retry
-   * reads all lanes of all agents again, and a server with many agents and threads holds its main
-   * thread for minutes (#11710).
+   * the round never uses too many slots. A hook in the round, such as a usage-limit move, can change
+   * a lane after the round read it. Then the lane waits for a slot until the next drain ends or the
+   * next memory sample. Without a round, each `mayStart` of a retry reads all lanes of all agents
+   * again, and a server with many agents and threads holds its main thread for minutes (#11710).
    */
   round<T>(check: () => T): T {
     if (this.#round) return check();
