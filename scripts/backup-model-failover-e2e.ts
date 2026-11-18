@@ -1479,7 +1479,6 @@ try {
     };
   });
 
-  // Last: the provider error below holds the own model for the checks after it.
   await check("a model chosen again during a provider error hold gets one try", async () => {
     await restart();
     const chooser = await withBackup("Chooser");

@@ -1668,8 +1668,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.get(agentId);
         return (
           agent !== undefined &&
-          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
-          !this.#usageLimits.mayTry(agentId) &&
+          this.#usageLimits.passesOver(agentId) &&
           (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
         );
       },
@@ -3858,10 +3857,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
   }
 
-  /** A requested change moved the agent to another model, so a provider error that holds that model gets one try. */
+  /**
+   * A requested change moved the agent to another model, now or when it is next idle, so a provider
+   * error that holds that model gets one try. Automatic moves do not come through here.
+   */
   #modelChosen(before: AgentSummary | undefined, after: AgentSummary): void {
-    if (before && !sameAgentModelChoice(agentModelChoice(before), agentModelChoice(after)))
-      this.#usageLimits.chosen(after.id);
+    const chosen = (agent: AgentSummary): AgentModelChoice => agent.pendingRuntime ?? agentModelChoice(agent);
+    if (before && !sameAgentModelChoice(chosen(before), chosen(after)))
+      this.#usageLimits.chosen(after.id, usageLimitOf(chosen(after)));
   }
 
   /**
@@ -4376,10 +4379,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // A refused try holds the agent again, and the drain after it moves (#7068).
     if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
     // A model that a person or an agent chose gets one turn before the agent leaves it again (#11992).
-    const failed =
-      !limited &&
-      this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
-      !this.#usageLimits.mayTry(agentId);
+    const failed = !limited && this.#usageLimits.passesOver(agentId);
     if (!limited && !failed) return null;
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#hasWaitingWork(agentId)) return null;
@@ -4658,7 +4658,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const agent = this.#store.get(agentId);
           const pending = agent?.pendingRuntime;
           if (!pending || this.#runtimeHandoverBusy(agentId) || this.#removal.deleting().has(agentId)) return false;
-          const updated = yield* this.#applyAgentUpdate(
+          yield* this.#applyAgentUpdate(
             {
               agentId,
               provider: pending.provider,
@@ -4669,8 +4669,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             undefined,
             "next-turn",
           );
-          // The queued change is one that a person or an agent asked for.
-          this.#modelChosen(agent, updated);
           return true;
         }),
       )

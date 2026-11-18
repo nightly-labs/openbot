@@ -135,15 +135,22 @@ export class UsageLimitGate {
   }
 
   /**
-   * A person or an agent chose the agent's model while a provider error passes over it, so one turn
-   * tries it before the agent moves to a backup again (#11992). The try ends when a turn starts or
-   * when the model fails again.
+   * A person or an agent chose this model for the agent while a provider error passes over it, so
+   * one turn tries it before the agent moves to a backup again (#11992). A change that is queued
+   * until the agent is idle keeps the try until it applies. The try ends when a turn starts, when
+   * the model fails again, or when the hold ends.
    */
-  chosen(agentId: string): void {
-    const agent = this.#agent(agentId);
-    if (!agent) return;
-    const key = limitKey(providerForAgent(agent), accountOf(agent), agent.model);
+  chosen(agentId: string, limit: UsageLimitKey): void {
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
     if (this.#failures.has(key) && !this.#limits.has(key)) this.#tries.set(agentId, key);
+  }
+
+  /** Whether a provider error passes over the agent's model, with no try that the model was chosen for. */
+  passesOver(agentId: string): boolean {
+    const agent = this.#agent(agentId);
+    if (!agent) return false;
+    const key = limitKey(providerForAgent(agent), accountOf(agent), agent.model);
+    return this.#failures.has(key) && this.#tries.get(agentId) !== key;
   }
 
   /** Whether the agent may start a turn that holds its model, because the user sent it a message or chose it. */
@@ -197,7 +204,8 @@ export class UsageLimitGate {
     const accountId = accountOf(agent);
     const turnModel = model ?? agent.model;
     const key = limitKey(provider, accountId, turnModel);
-    // The chosen model failed its try, so the agent moves to a backup.
+    // A try ends when its turn starts. This also ends it for a turn that started some other way, so a
+    // model that failed again never gets a second try.
     if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
