@@ -153,6 +153,9 @@ export const messages = {
   "error.backend.agentIdUnknown": "没有 ID 为 {id} 的助手。请用 openbot.list_agents 获取 ID，然后重试。",
   "error.backend.agentIdNear":
     "没有 ID 为 {id} 的助手。助手 {name} 的 ID {nearId} 几乎相同。如果你指的是该助手，请用它的 ID 重试。",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} 未指向任何消息。请使用你要回复的那条消息的 Message ID，或省去 replyToMessageId。",
+  "error.backend.replyReferenceRequests": "本轮中来自以下收件人的消息：{ids}。",
   "error.backend.attachBetween": "请附加 1 到 {limit} 个文件。",
   "error.backend.attachmentNotFile": "附件不是文件：{path}",
   "error.backend.generatedImageTooLarge": "生成的图片超过 100 MB 上限。",
@@ -260,10 +263,18 @@ export const messages = {
     "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
+  "error.backend.mcpAppReconnect":
+    "ChatGPT 上的 {name} 要求你重新登录。请在 ChatGPT 上重新连接 {name}，然后再向助手请求。",
+  "error.backend.mcpServerSignInPage":
+    "MCP 服务器 {name} 要求你在网页上登录。OpenBot 不会为服务器打开该页面，因此已拒绝。请在“市场、应用”中打开 {name} 并登录，然后再向助手请求。",
+  "error.backend.mcpServerRequestDeclined": "MCP 服务器 {name} 请求了 OpenBot 无法显示的内容，因此 OpenBot 已拒绝。",
+  "error.backend.mcpRequestDeclined": "某个 MCP 服务器请求了 OpenBot 无法显示的内容，因此 OpenBot 已拒绝。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
   "error.backend.mcpOAuthRenewalFailed":
     "OpenBot 暂时无法续期此 MCP 服务器的登录。登录信息已保留，下一次请求会重试。如果此错误持续出现，用户可以在 OpenBot 中退出该服务器的登录，然后重新登录。",
+  "error.backend.mcpOAuthRequestRefused":
+    "MCP 服务器拒绝了此请求，但它的登录仍然有效。可能是该账号无法使用此工具，或登录时未授予全部所需权限。用户可以在该服务中查看账号的套餐和权限，或在 OpenBot 中重新登录该服务器并允许其请求的全部权限。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
   "error.backend.mcpLocalServerOff":
     "该电脑上 {address} 没有服务器在响应。请启动服务器，或在运行它的应用中开启它，然后重试。",
@@ -370,6 +381,12 @@ export const messages = {
   "error.backend.browserViewProtected": "验证期间浏览器视图受保护。",
   "error.backend.browserPreviewPageChanged": "预览期间浏览器页面已变更，请重试。",
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
+  "error.backend.browserClickMoved": "未完成点击。指针靠近时页面移动了目标，结果点到了 {element}。请重新读取页面快照。",
+  "error.backend.browserTypingFocusMoved": "输入前页面移走了焦点，因此未输入任何内容。请重新读取页面快照。",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "尚未输入全部文字时页面就移走了焦点，框内只有前半部分文字。再次输入前请先重新读取页面快照并检查输入框。",
+  "error.backend.browserTypingSubmitSkipped":
+    "文字已输入到输入框中，但页面移走了焦点，因此未发送 Enter。请勿重复输入该文字，请重新读取页面快照。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
   "error.backend.mcpServerBearerKey":

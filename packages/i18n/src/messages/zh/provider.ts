@@ -186,6 +186,16 @@ export const messages = {
   "provider.geminiKey.descriptionHost":
     "在主机上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
   "provider.geminiKey.label": "Gemini API 密钥",
+  "provider.claudeKey.title": "Anthropic API 密钥",
+  "provider.claudeKey.description":
+    "在主机上保存 Anthropic API 密钥。Anthropic 会按该密钥的 API 额度计费，而不是从你的 Claude 套餐中扣费。要为某个助手使用它，请在助手的模型菜单中选择该 API 密钥账号。未登录 Claude 时，所有助手都会使用该密钥。",
+  "provider.claudeKey.label": "Anthropic API 密钥",
+  "provider.codexKey.title": "使用 OpenAI API 密钥登录",
+  "provider.codexKey.description":
+    "Codex 会将密钥保存在这台电脑上。OpenAI 会按该密钥计费，而不是使用你的 ChatGPT 套餐。要重新使用套餐，请断开该账号并连接 ChatGPT。",
+  "provider.codexKey.descriptionHost":
+    "Codex 会将密钥保存在主机上。OpenAI 会按该密钥计费，而不是使用你的 ChatGPT 套餐。要重新使用套餐，请断开该账号并连接 ChatGPT。",
+  "provider.codexKey.label": "OpenAI API 密钥",
   "provider.cursorKey.title": "Cursor API 密钥",
   "provider.cursorKey.description":
     "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
@@ -229,6 +239,7 @@ export const messages = {
   "provider.account.addWithCode": "用验证码添加账号",
   "provider.account.count": { one: "{count} 个账号", other: "{count} 个账号" },
   "provider.account.numbered": "账号 {number}",
+  "provider.account.apiKey": "API 密钥",
   "provider.account.listLabel": "{name} 的账号",
   "provider.account.usedBy": "被 {agents} 使用",
   "provider.account.failed": "登录失败",
@@ -301,6 +312,11 @@ export const messages = {
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
     "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
+  "provider.settings.claudeKeyInUse":
+    "Anthropic 会按该密钥的 API 额度计费，而不是你的 Claude 套餐。请在助手的模型菜单中选择该 API 密钥账号。未登录 Claude 时，所有助手都会使用该密钥。",
+  "provider.settings.codexKeyInUse":
+    "ChatGPT 使用该密钥，而不是你的 ChatGPT 套餐。OpenAI 会按该密钥计费。不显示该套餐的用量。",
+  "provider.settings.codexKeyAlternative": "或使用 OpenAI API 密钥登录。OpenAI 会按该密钥计费。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",

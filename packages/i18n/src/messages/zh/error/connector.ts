@@ -13,6 +13,15 @@ export const messages = {
   "error.connector.githubExpired": "GitHub 连接已过期，请重新连接 GitHub。",
   "error.connector.githubFileUnreadable": "GitHub 连接文件无法读取。",
   "error.connector.githubFileTooLarge": "GitHub 连接文件过大。",
+  "error.connector.linkDenied": "Link 登录被拒绝。",
+  "error.connector.linkCodeExpired": "Link 登录已过期，请重新连接 Link。",
+  "error.connector.linkUnexpected": "Link 返回了意外的响应：{detail}",
+  "error.connector.linkUnreachable": "OpenBot 无法连接 Link：{detail}",
+  "error.connector.linkExpired": "Link 连接已过期，请重新连接 Link。",
+  "error.connector.linkNotConnected": "Link 未连接。请在“服务器设置 > 保险库 > 银行卡”中连接。",
+  "error.connector.linkNoCard": "该 Link 账号没有银行卡。请在 Link 中添加银行卡。",
+  "error.connector.linkFileUnreadable": "Link 连接文件无法读取。",
+  "error.connector.linkFileTooLarge": "Link 连接文件过大。",
   // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot 找不到 1Password CLI。请安装它并在 1Password 应用中开启集成，或改用服务账号令牌。",

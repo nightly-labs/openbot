@@ -68,6 +68,9 @@ export const messages = {
   "error.import.transferSettingsInvalid": "文件中的应用设置无效，因此未导入。",
   "error.import.transferModelMissing":
     "{name}：模型“{model}”在此处暂不可用，助手将使用默认模型。待其服务商就绪后请重新选择该模型。",
+  "error.import.transferAgentSettingSkipped": "{name}：未应用该助手的一项设置。{reason}",
+  "error.import.transferChannelInstructionsCut":
+    "{name}：文件中仅包含频道指令的前 {limit} 个字符，因为新建频道最多支持 {limit} 个字符。",
   "error.import.transferSettingSkipped": "{name} 未导入。{reason}",
   "error.import.transferRunsSkipped": "{name}：自动化任务“{routine}”的运行历史未导入。",
   "error.import.transferSharedSkillsSkipped": "无法读取共享技能，因此文件中不包含它们。",
@@ -93,4 +96,28 @@ export const messages = {
     "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 市场、应用 中开启。",
   "error.import.transferValuesCleared": "{name}：可能包含密钥的取值已从其参数或地址中移除，请在设置中重新输入。",
   "error.import.transferSharedKept": "共享文件夹中已有 {number} 个同名文件，因此保持原样。",
+  "error.import.transferChannelInvalid": "文件中的第 {number} 个频道无效，已跳过。",
+  "error.import.transferChannelLimit": "文件中仅包含前 {limit} 个频道。",
+  "error.import.transferWorkflowInvalid": "文件中的某个工作流无效，已跳过。",
+  "error.import.transferRoutineWebhook":
+    "{name}：自动化任务“{routine}”有了新的 Webhook 地址。请打开它，生成新密钥，并把两者发给发送方。",
+  "error.import.transferWorkflowWebhook":
+    "{name}：该工作流需要新的 Webhook 地址。请打开它，重新生成地址，并发送给发送方。",
+  "error.import.transferWorkflowConnection":
+    "{name}：在此处连接后，请重新选择该工作流的 Slack、Discord 或 Telegram 连接。",
+  "error.import.transferHistorySkipped": "{name}：文件中的对话历史无效，因此未导入。",
+  "error.import.transferChatsSkipped": {
+    one: "{name}：有 {count} 段对话未导入。",
+    other: "{name}：有 {count} 段对话未导入。",
+  },
+  "error.import.transferLocalScripts": "{name}：该助手原先开启了“本地脚本”。如果你信任该文件，请在助手设置中重新开启。",
+  "error.import.transferAgentNewChats":
+    "{name}：该助手原先开启了“助手自行开始新对话”。如果你信任该文件，请在助手设置中重新开启。",
+  "error.import.transferAlwaysAllow":
+    "{name}：你在另一台电脑上对该助手选择了“始终允许”。在这里它会先询问你，直到你再次选择允许。",
+  "error.import.transferFolders": "{name}：它曾使用工作区外的 {number} 个文件夹。请在助手设置的“文件夹”中重新添加。",
+  "error.import.transferPartsClosed": "与服务器的传输已停止，请重试。",
+  "error.import.transferPartInvalid": "部分迁移文件未能正确到达，请重试。",
+  "error.import.transferStepFailed": "该服务器未能保存它。",
+  "error.import.transferNoSpace": "该服务器没有足够的可用磁盘空间来存放此迁移文件。",
 } as const satisfies PartialTranslation<typeof source>;

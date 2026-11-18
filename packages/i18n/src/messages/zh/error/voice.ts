@@ -24,6 +24,8 @@ export const messages = {
   "error.voice.speech.modelRequired": "请在“设置 → 语音”中下载语音模型。",
   "error.voice.speech.timedOut": "朗读回复超时。",
   "error.voice.speech.failed": "OpenBot 无法朗读该回复。",
+  "error.voice.speech.providerFailed": "{provider} 未发送音频，请重试。",
+  "error.voice.speech.providerUnreachable": "无法连接到 {provider}，请检查网络连接。",
   "error.voice.recordingNotKept": "OpenBot 无法保留该录音。",
   "error.voice.live.timedOut": "Codex 实时语音未能及时启动。请重试。",
   "error.voice.live.failed": "实时语音已停止：{reason}",
@@ -34,4 +36,9 @@ export const messages = {
   "error.voice.live.unavailable": "OpenAI 无法启动实时语音。问题出在 OpenAI 一方。请稍后重试。",
   "error.voice.live.refused": "OpenAI 拒绝启动实时语音。请稍后重试，或在 设置 中关闭实时语音以用语音对话。",
   "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
+  "error.voice.server.routeOff": "语音服务器尚未为此配置。请检查“设置 → 语音”。",
+  "error.voice.server.keyRefused": "{host} 拒绝了该 API 密钥。",
+  "error.voice.server.invalidAnswer": "{host} 未返回兼容 OpenAI 的响应。",
+  "error.voice.server.invalidAudio": "{host} 发送了 OpenBot 无法播放的音频。请使用发送 WAV 的服务器。",
+  "error.voice.server.tooLarge": "{host} 返回的响应过大。",
 } as const satisfies PartialTranslation<typeof source>;
