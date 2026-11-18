@@ -135,6 +135,9 @@ const RESTORE_LIST_RETRY_MS = 500;
 /** How long the second `session/resume` waits while the new process still starts (OpenCode). */
 const RESTORE_START_RETRY_MS = 2_000;
 
+/** How long a session's own process gets to read its saved sign-in before it is asked again. */
+const SESSION_SIGN_IN_RETRY_MS = 2_000;
+
 /** How many `session/list` pages OpenBot reads to find a session before it stops looking. */
 const SESSION_LIST_PAGES = 50;
 
@@ -1989,6 +1992,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             const sessionTransport = transport;
             const connection = () =>
               sessionTransport ? sessionTransport.requireConnection() : this.#requireConnection();
+            // Antigravity 1.5.10 answers `authRequired` until it has read the saved sign-in, about
+            // 100 ms after its start and longer on a busy computer. The session request goes once
+            // more to the same process before the client reports a sign-out and ends all sessions (#11623).
+            const afterSignInRead = <A>(request: Effect.Effect<A, ProviderClientOperationError>) =>
+              sessionTransport && this.#flavor.authRequiredSignsOut
+                ? request.pipe(
+                    Effect.catchIf(
+                      (failure) => failure.cause instanceof RequestError && failure.cause.code === -32000,
+                      () => Effect.sleep(SESSION_SIGN_IN_RETRY_MS).pipe(Effect.andThen(request)),
+                    ),
+                  )
+                : request;
             const additionalDirectories = getArray(params, "runtimeWorkspaceRoots").filter(isString);
             // Sent only to an agent that advertises them, or whose flavor sets
             // `workspaceAsAdditionalDirectory`: Grok 1.0.60 refuses them on every session request,
@@ -2053,7 +2068,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 this.#supportsSessionResume ? "resume" : "load",
               );
               const response = providerResult(
-                yield* Effect.result(sessionTransport ? restored : this.#whileProcessWrites(restored)),
+                yield* Effect.result(afterSignInRead(sessionTransport ? restored : this.#whileProcessWrites(restored))),
               );
               id = requestedThreadId;
               configOptions = response.configOptions ?? [];
@@ -2061,7 +2076,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             } else {
               const response = providerResult(
                 yield* Effect.result(
-                  providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
+                  afterSignInRead(
+                    providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
+                  ),
                 ),
               );
               id = response.sessionId;
