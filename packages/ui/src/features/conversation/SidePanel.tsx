@@ -2,10 +2,12 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   buttonVariants,
+  ContextMenu,
   DropdownMenu,
   Folder,
   Maximize2,
   MessageCircleQuestionMark,
+  MessageSquare,
   Minimize2,
   PanelRight,
   Plus,
@@ -23,7 +25,7 @@ import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { For, flush, onSettled, Show } from "solid-js";
+import { createSignal, For, flush, onSettled, Show } from "solid-js";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
 import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threads/thread-tab-drag";
@@ -211,6 +213,76 @@ const TAB_GROUPS = {
 } as const;
 type TabGroup = keyof typeof TAB_GROUPS;
 
+/** The tab that a right-click or a long press opened the tab menu on. */
+type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string };
+
+/** The tab under the event, or null outside a tab. */
+function tabAt(target: EventTarget | null): MenuTab | null {
+  const tab = target instanceof Element ? target.closest<HTMLElement>(".side-panel-tab") : null;
+  const pane = tab?.dataset.pane;
+  if (pane && isSidePanelPane(pane)) return { pane };
+  if (tab?.dataset.threadId) return { thread: tab.dataset.threadId };
+  if (tab?.dataset.fileKey) return { file: tab.dataset.fileKey };
+  return null;
+}
+
+/**
+ * The top row of the side panel, with a menu on each tab. A right-click or a long press on a tab opens
+ * Close tab, and for a thread also Open in the chat. Thus a close does not need a hover on the tab icon,
+ * and a thread goes back to the chat without a drag.
+ */
+export function SidePanelHeader(props: SidePanelHeaderProps) {
+  const { t } = useText();
+  const [menuTab, setMenuTab] = createSignal<MenuTab | null>(null);
+  /** A right-click outside a tab opens no menu. */
+  const pickMenuTab = (event: MouseEvent) => {
+    const tab = tabAt(event.target);
+    if (tab) setMenuTab(tab);
+    else event.preventDefault();
+  };
+  /** A long press opens the menu on touch screens. Outside a tab, the menu has no item. */
+  const pickTouchMenuTab = (event: PointerEvent) => {
+    if (event.pointerType !== "mouse") setMenuTab(tabAt(event.target));
+  };
+  const menuThread = () => {
+    const tab = menuTab();
+    return tab && "thread" in tab ? tab.thread : undefined;
+  };
+  const closeMenuTab = () => {
+    const tab = menuTab();
+    if (!tab) return;
+    if ("pane" in tab) props.onClose(tab.pane);
+    else if ("thread" in tab) props.threads?.onClose(tab.thread);
+    else props.files?.onClose(tab.file);
+  };
+  return (
+    <ContextMenu.Root>
+      <SidePanelTabRow {...props} onTabMenu={pickMenuTab} onTabMenuPress={pickTouchMenuTab} />
+      <ContextMenu.Portal>
+        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")}>
+          <Show when={menuThread()}>
+            {(thread) => (
+              <>
+                <ContextMenu.Item class="side-panel-menu-item" onSelect={() => props.threads?.onToChat(thread())}>
+                  <MessageSquare aria-hidden="true" />
+                  {t("conversation.threads.toChat")}
+                </ContextMenu.Item>
+                <ContextMenu.Separator />
+              </>
+            )}
+          </Show>
+          <Show when={menuTab()}>
+            <ContextMenu.Item class="side-panel-menu-item" onSelect={closeMenuTab}>
+              <X aria-hidden="true" />
+              {t("conversation.threads.closeTab")}
+            </ContextMenu.Item>
+          </Show>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  );
+}
+
 /**
  * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
  * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link. The tab
@@ -226,7 +298,12 @@ type TabGroup = keyof typeof TAB_GROUPS;
  * the chat header. While the pointer takes a thread tab of the chat header over the panel, the panel
  * shows where the drop puts it. A file tab drags to a new place among the file tabs.
  */
-export function SidePanelHeader(props: SidePanelHeaderProps) {
+function SidePanelTabRow(
+  props: SidePanelHeaderProps & {
+    onTabMenu: (event: MouseEvent) => void;
+    onTabMenuPress: (event: PointerEvent) => void;
+  },
+) {
   const { t } = useText();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
@@ -427,7 +504,16 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
 
   return (
     <>
-      <Tabs.Root ref={root} class="window-drag side-panel-header" value={selectedValue()} activationMode="automatic">
+      {/* The row is also the trigger of the tab menu, so the row stays a direct child of the panel. */}
+      <Tabs.Root
+        as={ContextMenu.Trigger}
+        ref={root}
+        class="window-drag side-panel-header"
+        value={selectedValue()}
+        activationMode="automatic"
+        onContextMenu={props.onTabMenu}
+        onPointerDown={props.onTabMenuPress}
+      >
         <Tabs.List ref={tabList} class="side-panel-tabs" aria-label={t("conversation.sidePanel.label")}>
           <For each={props.panes}>
             {(pane) => {
@@ -435,7 +521,12 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               const selected = () =>
                 props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
               return (
-                <div role="presentation" class="side-panel-tab no-drag" data-selected={selected() ? "true" : undefined}>
+                <div
+                  role="presentation"
+                  class="side-panel-tab no-drag"
+                  data-pane={pane}
+                  data-selected={selected() ? "true" : undefined}
+                >
                   <Button
                     variant="ghost"
                     type="button"
