@@ -18,4 +18,5 @@ export const messages = {
   "error.kind.permission": "Bu eylemi tamamlamak için izniniz yok. Sahibinden erişim isteyin.",
   "error.kind.rateLimit": "Çok fazla istek. Bir süre bekleyin, ardından tekrar deneyin.",
   "error.kind.service": "Hizmet kullanılamıyor. Bir süre bekleyin, ardından tekrar deneyin.",
+  "error.kind.interrupted": "Yanıt bitmeden bağlantı kapandı. Mesajınızı yeniden gönderin.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,7 +5,7 @@ export const messages = {
   // Text that OpenBot posts in a Slack conversation. Slack users read it. It names no agent: in
   // Slack, every answer comes from OpenBot.
   "status.messaging.working": "Üzerinde çalışılıyor…",
-  "status.messaging.queued": "Bekleniyor: OpenBot başka bir istek üzerinde çalışıyor. Yanıt buraya gelecek.",
+  "status.messaging.queued": "Bekleniyor: önceki bir istek henüz bitmedi. Yanıt buraya gelecek.",
   "status.messaging.busy": "Çok fazla istek bekliyor. Daha sonra tekrar deneyin.",
   "status.messaging.failed": "OpenBot bu isteği tamamlayamadı. Ayrıntılar OpenBot ana makinesinde mevcuttur.",
   "status.messaging.noAnswer": "OpenBot yazılı bir yanıt olmadan tamamlandı.",
@@ -57,6 +57,10 @@ export const messages = {
     "👋 *OpenBot bağlandı*\n\nAjanlarına sormak için buraya yaz. WhatsApp Orchestrator yanıtlar ya da işi doğru ajana verir.\n\nBir isteği durdurmak için *stop* gönder.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot bağlandı*\n\nOpenBot'ta izin verdiğin kişiler artık bu numaraya yazabilir. Yeni bir kişi bir kod alır: OpenBot'ta İstekler altında onayla.\n\nBir isteği durdurmak için *stop* gönder.",
+  "status.messaging.whatsappOtherOpenBot":
+    "Bu WhatsApp numarasına başka bir OpenBot da bağlı, bu yüzden iki yanıt alabilirsin. Düzeltmek için telefonundaki WhatsApp'ta Bağlı cihazlar'ı aç ve kullanmadığın OpenBot'tan çıkış yap.",
+  "status.messaging.whatsappPaused":
+    "OpenBot burada 10 dakika yanıt vermeyi durdurdu: kısa sürede çok fazla mesaj geldi. Bu numaraya başka bir OpenBot da bağlıysa telefonundaki WhatsApp'ta Bağlı cihazlar'ı aç ve kullanmadığın OpenBot'tan çıkış yap.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Düzenleyicisi",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp'ta yanıt verir ve ekibe sorar",
 } as const satisfies PartialTranslation<typeof source>;

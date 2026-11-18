@@ -130,6 +130,10 @@ export function useChatMotion(
   const content = useSharedValue(0);
   // The list writes its scroll position here on the UI thread, so scrolling runs no JavaScript here.
   const scrollOffset = useSharedValue(0);
+  /** The reader's finger is on the list: from the start of a drag to its release. */
+  const dragging = useSharedValue(false);
+  /** Legend List writes here whether the list is at its end, within a point, on the UI thread. */
+  const atEnd = useSharedValue(false);
   const lowestOffset = useSharedValue(0);
   const scrolledUp = useSharedValue(false);
   const firstOffset = useSharedValue(0);
@@ -270,7 +274,7 @@ export function useChatMotion(
    * message is known. A sent message now moves to the top of the chat.
    */
   const onAnchorReady = useCallback(
-    (info: AnchorReadyInfo) => {
+    (info: AnchorReadyInfo, anchorMaxSize?: number) => {
       const send = pending.current;
       const list = listRef.current;
       if (!send || !list || info.anchorKey === undefined || info.anchorKey === send.baseline) return;
@@ -293,7 +297,9 @@ export function useChatMotion(
       if (!send.first || info.anchorIndex === undefined) return;
       const m = measurements.current;
       const lift = Math.max(0, keyboardHeight.get() - keyboardOffset);
-      const userHeight = Math.max(0, list.getState().sizeAtIndex(info.anchorIndex) - CHAT_ROW_GAP);
+      // A long message shows only its end, `anchorMaxSize` high, under the header.
+      const rowHeight = list.getState().sizeAtIndex(info.anchorIndex);
+      const userHeight = Math.max(0, Math.min(rowHeight, anchorMaxSize ?? rowHeight) - CHAT_ROW_GAP);
       // The first message rises from the composer to its place under the header.
       firstOffset.set(Math.max(0, m.viewport - lift - m.composer - header - userHeight));
       firstOpacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
@@ -402,11 +408,12 @@ export function useChatMotion(
   const onScrollBeginDrag = useCallback(() => {
     // A drag is the reader's choice. A move of the list while rows get their sizes is not.
     drags.current += 1;
+    dragging.set(true);
     setOpeningFollow(false);
     leaveLatest();
     reveal();
     cancelSend();
-  }, [leaveLatest, reveal, cancelSend]);
+  }, [leaveLatest, reveal, cancelSend, dragging]);
   /**
    * Opens the chat with row `index` under the header, instead of at the latest message. A message
    * from search is the reader's choice of place. The NEW line (`unread`) is not: as on desktop, the
@@ -451,8 +458,11 @@ export function useChatMotion(
   // Only a user scroll can resume following. Keyboard dismissal can make the
   // reply visible without the user choosing to return to it.
   const onScrollEndDrag = useCallback(
-    (event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) => followFrom(event.nativeEvent.contentOffset.y),
-    [followFrom],
+    (event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) => {
+      dragging.set(false);
+      followFrom(event.nativeEvent.contentOffset.y);
+    },
+    [followFrom, dragging],
   );
   const scrollToLatest = useCallback(() => {
     followLatest.current = true;
@@ -489,6 +499,8 @@ export function useChatMotion(
         (openingFollow && !holdOpening) ||
         pinnedToLatest,
       scrollOffset,
+      dragging,
+      atEnd,
       historyStyle,
       firstMessageStyle,
       responseStyle,
@@ -523,6 +535,8 @@ export function useChatMotion(
       openingFollow,
       pinnedToLatest,
       scrollOffset,
+      dragging,
+      atEnd,
       historyStyle,
       firstMessageStyle,
       responseStyle,

@@ -1,6 +1,10 @@
 import type { AgentModelOption } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { decodeAgentStatusFromMain, decodeQuitShortcutHint } from "./agent-decoding";
+import {
+  decodeAgentStatusFromMain,
+  decodeHostProviderAccountsFromMain,
+  decodeQuitShortcutHint,
+} from "./agent-decoding";
 
 const proModel = {
   provider: "antigravity",
@@ -60,6 +64,39 @@ describe("decodeQuitShortcutHint", () => {
   it("refuses a value that is not an agent list", () => {
     for (const value of [undefined, {}, [{ id: 1 }]]) {
       expect(() => decodeQuitShortcutHint(value)).toThrow("Invalid agent list response.");
+    }
+  });
+});
+
+// A joined server's pools reach the provider settings only through this decoder (#8612, #8955).
+describe("decodeHostProviderAccountsFromMain", () => {
+  const accounts = (pools?: unknown) => ({
+    providers: [],
+    agents: [],
+    ...(pools === undefined ? {} : { pools }),
+  });
+
+  it("keeps the pools of the host", () => {
+    const pools = [{ provider: "codex", pool: { leftOut: ["a0123456789abcdef"], inUse: "default" } }];
+
+    expect(decodeHostProviderAccountsFromMain(accounts(pools)).pools).toEqual(pools);
+    expect(decodeHostProviderAccountsFromMain(accounts([])).pools).toEqual([]);
+  });
+
+  it("gives no pools for a host that does not have them", () => {
+    expect(decodeHostProviderAccountsFromMain(accounts())).not.toHaveProperty("pools");
+  });
+
+  it("refuses pools that are not valid", () => {
+    for (const pools of [
+      null,
+      { provider: "codex" },
+      [{ provider: "unknown", pool: { leftOut: [], inUse: null } }],
+      [{ provider: "codex", pool: { leftOut: "second", inUse: null } }],
+      [{ provider: "codex", pool: { leftOut: [], inUse: 1 } }],
+      [{ provider: "codex" }],
+    ]) {
+      expect(() => decodeHostProviderAccountsFromMain(accounts(pools))).toThrow("Invalid provider accounts response.");
     }
   });
 });

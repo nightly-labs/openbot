@@ -126,21 +126,26 @@ function messageEvent(
   if (reply && replyFrom && !replyToBot && isNumber(reply.message_id)) {
     const replyAuthor = String(replyFrom.id);
     state.rememberName(replyAuthor, personName(replyFrom));
+    const replyFiles = inboundFiles(reply);
     state.rememberMessage({
       id: String(reply.message_id),
       threadKey,
       authorName: state.name(replyAuthor) ?? replyAuthor,
-      text: isString(reply.text) ? reply.text : isString(reply.caption) ? reply.caption : "",
+      text: (isString(reply.text) ? reply.text : isString(reply.caption) ? reply.caption : "") || fileNames(replyFiles),
       sentAt: sentAt(reply.date),
+      ...(replyFiles.length ? { files: replyFiles } : {}),
     });
   }
   const { text, mentioned } = withoutMention(rawText, entities, botId, state.botUsername);
+  // Saved with its files, such as a voice note without a mention, which the agent gets later.
+  const files = inboundFiles(message);
   state.rememberMessage({
     id: String(messageId),
     threadKey,
     authorName: state.name(authorId) ?? authorId,
-    text,
+    text: text || fileNames(files),
     sentAt: sentAt(message.date),
+    ...(files.length ? { files } : {}),
   });
   const inChain = reply !== null || message.message_thread_id !== undefined;
   if (!isDirect && !mentioned && !replyToBot && !inChain) return null;
@@ -159,7 +164,7 @@ function messageEvent(
       text,
       // A Telegram mention is already a readable `@username`.
       mentionedUserIds: [],
-      files: inboundFiles(message),
+      files,
     },
   };
 }
@@ -295,6 +300,11 @@ function inboundFiles(message: DynamicRecord): InboundFile[] {
   add(message.animation, "animation.mp4", "video/mp4");
   add(message.video_note, "video-note.mp4", "video/mp4");
   return files;
+}
+
+/** The text of a saved message that has only files. */
+function fileNames(files: readonly InboundFile[]): string {
+  return files.map((file) => file.name).join(", ");
 }
 
 function personName(value: DynamicRecord): string {

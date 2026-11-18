@@ -18,9 +18,17 @@ export const messages = {
     "OpenBot no pudo instalar la CLI de 1Password. Comprueba la conexión a Internet e inténtalo de nuevo.",
   "error.connector.onePasswordCliSignedOut":
     "La CLI de 1Password no tiene una sesión iniciada. Activa su integración en la aplicación 1Password y vuelve a conectar.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot no puede comunicarse con la aplicación de 1Password. Abre 1Password y desbloquéalo. En Ajustes > Desarrollador, comprueba que «Integrar con la CLI de 1Password» está activado. Luego vuelve a intentarlo.",
   "error.connector.onePasswordCliFailed": "La CLI de 1Password falló: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Tu cuenta de 1Password no te permite crear la bóveda compartida ni una cuenta de servicio. Pide este permiso a un propietario o administrador de la cuenta, o pídele un token de cuenta de servicio y haz clic en «Usar token».",
   "error.connector.onePasswordUnexpected": "1Password envió una respuesta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password no aceptó el token de cuenta de servicio.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot no pudo conectarse a 1Password. Comprueba la conexión a Internet e inténtalo de nuevo.",
+  "error.connector.onePasswordRateLimited":
+    "1Password recibió demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
   "error.connector.onePasswordNoVault":
     "La cuenta de servicio no puede leer ninguna bóveda. Dale acceso a una bóveda e inténtalo de nuevo.",
   "error.connector.onePasswordFileUnreadable": "El archivo de conexión de 1Password no se puede leer.",

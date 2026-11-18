@@ -20,9 +20,16 @@ export const messages = {
     "OpenBot이 1Password CLI를 설치하지 못했어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI에 로그인되어 있지 않아요. 1Password 앱에서 연동을 켠 후 다시 연결해 주세요.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot이 1Password 앱에 연결할 수 없어요. 1Password를 열고 잠금을 해제하세요. 설정 > 개발자에서 “1Password CLI와 통합”이 켜져 있는지 확인한 후 다시 시도해 주세요.",
   "error.connector.onePasswordCliFailed": "1Password CLI가 실패했어요: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "이 1Password 계정으로는 공유 보관함이나 서비스 계정을 만들 수 없어요. 계정 소유자나 관리자에게 이 권한을 요청하거나, 서비스 계정 토큰을 받아 ‘토큰 사용’을 클릭해 주세요.",
   "error.connector.onePasswordUnexpected": "1Password가 예상하지 못한 응답을 보냈어요: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password가 서비스 계정 토큰을 받아들이지 않았어요.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot이 1Password에 연결하지 못했어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
+  "error.connector.onePasswordRateLimited": "1Password에 요청이 너무 많아요. 몇 분 기다린 후 다시 시도해 주세요.",
   "error.connector.onePasswordNoVault":
     "서비스 계정이 볼트를 읽을 수 없어요. 볼트에 대한 접근 권한을 부여한 후 다시 시도해 주세요.",
   "error.connector.onePasswordFileUnreadable": "1Password 연결 파일을 읽을 수 없어요.",

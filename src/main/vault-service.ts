@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import {
   cardBrand,
+  VAULT_AGENT_SCOPE_LIMIT,
   VAULT_FILL_SITE_LIMIT,
   VAULT_NOTES_LIMIT,
   VAULT_PASSWORD_LIMIT,
@@ -277,6 +278,39 @@ function summary(record: VaultRecord): VaultItemSummary[] {
   ];
 }
 
+/**
+ * The edits that a new login makes to the saved logins that `allows` gives for its host and username,
+ * as `saveTypedLogin` changes such a login. Empty when none matches: the login is added. Two such
+ * logins look the same in `list_logins`, so an agent filled the old password (#10223). Each login gets
+ * the new password, and the new notes and two-step key when given, and keeps its website and agents.
+ * Agents that the input names are added to the first login, so no agent loses a login.
+ */
+function sameLoginEdits(
+  record: VaultRecord,
+  input: VaultSaveInput,
+  allows: (login: StoredLogin) => boolean,
+): VaultSaveInput[] {
+  // A new login with no password still fails as before: it does not take the saved password.
+  if (input.kind !== "login" || input.id !== null || input.password === null) return [];
+  const host = loginHost(input.website);
+  if (host === undefined) return [];
+  const { username, notes, password, twoStepKey, agents } = input;
+  return record.logins
+    .filter((login) => allows(login) && login.username === username && loginHost(login.website) === host)
+    .map((login, index) => ({
+      kind: "login",
+      id: login.id,
+      website: login.website,
+      username: login.username,
+      notes: notes || login.notes,
+      password,
+      ...(twoStepKey === undefined ? {} : { twoStepKey }),
+      ...(index === 0 && agents && login.agents
+        ? { agents: [...new Set([...agents, ...login.agents])].slice(0, VAULT_AGENT_SCOPE_LIMIT) }
+        : {}),
+    }));
+}
+
 function replaceOrAdd<T extends { id: string }>(items: readonly T[], item: T): T[] {
   return items.some(({ id }) => id === item.id)
     ? items.map((current) => (current.id === item.id ? item : current))
@@ -327,7 +361,8 @@ export class VaultService {
   }
 
   readonly save = Effect.fn("VaultService.save")(function* (this: VaultService, input: VaultSaveInput) {
-    yield* this.#change((record) => this.#put(record, input, undefined).record);
+    // The owner can use every login.
+    yield* this.#change((record) => this.#putNew(record, input, () => true, undefined).record);
     return this.state();
   });
 
@@ -654,8 +689,10 @@ export class VaultService {
     const outcome: { saved: VaultAgentResult | null } = { saved: null };
     yield* this.#change((record) => {
       // The same checks as the Vault page: an HTTPS website, a card number that passes the Luhn check.
-      // A new item is for every agent; the user can choose its agents in the Vault page.
-      const next = this.#put(record, { ...decodeVaultSaveInput(item), agents: null }, agent.name);
+      // A new item is for every agent; the user can choose its agents in the Vault page. The logins
+      // that this agent uses for the same host and username get the new values and keep their agents.
+      const input: VaultSaveInput = { ...decodeVaultSaveInput(item), agents: null };
+      const next = this.#putNew(record, input, (login) => vaultItemAllows(login, agent.id), agent.name);
       outcome.saved = itemName(next.record, next.id);
       return next.record;
     });
@@ -759,6 +796,19 @@ export class VaultService {
   }
 
   /** `record` with `input` added or changed, and the id of that item. */
+  /** Adds `input`, or changes the saved logins of its host and username (`sameLoginEdits`). */
+  #putNew(
+    record: VaultRecord,
+    input: VaultSaveInput,
+    allows: (login: StoredLogin) => boolean,
+    addedBy: string | undefined,
+  ): { record: VaultRecord; id: string } {
+    const edits = sameLoginEdits(record, input, allows);
+    const id = edits[0]?.id;
+    if (!id) return this.#put(record, input, addedBy);
+    return { record: edits.reduce((next, edit) => this.#put(next, edit, addedBy).record, record), id };
+  }
+
   #put(record: VaultRecord, input: VaultSaveInput, addedBy: string | undefined): { record: VaultRecord; id: string } {
     switch (input.kind) {
       case "login": {

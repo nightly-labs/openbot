@@ -38,7 +38,7 @@ export async function routeSignInRelay(
   mcpServers?: Pick<TeamApiMcpServers, "listMcpServers">,
   owners?: TeamApiMcpServerOwners,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, member, request, json } = context;
+  const { method, url, capabilities, member, sessionId, request, json } = context;
   const accountStart =
     method === "POST" ? PROVIDER_ACCOUNT_RELAYS.find((candidate) => candidate.start === url.pathname) : undefined;
   if (accountStart) {
@@ -52,7 +52,9 @@ export async function routeSignInRelay(
     if (!provider) throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
     return json(
       200,
-      await runCauseEffect(relay.startProviderAccount(member.id, provider, nullableString(body, "accountId"))),
+      await runCauseEffect(
+        relay.startProviderAccount(member.id, provider, nullableString(body, "accountId"), sessionId),
+      ),
     );
   }
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
@@ -90,7 +92,7 @@ export async function routeSignInRelay(
       // The codec admits only `SIGN_IN_RELAY_PROVIDERS`.
       const provider = SIGN_IN_RELAY_PROVIDERS.find((id) => id === stringField(body, "provider"));
       if (!provider) throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
-      return json(200, await runCauseEffect(relay.startProvider(member.id, provider)));
+      return json(200, await runCauseEffect(relay.startProvider(member.id, provider, sessionId)));
     }
     case SIGN_IN_RELAY_ROUTES.linkStart:
       return json(

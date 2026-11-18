@@ -236,4 +236,10 @@ export const messages = {
     other:
       "Twoja licencja ma maksymalną liczbę użytkowników: {count}. Skontaktuj się z nami w sprawie większej licencji. Nowe osoby nie mogą dołączyć do Twoich serwerów.",
   },
+  "billing.details.country": "Kraj rozliczenia",
+  "billing.details.countryPlaceholder": "Wybierz kraj",
+  "billing.details.vatId": "Numer VAT UE (opcjonalnie)",
+  "billing.details.vatIdInvalid": "To nie jest numer VAT wybranego kraju.",
+  "billing.details.countryMissing": "Wybierz kraj rozliczenia.",
+  "billing.details.saveFailed": "Nie udało się zapisać danych rozliczeniowych",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,9 +19,17 @@ export const messages = {
     "OpenBot 1Password CLI'yi yükleyemedi. İnternet bağlantısını kontrol edin, ardından tekrar deneyin.",
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI'de oturum açılmamış. 1Password uygulamasında entegrasyonunu açın, ardından yeniden bağlanın.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot, 1Password uygulamasına ulaşamıyor. 1Password'ü açın ve kilidini açın. Settings > Developer bölümünde “Integrate with 1Password CLI” seçeneğinin açık olduğundan emin olun. Ardından yeniden deneyin.",
   "error.connector.onePasswordCliFailed": "1Password CLI başarısız oldu: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "1Password hesabınız paylaşılan kasayı veya bir hizmet hesabı oluşturmanıza izin vermiyor. Hesabın sahibinden veya yöneticisinden bu izni isteyin ya da bir hizmet hesabı belirteci isteyip “Belirteç kullan” düğmesine tıklayın.",
   "error.connector.onePasswordUnexpected": "1Password beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hizmet hesabı belirtecini kabul etmedi.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot 1Password'e bağlanamadı. İnternet bağlantısını kontrol edin, ardından tekrar deneyin.",
+  "error.connector.onePasswordRateLimited":
+    "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
   "error.connector.onePasswordFileUnreadable": "1Password bağlantı dosyası okunamıyor.",

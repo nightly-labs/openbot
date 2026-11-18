@@ -83,6 +83,34 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "Cette action arrête le canal. Son historique reste dans « Canaux supprimés », en aperçu uniquement. Vous pouvez le restaurer depuis cette liste. Les agents membres sont conservés.",
   "mobile.channel.form.delete": "Supprimer le canal",
+  "mobile.channel.newConversation.title": "Nouvelle conversation",
+  "mobile.channel.newConversation.starting": "Démarrage de la nouvelle conversation…",
+  "mobile.channel.newConversation.footer":
+    "Les membres oublient les messages précédents. Les réglages du canal restent.",
+  "mobile.channel.newConversation.confirmTitle": "Démarrer une nouvelle conversation dans {name} ?",
+  "mobile.channel.newConversation.confirmBody":
+    "Les membres oublient les messages précédents de ce canal. Les messages restent visibles au-dessus d’un séparateur. Les membres, les instructions, les souvenirs et les routines ne changent pas.",
+  "mobile.channel.newConversation.confirm": "Démarrer une nouvelle conversation",
+  "mobile.channel.newConversation.failed": "Impossible de démarrer une nouvelle conversation",
+  "mobile.channel.newConversation.failedBody": "L’hôte n’a pas pu commencer une nouvelle conversation.",
+  "mobile.channel.compact.title": "Compacter le contexte",
+  "mobile.channel.compact.compacting": "Démarrage de la compaction…",
+  "mobile.channel.compact.footer":
+    "Les membres gardent un court résumé de leur session du canal et utilisent moins de jetons.",
+  "mobile.channel.compact.started":
+    "Compaction démarrée. Les fournisseurs des membres raccourcissent le contexte sur l’hôte.",
+  "mobile.channel.compact.failed": "Impossible de compacter le contexte du canal",
+  "mobile.channel.compact.failedBody": "L’hôte n’a pas pu compacter le contexte.",
+  "mobile.channel.deleteHistory.title": "Supprimer l’historique",
+  "mobile.channel.deleteHistory.deleting": "Suppression de l’historique…",
+  "mobile.channel.deleteHistory.footer":
+    "Les messages sont supprimés et les membres les oublient. La configuration du canal reste.",
+  "mobile.channel.deleteHistory.confirmTitle": "Supprimer l’historique de {name} ?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Tous les messages et fichiers de ce canal sont supprimés d’OpenBot et les membres les oublient. Cette action est irréversible. Les membres, les instructions, les mémoires, les routines et les tâches ne changent pas.",
+  "mobile.channel.deleteHistory.confirm": "Supprimer l’historique",
+  "mobile.channel.deleteHistory.failed": "Impossible de supprimer l’historique",
+  "mobile.channel.deleteHistory.failedBody": "L’hôte n’a pas pu supprimer l’historique.",
   "mobile.channel.form.unavailable":
     "Connectez-vous à un serveur de bureau qui prend en charge les canaux pour faire des modifications.",
   "mobile.channel.form.invalidName": "Saisissez un nom de canal valide.",

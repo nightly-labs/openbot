@@ -56,6 +56,8 @@ export const messages = {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Utilisation",
   "app.rail.library": "Bibliothèque",
+  "app.rail.providers": "Fournisseurs",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Réglages",
   "app.rail.settingsNotice": "Réglages. {notice}",
@@ -110,6 +112,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Rechercher dans les réglages…",
   "app.settingsPage.results": "Résultats de recherche des réglages",
   "app.settingsPage.noResults": "Aucun réglage correspondant.",
+  "app.settingsPage.marketplaceApps": "Connecteurs et serveurs MCP",
   "app.settingsPage.resultCount": {
     one: "{count} réglage correspondant.",
     other: "{count} réglages correspondants.",

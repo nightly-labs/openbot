@@ -1,11 +1,13 @@
-// Checks that an agent puts the files it attaches into a Library folder, and reads its folders.
-// Runs the real agent service, attachment gateway, tool router and Library folders store on a
-// temporary profile with a fake Codex app-server. The fake calls `attach_files_to_response` as a
-// direct tool and `list_library_folders` through `tool_call`, as a model does, and logs each result.
+// Checks that an agent puts the files it attaches into a Library folder, reads its folders, and
+// organizes them. Runs the real agent service, attachment gateway, tool router, storage scan, Library
+// folders service and store on a temporary profile with a fake Codex app-server. The fake calls
+// `attach_files_to_response` as a direct tool, and `list_library_folders` and `organize_library`
+// through `tool_call`, as a model does, and logs each result.
 // The check asserts the folders file on disk after each call: a path makes each level; the same path
 // in a different letter case uses the same folders; a path that cannot be used, a full store and a
 // host with no store keep the attachment in no folder, with the reason; a repeated call makes one
-// message; an agent sees only its own folders and files.
+// message; an agent sees only its own folders and files; an agent makes, renames, moves and deletes
+// its folders and moves its files into and out of them, and cannot change those of a different agent.
 // `bun scripts/library-folders-e2e.ts`. Writes .openbot-build/library-folders-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -37,6 +39,8 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } = await import("../src/backend/library-folders-store");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { StorageUsageScanner, StorageUsageService } = await import("../src/backend/storage-usage");
+const { LibraryFoldersService } = await import("../src/main/library-folders-service");
 
 const CALL_MARK = "LIBRARY-CALL";
 const PERSON = { id: "local", name: "Alex" };
@@ -151,6 +155,10 @@ process.stdin.on("data", (chunk) => {
 interface LibraryToolArgs {
   paths?: string[];
   folder?: string | number;
+  action?: string;
+  name?: string;
+  to?: string;
+  files?: string[];
 }
 
 interface ToolLog {
@@ -236,8 +244,25 @@ const listingSchema = z.object({
       files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
     }),
   ),
-  unfiled: z.number(),
+  unfiled: z
+    .object({
+      fileCount: z.number(),
+      files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
+    })
+    .optional(),
   truncated: z.boolean(),
+});
+const refusalSchema = z.object({ error: z.string() });
+/** The result of each organize_library action, in one object: the action gives some of the fields. */
+const organizedSchema = z.object({
+  folder: z.string().optional(),
+  created: z.boolean().optional(),
+  was: z.string().optional(),
+  to: z.string().nullable().optional(),
+  filesPlaced: z.number().optional(),
+  deleted: z.string().optional(),
+  foldersDeleted: z.number().optional(),
+  filesInNoFolder: z.number().optional(),
 });
 const storedSchema = z.object({
   version: z.literal(1),
@@ -256,6 +281,29 @@ async function startHost(directory: string, withFolders: boolean) {
   const foldersPath = join(directory, LIBRARY_FOLDERS_FILE);
   const libraryFolders = withFolders ? new LibraryFoldersStore(foldersPath) : null;
   if (libraryFolders) await runCauseEffect(libraryFolders.initialize());
+  // As in the app: the Library shows the files of the host scan, and the agent tools use the same scan.
+  const storageSources = {
+    roots: {
+      database: store.database.path,
+      downloads: store.downloadsRoot,
+      caches: [],
+      logs: [],
+      runtimes: null,
+      data: directory,
+    },
+    database: () => store.database.connection,
+    mailbox,
+    agents: () => agents.listAgents(),
+  };
+  const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
+  const foldersService = libraryFolders
+    ? new LibraryFoldersService({ store: libraryFolders, storage, agents: () => agents.listAgents() })
+    : null;
+  /** Each write of the folders: the app sends the new snapshot to each window and joined client. */
+  let folderChanges = 0;
+  libraryFolders?.onChanged(() => {
+    folderChanges += 1;
+  });
   const agents = new AgentService({
     store,
     mailbox,
@@ -263,7 +311,7 @@ async function startHost(directory: string, withFolders: boolean) {
     preferredProvider: "codex",
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
     timezone: () => "UTC",
-    libraryFolders,
+    libraryFolders: foldersService?.forAgents() ?? null,
   });
   await runCauseEffect(agents.initialize());
 
@@ -279,6 +327,7 @@ async function startHost(directory: string, withFolders: boolean) {
     agents,
     mailbox,
     libraryFolders,
+    folderChanges: () => folderChanges,
     /** The folders file as it is on disk. */
     stored: () => storedSchema.parse(JSON.parse(readFileSync(foldersPath, "utf8"))),
     hasFoldersFile: () => existsSync(foldersPath),
@@ -322,6 +371,7 @@ async function startHost(directory: string, withFolders: boolean) {
     },
     async stop() {
       await runCauseEffect(agents.stop()).catch(() => {});
+      await Effect.runPromise(storage.dispose()).catch(() => {});
       database.close();
     },
   };
@@ -574,16 +624,21 @@ try {
     all.text,
   );
   // deep.txt, long.txt, slash.txt and plain.txt.
+  const plainId = plain.attached?.attachments[0]?.id ?? "";
   pass(
-    "The list counts the files in no folder",
-    all.listing?.unfiled === 4 && all.listing.truncated === false,
+    "The list has the files in no folder, with the id of each",
+    all.listing?.unfiled?.fileCount === 4 &&
+      all.listing.unfiled.files.length === 4 &&
+      all.listing.unfiled.files.some((file) => file.id === plainId && file.name === "plain.txt") &&
+      all.listing.truncated === false,
     all.text,
   );
   const branch = await list("list one folder", maker.id, "autumn campaign");
   pass(
     "A folder argument limits the list to that folder and the folders in it",
     JSON.stringify(branch.listing?.folders.map((folder) => folder.path)) ===
-      JSON.stringify(["Autumn campaign", "Autumn campaign/Images", "Autumn campaign/Video"]),
+      JSON.stringify(["Autumn campaign", "Autumn campaign/Images", "Autumn campaign/Video"]) &&
+      branch.listing?.unfiled === undefined,
     branch.text,
   );
   const missing = await list("list an unknown folder", maker.id, "Winter");
@@ -597,7 +652,7 @@ try {
   const empty = await list("list as an agent with no folder", other.id);
   pass(
     "An agent does not see the folders or files of a different agent",
-    empty.success && empty.listing?.folders.length === 0 && empty.listing.unfiled === 0,
+    empty.success && empty.listing?.folders.length === 0 && empty.listing.unfiled?.fileCount === 0,
     empty.text,
   );
   const sameName = await one(
@@ -614,6 +669,190 @@ try {
       storedFolder(other.id, "Reports") !== null &&
       storedFolder(other.id, "Reports")?.id !== storedFolder(maker.id, "Reports")?.id,
     sameName.text,
+  );
+
+  // 9b. organize_library: an agent makes, renames, moves and deletes its folders, and moves its files
+  // into and out of them. No action changes a stored file. Each change is one write of the folders,
+  // which the app sends to each window and joined client.
+  const organize = async (name: string, agentId: string, args: LibraryToolArgs) => {
+    const [result] = await host.call(name, agentId, "organize_library", args);
+    if (!result) throw new Error(`${name}: no tool result.`);
+    return { ...result, value: result.success ? organizedSchema.parse(JSON.parse(result.text)) : null };
+  };
+  const refused = async (name: string, agentId: string, args: LibraryToolArgs, reason: string) => {
+    const before = JSON.stringify(host.stored());
+    const result = await organize(name, agentId, args);
+    pass(
+      `${name}: refused with the reason, and nothing changes`,
+      !result.success &&
+        refusalSchema.parse(JSON.parse(result.text)).error.includes(reason) &&
+        JSON.stringify(host.stored()) === before,
+      result.text,
+    );
+  };
+  const idOf = (result: { attached: { attachments: { id: string }[] } | null } | undefined) =>
+    result?.attached?.attachments[0]?.id ?? "";
+  const deepId = idOf(tooDeep);
+  const longId = idOf(longName);
+  const otherFileId = idOf(sameName);
+  const storedBefore = storedFileIds();
+  const changesBefore = host.folderChanges();
+
+  const drafts = await organize("create a nested folder", maker.id, { action: "create", folder: "Drafts/Social" });
+  pass(
+    "create makes each level of the path",
+    drafts.success &&
+      drafts.value?.folder === "Drafts/Social" &&
+      drafts.value.created === true &&
+      drafts.value.filesPlaced === 0 &&
+      storedFolder(maker.id, "Drafts", "Social") !== null &&
+      host.folderChanges() > changesBefore,
+    drafts.text,
+  );
+  const again = await organize("create a folder that exists", maker.id, { action: "create", folder: "drafts/SOCIAL" });
+  pass(
+    "create of a path that exists makes no folder",
+    again.success &&
+      again.value?.created === false &&
+      host.stored().folders.filter((f) => f.name === "Social").length === 1,
+    again.text,
+  );
+  const notes = await organize("create a folder with a file", maker.id, {
+    action: "create",
+    folder: "Notes",
+    files: [plainId],
+  });
+  pass(
+    "create with files puts the files in the new folder",
+    notes.success &&
+      notes.value?.filesPlaced === 1 &&
+      host.stored().placement[plainId] === storedFolder(maker.id, "Notes")?.id,
+    notes.text,
+  );
+  const placed = await organize("place files in a folder", maker.id, {
+    action: "place",
+    to: "drafts/social",
+    files: [deepId, longId],
+  });
+  const social = storedFolder(maker.id, "Drafts", "Social");
+  pass(
+    "place moves the files into a folder of the path",
+    placed.success &&
+      placed.value?.to === "Drafts/Social" &&
+      placed.value.filesPlaced === 2 &&
+      host.stored().placement[deepId] === social?.id &&
+      host.stored().placement[longId] === social?.id,
+    placed.text,
+  );
+  const out = await organize("place a file in no folder", maker.id, { action: "place", files: [deepId] });
+  pass(
+    "place with no to takes the file out of its folder",
+    out.success && out.value?.to === null && host.stored().placement[deepId] === undefined,
+    out.text,
+  );
+  await refused(
+    "place an unknown file",
+    maker.id,
+    { action: "place", to: "Notes", files: ["no-such-file"] },
+    "No Library file has the id",
+  );
+  await refused(
+    "place a file of a different agent",
+    maker.id,
+    { action: "place", to: "Notes", files: [otherFileId] },
+    "is not one of your Library files",
+  );
+
+  const renamed = await organize("rename a folder", maker.id, { action: "rename", folder: "Drafts", name: "Posts" });
+  pass(
+    "rename changes the name and keeps the folders and files in it",
+    renamed.success &&
+      renamed.value?.folder === "Posts" &&
+      renamed.value.was === "Drafts" &&
+      storedFolder(maker.id, "Drafts") === null &&
+      storedFolder(maker.id, "Posts", "Social")?.id === social?.id &&
+      host.stored().placement[longId] === social?.id,
+    renamed.text,
+  );
+  await refused(
+    "rename to the name of a sibling",
+    maker.id,
+    { action: "rename", folder: "Posts", name: "reports" },
+    'You already have a Library folder "Reports"',
+  );
+  await refused(
+    "rename with a slash",
+    maker.id,
+    { action: "rename", folder: "Posts", name: "A/B" },
+    "cannot have a slash",
+  );
+  await refused("rename with no name", maker.id, { action: "rename", folder: "Posts" }, "rename needs name");
+
+  const moved = await organize("move a folder into a folder", maker.id, {
+    action: "move",
+    folder: "Posts/Social",
+    to: "Reports",
+  });
+  pass(
+    "move puts the folder and its files in the new parent",
+    moved.success &&
+      moved.value?.folder === "Reports/Social" &&
+      moved.value.was === "Posts/Social" &&
+      storedFolder(maker.id, "Reports", "Social")?.id === social?.id &&
+      host.stored().placement[longId] === social?.id,
+    moved.text,
+  );
+  const top = await organize("move a folder to the top level", maker.id, { action: "move", folder: "Reports/Social" });
+  pass(
+    "move with no to puts the folder at the top level",
+    top.success && top.value?.folder === "Social" && storedFolder(maker.id, "Social")?.parentId === undefined,
+    top.text,
+  );
+  await refused(
+    "move a folder into a folder in it",
+    maker.id,
+    { action: "move", folder: "Autumn campaign", to: "Autumn campaign/Images" },
+    "This folder cannot go there",
+  );
+  await organize("create a deep path", maker.id, { action: "create", folder: "L1/L2/L3/L4" });
+  await refused(
+    "move a folder below the level limit",
+    maker.id,
+    { action: "move", folder: "Autumn campaign", to: "L1/L2/L3/L4" },
+    `only ${LIBRARY_FOLDER_LIMITS.levels} levels deep`,
+  );
+  await refused(
+    "rename a folder of a different agent",
+    other.id,
+    { action: "rename", folder: "Autumn campaign", name: "Mine" },
+    'You have no Library folder "Autumn campaign"',
+  );
+
+  const campaignFiles = [firstId, secondId, idOf(video)];
+  const deleted = await organize("delete a folder", maker.id, { action: "delete", folder: "autumn campaign" });
+  pass(
+    "delete removes the folder and the folders in it; its files stay, in no folder",
+    deleted.success &&
+      deleted.value?.deleted === "Autumn campaign" &&
+      deleted.value.foldersDeleted === 3 &&
+      deleted.value.filesInNoFolder === 3 &&
+      storedFolder(maker.id, "Autumn campaign") === null &&
+      campaignFiles.every((fileId) => storedFileIds().has(fileId) && host.stored().placement[fileId] === undefined),
+    deleted.text,
+  );
+  await organize("delete the deep path", maker.id, { action: "delete", folder: "L1" });
+  pass(
+    "No organize action adds or removes a stored file",
+    JSON.stringify([...storedFileIds()].sort()) === JSON.stringify([...storedBefore].sort()),
+  );
+  const after = await list("list after organize", maker.id);
+  pass(
+    "The list shows the organized folders and files",
+    JSON.stringify(after.listing?.folders.map((folder) => folder.path)) ===
+      JSON.stringify(["Reports", "Retry", "Posts", "Notes", "Social"]) &&
+      after.listing?.unfiled?.files.some((file) => file.id === firstId) === true &&
+      after.listing.folders.find((folder) => folder.path === "Social")?.files[0]?.id === longId,
+    after.text,
   );
 
   const names = new Map(host.stored().folders.map((folder) => [folder.id, folder]));

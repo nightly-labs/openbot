@@ -55,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "İş akışları",
   "app.rail.usage": "Kullanım",
   "app.rail.library": "Kitaplık",
+  "app.rail.providers": "Sağlayıcılar",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Pazar yeri",
   "app.rail.settings": "Ayarlar",
   "app.rail.settingsNotice": "Ayarlar. {notice}",
@@ -106,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Ayarlarda ara…",
   "app.settingsPage.results": "Ayar arama sonuçları",
   "app.settingsPage.noResults": "Eşleşen ayar yok.",
+  "app.settingsPage.marketplaceApps": "Bağlayıcılar ve MCP sunucuları",
   "app.settingsPage.resultCount": {
     one: "{count} eşleşen ayar.",
     other: "{count} eşleşen ayar.",

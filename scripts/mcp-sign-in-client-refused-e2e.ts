@@ -9,8 +9,8 @@
 // RevenueCat (#4884) registers only the clients it approved and answers every other registration
 // with 400 `invalid_client`: the refusal must say so, not quote "The client is not registered.".
 // Omnisend (#7722) registers only the app names it approved and answers OpenBot with 400
-// `invalid_client_metadata` "unknown application: OpenBot": the refusal must say so too. The same
-// error about other metadata keeps the server's own words.
+// `invalid_client_metadata` "unknown application: OpenBot": the refusal must say so too. Tessie
+// (#9372) answers the same error in other words, and the refusal must say the same.
 // Microsoft 365 (#7812) has no protected-resource metadata and names no scope in its challenge, and
 // Microsoft refuses a sign-in page with no scope: OpenBot must ask for the scopes that its
 // authorization server lists. A resource with metadata keeps the scope it names, or none.
@@ -20,6 +20,12 @@
 // TradingView (#9209) blocks a sign-in page that returns to `127.0.0.1` or `localhost`. A joined
 // server's relayed sign-in for a client that opens `openbot://mcp-auth` must register and send that
 // link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
+// Enrich (#11426) issues a secret for a public registration and wants it at the token endpoint.
+// GitLab (#9372) answers 403 to the token of an account that may not use its MCP server, after the
+// sign-in and at each Test with the saved sign-in: the refusal must say that the server refused the
+// account, not "Check the API key", and must ask for neither a key nor a sign-in. A 403 step-up
+// challenge (`insufficient_scope`) asks for a sign-in instead, and a 403 from the token endpoint
+// says that the server did not accept the sign-in: neither one checked the account.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -30,7 +36,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { McpOAuth, type McpOAuthRecord } from "../src/backend/mcp-oauth-provider";
-import { testMcpServer } from "../src/backend/mcp-probe";
+import { inspectMcpServer, testMcpServer } from "../src/backend/mcp-probe";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-refused-e2e");
 const ACCESS_TOKEN = "e2e-access-token";
@@ -63,6 +69,8 @@ interface FakeServer {
 interface Case {
   name: string;
   attempts: { toolCount: number; error: string | null }[];
+  /** A Test after the attempts, with the saved sign-in and no browser, as the Test button runs it. */
+  silentTest?: { error: string | null; needs: string | null };
   registrations: (string | null)[];
   registrationScopes: (string | null)[];
   /** The `scope` of each sign-in page that opened, in order. */
@@ -97,7 +105,10 @@ const REGISTRATION_REFUSALS = {
     error_description: "The client is not registered. Contact support if you need to register a new client.",
   },
   omnisend: { error: "invalid_client_metadata", error_description: "unknown application: OpenBot" },
-  badMetadata: { error: "invalid_client_metadata", error_description: "redirect URI must have a host" },
+  tessie: {
+    error: "invalid_client_metadata",
+    error_description: "No dynamic client registration template matched this request.",
+  },
 } as const;
 type RegistrationRefusal = keyof typeof REGISTRATION_REFUSALS;
 
@@ -108,6 +119,8 @@ const REGISTRATION_FORBIDDEN = {
     "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
 };
 type RegistrationForbidden = "dropbox" | "forbidden";
+/** How the MCP endpoint answers a valid token: GitLab's plain 403, or a 403 step-up challenge. */
+type AccountRefusal = "forbidden" | "insufficientScope";
 
 /** The loopback addresses that Dropbox registers, whatever the registration asked for. */
 const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
@@ -131,6 +144,12 @@ async function fakeServer(
   registrationRefused: RegistrationRefusal | null,
   scopes: ScopeMetadata = {},
   registrationForbidden: RegistrationForbidden | null = null,
+  /** How the MCP endpoint refuses a valid token, or `null` when it answers. */
+  accountRefused: AccountRefusal | null = null,
+  /** The token endpoint answers 403 with a body that is not an OAuth error. */
+  tokenForbidden = false,
+  /** Enrich (#11426): a public (`none`) registration also gets a client secret. */
+  secretForPublic = false,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -191,7 +210,7 @@ async function fakeServer(
           });
         return json(response, 201, {
           client_id: id,
-          ...(method === "none" ? {} : { client_secret: CLIENT_SECRET }),
+          ...(method === "none" && !secretForPublic ? {} : { client_secret: CLIENT_SECRET }),
           token_endpoint_auth_method: method,
           redirect_uris: asked.redirect_uris,
         });
@@ -205,6 +224,7 @@ async function fakeServer(
         // Railway: the secret it issued is refused. Make: the secret must come in the body.
         if (secretAccepted ? !secretInBody : withSecret)
           return json(response, 401, { error: "invalid_client", error_description: "client authentication failed" });
+        if (tokenForbidden) return json(response, 403, { message: "403 Forbidden" });
         if (form.get("code") !== "e2e-grant") return json(response, 400, { error: "invalid_grant" });
         return json(response, 200, { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 });
       }
@@ -215,6 +235,16 @@ async function fakeServer(
           401,
           { error: "unauthorized" },
           { "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"` },
+        );
+      if (accountRefused === "forbidden") return json(response, 403, { message: "403 Forbidden" });
+      if (accountRefused === "insufficientScope")
+        return json(
+          response,
+          403,
+          { error: "insufficient_scope" },
+          {
+            "www-authenticate": `Bearer error="insufficient_scope", scope="mcp", resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"`,
+          },
         );
       const message = rpcRequest.parse(JSON.parse(await body(request)));
       if (message.id === undefined) {
@@ -288,6 +318,10 @@ async function runCase(
     registrationForbidden = null,
     storedClient = null,
     relayDeepLink,
+    accountRefused = null,
+    tokenForbidden = false,
+    storedTokens = false,
+    secretForPublic = false,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
@@ -301,9 +335,24 @@ async function runCase(
      * for none). The firewall blocks each page but the last, and the member cancels it.
      */
     relayDeepLink?: string | null;
+    /** The server refuses a valid token with 403, and a silent Test follows the attempts. */
+    accountRefused?: AccountRefusal | null;
+    tokenForbidden?: boolean;
+    /** A sign-in already on file, with a valid token, as a sign-in in an earlier run leaves it. */
+    storedTokens?: boolean;
+    secretForPublic?: boolean;
   } = {},
 ): Promise<Case> {
-  const server = await fakeServer(authMethods, secretAccepted, registrationRefused, scopes, registrationForbidden);
+  const server = await fakeServer(
+    authMethods,
+    secretAccepted,
+    registrationRefused,
+    scopes,
+    registrationForbidden,
+    accountRefused,
+    tokenForbidden,
+    secretForPublic,
+  );
   const records = new Map<string, McpOAuthRecord>();
   if (storedClient)
     records.set(server.url, {
@@ -312,6 +361,16 @@ async function runCase(
         token_endpoint_auth_method: "none",
         redirect_uris: DROPBOX_REDIRECTS,
         issuer: new URL(server.url).origin,
+      },
+    });
+  if (storedTokens)
+    records.set(server.url, {
+      client: { client_id: "e2e-client", token_endpoint_auth_method: "none", redirect_uris: [] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 },
+      obtainedAt: Date.now(),
+      discovery: {
+        authorizationServerUrl: new URL(server.url).origin,
+        resourceMetadataUrl: `${new URL(server.url).origin}/.well-known/oauth-protected-resource/mcp`,
       },
     });
   if (storedDiscovery)
@@ -358,9 +417,14 @@ async function runCase(
     const results: Case["attempts"] = [];
     for (attempt = 0; attempt < attempts; attempt++)
       results.push(await runCauseEffect(testMcpServer(httpConfig(server.url), 10_000, undefined, authority, "here")));
+    const silent = { accessToken: (url: string) => oauth.accessToken(url), signIn: () => null };
+    const silentTest = accountRefused
+      ? await runCauseEffect(inspectMcpServer(httpConfig(server.url), 10_000, undefined, silent, "here"))
+      : null;
     return {
       name,
       attempts: results,
+      ...(silentTest ? { silentTest: { error: silentTest.error, needs: silentTest.needs } } : {}),
       registrations: [...server.registrations],
       registrationScopes: [...server.registrationScopes],
       pageScopes: server.pagesOpened.map((page) => new URL(page).searchParams.get("scope")),
@@ -477,16 +541,71 @@ async function main(): Promise<void> {
     check(omnisend, !omnisend.signedIn, "a token is stored after a refused registration");
     report.cases.push(omnisend);
 
-    // The same error about metadata that does not name OpenBot is not a refusal of OpenBot.
-    const badMetadata = await runCase("registration-bad-metadata", ["none"], 1, { registrationRefused: "badMetadata" });
-    const [metadataAttempt] = badMetadata.attempts;
+    // Tessie refuses with the same error in words that do not name OpenBot. The probe says the same,
+    // not "No dynamic client registration template matched this request.".
+    const tessie = await runCase("registration-refused-no-template", ["none"], 1, { registrationRefused: "tessie" });
+    const [tessieAttempt] = tessie.attempts;
+    check(tessie, tessieAttempt?.error === registrationRefused, `the attempt reported: ${tessieAttempt?.error}`);
+    check(tessie, tessie.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(tessie, !tessie.storedClient, "a client is stored after a refused registration");
+    check(tessie, !tessie.signedIn, "a token is stored after a refused registration");
+    report.cases.push(tessie);
+
+    // GitLab refuses the signed-in account with 403, after the sign-in and at the Test that follows.
+    const accountRefused = sourceText("error.backend.mcpSignInAccountRefused");
+    const gitlab = await runCase("account-refused-after-sign-in", ["none"], 1, { accountRefused: "forbidden" });
+    const [signInAttempt] = gitlab.attempts;
+    check(gitlab, signInAttempt?.error === accountRefused, `the sign-in reported: ${signInAttempt?.error}`);
+    check(gitlab, gitlab.signedIn, "no token is stored after the sign-in");
     check(
-      badMetadata,
-      metadataAttempt?.error !== registrationRefused && metadataAttempt?.error?.includes("must have a host") === true,
-      `the attempt reported: ${metadataAttempt?.error}`,
+      gitlab,
+      gitlab.silentTest?.error === accountRefused,
+      `the Test with the saved sign-in reported: ${gitlab.silentTest?.error}`,
     );
-    check(badMetadata, !badMetadata.signedIn, "a token is stored after a refused registration");
-    report.cases.push(badMetadata);
+    check(gitlab, gitlab.silentTest?.needs === null, `the Test asked for: ${gitlab.silentTest?.needs}`);
+    report.cases.push(gitlab);
+
+    // A step-up challenge on a saved sign-in: the token needs a scope, which Sign in asks for.
+    const stepUp = await runCase("account-scope-step-up", ["none"], 0, {
+      accountRefused: "insufficientScope",
+      storedTokens: true,
+    });
+    const signInRequired = sourceText("error.backend.mcpSignInRequired");
+    check(
+      stepUp,
+      stepUp.silentTest?.error === signInRequired,
+      `the Test with the saved sign-in reported: ${stepUp.silentTest?.error}`,
+    );
+    check(stepUp, stepUp.silentTest?.needs === "sign_in", `the Test asked for: ${stepUp.silentTest?.needs}`);
+    report.cases.push(stepUp);
+
+    // Enrich (#11426) lists `none` and registers it, but also issues a secret, and its token
+    // endpoint refuses a request without it. The secret goes in the body, and the sign-in works.
+    const enrich = await runCase("public-registration-with-secret", ["client_secret_post", "none"], 1, {
+      secretAccepted: true,
+      secretForPublic: true,
+    });
+    check(enrich, enrich.attempts[0]?.error === null, `the sign-in failed: ${enrich.attempts[0]?.error}`);
+    check(enrich, enrich.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(enrich, enrich.registrations.join() === "none", `the registration asked for ${enrich.registrations.join()}`);
+    check(
+      enrich,
+      enrich.tokenRequestsWithSecret.join() === "true",
+      "the token request did not carry the client secret",
+    );
+    check(enrich, enrich.signedIn, "no token is stored after the sign-in");
+    report.cases.push(enrich);
+
+    // The token endpoint refuses the grant with 403: the sign-in failed before any account was checked.
+    const tokenRefused = await runCase("token-endpoint-forbidden", ["none"], 1, { tokenForbidden: true });
+    const notAccepted = sourceText("error.backend.mcpSignInNotAccepted");
+    check(
+      tokenRefused,
+      tokenRefused.attempts[0]?.error === notAccepted,
+      `the sign-in reported: ${tokenRefused.attempts[0]?.error}`,
+    );
+    check(tokenRefused, !tokenRefused.signedIn, "a token is stored after a refused grant");
+    report.cases.push(tokenRefused);
 
     // Dropbox refuses `/mcp-auth` with 403. OpenBot registers the `/callback` form once more and
     // sends it on the page and in the token request, although the registration names no port.
