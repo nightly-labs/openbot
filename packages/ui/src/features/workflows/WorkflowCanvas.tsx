@@ -911,8 +911,18 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const hovered = hoveredNode();
     if (hovered !== null && kindOf(hovered) === "asset" && !board.isRemoved(hovered)) return hovered;
     const selected = board.selected();
-    return selected !== null && kindOf(selected) === "asset" ? selected : null;
+    return selected !== null && kindOf(selected) === "asset" && !board.isRemoved(selected) ? selected : null;
   });
+  /** A node that goes away under the pointer gets no pointerleave, so its hover ends here. */
+  createEffect(
+    () => {
+      const hovered = hoveredNode();
+      return hovered !== null && (board.isRemoved(hovered) || kindOf(hovered) === undefined);
+    },
+    (gone) => {
+      if (gone) setHoveredNode(null);
+    },
+  );
   /** The nodes that the focused asset connects to, with the asset itself. */
   const focusSet = createMemo(() => {
     const focus = focusAsset();
@@ -3039,7 +3049,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       data-build={buildState(node().id)}
                       data-focus={focusSet()?.has(node().id) ? "" : undefined}
                       data-dim={focusSet()?.has(node().id) === false ? "" : undefined}
-                      onPointerEnter={() => setHoveredNode(node().id)}
+                      // A drag (a connection, a move, a frame) that passes over a node does not change the focus.
+                      onPointerEnter={(event) => {
+                        if (event.buttons === 0) setHoveredNode(node().id);
+                      }}
                       onPointerLeave={() => {
                         if (hoveredNode() === node().id) setHoveredNode(null);
                       }}

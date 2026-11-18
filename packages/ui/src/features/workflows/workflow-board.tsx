@@ -1469,6 +1469,7 @@ export function createBoard(options: BoardOptions) {
                         class="wfn-edge"
                         data-type={edge.type}
                         data-tone={tone(edge)}
+                        data-selected={state.edge === edge.id ? "" : undefined}
                         data-focus=""
                         data-removing={
                           state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined

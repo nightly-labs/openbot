@@ -43,7 +43,9 @@
   display: grid;
   gap: var(--openbot-space-1-5);
   width: var(--wfn-width);
-  transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
+  transition:
+    width var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
 .wfn-node[data-kind="prompt"] {
@@ -1637,10 +1639,6 @@ fieldset.wfn-picker-group {
   z-index: 2;
 }
 
-.wfn-stage .wfn-node:has(.wfn-port[data-armed]) {
-  z-index: 1;
-}
-
 /*
  * The reference lines of a hovered or selected asset draw again in a layer above the other nodes. The
  * asset and the nodes that it connects to go above that layer, so the lines end under their ports.
@@ -1653,12 +1651,15 @@ fieldset.wfn-picker-group {
   z-index: 2;
 }
 
-/* The other nodes fade a little, so the asset and its references stay clear on a full board. */
-.wfn-stage .wfn-slot {
-  transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
+.wfn-stage .wfn-node:has(.wfn-port[data-armed]) {
+  z-index: 1;
 }
 
-.wfn-stage .wfn-slot[data-dim] {
+/*
+ * The other nodes fade a little, so the asset and its references stay clear on a full board. The node
+ * fades, not its slot: an opacity on the slot traps the z-index of the node in it.
+ */
+.wfn-stage .wfn-slot[data-dim] > :is(.wfn-node, .wfn-text) {
   opacity: 0.9;
 }
 
@@ -1686,14 +1687,19 @@ fieldset.wfn-picker-group {
   --wfn-edge: color-mix(in srgb, var(--openbot-text-primary) 72%, transparent);
 }
 
+/* The reference lines of the focused asset are solid, in the highlight colour. */
+.wfn-edge[data-focus] {
+  --wfn-edge: var(--openbot-chart-storage-downloads);
+}
+
 /* A selected edge is solid and bright, like the selected node ring. */
 .wfn-edge[data-selected] {
   --wfn-edge: var(--openbot-text-primary);
 }
 
-/* The reference lines of the focused asset are solid, in the highlight colour. */
-.wfn-edge[data-focus] {
-  --wfn-edge: var(--openbot-chart-storage-downloads);
+/* The focus layer draws a focused line, so its copy under the nodes does not show a second comet. */
+.wfn-edges:not(.wfn-edges-focus) > .wfn-edge[data-focus] > :is(.wfn-edge-line, .wfn-edge-comet) {
+  visibility: hidden;
 }
 
 .wfn-edge[data-removing] {
