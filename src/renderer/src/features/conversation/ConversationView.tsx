@@ -3,7 +3,9 @@ import { DEFAULT_AGENT_ACCESS } from "@openbot/contracts/ipc";
 import { ConfirmDialog } from "@openbot/ui";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
+import { CoveredVoiceRecording } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
+import { Portal } from "@solidjs/web";
 import { createEffect, Show } from "solid-js";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { agentFolderCalls } from "./agent-folders-port";
@@ -42,6 +44,11 @@ export function ConversationView(props: ConversationProps) {
     fastModeConfirmationOpen,
     confirmFastMode,
     cancelFastModeConfirmation,
+    voicePhase,
+    voiceLevels,
+    voiceElapsedSeconds,
+    stopVoiceRecording,
+    cancelVoiceRecording,
   } = scope;
   const { t } = useText();
   /**
@@ -144,6 +151,17 @@ export function ConversationView(props: ConversationProps) {
         </Show>
 
         <ConversationPanels onOpenUsage={props.onOpenUsage} />
+        {/* A page such as Usage covers the chat, and its recording goes on: the bar stays in sight over the page. */}
+        <Show when={props.workspaceCovered && voicePhase() === "recording"}>
+          <Portal>
+            <CoveredVoiceRecording
+              levels={voiceLevels()}
+              elapsedSeconds={voiceElapsedSeconds()}
+              onCancel={cancelVoiceRecording}
+              onFinish={stopVoiceRecording}
+            />
+          </Portal>
+        </Show>
         <ConfirmDialog
           open={fastModeConfirmationOpen()}
           tone="default"

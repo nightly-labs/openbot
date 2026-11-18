@@ -199,6 +199,51 @@ export function ComposerVoiceControls(props: {
 }
 
 /**
+ * A recording whose message box a page covers, such as Usage or Settings. The microphone stays on
+ * under the page, so this bar shows it, and Cancel and Finish stay in reach. Enter is not handled here:
+ * the bar of the message box still owns it.
+ */
+export function CoveredVoiceRecording(props: {
+  /** Microphone loudness, 0 to 1, oldest first. */
+  levels: readonly number[];
+  elapsedSeconds: number;
+  onCancel: () => void;
+  onFinish: () => void;
+}): JSX.Element {
+  const { t } = useText();
+  return (
+    <section class="covered-voice-recording" aria-label={t("composer.voice.recording")}>
+      <Mic class="covered-voice-recording-icon" aria-hidden="true" />
+      <span class="covered-voice-recording-label">{t("composer.voice.recording")}</span>
+      <VoiceWaveform levels={props.levels} class="covered-voice-recording-waveform" />
+      <time class="covered-voice-recording-time" datetime={`PT${props.elapsedSeconds}S`}>
+        {formatVoiceDuration(props.elapsedSeconds)}
+      </time>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        aria-label={t("composer.voice.cancel")}
+        title={t("composer.voice.cancel")}
+        onClick={() => props.onCancel()}
+      >
+        <X aria-hidden="true" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        aria-label={t("composer.voice.stop")}
+        title={t("composer.voice.stop")}
+        onClick={() => props.onFinish()}
+      >
+        <Check aria-hidden="true" />
+      </Button>
+    </section>
+  );
+}
+
+/**
  * Each new level enters on the right and pushes the others one dot to the left. The dots keep their
  * places, so the track is moved back by one step and slides home over the time until the next level:
  * the waveform scrolls instead of jumping.
