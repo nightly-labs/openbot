@@ -523,6 +523,17 @@ export class MailboxStore {
     return messageId ? this.#receipt(messageId) : null;
   }
 
+  /** Forgets one idempotency key. The next persist writes the map without it. */
+  forgetIdempotencyKey(key: string): void {
+    delete this.#state.idempotency[key];
+  }
+
+  /** The task of the message an idempotency key already stored, or null for a chat message or no message. */
+  taskIdForKey(key: string): string | null {
+    const messageId = this.#state.idempotency[key];
+    return messageId ? (this.#state.messages.find((message) => message.id === messageId)?.taskId ?? null) : null;
+  }
+
   deliveryForKey(key: string): DeliveryContext | null {
     const messageId = this.#state.idempotency[key];
     const delivery = this.#state.deliveries.find((item) => item.messageId === messageId);
