@@ -2577,8 +2577,15 @@ export class AttentionRegistry {
       Effect.gen(function* () {
         if (Result.isFailure(parsed)) return yield* parsed.failure;
         const candidates = loginId ? [] : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(fits);
-        const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        if (!chosen) return { chosen: false as const, several: candidates.length > 1 };
+        // A sign-in that names another account than the only saved login gets the card, as a browser
+        // password manager does not fill a login of another username (#12070).
+        const account = (name: string | null | undefined) => name?.trim().toLowerCase() ?? "";
+        const wanted = parsed.success.tool === "submit_secret" ? account(parsed.success.args.username) : "";
+        const only = candidates.length === 1 ? candidates[0] : undefined;
+        if (only && wanted && account(only.username) !== wanted)
+          return { chosen: false as const, several: false, otherAccount: true };
+        const chosen = loginId ?? only?.id;
+        if (!chosen) return { chosen: false as const, several: candidates.length > 1, otherAccount: false };
         const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
         // With no value, an id that list_logins does not give for this site is a wrong id, not a login
         // with no password. When the list cannot be read, the reason for the agent stays as before, and
@@ -2607,6 +2614,11 @@ export class AttentionRegistry {
     }
     const login = found.success;
     if (this.#takeovers.get(requestId) !== pending) return false;
+    if (!login.chosen && login.otherAccount)
+      return skip(
+        "other-username",
+        "the only saved login for this site has another username than this sign-in, so the user types the password.",
+      );
     if (!login.chosen)
       return skip(
         "no-login",
