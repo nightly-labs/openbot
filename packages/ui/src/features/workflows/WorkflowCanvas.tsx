@@ -1485,20 +1485,22 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   /**
-   * The place in the view nearest to its centre where a box of this size covers no card, on the grid.
-   * The margin of a fit stays free at the edges, so the bars over the canvas do not hide the box. When
-   * the view has no free place, the box goes to the centre. The view is where the camera stops after a
-   * glide.
+   * The place in the view nearest to its centre where a box of this size covers no card, on the grid. A
+   * place with a gap to each card comes first. A card that has no measured size yet takes the room of
+   * NEW_NODE. The margin of a fit stays free at the edges, so the bars over the canvas do not hide the
+   * box. When the view has no free place, the box goes to the centre. The view is where the camera stops
+   * after a glide.
    */
-  const freePlace = (size: { width: number; height: number }, except?: string): WfnPoint => {
+  const freePlace = (size: { width: number; height: number }, except: string): WfnPoint => {
     const { width, height } = view();
     const { x, y, scale } = target();
     const cards = untrack(() =>
-      boxesOf(
-        live().flatMap((node) =>
-          node.kind === "text" || node.kind === "shape" || node.id === except ? [] : [node.id],
-        ),
-      ),
+      live().flatMap((node) => {
+        if (node.kind === "text" || node.kind === "shape" || node.id === except) return [];
+        const at = positions[node.id];
+        const box = boxOf(node.id) ?? (at && { ...at, ...NEW_NODE });
+        return box ? [box] : [];
+      }),
     );
     const margin = FIT_MARGIN / scale;
     const left = -x / scale + margin;
@@ -1506,46 +1508,39 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const right = left + width / scale - 2 * margin - size.width;
     const bottom = top + height / scale - 2 * margin - size.height;
     const center = snapPoint({ x: (left + right) / 2, y: (top + bottom) / 2 });
-    const free = (at: WfnPoint) => !cards.some((box) => overlaps({ ...at, ...size }, box));
-    if (free(center) || right < left || bottom < top) return center;
+    if (right < left || bottom < top) return center;
     // The places are some screen pixels apart, so their count does not change with the zoom.
     const step = Math.max(SNAP, Math.round(PLACE_STEP / scale / SNAP) * SNAP);
+    const across = Math.floor((right - left) / 2 / step);
+    const down = Math.floor((bottom - top) / 2 / step);
     const places: WfnPoint[] = [];
-    for (let dx = 0; center.x - dx >= left || center.x + dx <= right; dx += step)
-      for (let dy = 0; center.y - dy >= top || center.y + dy <= bottom; dy += step)
-        for (const at of [
-          { x: center.x - dx, y: center.y - dy },
-          { x: center.x + dx, y: center.y - dy },
-          { x: center.x - dx, y: center.y + dy },
-          { x: center.x + dx, y: center.y + dy },
-        ])
-          if (at.x >= left && at.x <= right && at.y >= top && at.y <= bottom) places.push(at);
+    for (let column = -across; column <= across; column++)
+      for (let row = -down; row <= down; row++) places.push({ x: center.x + column * step, y: center.y + row * step });
     const distance = (at: WfnPoint) => Math.hypot(at.x - center.x, at.y - center.y);
-    return places.filter(free).sort((a, b) => distance(a) - distance(b))[0] ?? center;
+    places.sort((one, other) => distance(one) - distance(other));
+    const free = (gap: number) => (at: WfnPoint) =>
+      !cards.some((box) =>
+        overlaps({ x: at.x - gap, y: at.y - gap, width: size.width + gap * 2, height: size.height + gap * 2 }, box),
+      );
+    return places.find(free(GRID * 2)) ?? places.find(free(0)) ?? center;
   };
 
   /**
-   * Adds a node with its top-left corner at a world point, or in a free place in the view. Before the
-   * node renders, its size is that of a node of the same kind, or NEW_NODE. After the first layout,
-   * the place uses the measured size, before the node shows.
+   * Adds a node with its top-left corner at a world point, or in a free place in the view. The place in
+   * the view uses the size of the node after its first layout, before the node shows.
    */
   const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
     const id = `${kind}-${crypto.randomUUID()}`;
-    const guess = untrack(() => {
-      const same = live().find((node) => node.kind === kind && !sizes[node.id] && slotSizes[node.id]);
-      return (same && slotSizes[same.id]) ?? NEW_NODE;
-    });
-    const at = point ? snapPoint(point) : freePlace(guess);
     setPositions((draft) => {
-      draft[id] = at;
+      draft[id] = point ? snapPoint(point) : freePlace(NEW_NODE, id);
     });
     canvas.putFields(id, { ...fields, ...hostDefaults(kind, props.catalogs, props.features, fields) });
     setNodes((list) => [...list, kind === "trigger" ? { id, kind, schedule: newTriggerSchedule() } : { id, kind }]);
     if (!point)
       afterLayout(() => {
         const element = slot(id);
-        if (!element || (element.offsetWidth === guess.width && element.offsetHeight === guess.height)) return;
+        if (!element) return;
         const next = freePlace({ width: element.offsetWidth, height: element.offsetHeight }, id);
         setPositions((draft) => {
           draft[id] = next;
