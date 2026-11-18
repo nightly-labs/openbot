@@ -162,9 +162,14 @@ export class UsageLimitGate {
     );
   }
 
-  /** A turn of this agent starts, so a try that let it start ends. */
+  /**
+   * A turn of this agent starts, so a try that let it start ends. A try for a queued model change is
+   * kept: the turn runs on the model that the agent leaves.
+   */
   tryStarted(agentId: string): void {
-    this.#tries.delete(agentId);
+    const agent = this.#agent(agentId);
+    if (!agent || this.#tries.get(agentId) === limitKey(providerForAgent(agent), accountOf(agent), agent.model))
+      this.#tries.delete(agentId);
   }
 
   /** Whether a limit holds this provider account and model. */
