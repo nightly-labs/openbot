@@ -19,7 +19,6 @@ export const messages = {
     "Le serveur du modèle manque de mémoire pour cette conversation. {provider} réessaie : tentative {attempt}. Une nouvelle conversation demande moins de mémoire.",
   "status.provider.modelRetryRecovered": "Le fournisseur du modèle répond de nouveau.",
   "status.provider.retryRecovered": "{provider} reçoit de nouveau des réponses de son serveur.",
-  "status.provider.retryNoLimit": "Le serveur de {provider} est occupé ou en erreur. Nouvelle tentative {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude a répondu à la vitesse standard. Avec un abonnement Claude, le mode rapide utilise des crédits d’utilisation. Activez-les dans votre compte Claude.",
   "status.provider.claudeFastModeNotOnPlan":

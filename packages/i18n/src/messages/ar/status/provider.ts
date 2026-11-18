@@ -17,7 +17,6 @@ export const messages = {
     "نفدت ذاكرة خادم النموذج لهذه المحادثة. يحاول {provider} مرة أخرى: المحاولة {attempt}. المحادثة الجديدة تحتاج إلى ذاكرة أقل.",
   "status.provider.modelRetryRecovered": "يجيب مزود النموذج مجددًا.",
   "status.provider.retryRecovered": "يتلقى {provider} الإجابات من خادمه مجددًا.",
-  "status.provider.retryNoLimit": "خادم {provider} مشغول أو به خطأ. المحاولة {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "أجاب Claude بالسرعة العادية. مع اشتراك Claude، يستخدم الوضع السريع أرصدة الاستخدام. شغّلها في حسابك على Claude.",
   "status.provider.claudeFastModeNotOnPlan": "أجاب Claude بالسرعة العادية. لا تتضمن خطة Claude الخاصة بك الوضع السريع.",

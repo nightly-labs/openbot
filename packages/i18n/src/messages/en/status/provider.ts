@@ -20,9 +20,6 @@ export const messages = defineMessages("status.provider", {
     "The model server ran out of memory for this chat. {provider} tries again: attempt {attempt}. A new chat needs less memory.",
   "status.provider.modelRetryRecovered": "The model provider answers again.",
   "status.provider.retryRecovered": "{provider} gets answers from its server again.",
-  // A provider that gives no limit for its retries.
-  "status.provider.retryNoLimit":
-    "The {provider} server is busy or has an error. {provider} tries again (attempt {attempt}).",
   // Claude Code ran a fast mode turn at the standard speed, with the reason.
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude answered at the standard speed. Fast mode with a Claude subscription uses usage credits. Turn them on in your Claude account.",

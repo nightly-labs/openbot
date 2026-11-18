@@ -19,7 +19,6 @@ export const messages = {
     "Serwerowi modelu zabrakło pamięci na ten czat. {provider} ponawia próbę: próba {attempt}. Nowy czat potrzebuje mniej pamięci.",
   "status.provider.modelRetryRecovered": "Dostawca modelu znowu odpowiada.",
   "status.provider.retryRecovered": "{provider} znów otrzymuje odpowiedzi ze swojego serwera.",
-  "status.provider.retryNoLimit": "Serwer {provider} jest zajęty lub zwrócił błąd. Ponowienie {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude odpowiedział ze standardową szybkością. Z subskrypcją Claude tryb szybki korzysta ze środków na użycie. Włącz je na koncie Claude.",
   "status.provider.claudeFastModeNotOnPlan":

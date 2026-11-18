@@ -3700,14 +3700,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const attempt = text === null ? null : (this.#flavor.sdkHarness?.retryNotice?.(text) ?? null);
     if (text !== null && attempt !== null) {
       turn.retryNotices += text;
-      this.emit("notification", {
-        method: "openbot/turn-progress",
-        params: {
-          threadId: thread.id,
-          turnId: turn.id,
-          detail: sourceText("status.provider.retryNoLimit", { provider: this.#label, attempt: String(attempt) }),
-        },
-      });
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText("status.provider.modelRetryServerError", { provider: this.#label, attempt }),
+      );
       return;
     }
     if (turn.retryNotices && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
@@ -3718,15 +3715,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (text !== null && this.#flavor.sdkHarness?.answerIsFailure.test(`\n${text.replace(/^\n+/u, "")}`)) {
         turn.sdkFailureAt ??= turn.text.length;
         turn.text += notices;
-      } else
-        this.emit("notification", {
-          method: "openbot/turn-progress",
-          params: {
-            threadId: thread.id,
-            turnId: turn.id,
-            detail: sourceText("status.provider.retryRecovered", { provider: this.#label }),
-          },
-        });
+      } else this.#emitTurnProgress(thread, turn, sourceText("status.provider.modelRetryRecovered"));
     }
     if (this.#flavor.unsentBackgroundTurns) {
       const id = shownEntryId(update);

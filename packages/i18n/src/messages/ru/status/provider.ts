@@ -19,7 +19,6 @@ export const messages = {
     "Серверу модели не хватило памяти для этого чата. {provider} пробует снова: попытка {attempt}. Новому чату нужно меньше памяти.",
   "status.provider.modelRetryRecovered": "Поставщик модели снова отвечает.",
   "status.provider.retryRecovered": "{provider} снова получает ответы от своего сервера.",
-  "status.provider.retryNoLimit": "Сервер {provider} перегружен или вернул ошибку. Повтор {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude ответил на стандартной скорости. С подпиской Claude быстрый режим расходует кредиты использования. Включите их в аккаунте Claude.",
   "status.provider.claudeFastModeNotOnPlan":

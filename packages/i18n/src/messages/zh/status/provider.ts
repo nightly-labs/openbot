@@ -16,7 +16,6 @@ export const messages = {
     "模型服务器的内存不足以处理此聊天。{provider} 正在重试：第 {attempt} 次。新的聊天需要的内存更少。",
   "status.provider.modelRetryRecovered": "模型提供商已恢复响应。",
   "status.provider.retryRecovered": "{provider} 已重新从其服务器收到响应。",
-  "status.provider.retryNoLimit": "{provider} 服务器繁忙或出错。第 {attempt} 次重试。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude 以标准速度回答。使用 Claude 订阅时，快速模式使用用量额度。请在你的 Claude 账户中开启。",
   "status.provider.claudeFastModeNotOnPlan": "Claude 以标准速度回答。你的 Claude 套餐不包含快速模式。",

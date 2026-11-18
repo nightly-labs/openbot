@@ -15,7 +15,6 @@ export const messages = {
     "לשרת המודל נגמר הזיכרון עבור השיחה הזו. {provider} מנסה שוב: ניסיון {attempt}. שיחה חדשה צריכה פחות זיכרון.",
   "status.provider.modelRetryRecovered": "ספק המודל עונה שוב.",
   "status.provider.retryRecovered": "{provider} מקבל שוב תשובות מהשרת שלו.",
-  "status.provider.retryNoLimit": "השרת של {provider} עמוס או שיש בו שגיאה. ניסיון {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude ענה במהירות הרגילה. עם מינוי Claude, המצב המהיר משתמש בקרדיטים לשימוש. יש להפעיל אותם בחשבון Claude.",
   "status.provider.claudeFastModeNotOnPlan": "Claude ענה במהירות הרגילה. תוכנית Claude שלך לא כוללת את המצב המהיר.",

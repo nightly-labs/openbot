@@ -19,7 +19,6 @@ export const messages = {
     "Il server del modello ha esaurito la memoria per questa chat. {provider} riprova: tentativo {attempt}. Una nuova chat richiede meno memoria.",
   "status.provider.modelRetryRecovered": "Il fornitore del modello risponde di nuovo.",
   "status.provider.retryRecovered": "{provider} riceve di nuovo risposte dal suo server.",
-  "status.provider.retryNoLimit": "Il server di {provider} è occupato o ha un errore. Tentativo {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude ha risposto alla velocità standard. Con un abbonamento Claude, la modalità veloce usa i crediti di utilizzo. Attivali nel tuo account Claude.",
   "status.provider.claudeFastModeNotOnPlan":

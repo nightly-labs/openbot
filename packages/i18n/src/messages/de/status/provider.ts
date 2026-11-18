@@ -19,7 +19,6 @@ export const messages = {
     "Dem Modellserver ist für diesen Chat der Speicher ausgegangen. {provider} versucht es erneut: Versuch {attempt}. Ein neuer Chat braucht weniger Speicher.",
   "status.provider.modelRetryRecovered": "Der Modellanbieter antwortet wieder.",
   "status.provider.retryRecovered": "{provider} erhält wieder Antworten von seinem Server.",
-  "status.provider.retryNoLimit": "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude hat mit normaler Geschwindigkeit geantwortet. Der Schnellmodus nutzt mit einem Claude-Abo Nutzungsguthaben. Schalte es in deinem Claude-Konto ein.",
   "status.provider.claudeFastModeNotOnPlan":

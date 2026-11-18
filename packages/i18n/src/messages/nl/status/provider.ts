@@ -19,7 +19,6 @@ export const messages = {
     "De modelserver heeft niet genoeg geheugen voor deze chat. {provider} probeert het opnieuw: poging {attempt}. Een nieuwe chat heeft minder geheugen nodig.",
   "status.provider.modelRetryRecovered": "De modelaanbieder antwoordt weer.",
   "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
-  "status.provider.retryNoLimit": "De server van {provider} is bezet of heeft een fout. Poging {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude antwoordde op de standaardsnelheid. Met een Claude-abonnement gebruikt de snelle modus gebruikstegoed. Schakel het in je Claude-account in.",
   "status.provider.claudeFastModeNotOnPlan":

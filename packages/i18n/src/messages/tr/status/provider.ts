@@ -18,7 +18,6 @@ export const messages = {
     "Model sunucusunun belleği bu sohbet için yetmedi. {provider} yeniden deniyor: deneme {attempt}. Yeni bir sohbet daha az bellek gerektirir.",
   "status.provider.modelRetryRecovered": "Model sağlayıcısı yeniden yanıt veriyor.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
-  "status.provider.retryNoLimit": "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude standart hızda yanıt verdi. Claude aboneliğinde hızlı mod kullanım kredisi harcar. Bunu Claude hesabınızda açın.",
   "status.provider.claudeFastModeNotOnPlan": "Claude standart hızda yanıt verdi. Claude planınız hızlı modu içermiyor.",

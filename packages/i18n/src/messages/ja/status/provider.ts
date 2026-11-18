@@ -18,7 +18,6 @@ export const messages = {
     "モデルサーバーのメモリーがこのチャットには足りません。{provider} が再試行しています: {attempt} 回目。新しいチャットなら必要なメモリーが少なくなります。",
   "status.provider.modelRetryRecovered": "モデルプロバイダーが再び応答しています。",
   "status.provider.retryRecovered": "{provider} がサーバーから再び応答を受け取っています。",
-  "status.provider.retryNoLimit": "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude は標準の速度で応答しました。Claude サブスクリプションでは、高速モードは使用クレジットを使います。Claude アカウントでオンにしてください。",
   "status.provider.claudeFastModeNotOnPlan":
