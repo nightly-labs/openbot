@@ -21,3 +21,6 @@
   show the row yet.
 - In a thread, the steps of an answer now show beside it, with the reply and menu actions, as in the
   agent's chat. "Show agent steps" still keeps the open list above the answer.
+- A thread now looks like the agent's chat. Messages by one sender in a row read as one block, a
+  separator shows the day and time, and the "working" and "waiting" rows stand right under the last
+  message. With compact message actions, the time no longer shows under each message.

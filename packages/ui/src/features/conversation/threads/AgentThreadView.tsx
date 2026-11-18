@@ -53,6 +53,8 @@ import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerS
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import {
   preferredMessageScrollBehavior,
   ScrollToLatestButton,
@@ -89,6 +91,8 @@ const HOLD_TEXT = {
 
 /** The list stays at its end while new text comes in, when the user has not scrolled up. */
 const STICK_DISTANCE = 48;
+/** As in the agent's chat: with the compact action row, a pause this long gets a time separator. */
+const THREAD_TIME_GAP_MS = 60 * 60 * 1000;
 /** A message this many view heights from the middle of the view or nearer slides into place. */
 const NEAR_SCROLL_VIEWS = 2;
 
@@ -355,7 +359,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -710,6 +714,59 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
+  const shownRows = createMemo(() => props.messages.filter(shownRow));
+  /** A marker, a question or a thinking row draws no message row, so a run of one sender cannot continue under it. */
+  const holdsSenderRun = (message: AgentMessage) =>
+    message.kind !== "thinking" &&
+    message.kind !== "plan" &&
+    message.kind !== "subagents" &&
+    message.kind !== "memory-changes" &&
+    message.questionPrompt === undefined &&
+    !agentMessageMarker(message) &&
+    !changeMarker(message);
+  const senderRunRow = (message: AgentMessage) => ({
+    author: message.author === "agent" ? `agent:${message.senderAgentId ?? props.agent.id}` : message.author,
+    ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
+    ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
+  });
+  /**
+   * As in the agent's chat: a separator names the time above the first row and above a new day. The
+   * compact action row shows no time, so a pause of an hour or more also gets one.
+   */
+  const timeMarkers = createMemo(() => {
+    const labels = new Map<string, string>();
+    const gap = props.compactMessageActions === false ? {} : { gapMs: THREAD_TIME_GAP_MS };
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      const label =
+        message.createdAt === undefined
+          ? previous === undefined
+            ? (message.time ?? t("chat.day.now"))
+            : null
+          : dayMarkerLabel(previous?.createdAt, message.createdAt, { t, format, ...gap });
+      if (label !== null) labels.set(message.id, label);
+      previous = message;
+    }
+    return labels;
+  });
+  /** As in the agent's chat: the messages of a run by one sender read as one block. */
+  const continuesRunIds = createMemo(() => {
+    const ids = new Set<string>();
+    const markers = timeMarkers();
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      if (
+        holdsSenderRun(message) &&
+        continuesSenderRun(previous && senderRunRow(previous), senderRunRow(message), {
+          previousDrawsTime: previous !== undefined && holdsSenderRun(previous),
+          startsDay: markers.has(message.id),
+        })
+      )
+        ids.add(message.id);
+      previous = message;
+    }
+    return ids;
+  });
   /**
    * The row that the branch line follows: the last message that the branch copied. That message can be
    * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
@@ -718,7 +775,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownRow);
+    const shown = shownRows();
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -857,7 +914,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
+          <For each={shownRows()} keyed={(message) => message.id}>
             {(message) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
               // As in the agent's chat: the steps of an answer stand beside it and open only the trace.
@@ -886,7 +943,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 </Show>
               );
               return (
-                <div class="virtual-chat-row">
+                <div
+                  class="virtual-chat-row"
+                  data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                >
+                  <Show when={timeMarkers().get(message().id)}>
+                    {(label) => (
+                      <div class="time-marker">
+                        <span>{label()}</span>
+                      </div>
+                    )}
+                  </Show>
                   <Show when={!stepsInRow()}>{stepsDisclosure()}</Show>
                   <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
                     {(marker) => (
@@ -955,7 +1022,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           }}
                           actions={messageActions(message())}
                           steps={stepsInRow() ? stepsDisclosure() : undefined}
-                          actionsBeside={stepsInRow()}
+                          actionTime={props.compactMessageActions === false}
+                          actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
                           data-chat-search-message={message().id}
                         />
@@ -971,7 +1039,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </For>
           <Show when={running()}>
             {(task) => (
-              <div class="virtual-chat-row">
+              <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
                   label={activityLabel}
@@ -984,7 +1052,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </Show>
           <Show when={backgroundWorkSince()}>
             {(since) => (
-              <div class="virtual-chat-row">
+              <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
                   label={activityLabel}
