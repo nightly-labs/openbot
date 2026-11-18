@@ -196,7 +196,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "יש לעדכן את שרת שולחן העבודה הזה כדי למחוק ערוצים.",
   "error.remote.historyRefreshFailed": "ההודעה נשלחה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
   "error.remote.taskHistoryRefreshFailed": "המשימה שונתה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
-  "error.remote.localServerStartFailed": "השרת במחשב הזה לא הופעל.",
+  "error.remote.serverNotLoaded": "לא ניתן היה לטעון את השרת. יש לנסות שוב.",
+  "error.remote.localServerNotStarted":
+    "השרת במחשב הזה לא הופעל. יש לנסות שוב. אם הוא לא מופעל, יש להפעיל מחדש את OpenBot.",
   "error.remote.localServerNotFound": "השרת הזה אינו במחשב הזה.",
   "error.remote.localServerAccountRemovalFailed":
     "השרת נמחק במחשב שלו, אבל החשבון עדיין מציג אותו. יש למחוק אותו שוב כדי להסיר אותו מהחשבון.",

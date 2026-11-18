@@ -205,8 +205,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
   "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
+  "error.remote.serverNotLoaded": "OpenBot could not load the server. Try again.",
   // Servers that the desktop app starts on this computer.
-  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.localServerNotStarted":
+    "The server on this computer did not start. Try again. If it does not start, restart OpenBot.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
   "error.remote.localServerAccountRemovalFailed":
     "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",

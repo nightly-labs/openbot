@@ -3001,7 +3001,7 @@ function sameAppearance(left: ServerAppearance | null | undefined, right: Server
 
 function requiredServerSummary(servers: ServerSummary[], serverId: string): ServerSummary {
   const server = servers.find((candidate) => candidate.id === serverId);
-  if (!server) throw new Error("Remote server summary is missing.");
+  if (!server) throw new Error(sourceText("error.remote.serverNotLoaded"));
   return server;
 }
 

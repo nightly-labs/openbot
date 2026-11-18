@@ -140,7 +140,7 @@ function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable |
 }
 
 function startFailure(): LocalServerFailure {
-  return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerStartFailed")) });
+  return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerNotStarted")) });
 }
 
 interface RunningChild {
@@ -803,8 +803,10 @@ export class LocalServers {
     control?.on("error", () => undefined);
     // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
     if (control instanceof Readable && control.readable) control.resume();
+    // A spawn error names a path or an errno, which tells the user nothing they can fix. The log keeps it.
     child.once("error", (error: Error) => {
-      Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
+      this.#options.log.warn("A server on this computer could not start.", error);
+      Deferred.doneUnsafe(ready, Exit.fail(startFailure()));
     });
     child.once("exit", (code, signal) => {
       Deferred.doneUnsafe(ready, Exit.fail(startFailure()));

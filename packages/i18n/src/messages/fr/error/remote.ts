@@ -210,6 +210,9 @@ export const messages = {
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.serverNotLoaded": "OpenBot n'a pas pu charger le serveur. Réessayez.",
+  "error.remote.localServerNotStarted":
+    "Le serveur sur cet ordinateur n'a pas démarré. Réessayez. S'il ne démarre toujours pas, redémarrez OpenBot.",
   "error.remote.localServerAccountRemovalFailed":
     "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

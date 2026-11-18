@@ -204,6 +204,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
   "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.serverNotLoaded": "OpenBot sunucuyu yükleyemedi. Tekrar deneyin.",
+  "error.remote.localServerNotStarted":
+    "Bu bilgisayardaki sunucu başlamadı. Tekrar deneyin. Başlamazsa OpenBot'u yeniden başlatın.",
   "error.remote.localServerAccountRemovalFailed":
     "Sunucu kendi bilgisayarında silindi ancak hesap onu hâlâ listeliyor. Hesaptan kaldırmak için yeniden silin.",
 } as const satisfies PartialTranslation<typeof source>;
