@@ -25,12 +25,17 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/**
+ * Why a model request failed: the agent could not connect to the model provider, the model server ran
+ * out of memory for the request, or the provider answered with another error or stopped answering.
+ */
+export type AcpRetryCause = "unreachable" | "outOfMemory" | "serverError";
+
 /** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
 interface AcpRetryUpdate {
   /** The number of the retry: 1 for the first request after the failed one. */
   readonly attempt: number;
-  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
-  readonly unreachable: boolean;
+  readonly cause: AcpRetryCause;
 }
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
