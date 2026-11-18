@@ -98,6 +98,8 @@ export interface AcpFlavor {
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
    * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
    * agent's own store has a key for a provider. `label` is the agent's name for the user.
+   * `refusalStatus` reads the HTTP status of the provider refusal that the agent's own store keeps
+   * for this turn, or null.
    */
   turnFailure?(
     error: unknown,
@@ -109,6 +111,7 @@ export interface AcpFlavor {
     savedKey: boolean,
     providerKeyStored: (provider: string) => boolean,
     label: string,
+    refusalStatus: () => number | null,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name

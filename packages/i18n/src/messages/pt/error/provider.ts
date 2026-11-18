@@ -240,6 +240,8 @@ export const messages = {
     "Sua chave de API do OpenCode expirou. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
   "error.provider.opencodeKeyRefused":
     "O OpenCode Go recusou sua chave de API salva. A chave pode ter expirado. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
+  "error.provider.opencodeGoRequestRefused":
+    "O OpenCode Go recusou a solicitação. Uma nova chave de API não resolve isso. Seu plano do OpenCode Go pode não estar ativo, ou o OpenCode Go pode bloquear sua rede: alguns serviços bloqueiam VPNs, proxies ou alguns países. Verifique se o seu plano está ativo no OpenCode Console ou desative a VPN e tente novamente. Você também pode escolher outro modelo.",
   "error.provider.opencodeServiceFailure":
     "O OpenCode não conseguiu concluir este turno porque seu serviço local falhou. Tente novamente. Se o erro continuar, reconecte o OpenCode em Configurações.",
   "error.provider.opencodeRateLimited":

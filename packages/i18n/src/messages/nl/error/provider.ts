@@ -238,6 +238,8 @@ export const messages = {
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
   "error.provider.opencodeRateLimited":

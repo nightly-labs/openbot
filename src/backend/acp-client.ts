@@ -596,6 +596,8 @@ export interface AcpProviderOptions {
   savedKey?: (modelId: string | null) => boolean;
   /** Whether the agent's own store has a key for a provider, such as OpenCode's. Never the key itself. */
   providerKeyStored?: (provider: string) => boolean;
+  /** The HTTP status of the provider refusal that the agent's own store keeps for a session's failed turn. */
+  providerRefusalStatus?: (sessionId: string) => number | null;
   /**
    * Values to mask in every diagnostic and error this client emits, read at each use: the custom
    * agent's environment values, which have no secret name that `redactText` could know them by.
@@ -4642,6 +4644,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.options.savedKey?.(thread.currentModelId) ?? false,
           (provider) => this.options.providerKeyStored?.(provider) ?? false,
           this.#label,
+          () => this.options.providerRefusalStatus?.(thread.id) ?? null,
         ) ??
         detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
