@@ -1864,7 +1864,19 @@ export class AttentionRegistry {
     const call = yield* Effect.result(
       attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
     );
-    const username = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args.username : "";
+    const args = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args : undefined;
+    // A call with a `loginId` has no username. The password then goes to that login's username, so a
+    // saved login that OpenBot did not fill gets the new password and no second login is made (#8053).
+    const loginId = args?.loginId;
+    const chosen =
+      loginId && this.#passwordVault
+        ? yield* this.#passwordVault.loginsFor(origin, agentId).pipe(
+            // When a source cannot be read, the failure keeps the logins of the other sources.
+            Effect.catch((error) => Effect.succeed(error.logins)),
+            Effect.map((logins) => logins?.find((login) => login.id === loginId)),
+          )
+        : undefined;
+    const username = chosen?.username ?? args?.username;
     const saved = yield* Effect.result(
       vault.saveLogin({ origin, username: username ?? "", password }, this.#vaultAgent(agentId)),
     );
