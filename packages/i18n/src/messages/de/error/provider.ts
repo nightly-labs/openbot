@@ -521,6 +521,8 @@ export const messages = {
     "Pi hat eine andere Sitzung zurückgegeben. Die gespeicherte Sitzung wurde nicht ersetzt.",
   "error.provider.piExtensionFailed":
     "Pi wurde beendet, weil eine Erweiterung nicht geladen werden konnte. Entferne oder aktualisiere diese Erweiterung und versuche es erneut. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi wurde unerwartet beendet, bevor dieser Durchgang fertig war. Sende eine Nachricht, um fortzufahren.",
   "error.provider.piModelInvalid": "Wähle ein Pi-Modell, das seinen Anbieter enthält.",
   "error.provider.piToolInvalid": "Das Werkzeug hat ein ungültiges Ergebnis zurückgegeben.",
   "error.provider.piSignIn":

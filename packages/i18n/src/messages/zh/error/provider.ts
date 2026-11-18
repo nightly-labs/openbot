@@ -434,6 +434,7 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi 取消了会话恢复，请重试。",
   "error.provider.piSessionIdentity": "Pi 返回了另一个会话，已保存的会话未被替换。",
   "error.provider.piExtensionFailed": "Pi 无法加载某个扩展，因此已停止。请移除或更新该扩展，然后重试。{detail}",
+  "error.provider.piThreadStopped": "Pi 在完成本轮之前意外停止。发送一条消息以继续。",
   "error.provider.piModelInvalid": "请选择包含其服务商的 Pi 模型。",
   "error.provider.piToolInvalid": "工具返回了无效结果。",
   "error.provider.piSignIn": "请在主机电脑的 Pi 中使用 /login。登录完成后关闭 Pi。",

@@ -500,6 +500,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi gaf een andere sessie terug. De opgeslagen sessie is niet vervangen.",
   "error.provider.piExtensionFailed":
     "Pi is gestopt omdat een extensie niet kon worden geladen. Verwijder of werk deze extensie bij en probeer het opnieuw. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi is onverwacht gestopt voordat deze beurt klaar was. Stuur een bericht om verder te gaan.",
   "error.provider.piModelInvalid": "Kies een Pi-model dat de aanbieder bevat.",
   "error.provider.piToolInvalid": "De tool gaf een ongeldig resultaat terug.",
   "error.provider.piSignIn": "Gebruik /login in Pi op de hostcomputer. Sluit Pi als het inloggen klaar is.",

@@ -491,6 +491,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi zwrócił inną sesję. Zapisana sesja nie została zastąpiona.",
   "error.provider.piExtensionFailed":
     "Pi zatrzymał się, ponieważ nie mógł wczytać rozszerzenia. Usuń lub zaktualizuj to rozszerzenie, a następnie spróbuj ponownie. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi nieoczekiwanie zatrzymał się przed zakończeniem tej tury. Wyślij wiadomość, aby kontynuować.",
   "error.provider.piModelInvalid": "Wybierz model Pi, który zawiera nazwę dostawcy.",
   "error.provider.piToolInvalid": "Narzędzie zwróciło nieprawidłowy wynik.",
   "error.provider.piSignIn": "Użyj /login w Pi na komputerze hosta. Zamknij Pi po zakończeniu logowania.",

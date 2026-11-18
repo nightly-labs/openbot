@@ -462,6 +462,7 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi החזיר סשן אחר. הסשן השמור לא הוחלף.",
   "error.provider.piExtensionFailed":
     "Pi נעצר כי לא הצליח לטעון הרחבה. יש להסיר או לעדכן את ההרחבה הזו ולנסות שוב. {detail}",
+  "error.provider.piThreadStopped": "Pi נעצר באופן בלתי צפוי לפני שסיים את התור הזה. שלחו הודעה כדי להמשיך.",
   "error.provider.piModelInvalid": "יש לבחור מודל Pi שכולל את הספק שלו.",
   "error.provider.piToolInvalid": "הכלי החזיר תוצאה לא תקינה.",
   "error.provider.piSignIn": "יש להשתמש ב-/login ב-Pi במחשב המארח. יש לסגור את Pi כשההתחברות הושלמה.",
