@@ -27,22 +27,20 @@ export class AgentActivityController {
 
   observe(event: AgentEvent): void {
     switch (event.type) {
-      case "turn-started":
-      case "turn-completed":
       case "prompt":
       case "agent-input-resolved":
       case "browser-takeover-resolved":
-        this.#record(event.agentId);
+        this.refresh(event.agentId);
         break;
       case "approval":
-        this.#record(event.approval.agentId);
+        this.refresh(event.approval.agentId);
         break;
       case "browser-takeover-requested":
-        this.#record(event.request.agentId);
+        this.refresh(event.request.agentId);
         break;
       case "runtime-snapshot":
         // Background subagents can finish after their parent turn.
-        for (const agentId of this.#activity.keys()) this.#record(agentId);
+        for (const agentId of this.#activity.keys()) this.refresh(agentId);
         break;
       case "agents-changed": {
         const agentIds = new Set(event.agents.map((agent) => agent.id));
@@ -57,7 +55,7 @@ export class AgentActivityController {
     return this.#options.runsWork(agentId) ? "busy" : "idle";
   }
 
-  #record(agentId: string): void {
+  refresh(agentId: string): void {
     const state = this.#state(agentId);
     const previous = this.#activity.get(agentId);
     if (previous?.state === state || (!previous && state === "idle")) return;

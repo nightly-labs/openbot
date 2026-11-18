@@ -189,6 +189,20 @@ async function cardShown(before: number): Promise<void> {
   while (count("browser-takeover-requested") === before) await new Promise((done) => setImmediate(done));
 }
 
+async function withinDeadline<T>(result: Promise<T>, error: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      result,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(error)), 5_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const steps: Array<{ step: string; result: unknown }> = [];
 async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   try {
@@ -204,6 +218,7 @@ await mkdir(OUT, { recursive: true });
 
 try {
   await step("a delayed automatic Vault fill does not require a person", async () => {
+    const turnId = "turn-autofill";
     const started = Promise.withResolvers<void>();
     const password = Promise.withResolvers<string>();
     const shown = count("browser-takeover-requested");
@@ -211,32 +226,27 @@ try {
       started.resolve();
       return password.promise;
     };
-    const pending = call("submit_secret", "turn-autofill");
-    const unexpectedCard = AbortSignal.timeout(5_000);
+    const pending = call("submit_secret", turnId);
     try {
-      await Promise.race([
-        started.promise,
-        pending.then(() => assert.fail("The tool finished before it read the Vault.")),
-        new Promise<never>((_resolve, reject) => {
-          unexpectedCard.addEventListener("abort", () => reject(new Error("The Vault read did not start.")), {
-            once: true,
-          });
-        }),
-      ]);
+      await withinDeadline(
+        Promise.race([started.promise, pending.then(() => assert.fail("The tool finished before it read the Vault."))]),
+        "The Vault read did not start.",
+      );
       assert.equal(count("browser-takeover-requested"), shown);
       assert.deepEqual(registry.waitsFor(AGENT), [], "An automatic Vault read does not need a person.");
+      password.resolve(VAULT_SECRET);
+      const result = await withinDeadline(pending, "The automatic Vault fill did not complete.");
+      assert.equal(answerOf(result).status, "completed");
+      assert.equal(count("browser-takeover-requested"), shown, "The fill completed without a card.");
+      assert.deepEqual(registry.waitsFor(AGENT), []);
     } finally {
       password.resolve(VAULT_SECRET);
-      if (count("browser-takeover-requested") !== shown) registry.clearForTurn(THREAD, "turn-autofill", false);
-      await pending;
+      registry.clearForTurn(THREAD, turnId, false);
       vaultRead = undefined;
       submitted.length = 0;
+      events.length = 0;
+      browserLog.length = 0;
     }
-    assert.equal(answerOf(await pending).status, "completed");
-    assert.equal(count("browser-takeover-requested"), shown, "The fill completed without a card.");
-    assert.deepEqual(registry.waitsFor(AGENT), []);
-    events.length = 0;
-    browserLog.length = 0;
   });
 
   await step("a password card stays open after its call gets the deadline answer", async () => {

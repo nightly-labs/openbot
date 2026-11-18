@@ -801,6 +801,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       store,
       (event) => this.#emit(event),
       () => this.listAgents(),
+      (agentId) => this.#agentActivity.refresh(agentId),
     );
     this.#history = new AgentHistoryTransfer({
       database: store.database,

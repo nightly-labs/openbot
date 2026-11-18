@@ -294,6 +294,18 @@ const standInEvents = () =>
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
+let previewStarted = false;
+const finishFirstPreview = Promise.withResolvers<void>();
+const updatePreview = store.updatePreview;
+// Hold the first turn after it clears the active turn but before it publishes completion.
+store.updatePreview = (agentId, preview) =>
+  Effect.gen(function* () {
+    if (preview === "Started.") {
+      previewStarted = true;
+      yield* Effect.promise(() => finishFirstPreview.promise);
+    }
+    yield* updatePreview(agentId, preview);
+  });
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
 const agents = new AgentService({
   store,
@@ -307,6 +319,10 @@ const agents = new AgentService({
 const checked = (text: string) => SHOWN_ORDER.find((shown) => text.startsWith(shown));
 try {
   await runCauseEffect(agents.initialize());
+  const firstBusy: { since: string | null } = { since: null };
+  agents.on("event", (event) => {
+    if (event.type === "turn-started") firstBusy.since ??= agents.getAgentActivity(event.agentId).since;
+  });
   const agent = await runCauseEffect(
     agents.createAgent({
       name: "Question steer",
@@ -326,10 +342,11 @@ try {
     !agents
       .listQueue(agent.id)
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
-  await waitFor("the first turn to end", idle);
+  await waitFor("the first turn to begin its final preview write", () => previewStarted);
   const firstIdle = agents.getAgentActivity(agent.id);
+  const firstBusySince = firstBusy.since;
+  assert.ok(firstBusySince, "The first turn records when the agent became busy.");
   assert.equal(firstIdle.state, "idle");
-  assert.ok(firstIdle.since, "The first turn end records when the agent became idle.");
   const side = await runCauseEffect(agents.startTask({ agentId: agent.id, text: SIDE_MESSAGE }));
   const sideTask = () => agents.listTasks(agent.id).tasks.find((task) => task.id === side.id);
   await waitFor("the side thread to run", () => sideTask()?.state === "running");
@@ -338,6 +355,11 @@ try {
     return activity.state === "busy" && activity;
   });
   assert.ok(busy.since, "The side turn records when the agent became busy.");
+  assert.ok(busy.since > firstBusySince, "The side turn has a new busy start time.");
+  assert.ok(firstIdle.since, "The idle transition has a time before the first completion event.");
+  assert.ok(busy.since >= firstIdle.since);
+  finishFirstPreview.resolve();
+  await waitFor("the first turn to end", idle);
 
   // The turn that the CLI starts by itself asks its question.
   writeFileSync(askTrigger, "");
@@ -389,6 +411,7 @@ try {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.exitCode = 1;
 } finally {
+  finishFirstPreview.resolve();
   await runCauseEffect(agents.stop()).catch(() => {});
   database.close();
   mkdirSync(OUT, { recursive: true });
