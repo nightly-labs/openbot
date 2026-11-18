@@ -1,10 +1,10 @@
 {
-  "version": "1.4.10",
+  "version": "1.4.11",
   "highlights": [
-    "Added 207 new marketplace apps, including Dropbox, monday.com, Miro, Zapier, Webflow and Datadog, plus support for long-term agent memory via Honcho and Hindsight.",
-    "Added chat pinning, agent muting, improved file handling (up to 100 MB), in-chat video playback, and image/file sharing.",
-    "Added server management features, including provider account pooling, custom provider editing, agent personality settings, MCP access controls, and one-step agent transfers between servers.",
-    "Improved chat experience with unread-first sorting, smoother scrolling, persistent message positioning, and reduced rendering overhead during streaming replies.",
-    "Fixed numerous chat, synchronization, networking, Android sharing, provider model selection, and UI issues."
+    "Added new integrations and expanded app connectivity.",
+    "Improved chat with context tracking, subagent progress, and memory updates.",
+    "Redesigned workflow editor with interactive Flow view.",
+    "Added more customization options for chat appearance and behavior.",
+    "Improved file handling, connection reliability, and overall app stability."
   ]
 }
