@@ -342,6 +342,7 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentAction,
     attachmentDownloads,
     openSharedFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
@@ -595,6 +596,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverResolution,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    openWaitingAgent,
     canOpenBrowserTakeoverTab,
     localSignIn,
     activeBrowserControl,
@@ -1113,6 +1115,15 @@ export function createConversationViewScope(props: ConversationProps) {
     // The branch shows first, so that its editor takes the request.
     flush();
     setThreadFocusRequest((current) => current + 1);
+  };
+  /** Opens a new thread, and its composer takes the focus, so the user can type at once. */
+  const startNewThread = () => {
+    const onNew = props.threads?.header.onNew;
+    if (!onNew) return;
+    onNew();
+    // The new thread shows first, so that its editor takes the request.
+    flush();
+    requestThreadFocus();
   };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
@@ -2683,6 +2694,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadFocusRequest,
     requestThreadFocus,
     branchThread,
+    startNewThread,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
@@ -2718,6 +2730,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverTab,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    openWaitingAgent,
     canOpenBrowserTakeoverTab,
     localSignIn,
     activeChatSearchIndex,
@@ -2846,6 +2859,7 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     downloadMessageImageFile,
     revealSidebarFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,

@@ -7,6 +7,7 @@ export const messages = {
   "error.update.restartFailed": "تعذّر على OpenBot إعادة التشغيل لتثبيت التحديث.",
   "error.update.downloadStalled": "توقف تنزيل التحديث عن الاستجابة. حاول مرة أخرى.",
   "error.update.installFailed": "تعذّر تثبيت التحديث. أغلق OpenBot وأعد فتحه، ثم حاول مرة أخرى.",
+  "error.update.notInstalled": "لم تُثبِّت إعادة التشغيل الأخيرة التحديث. أعد التشغيل للمحاولة مرة أخرى.",
   "error.update.downloadFailed": "تعذّر تنزيل التحديث. حاول مرة أخرى.",
   "error.update.checkFailed": "تعذّر التحقق من وجود تحديثات. حاول مرة أخرى.",
   "error.update.checkStalled": "توقف التحقق من التحديثات عن الاستجابة. حاول مرة أخرى.",

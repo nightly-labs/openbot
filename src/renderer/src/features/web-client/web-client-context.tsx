@@ -67,6 +67,7 @@ import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
+import { messagePromptRequestKey, promptRequestKey } from "../conversation/conversation-keys";
 import {
   mergeConversationPage,
   missingReplyOriginals,
@@ -691,10 +692,9 @@ export function createWebWorkspace(
         } else if (event.type === "turn-completed") {
           setState((draft) => {
             if (draft.progress[event.agentId]?.turnId === event.turnId) delete draft.progress[event.agentId];
-            draft.prompts = draft.prompts.filter(
-              (item) =>
-                item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
-            );
+            // The host closes each question that ends with its turn with `agent-input-resolved` before
+            // this event. A question that is still here outlives its turn, and the user can answer it
+            // later; the Team API does not mark it (#11440).
             draft.approvals = draft.approvals.filter(
               (item) =>
                 item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
@@ -1684,16 +1684,18 @@ export function createWebWorkspace(
         const merge = older ? "older" : old && !item.trimmed ? "latest" : "replace";
         // A part around an older message keeps its place. The latest page changes only its shown messages.
         const around = !older && merge === "latest" && item.around === true && page.pageInfo.hasOlder;
+        // By turn and request: an agent can count its request ids from the start again after a restart, so
+        // an old answered row must not close a new question that has the same id (#11440).
         const resolvedRequests = new Set(
           page.messages.flatMap((message) =>
-            message.questionPrompt?.resolution ? [String(message.questionPrompt.requestId)] : [],
+            message.questionPrompt?.resolution ? [messagePromptRequestKey(message)] : [],
           ),
         );
         draft.prompts = draft.prompts.filter(
           (prompt) =>
             prompt.agentId !== id ||
             prompt.threadId !== page.threadId ||
-            !resolvedRequests.has(String(prompt.requestId)),
+            !resolvedRequests.has(promptRequestKey(prompt.turnId, prompt.requestId)),
         );
         // A latest page that does not meet the loaded messages, after a long time with no connection,
         // replaces them: joined end to end, the two would hide the messages between with no sign.

@@ -29,6 +29,7 @@ import { type AgentContextCategoryUsage, agentProviderName, defaultProviderModel
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
@@ -276,7 +277,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
       : {}),
     ...(sources.includes("project") && !sources.includes("user") ? { claudeMdExcludes: claudeHomeMemoryFiles() } : {}),
   };
-  return settings;
+  return { settings, firstPartyApi };
 });
 
 /**
@@ -510,10 +511,20 @@ interface ActiveTurn {
   messageIds: Set<string>;
   /** The CLI started the prompt, or sent a frame of the turn. */
   promptStarted: boolean;
+  /** When the CLI last sent a message for this turn, or OpenBot last answered one of its requests. */
+  lastActivityAt: number;
+  /** The CLI sent nothing past the stall limit, so the close of its query fails the turn. */
+  stalled: boolean;
+  /** Requests of this turn that OpenBot answers, such as an OpenBot tool or a question to the user. The stall limit waits. */
+  hostRequests: number;
+  /** The user stopped the turn. Its stop ends it, also when the CLI does not answer (`#closeIfStopIgnored`). */
+  stopRequested: boolean;
 }
 
 interface ThreadRuntime {
   id: string;
+  /** No gateway, Bedrock or Vertex in the environment or the settings files: requests go to the Anthropic API. */
+  firstPartyApi: boolean;
   usageCounterId: string;
   usageCost: number;
   /**
@@ -612,6 +623,22 @@ const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
  * the stop otherwise holds the agent's queue until OpenBot restarts (#6348).
  */
 const CLAUDE_STOP_CONFIRM_MS = 10_000;
+
+/**
+ * How long a turn can send nothing, with no tool call or compaction open, before OpenBot ends it. A
+ * CLI that stopped answering held its turn and the agent's queue until the user pressed Stop
+ * (#8178). Longer than the CLI's own request timeout, so its own retry goes first.
+ */
+const CLAUDE_TURN_STALL_MS = 15 * 60_000;
+
+/**
+ * The same limit while a tool call or a compaction is open. A foreground command or an MCP tool can
+ * run long with no output, so only a wait far longer than those ends the turn.
+ */
+const CLAUDE_TOOL_STALL_MS = 60 * 60_000;
+
+/** How often a thread checks its turn against the stall limits. */
+const CLAUDE_STALL_CHECK_MS = 60_000;
 
 /** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
 const TAKEN_PROMPT_LIMIT = 1_000;
@@ -1028,9 +1055,69 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (turn && runtime.activeTurn === turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
       turn.toolCalls.clear();
-      yield* this.#completeTurn(runtime, "interrupted", null);
+      if (turn.stalled)
+        yield* this.#completeTurn(
+          runtime,
+          "failed",
+          sourceText("error.agent.turnStalled", { provider: agentProviderName("claude") }),
+        );
+      else yield* this.#completeTurn(runtime, "interrupted", null);
     }
   });
+
+  /**
+   * Ends the turn of a CLI that sends nothing past the stall limit. The wait for OpenBot, such as an
+   * OpenBot tool or a question to the user, does not count, nor does the time the computer sleeps.
+   * The query closes as after an ignored stop, so the queue goes on and the next turn resumes the
+   * session.
+   */
+  readonly #watchStall = Effect.fn("ClaudeAgentClient.watchStall")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+  ) {
+    while (this.#threads.get(runtime.id) === runtime) {
+      const before = Date.now();
+      yield* Effect.sleep(CLAUDE_STALL_CHECK_MS);
+      const turn = runtime.activeTurn;
+      if (!turn) continue;
+      // A timer does not run while the computer sleeps, but the clock does.
+      const asleep = Date.now() - before - CLAUDE_STALL_CHECK_MS;
+      if (asleep > CLAUDE_STALL_CHECK_MS) turn.lastActivityAt = Math.min(Date.now(), turn.lastActivityAt + asleep);
+      const silentFor = Date.now() - turn.lastActivityAt;
+      const limit = turn.toolCalls.size > 0 || runtime.compacting ? CLAUDE_TOOL_STALL_MS : CLAUDE_TURN_STALL_MS;
+      if (turn.hostRequests > 0 || turn.stopRequested || silentFor < limit || this.#threads.get(runtime.id) !== runtime)
+        continue;
+      queryLogger.warn("Closed a Claude query that sent nothing past the stall limit.", {
+        threadId: runtime.id,
+        silentForMinutes: Math.floor(silentFor / 60_000),
+        openToolCalls: turn.toolCalls.size,
+      });
+      turn.stalled = true;
+      // A session that is not saved cannot open again.
+      yield* (runtime.config.persistSession ? this.#threads.releaseNow(runtime) : this.#threads.close(runtime)).pipe(
+        Effect.ignore,
+      );
+      return;
+    }
+  });
+
+  /** Runs a request that OpenBot answers. The stall limit waits for it and counts again from its answer. */
+  #awaitHost<A, E, R>(threadId: string, request: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+    return Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const turn = this.#threads.get(threadId)?.activeTurn ?? null;
+        if (turn) turn.hostRequests += 1;
+        return turn;
+      }),
+      () => request,
+      (turn) =>
+        Effect.sync(() => {
+          if (!turn) return;
+          turn.hostRequests -= 1;
+          turn.lastActivityAt = Date.now();
+        }),
+    );
+  }
 
   /**
    * Closes the query of a stopped turn that still runs after `CLAUDE_STOP_CONFIRM_MS`, which ends
@@ -1130,7 +1217,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
         const turn = runtime.activeTurn;
         const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
-        if (stopped) yield* this.#closeIfStopIgnored(runtime, stopped);
+        if (stopped) {
+          stopped.stopRequested = true;
+          yield* this.#closeIfStopIgnored(runtime, stopped);
+        }
         yield* providerCall(() => runtime.query.interrupt()).pipe(
           // The close of a CLI that did not answer the stop rejects the stop request, but the close ends the turn.
           Effect.catch((failure) =>
@@ -1414,6 +1504,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  /**
+   * Whether the CLI's last sign-in status of this folder is a Claude account sign-in, not a Console
+   * sign-in or a key. Read from the cache: each status read can spend the sign-in's refresh token (#4831).
+   */
+  #onClaudeAccount(): boolean {
+    const last = lastAuthStatuses.get(this.#environment(false).CLAUDE_CONFIG_DIR ?? "");
+    return last?.loggedIn === true && last.authMethod === "claude.ai";
+  }
+
   /** The agent environment, with the saved key when `withApiKey`. */
   #environment(withApiKey: boolean): Readonly<Record<string, string>> {
     const key = withApiKey ? this.#fallbackApiKey?.() : null;
@@ -1562,8 +1661,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ...this.#environment(this.#onApiKey),
     };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
-    const openBotSettings: Settings = config.profileGeneration
-      ? {}
+    const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
+      ? {
+          settings: {},
+          // The sign-in settings send the `env` of the user settings to the CLI, also for a profile generation.
+          firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every(
+            (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
+          ),
+        }
       : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
     const flagSettings: Settings = {
       ...openBotSettings,
@@ -1691,6 +1796,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     ).pipe(Effect.onError(() => removeQueryFiles));
     const runtime: ThreadRuntime = {
       id: threadId,
+      firstPartyApi,
       usageCounterId: randomUUID(),
       usageCost: 0,
       resumedUsage: resume,
@@ -1734,6 +1840,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.add(runtime);
     // Only a saved session can be resumed.
     if (config.persistSession) this.#takenPrompts.set(threadId, runtime.promptIds);
+    yield* Effect.forkIn(this.#watchStall(runtime), this.#scope);
   });
 
   readonly #startTurnEffect = Effect.fn("ClaudeAgentClient.startTurn")(function* (
@@ -1867,6 +1974,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       prompt: null,
       messageIds: new Set<string>(),
       promptStarted: false,
+      lastActivityAt: Date.now(),
+      stalled: false,
+      hostRequests: 0,
+      stopRequested: false,
     };
     // A turn that answers background work that ended continues the turns that started it. Work of an
     // unknown turn continues none, so the lifecycle does not take the turn as quiet.
@@ -2068,6 +2179,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     message: ClaudeStreamMessage,
   ) {
     runtime.lastOutputAt = Date.now();
+    if (runtime.activeTurn) runtime.activeTurn.lastActivityAt = runtime.lastOutputAt;
     runtime.answered = true;
     if (message.type === "command_lifecycle") {
       yield* this.#promptLifecycle(runtime, message.command_uuid, message.state);
@@ -2845,19 +2957,29 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
       const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
+      const apiKey = this.#usesApiKey();
+      const message = claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
+      // A crash of the CLI that no rule names, as Claude Code 2.1.327 with a Bun panic on Windows
+      // (#12175). The message keeps the CLI text for the classifiers of the turn's end, such as a
+      // refused session, and that end continues the turn once, as after a provider exit.
+      const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
-          message: claudeTurnError(error, this.#usesApiKey()),
+          message,
           ...(blocked
             ? { causeCode: "provider_unavailable" }
             : signInFailed
               ? { causeCode: "authentication" }
               : billing
                 ? { causeCode: "billing" }
-                : {}),
+                : turn.stalled
+                  ? { causeCode: "stalled" }
+                  : crashed
+                    ? { causeCode: "provider_exited" }
+                    : {}),
         },
       });
     }
@@ -3029,16 +3151,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     args: unknown,
   ): Effect.fn.Return<CallToolResult, ProviderClientOperationError> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
-    const result = yield* this.#serverRequests
-      .call("item/tool/call", {
+    const result = yield* this.#awaitHost(
+      threadId,
+      this.#serverRequests.call("item/tool/call", {
         threadId,
         turnId: runtime.activeTurn?.id ?? randomUUID(),
         callId: randomUUID(),
         namespace,
         tool: name,
         arguments: args,
-      })
-      .pipe(toProviderClientOperationError);
+      }),
+    ).pipe(toProviderClientOperationError);
     if (!isRecord(result)) return { content: [{ type: "text" as const, text: String(result) }] };
     const content: CallToolResult["content"] = [];
     if (Array.isArray(result.contentItems)) {
@@ -3062,14 +3185,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       options: Array.isArray(question.options) ? question.options : undefined,
       ...(question.multiSelect === true ? { multiSelect: true } : {}),
     }));
-    const result = yield* this.#serverRequests
-      .call("item/tool/requestUserInput", {
+    const result = yield* this.#awaitHost(
+      threadId,
+      this.#serverRequests.call("item/tool/requestUserInput", {
         threadId,
         turnId: runtime.activeTurn?.id ?? randomUUID(),
         itemId: toolUseId,
         questions,
-      })
-      .pipe(toProviderClientOperationError);
+      }),
+    ).pipe(toProviderClientOperationError);
     const responseAnswers = isRecord(result) && isRecord(result.answers) ? result.answers : {};
     // The question closed without an answer, and the note says why, such as a new message from the user.
     // Claude reads the answers alone, so the note takes the place of the blank answer (#9199).
@@ -3094,8 +3218,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     request: Parameters<OnElicitation>[0],
     signal: AbortSignal,
   ): Effect.fn.Return<ElicitationResult> {
-    const result = yield* this.#serverRequests
-      .call(
+    const result = yield* this.#awaitHost(
+      threadId,
+      this.#serverRequests.call(
         "mcpServer/elicitation/request",
         {
           threadId,
@@ -3108,8 +3233,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           elicitationId: request.elicitationId ?? null,
         },
         signal,
-      )
-      .pipe(Effect.orElseSucceed(() => ({ action: "cancel" })));
+      ),
+    ).pipe(Effect.orElseSucceed(() => ({ action: "cancel" })));
     const action = getString(result, "action");
     if (action !== "accept") return { action: action === "decline" ? "decline" : "cancel" };
     const content: NonNullable<ElicitationResult["content"]> = {};
@@ -3133,14 +3258,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     toolInput: DynamicRecord,
     toolUseId: string,
   ): Effect.fn.Return<PermissionResult, ProviderClientOperationError> {
-    const result = yield* this.#serverRequests
-      .call("item/fileChange/requestApproval", {
+    const result = yield* this.#awaitHost(
+      threadId,
+      this.#serverRequests.call("item/fileChange/requestApproval", {
         threadId,
         turnId: this.#threads.get(threadId)?.activeTurn?.id ?? randomUUID(),
         itemId: toolUseId,
         reason: sourceText("status.agent.claudeWriteOutside", { path }),
-      })
-      .pipe(toProviderClientOperationError);
+      }),
+    ).pipe(toProviderClientOperationError);
     if (isRecord(result) && result.decision === "accept") return { behavior: "allow", updatedInput: toolInput };
     return { behavior: "deny", message: "The user did not allow this write outside the workspace." };
   });
@@ -3307,9 +3433,13 @@ const CLAUDE_SANDBOX_BLOCKED = /^apply-seccomp: (?:unshare\(|write \/proc\/self\
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
  * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
- * turn on a key gets the key text: a gateway or a plan's extra usage can send the same words. The
- * key text keeps "credit balance is too low", so `isUsageLimitDiagnostic` still moves the turn to a
- * backup model (#4616).
+ * turn on a key gets the key text. A plan's usage credits can send the same words; a turn of a
+ * Claude account sign-in on the Anthropic API gets the account text, because the CLI text names no
+ * provider (#9710). Another sign-in, such as a Console account, and a turn on another API
+ * (`CLAUDE_OTHER_API_VARIABLES`) keep the CLI text: OpenBot does not know whose credit it is. Both
+ * texts keep "credit balance … too low", so `isUsageLimitDiagnostic` still moves the turn to a
+ * backup model (#4616). The account text keeps "credit balance is too low", so `classifyFailure`
+ * gives it `usage_limit` as it gives the CLI text, and started work continues on a backup (#11516).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
@@ -3354,14 +3484,31 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
-function claudeTurnError(error: unknown, apiKey: boolean): string {
+function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (claudeAccount && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
   if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
+}
+
+/**
+ * The SDK's error for a CLI process that exited with a code other than 0 or that a signal ended. The
+ * SDK marks it with `errorClass`, also inside the error that adds the stderr. A Stop ends the process
+ * with an abort error instead.
+ */
+function claudeProcessExited(error: unknown): boolean {
+  for (let cause = error, depth = 0; cause instanceof Error && depth < 3; cause = cause.cause, depth += 1) {
+    if (
+      "errorClass" in cause &&
+      (cause.errorClass === "process_exited_nonzero" || cause.errorClass === "process_killed_by_signal")
+    )
+      return true;
+  }
+  return false;
 }
 
 /**

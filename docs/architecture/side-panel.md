@@ -49,7 +49,7 @@ mode map.
 
 ### Close behavior
 
-The tab icon closes its tab on hover, and the tab menu (right-click or long press) has Close tab.
+The X at the end of a tab closes it, and the tab menu (right-click or long press) has Close tab.
 The menu of a side thread tab also has Open in the chat.
 
 `closeSidePanelPane` runs the `release` action, removes the tab, and keeps the order of the other

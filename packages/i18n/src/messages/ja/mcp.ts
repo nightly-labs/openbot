@@ -28,6 +28,8 @@ export const messages = {
   "mcp.signIn.waiting": "ブラウザーを待機中…",
   "mcp.signIn.continue": "{name} に進む",
   "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
+  "mcp.signIn.copyHint": "ページが読み込まれない場合は、リンクをコピーして別のブラウザーで開いてください。",
+  "mcp.signIn.copyLink": "リンクをコピー",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テスト中…",
   "mcp.status.failed": "失敗",

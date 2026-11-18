@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} üzerindeki OpenBot'u güncelleyin",
   "server.compatibility.unsafeDataTitle": "Ana makine güvenli olmayan veri döndürdü",
   "server.compatibility.cannotConnectTitle": "{name} ile bağlantı kurulamıyor",
+  "server.compatibility.safeModeTitle": "{name} başlamıyor",
   "server.compatibility.updateClientDescription":
     "Bu uygulama yalnızca ana makineden daha eski protokolleri destekliyor. Bu uygulamayı güncelleyin, ardından tekrar deneyin.",
   "server.compatibility.updateHostDescription":
@@ -120,6 +121,8 @@ export const messages = {
   "server.local.create": "Sunucu oluştur",
   "server.local.creating": "Sunucu oluşturuluyor…",
   "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.createFailedRetry":
+    "Bir sorun oluştu. Tekrar deneyin. Yine başarısız olursa OpenBot'u yeniden başlatın.",
   "server.local.limitReached":
     "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
   "server.local.deleteConfirmTitle": "{name} silinsin mi?",

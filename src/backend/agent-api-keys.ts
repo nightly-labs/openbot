@@ -122,6 +122,16 @@ export class AgentApiKeys {
     return saved ?? (yield* failed());
   });
 
+  /**
+   * True when the agent has a key of this name for it only. Unlike `list`, it writes no file, so it is
+   * safe to call for an agent that never asked for its keys.
+   */
+  readonly has = Effect.fn("AgentApiKeys.has")(function* (this: AgentApiKeys, agentId: string, name: string) {
+    if (!AGENT_ID_PATTERN.test(agentId) || !API_KEY_NAME_PATTERN.test(name)) return false;
+    if ((yield* this.#plainKeys(agentId)).some((key) => key.name === name)) return true;
+    return (this.#readyVault()?.apiKeys(agentId) ?? []).some((key) => key.own && key.name === name);
+  });
+
   /** The keys that the agent can use. A plain file of the agent wins over a Vault key of its name. */
   readonly list = Effect.fn("AgentApiKeys.list")(function* (this: AgentApiKeys, agentId: string) {
     const folder = yield* this.#agentFolder(agentId);

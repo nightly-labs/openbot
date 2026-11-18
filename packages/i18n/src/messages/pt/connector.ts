@@ -469,7 +469,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcional. Se ficar vazio, a lista mostra o número de telefone.",
   "connector.whatsapp.add": "Adicionar",
   "connector.whatsapp.groupTitle": "Adicionar um grupo",
-  "connector.whatsapp.groupDescription": "As pessoas deste grupo podem passar trabalho para seus agentes.",
+  "connector.whatsapp.groupDescription":
+    "As pessoas deste grupo podem passar trabalho para seus agentes quando mencionam o número ou respondem às mensagens dele.",
   "connector.whatsapp.groupSearch": "Buscar grupos",
   "connector.whatsapp.groupsLoading": "Lendo os grupos…",
   "connector.whatsapp.groupsLoadFailed": "O OpenBot não conseguiu ler os grupos",
@@ -625,9 +626,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Os agentes não podem entrar com seus logins compartilhados até você entrar de novo.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano pago",
+  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano com Pass Plus",
   "connector.protonPass.planDescription":
-    "A CLI do Proton Pass só funciona com um plano pago do Proton. Mude seu plano e conecte de novo.",
+    "A CLI do Proton Pass precisa de um plano do Proton que inclua o Pass Plus. Outros planos pagos, como o Mail Plus, não a incluem. Mude seu plano e conecte de novo.",
   "connector.protonPass.vaultTitle": "Cofre compartilhado",
   "connector.protonPass.vaultDescription":
     "Os agentes podem entrar com os logins deste cofre. Mova um login para ele para compartilhá-lo.",

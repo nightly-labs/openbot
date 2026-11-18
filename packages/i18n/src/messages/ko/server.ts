@@ -46,6 +46,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name}의 OpenBot 업데이트",
   "server.compatibility.unsafeDataTitle": "호스트가 안전하지 않은 데이터를 반환했어요",
   "server.compatibility.cannotConnectTitle": "{name}에 연결할 수 없어요",
+  "server.compatibility.safeModeTitle": "{name}이(가) 시작되지 않습니다",
   "server.compatibility.updateClientDescription":
     "이 앱은 호스트보다 오래된 프로토콜만 지원해요. 이 앱을 업데이트한 후 다시 시도해 주세요.",
   "server.compatibility.updateHostDescription":
@@ -114,6 +115,7 @@ export const messages = {
   "server.local.create": "서버 만들기",
   "server.local.creating": "서버 만드는 중…",
   "server.local.createFailed": "서버를 만들지 못했어요.",
+  "server.local.createFailedRetry": "문제가 생겼어요. 다시 시도하세요. 또 실패하면 OpenBot을 다시 시작하세요.",
   "server.local.limitReached": "이 컴퓨터에는 서버를 최대 {limit}개까지 둘 수 있어요. 새로 만들려면 하나를 삭제하세요.",
   "server.local.deleteConfirmTitle": "{name}을(를) 삭제할까요?",
   "server.local.deleteConfirmDescription": "OpenBot이 서버를 중지하고 에이전트, 채팅, 파일을 휴지통으로 옮겨요.",

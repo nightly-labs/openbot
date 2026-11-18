@@ -27,6 +27,7 @@ import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /**
  * A side thread in the side panel, beside the agent's own chat. Its message box takes text only:
@@ -40,6 +41,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    openThreadFile,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
@@ -54,6 +56,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     branchThread,
     messagePins,
     changeMarkerActions,
+    openWaitingAgent,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
@@ -83,6 +86,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     messages: () => messages,
     lines: () => undefined,
     activeTurnId: () => thread()?.task.activeTurnId,
+  });
+  const turnTrace = useTurnTrace({
+    turnSteps,
+    agentName: () => view.agent?.name,
+    agents: () => view.agents,
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
@@ -218,7 +226,9 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onOpenFile={openThreadFile}
             onSelectAgent={view.onSelectAgent}
+            onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
@@ -242,6 +252,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}

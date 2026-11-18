@@ -19,6 +19,7 @@ import { Effect, Semaphore } from "effect";
 import {
   app,
   BrowserWindow,
+  clipboard,
   crashReporter,
   dialog,
   type NativeImage,
@@ -160,6 +161,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { type ServerSafeMode, safeModeMarkerDirectory, startServerSafeMode } from "./server-safe-mode";
 import {
   START_LOOP_EXIT_CODE,
   type StartHaltReason,
@@ -203,6 +205,13 @@ let startAttempts: StartAttempts | null = null;
 let previousStartHalt: StartHaltRecord | null = null;
 /** Set when this run stops a server start loop. The process then exits with this code after the teardown. */
 let startHaltExitCode: number | null = null;
+/** The minimal Team API of a server that stopped its start loop (`server-safe-mode.ts`). */
+let serverSafeMode: ServerSafeMode | null = null;
+/**
+ * Where no update script restarts the safe mode, it ends after this time with the start-loop exit
+ * code, and the restart policy, such as the one of Docker, tries the start again.
+ */
+const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
@@ -1192,6 +1201,7 @@ function registerIpcHandlers({
       ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
       relay: signInRelayClient,
+      writeClipboard: (text) => clipboard.writeText(text),
     }),
     ...attachmentIpcHandlers({
       service,
@@ -1255,14 +1265,38 @@ function requestDesktopNotificationPermission(
  * A server stops its start loop: it records the reason and exits with `START_LOOP_EXIT_CODE` after
  * the teardown, and systemd does not start it again (`server-start-halt.ts`).
  */
-function haltServerStart(reason: StartHaltReason): void {
+function haltServerStart(reason: StartHaltReason): Omit<StartHaltRecord, "version"> {
   const appVersion = app.getVersion();
   logger.error(
     `OpenBot ${appVersion} stopped its start loop (${reason}). It starts again after an update or a restart of the server or of the service.`,
   );
-  writeStartHalt(app.getPath("userData"), { reason, appVersion, haltedAt: Date.now() });
+  const record = { reason, appVersion, haltedAt: Date.now() };
+  writeStartHalt(app.getPath("userData"), record);
   startHaltExitCode = START_LOOP_EXIT_CODE;
   recordExit("start_loop");
+  return record;
+}
+
+/**
+ * After `haltServerStart`, and after the teardown of any service that started: keeps the safe mode
+ * open so that members read the reason. When it cannot start (no team, no host credential), the
+ * server quits with the start-loop exit code, as before.
+ */
+async function enterServerSafeMode(halt: Omit<StartHaltRecord, "version">): Promise<void> {
+  if (shutdownStarted) return;
+  const markerDirectory = safeModeMarkerDirectory(process.env, process.platform);
+  try {
+    serverSafeMode = await runCauseEffect(
+      startServerSafeMode({ userDataPath: app.getPath("userData"), reason: halt, markerDirectory }),
+    );
+    // A quit that came during the start: its teardown did not see the safe mode.
+    if (shutdownStarted) await Effect.runPromise(serverSafeMode.stop);
+  } catch (error) {
+    logger.warn("The safe mode did not start. OpenBot quits.", toLogValue(error));
+    app.quit();
+    return;
+  }
+  if (markerDirectory === null) setTimeout(() => app.quit(), SERVER_SAFE_MODE_LIFETIME_MS);
 }
 
 /**
@@ -1271,7 +1305,9 @@ function haltServerStart(reason: StartHaltReason): void {
  * found. A server has no window and nobody to read it: it stops the loop, except in the one start
  * after a halt, which tries again.
  */
-async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
+async function recoverFromStartLoop(): Promise<
+  StartRecovery | "quit" | { halt: Omit<StartHaltRecord, "version"> } | null
+> {
   if (!startAttempts?.loopDetected) return null;
   const summary = startAttempts.summary();
   if (serverStartGuard) {
@@ -1279,8 +1315,7 @@ async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
       logger.warn(`OpenBot ${summary.appVersion} is in a start loop. It stopped the loop before, so it tries again.`);
       return null;
     }
-    haltServerStart("start_failed");
-    return "quit";
+    return { halt: haltServerStart("start_failed") };
   }
   logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
   // An earlier release that cannot open the data would install this release again over it.
@@ -1633,6 +1668,13 @@ if (!hasSingleInstanceLock) {
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");
+        return;
+      }
+      if (recovery && "halt" in recovery) {
+        // The bridge window of the safe mode is the only page. It gets the policy of each page.
+        configureContentSecurityPolicy();
+        configureRendererPermissions();
+        await enterServerSafeMode(recovery.halt);
         return;
       }
       if (forcedStartFailure === "crash") process.crash();
@@ -2117,8 +2159,19 @@ if (!hasSingleInstanceLock) {
       // third failed start in a row. A failed migration counts as a failed start.
       if (serverStartGuard) {
         const reason = startHaltReason(error);
-        if (reason === "newer_database" || startAttempts?.failureLimitReached) haltServerStart(reason);
-        app.quit();
+        if (reason !== "newer_database" && !startAttempts?.failureLimitReached) {
+          app.quit();
+          return;
+        }
+        const halt = haltServerStart(reason);
+        // The services that started stop first: the safe mode takes their Signal host connection.
+        void teardown
+          .runAll()
+          .then(() => enterServerSafeMode(halt))
+          .catch((teardownError) => {
+            logger.error("The teardown before the safe mode failed:", toLogValue(teardownError));
+            app.quit();
+          });
         return;
       }
       // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
@@ -2270,6 +2323,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     services?.agentDock.destroy();
     macHapticFeedback.destroy();
     await teardown.runAll();
+    if (serverSafeMode) await Effect.runPromise(serverSafeMode.stop);
     runMarker?.clean();
   } finally {
     shutdownDone = true;

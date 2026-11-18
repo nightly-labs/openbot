@@ -1529,16 +1529,11 @@ export class ThreadLifecycle {
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
-              // tools of the saved rows through tool_call, so only the rows that it can run are listed.
-              // The built-in servers are not saved rows.
+              // tools of the saved rows and of the GitHub connection through tool_call (#12035), so
+              // only the servers that it can run are listed. Computer Use is not one of them.
               client.provider === "antigravity"
               ? mcpServers
-                  .filter(
-                    (config) =>
-                      mcpFallbackRunsServer(config, agent) &&
-                      config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID &&
-                      config.id !== COMPUTER_USE_MCP_SERVER_ID,
-                  )
+                  .filter((config) => mcpFallbackRunsServer(config, agent) && config.id !== COMPUTER_USE_MCP_SERVER_ID)
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,

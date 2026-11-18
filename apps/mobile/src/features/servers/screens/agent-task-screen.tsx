@@ -70,12 +70,17 @@ import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settin
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
-import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useApprovalRequests,
+  useBrowserRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { addStartedTask } from "@/features/workspace/model/task-cache";
+import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -336,9 +341,15 @@ function AgentTaskChat({
     (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
     [agentId, serverId, taskId],
   );
-  // As in the agent's chat: the open question of the running turn has the form; earlier ones show their result.
+  const threadWaits = useThreadWaits(serverId);
+  // As in the agent's chat: the open question of the running turn has the form, and so has one that the
+  // host still waits for after its turn (#11440); earlier ones show their result.
   const activePrompt = messages.findLast(
-    (row) => row.kind === "question" && !row.prompt.resolution && activeTurnId !== null && row.turnId === activeTurnId,
+    (row) =>
+      row.kind === "question" &&
+      !row.prompt.resolution &&
+      ((activeTurnId !== null && row.turnId === activeTurnId) ||
+        hostAwaitsQuestion(threadWaits, agentId, row.turnId, row.prompt.requestId)),
   );
   const respond = useCallback(
     (_agentId: string, input: RespondToPromptInput) => respondToTaskPrompt(input, serverId),
@@ -665,7 +676,10 @@ function AgentTaskChat({
             {t("mobile.server.threads.failedTitle")}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" className="text-danger-text">
-            {task.error || t("mobile.server.threads.failedBody")}
+            {/* A thread keeps the provider's text, which can be technical: it shows as a failed chat turn does (#10888). */}
+            {task.error?.trim()
+              ? errorMessage(task.error, t("mobile.chat.failure.fallback"))
+              : t("mobile.server.threads.failedBody")}
           </Typography.Paragraph>
         </View>
       ) : null}

@@ -9,6 +9,7 @@ import {
   encodeTeamProtocolV1CurrentHttpRequest,
   encodeTeamProtocolV1CurrentHttpResponse,
 } from "./v1-adapter";
+import { isTeamWebRtcNoBodyRoute, isTeamWebRtcRemoteViewerRoute } from "./webrtc-bodyless-requests";
 import {
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2Json,
@@ -16,7 +17,7 @@ import {
   type TeamProtocolV2EventFrame,
   type TeamProtocolV2Json,
   type TeamProtocolV2RpcFrame,
-} from "./v2";
+} from "./webrtc-framing";
 
 export function createTeamProtocolV2Request(
   requestId: string,
@@ -95,72 +96,13 @@ function normalizeV2HttpRequest(
   value: unknown,
 ): { done: true; value: TeamProtocolV2Json } | { done: false; value: TeamProtocolV2Json } {
   const normalized = value === undefined ? null : wireJson(value);
-  if (isRemoteViewerRoute(path)) return { done: true, value: isEmptyRequest(normalized) ? {} : normalized };
-  if (isEmptyRequest(normalized) && isTeamProtocolV2NoBodyRoute(method, path)) return { done: true, value: {} };
+  if (isTeamWebRtcRemoteViewerRoute(path)) return { done: true, value: isEmptyRequest(normalized) ? {} : normalized };
+  if (isEmptyRequest(normalized) && isTeamWebRtcNoBodyRoute(method, path)) return { done: true, value: {} };
   return { done: false, value: normalized };
 }
 
 function isEmptyRequest(value: unknown): boolean {
   return value === null || (isDynamicRecord(value) && Object.keys(value).length === 0);
-}
-
-function isTeamProtocolV2NoBodyRoute(method: string, path: string): boolean {
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  if (method === "GET") {
-    if (
-      new Set([
-        "/v1/compatibility",
-        "/v1/identity",
-        "/v1/me",
-        "/v1/team/presence",
-        "/v1/remote-screen/capabilities",
-        "/v1/direct/threads",
-        "/v1/messages/search",
-        "/v1/browser/tabs",
-        "/v1/browser/control",
-        "/v1/team/members",
-        "/v1/team/invites",
-        "/v1/team/sessions",
-        "/v1/agents/status",
-        "/v1/sidebar-layout",
-        "/v1/agents/usage",
-        "/v1/agents/models",
-        "/v1/agents",
-        "/v1/agents/conversation-reads",
-      ]).has(pathname)
-    ) {
-      return true;
-    }
-    if (
-      /^\/v1\/attachments\/[^/]+$/u.test(pathname) ||
-      pathname === "/v1/shared-files" ||
-      pathname === "/v1/workspace-files" ||
-      isRemoteViewerRoute(pathname)
-    ) {
-      return true;
-    }
-    if (/^\/v1\/direct\/conversations\/[^/]+(?:\/page)?$/u.test(pathname)) return true;
-    return /^\/v1\/agents\/[^/]+\/(?:avatar|skills|memories|routines|routines\/[^/]+\/runs|conversation|conversation-page|queue)$/u.test(
-      pathname,
-    );
-  }
-  if (method === "POST" && /^\/v1\/agents\/[^/]+\/routines\/[^/]+\/test$/u.test(pathname)) return true;
-  if (method !== "DELETE") return false;
-  return (
-    /^\/v1\/attachments\/[^/]+$/u.test(pathname) ||
-    /^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+$/u.test(pathname) ||
-    /^\/v1\/agents\/[^/]+$/u.test(pathname) ||
-    /^\/v1\/agents\/[^/]+\/avatar$/u.test(pathname) ||
-    /^\/v1\/agents\/[^/]+\/memories(?:\/[^/]+)?$/u.test(pathname) ||
-    /^\/v1\/agents\/[^/]+\/routines\/[^/]+$/u.test(pathname)
-  );
-}
-
-function isRemoteViewerRoute(path: string): boolean {
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  return /^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+\/(?:viewer|authorize|viewer-state|moonlight(?:\/.*)?)$/u.test(
-    pathname,
-  );
 }
 
 export function encodeTeamProtocolV2CurrentHttpResponse(
@@ -171,7 +113,7 @@ export function encodeTeamProtocolV2CurrentHttpResponse(
   options: { preserveSemanticTags?: boolean } = {},
 ): TeamProtocolV2Json {
   if (status === 204) return {};
-  if (isRemoteViewerRoute(path)) return wireJson(value === undefined ? null : value);
+  if (isTeamWebRtcRemoteViewerRoute(path)) return wireJson(value === undefined ? null : value);
   return wireJson(
     JSON.parse(
       encodeTeamProtocolV1CurrentHttpResponse(method, path, status, value === undefined ? null : value, options),
@@ -186,7 +128,7 @@ export function decodeTeamProtocolV2CurrentHttpResponse(
   value: unknown,
 ): TeamProtocolV2Json {
   if (status === 204) return {};
-  if (isRemoteViewerRoute(path)) return wireJson(value === undefined ? null : value);
+  if (isTeamWebRtcRemoteViewerRoute(path)) return wireJson(value === undefined ? null : value);
   return wireJson(decodeTeamProtocolV1CurrentHttpResponse(method, path, status, value === undefined ? null : value));
 }
 

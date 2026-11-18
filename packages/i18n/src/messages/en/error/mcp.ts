@@ -7,6 +7,7 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.redirectRefused": "The sign-in was refused. Go back to OpenBot and try again.",
   "error.mcp.redirectNoSignIn": "No sign-in is waiting for this. It may have ended.",
   "error.mcp.redirectSignedIn": "OpenBot is signed in. You can close this window.",
+  "error.mcp.redirectNotSaved": "The sign-in did not finish. Go back to OpenBot to see why.",
   "error.mcp.signInFileUnreadable": "The MCP sign-in file is unreadable.",
   "error.mcp.signInFileTooLarge": "The MCP sign-in file is too large.",
   "error.mcp.unsupported": "MCP servers are not supported by this server.",
@@ -18,6 +19,7 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.signInAppUnsupported": "This server does not support sign-in apps. Update OpenBot on the host.",
   "error.mcp.redirectRelayed": "OpenBot sent the sign-in to the server. You can close this window.",
   "error.mcp.relayEnded": "This sign-in ended. Start it again.",
+  "error.mcp.signInLinkNotReady": "The sign-in page is not open yet. Try again in a moment.",
   "error.mcp.relayNoState":
     "The server's sign-in page does not protect its return address, so OpenBot does not open it on this computer.",
   "error.mcp.relayAddressInvalid":
