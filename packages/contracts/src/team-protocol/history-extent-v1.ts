@@ -1,6 +1,6 @@
 import { isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional history-extent-v1 contract: the unloaded length of a history page, which the chat's

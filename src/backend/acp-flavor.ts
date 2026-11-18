@@ -200,6 +200,11 @@ export interface AcpFlavor {
   /** How long a model discovery session stays open after discovery read it. Absent: it closes at once. */
   probeCloseDelayMs?: number;
   /**
+   * The categories of the select option that holds the reasoning effort. Absent: the protocol's
+   * `thought_level` only. The option then goes to the Effort menu, not to the provider settings.
+   */
+  effortCategories?: readonly string[];
+  /**
    * Each session gets a process of its own, and an idle session is closed by ending that process.
    * For an agent with `closeKeepsSession`, or one that shares MCP servers between its sessions.
    */
@@ -270,6 +275,13 @@ export interface AcpFlavor {
    * the answer text. A tool call or the end of the turn still does.
    */
   thoughtsInsideAnswer?: true;
+  /**
+   * The agent continues a dropped answer in a new model step of the same turn, so a thought after
+   * answer text, with no tool call between, does not end the answer. A tool call or the end of the
+   * turn still does. A line break joins the two parts when neither side has a space at the seam.
+   * `report` is the agent's notice of the dropped stream, which shows as a thought.
+   */
+  resumesAnswerAfterThought?: { report: RegExp };
   /**
    * `session/prompt` stays open with no update while background tasks run, so a silent turn is not
    * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`). A prompt that gets no update at all
@@ -418,6 +430,12 @@ export interface AcpFlavor {
    * turn and ends the process, so the next turn starts a process that reads the sign-in again.
    */
   signInLostChunk?: RegExp;
+  /**
+   * The text for a session that the agent could not open because its server refused the saved
+   * sign-in or did not answer, or null for another error. The start asks once more, because the
+   * failure can be short, and then asks the user to sign in again.
+   */
+  signInUnusable?(error: RequestError): string | null;
   /**
    * A whole answer chunk that tells that the plan is used up, sent as answer text in a turn that
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
@@ -808,6 +826,12 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
+  // Cursor 2026.09.28-64d2043 and 2026.11.05-86047df open a session only when their server accepts the
+  // saved sign-in or key. A refused one and no connection give the same error (#7644).
+  signInUnusable: (error) =>
+    error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
+      ? sourceText("error.provider.cursorSignInUnusable")
+      : null,
   // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
   // (#5668), and a plan that needs a payment method too (#4556). Only the full chunk matches, so an
   // answer that quotes the text stays an answer.
@@ -885,6 +909,10 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
   // params" and "Layer 'user-toml': cannot write config file at <path>".
   configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
+  // Vibe 3.1.0 to 3.1.2 sends the thinking level of the model as the option `thinking` with the
+  // category `thinking`, not the protocol's `thought_level` (#8056, mistralai/mistral-vibe#989).
+  // Its levels `off` to `max` are OpenBot's effort names. `thought_level` stays for a later Vibe.
+  effortCategories: ["thought_level", "thinking"],
   // Vibe 3.1.0 asks Mistral for the account's model catalogue when a session opens, and waits up to
   // 5 s for it. A close stops that request, and then nothing saves the catalogue for later sessions.
   probeCloseDelayMs: 5_000,

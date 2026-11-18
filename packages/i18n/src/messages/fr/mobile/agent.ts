@@ -229,6 +229,13 @@ export const messages = {
     "Le secret actuel cesse de fonctionner. L’hôte rejette les requêtes qui l’utilisent.",
   "mobile.agent.webhook.rotateConfirm": "Régénérer",
   "mobile.agent.webhook.rotateFailed": "Impossible de régénérer le secret. Réessayez.",
+  "mobile.agent.webhook.giveToAgent": "Donner le secret de signature à {name}",
+  "mobile.agent.webhook.giveTitle": "Donner un nouveau secret de signature à {name} ?",
+  "mobile.agent.webhook.giveBody":
+    "Le secret actuel cesse de fonctionner. {name} enregistre le nouveau secret comme clé API et peut l’ajouter chez l’expéditeur.",
+  "mobile.agent.webhook.giveConfirm": "Donner",
+  "mobile.agent.webhook.giveFailed": "Impossible de donner le secret de signature à l’agent. Réessayez.",
+  "mobile.agent.webhook.given": "{name} a le nouveau secret de signature.",
   "mobile.agent.webhook.activity": "Activité",
   "mobile.agent.webhook.activityFailed": "Impossible de charger l’activité. Réessayez.",
   "mobile.agent.webhook.activity.ignored": "Ignoré",

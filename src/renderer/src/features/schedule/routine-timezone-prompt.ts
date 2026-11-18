@@ -42,6 +42,7 @@ export function desktopRoutineZoneTargets(servers: readonly ServerSummary[]): Ro
 
 const toastId = (serverId: string) => `routine-timezone-move:${serverId}`;
 const storageKey = (serverId: string) => `openbot:routine-timezone-answers:${serverId}`;
+const checkedKey = (serverId: string) => `openbot:routine-timezone-checked:${serverId}`;
 
 function deviceZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -65,6 +66,26 @@ function writeAnswer(serverId: string, zone: string, from: string): void {
     window.localStorage.setItem(storageKey(serverId), [zone, ...answeredZones(serverId, zone), from].join("\n"));
   } catch {
     // Blocked storage asks again on the next check.
+  }
+}
+
+/**
+ * The device zone of the last check of `serverId` that had no question, from an earlier start. A start
+ * in the same zone does not read the calendar again: on a large server that read is slow.
+ */
+function storedCheckedZone(serverId: string): string | null {
+  try {
+    return window.localStorage.getItem(checkedKey(serverId));
+  } catch {
+    return null;
+  }
+}
+
+function storeCheckedZone(serverId: string, zone: string): void {
+  try {
+    window.localStorage.setItem(checkedKey(serverId), zone);
+  } catch {
+    // Blocked storage reads the calendar again on the next start.
   }
 }
 
@@ -169,6 +190,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
    * again only after the zone changed: its workspace reads the same agents and channels as it reconnects.
    */
   const checkedZones = new Map<string, string>();
+  const checkedIn = (serverId: string) => checkedZones.get(serverId) ?? storedCheckedZone(serverId);
 
   async function check(target: RoutineZoneTarget): Promise<void> {
     if (checking.has(target.id) || moving.has(target.id)) return;
@@ -186,6 +208,8 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
             source !== zone && !answered.includes(source) && !dismissed.get(target.id)?.has(`${source}>${zone}`),
         )
         .sort((a, b) => b[1].length - a[1].length)[0];
+      // Only a check with no question is kept: a toast closed with no answer shows on the next start.
+      if (!next) storeCheckedZone(target.id, zone);
       const key = next ? `${next[0]}>${zone}` : undefined;
       if (key === shown.get(target.id)) return;
       if (!next) {
@@ -272,7 +296,7 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
       checkedZones.delete(serverId);
       toast.dismiss(toastId(serverId));
     }
-    for (const target of current) if (checkedZones.get(target.id) !== zone) void check(target);
+    for (const target of current) if (checkedIn(target.id) !== zone) void check(target);
   }
 
   // An effect runs again each time its key is computed. The server summaries change while a workspace

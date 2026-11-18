@@ -11,6 +11,7 @@ import {
   type RoutineRunPlace,
   type RoutineSchedule,
 } from "./ipc-routines";
+import { API_KEY_NAME_PATTERN } from "./ipc-vault";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /** JSON values accepted from a webhook request. */
@@ -105,6 +106,14 @@ export interface SaveEventRoutineResult {
 
 export interface WebhookSecret {
   secret: string;
+}
+
+/**
+ * The API key of the agent that has the new signing secret of its webhook routine. The host keeps the
+ * secret; the agent reads it from the file of the key with this name.
+ */
+export interface AgentWebhookSecret {
+  name: string;
 }
 
 /** A signing secret that the sender made, such as a Composio or Svix webhook secret. */
@@ -288,6 +297,10 @@ function isWebhookSecret(value: unknown): value is WebhookSecret {
   return isDynamicRecord(value) && isString(value.secret) && value.secret.length > 0;
 }
 
+function isAgentWebhookSecret(value: unknown): value is AgentWebhookSecret {
+  return isDynamicRecord(value) && isString(value.name) && API_KEY_NAME_PATTERN.test(value.name);
+}
+
 function isDeliveryId(value: unknown): value is string {
   return isString(value) && value.length > 0 && value.length <= EVENT_DELIVERY_ID_MAX_LENGTH;
 }
@@ -339,6 +352,7 @@ export const decodeEventActivity = decodeList(isEventActivity, "Invalid event ac
 export const decodeEventRoutines = decodeList(isEventRoutine, "Invalid event routine response.");
 export const decodeSaveEventRoutineResult = decodeOne(isSaveEventRoutineResult, "Invalid event routine response.");
 export const decodeWebhookSecret = decodeOne(isWebhookSecret, "Invalid webhook secret response.");
+export const decodeAgentWebhookSecret = decodeOne(isAgentWebhookSecret, "Invalid webhook secret response.");
 export const decodeWebhookTestResult = decodeOne(isWebhookTestResult, "Invalid webhook test response.");
 function isEventRoutineRun(value: unknown): value is EventRoutineRun {
   return (

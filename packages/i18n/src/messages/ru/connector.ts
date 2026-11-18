@@ -496,7 +496,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Необязательно. Если пусто, в списке будет номер телефона.",
   "connector.whatsapp.add": "Добавить",
   "connector.whatsapp.groupTitle": "Добавить группу",
-  "connector.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "connector.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "connector.whatsapp.groupSearch": "Поиск групп",
   "connector.whatsapp.groupsLoading": "Загрузка групп…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
@@ -653,9 +654,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Агенты не могут входить с общими учётными данными, пока вы не войдёте снова.",
   "connector.protonPass.reconnect": "Переподключить",
-  "connector.protonPass.planTitle": "Proton Pass требует платный план",
+  "connector.protonPass.planTitle": "Для Proton Pass нужен план с Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI работает только с платным планом Proton. Смените план и подключитесь снова.",
+    "Для Proton Pass CLI нужен план Proton, который включает Pass Plus. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
   "connector.protonPass.vaultTitle": "Общее хранилище",
   "connector.protonPass.vaultDescription":
     "Агенты могут входить с учётными данными из этого хранилища. Переместите в него учётные данные, чтобы поделиться ими.",

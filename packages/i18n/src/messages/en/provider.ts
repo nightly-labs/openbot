@@ -134,6 +134,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
     "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
@@ -332,6 +334,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Not in use: {version} · installed by you",
   "provider.settings.otherVersionDownloaded": "Not in use: {version} · downloaded by OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Some models need a part that this version does not have. Download OpenBot's version to use them.",
   "provider.settings.useInstalledVersion": "Use installed version",
   "provider.settings.useDownloadedVersion": "Use OpenBot's version",
   "provider.settings.update": "Update",

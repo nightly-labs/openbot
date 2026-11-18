@@ -54,6 +54,8 @@ export const messages = {
     "Не удалось установить Proton Pass CLI. Проверьте сетевое подключение и подключитесь снова.",
   "error.connector.protonPassPlan":
     "Ваш тариф Proton не разрешает Proton Pass CLI. Смените тариф и подключитесь снова.",
+  "error.connector.protonPassPlanMissing":
+    "Ваш тариф Proton не включает Proton Pass CLI. Нужен тариф Proton, который включает Pass Plus. Смените тариф и подключитесь снова.",
   "error.connector.protonPassExpired": "Доступ к Proton Pass закончился. Подключитесь снова.",
   "error.connector.protonPassKeyInvalid": "Введите ключ доступа Proton Pass, который начинается с pst_.",
   "error.connector.protonPassExtraPassword": "Дополнительный пароль неверен. Введите его снова.",

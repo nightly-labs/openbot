@@ -131,6 +131,9 @@ export const messages = {
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
+  "provider.picker.showCustomModels": "Voir les modèles",
   "provider.picker.museNoModels":
     "Muse n’a envoyé aucun modèle pour ce compte. Muse n’est peut-être pas disponible dans le pays où cet agent s’exécute. Choisissez un modèle d’un autre fournisseur.",
   "provider.picker.customEmpty":
@@ -276,6 +279,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
   "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Certains modèles ont besoin d'un élément absent de cette version. Téléchargez la version d'OpenBot pour les utiliser.",
   "provider.settings.useInstalledVersion": "Utiliser l'installée",
   "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",

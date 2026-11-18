@@ -500,7 +500,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, הרשימה מציגה את מספר הטלפון.",
   "connector.whatsapp.add": "הוספה",
   "connector.whatsapp.groupTitle": "הוספת קבוצה",
-  "connector.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "connector.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "connector.whatsapp.groupSearch": "חיפוש קבוצות",
   "connector.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",
@@ -659,9 +660,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "המפתח של Proton Pass פג תוקף",
   "connector.protonPass.expiredDescription": "סוכנים לא יכולים להתחבר עם פרטי הכניסה המשותפים עד להתחברות מחדש.",
   "connector.protonPass.reconnect": "חיבור מחדש",
-  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית בתשלום",
+  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית עם Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI עובד רק עם תוכנית בתשלום של Proton. יש לשנות את התוכנית ואז להתחבר שוב.",
+    "Proton Pass CLI דורש תוכנית Proton שכוללת Pass Plus. תוכניות בתשלום אחרות, כמו Mail Plus, לא כוללות אותו. יש לשנות את התוכנית ואז להתחבר שוב.",
   "connector.protonPass.vaultTitle": "כספת משותפת",
   "connector.protonPass.vaultDescription":
     "סוכנים יכולים להתחבר עם פרטי הכניסה שבכספת הזו. כדי לשתף פרטי כניסה, יש להעביר אותם אליה.",

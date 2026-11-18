@@ -231,6 +231,16 @@ const MESSAGING_QUESTION_REFUSED =
 /** The agent reads this, not the user: it says what to do in a turn that answers another agent's request from an external chat. */
 const MESSAGING_REQUEST_CARD_REFUSED =
   "This request came from an external chat (Slack, Discord, Telegram or WhatsApp) through another agent, and nobody can answer a card here. Decide on your own and continue. When only the OpenBot user can unblock you, such as a sign-in, a key or a password, stop and say in your answer exactly what the OpenBot user must do in OpenBot.";
+/**
+ * Codex's cancel of a tool consent that nobody can answer. Without the reason, Codex tells the model
+ * "user cancelled MCP tool call", so the agent cannot say why the step stopped (#12200). Codex 0.164.0
+ * and later read it; an earlier Codex ignores it.
+ */
+const MCP_TOOL_CONSENT_UNANSWERABLE = {
+  action: "cancel",
+  content: null,
+  _meta: { codex_approval_cancellation_reason: "non_interactive" },
+} as const;
 
 /** The agent reads these, not the user. */
 const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
@@ -1864,7 +1874,19 @@ export class AttentionRegistry {
     const call = yield* Effect.result(
       attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
     );
-    const username = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args.username : "";
+    const args = Result.isSuccess(call) && call.success.tool === "submit_secret" ? call.success.args : undefined;
+    // A call with a `loginId` has no username. The password then goes to that login's username, so a
+    // saved login that OpenBot did not fill gets the new password and no second login is made (#8053).
+    const loginId = args?.loginId;
+    const chosen =
+      loginId && this.#passwordVault
+        ? yield* this.#passwordVault.loginsFor(origin, agentId).pipe(
+            // When a source cannot be read, the failure keeps the logins of the other sources.
+            Effect.catch((error) => Effect.succeed(error.logins)),
+            Effect.map((logins) => logins?.find((login) => login.id === loginId)),
+          )
+        : undefined;
+    const username = chosen?.username ?? args?.username;
     const saved = yield* Effect.result(
       vault.saveLogin({ origin, username: username ?? "", password }, this.#vaultAgent(agentId)),
     );
@@ -2198,7 +2220,10 @@ export class AttentionRegistry {
     const { agentId, publicThreadId, turnId, params } = owner;
     if (this.#answerMcpToolConsentWithoutAsking(client, request, agentId)) return;
     if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
-      client.respond(request.id, { action: "cancel", content: null, _meta: null });
+      client.respond(
+        request.id,
+        mcpToolCallConsent(params) ? MCP_TOOL_CONSENT_UNANSWERABLE : { action: "cancel", content: null, _meta: null },
+      );
       return;
     }
 
@@ -2516,10 +2541,10 @@ export class AttentionRegistry {
 
   /**
    * Fills a password or authenticator request from the shared vault, without a card. True when the
-   * request was answered this way. With no login for the site, or several and no `loginId`, the card
-   * opens as before. The value goes to the browser only; the agent gets the usual result. When a saved
-   * login fits the site but is not filled, or the password manager cannot be read, the card gets
-   * `vaultSkip`, so the user sees why.
+   * request was answered this way. With no login for the site, several and no `loginId`, or one login
+   * of another username than the call names, the card opens as before. The value goes to the browser
+   * only; the agent gets the usual result. When a saved login fits the site but is not filled, or the
+   * password manager cannot be read, the card gets `vaultSkip`, so the user sees why.
    */
   readonly #fillFromVault = Effect.fn("AttentionRegistry.fillFromVault")(function* (
     this: AttentionRegistry,
@@ -2546,8 +2571,8 @@ export class AttentionRegistry {
     const parsed = yield* Effect.result(
       attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
     );
-    const loginId =
-      Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args.loginId : undefined;
+    const args = Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args : undefined;
+    const loginId = args?.loginId;
     // Before a vault read, only a call that names a saved login gives the card a reason. A read here
     // would delay the card by a password manager sync.
     const namedCard = (card: BrowserVaultSkipReason) => (loginId ? { loginId, card } : {});
@@ -2556,7 +2581,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, and close or navigate each other tab where you ran evaluate on this site, before submit_secret.",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
         namedCard("agent-script"),
       );
     const withCode = pending.secret.withCode;
@@ -2577,8 +2602,17 @@ export class AttentionRegistry {
       Effect.gen(function* () {
         if (Result.isFailure(parsed)) return yield* parsed.failure;
         const candidates = loginId ? [] : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(fits);
-        const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        if (!chosen) return { chosen: false as const, several: candidates.length > 1 };
+        // A sign-in that names another account than the only saved login gets the card, as a browser
+        // password manager does not fill a login of another username (#12070). A login saved with no
+        // username names no account, so it is filled as before.
+        const account = (name: string | null | undefined) => name?.trim().toLowerCase() ?? "";
+        const wanted = account(args?.username);
+        const only = candidates.length === 1 ? candidates[0] : undefined;
+        const saved = account(only?.username);
+        if (only && wanted && saved && saved !== wanted)
+          return { chosen: false as const, several: false, otherAccount: true };
+        const chosen = loginId ?? only?.id;
+        if (!chosen) return { chosen: false as const, several: candidates.length > 1, otherAccount: false };
         const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
         // With no value, an id that list_logins does not give for this site is a wrong id, not a login
         // with no password. When the list cannot be read, the reason for the agent stays as before, and
@@ -2607,6 +2641,11 @@ export class AttentionRegistry {
     }
     const login = found.success;
     if (this.#takeovers.get(requestId) !== pending) return false;
+    if (!login.chosen && login.otherAccount)
+      return skip(
+        "other-username",
+        "the only saved login for this site has another username than this sign-in, so the user types the password. When the sign-in is for that saved account, call list_logins and use its loginId.",
+      );
     if (!login.chosen)
       return skip(
         "no-login",

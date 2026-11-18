@@ -38,7 +38,8 @@ import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-c
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
-import { PI_REQUEST_TIMEOUT_MS, PiRpc } from "./pi-rpc";
+import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
+import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type AppServerNotification,
@@ -385,6 +386,34 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     }).pipe(thread.gate.withPermitsIfAvailable(1));
     if (Option.isNone(done) && !thread.turn && this.#threads.get(thread.id) === thread) this.#armIdle(thread);
   });
+
+  /**
+   * The Pi process of one open thread exited. The other threads keep their processes and turns. This
+   * turn fails, and the agent that asked for it gets the failure. Out of the map first, as an idle
+   * release, so the next turn opens the session again with the saved settings.
+   */
+  readonly #threadExited = Effect.fn("PiAgentClient.threadExited")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+    error: Error,
+  ) {
+    logger.warn("A Pi process exited. Only its thread ends.", { provider: this.provider, error: error.message });
+    if (this.#threads.get(thread.id) !== thread) return;
+    if (thread.configured) this.#released.set(thread.id, thread.params);
+    this.#threads.delete(thread.id);
+    if (thread.turn)
+      yield* error instanceof PiProcessClosedError
+        ? this.#endAfterExit(thread)
+        : this.#finish(thread, "failed", error.message, "provider_exited");
+    yield* this.#close(thread);
+  });
+
+  /** Ends the turn of a thread whose Pi process closed: as stopped when the user stopped it, else as failed. */
+  #endAfterExit(thread: PiThread) {
+    return thread.turn?.stopped
+      ? this.#finish(thread, "interrupted")
+      : this.#finish(thread, "failed", sourceText("error.provider.piThreadStopped"), "provider_exited");
+  }
 
   /** Marks a thread whose turn ended as idle, and closes the longest idle threads over the limit. */
   readonly #markIdle = Effect.fn("PiAgentClient.markIdle")(function* (this: PiAgentClient, thread: PiThread) {
@@ -736,6 +765,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       });
       rpc.on("exit", (error) => {
         if (thread?.closed) return;
+        // Each thread has a Pi process of its own, so its exit ends only this thread (#11584).
+        if (thread && this.#threads.get(thread.id) === thread) {
+          this.#background(this.#threadExited(thread, error));
+          return;
+        }
         if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message, "provider_exited"));
         this.emit("exit", error);
       });
@@ -750,6 +784,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           ? ["--no-tools", ...(withExtensions ? [] : ["--no-extensions"]), "--no-mcp"]
           : ["--extension", extension.path]),
       );
+      if (!this.options.profileGeneration && process.platform === "win32")
+        args.push(...(yield* piWindowsShellArguments(cwd, this.#environment())));
       const instructions = getString(params, "developerInstructions");
       if (instructions) {
         // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`
@@ -908,9 +944,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     const fail = (failure: ProviderClientOperationError) =>
-      thread.turn === turn
-        ? this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause))
-        : Effect.void;
+      thread.turn !== turn
+        ? Effect.void
+        : failure.cause instanceof PiProcessClosedError
+          ? this.#endAfterExit(thread)
+          : this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause));
     let answered = false;
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
     // Pi acknowledges only after it prepares the run, which can compact the session first. A late

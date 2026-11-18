@@ -1,6 +1,6 @@
 ### Fixed
 
-- Scroll the row of results under a workflow step, such as the generated images. Before, a step with
-  more than 7 results always showed the 7 oldest: the mouse wheel and the trackpad moved the canvas,
-  and the arrows changed the result without moving the row. Now the wheel and the trackpad scroll the row,
-  and the row moves to the result that the arrows or a new run show.
+- Scroll the row of results under a workflow step, such as the generated images, with the mouse wheel or
+  the trackpad. Before, the wheel and the trackpad moved the canvas, so in a step with more than 7 results
+  you could see the other results only one at a time with the arrows. At an end of the row, the wheel
+  moves the canvas as before.

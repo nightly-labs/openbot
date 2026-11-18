@@ -1,4 +1,4 @@
-import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 // What a failure means to the user, and what this build claims to support. Pure functions only --
 // nothing here reads or writes connection state, so the whole table can be checked with a value in
 // and a value out.
@@ -19,7 +19,7 @@ import { errorReference, referenceFrom } from "@openbot/user-errors";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
-export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 } as const;
+export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 } as const;
 
 // Everything the app tracks about one server's connection, and the whole of what `list()` reports
 // beyond the server's stored fields.
@@ -92,7 +92,7 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         referenceFrom("protocol", error.code),
       ),
       // A protocol error is this app and the host disagreeing about the bytes, which is not the same
-      // as either being out of date -- only the two update codes say "incompatible".
+      // as either being out of date -- the two update codes and a host in safe mode say "incompatible".
       state: error.code === "protocol_error" ? "error" : "incompatible",
       suspendReconnect: true,
       hostSupport: error.support,
@@ -112,6 +112,18 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
                 : sourceText("error.team.hostUpdateRequired"),
             retryable: true,
           },
+          reference,
+        ),
+        state: "incompatible",
+        suspendReconnect: true,
+        hostSupport: null,
+      };
+    }
+    // A host in safe mode refuses every route but the reason. The next compatibility read gets the reason.
+    if (error.code === "server_safe_mode") {
+      return {
+        issue: withReference(
+          { code: "server_safe_mode", message: sourceText("error.team.serverSafeMode"), retryable: true },
           reference,
         ),
         state: "incompatible",

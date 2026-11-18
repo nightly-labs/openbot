@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Demasiados intentos de inicio de sesión. Inténtalo más tarde.",
   "error.team.clientUpdateRequired": "Actualiza este cliente de OpenBot antes de conectarte a este host.",
   "error.team.hostUpdateRequired": "Actualiza OpenBot en el host antes de conectarte.",
+  "error.team.serverSafeMode": "Este servidor está en modo seguro porque OpenBot no se inicia en él.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} en este servidor no puede abrir sus datos porque una versión más reciente de OpenBot los guardó. Una versión más reciente de OpenBot en el servidor lo soluciona.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} en este servidor se detuvo tras fallar al iniciarse muchas veces. Una versión más reciente de OpenBot en el servidor lo soluciona.",
   "error.team.sidebarLayoutUnavailable": "La distribución de la barra lateral no está disponible.",
   "error.team.providersUnsupported": "Esta conexión no admite los ajustes de proveedores.",
   "error.team.providerNotManaged": "OpenBot no gestiona la CLI de este proveedor.",
@@ -75,6 +80,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
   "error.team.routinePauseReasonsUnsupported": "Esta conexión no puede mostrar por qué una rutina está en pausa.",
+  "error.team.activeQueuesUnsupported": "Esta conexión no puede mostrar las colas de todos los agentes.",
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",

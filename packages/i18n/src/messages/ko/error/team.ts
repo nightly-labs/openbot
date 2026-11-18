@@ -52,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "로그인 시도가 너무 많아요. 나중에 다시 시도해 주세요.",
   "error.team.clientUpdateRequired": "이 호스트에 연결하기 전에 이 OpenBot 클라이언트를 업데이트해 주세요.",
   "error.team.hostUpdateRequired": "연결하기 전에 호스트의 OpenBot을 업데이트해 주세요.",
+  "error.team.serverSafeMode": "이 서버에서 OpenBot이 시작되지 않아 안전 모드로 실행 중입니다.",
+  "error.team.serverSafeModeNewerDatabase":
+    "이 서버의 OpenBot {version}은(는) 데이터를 열 수 없습니다. 더 새로운 OpenBot 버전이 데이터를 저장했기 때문입니다. 서버에 더 새로운 OpenBot 릴리스를 설치하면 해결됩니다.",
+  "error.team.serverSafeModeStartFailed":
+    "이 서버의 OpenBot {version}은(는) 여러 번 시작에 실패한 후 중지되었습니다. 서버에 더 새로운 OpenBot 릴리스를 설치하면 해결됩니다.",
   "error.team.sidebarLayoutUnavailable": "사이드바 레이아웃을 사용할 수 없어요.",
   "error.team.providersUnsupported": "이 연결에서는 제공자 설정을 지원하지 않아요.",
   "error.team.providerNotManaged": "OpenBot은 이 제공자의 CLI를 관리하지 않아요.",
@@ -72,6 +77,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "이 연결에서는 채팅 색상을 지원하지 않아요.",
   "error.team.routineRunPlaceUnsupported": "이 연결에서는 루틴이 실행되는 위치를 바꿀 수 없어요.",
   "error.team.routinePauseReasonsUnsupported": "이 연결에서는 루틴이 일시 정지된 이유를 표시할 수 없어요.",
+  "error.team.activeQueuesUnsupported": "이 연결에서는 모든 에이전트의 대기열을 표시할 수 없습니다.",
   "error.team.routinesOnceUnsupported": "이 연결에서는 한 번 실행되는 루틴을 저장할 수 없어요.",
   "error.team.routineRunCommandUnsupported": "이 연결에서는 루틴 실행 명령을 가져올 수 없어요.",
   "error.team.threadQueueUnsupported": "이 연결에서는 사이드 스레드의 대기열을 표시할 수 없어요.",

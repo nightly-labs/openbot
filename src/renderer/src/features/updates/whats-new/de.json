@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nachdem du diese Version installiert hast, kannst du nicht mehr zu einer älteren OpenBot-Version auf diesem Computer oder Server zurück. Diese Version macht die Datenbank kleiner, und eine ältere Version kann sie nicht öffnen.",
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren benutzerdefinierte Bildgrößen, die Modelle und Preise von Sunra und Higgsfield sowie das schnellere Laden vieler Agenten nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sieh dir die Nebenthreads jedes Agenten in der Seitenleiste an. Wähle den Pfeil am Ende einer Agentenzeile, oder lass den Zeiger auf der Zeile, um alle ihre Threads zu sehen.",
+          "Filtere die Seitenleiste mit dem Filter-Button am Ende des Suchfelds. Zeige nur Agenten oder Kanäle, nur ungelesene Chats oder Agenten, die arbeiten, oder nur die Chats in den Ordnern, die du auswählst.",
+          "Gib einem Bild-Schritt im Workflow-Canvas eine eigene Größe in Pixeln, oder wähle das Seitenverhältnis 4:5 oder 5:4.",
+          "Der Workflow-Canvas zeigt alle Bild- und Videomodelle von Sunra und Higgsfield, und die Schaltfläche Ausführen zeigt den Preis in Credits.",
+          "Schalte Hintergrundunschärfe und Bewegte Agentengesichter unter Einstellungen > Darstellung > Bewegung aus, damit OpenBot auf einem langsamen Computer schneller läuft."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Mehrere Personen können einen Workflow gleichzeitig bearbeiten. Der Canvas übernimmt die Änderungen der anderen Personen, sobald sie speichern.",
+          "OpenBot braucht viel weniger CPU, wenn viele Agenten arbeiten, und du kannst ohne Verzögerung tippen.",
+          "Agenten schließen einen Checkout ab, wenn die Bank einen 3-D-Secure-Code verlangt. Steht der Code in einer E-Mail oder SMS, die der Agent lesen kann, gibt der Agent ihn ein.",
+          "Servereinstellungen > Übertragung > Auf einen anderen Server kopieren kopiert jetzt auch die Workflows und Routine-Abläufe der Agenten."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Die OpenBot-Datenbank braucht viel weniger Platz. Nach dem Update entfernt OpenBot alte Kopien von Chatnachrichten in kleinen Schritten.",
+          "Unter Windows zeigt ein Update seinen Fortschritt wieder an.",
+          "Ein verbundener Server mit vielen Agenten und ein großer Kanal öffnen sich schneller.",
+          "Gemini-Chats mit vielen Bildern oder einem langen Verlauf funktionieren wieder, und Gemini fragt nicht mehr nach einer Anmeldung, wenn ein neuer Chat beginnt.",
+          "Die Desktop-App verbindet sich wieder mit einem Server mit OpenBot v0.34.1 oder älter."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

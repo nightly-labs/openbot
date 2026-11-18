@@ -134,6 +134,8 @@ export const messages = {
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
+  "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
     "Muse 没有为此账号返回任何模型。Muse 可能在此智能体运行的国家或地区不可用。请选择其他提供商的模型。",
   "provider.picker.customEmpty":
@@ -308,6 +310,7 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 你自己安装的",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · 由 OpenBot 下载",
+  "provider.settings.installedVersionIncomplete": "部分模型需要此版本缺少的组件。下载 OpenBot 的版本即可使用它们。",
   "provider.settings.useInstalledVersion": "使用已安装的版本",
   "provider.settings.useDownloadedVersion": "使用 OpenBot 的版本",
   "provider.settings.update": "更新",

@@ -141,6 +141,8 @@ export const messages = {
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
+  "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
     "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
@@ -355,6 +357,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
   "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
   "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "تحتاج بعض النماذج إلى جزء غير موجود في هذا الإصدار. نزّل إصدار OpenBot لاستخدامها.",
   "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
   "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",

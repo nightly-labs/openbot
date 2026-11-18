@@ -120,7 +120,10 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
+  /**
+   * The saved, enabled servers and the GitHub connection that the agent gets and that
+   * `mcpFallbackRunsServer` allows.
+   */
   forAgent(agentId: string): McpServerConfig[];
   /** Whether the agents that the user selected for this saved server include the agent. */
   allowsAgent(mcpServerId: string, agentId: string): boolean;
@@ -333,8 +336,8 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
           server: describeServer(config, servers.signIns()),
           toolCount: outcome.toolCount,
           tools: outcome.tools,
-          error: sourceText("error.backend.mcpRegistrationRefused"),
-          next: "The tools that need a sign-in fail, and a sign-in cannot fix it. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in.",
+          error: sourceText("error.backend.mcpRegistrationUnavailable"),
+          next: "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.",
         });
       if (offer === "offered") {
         yield* call.requestSignIn(config);
@@ -416,8 +419,10 @@ const findServer = (servers: AgentMcpServers, name: string) => {
   return Effect.fail(new ToolOperationFailed({ cause: new Error(sourceText(key, { name })) }));
 };
 
+// Only the user sees the card. An agent that got needs_sign_in again, or a user who said that no card
+// showed, made the agent report an OpenBot bug while the card was in the chat (#9184).
 const SIGN_IN_NEXT =
-  "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
+  "A Sign in card is in this conversation. Only the user sees it: do not check it, and do not test again in this turn. Tell the user to press Sign in on it, end your turn, and test again when the user says it is done. Another needs_sign_in means only that the sign-in is not done; it is not an OpenBot fault. If the user sees no card, tell them to sign in from Marketplace, Apps, the server's page, and end your turn. Do not send openbot.send_feedback about the card unless the user asks for it, or says that the sign-in there failed too.";
 
 /**
  * A silent test of each saved http server that a tool search names and that has no sign-in on this

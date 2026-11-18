@@ -18,6 +18,10 @@
  * - `race`: two creates at the same time for the last slot of the pool. Exactly one succeeds.
  * - `account-cap`: an account with 300 active sites gets no more on its pool or plan servers, but its
  *   custom-limit server still gets sites.
+ * - `replace-retry`: two failed replaces of a site fill the upload slots. A third replace of that site frees
+ *   the oldest one and publishes; the uploads of new sites keep their slots (#11929).
+ * - `idle-new-upload`: a new site whose first upload stopped holds the free pool's slot, and the list does not show
+ *   it. A new site of the pool takes the slot when the upload had no file upload for a minute (#12207).
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -31,7 +35,16 @@ import { developmentChildEnvironment } from "./development-environment";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = join(ROOT, ".openbot-build", "hosted-site-limits-e2e.json");
 const DAY = 86_400_000;
-const SCENARIOS = ["free-pool", "license-pool", "server-plan", "custom-limit", "race", "account-cap"] as const;
+const SCENARIOS = [
+  "free-pool",
+  "license-pool",
+  "server-plan",
+  "custom-limit",
+  "race",
+  "account-cap",
+  "replace-retry",
+  "idle-new-upload",
+] as const;
 type Scenario = (typeof SCENARIOS)[number];
 
 const d1ResultSchema = z.array(z.object({ results: z.array(z.unknown()) }));
@@ -198,6 +211,23 @@ class Account {
     }
   }
 
+  /** Moves the start and the file uploads of the account's uploads `ms` into the past. */
+  backdateUploads(ms: number, files: boolean) {
+    const id = quote(this.id);
+    d1(
+      [
+        `UPDATE site_deployments SET created_at = created_at - ${ms} WHERE user_id = ${id} AND status = 'uploading'`,
+        ...(files
+          ? [
+              `UPDATE site_upload_files SET uploaded_at = uploaded_at - ${ms}
+               WHERE deployment_id IN (SELECT id FROM site_deployments WHERE user_id = ${id})`,
+            ]
+          : []),
+      ].join("; "),
+      z.unknown(),
+    );
+  }
+
   private headers(server: Server | null, extra: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = { Authorization: `Bearer ${this.token}`, ...extra };
     if (server) {
@@ -215,8 +245,8 @@ class Account {
     return listSchema.parse(await response.json());
   }
 
-  /** Starts an upload. A refusal returns its code; the upload is left for `finish`. */
-  async start(server: Server | null) {
+  /** Starts an upload, of a new site or of a new version of `siteId`. A refusal returns its code. */
+  async start(server: Server | null, siteId: string | null = null) {
     const body = "<!doctype html><title>e2e</title>";
     const response = await fetch(`${this.api}/v1/sites/`, {
       method: "POST",
@@ -229,6 +259,7 @@ class Account {
         description: "A site that checks the limits",
         framework: "vanilla",
         spaFallback: false,
+        siteId,
         files: [{ path: "index.html", size: Buffer.byteLength(body), mimeType: "text/html" }],
       }),
     });
@@ -238,12 +269,16 @@ class Account {
     return { ok: false as const, status: response.status, code: error.code, message: error.message };
   }
 
-  async finish(upload: z.infer<typeof uploadSchema>, body: string): Promise<Publish> {
-    const put = await fetch(`${this.api}/v1/sites/uploads/${upload.uploadId}/file?path=index.html`, {
+  put(upload: z.infer<typeof uploadSchema>, body: string) {
+    return fetch(`${this.api}/v1/sites/uploads/${upload.uploadId}/file?path=index.html`, {
       method: "PUT",
       headers: this.headers(null, { "Content-Type": "text/html", "Content-Length": String(Buffer.byteLength(body)) }),
       body,
     });
+  }
+
+  async finish(upload: z.infer<typeof uploadSchema>, body: string): Promise<Publish> {
+    const put = await this.put(upload, body);
     if (!put.ok) throw new Error(`The file upload failed: ${put.status} ${await put.text()}`);
     const activate = await fetch(`${this.api}/v1/sites/uploads/${upload.uploadId}/activate`, {
       method: "POST",
@@ -428,6 +463,97 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       reason: "account",
     });
     expectPublished("account-cap", "a custom server is outside the cap", await account.publish(custom));
+  },
+
+  async "replace-retry"(account) {
+    const published = await account.publish(null);
+    if (!published.ok) throw new Error(`The site was refused: ${published.code} ${published.message}`);
+    // Two replaces that fail before activation keep both upload slots of the account.
+    const failed = [await account.start(null, published.siteId), await account.start(null, published.siteId)];
+    record(
+      "replace-retry",
+      "two replaces start",
+      failed.every((result) => result.ok),
+      "2 sessions",
+    );
+    const retry = await account.start(null, published.siteId);
+    record(
+      "replace-retry",
+      "a third replace of the site gets a slot",
+      retry.ok,
+      retry.ok ? retry.upload.uploadId : `${retry.status} ${retry.code}: ${retry.message}`,
+    );
+    // One free slot is enough, so only the oldest replace is closed.
+    const [stale, newer] = failed;
+    if (stale?.ok) {
+      const put = await account.put(stale.upload, stale.body);
+      const code = put.ok ? "accepted" : errorSchema.parse(await put.json()).error.code;
+      record("replace-retry", "the oldest replace is closed", code === "upload_expired", code);
+    }
+    if (newer?.ok) {
+      const put = await account.put(newer.upload, newer.body);
+      record("replace-retry", "the newer replace stays open", put.ok, String(put.status));
+    }
+    if (retry.ok) {
+      expectPublished("replace-retry", "the third replace publishes", await account.finish(retry.upload, retry.body));
+    }
+    // The first uploads of new sites belong to other sites, so a replace does not free their slots. The upload
+    // slots belong to the account, so the new sites go to a server with room for them.
+    const server = account.addServer("roomy");
+    account.setCustomLimit(server, 3);
+    const fresh = [await account.start(server), await account.start(server)];
+    record(
+      "replace-retry",
+      "two new sites start",
+      fresh.every((result) => result.ok),
+      "2 sessions",
+    );
+    const refused = await account.start(null, published.siteId);
+    record(
+      "replace-retry",
+      "a replace keeps the uploads of new sites",
+      !refused.ok && refused.code === "upload_session_limit",
+      refused.ok ? "a slot was freed" : refused.code,
+    );
+  },
+
+  async "idle-new-upload"(account) {
+    const pool = account.addServer("pool");
+    const stopped = await account.start(pool);
+    if (!stopped.ok) throw new Error(`The upload was refused: ${stopped.code} ${stopped.message}`);
+    await expectList("idle-new-upload", "the stopped upload holds the slot, not shown", account, pool, {
+      limit: 1,
+      used: 1,
+      reason: "shared",
+      sites: 0,
+    });
+    // A live publish keeps its slot: a second publish at the same time is refused, as in `race`.
+    expectRefused(
+      "idle-new-upload",
+      "a live upload keeps the slot",
+      await account.publish(pool),
+      "share 1 active site",
+    );
+    const put = await account.put(stopped.upload, stopped.body);
+    record("idle-new-upload", "the stopped upload sends its file", put.ok, String(put.status));
+    account.backdateUploads(61_000, false);
+    expectRefused(
+      "idle-new-upload",
+      "a recent file upload keeps the slot",
+      await account.publish(pool),
+      "share 1 active site",
+    );
+    account.backdateUploads(61_000, true);
+    expectPublished("idle-new-upload", "a new site takes the slot of the idle upload", await account.publish(pool));
+    const late = await account.put(stopped.upload, stopped.body);
+    const code = late.ok ? "accepted" : errorSchema.parse(await late.json()).error.code;
+    record("idle-new-upload", "the idle upload is closed", code === "upload_expired", code);
+    await expectList("idle-new-upload", "the pool holds 1 site", account, pool, {
+      limit: 1,
+      used: 1,
+      reason: "shared",
+      sites: 1,
+    });
   },
 };
 

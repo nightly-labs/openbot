@@ -221,6 +221,13 @@ export const messages = {
     "El secreto actual deja de funcionar. El host rechaza las solicitudes que lo usen.",
   "mobile.agent.webhook.rotateConfirm": "Regenerar",
   "mobile.agent.webhook.rotateFailed": "No se pudo regenerar el secreto. Inténtalo de nuevo.",
+  "mobile.agent.webhook.giveToAgent": "Dar el secreto de firma a {name}",
+  "mobile.agent.webhook.giveTitle": "¿Dar un nuevo secreto de firma a {name}?",
+  "mobile.agent.webhook.giveBody":
+    "El secreto actual deja de funcionar. {name} guarda el nuevo secreto como clave de API y puede añadirlo al remitente.",
+  "mobile.agent.webhook.giveConfirm": "Dar secreto",
+  "mobile.agent.webhook.giveFailed": "No se pudo dar el secreto de firma al agente. Inténtalo de nuevo.",
+  "mobile.agent.webhook.given": "{name} tiene el nuevo secreto de firma.",
   "mobile.agent.webhook.activity": "Actividad",
   "mobile.agent.webhook.activityFailed": "No se pudo cargar la actividad. Inténtalo de nuevo.",
   "mobile.agent.webhook.activity.ignored": "Ignorada",

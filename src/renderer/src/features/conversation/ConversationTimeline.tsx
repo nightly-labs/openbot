@@ -356,12 +356,13 @@ export function ConversationTimeline() {
       return null;
     return { ...state.compaction, timestamp: new Date(state.compaction.startedAt).toISOString() };
   };
-  const compactionBefore = () => {
+  // Each row compares its id with this, so it is computed once for each change, not once for each row.
+  const compactionBefore = createMemo(() => {
     const startedAt = props.contextState?.compaction?.startedAt;
     return startedAt === undefined
       ? undefined
       : timelineMessages().find((message) => message.createdAt && Date.parse(message.createdAt) > startedAt)?.id;
-  };
+  });
   const CompactionMarker = () => (
     <Show when={compaction()}>{(state) => <ContextCompactionMarker compaction={state()} />}</Show>
   );
@@ -457,8 +458,15 @@ export function ConversationTimeline() {
       chatColor: member?.chatColor,
     };
   };
-  /** The reader's own chat color: the member of the server that is the reader. */
-  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
+  /**
+   * The reader's own chat color. The account gives it, so it shows also on a computer with no server
+   * and no member list. An account service from before chat colors sends none; then the member of the
+   * server that is the reader gives it.
+   */
+  const ownChatColor = () =>
+    props.currentUserChatColor === undefined
+      ? props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor
+      : (props.currentUserChatColor ?? undefined);
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
@@ -999,8 +1007,9 @@ export function ConversationTimeline() {
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
                   if (!replyToMessageId) return undefined;
+                  const referencedIndex = timelineIndexById().get(replyToMessageId);
                   return (
-                    timelineMessages().find((candidate) => candidate.id === replyToMessageId) ??
+                    (referencedIndex === undefined ? undefined : timelineMessages()[referencedIndex]) ??
                     props.messageReferences?.[replyToMessageId]
                   );
                 });
@@ -1198,6 +1207,7 @@ export function ConversationTimeline() {
                                                     action={card().action}
                                                     routine={card().routine}
                                                     connected={webhookRoutines.state.connected}
+                                                    agentName={props.agent?.name}
                                                     secret={webhookRoutines.state.secrets[card().routine.id] ?? null}
                                                     onSecret={(secret) =>
                                                       webhookRoutines.setSecret(card().routine.id, secret)

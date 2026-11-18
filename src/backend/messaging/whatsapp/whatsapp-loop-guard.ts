@@ -1,5 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
-import { CANCEL_TEXT } from "../messaging-types";
+import { CANCEL_TEXT, chatFailureReason } from "../messaging-types";
 
 /**
  * OpenBot 0.70 and older ended each post in the owner's own chat with a line of blank braille
@@ -60,7 +60,13 @@ function openBotPosts(): { posts: ReadonlySet<string>; menus: readonly string[] 
 export function isOtherOpenBotPost(text: string): boolean {
   const { posts, menus } = openBotPosts();
   const trimmed = text.trim();
-  return OLD_SPACER.test(text) || posts.has(trimmed) || menus.some((menu) => trimmed.endsWith(menu));
+  return (
+    OLD_SPACER.test(text) ||
+    posts.has(trimmed) ||
+    // The reason of a failed request, which a chat gets in place of the general failure text.
+    chatFailureReason(trimmed) !== null ||
+    menus.some((menu) => trimmed.endsWith(menu))
+  );
 }
 
 /**

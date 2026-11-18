@@ -89,7 +89,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",
   "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
-  "error.remote.hostDisconnected": "O computador anfitrião WebRTC se desconectou.",
+  "error.remote.hostDisconnected":
+    "A conexão com o servidor foi perdida. Verifique se a ação foi concluída e tente novamente.",
   "error.remote.eventGap": "Há uma lacuna na sequência de eventos do computador anfitrião.",
   "error.remote.malformedKnownEvent": "O computador anfitrião retornou um evento conhecido malformado.",
   "error.remote.fileTransportIsStopped": "O transporte de arquivos WebRTC está parado.",
@@ -213,6 +214,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.serverNotLoaded": "O OpenBot não conseguiu carregar o servidor. Tente novamente.",
+  "error.remote.localServerNotStarted":
+    "O servidor neste computador não iniciou. Tente novamente. Se ele não iniciar, reinicie o OpenBot neste computador.",
   "error.remote.localServerAccountRemovalFailed":
     "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

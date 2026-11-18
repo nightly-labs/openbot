@@ -101,7 +101,9 @@ function isOpenCodeServerLost(error: unknown): boolean {
  *
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
- * OpenCode sign-in sent the user to the wrong place.
+ * OpenCode sign-in sent the user to the wrong place. OpenCode 2.2.7 also answers an HTTP 403 or a
+ * `permission_denied` this way, with empty data: the key can be correct while the endpoint's account
+ * cannot use the model. With no status, the text names both causes (#7691).
  *
  * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
  * user's country: `opencode run` shows "This model is not available in your country". A free model
@@ -127,7 +129,9 @@ function openCodeAuthRequired(
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
-      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      endpoint.hasCredentials
+        ? "error.provider.customEndpointAccessRefused"
+        : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
@@ -149,6 +153,15 @@ function openCodeAuthRequired(
  */
 const OPENCODE_CONTEXT_TOO_SMALL =
   /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+
+/**
+ * NVIDIA's model API answers a model that it does not serve to the account with a 404 and
+ * `Function '<id>': Not found for account '<id>'`, and a model that it cannot run now with a 400 and
+ * "DEGRADED function cannot be invoked". OpenCode 2.2.7 passes both on as invalid requests, so the
+ * chat showed NVIDIA's IDs with no next step (#8699).
+ */
+const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
+const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -222,6 +235,12 @@ function openCodeRequestFailure(
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }
+  if (NVIDIA_MODEL_NOT_SERVED.test(reason)) {
+    log(`The model provider does not serve this model to the account: ${reason}`);
+    return sourceText("error.provider.opencodeModelNotServed");
+  }
+  if (NVIDIA_MODEL_DEGRADED.test(reason))
+    return sourceText("error.provider.opencodeProviderFailed", { detail: shownFailureDetail(redact(reason)) });
   // OpenCode 2 names a provider's 5xx `provider.internal`, with text such as "Provider request failed
   // with HTTP 504" or the provider's own reason, which the OpenCode 1 texts above do not match (#10129).
   // It names a model that it cannot find or set up `provider.no-route` ("Model unavailable: …").
@@ -263,7 +282,11 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 };
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return null;
+  if (!(error instanceof RequestError)) return null;
+  // OpenCode names both as invalid requests. A degraded model is an outage, so a backup model can take the turn.
+  if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
+  if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
+  if (!isRecord(error.data)) return null;
   const name = error.data.errorName;
   return typeof name === "string" && Object.hasOwn(OPENCODE_ERROR_CAUSES, name)
     ? (OPENCODE_ERROR_CAUSES[name] ?? null)

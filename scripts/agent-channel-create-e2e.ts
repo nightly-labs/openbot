@@ -377,6 +377,19 @@ try {
     icon: { name: "megaphone", hue: 31 },
   });
   pass("An unknown hue is refused", !badHue.success && channelCount() === 0, badHue.text);
+  // A model that copies a long id from list_agents can drop a character (#7306).
+  const miscopied = await callFromChat("create with a miscopied member id", lead.id, "create_channel", {
+    name: "launch",
+    memberAgentIds: [lead.id, tester.id.slice(0, -1)],
+  });
+  pass(
+    "A miscopied member id names the near agent and creates no channel",
+    !miscopied.success &&
+      miscopied.text.includes(tester.id) &&
+      miscopied.text.includes(tester.name) &&
+      channelCount() === 0,
+    miscopied.text,
+  );
   const misplacedHue = await callFromChat("create with a hue outside icon", lead.id, "create_channel", {
     name: "launch",
     memberAgentIds: [lead.id],

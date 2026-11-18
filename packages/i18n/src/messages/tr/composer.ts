@@ -73,6 +73,8 @@ export const messages = {
     "Mikrofon erişimi engellendi. Sistem ayarlarından OpenBot'un mikrofonu kullanmasına izin verin.",
   "composer.voice.noMicrophone": "Kullanılabilir mikrofon yok.",
   "composer.voice.startFailed": "OpenBot ses kaydını başlatamadı.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot mikrofonu açamadı. Mikrofonu kullanan diğer uygulamaları kapatın, bağlı olduğundan ve sistem ayarlarında izin verildiğinden emin olun, sonra tekrar deneyin.",
   "composer.voice.transcribeFailed": "OpenBot bu kaydı metne dönüştüremedi.",
   "composer.reply.toYou": "Mesajınıza yanıt veriliyor",
   "composer.reply.toAgent": "Ajana yanıt veriliyor",
@@ -132,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",
   "composer.voice.readFailed": "Yanıt sesli okunamadı.",
+  "composer.voice.languageUnsupported": "Yanıt sesli okunamadı. Bu dil henüz desteklenmiyor.",
   "composer.error.saveEditTryAgain": "Bu düzenleme bu bilgisayarda kaydedilemedi. Tekrar deneyin.",
   "composer.error.saveUnconfirmed": "Kaydetme doğrulanmadı. Sonucu kontrol etmek için Kaydet'i tekrar deneyin.",
   "composer.error.changeModel": "Model değiştirilemedi. Tekrar deneyin.",

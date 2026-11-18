@@ -100,6 +100,7 @@ import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -236,6 +237,7 @@ import {
 } from "../../WorkspaceOverlayViews";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
+import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
@@ -294,6 +296,7 @@ import {
   remoteMcpSignIn,
   remoteUpdateServer,
   serverCanAdminister,
+  serverCanManageMcp,
   serverRoleCanAdminister,
   serverRotatesHostKey,
 } from "../servers/server-capabilities";
@@ -1007,6 +1010,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   // The same owner or admin gives a webhook routine a secret that the sender made.
   const webhookSenderSecretEnabled = () =>
     eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_SENDER_SECRET_CAPABILITY);
+  // The same owner or admin gives the signing secret of an agent's webhook routine to that agent.
+  const webhookAgentSecretEnabled = () =>
+    eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_AGENT_SECRET_CAPABILITY);
   // A host with this capability lists and saves the routines that run once.
   const routinesOnceEnabled = () => workspace.state.capabilities.includes(ROUTINES_ONCE_CAPABILITY);
   const providerAdmin = createWebProviderSettings({
@@ -1858,9 +1864,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return agentId ? workspace.deleteMessage(agentId, messageId) : Promise.resolve();
   };
   /** Pin and Unpin on the host. A host without `message-pins-v1` has none. */
-  const agentMessagePins = () => {
+  const messagePinsSupported = createMemo(() => workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY));
+  // One object while the capability stays: a new object reads the pinned list again.
+  const agentMessagePins = createMemo(() => {
     const { listPinnedMessages: list, setMessagePinned: set } = workspace.runtime;
-    if (!list || !set || !workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY)) return undefined;
+    if (!list || !set || !messagePinsSupported()) return undefined;
     return {
       list,
       set,
@@ -1869,7 +1877,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           if (event.type === "message-pins-changed" && event.agentId === agentId) changed();
         }),
     };
-  };
+  });
   /** The Delete action of the open agent's chat. A host without `message-delete-v1` has none. */
   const agentDeleteMessageAction = () => (messageDeleteSupported() ? deleteOpenAgentMessage : undefined);
   const hostServerAuditCalls: HostServerAuditCalls = {
@@ -2109,11 +2117,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return;
       }
       const description = readableAgentError(event.message);
-      if (claimErrorToast(description))
-        toast.error(t("webClient.error.hostReported"), {
+      if (!claimErrorToast(description)) return;
+      // As on desktop: an MCP server that a provider could not use is not a failure of the server,
+      // and the button opens the Marketplace, which holds the MCP servers, for a user who can manage them.
+      if (event.code === "mcp_server_not_started") {
+        toast.error(t("agent.error.mcpNotStarted"), {
           ...{ description },
-          report: { operation: "other", source: "system", cause_code: "unknown" },
+          ...(serverCanManageMcp(server())
+            ? { action: { label: t("agent.error.openMarketplace"), onClick: openMarketplace } }
+            : {}),
+          report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
         });
+        return;
+      }
+      toast.error(t("webClient.error.hostReported"), {
+        ...{ description },
+        report: { operation: "other", source: "system", cause_code: "unknown" },
+      });
     }),
   );
   const channelOpen = () => channels.state.selectedId !== null;
@@ -2168,6 +2188,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     undefined,
     routinesOnceEnabled,
+    undefined,
+    webhookAgentSecretEnabled,
   );
   // Asks to move the connected host's routines after this device's time zone changed.
   createRoutineTimezonePrompt(() => {
@@ -2406,14 +2428,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     );
   };
-  createEffect(
+  // The conversation changes with each message, and an effect runs again each time its key is computed.
+  // The memo compares the key, so only another agent or turn reads the waits again.
+  const waitsKey = createMemo(
     () => ({
       agentId: workspace.state.selectedId ?? null,
       turnId: workspace.conversation()?.page?.activeTurnId ?? null,
       supported: workspace.state.capabilities.includes(AGENT_WAITS_CAPABILITY),
     }),
-    ({ agentId, supported }) => loadSelectedWaits(agentId, supported),
+    {
+      equals: (before, after) =>
+        before.agentId === after.agentId && before.turnId === after.turnId && before.supported === after.supported,
+    },
   );
+  createEffect(waitsKey, ({ agentId, supported }) => loadSelectedWaits(agentId, supported));
   const visibleWaits = () => {
     const snapshot = selectedWaits();
     return snapshot && snapshot.agentId === workspace.state.selectedId ? snapshot.waits : undefined;
@@ -2676,6 +2704,34 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const ask = usageLimitAsk();
     const agent = conversationAgent();
     return ask && agent ? { agentId: agent.id, ask } : undefined;
+  });
+  /** The side threads under each agent row of the sidebar. */
+  const sidebarThreads = createMemo(() => {
+    const current = agentThreads();
+    if (!current) return undefined;
+    const openChat = (agentId: string) => {
+      setMobilePane("conversation");
+      void select(agentId);
+    };
+    return sidebarAgentThreads({
+      tasks: current.tasks,
+      tabs: current.tabs,
+      activeAgentId: () => (tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")),
+      waits: () => ({
+        approvals: workspace.state.approvals,
+        prompts: workspace.state.prompts,
+        takeovers: workspace.state.takeovers,
+      }),
+      // The tab is written first, so the chat opens on it.
+      openThread: (agentId, threadId) => {
+        current.tabs.open(agentId, threadId);
+        openChat(agentId);
+      },
+      onNew: (agentId) => {
+        openChat(agentId);
+        current.tabs.startNew(agentId);
+      },
+    });
   });
   /** The selected agent's threads. A host without side threads shows only the agent's own chat. */
   const threads = createMemo((): ConversationThreads | undefined => {
@@ -3371,6 +3427,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     }}
                     agents={workspace.profiles()}
                     activeAgentId={tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")}
+                    agentThreads={sidebarThreads()}
                     people={[]}
                     directThreads={[]}
                     activeDirectMemberId={null}

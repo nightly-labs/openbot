@@ -6,7 +6,11 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, Show } from "solid-js";
 import { useText } from "../../text";
 import { CodeBlock } from "./CodeBlock";
-import { RoutineWebhookSecretField, RoutineWebhookUrlField } from "./RoutineWebhookEndpoint";
+import {
+  type RoutineWebhookAgentSecret,
+  RoutineWebhookSecretField,
+  RoutineWebhookUrlField,
+} from "./RoutineWebhookEndpoint";
 import { RoutineWebhookEvents } from "./RoutineWebhookEvents";
 
 export interface RoutineWebhookTriggerProps {
@@ -27,6 +31,8 @@ export interface RoutineWebhookTriggerProps {
   onRegenerateSecret: () => Promise<void>;
   /** Replaces the secret with one that the sender made. Leave it out when the host cannot do this. */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
+  /** Gives a new secret to the agent of the routine. Leave it out when the host cannot do this. */
+  agentSecret?: RoutineWebhookAgentSecret | undefined;
   /** A control at the end of the header, such as the menu that changes the trigger. */
   menu?: JSX.Element;
   /** Saves a new routine, so the host makes its URL and secret. Without it the card only asks for a save. */
@@ -116,6 +122,21 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
       setSteps((state) => {
         state.secretCopied = true;
       });
+    };
+  }
+  /** The agent gives the secret to the sender, so a secret given to it finishes step 2. */
+  function agentSecretAction(): RoutineWebhookAgentSecret | undefined {
+    const action = props.agentSecret;
+    if (!action) return undefined;
+    return {
+      routineId: action.routineId,
+      agentName: action.agentName,
+      give: async () => {
+        await action.give();
+        setSteps((state) => {
+          state.secretCopied = true;
+        });
+      },
     };
   }
   async function sendTest(): Promise<void> {
@@ -229,6 +250,7 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
                   onSecretDismiss={props.onSecretDismiss}
                   onRegenerateSecret={props.onRegenerateSecret}
                   onUseSenderSecret={senderSecretAction()}
+                  agentSecret={agentSecretAction()}
                   onCopy={() =>
                     setSteps((state) => {
                       state.secretCopied = true;

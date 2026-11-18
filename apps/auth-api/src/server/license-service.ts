@@ -320,6 +320,8 @@ export class LicenseService {
       request: Required<LicenseCheckoutRequest>,
       target: LicenseReturnTarget,
       origin: string,
+      /** The code of a discount link. Only the web client sends one. */
+      promotionCode: string | null = null,
     ): Effect.fn.Return<string, BillingError | BillingOperationError, LicenseDependencies> {
       const dependencies = yield* LicenseDependencies;
       const plan: LicensePlan = {
@@ -354,6 +356,7 @@ export class LicenseService {
           tax,
           metadata: licenseMetadata(plan),
           ...(trialEnd === null ? {} : { trialEndSeconds: Math.floor(trialEnd / 1_000) }),
+          ...(promotionCode ? { promotionCode } : {}),
           successUrl: returnUrl,
           cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
           nowSeconds: Math.floor(dependencies.now() / 1_000),
@@ -964,6 +967,7 @@ export class LicenseService {
             {
               event,
               periodEnd: subscriptionEnd(subscription),
+              cancelRequest: subscription.canceled_at ?? null,
               ...(change.endReason ? { endReason: change.endReason } : {}),
               product: "license",
               tier: plan.tier,

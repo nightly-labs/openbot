@@ -1,5 +1,6 @@
 import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -662,22 +663,31 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
+  /**
+   * The client ids of task starts. A failed start can still have made
+   * its task on the server (the answer got lost), so a retry of the same start sends the same id and
+   * gets that task, not a second one.
+   */
+  const startIds = retryOperationIds(() => crypto.randomUUID());
+
   /** Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key. */
   async function startTask(
     agentId: string,
     text: string,
     attachmentDraftIds: string[] = [],
   ): Promise<AgentTask | null> {
+    const start = startIds([agentId, text, attachmentDraftIds]);
     const task = await runAction(
       () =>
         port().startTask({
           agentId,
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: start.id,
         }),
       "conversation.threads.error.start",
     );
+    if (!task) start.failed();
     if (task && scopeIsCurrent()) rememberTask(task);
     return task;
   }
@@ -714,6 +724,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return task;
   }
 
+  /** The client ids of thread messages: a send again after a failure sends the same id, as a start does. */
+  const sendIds = retryOperationIds(() => crypto.randomUUID());
+
   /** Steers the task's running turn, or queues the message in the task. */
   async function sendToTask(
     agentId: string,
@@ -725,6 +738,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     // The sent message and the answer come after the part around an old message, so the thread shows
     // its latest messages again.
     void loadLatest(agentId, taskId);
+    const message = sendIds([agentId, taskId, text, attachmentDraftIds, replyToMessageId]);
     const receipt = await runAction(
       () =>
         port().sendToTask({
@@ -733,10 +747,11 @@ export function createAgentTasks(options: AgentTasksOptions) {
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
           ...(replyToMessageId ? { replyToMessageId } : {}),
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: message.id,
         }),
       "conversation.threads.error.send",
     );
+    if (receipt === null) message.failed();
     return receipt !== null;
   }
 

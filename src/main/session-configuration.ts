@@ -21,6 +21,7 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
+import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
 import { bytesResponse, fileResponse } from "./file-response";
@@ -93,7 +94,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
             ...attachmentCorsHeaders(request.headers.get("Origin")),
             ...attachmentDocumentHeaders(attachment.mimeType),
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": "inline",
+            "Content-Disposition": inlineContentDisposition(attachment.name),
           },
           request.headers.get("Range"),
         ),
@@ -119,7 +120,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
           ...attachmentCorsHeaders(request.headers.get("Origin")),
           ...attachmentDocumentHeaders(attachment.mimeType),
           "X-Content-Type-Options": "nosniff",
-          "Content-Disposition": "inline",
+          "Content-Disposition": inlineContentDisposition(attachment.name),
         },
         canAnswerRemoteRanges(attachment) ? request.headers.get("Range") : undefined,
       );

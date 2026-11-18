@@ -104,6 +104,10 @@ export type McpEndpointSource = (
  * `working_directory_unsupported` is the only one that describes a perfectly valid server: it names
  * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
  * say so without probing anything.
+ *
+ * `failed_in_provider` is a failed start that the provider's other report of the same failure also
+ * shows, such as a sign-in. Its `detail` is the whole sentence that the other report shows, so the
+ * user reads it once.
  */
 type McpDropReason =
   | "command_not_found"
@@ -111,7 +115,8 @@ type McpDropReason =
   | "name_conflict"
   | "provider_limit"
   | "unusable"
-  | "failed_to_start";
+  | "failed_to_start"
+  | "failed_in_provider";
 
 /** One server a provider did not get, named so the user can be told which one and why. */
 export interface McpServerDrop {

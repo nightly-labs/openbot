@@ -69,6 +69,7 @@ import {
   providerAvailability,
   providerTurnedOff,
   providerUsable,
+  splitServiceName,
 } from "./provider-model-options";
 import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
@@ -643,9 +644,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const effort = props.reasoningEffort;
     if (props.foreignProvider !== undefined || selectedHasVariants()) return;
     // The effort that the model value fixes is part of the model, also where the effort is not a setting.
-    const fixed = selectedFixed()?.effort;
-    if (fixed) return reasoningLabel(fixed, t);
-    if (!showsReasoningEffort() || !effort) return;
+    const fixed = selectedFixed();
+    if (fixed?.effort) return reasoningLabel(fixed.effort, t);
+    if (fixed || !showsReasoningEffort() || !effort) return;
     const model = selectedModel();
     if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
@@ -682,11 +683,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
   /**
    * The model name in the trigger. Beside an account it has no provider word, because the mark
-   * shows the provider and the account needs the room. The tooltip and the label keep the full name.
-   * A form field has the room of its row and keeps the full name.
+   * shows the provider and the account needs the room. An OpenCode model has no service either, as
+   * in its list: "OpenCode Go/DeepSeek" left the model no room (#8591). The tooltip and the label
+   * keep the full name. A form field has the room of its row and keeps the full name.
    */
   const triggerShownName = () => {
-    const name = triggerModelName();
+    const fullName = triggerModelName();
+    const model = splitServiceName(props.provider, fullName).name;
+    const name = !field() && activeProvider() === "opencode" && model.trim() ? model : fullName;
     const prefix = `${railName(activeProvider(), t)} `;
     return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
   };
@@ -926,6 +930,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 };
                 const status = () => entryStatus(key);
                 const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
+                // OpenCode or Pi can list only the models of the endpoints it runs, and those are on the
+                // Custom tab. Its own tab then points there, not to "no models" (#11231).
+                const endpointModelsElsewhere = () =>
+                  provider !== CUSTOM_RAIL &&
+                  railModelOptions(CUSTOM_RAIL).some((option) => option.provider === provider);
                 const [showOlder, setShowOlder] = createSignal(false);
                 const olderExpanded = () => (showOlder() ? "true" : "false");
                 // An endpoint and a custom agent can both list `goose/default`: match the provider too.
@@ -1052,17 +1061,29 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
                 });
                 const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
-                const effortOptions = createMemo(() => {
-                  const variants = effortModel()?.variants ?? [];
-                  if (variants.length) return variants;
-                  const option = effortOption();
-                  return showsReasoningEffort() && option && option.reasoningEffortConfigurable !== false
-                    ? option.supportedReasoningEfforts.map((effort) => ({
-                        id: effort,
-                        name: reasoningLabel(effort, t),
-                      }))
-                    : [];
-                });
+                // A model list refresh gives new objects for the same efforts. The list keeps its array
+                // then: a new array makes the open Effort list close.
+                const effortOptions = createMemo<{ id: string; name: string }[]>(
+                  () => {
+                    const variants = effortModel()?.variants ?? [];
+                    if (variants.length) return variants;
+                    const option = effortOption();
+                    return showsReasoningEffort() &&
+                      option &&
+                      option.reasoningEffortConfigurable !== false &&
+                      !fixedModelSettings(option)
+                      ? option.supportedReasoningEfforts.map((effort) => ({
+                          id: effort,
+                          name: reasoningLabel(effort, t),
+                        }))
+                      : [];
+                  },
+                  {
+                    equals: (previous, next) =>
+                      previous.length === next.length &&
+                      previous.every((option, i) => option.id === next[i]?.id && option.name === next[i]?.name),
+                  },
+                );
                 const effortValue = () => {
                   const model = effortModel();
                   const queued = queuedEffort();
@@ -1243,12 +1264,36 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               <Show
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
-                                  search().trim()
-                                    ? t("provider.picker.noMatches")
-                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
-                                      provider === "muse"
-                                      ? t("provider.picker.museNoModels")
-                                      : t("provider.picker.noModels", { name: railName(provider, t) })
+                                  <Show
+                                    when={!search().trim() && endpointModelsElsewhere()}
+                                    fallback={
+                                      search().trim()
+                                        ? t("provider.picker.noMatches")
+                                        : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                          provider === "muse"
+                                          ? t("provider.picker.museNoModels")
+                                          : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    }
+                                  >
+                                    <span>
+                                      {t("provider.picker.endpointModelsInCustom", { name: railName(provider, t) })}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const custom = providerButtons.get(CUSTOM_RAIL);
+                                        selectRailProvider(CUSTOM_RAIL);
+                                        // Focus that enters the tab list goes back to the tab that had it
+                                        // last. As on a rail click, the second focus then moves it to Custom.
+                                        custom?.focus({ preventScroll: true });
+                                        queueMicrotask(() => custom?.focus({ preventScroll: true }));
+                                      }}
+                                    >
+                                      {t("provider.picker.showCustomModels")}
+                                    </Button>
+                                  </Show>
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}
@@ -1460,14 +1505,16 @@ function displayModelName(name: string | undefined, fallback: string): string {
 
 interface FixedModelSettings {
   context: string | null;
-  /** Only when the model has no effort setting of its own. */
   effort: AgentReasoningEffort | null;
   fast: boolean;
 }
 
 /**
- * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning=high,fast=true]`.
- * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411).
+ * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning_effort=high,fast=true]`.
+ * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411),
+ * and such a model has no effort setting. The value says so also where the model option does not:
+ * a joined server does not send `reasoningEffortConfigurable` (#7737). Cursor names the effort
+ * `reasoning`, `effort` or `reasoning_effort`, which differs between models.
  */
 function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedModelSettings | null {
   if (model?.provider !== "cursor") return null;
@@ -1477,11 +1524,7 @@ function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedMod
   for (const pair of params.split(",")) {
     const [key, value = ""] = pair.split("=");
     if (key === "context" && /^\d+(?:\.\d+)?[km]$/iu.test(value)) settings.context = value;
-    else if (
-      (key === "reasoning" || key === "effort") &&
-      model.reasoningEffortConfigurable === false &&
-      isReasoningEffort(value)
-    )
+    else if ((key === "reasoning" || key === "effort" || key === "reasoning_effort") && isReasoningEffort(value))
       settings.effort = value;
     else if (key === "fast") settings.fast = value === "true";
   }

@@ -577,6 +577,7 @@ export const messages = {
   "chat.suggestion.undo": "Cofnij",
   "chat.suggestion.localOnly": "Połącz {name} w OpenBot na swoim komputerze.",
   "chat.suggestion.unavailable": "Ten serwer nie może połączyć {name}.",
+  "chat.suggestion.notAllowed": "Tylko właściciel serwera lub administrator może połączyć {name}.",
   "chat.serverInstall.title": "Nowy serwer",
   "chat.serverInstall.expired": "Polecenie wygasło. Poproś agenta o nowe.",
   "chat.compaction.running": "Kompaktowanie kontekstu",

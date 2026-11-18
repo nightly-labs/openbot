@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Fuente del código",
   "settings.codeFont.description": "La fuente del código, las terminales y las rutas de archivo.",
   "settings.codeFont.default": "Predeterminada",
+  "settings.motion.title": "Movimiento",
+  "settings.backgroundBlur.title": "Desenfoque de fondo",
+  "settings.backgroundBlur.description":
+    "Desenfoque detrás de menús y diálogos. Empieza desactivado en un equipo sin GPU.",
+  "settings.movingFaces.title": "Caras de agentes en movimiento",
+  "settings.movingFaces.description":
+    "Las caras de los agentes parpadean y se mueven. Empiezan quietas en un equipo sin GPU.",
   "settings.logoColor.title": "Color del logotipo",
   "settings.logoColor.description": "Se muestra en el Dock, la barra de tareas y Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -831,7 +838,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Este servidor no tiene agentes.",
   "settings.transfer.copy.new": "Nuevo",
   "settings.transfer.copy.notCopied":
-    "Sus canales y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
+    "Sus canales, flujos de rutinas, flujos de trabajo y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {

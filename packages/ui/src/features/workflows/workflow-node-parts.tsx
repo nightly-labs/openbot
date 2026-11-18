@@ -700,7 +700,9 @@ export function resultTime(format: AppFormat, at: string): string {
 /**
  * The results of a step, oldest first, under the selected node, as on the Higgsfield canvas. An
  * image step shows each image; a text step shows the number of each result. The arrows move to the
- * result before or after the one on view. A step with one result shows nothing.
+ * result before or after the one on view. A step with one result shows nothing. When there are more
+ * results than fit, the list scrolls so that the result on view is in the middle, clear of the faded
+ * edges. A wheel or a trackpad over the list scrolls it.
  */
 function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string | undefined) | undefined }) {
   const board = useBoard();
@@ -714,42 +716,40 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
     const next = list()[index() + step];
     if (next) board.pick(props.id, next.id);
   };
-  let row: HTMLSpanElement | undefined;
-  // The row moves to the result on view when it is out of view or under a faded edge: after an arrow,
-  // a new run, or when the row opens. Only the row scrolls; scrollIntoView would also move the canvas.
-  createEffect(index, (at, before) => {
-    const item = row?.querySelectorAll<HTMLElement>(".wfn-strip-item")[at];
-    if (!row || !item) return;
-    const box = row.getBoundingClientRect();
-    const shown = item.getBoundingClientRect();
-    if (shown.left >= box.left + shown.width && shown.right <= box.right - shown.width) return;
-    // The row keeps its screen size at every zoom, but measure the scale so the offset is in its pixels.
-    const scale = box.width > 0 ? row.offsetWidth / box.width : 1;
-    const offset = (shown.left + shown.width / 2 - (box.left + box.width / 2)) * scale;
-    row.scrollBy({ left: offset, behavior: before === undefined || prefersReducedMotion() ? "instant" : "smooth" });
-  });
+  let items: HTMLSpanElement | undefined;
+  createEffect(
+    () => (list().length > 1 ? board.shown(props.id)?.id : undefined),
+    (id, before) => {
+      const item = id ? items?.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
+      if (!items || !item) return;
+      items.scrollTo({
+        left: item.offsetLeft + item.offsetWidth / 2 - items.clientWidth / 2,
+        behavior: before === undefined || prefersReducedMotion() ? "instant" : "smooth",
+      });
+    },
+  );
   // A wheel or a trackpad scrolls the row while the row can move that way. At an end of the row, and
   // for a pinch, the canvas pans or zooms as before.
   const scrollOnWheel = (event: WheelEvent) => {
-    if (!row || event.ctrlKey || event.metaKey) return;
+    if (!items || event.ctrlKey || event.metaKey) return;
     const unit =
       event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-          ? row.clientWidth
+          ? items.clientWidth
           : 1;
-    const rightToLeft = getComputedStyle(row).direction === "rtl";
+    const rightToLeft = getComputedStyle(items).direction === "rtl";
     // A sideways swipe moves the row as the browser does. A vertical wheel moves it toward the end of
     // the row, which is on the left in a right-to-left language.
     const sideways = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
     const step = (sideways ? event.deltaX : rightToLeft ? -event.deltaY : event.deltaY) * unit;
     // In a right-to-left language, scrollLeft goes from 0 at the start to a negative value at the end.
-    const end = row.scrollWidth - row.clientWidth;
+    const end = items.scrollWidth - items.clientWidth;
     const [min, max] = rightToLeft ? [-end, 0] : [0, end];
-    if (step === 0 || (step > 0 ? row.scrollLeft >= max - 1 : row.scrollLeft <= min + 1)) return;
+    if (step === 0 || (step > 0 ? items.scrollLeft >= max - 1 : items.scrollLeft <= min + 1)) return;
     event.preventDefault();
     event.stopPropagation();
-    row.scrollLeft += step;
+    items.scrollLeft += step;
   };
   return (
     <Show when={list().length > 1}>
@@ -763,13 +763,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
         >
           <ChevronLeft />
         </Button>
-        <span
-          ref={(element: HTMLSpanElement) => {
-            row = element;
-          }}
-          class="wfn-strip-list"
-          onWheel={scrollOnWheel}
-        >
+        <span ref={items} class="wfn-strip-list" onWheel={scrollOnWheel}>
           <For each={list()}>
             {(result, at) => (
               <Hint

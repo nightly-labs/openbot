@@ -110,15 +110,12 @@ All in `src/backend/openbot-database-schema.ts`:
 
 | Constant | Value or meaning |
 | --- | --- |
-| `BASELINE_SCHEMA_VERSION` | `8` — the frozen baseline, `BASELINE_V8_SCHEMA_SQL` |
+| `BASELINE_SCHEMA_VERSION` | `8` — the frozen baseline (`migrations/0008-baseline.ts`), where a new database starts |
 | `MIGRATIONS` | one contiguous entry per version from 8 up; read the last one from the release tag, never from here — a number written down here is stale the next time a migration ships |
 | `LATEST_SCHEMA_VERSION` | derived from the last `MIGRATIONS` entry |
-| `LATEST_SCHEMA_SQL` | `substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL)` |
-| `substituteOnce` | throws unless the search string appears **exactly once**; handles one table substitution and no more |
 | `validateMigrationRegistry` | throws on a non-contiguous version |
-| `createLatestDatabase` | execs `LATEST_SCHEMA_SQL`, then stamps every `MIGRATIONS` entry as applied without running it |
 
-Tests: `src/backend/openbot-database-schema-parity.test.ts` (the two build paths must agree),
+Tests: `src/backend/openbot-database-schema-parity.test.ts` (a new database from an empty file must match the recorded history),
 `src/backend/openbot-database.test.ts` (including "rejects a database created by a newer
 application").
 

@@ -87,7 +87,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "De externe host heeft geen vastgezette apparaatsleutel.",
   "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
-  "error.remote.hostDisconnected": "De verbinding met de WebRTC-host is verbroken.",
+  "error.remote.hostDisconnected":
+    "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",
   "error.remote.eventGap": "De volgorde van events van de host heeft een gat.",
   "error.remote.malformedKnownEvent": "De host gaf een misvormd bekend event terug.",
   "error.remote.fileTransportIsStopped": "Het WebRTC-bestandstransport is gestopt.",
@@ -208,6 +209,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",
   "error.remote.taskHistoryRefreshFailed": "De taak is gewijzigd, maar de chatgeschiedenis kon niet worden vernieuwd.",
+  "error.remote.serverNotLoaded": "OpenBot kon de server niet laden. Probeer het opnieuw.",
+  "error.remote.localServerNotStarted":
+    "De server op deze computer is niet gestart. Probeer het opnieuw. Start hij niet, start OpenBot dan opnieuw op deze computer.",
   "error.remote.localServerAccountRemovalFailed":
     "De server is op zijn computer verwijderd, maar het account toont hem nog. Verwijder hem opnieuw om hem uit het account te halen.",
 } as const satisfies PartialTranslation<typeof source>;

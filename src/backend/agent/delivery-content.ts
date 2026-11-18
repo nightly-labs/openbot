@@ -1,15 +1,17 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
-import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentSummary,
   AgentWait,
+  ConversationMessage,
   ConversationPlanStep,
   ConversationSnapshot,
   QueueDelivery,
   RoutineRun,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
@@ -45,15 +47,23 @@ export function visualReplyFileName(title: string): string {
   );
 }
 
-/** A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history. */
-export function conversationContentSignature(snapshot: ConversationSnapshot): string {
-  const content = JSON.stringify({
-    agentId: snapshot.agentId,
-    threadId: snapshot.threadId,
-    activeTurnId: snapshot.activeTurnId,
-    messages: snapshot.messages,
+/**
+ * A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history.
+ * It hashes the same text as `JSON.stringify` of the agent, thread, active turn and messages, in parts, so
+ * a caller that already has the JSON of each message gives it in `messageJson` and nothing is made twice.
+ */
+export function conversationContentSignature(
+  snapshot: ConversationSnapshot,
+  messageJson: (message: ConversationMessage) => string = (message) => JSON.stringify(message),
+): string {
+  const hash = createHash("sha256").update(
+    `{"agentId":${JSON.stringify(snapshot.agentId)},"threadId":${JSON.stringify(snapshot.threadId)},"activeTurnId":${JSON.stringify(snapshot.activeTurnId)},"messages":[`,
+  );
+  snapshot.messages.forEach((message, index) => {
+    if (index > 0) hash.update(",");
+    hash.update(messageJson(message));
   });
-  return createHash("sha256").update(content).digest("base64");
+  return hash.update("]}").digest("base64");
 }
 
 /**
@@ -76,6 +86,20 @@ export function routineStatusForDelivery({ status, error }: Pick<QueueDelivery, 
     case "cancelled":
       return "cancelled";
   }
+}
+
+/**
+ * The reason a run that fails keeps. A provider can end a turn as failed and send no error; the run
+ * then showed "Routine failed" with no reason anywhere (#11627). A run that failed already keeps the
+ * reason it has, so a run that failed before this change keeps its row and its finish time.
+ */
+export function failedRunReason(
+  error: string | null,
+  current: { status: string; error: string | null },
+): string | null {
+  if (error?.trim()) return error;
+  if (current.status === "failed") return current.error;
+  return sourceText("error.backend.routineRunFailedNoReason");
 }
 
 export type DeliveryInputItem =
@@ -199,6 +223,21 @@ export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
 /** Between a provider handoff and the prompt of the turn that takes it. */
 export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
+
+const RESTARTED_RESULT_NOTE =
+  "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
+
+/**
+ * The input of a turn that starts again with a teammate's result after a restart stopped the turn that
+ * read it (#11857). The note goes in front as a handoff, so `teammatePrompts` still finds the teammate
+ * messages after it when the history is imported.
+ */
+export function restartedResultInput(input: readonly DeliveryInputItem[]): DeliveryInputItem[] {
+  const note = `${HANDOFF_START}\n\n${RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+  return input.map((item, index) =>
+    index === 0 && item.type === "text" ? { ...item, text: `${note}${item.text}` } : item,
+  );
+}
 const TEAMMATE_PROMPT = new RegExp(
   `^${TEAMMATE_HEADER} [^\\n]* \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)\\n(?:This replies to message: (\\S+)\\n)?`,
   "gm",
@@ -451,12 +490,24 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
         : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+      // A run that the user paused or stopped on purpose was shown as "Routine failed" (#11578). A
+      // Test run and a local script run are requests to run now, also when the routine is paused, so
+      // they do not get this line.
+      ...(testRun || run?.source === "script"
+        ? []
+        : [
+            `A stop that the user asked for is not a failure. When the user paused this routine, or asked to stop or skip this run, and did not turn it on again, do not do the task and do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool: call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+          ]),
       `When the task could not be done, call the ${ROUTINE_REPORT_FAILURE_TOOL} tool with a short reason, then give your answer as usual.`,
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
     const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
     if (waits) text += `\n\n${waits}`;
+  }
+  if (delivery.sender.kind === "user" && sources.executionText === undefined) {
+    const note = taggedAgentsNote(delivery.text, delivery.recipientAgentId, agentNames);
+    if (note) text += `\n\n${note}`;
   }
   const skillSuggestion = pendingSkillSuggestionNote(
     delivery,
@@ -503,6 +554,32 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/**
+ * The agents that the user tags in a message to this agent's chat. A tag sends the message to the
+ * tagged agent only in a channel; here only this agent gets it. As the text "@Name" alone, the model
+ * often took the tag for a name and the tagged agent never got the request (#11305).
+ */
+function taggedAgentsNote(
+  text: string,
+  recipientAgentId: string,
+  agentNames: ReadonlyMap<string, string>,
+): string | null {
+  const ids = new Set(
+    chatTagReferences(text)
+      .filter((reference) => reference.kind === "agent" && reference.id !== recipientAgentId)
+      .map((reference) => reference.id),
+  );
+  const agents = [...ids].flatMap((id) => {
+    const name = agentNames.get(id);
+    return name === undefined ? [] : [`${name} (${id})`];
+  });
+  if (!agents.length) return null;
+  return [
+    `The user tagged these agents in this message: ${agents.join(", ")}. Only you received the message.`,
+    "When the user wants a tagged agent to do or know something, send that agent your own message with openbot.send_message, with its id in recipientAgentIds, and tell the user that you sent it. When the user only names the agent, send nothing.",
+  ].join(" ");
 }
 
 /**
