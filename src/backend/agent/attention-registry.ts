@@ -231,6 +231,16 @@ const MESSAGING_QUESTION_REFUSED =
 /** The agent reads this, not the user: it says what to do in a turn that answers another agent's request from an external chat. */
 const MESSAGING_REQUEST_CARD_REFUSED =
   "This request came from an external chat (Slack, Discord, Telegram or WhatsApp) through another agent, and nobody can answer a card here. Decide on your own and continue. When only the OpenBot user can unblock you, such as a sign-in, a key or a password, stop and say in your answer exactly what the OpenBot user must do in OpenBot.";
+/**
+ * Codex's cancel of a tool consent that nobody can answer. Without the reason, Codex tells the model
+ * "user cancelled MCP tool call", so the agent cannot say why the step stopped (#12200). Codex 0.164.0
+ * and later read it; an earlier Codex ignores it.
+ */
+const MCP_TOOL_CONSENT_UNANSWERABLE = {
+  action: "cancel",
+  content: null,
+  _meta: { codex_approval_cancellation_reason: "non_interactive" },
+} as const;
 
 /** The agent reads these, not the user. */
 const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
@@ -2210,7 +2220,10 @@ export class AttentionRegistry {
     const { agentId, publicThreadId, turnId, params } = owner;
     if (this.#answerMcpToolConsentWithoutAsking(client, request, agentId)) return;
     if (this.#messagingThread(publicThreadId) || this.#messagingRequestTurn(agentId, turnId)) {
-      client.respond(request.id, { action: "cancel", content: null, _meta: null });
+      client.respond(
+        request.id,
+        mcpToolCallConsent(params) ? MCP_TOOL_CONSENT_UNANSWERABLE : { action: "cancel", content: null, _meta: null },
+      );
       return;
     }
 
