@@ -114,13 +114,19 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     ),
     { startImmediately: true },
   );
-  // A CLI that saved a new sign-in and then failed signed in with no prompt, as one that exits with success.
-  yield* Effect.forkScoped(
-    Deferred.complete(prompt, orNewSavedSignIn(readCodePrompt(child, options.flow), watch, null)),
-    {
-      startImmediately: true,
-    },
+  // A CLI that saved a new sign-in and then failed signed in with no prompt, as one that exits with
+  // success: `done` decides, and a failure keeps the prompt's own message.
+  const prompted = readCodePrompt(child, options.flow).pipe(
+    Effect.catch((failure) =>
+      watch
+        ? Fiber.join(done).pipe(
+            Effect.as(null),
+            Effect.mapError(() => failure),
+          )
+        : Effect.fail(failure),
+    ),
   );
+  yield* Effect.forkScoped(Deferred.complete(prompt, prompted), { startImmediately: true });
   return {
     child,
     done: Fiber.join(done),

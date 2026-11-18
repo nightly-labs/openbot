@@ -13,7 +13,6 @@
 // `usages.limit_5h`, `usages.limit_7d` and, on plans with a monthly quota, `usages.limit_month_total`,
 // each a `used_ratio` from 0 to 1 and a `reset_time` (`packages/oauth/src/managed-usage.ts`).
 
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -147,21 +146,6 @@ export const readKimiSavedSignIn = Effect.fn("Kimi.readSavedSignIn")(function* (
     expiresAt: token.value.expires_at ?? null,
   });
 });
-
-/**
- * A hash of the saved tokens, which each new sign-in changes, or null with no saved sign-in. `python`
- * and `env` as for `readKimiSavedSignIn`. Only the hash is kept, not the tokens.
- */
-export const kimiSavedSignInVersion = (python: boolean, env: NodeJS.ProcessEnv): Effect.Effect<string | null> =>
-  readKimiSavedSignIn(python, env).pipe(
-    Effect.map((signIn) =>
-      Option.isSome(signIn)
-        ? createHash("sha256")
-            .update(`${signIn.value.refreshToken ?? ""}\n${signIn.value.accessToken}`)
-            .digest("hex")
-        : null,
-    ),
-  );
 
 /** `python` and `env` as for `readKimiSavedSignIn`. */
 export const readKimiUsage = Effect.fn("Kimi.readUsage")(function* (python: boolean, env: NodeJS.ProcessEnv) {
