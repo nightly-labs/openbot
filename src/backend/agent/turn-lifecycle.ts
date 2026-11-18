@@ -1743,7 +1743,12 @@ export class TurnLifecycle {
           this.#runningTurns.has(errorTurnId) &&
           context.causeCode === "provider_exited"
         ) {
-          this.#compactionFailures.set(errorTurnId, { message, context, exited: true });
+          // A compaction that failed or looped keeps its own reason.
+          const held = this.#compactionFailures.get(errorTurnId);
+          const reason = held?.message ?? sourceText("error.agent.answerCutOff");
+          if (!held) this.#compactionFailures.set(errorTurnId, { message: reason, context, exited: true });
+          // The failed delivery keeps this reason. The exit code and the CLI's stderr stay in the log.
+          this.#turnErrors.set(errorTurnId, reason);
           return;
         }
         // A spent quota passes over the pooled account at once, so the pool moves the agent to its next

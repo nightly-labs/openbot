@@ -9,7 +9,7 @@
 //      after one continuation only.
 //   3. A crash of a new process before it sends anything, which also stops the shared Claude client:
 //      the same as check 1.
-// `bun scripts/claude-process-crash-e2e.ts`. Writes .openbot-build/claude-process-crash-e2e/report.json.
+// `bun run test:claude-process-crash`. Writes .openbot-build/claude-process-crash-e2e/report.json.
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
