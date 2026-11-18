@@ -3,10 +3,12 @@ import {
   Button,
   buttonVariants,
   ChevronDown,
+  ContextMenu,
   DropdownMenu,
   Folder,
   Maximize2,
   MessageCircleQuestionMark,
+  MessageSquare,
   Minimize2,
   PanelRight,
   Plus,
@@ -24,7 +26,7 @@ import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, flush, onSettled, Show } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
@@ -242,6 +244,101 @@ interface TabEntry {
   select: () => void;
 }
 
+/** The tab that a right-click or a long press opened the tab menu on. */
+type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string };
+
+/** The tab under the event, or null outside a tab. */
+function tabAt(target: EventTarget | null): MenuTab | null {
+  const tab = target instanceof Element ? target.closest<HTMLElement>(".side-panel-tab") : null;
+  const pane = tab?.dataset.value;
+  if (pane && isSidePanelPane(pane)) return { pane };
+  if (tab?.dataset.threadId) return { thread: tab.dataset.threadId };
+  if (tab?.dataset.fileKey) return { file: tab.dataset.fileKey };
+  return null;
+}
+
+/**
+ * The top row of the side panel, with a menu on each tab. A right-click or a long press on a tab opens
+ * Close tab, and for a thread also Open in the chat, so a thread goes back to the chat without a drag.
+ */
+export function SidePanelHeader(props: SidePanelHeaderProps) {
+  const { t } = useText();
+  const [menuTab, setMenuTab] = createSignal<MenuTab | null>(null);
+  /** The focus when the menu opened, and the top row. The row itself cannot take the focus back. */
+  let menuReturn: { focus: Element | null; header: Element | null } | undefined;
+  const pick = (event: Event) => {
+    const tab = tabAt(event.target);
+    setMenuTab(tab);
+    menuReturn = {
+      focus: document.activeElement,
+      header: event.target instanceof Element ? event.target.closest(".side-panel-header") : null,
+    };
+    return tab;
+  };
+  /** A right-click outside a tab opens no menu. */
+  const pickMenuTab = (event: MouseEvent) => {
+    if (!pick(event)) event.preventDefault();
+  };
+  /** A long press opens the menu on touch screens. Outside a tab, the menu has no item. */
+  const pickTouchMenuTab = (event: PointerEvent) => {
+    if (event.pointerType !== "mouse") pick(event);
+  };
+  /** The tab of the menu while it is still open in the panel. A tab can close while its menu shows. */
+  const liveMenuTab = () => {
+    const tab = menuTab();
+    if (!tab) return null;
+    if ("pane" in tab) return props.panes.includes(tab.pane) ? tab : null;
+    if ("thread" in tab) return props.threads?.items.some((item) => item.id === tab.thread) ? tab : null;
+    return props.files?.items.some((item) => item.key === tab.file) ? tab : null;
+  };
+  const menuThread = () => {
+    const tab = liveMenuTab();
+    return tab && "thread" in tab ? tab.thread : undefined;
+  };
+  const closeMenuTab = () => {
+    const tab = liveMenuTab();
+    if (!tab) return;
+    if ("pane" in tab) props.onClose(tab.pane);
+    else if ("thread" in tab) props.threads?.onClose(tab.thread);
+    else props.files?.onClose(tab.file);
+  };
+  /** The focus goes back where it was, or to the selected tab when that element left with its tab. */
+  const returnFocus = (event: Event) => {
+    const back = menuReturn?.focus?.isConnected
+      ? menuReturn.focus
+      : menuReturn?.header?.querySelector(".side-panel-tab[data-selected] .side-panel-tab-select");
+    if (!(back instanceof HTMLElement)) return;
+    event.preventDefault();
+    back.focus();
+  };
+  return (
+    <ContextMenu.Root>
+      <SidePanelTabRow {...props} onTabMenu={pickMenuTab} onTabMenuPress={pickTouchMenuTab} />
+      <ContextMenu.Portal>
+        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")} onCloseAutoFocus={returnFocus}>
+          <Show when={menuThread()}>
+            {(thread) => (
+              <>
+                <ContextMenu.Item class="side-panel-menu-item" onSelect={() => props.threads?.onToChat(thread())}>
+                  <MessageSquare aria-hidden="true" />
+                  {t("conversation.threads.toChat")}
+                </ContextMenu.Item>
+                <ContextMenu.Separator />
+              </>
+            )}
+          </Show>
+          <Show when={liveMenuTab()}>
+            <ContextMenu.Item class="side-panel-menu-item" onSelect={closeMenuTab}>
+              <X aria-hidden="true" />
+              {t("conversation.threads.closeTab")}
+            </ContextMenu.Item>
+          </Show>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  );
+}
+
 /**
  * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
  * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link.
@@ -261,7 +358,12 @@ interface TabEntry {
  * the chat header. While the pointer takes a thread tab of the chat header over the panel, the panel
  * shows where the drop puts it. A file tab drags to a new place among the file tabs.
  */
-export function SidePanelHeader(props: SidePanelHeaderProps) {
+function SidePanelTabRow(
+  props: SidePanelHeaderProps & {
+    onTabMenu: (event: MouseEvent) => void;
+    onTabMenuPress: (event: PointerEvent) => void;
+  },
+) {
   const { t } = useText();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
@@ -524,7 +626,16 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
 
   return (
     <>
-      <Tabs.Root ref={root} class="window-drag side-panel-header" value={selectedValue()} activationMode="automatic">
+      {/* The row is also the trigger of the tab menu, so the row stays a direct child of the panel. */}
+      <Tabs.Root
+        as={ContextMenu.Trigger}
+        ref={root}
+        class="window-drag side-panel-header"
+        value={selectedValue()}
+        activationMode="automatic"
+        onContextMenu={props.onTabMenu}
+        onPointerDown={props.onTabMenuPress}
+      >
         <Tabs.List
           ref={tabList}
           class="side-panel-tabs"

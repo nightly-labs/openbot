@@ -148,6 +148,7 @@ export const messages = {
   "workflow.video.models": "動画モデル",
   "workflow.video.making": "動画を作成中、{time}",
   "workflow.video.length": "長さ",
+  "workflow.video.length.custom": "カスタム",
   "workflow.video.lengthLabel": "長さ: {value}",
   "workflow.video.seconds": "{value} 秒",
   "workflow.video.resolution": "解像度",

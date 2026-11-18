@@ -51,6 +51,7 @@ import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
@@ -227,24 +228,21 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
-    excludeRoutineQuietAnswers: true,
+    excludeRoutineQuietAnswers: !capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY),
     excludeSettingLinks: !capabilities.has(SETTING_LINK_MARKERS_CAPABILITY),
   };
 }
 
 /**
- * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
- * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
- * agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
- * agent only, so they go to none either.
+ * Whether a client can show a message of this kind. A quiet routine answer goes only to a client that
+ * folds it into its run (`routine-quiet-answers-v1`): another client would show it as a new answer,
+ * and before it, a user on a server could never read a report that the agent ended quiet (#11174). A
+ * new agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
+ * agent only, so they go to none.
  */
-function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (
-    itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
-    itemType === AGENT_WELCOME_ITEM_TYPE ||
-    itemType === CHANNEL_RESUME_ITEM_TYPE
-  )
-    return false;
+export function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
+  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY);
+  if (itemType === AGENT_WELCOME_ITEM_TYPE || itemType === CHANNEL_RESUME_ITEM_TYPE) return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");

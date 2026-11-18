@@ -45,6 +45,8 @@ export interface ClaudeSessionMessage {
   parent_tool_use_id: string | null;
   parent_agent_id: string | null;
   timestamp?: string;
+  /** The task run whose end this task notification reports (`origin.runId`). */
+  task_run_id?: string;
 }
 
 interface ParsedRecord {
@@ -63,6 +65,7 @@ interface ParsedRecord {
   teamName?: unknown;
   subtype?: unknown;
   compactMetadata?: unknown;
+  origin?: unknown;
   message?: unknown;
 }
 
@@ -132,6 +135,18 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
       try: (signal) => scanClaudeHistory(request, consume, options, signal),
       catch: providerFailure,
     });
+}
+
+/**
+ * The turn ID of a turn that Claude Code starts by itself to answer the end of a background task.
+ * The live stream gives no ID of the transcript entry for that turn, so the live client and the history
+ * import both make this ID from the task run that ended. Then the import finds the turn that the live
+ * client stored and does not add its messages again.
+ */
+export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
+  const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 /** Explicit test boundary for an injected SDK history reader. Production uses claudeHistoryReader. */
@@ -710,12 +725,14 @@ async function emitTurnFragments(
   let items: ThreadItem[] = [];
   let itemOffset = 0;
   let stopped = false;
+  let liveTurnId: string | null = null;
   const flush = async (complete: boolean): Promise<boolean> => {
     if (signal.aborted) throw signal.reason;
     const count = items.length;
     const result = await Effect.runPromise(
       consume({
         turnId: turn.turnId,
+        ...(liveTurnId ? { liveTurnId } : {}),
         status: "completed",
         startedAt: turnStartedAt(turn.timestamp, turn.startSeq),
         itemOffset,
@@ -764,6 +781,7 @@ async function emitTurnFragments(
           if (stopped) break;
           continue;
         }
+        if (row.seq === turn.startSeq && isClaudeTaskNotification(text)) liveTurnId = taskNotificationTurnId(message);
         if (
           row.seq !== turn.startSeq ||
           !text ||
@@ -827,6 +845,17 @@ async function emitTurnFragments(
   }
 }
 
+/**
+ * The ID that the live client gave the turn that this task notification started. A notice can report
+ * more than one task; the live client takes the last task that ended before the turn.
+ */
+function taskNotificationTurnId(message: ClaudeSessionMessage): string | null {
+  const taskId = [...messageText(message.message).matchAll(/<task-id>([^<]+)<\/task-id>/g)].at(-1)?.[1];
+  return taskId && message.task_run_id && message.session_id
+    ? claudeTaskTurnId(message.session_id, taskId, message.task_run_id)
+    : null;
+}
+
 function decodeTurnRow(raw: unknown): { seq: number; uuid: string; timestamp: string | null } {
   const row = databaseRow(raw);
   if (!row) throw new Error("Invalid Claude history turn row.");
@@ -876,6 +905,8 @@ async function readMessage(
   if (result.bytesRead !== row.length) throw new Error("Claude transcript changed while it was being read.");
   const parsed = parseRecord(buffer.toString("utf8"));
   if (!parsed || (parsed.type !== "user" && parsed.type !== "assistant" && parsed.type !== "system")) return null;
+  const taskRunId =
+    isRecord(parsed.origin) && parsed.origin.kind === "task-notification" ? stringOrNull(parsed.origin.runId) : null;
   return {
     type: parsed.type,
     uuid: parsed.uuid,
@@ -884,6 +915,7 @@ async function readMessage(
     parent_tool_use_id: stringOrNull(parsed.parentToolUseId ?? parsed.parent_tool_use_id),
     parent_agent_id: stringOrNull(parsed.parentAgentId ?? parsed.parent_agent_id),
     ...(parsed.timestamp ? { timestamp: String(parsed.timestamp) } : {}),
+    ...(taskRunId ? { task_run_id: taskRunId } : {}),
   };
 }
 
@@ -1029,6 +1061,7 @@ function parseRecord(line: string): ParsedRecord | null {
       teamName: value.teamName,
       subtype: value.subtype,
       compactMetadata: value.compactMetadata,
+      origin: value.origin,
       message: value.message,
     };
   } catch {

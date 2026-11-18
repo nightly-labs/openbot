@@ -424,9 +424,9 @@ export interface HiggsfieldPriceRequest {
 }
 
 /**
- * What one file costs with the choices of the step, in credits, or null when Higgsfield gives no
- * price. `get_cost` only asks for the price: Higgsfield starts no job and spends no credits. The quote
- * sends no picture, so a mode is the mode with no picture.
+ * What one file costs with the choices of the step, in credits. An answer without a price fails, as
+ * a short fault can give one. `get_cost` only asks for the price: Higgsfield starts no job and spends
+ * no credits. The quote sends no picture, so a mode is the mode with no picture.
  */
 export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
   signIn: McpMediaSignIn,
@@ -448,7 +448,7 @@ export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
       });
       const cost = isDynamicRecord(answer.cost) ? answer.cost : null;
       const credits = cost?.credits_exact ?? cost?.credits;
-      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : null;
+      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : yield* mediaFailed();
     }),
   ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

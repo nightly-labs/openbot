@@ -49,6 +49,9 @@ mode map.
 
 ### Close behavior
 
+The X at the end of a tab closes it, and the tab menu (right-click or long press) has Close tab.
+The menu of a side thread tab also has Open in the chat.
+
 `closeSidePanelPane` runs the `release` action, removes the tab, and keeps the order of the other
 tabs. When the closed pane showed, the panel shows, in this order:
 
@@ -74,6 +77,8 @@ these in the real app:
 - File tabs and side threads beside the panes.
 - Switch to another agent or server and back. An open panel stays open, and a closed panel stays closed.
 - The question pane deletes its question on close.
+- Drag the start edge of each pane, side threads included. All panes keep one width.
+- Right-click each kind of tab: Close tab closes it, and Open in the chat moves a side thread to the chat.
 
 `scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close, collapse,
 maximize, an agent change with the panel open and closed, and the side question release in the

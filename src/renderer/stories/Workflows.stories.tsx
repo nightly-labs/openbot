@@ -260,6 +260,42 @@ export const ImageStory: Story = {
   ),
 };
 
+/** A live Higgsfield video model that makes each second from 3 to 15, as the host reads a duration range. */
+const RANGE_VIDEO_MODEL = {
+  id: "higgsfield-kling3_0_story",
+  provider: "higgsfield",
+  name: "Kling 3.0",
+  maker: "Kuaishou",
+  subscription: "Higgsfield",
+  credits: true,
+  kinds: ["video"],
+  voices: false,
+  aspects: ["16:9", "9:16", "1:1"],
+  durations: Array.from({ length: 13 }, (_, index) => index + 3),
+  resolutions: ["720p", "1080p"],
+} as const satisfies WorkflowCatalogs["imageModels"][number];
+
+/**
+ * Video steps on a model with more lengths than the Length menu lists: one on a length of the list,
+ * and one on Custom, whose seconds chip takes any length of the model.
+ */
+export const VideoCustomLength: Story = {
+  name: "Video, custom length",
+  render: () => (
+    <NodeGallery
+      selected="custom"
+      catalogs={{ ...STORY_CATALOGS, imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels] }}
+      fields={{
+        listed: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 10 },
+        custom: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 7 },
+      }}
+    >
+      <ImageNode id="listed" prompt="A drone shot over a coastal town at sunrise" />
+      <ImageNode id="custom" prompt="A drone shot over a coastal town at sunrise" />
+    </NodeGallery>
+  ),
+};
+
 /**
  * An image step with more results than the list under it fits. The list opens on the newest result,
  * and the arrows scroll it to the result on view.

@@ -1,5 +1,6 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
   type AgentStepActivity,
@@ -132,6 +133,14 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
+
+/** Adds a turn to a set that keeps the newest `ENDED_TURN_LIMIT` turns, oldest first. */
+function keepNewest(turns: Set<string>, turnId: string): void {
+  turns.add(turnId);
+  if (turns.size <= ENDED_TURN_LIMIT) return;
+  const [oldest] = turns;
+  if (oldest !== undefined) turns.delete(oldest);
+}
 /**
  * Failed turns in a row after which OpenBot closes an Antigravity session. Antigravity keeps the
  * history of each session in its CLI, and a session can fail each turn while a new session of the
@@ -523,6 +532,12 @@ export class TurnLifecycle {
    */
   readonly #quietTurns = new Set<string>();
   /**
+   * The newest completed turns that the provider started itself to answer the background work of known
+   * turns, oldest first (`ENDED_TURN_LIMIT`). The first such turn after a person's work shows its answer,
+   * so a later turn for work that it started can end quiet, as a watcher that wakes again (#11090).
+   */
+  readonly #followUpTurns = new Set<string>();
+  /**
    * Running turns whose agent owns a main task of a channel routine's request and called the no-update
    * tool. The channel shows their answers as steps. The entry stays until the completion has marked
    * them as quiet answers, so no capture in between posts them.
@@ -567,6 +582,11 @@ export class TurnLifecycle {
    */
   readonly #subagentTurns = new Map<string, Set<string>>();
   /**
+   * The threads whose provider runs background work after their turn ended, with the time it started.
+   * The provider starts a turn when the work ends, so the chat shows that the agent waits (#11090).
+   */
+  readonly #waitingThreads = new Map<string, { agentId: string; client: AgentClient; since: number }>();
+  /**
    * The routine sessions whose turn ended with no subagent at work. Their close also archives them.
    * An archive stops the subagents of a Codex session, so a session with one at work stays listed.
    */
@@ -604,10 +624,27 @@ export class TurnLifecycle {
     return turns;
   }
 
+  /** The chats of the agents in `agentIds` whose background work runs, by task, or null for the agent's own chat. */
+  backgroundWork(agentIds: ReadonlySet<string>): Array<{ agentId: string; taskId: string | null; since: number }> {
+    const work: Array<{ agentId: string; taskId: string | null; since: number }> = [];
+    for (const [threadId, { agentId, since }] of this.#waitingThreads) {
+      if (!agentIds.has(agentId)) continue;
+      const taskId = this.#taskForThread(agentId, threadId);
+      // Work in a channel, a routine run or another thread of the agent waits in no chat that a client shows.
+      const ownChat =
+        !this.#conversation.isRoutineSession(threadId) &&
+        this.#conversation.publicThreadId(agentId, threadId) === this.#store.get(agentId)?.threadId;
+      if (taskId !== null || ownChat) work.push({ agentId, taskId, since });
+    }
+    return work.slice(-INPUT_LIMITS.agents);
+  }
+
   forgetAgent(agentId: string): void {
     this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
     this.#subagentTurns.delete(agentId);
+    for (const [threadId, work] of this.#waitingThreads)
+      if (work.agentId === agentId) this.#waitingThreads.delete(threadId);
     this.#lastEventAt.delete(agentId);
     for (const key of this.#lastResults.keys()) if (key.startsWith(`${agentId}\u0000`)) this.#lastResults.delete(key);
     for (const [childId, parent] of this.#codexChildren)
@@ -696,6 +733,7 @@ export class TurnLifecycle {
     this.#unreadReports.clear();
     this.#lastResults.clear();
     this.#quietTurns.clear();
+    this.#followUpTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
@@ -713,6 +751,7 @@ export class TurnLifecycle {
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#codexChildTurns.clear();
+    this.#waitingThreads.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
@@ -744,6 +783,11 @@ export class TurnLifecycle {
         this.#codexChildTurns.delete(threadId);
         endedChildren.push(threadId);
       }
+    // The background work ended with the process.
+    let backgroundEnded = false;
+    for (const [threadId, work] of this.#waitingThreads)
+      if (work.client === client) backgroundEnded = this.#waitingThreads.delete(threadId);
+    if (backgroundEnded) this.#hooks.emitRuntimeSnapshot();
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
@@ -1555,6 +1599,15 @@ export class TurnLifecycle {
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
         return;
       }
+      case "openbot/background-work": {
+        if (!threadId || !agentId) return;
+        const runs = isRecord(params) && params.running === true;
+        if (runs === this.#waitingThreads.has(threadId)) return;
+        if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
+        else this.#waitingThreads.delete(threadId);
+        this.#hooks.emitRuntimeSnapshot();
+        return;
+      }
       case "openbot/context-compaction": {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
@@ -1872,7 +1925,8 @@ export class TurnLifecycle {
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs,
    * teammate updates and answered teammate requests, so its completion keeps the text answers as quiet
    * answers; `unanswered` when a teammate's request still waits for its `send_message` reply; `shown`
-   * when a person waits for the answer, as in a Test run; null when no routine run, teammate update,
+   * when a person waits for the answer, as in a Test run or the first wake for a person's background work;
+   * null when no routine run, teammate update,
    * teammate request or teammate's answer to a quiet routine run (`#continuesQuietRun`) started the
    * turn, and it does not answer only background work of quiet turns (`#continuesQuietTurns`). The
    * completion decides again, because a message can join the turn after the call and the
@@ -1892,13 +1946,17 @@ export class TurnLifecycle {
       return "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const running = this.#runningTurns.get(turnId);
     // A turn that the provider started itself to answer the background work of quiet turns (#10847).
-    if (this.#continuesQuietTurns(this.#runningTurns.get(turnId)?.continues, deliveries)) {
+    if (this.#continuesQuietTurns(running?.continues, deliveries)) {
       this.#noUpdateTurns.add(turnId);
       if (this.#reportedFailures.has(turnId)) return "shown";
       this.#armQuietEnd(agentId, turnId);
       return "quiet";
     }
+    // The first wake for a person's work shows its answer. A refusal here made the model stop calling the
+    // tool on the later wakes that can end quiet (#11090).
+    if (deliveries.length === 0 && running?.unprompted && running.continues.length > 0) return "shown";
     if (
       !deliveries.some(
         ({ delivery }) =>
@@ -1938,14 +1996,16 @@ export class TurnLifecycle {
   /**
    * Whether a turn with no delivery answers only the background work of turns that ended quiet, such as a
    * Claude turn after a background command of a teammate update ended. Nobody waited for those turns, so
-   * nobody waits for this one. A turn that also answers work of a person's request is not quiet (#10847).
+   * nobody waits for this one. A turn that also answers work of a person's request is not quiet (#10847):
+   * its answer is the first one after that request. Work that a turn of the provider's own started, after
+   * that first answer, can end quiet too, so a watcher that wakes again does not post each time (#11090).
    */
   #continuesQuietTurns(continues: readonly string[] | undefined, deliveries: readonly DeliveryContext[]): boolean {
     return (
       deliveries.length === 0 &&
       continues !== undefined &&
       continues.length > 0 &&
-      continues.every((turnId) => this.#quietTurns.has(turnId))
+      continues.every((turnId) => this.#quietTurns.has(turnId) || this.#followUpTurns.has(turnId))
     );
   }
 
@@ -2462,13 +2522,9 @@ export class TurnLifecycle {
               running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
-      if (quiet && quietTurn) {
-        this.#quietTurns.add(turnId);
-        if (this.#quietTurns.size > ENDED_TURN_LIMIT) {
-          const [oldest] = this.#quietTurns;
-          if (oldest !== undefined) this.#quietTurns.delete(oldest);
-        }
-      }
+      if (quiet && quietTurn) keepNewest(this.#quietTurns, turnId);
+      if (settles && running?.unprompted && deliveries.length === 0 && running.continues.length > 0)
+        keepNewest(this.#followUpTurns, turnId);
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
       if (!quiet) this.#quietChannelTurns.delete(turnId);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
@@ -2491,7 +2547,12 @@ export class TurnLifecycle {
         !channelTurn &&
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
-        this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text);
+        this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text) &&
+        // The provider wakes the agent when its background work ends. A continuation before that only
+        // gets "it still runs" (#11090). A failed check continues as before.
+        !(yield* (running.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+          Effect.orElseSucceed(() => false),
+        ));
       const considered = planContinues
         ? this.#planContinuation.consider({
             agentId,
@@ -3545,7 +3606,12 @@ function answeredRequestTurn(
   snapshot: ConversationSnapshot,
   turnId: string,
 ): boolean {
-  return deliveries.every(({ delivery }) => teammateRequest(delivery)) && textAnswersOnly(snapshot, turnId);
+  // A turn with no delivery answers no request: a result of its background work shows (#11090).
+  return (
+    deliveries.length > 0 &&
+    deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
+    textAnswersOnly(snapshot, turnId)
+  );
 }
 
 /**

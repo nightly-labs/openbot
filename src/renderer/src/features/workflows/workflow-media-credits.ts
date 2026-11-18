@@ -1,16 +1,24 @@
 import type { WorkflowMediaCredits } from "@openbot/contracts/ipc";
 import type { MediaCreditsRailRow } from "@openbot/ui/features/window/PageRail";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 
 /** Brand names: they are not translated. */
 const SUNRA_NAME = "Sunra";
 const HIGGSFIELD_NAME = "Higgsfield";
 
+/** Goes up by one each time a Sunra or Higgsfield step of the open canvas ends. */
+const [mediaStepsEnded, setMediaStepsEnded] = createSignal(0);
+
+/** The canvas calls this when a Sunra or Higgsfield step ends: the step spent credits. */
+export function noteMediaStepEnded(): void {
+  setMediaStepsEnded((count) => count + 1);
+}
+
 /**
  * The Sunra and Higgsfield credits of one server while the Canvas page shows it. `server` is the id
- * of that server, or null while the page does not show. The credits are read when the page opens on a server, and
- * again when the window comes back to the front: a run, or a person in the browser, can spend them.
- * A failed read keeps the last answer.
+ * of that server, or null while the page does not show. The credits are read when the page opens on a server,
+ * when a Sunra or Higgsfield step of the canvas ends, and when the window comes back to the front: a
+ * person in the browser can spend them too. A failed read keeps the last answer.
  */
 export function createWorkflowMediaCredits(
   server: () => string | null,
@@ -36,6 +44,12 @@ export function createWorkflowMediaCredits(
     current = serverId;
     request += 1;
     setCredits(null);
+    refresh();
+  });
+  let ended = untrack(mediaStepsEnded);
+  createEffect(mediaStepsEnded, (count) => {
+    if (count === ended) return;
+    ended = count;
     refresh();
   });
   window.addEventListener("focus", refresh);

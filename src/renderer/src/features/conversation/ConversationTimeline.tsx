@@ -7,7 +7,7 @@ import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
-import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
+import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
 import {
   type AgentStep,
@@ -25,6 +25,7 @@ import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conve
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -49,7 +50,11 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { remoteRoutineRecovery, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  remoteRoutineRecovery,
+  serverRoleCanAdminister,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -65,7 +70,6 @@ import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
-import { continuesSenderRun } from "./chat-grouping";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationController } from "./conversation-controller-context";
@@ -79,6 +83,7 @@ import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdro
 import { createMessageImageFiles } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
+import { createRoutineRunFailures, type RoutineRunFailureSource } from "./routine-run-failures";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { ServerInstallChatCard } from "./ServerInstallChatCard";
 import { SettingLinkChatCard } from "./SettingLinkChatCard";
@@ -109,9 +114,6 @@ function frozenUiBlock(message: AgentMessage | undefined): ConversationUiBlock |
  * draw a card instead of a message row. None shows the header a run continues under, so none can
  * hold a run open.
  */
-/** In the agent chat, a separator with the time stands above a message that comes this long after the one before it. */
-const AGENT_CHAT_TIME_GAP_MS = 60 * 60 * 1000;
-
 function rowDrawsTime(message: AgentMessage): boolean {
   return (
     !markerOnlyMessage(message) &&
@@ -656,6 +658,31 @@ export function ConversationTimeline() {
       webhookRoutines.state.routines.find((candidate) => candidate.id === routineId);
     return routine?.runIn === "chat" ? undefined : props.threads?.routineThread(routineId);
   };
+  /**
+   * The run history of this agent, where a failed run keeps its reason. The browser client reads it
+   * through its runtime; the desktop reads it for this computer, or as an owner or admin of a joined
+   * server, as Agent settings > Routines does.
+   */
+  const routineRunFailureSource = createMemo(
+    (): RoutineRunFailureSource | undefined => {
+      const agentId = channel ? undefined : props.agent?.id;
+      const server = props.server;
+      if (!agentId) return undefined;
+      if (props.runtime) {
+        const routines = props.runtime.routines;
+        return routines ? { agentId, serverId: server?.id, listRuns: routines.listRoutineRuns } : undefined;
+      }
+      if (!server || !serverRoleCanAdminister(server)) return undefined;
+      return {
+        agentId,
+        serverId: server.id,
+        listRuns: (input) => window.openbot.agent.listRoutineRuns(input, server.id),
+      };
+    },
+    // A new adapter for the same agent and host is the same history: no new read.
+    { equals: (left, right) => left?.agentId === right?.agentId && left?.serverId === right?.serverId },
+  );
+  const routineRunFailure = createRoutineRunFailures(routineRunFailureSource, timelineMessages);
   // The plain marker of a webhook routine opens it too: the host lists those routines on their own.
   const availableRoutineIds = createMemo(() =>
     props.availableRoutineIds
@@ -807,6 +834,10 @@ export function ConversationTimeline() {
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
+  // The agent's turn ended, and its background work still runs: the provider starts a turn when it ends.
+  // Not shown: the detail names the wait. The indicator reads it only without a detail.
+  const backgroundWorkLabel = nextAgentActivityLabel();
+  const backgroundWorkSince = () => (props.activeTurnId ? undefined : props.backgroundWorkSince?.(null));
   const emptyAgent = createMemo(() =>
     !channel &&
     timelineMessages().length === 0 &&
@@ -827,7 +858,9 @@ export function ConversationTimeline() {
     props.routines?.find((routine) => routine.instruction.trim())?.instruction;
   // A skill of the agent's own: every agent has the managed OpenBot skills.
   const sampleSkillName = () =>
-    installedSkills().find((skill) => skill.enabled !== false && skill.origin !== "managed")?.name;
+    installedSkills().find(
+      (skill) => skill.enabled !== false && skill.origin !== "managed" && skill.problem === undefined,
+    )?.name;
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -965,7 +998,7 @@ export function ConversationTimeline() {
                     return dayMarkerLabel(previous?.createdAt, current.createdAt, {
                       t,
                       format,
-                      ...(channel || !compactActions() ? {} : { gapMs: AGENT_CHAT_TIME_GAP_MS }),
+                      ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
                     });
                   return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });
@@ -1164,6 +1197,7 @@ export function ConversationTimeline() {
                                                             onSelectAgent={props.onSelectAgent}
                                                             onOpenRoutine={openRoutineSettings}
                                                             openRoutineThread={openRoutineThread}
+                                                            routineRunFailure={routineRunFailure}
                                                             onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                             onWithdrawFeedback={withdrawFeedback()}
@@ -1862,7 +1896,21 @@ export function ConversationTimeline() {
                   </Show>
                 }
               >
-                <Show when={renderedAgentActivity()}>
+                <Show
+                  when={renderedAgentActivity()}
+                  fallback={
+                    <Show when={backgroundWorkSince()}>
+                      {(since) => (
+                        <AgentActivityIndicator
+                          agent={props.agent}
+                          detail={t("chat.activity.backgroundWork")}
+                          label={backgroundWorkLabel}
+                          since={since()}
+                        />
+                      )}
+                    </Show>
+                  }
+                >
                   {(activity) => (
                     <AgentActivityIndicator
                       agent={activity().agent}

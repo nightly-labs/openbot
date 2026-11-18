@@ -151,6 +151,7 @@ export const messages = {
   "workflow.video.models": "Video modelleri",
   "workflow.video.making": "Video oluşturuluyor, {time}",
   "workflow.video.length": "Uzunluk",
+  "workflow.video.length.custom": "Özel",
   "workflow.video.lengthLabel": "Uzunluk: {value}",
   "workflow.video.seconds": "{value} sn",
   "workflow.video.resolution": "Çözünürlük",

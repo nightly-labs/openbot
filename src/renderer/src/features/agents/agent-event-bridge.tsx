@@ -27,6 +27,7 @@ import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useChannels } from "../channels/channels-context";
+import { backgroundWorkKey } from "../conversation/background-work-key";
 import { useConversation } from "../conversation/conversation-context";
 import { useConversationController } from "../conversation/conversation-controller-context";
 import { agentConversationKey, composerDraftKey, promptRequestKey } from "../conversation/conversation-keys";
@@ -142,6 +143,7 @@ export function AgentEventBridge() {
     setFailedTurns,
     setUsageLimits,
     setSubagentTurns,
+    setBackgroundWork,
     setUsageLimitedModels,
     setFailedModels,
     setWaitedUsageLimits,
@@ -597,6 +599,15 @@ export function AgentEventBridge() {
       keepEqualRecord(
         current,
         Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])),
+      ),
+    );
+    // A host without `agent-background-work-v1` sends no list, so its chats show no waiting line.
+    setBackgroundWork((current) =>
+      keepEqualRecord(
+        current,
+        Object.fromEntries(
+          (snapshot.backgroundWork ?? []).map((work) => [backgroundWorkKey(work.agentId, work.taskId), work.since]),
+        ),
       ),
     );
     setQueues((current) =>

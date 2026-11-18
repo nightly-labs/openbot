@@ -150,6 +150,7 @@ export const messages = defineMessages("workflow", {
   "workflow.video.models": "Video models",
   "workflow.video.making": "Making the video, {time}",
   "workflow.video.length": "Length",
+  "workflow.video.length.custom": "Custom",
   "workflow.video.lengthLabel": "Length: {value}",
   "workflow.video.seconds": "{value} s",
   "workflow.video.resolution": "Resolution",

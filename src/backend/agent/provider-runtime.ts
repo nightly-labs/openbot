@@ -112,6 +112,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSessionClosingDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
@@ -1151,7 +1152,8 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Stops the provider's shared process now, when nothing uses it, as an idle release does. OpenCode
    * keeps watchers in each folder that one of its sessions used until its process ends, also after
-   * `session/close`, and Windows refuses to remove a watched folder (`EBUSY`, #7029). A process that
+   * `session/close`, and a command that a CLI started in a folder can keep it too. Windows refuses to
+   * remove a folder that a process holds (`EBUSY`, #7029, #12294). A process that
    * a turn of another agent uses stays: the delete fails, and a retry after that turn can succeed.
    * True when work keeps the process: a turn, a start, or work that a turn left running.
    */
@@ -4505,6 +4507,15 @@ export class ProviderRuntime implements ProviderPort {
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
         stderrLogger.warn("A provider wrote an error while OpenBot stopped it.", {
+          provider: client.provider,
+          message,
+        });
+        return;
+      }
+      // A server that the provider did not start because its session was closing did not fail, also
+      // when it is a built-in server such as Computer Use (#12320).
+      if (isMcpSessionClosingDiagnostic(redacted)) {
+        stderrLogger.warn("A provider did not start an MCP server of a closing session.", {
           provider: client.provider,
           message,
         });

@@ -114,6 +114,12 @@ const bothCredits: MediaCreditsRailRow[] = [
   { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
 ];
 
+/** Almost no Sunra team credits, and no Higgsfield credits. */
+const lowCredits: MediaCreditsRailRow[] = [
+  { provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
+  { provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
+];
+
 /** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
@@ -237,7 +243,7 @@ export const DesktopLogo: Story = {
   args: { logo: { variant: "production" } },
 };
 
-/** The Canvas page with a Sunra team quota: a ring with the part that is left. Hover it to see the credits. */
+/** The Canvas page with a Sunra team quota: the logo with the number of credits left. Hover it to see the quota. */
 export const MediaCreditsQuota: Story = {
   args: { mediaCredits: teamCredits },
 };
@@ -250,6 +256,11 @@ export const MediaCreditsPersonal: Story = {
 /** The Canvas page with Sunra and Higgsfield: a button for each service. */
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
+};
+
+/** Low credits: 7% of the Sunra team quota is left, and the Higgsfield account has none. Both numbers show in red. */
+export const MediaCreditsLow: Story = {
+  args: { mediaCredits: lowCredits },
 };
 
 /** The CRM is pinned. Right-click its button for Connectors and Unpin; the other pinned buttons have Unpin. */

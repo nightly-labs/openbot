@@ -151,6 +151,7 @@ export const messages = {
   "workflow.video.models": "视频模型",
   "workflow.video.making": "正在生成视频，{time}",
   "workflow.video.length": "时长",
+  "workflow.video.length.custom": "自定义",
   "workflow.video.lengthLabel": "时长：{value}",
   "workflow.video.seconds": "{value} 秒",
   "workflow.video.resolution": "分辨率",

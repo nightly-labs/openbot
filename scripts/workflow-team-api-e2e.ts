@@ -49,6 +49,7 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaPriceRequest,
   type WorkflowNode,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -127,6 +128,8 @@ const mediaAccounts: (string | null)[] = [];
 const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
 /** The model id at the provider and the catalog id of each media request, in order. */
 const mediaModels: { model: string; catalogId: string }[] = [];
+/** The length in seconds that each media request asks for, in order. */
+const mediaDurations: number[] = [];
 /** Each price request that reached the host's price read, in order. */
 const priceRequests: WorkflowMediaPriceRequest[] = [];
 /** A Higgsfield model that only the live list has, as the host's catalog read gives it after the sign-in. */
@@ -138,7 +141,8 @@ const LIVE_MODEL: WorkflowMediaCatalogModel = {
   maker: "Kuaishou",
   kinds: ["video"],
   aspects: ["16:9", "9:16", "1:1"],
-  durations: [5, 10],
+  // Each second from 3 to 15, as the host reads a duration range: more lengths than the short list shows.
+  durations: Array.from({ length: 13 }, (_, index) => index + 3),
   resolutions: ["720p", "1080p"],
   transparent: false,
 };
@@ -286,6 +290,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -387,6 +392,7 @@ async function startHost(): Promise<Host> {
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
         mediaModels.push({ model: request.model, catalogId: request.catalogId });
+        mediaDurations.push(request.specs.duration);
         mediaRequests.push({
           transparent: request.specs.transparent,
           prompt: request.prompt,
@@ -1771,7 +1777,9 @@ try {
         const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
         assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
         assert.equal(priceRequests.length, before + 1);
-        // A step with the live model reaches the media maker with its id at Higgsfield and its catalog id.
+        // A step with the live model reaches the media maker with its id at Higgsfield, its catalog id and
+        // a custom length that the short list of the canvas does not show.
+        assert.ok(!workflowVideoLengthChoices(LIVE_MODEL.durations).includes(7), "7 s is a custom length");
         const beforeModels = mediaModels.length;
         const workflow = await hostWorkflow("Live Higgsfield model", {
           nodes: [
@@ -1780,7 +1788,7 @@ try {
               id: "image",
               kind: "image",
               at: at(300),
-              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 10, resolution: "1080p" },
+              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 7, resolution: "1080p" },
             },
           ],
           edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
@@ -1795,6 +1803,7 @@ try {
         assert.deepEqual(mediaModels.slice(beforeModels), [
           { model: LIVE_MODEL.providerModel, catalogId: LIVE_MODEL.id },
         ]);
+        assert.deepEqual(mediaDurations.slice(beforeModels), [7], "the step asks for the custom length");
         const old = await raw(
           WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
           {},
