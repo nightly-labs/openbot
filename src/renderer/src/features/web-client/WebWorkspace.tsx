@@ -241,6 +241,7 @@ import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
+import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -2384,6 +2385,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   const agentWaits = createMemo(() => sidebarAgentWaits(sidebarActivity()));
+  const agentTakeoverTabs = createMemo(() => agentTakeoverTabIds(workspace.state.agents, workspace.state.takeovers));
   const sidebarAgentMoods = createMemo(() => computeAgentAvatarMoods(sidebarActivity()));
   const browserEnabled = createMemo(
     () =>
@@ -4141,11 +4143,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   promptUiBlock={view.promptUiBlock()}
                   approval={view.approval()}
                   browserTakeover={browserTakeover()}
-                  onSelectAgent={(id) => {
+                  onSelectAgent={(id, tabId) => {
+                    // The tab is written first, so the chat opens at it, as on the desktop.
+                    if (tabId !== undefined) agentThreads()?.tabs.open(id, tabId);
                     setMobilePane("conversation");
                     void select(id);
                   }}
                   agentWaits={agentWaits()}
+                  agentTakeoverTabIds={agentTakeoverTabs()}
                   onUpdateAgent={async (agentId, updates) => {
                     await updateRemoteAgent(remoteAgentAdmin, { agentId, ...updates }, workspace.runtime.updateAgent);
                     await workspace.refresh();

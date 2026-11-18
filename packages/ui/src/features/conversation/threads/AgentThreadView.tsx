@@ -331,6 +331,8 @@ export interface AgentThreadViewProps {
   queue?: AgentThreadQueue | undefined;
   /** The agents that the thread asked and that have not answered yet, as the agent's own chat shows them. */
   awaiting?: readonly AwaitingReplyItem[] | undefined;
+  /** Opens an agent of `awaiting` that waits for the user, where it waits. Without it, `onSelectAgent` opens the agent. */
+  onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   /**
    * The actions for text selected in the thread. Quote puts the text in this message box, and a send
    * goes to this thread. Without it, selected text has no actions.
@@ -1023,7 +1025,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             }}
           </ComposerStackCard>
           <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
-            {(items) => <AwaitingReplies items={items()} onOpenAgent={props.onSelectAgent} />}
+            {(items) => (
+              <AwaitingReplies items={items()} onOpenAgent={props.onOpenWaitingAgent ?? props.onSelectAgent} />
+            )}
           </ComposerStackCard>
           <Show when={props.queue}>
             {(queue) => (

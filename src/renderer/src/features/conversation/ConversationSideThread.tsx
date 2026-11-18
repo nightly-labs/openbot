@@ -55,6 +55,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     branchThread,
     messagePins,
     changeMarkerActions,
+    openWaitingAgent,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
@@ -224,6 +225,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onOpenFile={openThreadFile}
             onSelectAgent={view.onSelectAgent}
+            onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
