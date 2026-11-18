@@ -13,6 +13,8 @@
 // that answer, in the log or, with `CLI_1_5_9`, in the answer. From #11063: the real CLI 1.5.9 and
 // 1.5.10 refuse the tool of a server that the session had when it opened again from the second prompt
 // of a process that resumed it without that server. A prompt with `SERVERS_RETURN` does the same.
+// From #12358: the CLI sends each number in an `enum` as an empty value, so a session with the
+// server `aave` gets Google's answer for an empty `enum` value too.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -34,7 +36,7 @@ interface SavedTool {
   parameters: { type: "object"; properties: object };
 }
 
-/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick` and `bling` have tools that Google refuses. */
+/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick`, `bling` and `aave` have tools that Google refuses. */
 const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
   ticktick: [
     { name: "list_tasks", parameters: { type: "object", properties: { tags: { type: "array" } } } },
@@ -53,12 +55,23 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       },
     },
   ],
+  // From #12358: a number `enum`, which the CLI sends as empty values.
+  aave: [
+    {
+      name: "get_reserve_holders",
+      parameters: { type: "object", properties: { limit: { type: "number", enum: [10, 50] } } },
+    },
+  ],
   // Fields with the same name as refused ones, which Google accepts.
   atlas: [
     { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
     {
       name: "receivables",
       parameters: { type: "object", properties: { situacoes: { type: "array", items: { type: "integer" } } } },
+    },
+    {
+      name: "top_holders",
+      parameters: { type: "object", properties: { limit: { type: "string", enum: ["10", "50"] } } },
     },
   ],
 };
@@ -69,6 +82,10 @@ const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
   ].join("\n"),
   bling:
     "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[situacoes].items: field predicate failed: $type == Type.ARRAY",
+  aave: [
+    "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[0]: cannot be empty",
+    "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[1]: cannot be empty",
+  ].join("\n"),
 };
 
 /** The servers of each session that this process started. A resume does not change them. */
