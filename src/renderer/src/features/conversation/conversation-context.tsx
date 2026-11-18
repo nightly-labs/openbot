@@ -28,7 +28,7 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
-import { useUiErrors } from "../../ui-errors";
+import { isConnectionDrop, useUiErrors } from "../../ui-errors";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
@@ -312,9 +312,14 @@ const Conversation = createSimpleContext({
             const markReadOnOpen = agentChatsToMarkRead.delete(trackingKey);
             if (markReadOnOpen && (page.readState?.unreadCount ?? 0) > 0) {
               void markAgentMessagesRead(agentId, page.messages.at(-1)?.id ?? null, serverId).catch((error) =>
-                appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                reportAutomaticReadFailure(agentId, error, serverId),
               );
-            } else if (agentChatsToRetryRead.has(trackingKey) && (page.readState?.unreadCount ?? 0) > 0) {
+            } else if (
+              agentChatsToRetryRead.has(trackingKey) &&
+              (page.readState?.unreadCount ?? 0) > 0 &&
+              // A reply that came while the window was hidden stays unread.
+              isAgentChatReadable(agentId)
+            ) {
               const latestIncomingMessage = latestIncomingConversationMessage(page.messages);
               if (latestIncomingMessage) autoMarkAgentMessageRead(agentId, latestIncomingMessage.id);
             }
@@ -350,6 +355,9 @@ const Conversation = createSimpleContext({
     // raw body of a streamed message: the next delta would append to the preview, not to the text.
     // Main adds text to a message before it sends the buffered delta, so the preview can hold text
     // that the first delta also holds. A message added from the preview starts with an empty raw body.
+    // A window around an old message, from a search, does not reach the end of the thread: the
+    // preview would show there as a cut copy below older messages (#11539). Its snapshot does not
+    // add new messages either; "Scroll to latest message" loads them.
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
@@ -357,6 +365,7 @@ const Conversation = createSimpleContext({
         // Most snapshots repeat messages that are loaded. Only a new message, or an agent that is not
         // open and holds more than a page, has work.
         const pending = messages.filter((message) => {
+          if (current[message.agentId]?.windowMode === "around") return false;
           const loaded = current[message.agentId]?.messages;
           if (!loaded?.some((candidate) => candidate.id === message.id)) return true;
           return message.agentId !== activeAgentId() && loaded.length > LATEST_PAGE_SIZE;
@@ -487,8 +496,21 @@ const Conversation = createSimpleContext({
       if (!latestMessageId) return;
       if (autoReadAgentMessages.get(agentConversationKey(serverId, agentId))?.messageId === latestMessageId) return;
       void markAgentMessagesRead(agentId, latestMessageId, serverId).catch((error) =>
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+        reportAutomaticReadFailure(agentId, error, serverId),
       );
+    }
+
+    /**
+     * A read that the app sent by itself and that failed. When the connection to a joined server
+     * dropped, the chat reads its latest page again after the reconnect, and that page sends the
+     * read again. Only another failure shows in the chat.
+     */
+    function reportAutomaticReadFailure(agentId: string, error: unknown, serverId: string): void {
+      if (isConnectionDrop(error)) {
+        agentChatsToRetryRead.add(agentConversationKey(serverId, agentId));
+        return;
+      }
+      appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
     }
 
     function refreshAgentReadStateAfterFailure(
@@ -566,7 +588,7 @@ const Conversation = createSimpleContext({
           conversations[agentId]?.revision ?? -1,
           decision.rollbackState,
         );
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+        reportAutomaticReadFailure(agentId, error, serverId);
       });
     }
 
@@ -1107,7 +1129,7 @@ const Conversation = createSimpleContext({
         const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
         // The pending message does not wait for read state: it is the user's own message.
         markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {
-          appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+          reportAutomaticReadFailure(agentId, error, serverId);
         });
         return { messageId };
       } catch (error) {
@@ -1191,7 +1213,7 @@ const Conversation = createSimpleContext({
                 latestVisibleMessageId !== visibleMessageIdAtStart
               ) {
                 void markAgentMessagesRead(agentId, latestVisibleMessageId, serverId).catch((error) =>
-                  appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                  reportAutomaticReadFailure(agentId, error, serverId),
                 );
               }
             });

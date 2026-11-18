@@ -185,6 +185,8 @@ export const messages = {
     "{provider} {seconds} sn içinde modellerini listelemedi. Bilgisayar meşgul olabilir.",
   "error.provider.startStopped":
     "{provider} art arda birkaç kez başlamadı, bu yüzden OpenBot denemeyi bıraktı. Tekrar denemek için sağlayıcıları yenileyin.",
+  "error.provider.startPaused":
+    "{provider} art arda birkaç kez başlamadı. OpenBot bir sonraki mesajda veya rutinde yeniden deneyecek. Şimdi denemek için sağlayıcıları yenileyin.",
   "error.provider.tempDiskSpace":
     "{provider} başlamak için en az 1 GB boş disk alanı gerektirir. Yer açın, ardından sağlayıcıları yenileyin.",
   "error.provider.noCodeSignIn": "{provider} için kodla oturum açılamaz.",
@@ -273,6 +275,8 @@ export const messages = {
     "OpenCode modeli turu akıl yürütmesinden sonra yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",
@@ -303,6 +307,8 @@ export const messages = {
     "Google bu istek için Gemini oturum açma bilgisini kabul etmedi. Mesajınızı yeniden gönderin. Hata devam ederse Ayarlar'dan Gemini'ye yeniden bağlanın.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini'nin Google ile bağlantısı kesildi. Mesajınızı yeniden gönderin. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
   "error.provider.antigravityHistoryUnreadable":

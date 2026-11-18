@@ -512,7 +512,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "connector.whatsapp.add": "إضافة",
   "connector.whatsapp.groupTitle": "إضافة مجموعة",
-  "connector.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "connector.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "connector.whatsapp.groupSearch": "بحث في المجموعات",
   "connector.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "connector.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",

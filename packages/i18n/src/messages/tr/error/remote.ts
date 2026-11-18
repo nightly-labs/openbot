@@ -85,7 +85,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",
   "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
-  "error.remote.hostDisconnected": "WebRTC ana makinesinin bağlantısı kesildi.",
+  "error.remote.hostDisconnected":
+    "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",
   "error.remote.eventGap": "Ana makine etkinlik dizisinde bir boşluk var.",
   "error.remote.malformedKnownEvent": "Ana makine bozuk biçimli bir bilinen etkinlik döndürdü.",
   "error.remote.fileTransportIsStopped": "WebRTC dosya iletimi durduruldu.",
@@ -204,6 +205,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
   "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.serverNotLoaded": "OpenBot sunucuyu yükleyemedi. Tekrar deneyin.",
+  "error.remote.localServerNotStarted":
+    "Bu bilgisayardaki sunucu başlamadı. Tekrar deneyin. Başlamazsa OpenBot'u bu bilgisayarda yeniden başlatın.",
   "error.remote.localServerAccountRemovalFailed":
     "Sunucu kendi bilgisayarında silindi ancak hesap onu hâlâ listeliyor. Hesaptan kaldırmak için yeniden silin.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -375,6 +375,11 @@ the backup. When it has less, copy the old data to another disk, delete it from
 
 ## Upgrades
 
+When OpenBot cannot start, for example after a failed start of a new image, it stops its start loop
+and runs its safe mode: each member's app shows why the server does not start and which version it
+runs. The safe mode opens no database. After one hour it exits, and the restart policy starts the
+container again. A newer image is the fix. See [hosted servers](hosted-servers.md#start-loop).
+
 OpenBot does not update itself in a container. A new image replaces it. An instance of
 `docker/instances` can ask the host for that from the app, see
 [Updates from the app](#updates-from-the-app). Do not go back to an older tag: an older OpenBot cannot

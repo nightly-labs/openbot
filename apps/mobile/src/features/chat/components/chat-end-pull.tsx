@@ -30,15 +30,16 @@ import type { ChatMotion } from "./use-chat-motion";
 /**
  * The list moves this far past its end before the ring starts: a short pull only moves the list, and
  * makes room above the message field, so the ring does not cover the last message. The iOS bounce
- * resists more than the Android pull, so iOS starts the ring sooner.
+ * resists more than the Android pull, so iOS starts the ring at a smaller moved distance. On both
+ * platforms the finger moves about 70 points before the ring starts.
  */
-const PULL_DEAD_ZONE = isIOS ? 28 : 56;
+const PULL_DEAD_ZONE = isIOS ? 37 : 56;
 /** After the dead zone, the list moves this much further while the ring fills. */
 const PULL_DISTANCE = 48;
 /**
  * Android does not bounce past the end, so the list moves up with the finger under this resistance,
- * as an iOS bounce does. The ring is full at the same moved distance as on iOS, which the finger
- * reaches after about 160 dp: the finger moves the list almost one to one at first.
+ * as an iOS bounce does. The ring starts after about 70 dp of finger travel, as on iOS, and is full
+ * after about 160 dp: the finger moves the list almost one to one at first.
  */
 const ANDROID_BAND = 320;
 const ANDROID_BAND_FACTOR = 0.95;

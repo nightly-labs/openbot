@@ -415,7 +415,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "connector.whatsapp.add": "추가",
   "connector.whatsapp.groupTitle": "그룹 추가",
-  "connector.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "connector.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "connector.whatsapp.groupSearch": "그룹 검색",
   "connector.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",

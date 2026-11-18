@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import type { BrowserWindow } from "electron";
+import type { BaseWindow, BrowserWindow } from "electron";
 import type * as Koffi from "koffi";
 
 const logger = createOpenBotLogger("mac-panel-activation");
@@ -66,13 +66,13 @@ export function preventPanelActivation(window: BrowserWindow): void {
 }
 
 /**
- * Tells window switchers, such as AltTab, that a macOS panel is not a window to switch to.
+ * Tells window switchers, such as AltTab, that a macOS panel or helper window is not a window to switch to.
  *
  * An Electron panel reports the `AXStandardWindow` subrole, and a focused panel also reports itself as
- * the main window. A window switcher then lists it as a window of OpenBot. `AXFloatingWindow` is the
- * subrole of a floating palette, which window switchers do not list.
+ * the main window. A frameless window reports `AXDialog`. A window switcher lists both as windows of
+ * OpenBot. `AXFloatingWindow` is the subrole of a floating palette, which window switchers do not list.
  */
-export function hidePanelFromWindowSwitchers(window: BrowserWindow): void {
+export function hidePanelFromWindowSwitchers(window: BaseWindow): void {
   if (process.platform !== "darwin") return;
   try {
     const objc = objcRuntime();

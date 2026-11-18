@@ -94,8 +94,8 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); the share sender step needs a store build |
-| 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); no mobile build has it yet (1.4.11 does not), so no deletion before the first store build with it plus 60 days; step 2 (protocol 10) done (#12111, `78ad15d100`); prerequisite steps 2 and 3 done (#12139, `38fd2ed18e`); the share sender step needs a store build |
+| 3 | A server stops a start loop and reports the reason through the Team API | IN REVIEW: the loop stops (#10775, `932be637d6`); safe mode in #12185; `copy_release` stays a copy (see below) |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
@@ -155,12 +155,57 @@ Prerequisite steps, in this order:
    old adapters does not delete code that the current protocol uses.
 3. The host refuses an unmarked WebRTC request with `client_update_required`.
 
+Prerequisite steps 2 and 3 (branch `t3/plan-011-item-2-steps-2-3`, 2026-11-18):
+
+- Step 2. The WebRTC framing of every protocol is in
+  `packages/contracts/src/team-protocol/webrtc-framing.ts`; `v2.ts` only re-exports it. The bodyless
+  request frame (GET, DELETE, the routine test POST, the remote viewer routes) that protocols 4 to 10
+  sent through the v3 WebRTC codec is in `webrtc-bodyless-requests.ts`. The v4 to v8 WebRTC adapters
+  no longer import the v3 WebRTC codec. `scripts/team-webrtc-wire-parity-e2e.ts --before=<ref>`
+  compares each codec, framing and transcript output of protocols 1 to 10 with the base commit:
+  38904 cases against `6ea0807f6a`, 0 differences.
+- Step 3. `TeamWebRtcHostPeer` refuses an `http.request` with no protocol marker with status 426,
+  `client_update_required` and `error.team.clientUpdateRequired`, as the HTTP gate refuses a request
+  with no protocol header. `scripts/team-api-legacy-clients-e2e.ts` proves that an unmarked request
+  is refused and that a protocol 4 request still works.
+
+Step 3 evidence: the last release that sends an unmarked WebRTC request.
+
+| Surface | Releases in the window | Unmarked sender | Result |
+|---|---|---|---|
+| Desktop and host | v0.14.0 (2026-09-19) to v0.73.0 | v0.6.1 (2026-09-08) is the last one; v0.7.0 (2026-09-09) adds `opencode` | v0.6.1 left the window on 2026-11-07 |
+| Mobile | 1.0.0 (2026-09-28) to 1.4.11 (2026-11-17) | none: `remote-peer` is the only `http.request` sender, and the share sender (1.4.3+) uses it | no unmarked sender |
+| Web client | `remote-peer` of `main` | none | no unmarked sender |
+
+Where I looked: `git show <tag>:` of `team-webrtc-client-transport.ts` and
+`packages/team-client/src/remote-peer.ts` for each tag, and the mobile release commits. Not confirmed:
+the mobile store dates (from `apps/mobile/CHANGELOG.md` only), that 1.0.0 (`192540e9b2`) is the store
+build, the OTA bundles, and the commit that `openbot.run/app` serves.
+
+What the deletion PR must still move, because current code uses it:
+
+- 31 files outside the contracts package import `@openbot/contracts/team-protocol/v2`. Point them at
+  `team-protocol/webrtc-framing` before `v2.ts` goes.
+- The WebRTC response encoders of protocols 4-8 in `src/main/team-webrtc-host-peer.ts`
+  (`webRtcResponseEncoder`, selected by the peer protocol). The v3 encoder is no longer imported there.
+- `current.ts`, `current-agent-keys.ts`, `current-adapter-routes.ts`, `analytics-v1.ts`,
+  `host-analytics-v1.ts`, `channels-v1.ts`, `routines-once-v1.ts`, `profile-v1.ts` and
+  `http-codecs.ts` import from `v1`, `v1-adapter`, `v3` or `v3-adapter`.
+
 Not confirmed: mobile store release dates (the repo has only the prepare commits), the mobile window
 policy (no repo source), and whether the web client is served from the latest `main`.
 
-Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by the version. Only
-new capabilities go in the list. When no release in the window speaks protocol 9, delete those
-capabilities from the lists.
+Step 2: protocol 10 (`packages/contracts/src/team-protocol/v10.ts`) has a fixed capability baseline,
+the frozen protocol 9 list (`fixtures/v10/baseline-capabilities.json`). A protocol 10 peer sends two
+lists, in both directions: `capabilities`, with the names after protocol 9 and the markers, and
+`absent`, with the baseline names that it does not serve. The receiver's set is
+`(baseline - absent) + capabilities`. The version does not imply a baseline capability, because a
+peer can lack one: a Mac host does not serve `mac-apps-limit-v1`, and a host with no channel service
+does not serve the channel capabilities. A host ignores an unknown name in `absent` and refuses a
+malformed list with `protocol_error`. `absent` has at most as many names as the baseline. Protocols
+1-9 do not change. The host speaks 1-10; the desktop and web clients speak 10 when the host does, and
+mobile stays on 9 until a capability after protocol 9 needs it there. When no release in the window
+speaks protocol 9, the baseline stays: it is the protocol 10 wire contract.
 
 The protocol 9 list is full since #11930 (2026-11-18): 256 of the 256 capabilities that it can
 have. A new optional capability needs protocol 10 first.
@@ -172,8 +217,35 @@ Evidence: `src/main/index.ts` `recoverFromStartLoop` only logs for a server;
 `scripts/hosting/openbot-hosted-update` `copy_release` runs `rm -rf` before the copy.
 
 Change: after repeated failed starts, or a `NewerDatabaseError`, the server stops the loop, keeps a
-minimal Team API up that tells owners and admins the reason, and clients (desktop with a joined
-server, web client, mobile) show it. The release copy becomes atomic.
+minimal Team API up that tells all members the reason, and clients (desktop with a joined
+server, web client, mobile) show it. The release copy is safe after a stop or a failure.
+
+Decisions (developer, 2026-11-18): all members see the reason. The safe mode has no install and no
+rollback action, on servers and on Docker: a newer release, through the existing update path, is the
+fix. No "skip failed version" rule. The safe mode opens no `openbot.db`.
+
+Done in the safe-mode PR (stacked on protocol 10):
+
+- `src/main/server-safe-mode.ts` and `src/main/team-api/server-safe-mode-api.ts`: auth (read-only
+  `TeamStore`), compatibility and `GET /v1/server/safe-mode` only, through loopback HTTP and the
+  WebRTC gateway. Protocols 1-9 get `client_update_required`. The reason is a word, the app version
+  and a time.
+- Optional protocol 10 capability `server-safe-mode-v1`. Desktop, web client and mobile (the
+  mobile workspace now speaks 10 and keeps 9) show a translated reason.
+- `/run/openbot/server-safe-mode` marker. The hourly `check` of `openbot-hosted-update` stops the
+  safe mode, stages, applies and starts. Without the marker directory (Docker), the safe mode ends
+  after 1 h with exit 78.
+- `scripts/server-safe-mode-e2e.ts`.
+
+Not changed: `copy_release` stays a copy (decision, 2026-11-18). A rename of a release directory is
+not safe on boat: a directory moved with `mv` into `/opt` is empty after the next stop and resume.
+The copy is already safe without a rename:
+- `stage_release` writes `staged.ready` only after the copy is complete, so `apply` never uses a
+  partial `staged`.
+- `swap_in` writes `.applying` first and keeps `staged` until `finish_swap`, so a stop or a failure
+  during the copy makes the next `apply` copy again.
+- `swap_in` removes `app` before the copy, so the copy needs about the same free disk space that the
+  removal gives back.
 
 ### 4. Schema-aware desktop recovery
 
@@ -227,7 +299,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | DONE (#10806, `6b2da3b900`; no `name` column: the check stops a renumber) |
 | 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | DROPPED: developer decision, 2026-11-17 (#10805 closed) |
 | 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | DONE (#10801, `511572aee3`) |
-| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | TODO |
+| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | DONE: `TEAM_CAPABILITY_REGISTRY` and `supportsTeamCapability`, with item 2 step 2 (#12111, `78ad15d100`) |
 | 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | DONE (#10818; 1.96 GB: 25.5 s, v39 needs about 2x the file in free disk) |
 
 ## Phase 3: durable state
@@ -236,7 +308,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 |---|---|---|
 | 13 | Durable idempotency keys for commands that clients retry | DONE (#11906, `2279f4aa56`: task start; #11930, `8aa900004a`: agent create, protocol 9 capability `agent-create-operation-v1`, and a resent thread message keeps its client id. Message sends were already durable. The share extension has no resend after a failure, so it needs no change.) |
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | RE-SCOPED: developer decision, 2026-11-18 (see below) |
-| 16 | Typed update state machine and one runtime state file | TODO |
+| 16 | Typed update state machine and one runtime state file | RE-SCOPED: audit of 2026-11-18 (see below); the host takeover fix is done |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |
 | 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | DONE (#11872, `a694b58a7b`; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
 | 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | DONE (#11643, `d264b0a324`) |
@@ -266,12 +338,79 @@ Decision: no delete sweep, and no check against the replay. Make the replay keep
 and message order first, and only when a repair path needs it. Not confirmed: other users and
 hosted servers. Only one computer was measured.
 
+### 16. Update state audit (re-scoped)
+
+Audited on 2026-11-18: the desktop `UpdateService`, the hosted and container update scripts, and the
+macOS Host Manager. Each claim below was checked in the code.
+
+- **Fixed.** When a Host Manager takes over the updates, the tenant cancels its own check and
+  download and shows no busy phase (`setManagedByHost`, `scripts/update-host-takeover-e2e.ts`).
+  Before, a running download continued, and its events replaced the host state until the next poll.
+- **Not a defect.** A torn `staged.ready` reads as "not staged", and the next `stage` removes the
+  copy and stages it again, so an atomic write changes nothing. After a newer download replaces a
+  ready update, electron-updater has cleared the old file (`AppUpdater.js`, `DownloadedUpdateHelper.js`),
+  so "ready" cannot come back. `availableVersion` in `error` is the version that a download retry
+  uses (`#canDownload`), and mobile shows it. The macOS `failed` phase stops tenant starts by design,
+  and `docs/multi-tenant-hosting.md` "State and recovery" gives the admin reset. The three other
+  `sort -V` copies compare validated `X.Y.Z` versions only, as the tested bash `newer()` does.
+- **Not worth a union type.** `UpdateStatus` is also the server update status that mobile and the
+  web client read, and the loose fields have no defect left after the items above.
+- **Open, needs a decision.** The install result of a hosted server is not saved or reported (no
+  code reads `.applying`). Reporting it needs a new optional capability, and the protocol 9 list is
+  full (item 2). The four "run started" files (`start-attempts`, `run-marker`, `startup-history`,
+  `gpu-start`) can become one versioned file, but released versions read them, so this needs its own
+  upgrade plan.
+
 ## Phase 4: longer term
 
 | # | Item | State |
 |---|---|---|
 | 18 | Durable event cursor resume for clients | TODO |
 | 19 | Mailbox unit of work | TODO |
-| 20 | Tables that can be rebuilt move to a separate database | TODO |
+| 20 | Tables that can be rebuilt move to a separate database | DROPPED: audit of 2026-11-18 (see below); item 23 removed most of the size |
 | 21 | Effect Schema for new codecs | TODO |
-| 22 | Split `scripts/team-api-routes-e2e.ts` | TODO |
+| 26 | Give free pages back to the disk after the item 23 compaction | TODO: not measured at 17 GB yet (see item 20) |
+| 22 | Split `scripts/team-api-routes-e2e.ts` | NOT DONE: audit of 2026-11-18 (see below); new route areas go in their own script |
+
+### 20. Separate database for tables that can be rebuilt (dropped)
+
+Audit of 2026-11-18 (`main` at `6a5f3fab5b`):
+
+- **Few tables can be rebuilt.** The `projection_*` tables are the source of truth: the thread replay
+  (`thread-replay.ts:41`) and `ChannelStore.rebuild` (`channel-store.ts:1113`) have no production
+  caller. Only the FTS index `agent_memory_search` and the provider history staging cache can be
+  rebuilt, and both are small.
+- **`orchestration_events` is not a full event log.** The code deletes old events (for example
+  `agent-roster.ts:399-402`, `conversation-writer.ts:1042`, `memory-store.ts:298-312`), and production
+  code reads events (`agent-roster.ts:110`, `routine-store.ts:207`, `hosted-site-event-log.ts:71-135`).
+- **Item 23 (#11872, v0.73.0) already removes most of the size.** On a copy of the developer's
+  profile: `orchestration_events` 326.3 MB to 32.3 MB, in 1.6 s. The file stays 384.8 MB because the
+  free pages stay in it; `VACUUM INTO` gives 88.8 MB.
+- **A second file costs too much.** `dispatch` writes events, projections and the receipt in one
+  transaction (`database-core.ts:139-191`); across two WAL files a commit is atomic for each file only
+  (SQLite documentation), so a crash can run a retried command two times, and privacy deletes
+  (`deleted-thread-messages.ts:105-134`, `agent-roster.ts:178-243`) can leave deleted text. Migrations,
+  the frozen-file check, the harness, the 42 released schema fixtures, backups and hosted saves all
+  work on one file. The move copies about 12 GB on the largest hosted server.
+
+Item 26 takes the real gap that is left: the file does not get smaller on disk. A one-time `VACUUM`
+needs about 2x the file in free disk and holds the write lock for its full time; measure it with
+`bun scripts/migration-large-db-e2e.ts --full` on a large server first. Not confirmed: hosted
+servers after v0.73.0 were not measured.
+
+### 22. Routes E2E split (not done)
+
+Measured on 2026-11-18 (`main` at `641fc1e429`):
+
+- **No CI gain.** The file has 14,263 lines, but the `Team API routes E2E` job takes 39 s (with
+  the CRM and comparator scripts), and `Check` takes about 4 min. The job is not on the critical path.
+- **The size causes no merge conflicts.** 104 commits changed the file in 30 days. Of the 6 open PRs
+  that change it, `git merge-tree` with `origin/main` finds a conflict in it for 1 PR only (#8198,
+  which also has conflicts in many other files). A split moves each line, so all 6 PRs would get a conflict.
+- **The checks are one sequence.** Lines 2336-14252 are one `try` block on one server, and later
+  checks read stand-in state that earlier checks wrote. Separate scripts would each need the 2,300
+  lines of stand-ins, or a shared context module that only moves the code.
+
+Do instead: give a new route area its own script, as `scripts/crm-team-api-e2e.ts` does for `crm-v1`.
+Open this item again when the job time is on the critical path, or when conflicts in the file are
+frequent.

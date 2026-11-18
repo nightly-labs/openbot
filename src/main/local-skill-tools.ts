@@ -8,7 +8,7 @@ import type { SkillMarketplaceService } from "./skill-marketplace-service";
 export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTools {
   const library = skills.requireLocalLibrary();
   return {
-    list: () => library.list().pipe(toToolOperationFailed),
+    list: () => library.listWithUnreadable().pipe(toToolOperationFailed),
     get: (input) =>
       Effect.gen(function* () {
         const detail = yield* library.get(input.skillId, input.revision).pipe(toToolOperationFailed);

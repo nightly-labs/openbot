@@ -82,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "لا يملك المضيف البعيد مفتاح جهاز مثبّتًا.",
   "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
-  "error.remote.hostDisconnected": "انقطع اتصال مضيف WebRTC.",
+  "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
   "error.remote.eventGap": "يوجد انقطاع في تسلسل أحداث المضيف.",
   "error.remote.malformedKnownEvent": "أعاد المضيف حدثًا معروفًا مشوّهًا.",
   "error.remote.fileTransportIsStopped": "نقل الملفات عبر WebRTC متوقف.",
@@ -196,7 +196,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "حدّث خادم الحاسوب المكتبي هذا لحذف القنوات.",
   "error.remote.historyRefreshFailed": "أُرسلت الرسالة، لكن تعذّر تحديث سجل الدردشة.",
   "error.remote.taskHistoryRefreshFailed": "تغيّرت المهمة، لكن تعذّر تحديث سجل الدردشة.",
-  "error.remote.localServerStartFailed": "لم يبدأ الخادم على هذا الحاسوب.",
+  "error.remote.serverNotLoaded": "تعذّر على OpenBot تحميل الخادم. حاول مرة أخرى.",
+  "error.remote.localServerNotStarted":
+    "لم يبدأ الخادم على هذا الحاسوب. حاول مرة أخرى. إذا لم يبدأ، فأعد تشغيل OpenBot على هذا الحاسوب.",
   "error.remote.localServerNotFound": "هذا الخادم ليس على هذا الحاسوب.",
   "error.remote.localServerAccountRemovalFailed":
     "حُذف الخادم على حاسوبه، لكن الحساب لا يزال يُدرجه. احذفه مرة أخرى لإزالته من الحساب.",

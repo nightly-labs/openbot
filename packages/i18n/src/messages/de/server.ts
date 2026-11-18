@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "OpenBot auf {name} aktualisieren",
   "server.compatibility.unsafeDataTitle": "Der Host hat unsichere Daten zurückgegeben",
   "server.compatibility.cannotConnectTitle": "Verbindung mit {name} nicht möglich",
+  "server.compatibility.safeModeTitle": "{name} startet nicht",
   "server.compatibility.updateClientDescription":
     "Diese App unterstützt nur ältere Protokolle als der Host. Aktualisiere diese App und versuche es erneut.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,8 @@ export const messages = {
   "server.local.create": "Server erstellen",
   "server.local.creating": "Server wird erstellt…",
   "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
+  "server.local.createFailedRetry":
+    "Etwas ist schiefgelaufen. Versuche es erneut. Wenn es wieder fehlschlägt, starte OpenBot neu.",
   "server.local.limitReached":
     "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
   "server.local.deleteConfirmTitle": "{name} löschen?",

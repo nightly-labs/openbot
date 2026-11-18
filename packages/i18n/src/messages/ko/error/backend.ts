@@ -250,6 +250,8 @@ export const messages = {
     "이 에이전트는 정해진 수의 MCP 서버만 쓸 수 있어요. 이 서버를 쓰려면 에이전트에 필요 없는 MCP 서버를 꺼 주세요.",
   "error.backend.mcpRegistrationRefused":
     "로그인 서버가 아직 OpenBot을 앱으로 허용하지 않아요. 계정 문제가 아니에요. 로컬 MCP 서버처럼 다른 방법으로 연결하세요.",
+  "error.backend.mcpRegistrationUnavailable":
+    "로그인 서버가 OpenBot을 앱으로 등록할 수 없어요. 계정 문제가 아니에요. 연결하려면 마켓플레이스, 앱에서 이 서버를 저장한 다음 로그인 앱을 추가하세요.",
   "error.backend.mcpSignInAbandonedGeneric": "로그인이 중단되었어요.",
   "error.backend.mcpSignInForgotten": "MCP 로그인이 진행 중에 삭제되었어요.",
   "error.backend.mcpSignInAbandoned": "MCP 로그인이 중단되었어요.",
@@ -261,6 +263,7 @@ export const messages = {
     "이 서버에 로그인해야 하는데, OpenBot은 https로만 로그인해요. URL을 {url}(으)로 변경하세요.",
   "error.backend.mcpSignInCancelled": "로그인이 취소되었어요.",
   "error.backend.mcpSignInTimedOut": "브라우저에서 로그인을 마치지 않았어요.",
+  "error.backend.mcpSignInRefused": "로그인 페이지에서 접근을 거부했어요. 다시 로그인하세요.",
   "error.backend.mcpSignInResponseTimedOut": "로그인 응답이 제시간에 도착하지 않았어요.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",

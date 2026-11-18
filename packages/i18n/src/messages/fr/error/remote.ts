@@ -89,7 +89,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",
   "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
-  "error.remote.hostDisconnected": "L’hôte WebRTC s’est déconnecté.",
+  "error.remote.hostDisconnected":
+    "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",
   "error.remote.eventGap": "La séquence d’événements de l’hôte présente un trou.",
   "error.remote.malformedKnownEvent": "L’hôte a renvoyé un événement connu mal formé.",
   "error.remote.fileTransportIsStopped": "Le transport de fichiers WebRTC est arrêté.",
@@ -210,6 +211,9 @@ export const messages = {
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.serverNotLoaded": "OpenBot n'a pas pu charger le serveur. Réessayez.",
+  "error.remote.localServerNotStarted":
+    "Le serveur sur cet ordinateur n'a pas démarré. Réessayez. S'il ne démarre toujours pas, redémarrez OpenBot sur cet ordinateur.",
   "error.remote.localServerAccountRemovalFailed":
     "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

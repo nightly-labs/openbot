@@ -460,7 +460,7 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "connector.whatsapp.add": "添加",
   "connector.whatsapp.groupTitle": "添加群组",
-  "connector.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "connector.whatsapp.groupDescription": "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "connector.whatsapp.groupSearch": "搜索群组",
   "connector.whatsapp.groupsLoading": "正在读取群组…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",
