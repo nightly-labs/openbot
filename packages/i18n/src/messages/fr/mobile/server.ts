@@ -996,7 +996,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Ajouter",
   "mobile.server.connectors.whatsapp.groupTitle": "Ajouter un groupe",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "Les membres de ce groupe peuvent confier des tâches à vos agents.",
+    "Les membres de ce groupe peuvent confier des tâches à vos agents en mentionnant le numéro ou en répondant à ses messages.",
   "mobile.server.connectors.whatsapp.groupSearch": "Rechercher des groupes",
   "mobile.server.connectors.whatsapp.groupsLoading": "Lecture des groupes…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot n’a pas pu lire les groupes",

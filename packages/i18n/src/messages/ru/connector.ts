@@ -496,7 +496,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Необязательно. Если пусто, в списке будет номер телефона.",
   "connector.whatsapp.add": "Добавить",
   "connector.whatsapp.groupTitle": "Добавить группу",
-  "connector.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "connector.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "connector.whatsapp.groupSearch": "Поиск групп",
   "connector.whatsapp.groupsLoading": "Загрузка групп…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
