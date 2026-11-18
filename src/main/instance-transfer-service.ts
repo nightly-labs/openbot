@@ -16,7 +16,6 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/contracts/instance-transfer-copy";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportPreviewAgent,
@@ -90,6 +89,7 @@ import {
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/team-client/instance-transfer-copy";
 import { Deferred, Effect, Exit, Result } from "effect";
 import { Zip, ZipPassThrough, zipSync } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
@@ -803,7 +803,7 @@ export class InstanceTransferService {
 
   /**
    * Copy to another server: keeps only the settings of the copied agents in the file at `path`
-   * (`@openbot/contracts/instance-transfer-copy`). The file can be up to 2 GB, so only its end is
+   * (`@openbot/team-client/instance-transfer-copy`). The file can be up to 2 GB, so only its end is
    * read and written again.
    */
   readonly keepCopiedSettings = Effect.fn("InstanceTransfer.keepCopiedSettings")(function* (

@@ -26,7 +26,7 @@ import { ServerPreferencesInFile, type TransferServerPreferences } from "./insta
 import { TRANSFER_WORKFLOWS } from "./instance-transfer-workflows";
 import { isUnsafeArchivePath } from "./skill-package";
 
-export { INSTANCE_TRANSFER_MANIFEST } from "@openbot/contracts/instance-transfer-copy";
+export { INSTANCE_TRANSFER_MANIFEST } from "@openbot/team-client/instance-transfer-copy";
 export const INSTANCE_TRANSFER_FORMAT = "openbot-instance-transfer";
 export const INSTANCE_TRANSFER_VERSION = 1;
 /** Where the files of `~/OpenBot/Shared` are in the archive. */

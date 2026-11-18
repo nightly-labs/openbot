@@ -338,7 +338,7 @@ this computer's included. `instance-transfer:copy` is scoped to the destination 
 server settings and without chat history to a temporary file. As in a file export, the file also has
 the channels that have a selected agent as a member and the Shared folder. Each apply adds the
 channels again as new channels. Main then keeps only the settings of the copied agents in the file
-(`InstanceTransferService.keepCopiedSettings`, with `@openbot/contracts/instance-transfer-copy`): the
+(`InstanceTransferService.keepCopiedSettings`, with `@openbot/team-client/instance-transfer-copy`): the
 routine flows between them, the places on their routine canvas, and the workflows with a step for one
 of them or an output to one of their channels. MCP servers, custom providers and agents, sidebar
 sections and shared skills stay out. It writes a new manifest and a new central directory over the old

@@ -1,6 +1,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
 import { base64ToBytes, bytesToBase64 } from "./base64";
+import { copyTransfer } from "./instance-transfer-copy";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
@@ -8,7 +9,6 @@ import { base64ToBytes, bytesToBase64 } from "./base64";
 // stays at its call site.
 
 import type { FeedbackPhone } from "@openbot/contracts/feedback";
-import { copyTransfer } from "@openbot/contracts/instance-transfer-copy";
 import {
   type AgentApproval,
   type AgentImportPreview,
@@ -604,7 +604,7 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
 
 /**
  * Copy to another server: the host's transfer file with only the settings of the copied agents, their
- * routine flows and workflows (`@openbot/contracts/instance-transfer-copy`). Only the Base64 of the
+ * routine flows and workflows (`instance-transfer-copy.ts`). Only the Base64 of the
  * manifest and of the end of the file is decoded; the rest stays as it is. Null when the file is not
  * a transfer file.
  */

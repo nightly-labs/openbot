@@ -16,7 +16,7 @@
  * file in memory as Base64 and uses `copyTransfer`, which reads only the parts that it needs.
  */
 
-import { type DynamicRecord, isDynamicRecord, isString } from "./runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 
 /** The manifest at the root of an instance transfer file. */
 export const INSTANCE_TRANSFER_MANIFEST = "openbot-transfer.json";
