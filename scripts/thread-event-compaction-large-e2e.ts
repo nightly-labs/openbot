@@ -427,8 +427,20 @@ function parseChildResult(value: unknown): ChildResult {
   };
 }
 
-/** Runs the child to the end, or kills it with SIGKILL after `killAfter` batches. */
-function runChild(killAfter: number | null): Promise<Measured> {
+interface Sampled {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  peakExtraDiskBytes: number;
+  peakWalBytes: number;
+  walBytesAfter: number;
+  wallSeconds: number;
+}
+
+/**
+ * Runs a child mode of this script and samples the free disk and the WAL until it ends. `onLine` gets
+ * each line of its output and a function that kills it with SIGKILL.
+ */
+function runSampled(args: readonly string[], onLine: (line: string, kill: () => void) => void): Promise<Sampled> {
   return new Promise((resolvePromise, reject) => {
     const freeBefore = freeBytes(OUT);
     const started = performance.now();
@@ -439,38 +451,19 @@ function runChild(killAfter: number | null): Promise<Measured> {
       peakWalBytes = Math.max(peakWalBytes, fileBytes(`${databasePath}-wal`));
     };
     const timer = setInterval(sample, 25);
-    const compaction = spawn(
-      process.execPath,
-      [import.meta.filename, "--child=compact", `--root=${root}`, "--pause-ms=5"],
-      {
-        env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
-        stdio: ["ignore", "pipe", "inherit"],
-      },
-    );
-    let batchesSeen = 0;
-    let result: ChildResult | null = null;
-    let killed = false;
-    createInterface({ input: compaction.stdout }).on("line", (line) => {
-      if (line.startsWith("batch ")) {
-        batchesSeen += 1;
-        if (killAfter !== null && batchesSeen >= killAfter && !killed) {
-          killed = true;
-          compaction.kill("SIGKILL");
-        }
-      } else if (line.startsWith("result ")) result = parseChildResult(JSON.parse(line.slice(7)));
+    const child = spawn(process.execPath, [import.meta.filename, ...args], {
+      env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
+      stdio: ["ignore", "pipe", "inherit"],
     });
-    compaction.on("error", reject);
-    compaction.on("close", (code, signal) => {
+    const kill = () => child.kill("SIGKILL");
+    createInterface({ input: child.stdout }).on("line", (line) => onLine(line, kill));
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
       clearInterval(timer);
       sample();
-      if (!killed && code !== 0) {
-        reject(new Error(`The compaction child exited with ${code ?? signal}.`));
-        return;
-      }
       resolvePromise({
-        result,
-        killed,
-        batchesSeen,
+        code,
+        signal,
         peakExtraDiskBytes,
         peakWalBytes,
         walBytesAfter: fileBytes(`${databasePath}-wal`),
@@ -478,6 +471,32 @@ function runChild(killAfter: number | null): Promise<Measured> {
       });
     });
   });
+}
+
+/** Runs the compaction child to the end, or kills it with SIGKILL after `killAfter` batches. */
+async function runChild(killAfter: number | null): Promise<Measured> {
+  let batchesSeen = 0;
+  let result: ChildResult | null = null;
+  let killed = false;
+  const run = await runSampled(["--child=compact", `--root=${root}`, "--pause-ms=5"], (line, kill) => {
+    if (line.startsWith("batch ")) {
+      batchesSeen += 1;
+      if (killAfter !== null && batchesSeen >= killAfter && !killed) {
+        killed = true;
+        kill();
+      }
+    } else if (line.startsWith("result ")) result = parseChildResult(JSON.parse(line.slice(7)));
+  });
+  if (!killed && run.code !== 0) throw new Error(`The compaction child exited with ${run.code ?? run.signal}.`);
+  return {
+    result,
+    killed,
+    batchesSeen,
+    peakExtraDiskBytes: run.peakExtraDiskBytes,
+    peakWalBytes: run.peakWalBytes,
+    walBytesAfter: run.walBytesAfter,
+    wallSeconds: run.wallSeconds,
+  };
 }
 
 const generated = await generate();
@@ -522,48 +541,20 @@ const replaysAfter = await replayHashes();
 const replayDifferences = [...replaysBefore].filter(([threadId, hash]) => replaysAfter.get(threadId) !== hash).length;
 
 /** Runs one VACUUM in a child and samples the free disk and the WAL until it ends. */
-function runVacuum(): Promise<{
-  seconds: number;
-  maxRssBytes: number;
-  peakExtraDiskBytes: number;
-  peakWalBytes: number;
-}> {
-  return new Promise((resolvePromise, reject) => {
-    const freeBefore = freeBytes(OUT);
-    let peakExtraDiskBytes = 0;
-    let peakWalBytes = 0;
-    const sample = () => {
-      peakExtraDiskBytes = Math.max(peakExtraDiskBytes, freeBefore - freeBytes(OUT));
-      peakWalBytes = Math.max(peakWalBytes, fileBytes(`${databasePath}-wal`));
-    };
-    const timer = setInterval(sample, 25);
-    const vacuum = spawn(process.execPath, [import.meta.filename, "--child=vacuum", `--database=${databasePath}`], {
-      env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
-      stdio: ["ignore", "pipe", "inherit"],
-    });
-    let output = "";
-    vacuum.stdout.setEncoding("utf8");
-    vacuum.stdout.on("data", (chunk: string) => {
-      output += chunk;
-    });
-    vacuum.on("error", reject);
-    vacuum.on("close", (code) => {
-      clearInterval(timer);
-      sample();
-      const line = output.split("\n").find((value) => value.startsWith("result "));
-      const value = line ? JSON.parse(line.slice(7)) : null;
-      if (code !== 0 || !isDynamicRecord(value)) {
-        reject(new Error(`The VACUUM child exited with ${code}.`));
-        return;
-      }
-      resolvePromise({
-        seconds: Number(value.seconds),
-        maxRssBytes: Number(value.maxRssBytes),
-        peakExtraDiskBytes,
-        peakWalBytes,
-      });
-    });
+async function runVacuum() {
+  const results: string[] = [];
+  const run = await runSampled(["--child=vacuum", `--database=${databasePath}`], (line) => {
+    if (line.startsWith("result ")) results.push(line.slice(7));
   });
+  const value = results[0] === undefined ? null : JSON.parse(results[0]);
+  if (run.code !== 0 || !isDynamicRecord(value))
+    throw new Error(`The VACUUM child exited with ${run.code ?? run.signal}.`);
+  return {
+    seconds: Number(value.seconds),
+    maxRssBytes: Number(value.maxRssBytes),
+    peakExtraDiskBytes: run.peakExtraDiskBytes,
+    peakWalBytes: run.peakWalBytes,
+  };
 }
 
 const vacuum = await runVacuum();
