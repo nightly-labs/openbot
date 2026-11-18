@@ -284,6 +284,7 @@ import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
+import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
 import { canConfineProcesses } from "../backend/process-confinement";
@@ -1450,9 +1451,17 @@ export class TeamApiServer {
         error instanceof TeamStoreError ||
         error instanceof McpServerError ||
         error instanceof AnalyticsInputError ||
-        error instanceof AgentMemorySelectionError;
+        error instanceof AgentMemorySelectionError ||
+        error instanceof AgentThreadLimitError;
+      // The thread limit answers 409, as a branch at the limit does.
       const status =
-        error instanceof HttpError || error instanceof RemoteScreenError ? error.status : expected ? 400 : 500;
+        error instanceof HttpError || error instanceof RemoteScreenError
+          ? error.status
+          : error instanceof AgentThreadLimitError
+            ? 409
+            : expected
+              ? 400
+              : 500;
       // Catalog text with no placeholder is safe to show, and the user can act on it. Any other
       // unexpected text stays private.
       const message =
