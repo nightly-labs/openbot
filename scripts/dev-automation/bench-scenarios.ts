@@ -610,6 +610,9 @@ function manyAgents(total: number, channelMembers: number): Scenario {
         "stream.main.loopMaxMs": main.loopMaxMs,
         "stream.window.taskPercent": (rendererSeconds("TaskDuration") * 1000 * 100) / streamMs,
         "stream.window.scriptPercent": (rendererSeconds("ScriptDuration") * 1000 * 100) / streamMs,
+        // Beside script, these tell where the time of the window goes.
+        "stream.window.stylePercent": (rendererSeconds("RecalcStyleDuration") * 1000 * 100) / streamMs,
+        "stream.window.layoutPercent": (rendererSeconds("LayoutDuration") * 1000 * 100) / streamMs,
         "stream.window.lagP99Ms": lag.p99,
         "stream.window.lagMaxMs": lag.max,
       });
