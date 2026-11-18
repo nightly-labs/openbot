@@ -11,6 +11,9 @@ import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.t
 import { APP_FONT } from "@/shared/lib/app-font";
 import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
 
+// Fast typing can be some keystrokes in front of JS. This many recent field texts count as echoes.
+const RECENT_FIELD_TEXTS = 8;
+
 export function SheetFormField({
   autoCapitalize,
   autoCorrect,
@@ -41,16 +44,14 @@ export function SheetFormField({
   const nativeValue = useNativeState(value);
   // On iOS 18 and later, SwiftUI stops the app ("String index is out of bounds") when JS replaces the
   // text of a focused field: the selection still points into the old text (expo/expo#47434, #48274).
-  // When the user types fast, a re-render can send an older value back. So the field keeps its text
-  // while it has focus, and a different value from JS goes to the field at blur. Clearing is safe at
-  // once: the field drops each selection that is past the end of the new text.
-  const focused = useRef(false);
-  const fieldText = useRef(value);
-  const latestValue = useRef(value);
-  latestValue.current = value;
+  // When the user types fast, a re-render can send back an older text that the field sent. Such an
+  // echo is not written to the field. Other values from JS, such as a paste, go at once. A clear goes
+  // at once too: it is safe, because the field drops each selection past the end of the new text.
+  const fieldTexts = useRef([value]);
   useEffect(() => {
-    if ((focused.current && value !== "") || value === fieldText.current) return;
-    fieldText.current = value;
+    const [current, ...older] = fieldTexts.current;
+    if (value === current || (value !== "" && older.includes(value))) return;
+    fieldTexts.current = [value];
     nativeValue.set(value);
   }, [nativeValue, value]);
   const lines = multiline ? (tall ? 14 : 4) : 1;
@@ -107,17 +108,8 @@ export function SheetFormField({
             textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 * textScale }}
             value={nativeValue}
             onChangeText={(text) => {
-              fieldText.current = text;
+              fieldTexts.current = [text, ...fieldTexts.current.slice(0, RECENT_FIELD_TEXTS - 1)];
               onChangeText(text);
-            }}
-            onFocus={() => {
-              focused.current = true;
-            }}
-            onBlur={() => {
-              focused.current = false;
-              if (latestValue.current === fieldText.current) return;
-              fieldText.current = latestValue.current;
-              nativeValue.set(latestValue.current);
             }}
             onSubmitEditing={onSubmitEditing}
           />
