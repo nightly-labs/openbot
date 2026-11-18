@@ -594,12 +594,12 @@ export class DrainScheduler {
 
   /**
    * Counts one session that did not open in time. False after the last try: that message fails, and
-   * the next message gets all its tries again.
+   * the next message gets all its tries and the shortest wait again, as after a turn that starts.
    */
   #mayRetryResume(agentId: string): boolean {
     const entry = this.#busyRetryEntry(agentId);
     if (entry.resumeTimeouts >= SESSION_RESUME_TIMEOUT_RETRIES) {
-      entry.resumeTimeouts = 0;
+      this.#busyRetries.delete(agentId);
       return false;
     }
     entry.resumeTimeouts += 1;
