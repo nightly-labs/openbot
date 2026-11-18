@@ -975,7 +975,8 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
               ownerAgentId: agentId,
             };
-            const callTabId = isRecord(browserCallArgs) && isString(browserCallArgs.tabId) ? browserCallArgs.tabId : undefined;
+            const callTabId =
+              isRecord(browserCallArgs) && isString(browserCallArgs.tabId) ? browserCallArgs.tabId : undefined;
             if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,
