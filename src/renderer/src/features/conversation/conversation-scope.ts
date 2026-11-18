@@ -1114,6 +1114,15 @@ export function createConversationViewScope(props: ConversationProps) {
     flush();
     setThreadFocusRequest((current) => current + 1);
   };
+  /** Opens a new thread, and its composer takes the focus, so the user can type at once. */
+  const startNewThread = () => {
+    const onNew = props.threads?.header.onNew;
+    if (!onNew) return;
+    onNew();
+    // The new thread shows first, so that its editor takes the request.
+    flush();
+    requestThreadFocus();
+  };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
     const key = threadComposer.openDraftKey();
@@ -2683,6 +2692,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadFocusRequest,
     requestThreadFocus,
     branchThread,
+    startNewThread,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
