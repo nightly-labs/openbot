@@ -1709,7 +1709,7 @@ export class HostedServerService {
     }
     // A server that has had no plan cannot buy a sold-out plan. A server whose plan ended can renew it.
     if (awaiting && SOLD_OUT_PLANS.has(row.plan)) return yield* planSoldOut();
-    const chosen = order === "previous" ? (closed?.status === "closed" ? closed : null) : order;
+    const chosen = order === "previous" ? closed : order;
     const license = chosen?.license;
     const earlyStartAt = chosen?.earlyStartAt;
     const session = yield* billing

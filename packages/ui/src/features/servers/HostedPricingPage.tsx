@@ -1,5 +1,5 @@
 import { BILLING_PLANS, type BillingCurrency, type BillingPlanId } from "@openbot/contracts/billing";
-import { isEuVatCountry } from "@openbot/contracts/billing-details";
+import { isEuConsumer } from "@openbot/contracts/billing-details";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { LICENSE_MAX_USERS, type LicenseTier, type PricingOrder } from "@openbot/contracts/license";
 import {
@@ -100,14 +100,6 @@ export interface OrderConsent {
 }
 
 /**
- * A buyer in the EU with no VAT ID is a consumer, with a 14-day right of withdrawal. A hosting service begins at
- * once only when the consumer asks for it.
- */
-function euConsumer(details: BillingDetailsDraft | undefined): boolean {
-  return details?.country != null && isEuVatCountry(details.country) && details.vatId.trim() === "";
-}
-
-/**
  * The web pricing page in the app window, with the same layout: the switches, the order form, and Enterprise. The
  * app's page header takes the place of the site header and the big heading. The app is already on the user's computer, so it does not say that personal use is free.
  */
@@ -124,7 +116,9 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
   });
   // The tick stays when the buyer changes the order.
   const [accepted, setAccepted] = createSignal(false);
-  const earlyStartAsked = () => order().server !== null && euConsumer(props.billingDetails);
+  // A server order that the server limit blocks cannot go on, so the page does not ask for the request.
+  const earlyStartAsked = () =>
+    order().server !== null && props.serverLimit == null && isEuConsumer(props.billingDetails);
   // The box starts clear each time it shows, as the law asks: the consumer must tick it.
   const [earlyStart, setEarlyStart] = createSignal(false);
   createEffect(earlyStartAsked, (asked) => {

@@ -4,7 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import { type BillingDetails, isEuVatCountry } from "@openbot/contracts/billing-details";
+import { type BillingDetails, isEuConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -312,8 +312,7 @@ function AddServerSession(
     // EU must ask on the pricing page that the server begin before the withdrawal period ends; the dialog cannot ask.
     const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
     const order = resume ? null : (untrack(() => props.order) ?? null);
-    const euConsumer = details?.country ? isEuVatCountry(details.country) && !details.vatId : false;
-    const needsPage = needsCountry || (euConsumer && order?.server != null);
+    const needsPage = needsCountry || (isEuConsumer(details) && order?.server != null);
     draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
     draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
