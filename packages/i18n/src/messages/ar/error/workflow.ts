@@ -15,6 +15,7 @@ export const messages = {
   "error.workflow.agentMissing": "اختر وكيلًا لهذه الخطوة.",
   "error.workflow.handoffFailed": "تعذّر على OpenBot إرسال هذه الخطوة إلى وكيلها.",
   "error.workflow.agentStepEnded": "أُزيلت رسالة الوكيل لهذه الخطوة قبل أن يجيب.",
+  "error.workflow.agentStepStopped": "توقّف الوكيل قبل أن يجيب عن هذه الخطوة. شغّل الخطوة مرة أخرى.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
   "error.workflow.modelTimedOut":
