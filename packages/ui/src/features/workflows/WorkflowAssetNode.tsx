@@ -69,12 +69,13 @@ function fileExtension(name: string): string {
 
 /**
  * The address that a thumbnail of the file shows: the small copy of a host picture when the host
- * sends one, else the file. A file from the computer has its own address.
+ * sends one, else the file. A file from the computer has its own address. Undefined while the copy
+ * loads, null when there is no picture to show.
  */
-function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null {
+function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefined {
   const preview = board.catalogs().mediaPreview;
   if (!preview || file.previewKind !== "image" || board.uploads().includes(file)) return file.previewUrl;
-  return preview(file.id) ?? null;
+  return preview(file.id);
 }
 
 /** The picture or the file icon of a file. On a card, a picture pulses until it shows. */
@@ -85,7 +86,7 @@ function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
       when={thumbUrl(board, props.file)}
       fallback={
         <Show
-          when={props.card && props.file.previewKind === "image"}
+          when={props.card && thumbUrl(board, props.file) === undefined}
           fallback={
             <span class="wfn-asset-glyph" aria-hidden="true">
               <File />

@@ -1,5 +1,4 @@
 import { isDynamicRecord, isString } from "../runtime-values";
-import { isAttachmentPreviewRoute } from "./attachment-preview-v1";
 import { isBrowserDisplayRoute } from "./browser-navigation-v1";
 import { isBrowserViewSessionRoute } from "./browser-view-v1";
 import {
@@ -24,10 +23,8 @@ export function encodeTeamProtocolV8WebRtcHttpRequest(
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
   // A GET reaches the bodyless frame, whose frozen no-body route list cannot learn a route added after it.
-  // The display route carries no request body at all, so its frame is the empty object. So does the
-  // preview route of attachment-preview-v1, which a client asks only of a host that advertises it.
+  // The display route carries no request body at all, so its frame is the empty object.
   if (isBrowserDisplayRoute(method, path) || isBrowserViewSessionRoute(method, path)) return {};
-  if (isAttachmentPreviewRoute(method, path)) return {};
   if (isTeamWebRtcBodylessRoute(method, path)) return teamWebRtcBodylessRequest(method, path, value);
   return decodeTeamProtocolV2Json(
     JSON.parse(encodeTeamProtocolV8CurrentHttpRequest(method, path, value ?? {}, options)),
@@ -40,7 +37,6 @@ export function decodeTeamProtocolV8WebRtcHttpRequest(
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
   if (isBrowserDisplayRoute(method, path) || isBrowserViewSessionRoute(method, path)) return {};
-  if (isAttachmentPreviewRoute(method, path)) return {};
   if (isTeamWebRtcBodylessRoute(method, path)) return teamWebRtcBodylessRequest(method, path, value);
   return decodeTeamProtocolV2Json(decodeTeamProtocolV8CurrentHttpRequest(method, path, value ?? {}, options));
 }

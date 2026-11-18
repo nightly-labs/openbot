@@ -80,6 +80,7 @@ import {
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
+import { createSignal } from "solid-js";
 import type { GitHubConnectorPort } from "../connectors/github-connector-port";
 import { checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
 import { openWebLink } from "./web-attachments";
@@ -128,11 +129,25 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
+  // The files that did not load: too large for the page, or a failed download. A card shows its icon
+  // for them, not a loading pulse that does not end.
+  const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
+  const loaded = (
+    media: AttachmentMediaSource,
+    attachmentId: string,
+    kind: WorkflowMediaKind,
+    size: "thumbnail" | "generated",
+    key: string,
+  ) => {
+    if (unloaded().has(key)) return null;
+    void media.load(mediaSummary(attachmentId, kind), size).then((shown) => {
+      if (!shown) setUnloaded((keys) => new Set(keys).add(key));
+    });
+    return media.url(attachmentId);
+  };
   const mediaUrl = (attachmentId: string, kind: WorkflowMediaKind) => {
     const media = options.attachmentMedia;
-    if (!media) return undefined;
-    void media.load(mediaSummary(attachmentId, kind));
-    return media.url(attachmentId);
+    return media ? loaded(media, attachmentId, kind, "thumbnail", `file:${attachmentId}`) : undefined;
   };
 
   const post = async <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> => {
@@ -320,8 +335,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       const previews = options.previewMedia;
       if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY)) return mediaUrl(attachmentId, "image");
       // A host that makes no copy sends the file itself, which can be larger than a thumbnail.
-      void previews.load(mediaSummary(attachmentId, "image"), "generated");
-      return previews.url(attachmentId);
+      return loaded(previews, attachmentId, "image", "generated", `preview:${attachmentId}`);
     },
     githubConnector: options.githubConnector,
     hostName: options.hostName,

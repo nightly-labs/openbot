@@ -104,7 +104,7 @@ export class AttachmentPreviews {
 
   /**
    * The file to send as the preview of an image attachment: its copy, made now when there is none, or
-   * the attachment itself. A failure sends the attachment itself.
+   * the attachment itself. A failure sends the attachment itself, and the next request tries again.
    */
   readonly file = Effect.fn("AttachmentPreviews.file")(function* (
     this: AttachmentPreviews,
@@ -125,13 +125,14 @@ export class AttachmentPreviews {
     const request = Deferred.makeUnsafe<PreviewFile | "source">();
     this.#pending.set(key, request);
     const found = yield* this.#find(key, source).pipe(
+      // Only a result is kept. A read or a write that failed can work at the next request.
+      Effect.tap((value) => Effect.sync(() => this.#remember(key, value))),
       Effect.catch((cause) =>
         Effect.sync(() => {
           this.#logger.warn("An attachment preview could not be made.", { cause: toLogValue(cause) });
           return "source" as const;
         }),
       ),
-      Effect.tap((value) => Effect.sync(() => this.#remember(key, value))),
       Effect.onExit((exit) => Deferred.done(request, exit)),
       Effect.ensuring(Effect.sync(() => this.#pending.delete(key))),
     );
@@ -139,17 +140,24 @@ export class AttachmentPreviews {
   });
 
   #find = Effect.fn("AttachmentPreviews.find")(function* (this: AttachmentPreviews, key: string, source: PreviewFile) {
-    for (const [mimeType, extension] of Object.entries(EXTENSIONS)) {
-      const path = join(this.#root, `${key}.${extension}`);
-      if (yield* exists(path)) return { path, mimeType };
-    }
-    if (yield* exists(join(this.#root, `${key}.${SOURCE_MARK}`))) return "source" as const;
+    const copies = Object.entries(EXTENSIONS).map(([mimeType, extension]) => ({
+      path: join(this.#root, `${key}.${extension}`),
+      mimeType,
+    }));
+    const mark = join(this.#root, `${key}.${SOURCE_MARK}`);
+    const found = yield* Effect.all([...copies.map((copy) => exists(copy.path)), exists(mark)], {
+      concurrency: "unbounded",
+    });
+    const copy = copies.find((_, index) => found[index]);
+    if (copy) return copy;
+    if (found[copies.length]) return "source" as const;
     const bytes = yield* Effect.tryPromise(async () => {
       const metadata = await stat(source.path);
       return metadata.size > PREVIEW_SOURCE_BYTES ? null : readFile(source.path);
     });
-    // The decode is synchronous, as for `fitImageForAgent`: a 1024 px PNG takes about 30 ms.
-    const encoded = bytes ? previewImage(bytes, ATTACHMENT_PREVIEW_EDGE) : null;
+    // The decode is synchronous, as for `fitImageForAgent`: a 1024 px PNG takes about 30 ms. The
+    // limits above keep it below about 0.4 s.
+    const encoded = bytes ? yield* Effect.try(() => previewImage(bytes, ATTACHMENT_PREVIEW_EDGE)) : null;
     yield* Effect.tryPromise(() => mkdir(this.#root, { recursive: true }));
     if (!encoded) {
       yield* this.#write(join(this.#root, `${key}.${SOURCE_MARK}`), Buffer.alloc(0));

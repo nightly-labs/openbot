@@ -422,10 +422,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
-import {
-  decodeTeamProtocolV9WebRtcHttpRequest,
-  encodeTeamProtocolV9WebRtcHttpRequest,
-} from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
@@ -11952,12 +11949,12 @@ try {
     );
     const preview = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"), { token: bobToken });
     check(
-      "a picture preview gives the bytes of its copy, with the copy's type and no file name",
+      "a picture preview gives the bytes of its copy as a file, with the copy's type and name",
       preview.status === 200 &&
         preview.text === picturePreviewBytes &&
         preview.headers.get("content-type") === "image/jpeg" &&
         preview.headers.get("x-content-type-options") === "nosniff" &&
-        preview.headers.get("content-disposition") === null &&
+        preview.headers.get("content-disposition") === "attachment; filename*=UTF-8''picture-preview.jpg" &&
         isDeepStrictEqual(callsOf("attachmentPreview"), [
           ["att-picture", { path: pictureAttachmentPath, mimeType: "image/png" }],
         ]),
@@ -11974,13 +11971,30 @@ try {
         callsOf("attachmentPreview").length === 1,
       [summary(previewOfText), summary(previewMissing), summary(previewNoToken)],
     );
-    // The WebRTC frame of the preview route is the empty object, both ways. The frozen no-body list of
-    // protocol 2 does not know the route, so without its own check the client refused to send it.
+    // The preview route is a side route, so the frozen protocol adapters do not change. The frozen
+    // no-body list of protocol 2 does not know the route: without its side codec, a client refused to send it.
     const previewPath = TEAM_API_ROUTES.attachmentPreview("att-picture");
+    const previewCodec = teamSideRouteCodec(previewPath);
+    const refuses = (run: () => unknown) => {
+      try {
+        run();
+        return false;
+      } catch {
+        return true;
+      }
+    };
     check(
-      "the WebRTC request frame of a picture preview is the empty object",
-      isDeepStrictEqual(encodeTeamProtocolV9WebRtcHttpRequest("GET", previewPath, undefined), {}) &&
-        isDeepStrictEqual(decodeTeamProtocolV9WebRtcHttpRequest("GET", previewPath, {}), {}),
+      "the WebRTC request frame of a picture preview has no body, and an answer other than a file or an error is refused",
+      previewCodec !== null &&
+        previewCodec.request(previewPath, undefined) === null &&
+        previewCodec.request(previewPath, {}) === null &&
+        refuses(() => previewCodec.request(previewPath, { width: 100 })) &&
+        refuses(() => previewCodec.response(previewPath, 200, { url: "https://example.com" })) &&
+        isDeepStrictEqual(previewCodec.response(previewPath, 404, { error: "Not found.", code: "not_found" }), {
+          error: "Not found.",
+          code: "not_found",
+        }) &&
+        refuses(() => encodeTeamProtocolV9WebRtcHttpRequest("GET", previewPath, undefined)),
     );
 
     const cancelCalls = callsOf("cancelQueuedMessage").length;

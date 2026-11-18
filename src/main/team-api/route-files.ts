@@ -146,9 +146,11 @@ export async function routeFiles(
     const preview = await runCauseEffect(
       attachmentPreviews.file(attachmentId, { path: attachment.path, mimeType: attachment.mimeType }),
     );
+    // As for the file itself: the WebRTC host sends an answer with this header as a file, whatever its type.
     return sendFile(response, preview.path, null, (size) => ({
       "Content-Type": preview.mimeType,
       "Content-Length": String(size),
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(basename(preview.path))}`,
       "X-Content-Type-Options": "nosniff",
     }));
   }

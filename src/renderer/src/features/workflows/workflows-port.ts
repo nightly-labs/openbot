@@ -117,13 +117,17 @@ export interface WorkflowHost {
    * agent, and answers it as a Library file. Only a host with image and video steps keeps one.
    */
   uploadPicture(file: File): Promise<StoredFileRow>;
-  /** The address of an image or a video that a media step made, from its attachment id. */
-  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | undefined;
+  /**
+   * The address of an image or a video that a media step made, from its attachment id. Undefined
+   * while it loads, null when it cannot show here.
+   */
+  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
   /**
    * The address of a small copy of a picture, for a card that shows it small (`attachment-preview-v1`).
    * The file itself when the host makes no copy, or on this computer, which reads it from its disk.
+   * Undefined and null as for `mediaUrl`.
    */
-  mediaPreviewUrl(attachmentId: string): string | undefined;
+  mediaPreviewUrl(attachmentId: string): string | null | undefined;
   /** The GitHub connection that the host's GitHub triggers and outputs use. */
   githubConnector: GitHubConnectorPort;
   /** The joined server, as its server row names it, or undefined for this computer. */
