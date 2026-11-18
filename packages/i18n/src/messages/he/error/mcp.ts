@@ -17,6 +17,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "השרת הזה אינו תומך באפליקציות התחברות. יש לעדכן את OpenBot במארח.",
   "error.mcp.redirectRelayed": "OpenBot שלח את ההתחברות לשרת. אפשר לסגור את החלון הזה.",
   "error.mcp.relayEnded": "ההתחברות הזו הסתיימה. יש להתחיל אותה מחדש.",
+  "error.mcp.signInLinkNotReady": "דף ההתחברות עוד לא נפתח. אפשר לנסות שוב בעוד רגע.",
   "error.mcp.relayNoState": "דף ההתחברות של השרת אינו מגן על כתובת החזרה שלו, ולכן OpenBot אינו פותח אותו במחשב הזה.",
   "error.mcp.relayAddressInvalid": "זו אינה הכתובת שבסוף ההתחברות הזו. יש להעתיק את הכתובת המלאה מהדפדפן.",
 } as const satisfies PartialTranslation<typeof source>;

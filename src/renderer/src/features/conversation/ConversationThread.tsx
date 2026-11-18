@@ -78,6 +78,8 @@ export function ConversationThread() {
     changeMarkerActions,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
+  const threadBackgroundWorkSince = (taskId: string | undefined) =>
+    taskId === undefined ? undefined : props.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   /** A failed answer shows here, where the person answered, and not in the agent's own chat. */
@@ -349,6 +351,7 @@ export function ConversationThread() {
             factsAbove={turnSteps.factsAbove}
             traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
+            backgroundWorkSince={threadBackgroundWorkSince(current().threads.open?.id)}
             stepsOpenByDefault={showAgentSteps()}
             sendShortcut={deviceSendShortcut(props.platform)}
             onCopyMessage={(message) => void copyMessage(message)}

@@ -19,6 +19,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Questo server non supporta le app di accesso. Aggiorna OpenBot sull'host.",
   "error.mcp.redirectRelayed": "OpenBot ha inviato l'accesso al server. Puoi chiudere questa finestra.",
   "error.mcp.relayEnded": "Questo accesso è terminato. Avvialo di nuovo.",
+  "error.mcp.signInLinkNotReady": "La pagina di accesso non è ancora aperta. Riprova tra un momento.",
   "error.mcp.relayNoState":
     "La pagina di accesso del server non protegge il proprio indirizzo di ritorno, quindi OpenBot non la apre su questo computer.",
   "error.mcp.relayAddressInvalid":

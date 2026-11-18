@@ -96,8 +96,9 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     },
   );
 
-  // The viewer says "connected" at the first frame, and "error" only for a fatal Moonlight line. A host
-  // whose Sunshine never sends a stream says nothing more, so a stream that is not ready in time fails.
+  // The viewer says "connected" when the video track arrives, and "error" for a fatal Moonlight line or,
+  // from the host's stream watcher, when no frame decodes for 20 seconds. A host whose Sunshine never
+  // sends a stream says nothing more, so a stream that is not ready in time fails.
   createEffect(
     () => (props.session && !props.connecting && viewerState() === "connecting" ? props.session.id : null),
     (sessionId) => {

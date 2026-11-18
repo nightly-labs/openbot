@@ -64,6 +64,9 @@ function isPublicIpv6(address: string): boolean {
     const high = groups[6] ?? 0;
     return isPublicIpv4([high >> 8, high & 0xff]);
   }
+  // The rest of ::/64, such as IPv4-compatible `::a.b.c.d` and SIIT `::ffff:0:a.b.c.d`, is not on the
+  // public internet.
+  if (groups.slice(0, 4).every((group) => group === 0)) return false;
   // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) reach an IPv4 address, so they are classified as it.
   // Local-use NAT64 (64:ff9b:1::/48) is a private network.
   if (first === 0x64 && groups[1] === 0xff9b) {

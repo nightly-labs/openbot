@@ -19,6 +19,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "هذا الخادم لا يدعم تطبيقات تسجيل الدخول. حدّث OpenBot على المضيف.",
   "error.mcp.redirectRelayed": "أرسل OpenBot تسجيل الدخول إلى الخادم. يمكنك إغلاق هذه النافذة.",
   "error.mcp.relayEnded": "انتهى تسجيل الدخول هذا. ابدأه من جديد.",
+  "error.mcp.signInLinkNotReady": "صفحة تسجيل الدخول لم تُفتح بعد. حاول مرة أخرى بعد قليل.",
   "error.mcp.relayNoState": "صفحة تسجيل الدخول في الخادم لا تحمي عنوان العودة، لذا لا يفتحها OpenBot على هذا الحاسوب.",
   "error.mcp.relayAddressInvalid":
     "هذا ليس العنوان الذي يظهر في نهاية تسجيل الدخول هذا. انسخ العنوان الكامل من المتصفح.",

@@ -19,6 +19,7 @@ export interface SkillsPort {
     | "addMarketplaceAgent"
     | "cancelMcpSignIn"
     | "completeMcpSignInRelay"
+    | "copyMcpSignInLink"
     | "getMcpAccess"
     | "installAgentSkill"
     | "listAgentSkills"

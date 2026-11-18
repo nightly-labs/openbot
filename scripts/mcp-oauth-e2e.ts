@@ -1051,6 +1051,10 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
     "::ffff:10.0.0.5": false,
     "::ffff:93.184.216.34": true,
     "[::ffff:a00:5]": false,
+    // IPv4-compatible and SIIT forms reach the IPv4 address on some stacks.
+    "::127.0.0.1": false,
+    "::a9fe:a9fe": false,
+    "::ffff:0:a00:5": false,
   };
   for (const [address, expected] of Object.entries(addressTable))
     assert.equal(isPublicAddress(address), expected, `isPublicAddress(${address})`);

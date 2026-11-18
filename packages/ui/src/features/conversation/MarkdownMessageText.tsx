@@ -12,7 +12,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { ScrollEdges } from "../../components/ScrollEdges";
 import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
@@ -818,34 +818,13 @@ function MarkdownInline(props: {
             if (!url) {
               return <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />;
             }
-            const image = (
-              <img
-                class="message-markdown-image"
-                src={url}
+            return (
+              <MarkdownImage
+                url={url}
                 alt={token.text}
                 title={token.title ?? undefined}
-                loading="lazy"
-                decoding="async"
-                referrerpolicy="no-referrer"
+                onOpenImage={props.content.onOpenImage}
               />
-            );
-            const onOpenImage = props.content.onOpenImage;
-            return onOpenImage ? (
-              <Button
-                variant="ghost"
-                type="button"
-                class="message-markdown-image-button"
-                aria-label={t("chat.image.preview", { name: markdownImageName(token.text, url) })}
-                data-cuelume-tap="open"
-                onClick={(event) => {
-                  const picture = event.currentTarget.querySelector("img");
-                  if (picture) onOpenImage(picture);
-                }}
-              >
-                {image}
-              </Button>
-            ) : (
-              image
             );
           }
           case "html":
@@ -932,6 +911,64 @@ function semanticChatTag(token: Token | undefined): string | null {
   if (!token || !tokenIs(token, "link")) return null;
   const target = /^(agent|skill|mcp|quote|tab|thread)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
   return target?.[2] ? `@${token.raw}` : null;
+}
+
+/* A picture that does not load shows its name as text, not the browser's broken-image icon. */
+function MarkdownImage(props: {
+  url: string;
+  alt: string;
+  title: string | undefined;
+  onOpenImage: ((image: HTMLImageElement) => void) | undefined;
+}) {
+  const { t } = useText();
+  const [failedUrl, setFailedUrl] = createSignal<string>();
+  const loadingUrl = () => (failedUrl() === props.url ? undefined : props.url);
+  return (
+    <Show
+      when={loadingUrl()}
+      keyed
+      fallback={
+        <span class="message-markdown-image-unavailable">
+          {t("chat.image.unavailableNamed", { name: markdownImageName(props.alt, props.url) })}
+        </span>
+      }
+    >
+      {(url) => {
+        // Each URL gets its own element, so a late error of an earlier URL cannot mark this one.
+        const image = () => (
+          <img
+            class="message-markdown-image"
+            src={url}
+            alt={props.alt}
+            title={props.title}
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onError={() => setFailedUrl(url)}
+          />
+        );
+        return (
+          <Show when={props.onOpenImage} fallback={image()}>
+            {(onOpenImage) => (
+              <Button
+                variant="ghost"
+                type="button"
+                class="message-markdown-image-button"
+                aria-label={t("chat.image.preview", { name: markdownImageName(props.alt, url) })}
+                data-cuelume-tap="open"
+                onClick={(event) => {
+                  const picture = event.currentTarget.querySelector("img");
+                  if (picture) onOpenImage()(picture);
+                }}
+              >
+                {image()}
+              </Button>
+            )}
+          </Show>
+        );
+      }}
+    </Show>
+  );
 }
 
 function RichText(props: {

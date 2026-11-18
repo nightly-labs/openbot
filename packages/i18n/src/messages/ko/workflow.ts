@@ -148,6 +148,7 @@ export const messages = {
   "workflow.video.models": "동영상 모델",
   "workflow.video.making": "동영상 만드는 중, {time}",
   "workflow.video.length": "길이",
+  "workflow.video.length.custom": "사용자 지정",
   "workflow.video.lengthLabel": "길이: {value}",
   "workflow.video.seconds": "{value}초",
   "workflow.video.resolution": "해상도",

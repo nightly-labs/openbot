@@ -43,8 +43,9 @@ const GPU_FAILURE_REASONS: ReadonlySet<Details["reason"]> = new Set([
   "launch-failed",
 ]);
 // `viz::ExitCode::RESULT_CODE_GPU_EXIT_ON_CONTEXT_LOST`: the GPU process stops on purpose when the GPU
-// context is lost (for example after suspend and resume), and Chromium starts it again.
-const GPU_EXIT_ON_CONTEXT_LOST = 34;
+// context is lost (for example after suspend and resume), and Chromium starts it again. On Linux,
+// `exitCode` is the raw `waitpid` status (#12262): an exit with code 34 is `34 << 8`.
+const GPU_EXIT_ON_CONTEXT_LOST = 34 << 8;
 
 const logger = createOpenBotLogger("linux-gpu");
 

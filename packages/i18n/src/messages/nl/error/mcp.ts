@@ -19,6 +19,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Deze server ondersteunt geen inlogapps. Werk OpenBot bij op de host.",
   "error.mcp.redirectRelayed": "OpenBot heeft de inlog naar de server gestuurd. Je kunt dit venster sluiten.",
   "error.mcp.relayEnded": "Deze inlog is afgelopen. Start opnieuw.",
+  "error.mcp.signInLinkNotReady": "De aanmeldpagina is nog niet open. Probeer het zo opnieuw.",
   "error.mcp.relayNoState":
     "De inlogpagina van de server beschermt het terugkeeradres niet, dus OpenBot opent hem niet op deze computer.",
   "error.mcp.relayAddressInvalid":

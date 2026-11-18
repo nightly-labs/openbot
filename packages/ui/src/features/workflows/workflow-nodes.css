@@ -1410,6 +1410,7 @@ fieldset.wfn-picker-group {
 }
 
 .ui-popover-menu-surface.wfn-popover {
+  z-index: var(--openbot-layer-popover);
   display: grid;
   gap: var(--openbot-space-3);
   width: 344px;
@@ -1434,6 +1435,11 @@ fieldset.wfn-picker-group {
 .wfn-size-field {
   display: grid;
   gap: var(--openbot-space-1);
+}
+
+/* A custom length: one slider over the lengths of the model. */
+.ui-popover-menu-surface.wfn-popover.wfn-length-popover {
+  width: 240px;
 }
 
 /* The title of a popover, with one action at the end, such as Upload. */

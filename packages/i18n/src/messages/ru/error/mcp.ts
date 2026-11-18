@@ -19,6 +19,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Этот сервер не поддерживает приложения входа. Обновите OpenBot на хосте.",
   "error.mcp.redirectRelayed": "OpenBot отправил вход на сервер. Это окно можно закрыть.",
   "error.mcp.relayEnded": "Этот вход завершён. Начните его снова.",
+  "error.mcp.signInLinkNotReady": "Страница входа ещё не открыта. Повторите попытку через несколько секунд.",
   "error.mcp.relayNoState":
     "Страница входа сервера не защищает свой обратный адрес, поэтому OpenBot не открывает её на этом компьютере.",
   "error.mcp.relayAddressInvalid":

@@ -69,7 +69,12 @@ import {
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
 import { claudeContextCategories } from "./claude-context-categories";
-import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
+import {
+  type ClaudeHistoryOptions,
+  claudeHistoryFromMessages,
+  claudeHistoryReader,
+  claudeTaskTurnId,
+} from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
 import {
   CLAUDE_WORKSPACE_MANAGED_SETTINGS,
@@ -685,6 +690,8 @@ interface ClaudeStreamMessage {
   tasks?: unknown;
   /** `task_started`, `task_updated` and `task_notification`: the CLI's id of the background task. */
   task_id?: unknown;
+  /** `task_*`: the id of one run of the task. Absent from CLIs that predate it. */
+  run_id?: unknown;
   /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
   command_uuid?: unknown;
   state?: unknown;
@@ -1012,6 +1019,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** Tells the lifecycle that the thread's background work started or ended, so the chat shows that the agent waits. */
+  #emitBackgroundWork(runtime: ThreadRuntime): void {
+    this.emit("notification", {
+      method: "openbot/background-work",
+      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0 },
+    });
+  }
+
+  /** The end of each background subagent or command makes the CLI start a turn of its own (#10847). */
+  wakesAfterBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
+    return this.holdsBackgroundWork(threadId);
+  }
+
   /**
    * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
    * of that thread, so the close is what ends those child processes. The caller releases an idle
@@ -1047,6 +1067,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // A background subagent ends with the process (#1870).
     for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
+    if (runtime.backgroundTasks > 0) {
+      runtime.backgroundTasks = 0;
+      this.#emitBackgroundWork(runtime);
+    }
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
     // from the map, so there is nothing left to report it against.
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
@@ -2260,6 +2284,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // its tool result, so before the result of that turn. The level that ends the work comes with no turn.
       // With no turn, a level holds or frees the idle timer. When the work ends, the CLI starts a turn of its
       // own to answer the result. Until that turn shows output, the idle limit must not close the thread (#6557).
+      if (before > 0 !== runtime.backgroundTasks > 0) this.#emitBackgroundWork(runtime);
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
         else if (before > 0 && runtime.backgroundTasks === 0) {
@@ -2278,8 +2303,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       else if (message.subtype === "task_notification") {
         const origin = runtime.taskTurns.get(message.task_id) ?? null;
         runtime.taskTurns.delete(message.task_id);
-        if (!turn) runtime.endedTaskTurns.push(origin);
-        else if (turn.unprompted && origin !== turn.id)
+        if (!turn) {
+          runtime.endedTaskTurns.push(origin);
+          // The turn that the CLI starts to answer this end gets an ID that the history import makes too.
+          if (isString(message.run_id))
+            runtime.nextTurnId = claudeTaskTurnId(
+              isString(message.session_id) ? message.session_id : runtime.id,
+              message.task_id,
+              message.run_id,
+            );
+        } else if (turn.unprompted && origin !== turn.id)
           this.emit("notification", {
             method: "openbot/turn-continues",
             params: { threadId: runtime.id, turnId: turn.id, continues: origin },
@@ -3358,10 +3391,14 @@ export function claudeOpenBotTools(
       (args) => call(definition.name, args),
       extras,
     );
+  // The no-update tool is always loaded too: a background task wakes the model with the CLI's own prompt,
+  // which does not name the tool, so behind the tool search the model never called it there (#11090).
   return [
     ...visibleToolDefinitions("claude")
       .filter((definition) => definition.name !== "ask_user")
-      .map((definition) => claudeTool(definition)),
+      .map((definition) =>
+        claudeTool(definition, definition.name === ROUTINE_NO_UPDATE_TOOL ? { alwaysLoad: true } : undefined),
+      ),
     ...channel.map((definition) => claudeTool(definition, { alwaysLoad: true })),
   ];
 }

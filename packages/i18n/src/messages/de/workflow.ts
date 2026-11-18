@@ -151,6 +151,7 @@ export const messages = {
   "workflow.video.models": "Videomodelle",
   "workflow.video.making": "Video wird erstellt, {time}",
   "workflow.video.length": "Länge",
+  "workflow.video.length.custom": "Eigene",
   "workflow.video.lengthLabel": "Länge: {value}",
   "workflow.video.seconds": "{value} s",
   "workflow.video.resolution": "Auflösung",
