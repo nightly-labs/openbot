@@ -1871,8 +1871,9 @@ export class AttentionRegistry {
     const chosen =
       loginId && this.#passwordVault
         ? yield* this.#passwordVault.loginsFor(origin, agentId).pipe(
+            // When a source cannot be read, the failure keeps the logins of the other sources.
+            Effect.catch((error) => Effect.succeed(error.logins)),
             Effect.map((logins) => logins?.find((login) => login.id === loginId)),
-            Effect.catch(() => Effect.succeed(undefined)),
           )
         : undefined;
     const username = chosen?.username ?? args?.username;
