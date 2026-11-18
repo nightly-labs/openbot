@@ -65,6 +65,7 @@ import {
   type AgentDockChatModel,
   type AgentDockChatVoice,
   type AgentDockPendingMessage,
+  pendingMessageDelivered,
 } from "./AgentDockChat";
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
@@ -1108,6 +1109,25 @@ export function AgentDock(props: AgentDockProps) {
   }
 
   const shownSeat = () => (state.shown ? seatFor(state.shown) : undefined);
+
+  /* A sent message leaves `pending` once its host copy is in its chat, also in a chat that is closed.
+     The chat has only the newest messages, so a copy that newer messages pushed out showed the
+     message again at the bottom (#11783). */
+  createEffect(
+    () =>
+      Object.entries(state.pending).flatMap(([id, messages]) => {
+        const loaded = props.chat(refOfKey(id)).messages;
+        return messages.filter((message) => pendingMessageDelivered(message, loaded)).map((message) => message.key);
+      }),
+    (keys) => {
+      if (keys.length === 0) return;
+      const delivered = new Set(keys);
+      setState((draft) => {
+        for (const [id, messages] of Object.entries(draft.pending))
+          draft.pending[id] = messages.filter((message) => !delivered.has(message.key));
+      });
+    },
+  );
 
   /** Escape in the chat or on a seat closes the chat. A menu that is open handles Escape first. */
   const closeOnEscape = (event: KeyboardEvent) => {
