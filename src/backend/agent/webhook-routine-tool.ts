@@ -8,8 +8,9 @@ import {
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_TIMESTAMP_HEADER,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import type { Effect } from "effect";
+import { Effect } from "effect";
 import type { RoutineOperationFailed } from "./routine-scheduler";
 
 export const CREATE_WEBHOOK_ROUTINE_TOOL = "create_webhook_routine";
@@ -116,6 +117,33 @@ export function webhookToolTrigger(
  */
 export function webhookSecretKeyName(routineId: string): string {
   return `WEBHOOK_SECRET_${routineId.replaceAll("-", "").toUpperCase()}`;
+}
+
+const logger = createOpenBotLogger("webhook-routine");
+
+/** The agent keys that `removeWebhookSecretKey` reads and removes. */
+export interface WebhookSecretKeys {
+  has(agentId: string, name: string): Effect.Effect<boolean, unknown>;
+  remove(agentId: string, name: string): Effect.Effect<unknown, unknown>;
+}
+
+/**
+ * Removes the key that an agent got with the signing secret of a routine, when the routine or its
+ * webhook trigger is gone: the secret is of no use now. A key that stays does no harm, so a failure
+ * only writes a warning.
+ */
+export function removeWebhookSecretKey(
+  keys: WebhookSecretKeys,
+  agentId: string,
+  routineId: string,
+): Effect.Effect<void> {
+  const name = webhookSecretKeyName(routineId);
+  return keys.has(agentId, name).pipe(
+    Effect.flatMap((has) => (has ? keys.remove(agentId, name).pipe(Effect.asVoid) : Effect.void)),
+    Effect.catch(() =>
+      Effect.sync(() => logger.warn("The key of an old webhook routine signing secret was not removed.")),
+    ),
+  );
 }
 
 /** One webhook routine as `list_routines` shows it. */

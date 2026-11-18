@@ -27,7 +27,11 @@ import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Semaphore } from "effect";
 import { RoutineOperationFailed } from "../backend/agent/routine-scheduler";
-import { type WebhookRoutineWriter, webhookSecretKeyName } from "../backend/agent/webhook-routine-tool";
+import {
+  removeWebhookSecretKey,
+  type WebhookRoutineWriter,
+  webhookSecretKeyName,
+} from "../backend/agent/webhook-routine-tool";
 import type { AgentApiKeys } from "../backend/agent-api-keys";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { RoutineRecords } from "../backend/routine-records";
@@ -435,14 +439,7 @@ export class HostEventsService implements HostEventsApi {
   ) {
     const keys = this.#options.agentKeys;
     if (input.owner.kind !== "agent" || !keys) return;
-    const agentId = input.owner.id;
-    const name = webhookSecretKeyName(input.id);
-    yield* keys.has(agentId, name).pipe(
-      Effect.flatMap((has) => (has ? keys.remove(agentId, name) : Effect.void)),
-      Effect.catch(() =>
-        Effect.sync(() => logger.warn("The key of an old webhook routine signing secret was not removed.")),
-      ),
-    );
+    yield* removeWebhookSecretKey(keys, input.owner.id, input.id);
   });
 
   /**
