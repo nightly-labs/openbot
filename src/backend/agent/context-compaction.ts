@@ -620,6 +620,7 @@ export class ContextCompaction {
           return client
             .request(
               "thread/compact/start",
+              { threadId, ...(runsInRequest ? { cwd: agent.workspacePath } : {}) },
               runsInRequest ? { threadId, cwd: agent.workspacePath } : { threadId },
               decodeRecordResponse,
               runsInRequest ? this.#runTimeoutMs : undefined,

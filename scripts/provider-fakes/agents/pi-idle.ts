@@ -10,7 +10,7 @@ let sessionFile = join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}
 
 function log(entry: RpcRecord): void {
   const path = process.env.FAKE_LOG;
-  if (path) appendFileSync(path, `${JSON.stringify({ ...entry, pid: process.pid })}\n`);
+  if (path) appendFileSync(path, `${JSON.stringify({ ...entry, pid: process.pid, cwd: process.cwd() })}\n`);
 }
 
 function write(record: RpcRecord): void {
@@ -33,6 +33,10 @@ const handlers: Record<string, (command: RpcRecord) => void> = {
     answer(command, { cancelled: false });
   },
   get_session_stats: (command) => refuse(command, "No stats."),
+  compact: (command) => {
+    log({ event: "compact", sessionFile });
+    answer(command);
+  },
   prompt: (command) => {
     log({ event: "prompt", sessionFile });
     answer(command, { disposition: "started" });
