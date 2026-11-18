@@ -301,7 +301,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     const chunks = whatsAppChunks(markdown);
     const caption = chunks.length === 1 ? (chunks[0] ?? "") : "";
     if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
-    const content = yield* this.#fileContent(file);
+    // An unreadable file goes apart, so the text is still posted and the result names the file.
+    const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!content) return null;
     return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) });
   });
