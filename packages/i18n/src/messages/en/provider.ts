@@ -334,6 +334,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Not in use: {version} · installed by you",
   "provider.settings.otherVersionDownloaded": "Not in use: {version} · downloaded by OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Some models need a part that this version does not have. Download OpenBot's version to use them.",
   "provider.settings.useInstalledVersion": "Use installed version",
   "provider.settings.useDownloadedVersion": "Use OpenBot's version",
   "provider.settings.update": "Update",

@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Lettertype voor code",
   "settings.codeFont.description": "Het lettertype van code, terminals en bestandspaden.",
   "settings.codeFont.default": "Standaard",
+  "settings.motion.title": "Beweging",
+  "settings.backgroundBlur.title": "Achtergrondvervaging",
+  "settings.backgroundBlur.description":
+    "Vervaging achter menu’s en dialoogvensters. Staat eerst uit op een computer zonder GPU.",
+  "settings.movingFaces.title": "Bewegende agentgezichten",
+  "settings.movingFaces.description":
+    "Agentgezichten knipperen en bewegen. Staan eerst stil op een computer zonder GPU.",
   "settings.logoColor.title": "Logokleur",
   "settings.logoColor.description": "Te zien in het Dock, de taakbalk en het Dynamic Island.",
   "settings.logoColor.buildNote": "Deze build houdt een eigen logokleur. De keuze geldt voor de release-app.",
@@ -816,7 +823,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Deze server heeft geen agents.",
   "settings.transfer.copy.new": "Nieuw",
   "settings.transfer.copy.notCopied":
-    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+    "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "settings.transfer.copy.submit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
   "settings.transfer.copy.copying": "Kopiëren…",
   "settings.transfer.copy.done": {

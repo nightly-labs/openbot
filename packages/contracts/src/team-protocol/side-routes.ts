@@ -24,7 +24,7 @@ import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } 
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export interface TeamSideRouteOptions {
   /**

@@ -490,6 +490,7 @@ export const messages = {
   "chat.suggestion.undo": "Deshacer",
   "chat.suggestion.localOnly": "Conecta {name} en OpenBot en tu propio equipo.",
   "chat.suggestion.unavailable": "Este servidor no puede conectar {name}.",
+  "chat.suggestion.notAllowed": "Solo el propietario del servidor o un administrador puede conectar {name}.",
   "chat.serverInstall.title": "Servidor nuevo",
   "chat.serverInstall.expired": "El comando caducó. Pide uno nuevo al agente.",
   "chat.compaction.running": "Compactando el contexto",

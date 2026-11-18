@@ -131,6 +131,8 @@ interface WebConversation {
 const LATEST_PAGE_SIZE = 50;
 /** The recently opened agents whose latest page a new page reads after the open one. */
 const PRELOADED_AGENTS = 3;
+/** While events stream, at most one event read of the unread state starts in this time. */
+const EVENT_READS_INTERVAL_MS = 1_000;
 
 /**
  * Releases the older pages of a conversation that is not open. Only the open conversation gets new
@@ -777,7 +779,7 @@ export function createWebWorkspace(
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A changed chat can change the unread count of any agent, and the host tells a read on another
         // device only with an invalidation.
-        if (event.type === "conversation" || event.type === "conversation-invalidated") loadReads();
+        if (event.type === "conversation" || event.type === "conversation-invalidated") loadReadsSoon();
         // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
@@ -1935,6 +1937,9 @@ export function createWebWorkspace(
   }
   let readsLoad: { generation: number; promise: Promise<void> } | null = null;
   let pendingReads = false;
+  /** When the last read started, and the event read that waits for its interval. */
+  let readsStartedAt = 0;
+  let readsTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Reads the unread state of every agent chat. Event bursts coalesce: a call during a read schedules
    * one more read. A failed read keeps the counts that this tab has.
@@ -1946,6 +1951,7 @@ export function createWebWorkspace(
     const promise = (async () => {
       while (pendingReads && !disposed && current === generation) {
         pendingReads = false;
+        readsStartedAt = Date.now();
         const value = await runtime.conversationReads().catch(() => null);
         if (!value || disposed || current !== generation) continue;
         setState((draft) => {
@@ -1960,6 +1966,23 @@ export function createWebWorkspace(
   }
   function loadReads(): void {
     void readReads();
+  }
+  /**
+   * Reads the unread state after an event. Each read costs the host a query for each agent, so while
+   * events stream at most one read starts in `EVENT_READS_INTERVAL_MS`. The waiting read starts after
+   * the last event, so no change is lost.
+   */
+  function loadReadsSoon(): void {
+    if (readsTimer) return;
+    const wait = readsStartedAt + EVENT_READS_INTERVAL_MS - Date.now();
+    if (wait <= 0) {
+      loadReads();
+      return;
+    }
+    readsTimer = setTimeout(() => {
+      readsTimer = null;
+      loadReads();
+    }, wait);
   }
   async function resync() {
     const current = generation;
@@ -2224,6 +2247,8 @@ export function createWebWorkspace(
     return () => {
       disposed = true;
       generation += 1;
+      if (readsTimer) clearTimeout(readsTimer);
+      readsTimer = null;
       recovery.dispose();
       hostLifecycle.dispose();
       focusUse.dispose();

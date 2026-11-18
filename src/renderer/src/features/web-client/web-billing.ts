@@ -7,6 +7,7 @@ import {
   parseLicenseState,
   parsePricingOrder,
 } from "@openbot/contracts/license";
+import { readPromotionCode } from "@openbot/contracts/promotion-code";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
@@ -73,7 +74,8 @@ export function createWebLicenseCalls(
   return {
     getState: () => state("v1/me/license"),
     async openCheckout(checkout) {
-      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, JSON.stringify(checkout));
+      const body = JSON.stringify({ ...checkout, ...savedPromotionCode() });
+      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, body);
       if (!url) throw new Error(currentText().sourceText("error.billing.notStripePage"));
       navigate(url);
     },
@@ -81,6 +83,12 @@ export function createWebLicenseCalls(
     changePlan: (plan) => state("v1/me/license/plan", JSON.stringify(plan)),
     setRenewal: (renewal) => state("v1/me/license/renewal", JSON.stringify(renewal)),
   };
+}
+
+/** The code of a discount link that the website saved in this browser, as a Checkout request field. */
+export function savedPromotionCode(): { promotionCode?: string } {
+  const code = readPromotionCode(() => window.localStorage, Date.now());
+  return code ? { promotionCode: code } : {};
 }
 
 /**

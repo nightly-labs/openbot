@@ -4,13 +4,18 @@
 // scroll of the chat, or the main-process window call the close button makes.
 //
 // Turn scenarios use the real claude, opencode and grok CLIs, so they spend
-// the developer's model quota. They never start Codex.
+// the developer's model quota. They never start the real Codex: the scale
+// scenario runs a fake Codex (`bench-fake-codex.ts`) that streams fixed text.
 
+import { readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
-import type { DynamicIslandPreference } from "@openbot/contracts/ipc";
+import { join } from "node:path";
+import { CHANNEL_PARALLEL_LIMIT, type DynamicIslandPreference } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import type { Logger } from "@openbot/logging";
 import type { Browser, Page } from "playwright-core";
 import { NO_SCALE, parseSeedScale, type SeedScale } from "../seed-dev-scale";
+import { writeFakeCodex } from "./bench-fake-codex";
 import type { BenchApp } from "./bench-launch";
 import type { MetricValues } from "./bench-stats";
 import type { InspectorClient } from "./inspector-client";
@@ -42,9 +47,12 @@ export interface Scenario {
   settleMs?: number;
   // Heap snapshots of main and the app window after the first run.
   snapshots?: boolean;
+  // Runs before the app starts, in a directory that only this scenario uses. Returns extra
+  // environment for the app, such as a fake provider CLI.
+  prepare?: (directory: string) => Promise<Record<string, string>>;
 }
 
-type BenchProvider = "claude" | "opencode" | "grok";
+type BenchProvider = "claude" | "opencode" | "grok" | "codex";
 
 // The model each provider runs in a turn scenario, when the CLI lists it.
 // Otherwise the first model the CLI lists.
@@ -52,6 +60,8 @@ const PREFERRED_MODELS: Record<BenchProvider, string> = {
   claude: "claude-sonnet-5",
   opencode: "opencode-go/muse-spark-1.3-contributor",
   grok: "grok-4.6",
+  // The model that the fake Codex lists.
+  codex: "gpt-5.5",
 };
 
 // A long streamed reply with code blocks and a table, the Markdown the renderer
@@ -102,11 +112,20 @@ interface ListedModel {
 /** Model discovery ends some seconds after launch, once every provider CLI has answered. */
 const MODEL_DISCOVERY_TIMEOUT_MS = 2 * MINUTE;
 
-async function useProvider(context: ScenarioContext, agentIds: string[], provider: BenchProvider): Promise<void> {
+// `requiredModel` waits for that model: before the CLI lists its own models, the app lists the ones
+// it knows, and a fake CLI does not run them.
+async function useProvider(
+  context: ScenarioContext,
+  agentIds: string[],
+  provider: BenchProvider,
+  requiredModel?: string,
+): Promise<void> {
   let models: ListedModel[] = [];
   await poll(`${provider} models to be listed`, MODEL_DISCOVERY_TIMEOUT_MS, SECOND, async () => {
     models = await context.evaluate<ListedModel[]>("window.openbot.agent.listModels()");
-    return models.some((model) => model.provider === provider);
+    return models.some(
+      (model) => model.provider === provider && (requiredModel === undefined || model.id === requiredModel),
+    );
   }).catch(() => undefined);
   const choice =
     models.find((model) => model.provider === provider && model.id === PREFERRED_MODELS[provider]) ??
@@ -123,6 +142,17 @@ async function useProvider(context: ScenarioContext, agentIds: string[], provide
 
 async function openAgent(context: ScenarioContext, agentId: string): Promise<void> {
   await context.page.locator(`[data-chat-id="${agentId}"] > button`).click();
+  await context.page.locator('main[aria-label="Conversation"] .conversation-scroll').waitFor();
+}
+
+// A chat with unread messages sits in the "Unread" group, whose rows have no `data-chat-id`, so the
+// channel is found by the start of its accessible name, which every group gives it.
+async function openChannel(context: ScenarioContext, name: string): Promise<void> {
+  const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  await context.page
+    .getByRole("button", { name: new RegExp(`^${escaped}[.,]`, "u") })
+    .first()
+    .click();
   await context.page.locator('main[aria-label="Conversation"] .conversation-scroll').waitFor();
 }
 
@@ -330,6 +360,267 @@ function parallel(provider: BenchProvider, count: number): Scenario {
   };
 }
 
+// --- many agents at once ---------------------------------------------------------
+
+// Starts the readings of the main process: its CPU time and the delay of its event loop, which is
+// how long a click, an IPC call or a provider message waits.
+const MAIN_WINDOW_START = `(() => {
+  const { monitorEventLoopDelay } = require("node:perf_hooks");
+  const histogram = monitorEventLoopDelay({ resolution: 10 });
+  histogram.enable();
+  globalThis.__openbotBenchWindow = { histogram, cpu: process.cpuUsage(), at: performance.now() };
+  return true;
+})()`;
+
+const MAIN_WINDOW_STOP = `(() => {
+  const reading = globalThis.__openbotBenchWindow;
+  delete globalThis.__openbotBenchWindow;
+  reading.histogram.disable();
+  const cpu = process.cpuUsage(reading.cpu);
+  const elapsed = performance.now() - reading.at;
+  return {
+    cpuPercent: ((cpu.user + cpu.system) / 1000 / elapsed) * 100,
+    loopP50Ms: reading.histogram.percentile(50) / 1e6,
+    loopP99Ms: reading.histogram.percentile(99) / 1e6,
+    loopMaxMs: reading.histogram.max / 1e6,
+  };
+})()`;
+
+// The app window's timer lag: a 50 ms timer that fires late shows that a click would wait as long.
+const WINDOW_LAG_START = `(() => {
+  const lags = [];
+  let last = performance.now();
+  const timer = setInterval(() => {
+    const now = performance.now();
+    lags.push(Math.max(0, now - last - 50));
+    last = now;
+  }, 50);
+  window.__openbotBenchLag = { timer, lags };
+  return true;
+})()`;
+
+const WINDOW_LAG_STOP = `(() => {
+  const { timer, lags } = window.__openbotBenchLag;
+  delete window.__openbotBenchLag;
+  clearInterval(timer);
+  const sorted = lags.slice().sort((left, right) => left - right);
+  const at = (share) => sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))] ?? 0;
+  return { p99: at(0.99), max: sorted[sorted.length - 1] ?? 0 };
+})()`;
+
+interface MainWindowReading {
+  cpuPercent: number;
+  loopP50Ms: number;
+  loopP99Ms: number;
+  loopMaxMs: number;
+}
+
+function mainWindowReading(value: unknown): MainWindowReading {
+  const number = (key: string): number => {
+    const field = isDynamicRecord(value) ? value[key] : undefined;
+    if (!isNumber(field)) throw new Error(`The main process did not report ${key}.`);
+    return field;
+  };
+  return {
+    cpuPercent: number("cpuPercent"),
+    loopP50Ms: number("loopP50Ms"),
+    loopP99Ms: number("loopP99Ms"),
+    loopMaxMs: number("loopMaxMs"),
+  };
+}
+
+/** The fake Codex log lines of ended turns. */
+async function loggedCount(logPath: string, key: string): Promise<number> {
+  const text = await readFile(logPath, "utf8").catch(() => "");
+  return text.split("\n").filter((line) => line.includes(`"${key}"`)).length;
+}
+
+const endedTurns = (logPath: string) => loggedCount(logPath, "turnEnded");
+
+async function unknownCodexMethods(logPath: string): Promise<string[]> {
+  const text = await readFile(logPath, "utf8").catch(() => "");
+  const methods = new Set<string>();
+  for (const line of text.split("\n")) {
+    const match = /"unknownMethod":"([^"]+)"/u.exec(line);
+    if (match?.[1]) methods.add(match[1]);
+  }
+  return [...methods];
+}
+
+// One reply: 600 pieces of text, one each 50 ms, so each agent streams for 30 s, about 20 pieces a
+// second, as a fast model does.
+const SCALE_DELTA_MS = 50;
+const SCALE_DELTAS = 600;
+
+// chief, research, builder and launch, which `seed-dev-state.ts` always makes.
+const SEED_AGENT_COUNT = 4;
+
+/**
+ * The scale agents of a host with `total` agents stream at the same time. `channelMembers` of them are
+ * the members of an open channel with a long history. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at
+ * once and queues the rest, so only that many members get a task there: more tasks would add queue
+ * time, not load. All other agents answer in their own chat. The readings cover only the time from the
+ * first send to the last ended turn. With `OPENBOT_BENCH_PROFILE_STREAM=1`, the first
+ * run also writes CPU profiles of the main process and the app window for that time, which slow the
+ * app: compare readings only between runs without it.
+ */
+function manyAgents(total: number, channelMembers: number): Scenario {
+  // The seed always has its own agents, and a host has at most 100, so `total` counts them too.
+  const count = total - SEED_AGENT_COUNT;
+  const agents = Array.from({ length: count }, (_, index) => scaleAgent(index + 1));
+  const members = agents.slice(count - channelMembers);
+  const recipients = members.slice(0, CHANNEL_PARALLEL_LIMIT);
+  const direct = agents.filter((agentId) => !recipients.includes(agentId));
+  const streaming = direct.length + recipients.length;
+  let directory = "";
+  let logPath = "";
+  let profiled = false;
+  return {
+    id: `s14-agents-${total}`,
+    description: `${total} agents, ${streaming} of them stream at once on a fake Codex, ${recipients.length} of them in an open channel of ${channelMembers} members and 2,000 messages`,
+    seed: scaled(`agents:${count},messages:200,channels:1,channelMessages:2000`),
+    prepare: async (scenarioDirectory) => {
+      directory = scenarioDirectory;
+      const codex = await writeFakeCodex(join(scenarioDirectory, "fake-codex"), {
+        deltaMs: SCALE_DELTA_MS,
+        deltas: SCALE_DELTAS,
+      });
+      logPath = codex.logPath;
+      return codex.environment;
+    },
+    act: async (context) => {
+      const inspector = context.inspector;
+      if (!inspector) throw new Error("This scenario needs the main-process inspector.");
+      await useProvider(context, agents, "codex", PREFERRED_MODELS.codex);
+      interface ListedChannel {
+        id: string;
+        name: string;
+        title: string;
+        instructions: string;
+      }
+      const channels = await context.evaluate<ListedChannel[]>("window.openbot.agent.listChannels()");
+      const channel = channels.find((one) => one.id === "scale-channel-001");
+      if (!channel) throw new Error("The scaled seed has no channel scale-channel-001.");
+      const save = {
+        type: "save",
+        operationId: crypto.randomUUID(),
+        channelId: channel.id,
+        update: true,
+        draft: {
+          name: channel.name,
+          title: channel.title,
+          instructions: channel.instructions,
+          // Only agents on the fake: the lead also writes the channel's summaries, and an agent of the
+          // seed would send them to a real provider.
+          members: members.map((agentId) => ({ agentId })),
+          leadAgentId: members[0],
+        },
+      };
+      await context.evaluate(`window.openbot.agent.channelCommand(${json(save)}).then(() => null)`);
+      // A channel opens in the conversation view, as an agent does.
+      await openChannel(context, channel.name);
+      await context.wait(5 * SECOND);
+
+      const profile = process.env.OPENBOT_BENCH_PROFILE_STREAM === "1" && !profiled;
+      profiled ||= profile;
+      const rendererSession = await context.page.context().newCDPSession(context.page);
+      await rendererSession.send("Performance.enable");
+      const rendererMetrics = async (): Promise<Record<string, number>> => {
+        const { metrics } = await rendererSession.send("Performance.getMetrics");
+        return Object.fromEntries(metrics.map((metric) => [metric.name, metric.value]));
+      };
+      if (profile) {
+        await inspector.send("Profiler.enable");
+        await inspector.send("Profiler.setSamplingInterval", { interval: 500 });
+        await inspector.send("Profiler.start");
+        await rendererSession.send("Profiler.enable");
+        await rendererSession.send("Profiler.start");
+      }
+      const rendererBefore = await rendererMetrics();
+      await inspector.evaluate(MAIN_WINDOW_START);
+      await context.evaluate(WINDOW_LAG_START);
+      const started = Date.now();
+
+      const sent: SentDelivery[] = [];
+      for (const agentId of direct) {
+        const deliveryIds = await context.evaluate<string[]>(
+          `window.openbot.agent.sendMessage(${json({ agentId, text: SHORT_REPLY_PROMPT })}).then((receipt) => receipt.deliveries.map((one) => one.id))`,
+        );
+        for (const id of deliveryIds) sent.push({ agentId, id });
+      }
+      for (const agentId of recipients) {
+        const command = {
+          type: "send",
+          operationId: crypto.randomUUID(),
+          channelId: channel.id,
+          text: SHORT_REPLY_PROMPT,
+          recipientAgentId: agentId,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        };
+        await context.evaluate(`window.openbot.agent.channelCommand(${json(command)}).then(() => null)`);
+      }
+      const sendMs = Date.now() - started;
+      // The fake writes each ended turn to its log, so this wait sends nothing to the app.
+      await poll(
+        `${streaming} streamed turns to end`,
+        SCALE_DELTA_MS * SCALE_DELTAS + 5 * MINUTE,
+        SECOND,
+        async () => (await endedTurns(logPath)) >= streaming,
+      );
+      const streamMs = Date.now() - started;
+      const lag = await context.evaluate<{ p99: number; max: number }>(WINDOW_LAG_STOP);
+      const main = mainWindowReading(await inspector.evaluate(MAIN_WINDOW_STOP));
+      const rendererAfter = await rendererMetrics();
+      if (profile) {
+        const mainProfile = await inspector.send("Profiler.stop");
+        const rendererProfile = await rendererSession.send("Profiler.stop");
+        await writeFile(
+          join(directory, "stream-main.cpuprofile"),
+          JSON.stringify(isDynamicRecord(mainProfile) ? mainProfile.profile : null),
+        );
+        await writeFile(join(directory, "stream-renderer.cpuprofile"), JSON.stringify(rendererProfile.profile));
+        context.logger.info(`stream CPU profiles written under ${directory}`);
+      }
+      await rendererSession.detach().catch(() => undefined);
+      const rendererSeconds = (name: string) => (rendererAfter[name] ?? 0) - (rendererBefore[name] ?? 0);
+
+      // The app settles each turn after the provider ends it: wait for the queues too.
+      await poll("the direct turns to settle", 2 * MINUTE, 2 * SECOND, () => turnsEnded(context, sent));
+      await poll("the channel tasks to settle", 2 * MINUTE, 2 * SECOND, async () => {
+        const active = await context.evaluate<number>(
+          `window.openbot.agent.listChannels().then((all) => all.find((one) => one.id === ${json(channel.id)})?.activeTasks ?? 0)`,
+        );
+        return active === 0;
+      });
+      const unknown = await unknownCodexMethods(logPath);
+      if (unknown.length > 0) context.logger.warn(`fake Codex got unknown requests: ${unknown.join(", ")}`);
+      let failed = 0;
+      for (const agentId of direct) if (!(await lastReply(context, agentId)).completed) failed += 1;
+      if (failed > 0) context.logger.warn(`${failed} of ${direct.length} direct turn(s) did not complete`);
+      context.record({
+        "stream.ms": streamMs,
+        "stream.sendMs": sendMs,
+        "stream.turnsEnded": await endedTurns(logPath),
+        "stream.directFailed": failed,
+        "stream.sideTurns": await loggedCount(logPath, "sideTurnEnded"),
+        "stream.main.cpuPercent": main.cpuPercent,
+        "stream.main.loopP50Ms": main.loopP50Ms,
+        "stream.main.loopP99Ms": main.loopP99Ms,
+        "stream.main.loopMaxMs": main.loopMaxMs,
+        "stream.window.taskPercent": (rendererSeconds("TaskDuration") * 1000 * 100) / streamMs,
+        "stream.window.scriptPercent": (rendererSeconds("ScriptDuration") * 1000 * 100) / streamMs,
+        // Beside script, these tell where the time of the window goes.
+        "stream.window.stylePercent": (rendererSeconds("RecalcStyleDuration") * 1000 * 100) / streamMs,
+        "stream.window.layoutPercent": (rendererSeconds("LayoutDuration") * 1000 * 100) / streamMs,
+        "stream.window.lagP99Ms": lag.p99,
+        "stream.window.lagMaxMs": lag.max,
+      });
+      await context.wait(10 * SECOND);
+    },
+  };
+}
+
 function browserTabs(count: number): Scenario {
   return {
     id: `s10-browser-${count}`,
@@ -476,9 +767,7 @@ export const SCENARIOS: Scenario[] = [
       if (!channel) throw new Error("The showcase seed has no channel with 3 members.");
       const members = channel.members.slice(0, 3).map((member) => member.agentId);
       await useProvider(context, members, "claude");
-      const escaped = channel.name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-      await context.page.getByRole("button", { name: new RegExp(`^${escaped}[.,]`, "u") }).click();
-      await context.page.locator('main[aria-label="Channel conversation"]').waitFor();
+      await openChannel(context, channel.name);
       const started = Date.now();
       for (const agentId of members) {
         const command = {
@@ -510,6 +799,8 @@ export const SCENARIOS: Scenario[] = [
   browserTabs(1),
   browserTabs(5),
   browserTabs(25),
+  manyAgents(20, 6),
+  manyAgents(100, 30),
   {
     id: "s11-computer-use",
     description: "Computer Use state read (starts the driver when permitted), idle 2 min",

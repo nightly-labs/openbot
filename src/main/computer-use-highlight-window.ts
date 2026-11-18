@@ -21,6 +21,12 @@ const logger = createOpenBotLogger("computer-use-highlight");
  */
 const DEFAULT_POLL_INTERVAL_MS = 33;
 /**
+ * The poll while the rim is down but a turn runs. With many agents a turn almost always runs, and
+ * most turns do not use the desktop, so the fast poll would ask the daemon thirty times a second for
+ * no rim. The rim then shows at most this much later after an agent starts to use the desktop.
+ */
+const SEARCH_POLL_INTERVAL_MS = 250;
+/**
  * How long the overlays stay after the rim goes down. Each overlay is a renderer process, and the
  * daemon runs for the whole session while an agent holds the desktop only now and then. The next
  * target builds them again, which costs one window load.
@@ -125,6 +131,7 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   #target: ComputerUseHighlightTarget | null = null;
   #loggedWindowId: number | null = null;
   #timer: ReturnType<typeof setInterval> | null = null;
+  #timerInterval = 0;
   /** The tick in progress, which a refresh that arrives meanwhile waits for instead of starting another. */
   #tick: Deferred.Deferred<void> | null = null;
   #destroyed = false;
@@ -155,11 +162,18 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
 
   start(): void {
     if (this.#destroyed || this.#timer) return;
-    const interval = this.#options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    this.#poll(this.#options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
+    Effect.runFork(this.refresh());
+  }
+
+  /** Polls at `interval`, in place of the poll that runs. */
+  #poll(interval: number): void {
+    if (this.#timer && this.#timerInterval === interval) return;
+    if (this.#timer) clearInterval(this.#timer);
+    this.#timerInterval = interval;
     this.#timer = setInterval(() => Effect.runFork(this.refresh()), interval);
     // A timer that keeps the process alive would hold a quit open for a whole interval.
     this.#timer.unref?.();
-    Effect.runFork(this.refresh());
   }
 
   stop(): void {
@@ -224,9 +238,12 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       if (this.#overlays.size === 0 && this.#options.idle?.() && this.#timer) {
         clearInterval(this.#timer);
         this.#timer = null;
+      } else if (this.#timer) {
+        this.#poll(Math.max(this.#options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS, SEARCH_POLL_INTERVAL_MS));
       }
       return;
     }
+    if (this.#timer) this.#poll(this.#options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
     const displays = this.#options.displays();
     const pointer = this.#options.readPointer?.() ?? null;
     for (const id of [...this.#overlays.keys()]) {

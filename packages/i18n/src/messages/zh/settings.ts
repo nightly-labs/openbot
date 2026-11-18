@@ -24,6 +24,11 @@ export const messages = {
   "settings.codeFont.title": "代码字体",
   "settings.codeFont.description": "代码、终端和文件路径使用的字体。",
   "settings.codeFont.default": "默认",
+  "settings.motion.title": "动效",
+  "settings.backgroundBlur.title": "背景模糊",
+  "settings.backgroundBlur.description": "菜单和对话框背后的模糊效果。在没有 GPU 的电脑上默认关闭。",
+  "settings.movingFaces.title": "动态智能体面孔",
+  "settings.movingFaces.description": "智能体面孔会眨眼和移动。在没有 GPU 的电脑上默认静止。",
   "settings.logoColor.title": "标志颜色",
   "settings.logoColor.description": "显示在 Dock、任务栏和灵动岛中。",
   "settings.logoColor.buildNote": "当前版本使用自己的标志颜色，该选项仅对正式版生效。",
@@ -795,7 +800,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "此服务器没有助手。",
   "settings.transfer.copy.new": "新",
   "settings.transfer.copy.notCopied":
-    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+    "助手所在的频道、自动化任务流程、工作流和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "settings.transfer.copy.submit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
   "settings.transfer.copy.copying": "正在复制…",
   "settings.transfer.copy.done": {

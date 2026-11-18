@@ -22,6 +22,7 @@
 // From #7482: Google refuses a tool schema (an array with no `items`, an empty `enum` value) and names the
 // tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
 // out its server, and the turn answers.
+// From #11746: Google refuses `items` on a field that is not an array. Its server is left out the same way.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -63,6 +64,7 @@ interface Report {
   refused?: RefusedEntry[];
   refusedDrops?: McpServerDrop[];
   googleDrops?: McpServerDrop[];
+  blingDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -405,6 +407,47 @@ try {
     googleDrops.map((drop) => drop.name),
     ["ticktick", "ticktick"],
     "The server is left out of the new session too.",
+  );
+
+  // 10. Google refuses `items` on a field that is not an array (#11746). `atlas` has a field with the same
+  // name that is an array, which Google accepts.
+  const blingDrops: McpServerDrop[] = [];
+  const blingClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+        httpServer("bling", "bling", "https://bling.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => blingDrops.push(...dropped),
+    },
+  );
+  clients.push(blingClient);
+  blingClient.start();
+  const blingWorkspace = join(root, "bling-workspace");
+  await mkdir(blingWorkspace, { recursive: true });
+  const blingThread = await startThread(blingClient, { cwd: blingWorkspace });
+  const blingTurn = await runTurn(blingClient, blingThread, { text: "Reply with OK only.", timeoutMs: 30_000 });
+  report.turns.googleRefusedFieldType = blingTurn;
+  report.blingDrops = blingDrops;
+  assert.equal(blingTurn.error, null, "The turn that Google refused for a field type has no error.");
+  assert.equal(blingTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    blingDrops.map((drop) => drop.name),
+    ["bling"],
+    "Only the server whose field is not an array is left out.",
+  );
+  assert.match(blingDrops[0]?.detail ?? "", /listAccountReceivables/u, "The report names the tool.");
+  const blingPrompts = (await readJsonl<RefusedEntry>(googleLog)).filter(
+    (entry) => entry.method === "session/prompt" && entry.sessionId === blingThread,
+  );
+  assert.deepEqual(
+    blingPrompts.map((entry) => entry.refused),
+    ["bling", null],
+    "The prompt runs once more, and then without the refused server.",
   );
   report.passed = true;
 } catch (error) {

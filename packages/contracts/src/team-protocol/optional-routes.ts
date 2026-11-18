@@ -137,6 +137,7 @@ import { ROUTINE_RUN_COMMAND_CODECS } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CODECS } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CODECS } from "./routines-once-v1";
 import { SERVER_AUDIT_CODECS } from "./server-audit-v1";
+import { SERVER_SAFE_MODE_CODECS } from "./server-safe-mode-v1";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
@@ -155,6 +156,7 @@ import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
+import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
@@ -210,6 +212,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
   ...HOST_RESTART_CODECS,
+  ...SERVER_SAFE_MODE_CODECS,
   ...HOST_APPEARANCE_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
@@ -275,6 +278,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
   ...WEBHOOK_SENDER_SECRET_CODECS,
+  ...WEBHOOK_AGENT_SECRET_CODECS,
   ...STORAGE_DISK_CODECS,
   ...STORAGE_USER_FILES_CODECS,
   ...STORAGE_CHANNEL_CODECS,

@@ -74,6 +74,8 @@ export const messages = {
     "Toegang tot de microfoon is geblokkeerd. Geef OpenBot toegang tot de microfoon in de systeeminstellingen.",
   "composer.voice.noMicrophone": "Er is geen microfoon beschikbaar.",
   "composer.voice.startFailed": "OpenBot kan de spraakopname niet starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot kan de microfoon niet openen. Sluit andere apps die hem gebruiken, controleer of hij is aangesloten en is toegestaan in de systeeminstellingen, en probeer het opnieuw.",
   "composer.voice.transcribeFailed": "OpenBot kan deze opname niet uitschrijven.",
   "composer.reply.toYou": "Antwoord op je bericht",
   "composer.reply.toAgent": "Antwoord aan agent",
@@ -132,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",
   "composer.voice.readFailed": "Kan het antwoord niet voorlezen.",
+  "composer.voice.languageUnsupported": "Kan het antwoord niet voorlezen. Deze taal is nog niet beschikbaar.",
   "composer.error.saveEditTryAgain": "Kan deze wijziging niet opslaan op deze computer. Probeer het opnieuw.",
   "composer.error.saveUnconfirmed": "Opslaan is niet bevestigd. Kies opnieuw Opslaan om het resultaat te controleren.",
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",

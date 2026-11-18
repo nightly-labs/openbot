@@ -16,7 +16,7 @@
 import type { AvatarHue, ChannelIcon, ChannelIconName, ChannelMember } from "@openbot/contracts/ipc";
 import { UsersRound } from "@openbot/ui";
 import { avatarHueSwatch } from "@openbot/ui/bloub-avatar";
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { ComposerAgent } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { CHANNEL_ICONS, knownChannelIcon } from "./channel-icons";
@@ -76,22 +76,34 @@ export function ChannelIconTile(props: { name: ChannelIconName; hue: AvatarHue }
 
 function MemberFaces(props: ChannelAvatarProps) {
   const agentFor = (member: ChannelMember) => props.agents.find((agent) => agent.id === member.agentId);
+  // The faces are keyed by agent, and a key must be unique. A member list with an agent twice, such
+  // as one from a host, shows that agent once.
+  const members = createMemo(() => {
+    const seen = new Set<string>();
+    return props.members.filter((member) => !seen.has(member.agentId) && Boolean(seen.add(member.agentId)));
+  });
   const cluster = () => props.layout === "cluster";
   /* The last cell of a full cluster is the count, so a fifth member costs a face rather than
    * hiding without a trace. Four members still get four faces. A count of two digits is wider than
    * a cell, so it takes the whole bottom row, under two faces. */
   const shown = () => {
-    if (!cluster()) return props.members.slice(0, ROW_LIMIT);
-    if (props.members.length <= CLUSTER_CELLS) return props.members;
-    const countWithThreeFaces = props.members.length - (CLUSTER_CELLS - 1);
-    return props.members.slice(0, countWithThreeFaces >= 10 ? CLUSTER_CELLS - 2 : CLUSTER_CELLS - 1);
+    if (!cluster()) return members().slice(0, ROW_LIMIT);
+    if (members().length <= CLUSTER_CELLS) return members();
+    const countWithThreeFaces = members().length - (CLUSTER_CELLS - 1);
+    return members().slice(0, countWithThreeFaces >= 10 ? CLUSTER_CELLS - 2 : CLUSTER_CELLS - 1);
   };
-  const hidden = () => props.members.length - shown().length;
+  const hidden = () => members().length - shown().length;
   return (
     <span class={["channel-avatar", { "channel-avatar-cluster": cluster() }]} aria-hidden="true">
-      <Show when={props.members.length} fallback={<UsersRound />}>
-        <For each={shown()}>
-          {(member) => <AgentAvatar agent={agentFor(member)} seed={agentFor(member)?.avatarSeed ?? member.agentId} />}
+      <Show when={members().length} fallback={<UsersRound />}>
+        {/* Keyed by agent: the members come as new objects on each channel update. With 100 working
+            agents, the header made each face again about 20 times a second, and each new face plays its
+            entry. */}
+        <For each={shown()} keyed={(member) => member.agentId}>
+          {(member) => {
+            const agent = createMemo(() => agentFor(member()));
+            return <AgentAvatar agent={agent()} seed={agent()?.avatarSeed ?? member().agentId} />;
+          }}
         </For>
         <Show when={cluster() && hidden() > 0}>
           <span class="channel-avatar-count">+{hidden()}</span>

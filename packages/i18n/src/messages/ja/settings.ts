@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "コードのフォント",
   "settings.codeFont.description": "コード、ターミナル、ファイルパスのフォントです。",
   "settings.codeFont.default": "デフォルト",
+  "settings.motion.title": "モーション",
+  "settings.backgroundBlur.title": "背景のぼかし",
+  "settings.backgroundBlur.description":
+    "メニューとダイアログの背後のぼかしです。GPU のないコンピュータでは最初はオフです。",
+  "settings.movingFaces.title": "動くエージェントの顔",
+  "settings.movingFaces.description":
+    "エージェントの顔がまばたきして動きます。GPU のないコンピュータでは最初は止まっています。",
   "settings.logoColor.title": "ロゴの色",
   "settings.logoColor.description": "Dock、タスクバー、Dynamic Island に表示されます。",
   "settings.logoColor.buildNote": "このビルドは独自のロゴの色を使います。選択はリリース版のアプリに適用されます。",
@@ -816,7 +823,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "このサーバーにはエージェントがありません。",
   "settings.transfer.copy.new": "新規",
   "settings.transfer.copy.notCopied":
-    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "settings.transfer.copy.submit": { other: "エージェント {count} 件をコピー" },
   "settings.transfer.copy.copying": "コピー中…",
   "settings.transfer.copy.done": { other: "エージェント {count} 件を {server} にコピーしました。" },

@@ -53,6 +53,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Çok fazla oturum açma denemesi. Daha sonra tekrar deneyin.",
   "error.team.clientUpdateRequired": "Bu ana makineye bağlanmadan önce bu OpenBot istemcisini güncelleyin.",
   "error.team.hostUpdateRequired": "Bağlanmadan önce ana makinedeki OpenBot'u güncelleyin.",
+  "error.team.serverSafeMode": "OpenBot bu sunucuda başlamadığı için sunucu güvenli moddadır.",
+  "error.team.serverSafeModeNewerDatabase":
+    "Bu sunucudaki OpenBot {version}, verilerini açamıyor çünkü onları daha yeni bir OpenBot sürümü kaydetti. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
+  "error.team.serverSafeModeStartFailed":
+    "Bu sunucudaki OpenBot {version}, birçok kez başlatılamadıktan sonra durdu. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
   "error.team.sidebarLayoutUnavailable": "Kenar çubuğu düzeni kullanılamıyor.",
   "error.team.providersUnsupported": "Sağlayıcı ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",

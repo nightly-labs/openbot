@@ -211,6 +211,28 @@ export const ImageStory: Story = {
   ),
 };
 
+/**
+ * An image step with more results than the list under it fits. The list opens on the newest result,
+ * and the arrows scroll it to the result on view.
+ */
+export const ImageManyResults: Story = {
+  name: "Image, many results",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      results={{
+        filled: Array.from({ length: 12 }, (_, index) => ({
+          id: `image-result-${index + 1}`,
+          at: todayAt(9, index * 4),
+          value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
+        })),
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
 /** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
 function cutOutPicture(): string {
   const canvas = document.createElement("canvas");

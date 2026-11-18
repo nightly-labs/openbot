@@ -31,14 +31,20 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import { withTransaction } from "./database/sqlite-transaction";
+import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
 import { revokeRoutineWebhooks } from "./webhook-route-store";
 
 /**
  * A message that a person deleted keeps its row, with its id, sequence and author but no content,
  * so that read, summary and context cursors stay correct. Every read skips it.
+ *
+ * `json_extract` parses the whole message, and a page read counts the older history with it. A row
+ * whose text has no `"deleted"` cannot have the key: a quotation mark in a text value is escaped
+ * (`\"`), so the check finds only a key or a whole string value. Only those rows are parsed.
  */
-const SHOWN_MESSAGE_SQL = "json_extract(message_json, '$.deleted') IS NOT 1";
+const SHOWN_MESSAGE_SQL =
+  "(instr(message_json, '\"deleted\"') = 0 OR json_extract(message_json, '$.deleted') IS NOT 1)";
 
 /** The row that replaces a deleted channel message. `deleted` is internal and never sent. */
 function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
@@ -308,9 +314,10 @@ export class ChannelStore {
   /** One task by id, read through the primary key rather than every task of the channel. */
   task(channelId: string, taskId: string): ChannelTask | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare("SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?")
-        .get(channelId, taskId),
+      cachedStatement(
+        this.database.connection,
+        "SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?",
+      ).get(channelId, taskId),
     );
     if (!row) return null;
     const value = JSON.parse(requiredStringColumn(row, "task_json"));
@@ -335,6 +342,48 @@ export class ChannelStore {
       this.database.connection
         .prepare("SELECT assignment_json FROM projection_channel_assignments WHERE channel_id = ? ORDER BY rowid")
         .all(channelId),
+    ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
+  }
+
+  /**
+   * The assignments of one member, in the order of `assignments`. A streamed delta of a member reads
+   * these on each flush. The channel keeps every assignment that it ever had, and to parse all of them
+   * for each delta of each member made a large channel use most of a core.
+   */
+  agentAssignments(channelId: string, agentId: string): ChannelAssignment[] {
+    return databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT assignment_json FROM projection_channel_assignments
+            WHERE channel_id = ? AND json_extract(assignment_json, '$.agentId') = ? ORDER BY rowid`,
+        )
+        .all(channelId, agentId),
+    ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
+  }
+
+  /** One assignment by id, read through the primary key. */
+  assignment(channelId: string, assignmentId: string): ChannelAssignment | null {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          "SELECT assignment_json FROM projection_channel_assignments WHERE channel_id = ? AND assignment_id = ?",
+        )
+        .get(channelId, assignmentId),
+    );
+    return row ? decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))) : null;
+  }
+
+  /** The assignments of a channel in one of these states, in the order of `assignments`. */
+  assignmentsInStates(channelId: string, states: readonly ChannelAssignment["state"][]): ChannelAssignment[] {
+    if (!states.length) return [];
+    return databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT assignment_json FROM projection_channel_assignments
+            WHERE channel_id = ? AND json_extract(assignment_json, '$.state') IN (${states.map(() => "?").join(", ")})
+            ORDER BY rowid`,
+        )
+        .all(channelId, ...states),
     ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
   }
 
@@ -914,9 +963,10 @@ export class ChannelStore {
 
   channelForThread(threadId: string): string | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare("SELECT channel_id FROM projection_channel_contexts WHERE thread_id = ?")
-        .get(threadId),
+      cachedStatement(
+        this.database.connection,
+        "SELECT channel_id FROM projection_channel_contexts WHERE thread_id = ?",
+      ).get(threadId),
     );
     return row ? requiredStringColumn(row, "channel_id") : null;
   }

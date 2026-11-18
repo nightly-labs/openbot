@@ -6,7 +6,7 @@ import { Deferred, Effect, Fiber, Option, Schema } from "effect";
 import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
-import { waitForSuccessfulProcess } from "./provider-status";
+import { orNewSavedSignIn, waitForSuccessfulProcess, watchSavedSignIn } from "./provider-status";
 
 /**
  * What a provider CLI prints for a sign-in the user finishes on another device.
@@ -60,6 +60,8 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   timeoutMs: number;
   /** Closes the CLI's input at once: see `ProviderCliCommand.closeInput`. */
   closeInput?: boolean;
+  /** The version of the CLI's saved sign-in: see `ProviderSignInCommand.savedSignIn`. */
+  savedSignIn?: Effect.Effect<string | null>;
   platform?: NodeJS.Platform;
 }) {
   const platform = options.platform ?? process.platform;
@@ -67,6 +69,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     try: () => (options.flow === "paste" ? terminalCommand(platform, options.argv) : null),
     catch: (cause) => new CliCodeLoginFailed({ cause }),
   });
+  const watch = yield* watchSavedSignIn(options.savedSignIn);
   const child = yield* Effect.acquireRelease(
     Effect.try({
       try: () => {
@@ -96,7 +99,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
   const done = yield* Effect.forkScoped(
-    waitForSuccessfulProcess(child, options.timeoutMs).pipe(
+    orNewSavedSignIn(waitForSuccessfulProcess(child, options.timeoutMs), watch, undefined).pipe(
       Effect.mapError(
         (failure) =>
           new CliCodeLoginFailed({
@@ -111,7 +114,17 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     ),
     { startImmediately: true },
   );
-  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow)), {
+  // A CLI that saved a new sign-in and then stopped with a failure code signed in with no prompt, as
+  // one that exits with success: `done` decides. A timeout keeps the prompt's own message.
+  const afterFailedExit = watch
+    ? Fiber.join(done).pipe(
+        Effect.as(null),
+        Effect.mapError(
+          () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) }),
+        ),
+      )
+    : undefined;
+  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow, afterFailedExit)), {
     startImmediately: true,
   });
   return {
@@ -135,7 +148,11 @@ export class CliCodeLoginFailed extends Schema.TaggedError<CliCodeLoginFailed>()
 }) {}
 
 // Output contains credentials and must not become a trace payload.
-const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: CliCodePrompt["flow"]) {
+const readCodePrompt = Effect.fnUntraced(function* (
+  child: ChildProcess,
+  flow: CliCodePrompt["flow"],
+  afterFailedExit?: Effect.Effect<null, CliCodeLoginFailed>,
+) {
   return yield* Effect.callback<CliCodePrompt | null, CliCodeLoginFailed>((resume) => {
     let output = "";
     let settled = false;
@@ -152,7 +169,13 @@ const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: C
       resume(result instanceof Error ? Effect.fail(new CliCodeLoginFailed({ cause: result })) : Effect.succeed(result));
     };
     const unavailable = () => settle(new Error(sourceText("error.provider.codeLoginNoLink")));
-    const exited = (code: number | null) => (code === 0 ? settle(null) : unavailable());
+    const exited = (code: number | null) => {
+      if (code === 0) return settle(null);
+      if (!afterFailedExit || settled) return unavailable();
+      settled = true;
+      cleanup();
+      resume(afterFailedExit);
+    };
     const read = (chunk: Buffer) => {
       if (output.length >= MAX_OUTPUT_CHARS) return;
       output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);

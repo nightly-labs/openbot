@@ -451,18 +451,32 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
-    if (!managed) {
-      this.#downloadedVersion = null;
-      this.#setStatus({
-        phase: this.#options.enabled ? "idle" : "unsupported",
-        availableVersion: null,
-        progress: null,
-        message: null,
-        errorCode: null,
-      });
-      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    if (managed) {
+      // The host owns the updates now. A check or a download of this tenant that is still out must not
+      // write its result over the host state, and the download must not use the network for nothing.
+      this.#checkGeneration += 1;
+      this.#downloadGeneration += 1;
+      this.#activeDownload = null;
+      this.#cancellationToken?.cancel();
+      this.#cancellationToken = null;
+      // An install keeps its phase: its shutdown preparation runs, and the app quits.
+      if (this.#installStarted) {
+        this.#setStatus({});
+        return;
+      }
     }
-    this.#setStatus({});
+    // Also on a takeover: no phase deadline runs while the host manages the updates, so a busy phase
+    // of this tenant would stay on screen until the host state replaces it, and forever for a tenant
+    // that the host does not list.
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: this.#options.enabled ? "idle" : "unsupported",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      errorCode: null,
+    });
+    if (!managed && this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   setHostState(state: HostUpdateState): void {

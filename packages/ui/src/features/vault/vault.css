@@ -168,15 +168,20 @@
   padding-inline: var(--openbot-space-6) var(--openbot-space-4);
 }
 
+/* An agent's request title can be long, so it wraps like the title of its chat card. */
 .vault-dialog-title {
   flex: 1;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+/* A requested key is labelled with its variable name, which has no spaces. Without a break, a long
+   name makes the field wider than the dialog, which hides the end of the field. */
+.vault-dialog .ui-label {
+  overflow-wrap: anywhere;
 }
 
 .vault-dialog-body {

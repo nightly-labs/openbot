@@ -38,6 +38,8 @@ export interface RoutineResultPendingRun {
   agentId: string;
   routineName: string;
   deliveryId: string | null;
+  /** When the run ended: a result that waits for a teammate's answer waits from then. */
+  endedAt: string;
   destination: RoutineResultDestination;
 }
 
@@ -126,7 +128,7 @@ export class RoutineResultStore {
     return databaseRows(
       this.#database.connection
         .prepare(
-          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, destination.*
+          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
            FROM projection_routine_runs AS run
            JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
            WHERE (run.status = 'succeeded'
@@ -143,6 +145,7 @@ export class RoutineResultStore {
       agentId: String(row.agent_id),
       routineName: String(row.routine_name),
       deliveryId: nullableString(row.delivery_id),
+      endedAt: String(row.run_updated_at),
       destination: toDestination(row),
     }));
   }

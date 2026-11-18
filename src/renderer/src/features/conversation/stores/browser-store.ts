@@ -172,10 +172,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   createEffect(
     () => ({
       request: deps.props.browserTakeover,
-      tab: browserTakeoverTab(),
       suspended: deps.props.browserVisibilitySuspended,
     }),
-    ({ request, tab, suspended }) => {
+    ({ request, suspended }) => {
       if (!request || request.secret || suspended) {
         browserTakeoverPreviewKey = null;
         browserTakeoverPreviewGeneration += 1;
@@ -184,19 +183,15 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
 
       const requestKey = String(request.requestId);
-      if (!tab) {
-        if (browserTakeoverPreviewKey !== requestKey) {
-          setBrowserTakeoverPreview({ status: "loading", preview: null });
-        }
-        return;
-      }
       if (browserTakeoverPreviewKey === requestKey) return;
 
+      // The host has the tab of the request. A chat window or a web client can have no tab list, and a card
+      // that waited for the tab there stayed grey with no end (#11527), so the preview comes by its id.
       browserTakeoverPreviewKey = requestKey;
       const generation = ++browserTakeoverPreviewGeneration;
       setBrowserTakeoverPreview({ status: "loading", preview: null });
       void conversationRuntime(deps.props)
-        .browser.capturePreview(tab.id)
+        .browser.capturePreview(request.tabId)
         .then((preview) => {
           if (browserTakeoverPreviewGeneration !== generation) return;
           setBrowserTakeoverPreview({ status: "ready", preview });

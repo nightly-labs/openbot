@@ -5,11 +5,13 @@ import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/c
 import type {
   AgentSummary,
   AgentWait,
+  ConversationMessage,
   ConversationPlanStep,
   ConversationSnapshot,
   QueueDelivery,
   RoutineRun,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
@@ -45,15 +47,23 @@ export function visualReplyFileName(title: string): string {
   );
 }
 
-/** A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history. */
-export function conversationContentSignature(snapshot: ConversationSnapshot): string {
-  const content = JSON.stringify({
-    agentId: snapshot.agentId,
-    threadId: snapshot.threadId,
-    activeTurnId: snapshot.activeTurnId,
-    messages: snapshot.messages,
+/**
+ * A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history.
+ * It hashes the same text as `JSON.stringify` of the agent, thread, active turn and messages, in parts, so
+ * a caller that already has the JSON of each message gives it in `messageJson` and nothing is made twice.
+ */
+export function conversationContentSignature(
+  snapshot: ConversationSnapshot,
+  messageJson: (message: ConversationMessage) => string = (message) => JSON.stringify(message),
+): string {
+  const hash = createHash("sha256").update(
+    `{"agentId":${JSON.stringify(snapshot.agentId)},"threadId":${JSON.stringify(snapshot.threadId)},"activeTurnId":${JSON.stringify(snapshot.activeTurnId)},"messages":[`,
+  );
+  snapshot.messages.forEach((message, index) => {
+    if (index > 0) hash.update(",");
+    hash.update(messageJson(message));
   });
-  return createHash("sha256").update(content).digest("base64");
+  return hash.update("]}").digest("base64");
 }
 
 /**
@@ -76,6 +86,20 @@ export function routineStatusForDelivery({ status, error }: Pick<QueueDelivery, 
     case "cancelled":
       return "cancelled";
   }
+}
+
+/**
+ * The reason a run that fails keeps. A provider can end a turn as failed and send no error; the run
+ * then showed "Routine failed" with no reason anywhere (#11627). A run that failed already keeps the
+ * reason it has, so a run that failed before this change keeps its row and its finish time.
+ */
+export function failedRunReason(
+  error: string | null,
+  current: { status: string; error: string | null },
+): string | null {
+  if (error?.trim()) return error;
+  if (current.status === "failed") return current.error;
+  return sourceText("error.backend.routineRunFailedNoReason");
 }
 
 export type DeliveryInputItem =
@@ -199,6 +223,21 @@ export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
 /** Between a provider handoff and the prompt of the turn that takes it. */
 export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
+
+const RESTARTED_RESULT_NOTE =
+  "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
+
+/**
+ * The input of a turn that starts again with a teammate's result after a restart stopped the turn that
+ * read it (#11857). The note goes in front as a handoff, so `teammatePrompts` still finds the teammate
+ * messages after it when the history is imported.
+ */
+export function restartedResultInput(input: readonly DeliveryInputItem[]): DeliveryInputItem[] {
+  const note = `${HANDOFF_START}\n\n${RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+  return input.map((item, index) =>
+    index === 0 && item.type === "text" ? { ...item, text: `${note}${item.text}` } : item,
+  );
+}
 const TEAMMATE_PROMPT = new RegExp(
   `^${TEAMMATE_HEADER} [^\\n]* \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)\\n(?:This replies to message: (\\S+)\\n)?`,
   "gm",

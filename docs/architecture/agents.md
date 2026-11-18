@@ -623,7 +623,7 @@ the phone read the profiles again on `browser-profiles-changed` (`browser-profil
 A side thread (in code and on the wire still a **task**) is a separate execution thread of one agent.
 The agent keeps one identity, workspace and provider settings; each side thread has its own provider
 thread, conversation, queue, progress and result. The agent's own chat is its main thread and has no
-side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-schema.ts`,
+side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-store.ts`,
 migration 47) holds one row for each side thread, with its title and the source of the title
 (`auto`, `agent` or `user`). Migration 47 moved every task of `projection_agent_tasks` (migration 38)
 there: a closed task became an archived thread, and the task id stays as `legacy_task_id`. The task id

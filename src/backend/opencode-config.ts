@@ -20,6 +20,12 @@ export interface CustomProviderConfig {
   readonly headers: readonly CustomProviderHeader[];
   /** The provider that runs the endpoint. Absent: OpenCode, as before the choice existed. */
   readonly harness?: CustomProviderHarness;
+  /**
+   * The ids of the models that the endpoint's server reports as not able to reason (#8381). Not
+   * saved: the main process asks an Ollama server for it. Absent: nothing is known, and each model
+   * keeps the efforts of its harness.
+   */
+  readonly withoutReasoning?: readonly string[];
 }
 
 /**
@@ -66,7 +72,8 @@ interface OpenCodeModelEntry {
   /**
    * The efforts of the model's effort menu, each sent as `reasoning_effort`. OpenCode 2.2.5 gives a
    * custom model without `variants` its own Low, Medium and High, and it drops a `reasoning` key
-   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set.
+   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set,
+   * and an empty record leaves the model with no effort (#8381).
    */
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
   /**
@@ -198,20 +205,21 @@ function anthropicBaseUrl(baseUrl: string): string | null {
 
 /**
  * Azure OpenAI and Foundry refuse function tools with `reasoning_effort` on `/chat/completions`, and
- * every agent turn sends both, so each turn failed with a 400 (#3460). Their v1 API serves
- * `/responses` at the same base URL and takes the key as a bearer token, so the OpenAI adapter works
- * unchanged. `@ai-sdk/azure` is no fix: it builds `/deployments/<model>/responses`, which a v1
- * resource answers with 404.
+ * every agent turn sends both, so each turn failed with a 400 (#3460). OpenAI does the same for newer
+ * models such as `gpt-6-astra` (#7476). Both v1 APIs serve `/responses` at the same base URL and take
+ * the key as a bearer token, so the OpenAI adapter works unchanged. `@ai-sdk/azure` is no fix: it
+ * builds `/deployments/<model>/responses`, which a v1 resource answers with 404.
  *
- * Only with a key: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the environment
- * that OpenCode inherits, and would send the user's OpenAI key to Azure. A keyless endpoint, such as
- * one with an Entra ID `Authorization` header, keeps the OpenAI-compatible adapter.
+ * Only with a key, on both hosts: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the
+ * environment that OpenCode inherits, and would send a key that the user did not give this endpoint,
+ * to Azure or to OpenAI. A keyless endpoint, such as one with an Entra ID or a gateway
+ * `Authorization` header, keeps the OpenAI-compatible adapter.
  */
-function isAzureOpenAiV1(provider: CustomProviderConfig): boolean {
+function usesResponsesApi(provider: CustomProviderConfig): boolean {
   const url = URL.parse(provider.baseUrl);
+  if (!provider.apiKey || url?.protocol !== "https:") return false;
+  if (url.hostname === "api.openai.com") return url.pathname === "/v1" || url.pathname === "/v1/";
   return (
-    Boolean(provider.apiKey) &&
-    url?.protocol === "https:" &&
     (url.hostname.endsWith(".openai.azure.com") || url.hostname.endsWith(".services.ai.azure.com")) &&
     (url.pathname === "/openai/v1" || url.pathname === "/openai/v1/")
   );
@@ -220,7 +228,11 @@ function isAzureOpenAiV1(provider: CustomProviderConfig): boolean {
 function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
   const anthropic = anthropicBaseUrl(provider.baseUrl);
   return {
-    npm: anthropic ? OPENCODE_ANTHROPIC_NPM : isAzureOpenAiV1(provider) ? OPENCODE_OPENAI_NPM : OPENCODE_COMPATIBLE_NPM,
+    npm: anthropic
+      ? OPENCODE_ANTHROPIC_NPM
+      : usesResponsesApi(provider)
+        ? OPENCODE_OPENAI_NPM
+        : OPENCODE_COMPATIBLE_NPM,
     name: provider.name,
     options: {
       baseURL: anthropic ?? provider.baseUrl,
@@ -234,7 +246,12 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
         ? { headers: Object.fromEntries(provider.headers.map((header) => [header.name, header.value])) }
         : {}),
     },
-    models: Object.fromEntries(provider.models.map((model) => [model.id, modelEntry(model)])),
+    models: Object.fromEntries(
+      provider.models.map((model) => [
+        model.id,
+        modelEntry(model, provider.withoutReasoning?.includes(model.id) === true),
+      ]),
+    ),
   };
 }
 
@@ -250,7 +267,11 @@ export function customModelOutputLimit(model: CustomProviderModel, contextWindow
   return model.maxOutput ?? Math.min(DEFAULT_OUTPUT_LIMIT, Math.floor(contextWindow / 2));
 }
 
-function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
+/**
+ * `withoutReasoning`: the server says that the model cannot reason. Ollama refuses a
+ * `reasoning_effort` for such a model, so it gets no effort. Efforts that the user saved stay.
+ */
+function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): OpenCodeModelEntry {
   return {
     name: model.name,
     // With no window, the entry keeps OpenCode's own defaults, and a saved cap is not written.
@@ -258,7 +279,9 @@ function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
       ? {}
       : { limit: { context: model.contextWindow, output: customModelOutputLimit(model, model.contextWindow) } }),
     ...(model.reasoningEfforts === undefined
-      ? {}
+      ? withoutReasoning
+        ? { variants: {} }
+        : {}
       : {
           variants: Object.fromEntries(model.reasoningEfforts.map((effort) => [effort, { reasoningEffort: effort }])),
         }),
@@ -286,7 +309,7 @@ function customProviderEntries(
  * Mistral's API failed with HTTP 422 `extra_forbidden` after its first tool call (#10094). The
  * `provider` format cannot turn this off: OpenCode reads `compatibility` only from `providers`.
  */
-function isMistralApi(baseUrl: string): boolean {
+export function isMistralApi(baseUrl: string): boolean {
   const url = URL.parse(baseUrl);
   return url?.protocol === "https:" && (url.hostname === "mistral.ai" || url.hostname.endsWith(".mistral.ai"));
 }

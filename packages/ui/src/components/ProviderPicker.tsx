@@ -36,6 +36,7 @@ import { ProviderAccountList } from "./ProviderAccountList";
 import { hasKeyAccounts, type ProviderAccountActions, type ProviderPickerAccount } from "./provider-accounts";
 import {
   createProviderRow,
+  customEngineDownloadAction,
   PROVIDER_ACTION_LABEL,
   PROVIDER_ACTION_TEXT,
   type ProviderAction,
@@ -99,6 +100,11 @@ export interface ProviderPickerOption {
   cliSource?: AgentProviderStatus["cliSource"];
   /** The other CLI the user can run instead: theirs while OpenBot's copy runs, or the newer copy. */
   otherCliVersion?: string | undefined;
+  /**
+   * The version of the user's own CLI that runs while it lacks a part that some models need and
+   * OpenBot's copy, offered in its place, is not downloaded (#9139).
+   */
+  incompleteCliVersion?: string | undefined;
   /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
@@ -353,13 +359,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           when={(() => {
             if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
             if (customReady()) return undefined;
-            const engineOption = engine();
-            const runtime = engineOption.runtimeStatus;
-            if (!runtime) return undefined;
-            if (runtime.phase === "not-downloaded") return "download" as const;
-            if (runtime.phase === "downloading") return "cancel" as const;
-            if (runtime.phase === "download-error") return "retry" as const;
-            return undefined;
+            return customEngineDownloadAction(engine());
           })()}
         >
           {(action) => (

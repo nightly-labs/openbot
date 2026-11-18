@@ -43,6 +43,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentAccessLevel,
+  canAdministerServer,
   conversationMessageSender,
   DEFAULT_REMOTE_CONTROL_POLICY,
   isAvatarColor,
@@ -2244,6 +2245,16 @@ export class HostService extends EventEmitter<HostEvents> {
       .some(
         (member) => member.role === "member" && !member.disabled && this.#api.agentLevel(member, agentId) !== "none",
       );
+  }
+
+  /**
+   * Whether `personId` can change the server settings: this computer's user, or an active owner or
+   * admin of the team.
+   */
+  personCanAdminister(personId: string): boolean {
+    if (!this.channelPersonIsRemote(personId)) return true;
+    const member = this.#options.store.getMember(personId);
+    return member !== null && !member.disabled && canAdministerServer(member.role);
   }
 
   /**

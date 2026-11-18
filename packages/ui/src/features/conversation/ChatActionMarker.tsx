@@ -376,8 +376,15 @@ function AgentMessageGroupMarker(
             onClick={control.toggle}
           >
             <span class="chat-action-avatar-stack" aria-hidden="true">
-              <For each={agents().slice(0, 3)}>
-                {(agent) => <AgentAvatar agent={agent} class="chat-action-agent-avatar" />}
+              {/* Keyed by agent id: the agents come as new objects on each update, and a new face
+                  plays its entry again. */}
+              <For each={agentIds().slice(0, 3)}>
+                {(agentId) => (
+                  <AgentAvatar
+                    agent={props.agents.find((agent) => agent.id === agentId)}
+                    class="chat-action-agent-avatar"
+                  />
+                )}
               </For>
             </span>
             <span>{agentsLabel()}</span>

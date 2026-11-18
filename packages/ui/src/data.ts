@@ -354,10 +354,10 @@ export interface AgentProfile {
   preview: string;
 }
 
-/** The agent fields that the composer, the queue, rich text and the browser dock read. */
+/** The agent fields that the composer, the queue, rich text, the browser dock and the agent dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl" | "chatColor"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */

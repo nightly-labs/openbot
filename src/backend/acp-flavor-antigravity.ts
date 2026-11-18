@@ -40,6 +40,13 @@ const GEMINI_VERIFICATION_ANSWER =
  */
 const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
 /**
+ * Each verification link in the CLI's log. Google's `validation_url` is a `signin/continue` page
+ * (#2419), and its next page can be one other than Gemini's. A logged structure can end the link with
+ * `}`. Not a sign-in link of another kind, such as `/o/oauth2/`.
+ */
+const GEMINI_LOG_ACCOUNT_LINK =
+  /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+/**
  * The answer of the Antigravity CLI 1.5.6 and later when Google refuses a request until the user
  * verifies the account: `CustomUserErrorMessageFromHTTPError` maps `VALIDATION_REQUIRED` to this fixed
  * text, with no link, after the CLI's warning sign (#9508).
@@ -106,6 +113,10 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
   return null;
 }
 
+/** Go's text for a connection to Google that dropped, on Unix and on Windows (`wsarecv`). */
+const GEMINI_NETWORK_FAILURE =
+  /\bconnection reset by peer\b|\bunexpected EOF\b|\bforcibly closed by the remote host\b/u;
+
 /**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
  * sign-in on 1.4.1 or later, so a limit often has no usage notice to explain it, and the raw Google
@@ -158,6 +169,10 @@ const GEMINI_REQUEST_FAILURES = [
   // `antigravitySessionRejected` instead, and OpenBot opens a new session (#9593). This text shows
   // only when that recovery does not run.
   ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
+  // Go's text when the connection to Google drops during a request, after the CLI's own retries. The
+  // chat showed the Google URL and the IP addresses, and the user did not know that a new try helps
+  // (#7374, #8042). Last, so that a status that Google sent keeps its own kind.
+  ["error.provider.antigravityNetwork", GEMINI_NETWORK_FAILURE],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
@@ -167,6 +182,16 @@ const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>>
   "error.provider.antigravityQuotaReached": "usage_limit",
   "error.provider.antigravityRateLimited": "rate_limit",
 };
+
+/**
+ * The message for a failure of `GEMINI_REQUEST_FAILURES`. A network failure names only its cause,
+ * such as "connection reset by peer": the rest of Go's text is a URL and IP addresses.
+ */
+function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string): string {
+  if (key === "error.provider.antigravityNetwork")
+    return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
+  return sourceText(key, { detail: shownFailureDetail(text) });
+}
 
 /**
  * The message of a Gemini turn that the server failed but reported as answer text, and the request
@@ -184,7 +209,7 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
-  return { message: key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text), key };
+  return { message: key ? geminiRequestFailureText(key, text) : shownFailureDetail(text), key };
 }
 
 /**
@@ -230,7 +255,7 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
+  return key ? geminiRequestFailureText(key, reason) : detail;
 }
 
 /** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
@@ -281,11 +306,15 @@ const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises a
 /**
  * Google's answer, in the CLI's log, for a tool schema that its `parameters` format refuses. It has one
  * entry for each field, such as `GenerateContentRequest.tools[20].function_declarations[0].parameters
- * .properties[tags].items: missing field` or `….properties[revisions].enum[3]: cannot be empty`. It
- * names the tool only by its place in the request, which the log does not map to a name (#7482).
+ * .properties[tags].items: missing field` or `….properties[revisions].enum[3]: cannot be empty`. A
+ * field that Google takes only in a schema of one type, such as `items` on a `string`, gives
+ * `….properties[situacoes].items: field predicate failed: $type == Type.ARRAY` (#11746). It names the
+ * tool only by its place in the request, which the log does not map to a name (#7482).
  */
 const GOOGLE_REFUSED_FIELD =
-  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty)/gu;
+  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty|field predicate failed: \$type == Type\.\w+)/gu;
+/** The type that Google asks for in a `field predicate failed` reason of `GOOGLE_REFUSED_FIELD`. */
+const GOOGLE_FIELD_TYPE = /^field predicate failed: \$type == Type\.(\w+)$/u;
 /** One step of the field path in `GOOGLE_REFUSED_FIELD`: a key, and a property name or an index. */
 const GOOGLE_FIELD_STEP = /\.(\w+)(?:\[([^\]]*)\])?/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
@@ -305,18 +334,16 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The CLI's own log after the last prompt of the session. Each session has a process, and so a log,
- * of its own. A session that opened again on a new process has an older log too, so only the newest
- * log with a prompt of the session counts. A log that cannot be read gives `null`: the turn then
- * fails as before.
+ * The ends of the CLI's own logs that changed in the last minutes, newest first. The folder is in the
+ * account's Gemini home, so each log is of this account. A log is read only when the caller gets to
+ * it, and a log that cannot be read is skipped.
  */
-function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
-  if (!home || !appData) return null;
+  if (!home || !appData) return;
   const folder = join(home, appData, "log");
   const since = Date.now() - GEMINI_LOG_RECENT_MS;
-  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
   let logs: { file: string; size: number; mtimeMs: number }[];
   try {
     logs = readdirSync(folder)
@@ -332,15 +359,26 @@ function antigravityLastPromptLog(argv: readonly string[], sessionId: string): s
       })
       .sort((a, b) => b.mtimeMs - a.mtimeMs);
   } catch {
-    return null;
+    return;
   }
   for (const { file, size } of logs) {
-    let log: string;
     try {
-      log = logTail(file, size);
+      yield logTail(file, size);
     } catch {
-      continue;
+      // The CLI can remove or lock a log while it runs.
     }
+  }
+}
+
+/**
+ * The CLI's own log after the last prompt of the session. Each session has a process, and so a log,
+ * of its own. A session that opened again on a new process has an older log too, so only the newest
+ * log with a prompt of the session counts. A log that cannot be read gives `null`: the turn then
+ * fails as before.
+ */
+function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
+  for (const log of antigravityRecentLogs(argv)) {
     const at = log.lastIndexOf(prompt);
     if (at >= 0) return log.slice(at);
   }
@@ -374,19 +412,26 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
  * own log (#9508). A JSON encoder can write the `&`, `=` and `/` of the link as `\u0026`, `\u003d` and
  * `\/`; Go's writes each `&` as `\u0026`. A body that is logged as a JSON string has one more
  * backslash for each escape, and its quotes as `\"`.
+ *
+ * The CLI can log Google's 403 when it opens the session or checks the sign-in, before the line of
+ * the prompt, so only the text after the prompt had no link and the banner had no button (#11702).
+ * The newest link in the account's recent logs is the one to open: the log folder is the account's.
  */
-function antigravityAccountLink(text: string, argv: readonly string[], sessionId: string): string | null {
+function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
   if (link !== null || !GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return link;
-  const log = antigravityLastPromptLog(argv, sessionId);
-  if (log === null || !log.includes("VALIDATION_REQUIRED")) return null;
-  return geminiAccountLink(
-    log
+  for (const log of antigravityRecentLogs(argv)) {
+    if (!log.includes("VALIDATION_REQUIRED")) continue;
+    const links = log
       .replace(/\\+u0026/gu, "&")
       .replace(/\\+u003d/gu, "=")
       .replace(/\\+\//gu, "/")
-      .replace(/\\+"/gu, '"'),
-  );
+      .replace(/\\+"/gu, '"')
+      .match(GEMINI_LOG_ACCOUNT_LINK);
+    const newest = links?.at(-1)?.replace(/[.,;:]+$/u, "");
+    if (newest) return newest;
+  }
+  return null;
 }
 
 function folderNames(folder: string): string[] {
@@ -398,8 +443,9 @@ function folderNames(folder: string): string[] {
 }
 
 /**
- * Whether `parameters` has the field that Google refused at `path`: a missing key, or an empty value.
- * An index in a step reads an array, and a property name reads an object.
+ * Whether `parameters` has the field that Google refused at `path`: a missing key, an empty value, or
+ * a key in a schema of a type other than the one that Google asks for. An index in a step reads an
+ * array, and a property name reads an object.
  */
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
@@ -410,8 +456,9 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
   const last = steps.pop();
   if (!last) return false;
   const missing = reason === "missing field";
+  const type = GOOGLE_FIELD_TYPE.exec(reason)?.[1]?.toLowerCase();
   let node = parameters;
-  for (const { key, index } of missing ? steps : [...steps, last]) {
+  for (const { key, index } of missing || type ? steps : [...steps, last]) {
     if (!isRecord(node)) return false;
     const value = Object.hasOwn(node, key) ? node[key] : undefined;
     if (index === undefined) node = value;
@@ -422,6 +469,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
     // Google asks for `items` only in an array. A field of another type with the same name is not refused.
     return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+  }
+  if (type) {
+    if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;
+    // The field is refused only beside another type. A schema of the asked type with the same field is accepted.
+    return node.type !== type && !(Array.isArray(node.type) && node.type.includes(type));
   }
   return node === "" || (Array.isArray(node) && node.length === 0);
 }
@@ -532,6 +584,14 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity keeps session/prompt open while background tasks run. Its text must not wait for
   // that response.
   streamAnswerBeforePromptReturns: true,
+  // When the model's stream drops, the 1.5.10 CLI sends it "The stream was interrupted. Please
+  // continue the task you were working on." as an error step, and the model writes the rest of the
+  // answer in a new step that starts with a thought. The answer before the thought showed only in the
+  // steps, and the answer only had its end (#11805). The CLI sends a failure as "\n⚠ <text>\n".
+  resumesAnswerAfterThought: {
+    report:
+      /^\s*(?:⚠️?\s*)?(?:Error: )?The stream was interrupted\. Please continue the task you were working on\.\s*$/u,
+  },
   // A silent prompt can be a background task that still runs, so the turn is not ended as stalled.
   promptOpenForBackgroundTasks: true,
   // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the

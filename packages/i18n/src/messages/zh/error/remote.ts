@@ -75,10 +75,12 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "只有所有者可以移除该服务器。",
   "error.remote.requestTimeout": "远程请求超时。",
   "error.remote.requestFailed": "远程请求失败。",
-  "error.remote.pinnedKeyMissing": "远程主机没有固定的设备密钥。",
+  "error.remote.hostKeyMissing":
+    "此服务器的安全密钥缺失或已更改，OpenBot 无法验证此服务器。请让服务器所有者检查服务器。",
+  "error.remote.connectionNotStarted": "OpenBot 无法开始连接此服务器。如果问题持续，请退出 OpenBot 并重新打开。",
   "error.remote.hostDidNotConnect": "WebRTC 主机未连接。",
   "error.remote.connectionCancelled": "远程连接已取消。",
-  "error.remote.hostDisconnected": "WebRTC 主机已断开。",
+  "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
   "error.remote.eventGap": "主机事件序列存在断档。",
   "error.remote.malformedKnownEvent": "主机返回了格式错误的已知事件。",
   "error.remote.fileTransportIsStopped": "WebRTC 文件传输已停止。",
@@ -194,6 +196,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",
   "error.remote.taskHistoryRefreshFailed": "任务已更改，但无法刷新对话历史。",
+  "error.remote.serverNotLoaded": "OpenBot 无法加载该服务器。请重试。",
+  "error.remote.localServerNotStarted":
+    "这台电脑上的服务器没有启动。请重试。如果仍未启动，请在这台电脑上重启 OpenBot。",
   "error.remote.localServerAccountRemovalFailed":
     "服务器已在其电脑上删除，但账户中仍列出它。请再次删除以将其从账户中移除。",
 } as const satisfies PartialTranslation<typeof source>;

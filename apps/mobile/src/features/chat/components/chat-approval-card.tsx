@@ -245,8 +245,10 @@ export function ChatApprovalCard({
               </Typography.Paragraph>
             </View>
             {/* The whole report scrolls inside the card, so the user reads all of it before Send. A
-                report about the phone app also shows the phone's data under it, so its box is lower. */}
-            <ScrollView className={phone ? "max-h-56" : "max-h-72"} nestedScrollEnabled>
+                report about the phone app also shows the phone's data under it, so its box is lower.
+                A ScrollView grows by default, so without grow-0 a short report keeps the whole box
+                height and pushes Send down under the composer (#10636). */}
+            <ScrollView className={phone ? "max-h-56 grow-0" : "max-h-72 grow-0"} nestedScrollEnabled>
               <View className="gap-1 border-s-[3px] border-border ps-3">
                 <Typography.Paragraph weight="medium" selectable>
                   {report.title}
@@ -268,7 +270,7 @@ export function ChatApprovalCard({
                 <Typography.Paragraph type="body-xs" className="text-text-secondary" selectable>
                   {`${phone.platform} · ${phone.appVersion}\n${phone.system}\n${network}`}
                 </Typography.Paragraph>
-                <ScrollView className="max-h-32 rounded-xl bg-control px-2 py-1.5" nestedScrollEnabled>
+                <ScrollView className="max-h-32 grow-0 rounded-xl bg-control px-2 py-1.5" nestedScrollEnabled>
                   <Typography.Code
                     selectable
                     className="bg-transparent p-0"

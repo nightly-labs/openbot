@@ -175,6 +175,17 @@ function isCodexBareBadRequest(provider: AgentProvider, message: string): boolea
 }
 
 /**
+ * Codex sends the `input_audio` of a tool result to a model whose catalog entry lists audio input.
+ * GPT-6.2 Sol does not take it, and OpenAI answers 400 "Audio input is not available." or "Audio
+ * input is not supported for this request." Codex keeps the item in the session and sends it on each
+ * turn, so each later turn failed the same way, a text-only one too (#11728, openai/codex#62212). A
+ * new session, given the OpenBot transcript, has no audio.
+ */
+function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bAudio input is not (?:available|supported)\b/i.test(message);
+}
+
+/**
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
@@ -277,6 +288,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
   if (isCodexBareBadRequest(provider, message))
     return sourceText("error.provider.codexRequestRefused", { provider: providerLabel(provider) });
+  if (isCodexRefusedAudio(provider, message)) return sourceText("error.provider.codexAudioRefused");
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
