@@ -29,8 +29,8 @@ export function readPromotionCode(storage: () => Pick<Storage, "getItem">, now: 
     const stored = storage().getItem(PROMOTION_CODE_STORAGE_KEY);
     const value = stored ? JSON.parse(stored) : null;
     if (!isDynamicRecord(value) || !isNumber(value.savedAt)) return null;
-    const age = now - value.savedAt;
-    return age >= 0 && age <= PROMOTION_CODE_MAX_AGE_DAYS * DAY_MS ? parsePromotionCode(value.code) : null;
+    // A clock that moved back after the save gives a negative age, which is still a new code.
+    return now - value.savedAt <= PROMOTION_CODE_MAX_AGE_DAYS * DAY_MS ? parsePromotionCode(value.code) : null;
   } catch {
     return null;
   }
