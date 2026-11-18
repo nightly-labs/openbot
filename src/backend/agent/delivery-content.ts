@@ -452,8 +452,9 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
         : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
       // A run that the user paused or stopped on purpose was shown as "Routine failed" (#11578). A
-      // Test run is the user's own request to run, so it does not get this line.
-      ...(testRun
+      // Test run and a local script run are requests to run now, also when the routine is paused, so
+      // they do not get this line.
+      ...(testRun || run?.source === "script"
         ? []
         : [
             `A stop that the user asked for is not a failure. When the user paused this routine, or asked to stop or skip this run, and did not turn it on again, do not do the task and do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool: call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
