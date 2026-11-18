@@ -779,7 +779,11 @@ export class CuaDriverRuntime {
    */
   #scheduleRecheck(): void {
     if (this.#recheckTimer || this.#options.quitting?.()) return;
-    if (this.#readySince !== null && Date.now() - this.#readySince >= RECHECK_STABLE_MS) this.#recheckAttempt = 0;
+    // Once for each stable run: a failed check publishes no `ready`, so it must not reset the list again.
+    if (this.#readySince !== null && Date.now() - this.#readySince >= RECHECK_STABLE_MS) {
+      this.#recheckAttempt = 0;
+      this.#readySince = null;
+    }
     const delay = RECHECK_DELAYS_MS[this.#recheckAttempt];
     if (delay === undefined) return;
     this.#recheckAttempt += 1;
