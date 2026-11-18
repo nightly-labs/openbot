@@ -242,9 +242,9 @@ const Navigation = createSimpleContext({
     /** The index that Back or Forward opens. The chat records it when it opens; a refused open keeps it until then. */
     let historyTarget: number | null = null;
 
-    /** The chat that the sidebar marks as open. A page or the new agent form has none. */
-    const openChat = (): ChatHistoryEntry | null => {
-      if (windowPage.page() !== "agents" || agentSetupOpen()) return null;
+    /** The chat that shows when no page covers it. The new agent form has none. */
+    const currentChat = (): ChatHistoryEntry | null => {
+      if (agentSetupOpen()) return null;
       const channelId = channels.state.selectedId;
       if (channelId) return { kind: "channel", id: channelId };
       const member = activeDirectMember();
@@ -252,6 +252,10 @@ const Navigation = createSimpleContext({
       const agent = activeAgent();
       return agent ? { kind: "agent", id: agent.id } : null;
     };
+    /** The chat that the sidebar marks as open. A page or the new agent form has none. */
+    const openChat = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? currentChat() : null);
+    /** The chat under a page such as Settings or the Marketplace. Back closes the page and shows it. */
+    const chatUnderPage = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? null : currentChat());
     createEffect(
       () => {
         const entry = openChat();
@@ -275,10 +279,14 @@ const Navigation = createSimpleContext({
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
-    /** Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. */
+    /**
+     * Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. Then it
+     * leaves a page for the chat under it, not for the chat before that one.
+     */
     const goBack = () => {
       const pageBack = windowPage.pageBack();
       if (pageBack) pageBack.back();
+      else if (chatUnderPage()) windowPage.showAgents();
       else goInHistory(-1);
     };
     const goForward = () => goInHistory(1);
@@ -323,7 +331,14 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
+      chatHistory: {
+        previous: history.previous,
+        next: history.next,
+        pageBack: windowPage.pageBack,
+        chatUnderPage,
+        goBack,
+        goForward,
+      },
     };
   },
 });

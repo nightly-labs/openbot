@@ -126,10 +126,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           if (selectAgent(agentId)) agentThreads.startNew(agentId);
         }
       : undefined;
-  /** What Back opens: the list of an open settings detail page, or else the previous chat. */
+  /** What Back opens: the list of an open settings detail page, the chat under a page, or else the previous chat. */
   const backTarget = (): { name: string } | null => {
     const pageBack = chatHistory.pageBack();
-    return pageBack ? { name: pageBack.name } : chatName(chatHistory.previous());
+    if (pageBack) return { name: pageBack.name };
+    return chatName(chatHistory.chatUnderPage() ?? chatHistory.previous());
   };
   /** The name of a chat as its sidebar row shows it. */
   const chatName = (entry: ChatHistoryEntry | undefined): { name: string } | null => {
