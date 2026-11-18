@@ -470,7 +470,10 @@ async function speak(
   const analytics = desktopAnalytics.scope();
   try {
     const input = speechInput(markdown, fallback);
-    if (!input) return;
+    if (!input) {
+      if (markdown && speechTextFromMarkdown(markdown)) reportUnreadableLanguage(trigger, analytics);
+      return;
+    }
     spoken = own;
     // The first part takes longer to synthesize than the speed to load; a late speed applies at once.
     void loadSpeechSpeed();
@@ -488,6 +491,18 @@ async function speak(
   } finally {
     if (spoken === own) spoken = undefined;
   }
+}
+
+/**
+ * Tells the user that the reply has text but no voice of theirs reads its language. Each part of a
+ * reply in a voice conversation can come here, so all of them share one toast.
+ */
+function reportUnreadableLanguage(trigger: SpeechTrigger, analytics: ReturnType<typeof desktopAnalytics.scope>): void {
+  analytics.track("speech_reply", { trigger, result: "failed", failure_code: "unsupported_language" });
+  toast.warning(currentText().t("composer.voice.languageUnsupported"), {
+    id: "speech-unsupported-language",
+    report: { operation: "voice", source: "system", cause_code: "unknown" },
+  });
 }
 
 function reportReadFailure(error: unknown): void {
