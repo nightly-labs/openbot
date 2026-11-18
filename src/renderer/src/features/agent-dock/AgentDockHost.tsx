@@ -1154,13 +1154,27 @@ function withStepAnswers(
     const turnId = message.turnId;
     if (message.kind !== "thinking" || message.streaming || !turnId || answered.has(turnId) || running.has(turnId))
       return [message];
-    const note = narrationRows(message, provider(message)).at(-1);
+    const note = stepNote(message, provider);
     if (!note) return [message];
     if (!note.createdAt) return [note];
     notes.push([note]);
     return [];
   });
   return notes.length > 0 ? placeTurnRowsByTime(rows, notes) : rows;
+}
+
+/** The note of each steps row. A row keeps its note while its steps stay, so the chat does not draw it again. */
+const stepNotes = new WeakMap<AgentMessage, { count: number; note: AgentMessage | undefined }>();
+function stepNote(
+  steps: AgentMessage,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage | undefined {
+  const count = steps.items?.length ?? 0;
+  const known = stepNotes.get(steps);
+  if (known?.count === count) return known.note;
+  const note = narrationRows(steps, provider(steps)).at(-1);
+  stepNotes.set(steps, { count, note });
+  return note;
 }
 
 /** The unread agent answers: from the first unread message, or the last `count` messages. */
