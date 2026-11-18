@@ -3641,6 +3641,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // The report is a thought, so the answer before it stays in the answer.
       if (this.#flavor.resumesAnswerAfterThought?.report.test(update.content.text)) {
         turn.receivedOutput = true;
+        this.#completeThought(thread, turn);
         this.#appendThought(thread, turn, update.content.text.trim());
         this.#completeThought(thread, turn);
         return;
