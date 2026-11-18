@@ -1194,6 +1194,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - A Codex agent that shows the Standard speed now runs at the standard speed. Before, it used a fast
   tier from the Codex settings file (`service_tier` in `~/.codex/config.toml`), which uses more of the
   plan's limits. On a joined server, the server must also be on this version.
+- An agent can now find all of its older chats. Before, its list of chats showed only the newest
+  ones and could not go further back, so an agent with many chats could not recall work from the
+  older ones.
 
 ## [0.72.0] - 2026-11-16
 
