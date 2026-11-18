@@ -91,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "La mise à jour de l’environnement d’exécution ne s’est pas terminée.",
   "error.provider.downloadHttp": "Le téléchargement de l’environnement d’exécution a échoué avec HTTP {status}.",
   "error.provider.downloadNoData": "Le téléchargement de l’environnement d’exécution n’a renvoyé aucune donnée.",
+  "error.provider.downloadStalled":
+    "Le téléchargement s'est arrêté, car aucune donnée n'est arrivée pendant une minute. Vérifiez la connexion Internet, puis réessayez.",
   "error.provider.downloadSize": "Le téléchargement de l’environnement d’exécution a une taille inattendue.",
   "error.provider.downloadIntegrity":
     "Le téléchargement de l’environnement d’exécution a échoué au contrôle d’intégrité.",

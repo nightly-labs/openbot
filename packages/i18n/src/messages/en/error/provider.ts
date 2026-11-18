@@ -86,6 +86,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.runtimeUpdateIncomplete": "The runtime update did not complete.",
   "error.provider.downloadHttp": "Runtime download failed with HTTP {status}.",
   "error.provider.downloadNoData": "Runtime download returned no data.",
+  "error.provider.downloadStalled":
+    "The download stopped because no data arrived for one minute. Check the internet connection, then try again.",
   "error.provider.downloadSize": "The runtime download has an unexpected size.",
   "error.provider.downloadIntegrity": "The runtime download failed its integrity check.",
   "error.provider.runtimeReplacing": "The runtime could not be installed because another instance is replacing it.",

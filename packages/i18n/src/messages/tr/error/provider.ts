@@ -88,6 +88,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Çalışma zamanı güncellemesi tamamlanmadı.",
   "error.provider.downloadHttp": "Çalışma zamanı indirmesi HTTP {status} ile başarısız oldu.",
   "error.provider.downloadNoData": "Çalışma zamanı indirmesi veri döndürmedi.",
+  "error.provider.downloadStalled":
+    "Bir dakika boyunca veri gelmediği için indirme durdu. İnternet bağlantısını kontrol edin, ardından yeniden deneyin.",
   "error.provider.downloadSize": "Çalışma zamanı indirmesi beklenmeyen bir boyuta sahip.",
   "error.provider.downloadIntegrity": "Çalışma zamanı indirmesi bütünlük denetiminde başarısız oldu.",
   "error.provider.runtimeReplacing": "Başka bir örnek onun yerini aldığından çalışma zamanı yüklenemedi.",

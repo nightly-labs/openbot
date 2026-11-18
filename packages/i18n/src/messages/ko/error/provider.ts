@@ -87,6 +87,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "런타임 업데이트가 완료되지 않았어요.",
   "error.provider.downloadHttp": "런타임 다운로드가 HTTP {status}(으)로 실패했어요.",
   "error.provider.downloadNoData": "런타임 다운로드에서 데이터가 반환되지 않았어요.",
+  "error.provider.downloadStalled":
+    "1분 동안 데이터가 도착하지 않아 다운로드가 중지되었습니다. 인터넷 연결을 확인한 다음 다시 시도하세요.",
   "error.provider.downloadSize": "런타임 다운로드의 크기가 예상과 달라요.",
   "error.provider.downloadIntegrity": "런타임 다운로드가 무결성 검사에 실패했어요.",
   "error.provider.runtimeReplacing": "다른 인스턴스가 런타임을 교체하는 중이어서 설치할 수 없었어요.",

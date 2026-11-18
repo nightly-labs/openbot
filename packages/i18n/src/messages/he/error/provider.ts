@@ -84,6 +84,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "עדכון סביבת ההרצה לא הושלם.",
   "error.provider.downloadHttp": "הורדת סביבת ההרצה נכשלה עם HTTP {status}.",
   "error.provider.downloadNoData": "הורדת סביבת ההרצה לא החזירה נתונים.",
+  "error.provider.downloadStalled":
+    "ההורדה נעצרה כי לא הגיעו נתונים במשך דקה. יש לבדוק את החיבור לאינטרנט ואז לנסות שוב.",
   "error.provider.downloadSize": "לקובץ שהורד של סביבת ההרצה יש גודל לא צפוי.",
   "error.provider.downloadIntegrity": "הורדת סביבת ההרצה נכשלה בבדיקת השלמות.",
   "error.provider.runtimeReplacing": "לא ניתן להתקין את סביבת ההרצה כי מופע אחר מחליף אותה.",

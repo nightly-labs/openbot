@@ -87,6 +87,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Aktualizacja środowiska uruchomieniowego nie została ukończona.",
   "error.provider.downloadHttp": "Pobieranie środowiska uruchomieniowego nie powiodło się (HTTP {status}).",
   "error.provider.downloadNoData": "Pobieranie środowiska uruchomieniowego nie zwróciło danych.",
+  "error.provider.downloadStalled":
+    "Pobieranie zatrzymało się, ponieważ przez minutę nie dotarły żadne dane. Sprawdź połączenie z internetem, a potem spróbuj ponownie.",
   "error.provider.downloadSize": "Pobrane środowisko uruchomieniowe ma nieoczekiwany rozmiar.",
   "error.provider.downloadIntegrity": "Pobrane środowisko uruchomieniowe nie przeszło kontroli integralności.",
   "error.provider.runtimeReplacing":

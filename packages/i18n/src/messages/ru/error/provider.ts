@@ -87,6 +87,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Обновление среды выполнения не завершено.",
   "error.provider.downloadHttp": "Загрузка среды выполнения не удалась: HTTP {status}.",
   "error.provider.downloadNoData": "Загрузка среды выполнения не вернула данных.",
+  "error.provider.downloadStalled":
+    "Загрузка остановилась, потому что данные не поступали в течение минуты. Проверьте подключение к интернету и повторите попытку.",
   "error.provider.downloadSize": "У загруженной среды выполнения неожиданный размер.",
   "error.provider.downloadIntegrity": "Загруженная среда выполнения не прошла проверку целостности.",
   "error.provider.runtimeReplacing": "Не удалось установить среду выполнения, потому что другой экземпляр заменяет её.",

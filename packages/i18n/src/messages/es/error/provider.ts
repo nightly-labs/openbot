@@ -89,6 +89,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "La actualización del entorno de ejecución no se completó.",
   "error.provider.downloadHttp": "La descarga del entorno de ejecución falló con HTTP {status}.",
   "error.provider.downloadNoData": "La descarga del entorno de ejecución no devolvió datos.",
+  "error.provider.downloadStalled":
+    "La descarga se detuvo porque no llegaron datos durante un minuto. Comprueba la conexión a internet y vuelve a intentarlo.",
   "error.provider.downloadSize": "La descarga del entorno de ejecución tiene un tamaño inesperado.",
   "error.provider.downloadIntegrity": "La descarga del entorno de ejecución no superó la comprobación de integridad.",
   "error.provider.runtimeReplacing":

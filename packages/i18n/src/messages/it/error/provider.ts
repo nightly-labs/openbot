@@ -88,6 +88,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "L'aggiornamento del runtime non è stato completato.",
   "error.provider.downloadHttp": "Download del runtime non riuscito con HTTP {status}.",
   "error.provider.downloadNoData": "Il download del runtime non ha restituito dati.",
+  "error.provider.downloadStalled":
+    "Il download si è interrotto perché non sono arrivati dati per un minuto. Controlla la connessione a internet, poi riprova.",
   "error.provider.downloadSize": "Il download del runtime ha una dimensione inattesa.",
   "error.provider.downloadIntegrity": "Il download del runtime non ha superato il controllo di integrità.",
   "error.provider.runtimeReplacing": "Impossibile installare il runtime perché un'altra istanza lo sta sostituendo.",
