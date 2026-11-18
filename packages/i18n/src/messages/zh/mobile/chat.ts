@@ -466,7 +466,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "最新",
   "mobile.chat.history.loadingOlder": "正在加载更早的消息…",
   "mobile.chat.history.retryOlder": "重新尝试加载更早的消息",
-  "mobile.chat.history.loadOlder": "加载更早的消息",
   "mobile.chat.history.connecting": "正在连接服务器",
   "mobile.chat.history.loading": "正在加载对话记录",
   "mobile.chat.history.waiting": "等待连接",

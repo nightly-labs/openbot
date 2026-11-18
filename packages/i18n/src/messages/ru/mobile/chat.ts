@@ -572,7 +572,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Новое",
   "mobile.chat.history.loadingOlder": "Загрузка прежних сообщений…",
   "mobile.chat.history.retryOlder": "Повторить загрузку прежних сообщений",
-  "mobile.chat.history.loadOlder": "Загрузить прежние сообщения",
   "mobile.chat.history.connecting": "Подключение к серверу",
   "mobile.chat.history.loading": "Загрузка истории чата",
   "mobile.chat.history.waiting": "Ожидание подключения",

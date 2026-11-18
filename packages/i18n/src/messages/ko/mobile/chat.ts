@@ -477,7 +477,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "최신",
   "mobile.chat.history.loadingOlder": "이전 메시지를 불러오는 중…",
   "mobile.chat.history.retryOlder": "이전 메시지 다시 불러오기",
-  "mobile.chat.history.loadOlder": "이전 메시지 불러오기",
   "mobile.chat.history.connecting": "서버에 연결하는 중",
   "mobile.chat.history.loading": "채팅 기록을 불러오는 중",
   "mobile.chat.history.waiting": "연결을 기다리는 중",

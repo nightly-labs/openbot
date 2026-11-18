@@ -573,7 +573,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Najnowsze",
   "mobile.chat.history.loadingOlder": "Wczytywanie starszych wiadomości…",
   "mobile.chat.history.retryOlder": "Spróbuj ponownie wczytać starsze wiadomości",
-  "mobile.chat.history.loadOlder": "Wczytaj starsze wiadomości",
   "mobile.chat.history.connecting": "Łączenie z serwerem",
   "mobile.chat.history.loading": "Wczytywanie historii czatu",
   "mobile.chat.history.waiting": "Oczekiwanie na połączenie",

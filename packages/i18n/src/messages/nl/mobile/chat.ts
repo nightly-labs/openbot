@@ -457,7 +457,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Nieuwste",
   "mobile.chat.history.loadingOlder": "Oudere berichten laden…",
   "mobile.chat.history.retryOlder": "Probeer oudere berichten opnieuw te laden",
-  "mobile.chat.history.loadOlder": "Laad oudere berichten",
   "mobile.chat.history.connecting": "Verbinden met server",
   "mobile.chat.history.loading": "Chatgeschiedenis laden",
   "mobile.chat.history.waiting": "Wachten op verbinding",

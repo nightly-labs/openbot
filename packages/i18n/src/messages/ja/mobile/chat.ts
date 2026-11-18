@@ -481,7 +481,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "最新",
   "mobile.chat.history.loadingOlder": "以前のメッセージを読み込み中…",
   "mobile.chat.history.retryOlder": "以前のメッセージの読み込みを再試行",
-  "mobile.chat.history.loadOlder": "以前のメッセージを読み込む",
   "mobile.chat.history.connecting": "サーバーに接続中",
   "mobile.chat.history.loading": "チャット履歴を読み込み中",
   "mobile.chat.history.waiting": "接続を待っています",

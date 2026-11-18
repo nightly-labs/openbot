@@ -6,7 +6,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import { useIsFocused } from "expo-router";
-import { Button, Typography } from "heroui-native";
+import { Button, Spinner, Typography } from "heroui-native";
 import CircleX from "lucide-react-native/icons/circle-x";
 import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
@@ -2244,16 +2244,22 @@ export const ChatMessageList = memo(function ChatMessageList({
   const listHeader = (
     <>
       {hasOlder ? (
-        <View className="items-center pb-3">
-          <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
-            <Button.Label>
-              {olderLoading
-                ? t("mobile.chat.history.loadingOlder")
-                : olderError
-                  ? t("mobile.chat.history.retryOlder")
-                  : t("mobile.chat.history.loadOlder")}
-            </Button.Label>
-          </Button>
+        // Scrolling to the top loads older pages by itself (onStartReached). The slot keeps one height
+        // in every state, so the messages below it do not move when the state changes.
+        <View className="h-13 items-center justify-center">
+          {olderLoading ? (
+            <View
+              accessible
+              accessibilityLabel={t("mobile.chat.history.loadingOlder")}
+              accessibilityState={{ busy: true }}
+            >
+              <Spinner size="sm" color={themeMuted} />
+            </View>
+          ) : olderError ? (
+            <Button size="sm" variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
+              <Button.Label>{t("mobile.chat.history.retryOlder")}</Button.Label>
+            </Button>
+          ) : null}
         </View>
       ) : null}
       {historyState === "connecting" || historyState === "loading" ? (

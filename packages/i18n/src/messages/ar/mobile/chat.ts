@@ -598,7 +598,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "الأحدث",
   "mobile.chat.history.loadingOlder": "جارٍ تحميل الرسائل الأقدم…",
   "mobile.chat.history.retryOlder": "إعادة محاولة تحميل الرسائل الأقدم",
-  "mobile.chat.history.loadOlder": "تحميل الرسائل الأقدم",
   "mobile.chat.history.connecting": "جارٍ الاتصال بالخادم",
   "mobile.chat.history.loading": "جارٍ تحميل سجل الدردشة",
   "mobile.chat.history.waiting": "في انتظار الاتصال",

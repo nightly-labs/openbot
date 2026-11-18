@@ -496,7 +496,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Récent",
   "mobile.chat.history.loadingOlder": "Chargement des messages plus anciens…",
   "mobile.chat.history.retryOlder": "Réessayer de charger les messages plus anciens",
-  "mobile.chat.history.loadOlder": "Charger les messages plus anciens",
   "mobile.chat.history.connecting": "Connexion au serveur",
   "mobile.chat.history.loading": "Chargement de l’historique de la discussion",
   "mobile.chat.history.waiting": "En attente de connexion",
