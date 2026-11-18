@@ -628,6 +628,7 @@ export const messages = {
   "chat.suggestion.undo": "تراجع",
   "chat.suggestion.localOnly": "اربط {name} في OpenBot على حاسوبك.",
   "chat.suggestion.unavailable": "لا يمكن لهذا الخادم ربط {name}.",
+  "chat.suggestion.notAllowed": "يمكن لمالك الخادم أو المسؤول فقط ربط {name}.",
   "chat.mcpSignIn.signIn": "تسجيل الدخول",
   "chat.mcpSignIn.signInNamed": "تسجيل الدخول إلى {name}",
   "chat.mcpSignIn.signedIn": "تم تسجيل الدخول",

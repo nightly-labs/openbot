@@ -468,6 +468,7 @@ export const messages = {
   "chat.suggestion.undo": "실행 취소",
   "chat.suggestion.localOnly": "내 컴퓨터의 OpenBot에서 {name}을(를) 연결해 주세요.",
   "chat.suggestion.unavailable": "이 서버에서는 {name}을(를) 연결할 수 없어요.",
+  "chat.suggestion.notAllowed": "서버 소유자나 관리자만 {name}을(를) 연결할 수 있습니다.",
   "chat.mcpSignIn.signIn": "로그인",
   "chat.mcpSignIn.signInNamed": "{name}에 로그인",
   "chat.mcpSignIn.signedIn": "로그인됨",
