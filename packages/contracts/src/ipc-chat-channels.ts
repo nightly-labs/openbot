@@ -3,6 +3,7 @@ import type { AvatarImageInput } from "./ipc-agents";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
 import { optionalHistoryExtent } from "./ipc-decoding";
+import type { RoutineRunStatus } from "./ipc-routines";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
@@ -182,6 +183,38 @@ export interface ChannelMessage {
   taskId: string | null;
   superseded: boolean;
   message: ConversationMessage;
+}
+
+/** The author id prefix of the request that a channel routine posts (`ChannelService`). */
+const CHANNEL_ROUTINE_AUTHOR_PREFIX = "routine:";
+
+const CHANNEL_ROUTINE_RUN_STATUS: Record<ChannelTaskState, RoutineRunStatus> = {
+  queued: "queued",
+  running: "running",
+  waiting: "running",
+  paused: "interrupted",
+  completed: "succeeded",
+  failed: "failed",
+  cancelled: "cancelled",
+};
+
+/**
+ * The run of a channel routine request. Its text is the routine instruction, and for a webhook the
+ * event data, so a view shows the request as a routine marker, as an agent chat does. The run's
+ * state is the state of the task that the request made.
+ */
+export function channelRoutineRequest(
+  entry: ChannelMessage,
+  tasks: readonly ChannelTask[],
+): { routineId: string; runId: string; routineName: string; status: RoutineRunStatus } | null {
+  if (entry.author.kind !== "member" || !entry.author.id.startsWith(CHANNEL_ROUTINE_AUTHOR_PREFIX)) return null;
+  const task = tasks.find((candidate) => candidate.id === entry.taskId);
+  return {
+    routineId: entry.author.id.slice(CHANNEL_ROUTINE_AUTHOR_PREFIX.length),
+    runId: entry.id,
+    routineName: entry.author.name,
+    status: task ? CHANNEL_ROUTINE_RUN_STATUS[task.state] : "queued",
+  };
 }
 
 /** Deletes one message of a channel from its history and view. Agents can still remember it. */

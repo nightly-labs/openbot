@@ -383,7 +383,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn);
+    return channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn);
   });
   const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
 
