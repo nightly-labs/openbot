@@ -267,6 +267,13 @@ export interface AgentRuntimeSnapshot {
    * snapshot, as `usageLimits` is.
    */
   subagentTurns?: Array<{ agentId: string; turnId: string }>;
+  /**
+   * The chats whose background work, such as a shell command, still runs after their turn ended. The
+   * provider starts a turn by itself when the work ends. `taskId` is null for the agent's own chat, and
+   * `since` is when the work started, from `Date.now()` on the host. Absent from a released Team API
+   * snapshot, as `usageLimits` is.
+   */
+  backgroundWork?: Array<{ agentId: string; taskId: string | null; since: number }>;
 }
 
 export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSnapshot {
@@ -341,6 +348,17 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
         value.subagentTurns.length <= INPUT_LIMITS.agents &&
         value.subagentTurns.every(
           (turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId),
+        ))) &&
+    (value.backgroundWork === undefined ||
+      (Array.isArray(value.backgroundWork) &&
+        value.backgroundWork.length <= INPUT_LIMITS.agents &&
+        value.backgroundWork.every(
+          (work) =>
+            isDynamicRecord(work) &&
+            isIdentifier(work.agentId) &&
+            (work.taskId === null || isIdentifier(work.taskId)) &&
+            typeof work.since === "number" &&
+            Number.isFinite(work.since),
         )))
   );
 }

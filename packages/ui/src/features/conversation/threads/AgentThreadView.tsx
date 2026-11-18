@@ -274,6 +274,11 @@ export interface AgentThreadViewProps {
   traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
+  /**
+   * When the background work of the thread started, in epoch milliseconds, while it still runs after
+   * its turn ended. The agent continues when it ends, so the thread shows that it waits.
+   */
+  backgroundWorkSince?: number | undefined;
   /** The "Show agent steps" setting: the steps are open at first. */
   stepsOpenByDefault?: boolean | undefined;
   /** Receives the message list, where the app searches the thread. */
@@ -739,6 +744,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
+  const backgroundWorkSince = () => (running() ? undefined : props.backgroundWorkSince);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
   const sendLabel = () =>
@@ -972,6 +978,18 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                />
+              </div>
+            )}
+          </Show>
+          <Show when={backgroundWorkSince()}>
+            {(since) => (
+              <div class="virtual-chat-row">
+                <AgentActivityIndicator
+                  agent={props.agent}
+                  label={activityLabel}
+                  detail={t("chat.activity.backgroundWork")}
+                  since={since()}
                 />
               </div>
             )}

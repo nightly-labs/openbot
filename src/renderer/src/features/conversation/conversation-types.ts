@@ -264,6 +264,11 @@ export interface ConversationProps {
   activityRunning?: boolean | undefined;
   /** What the running tool step does, as the host's `turn-progress` names it, for the agent's avatar. */
   activityKind?: string | undefined;
+  /**
+   * When the background work of the agent's chat (`null`) or of a thread started, in epoch
+   * milliseconds, while it still runs after its turn ended. The provider starts a turn when it ends.
+   */
+  backgroundWorkSince?: ((taskId: string | null) => number | undefined) | undefined;
   /** The host's progress lines of the newest turns, by turn, for the steps of each turn. */
   turnStepLines?: TurnStepLines | undefined;
   skillsMarketplaceOpen?: boolean | undefined;

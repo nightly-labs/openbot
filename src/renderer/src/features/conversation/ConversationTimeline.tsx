@@ -6,7 +6,7 @@ import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
-import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
+import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
 import {
   type AgentStep,
@@ -790,6 +790,10 @@ export function ConversationTimeline() {
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
+  // The agent's turn ended, and its background work still runs: the provider starts a turn when it ends.
+  // Not shown: the detail names the wait. The indicator reads it only without a detail.
+  const backgroundWorkLabel = nextAgentActivityLabel();
+  const backgroundWorkSince = () => (props.activeTurnId ? undefined : props.backgroundWorkSince?.(null));
   const emptyAgent = createMemo(() =>
     !channel &&
     timelineMessages().length === 0 &&
@@ -1844,7 +1848,21 @@ export function ConversationTimeline() {
                   </Show>
                 }
               >
-                <Show when={renderedAgentActivity()}>
+                <Show
+                  when={renderedAgentActivity()}
+                  fallback={
+                    <Show when={backgroundWorkSince()}>
+                      {(since) => (
+                        <AgentActivityIndicator
+                          agent={props.agent}
+                          detail={t("chat.activity.backgroundWork")}
+                          label={backgroundWorkLabel}
+                          since={since()}
+                        />
+                      )}
+                    </Show>
+                  }
+                >
                   {(activity) => (
                     <AgentActivityIndicator
                       agent={activity().agent}

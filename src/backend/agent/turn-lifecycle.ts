@@ -1,5 +1,6 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
   type AgentStepActivity,
@@ -573,6 +574,11 @@ export class TurnLifecycle {
    */
   readonly #subagentTurns = new Map<string, Set<string>>();
   /**
+   * The threads whose provider runs background work after their turn ended, with the time it started.
+   * The provider starts a turn when the work ends, so the chat shows that the agent waits (#11090).
+   */
+  readonly #waitingThreads = new Map<string, { agentId: string; client: AgentClient; since: number }>();
+  /**
    * The routine sessions whose turn ended with no subagent at work. Their close also archives them.
    * An archive stops the subagents of a Codex session, so a session with one at work stays listed.
    */
@@ -610,10 +616,20 @@ export class TurnLifecycle {
     return turns;
   }
 
+  /** The chats of the agents in `agentIds` whose background work runs, by task, or null for the agent's own chat. */
+  backgroundWork(agentIds: ReadonlySet<string>): Array<{ agentId: string; taskId: string | null; since: number }> {
+    const work: Array<{ agentId: string; taskId: string | null; since: number }> = [];
+    for (const [threadId, { agentId, since }] of this.#waitingThreads)
+      if (agentIds.has(agentId)) work.push({ agentId, taskId: this.#taskForThread(agentId, threadId), since });
+    return work.slice(-INPUT_LIMITS.agents);
+  }
+
   forgetAgent(agentId: string): void {
     this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
     this.#subagentTurns.delete(agentId);
+    for (const [threadId, work] of this.#waitingThreads)
+      if (work.agentId === agentId) this.#waitingThreads.delete(threadId);
     this.#lastEventAt.delete(agentId);
     for (const [childId, parent] of this.#codexChildren)
       if (parent.agentId === agentId) this.#codexChildren.delete(childId);
@@ -718,6 +734,7 @@ export class TurnLifecycle {
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#codexChildTurns.clear();
+    this.#waitingThreads.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
@@ -749,6 +766,11 @@ export class TurnLifecycle {
         this.#codexChildTurns.delete(threadId);
         endedChildren.push(threadId);
       }
+    // The background work ended with the process.
+    let backgroundEnded = false;
+    for (const [threadId, work] of this.#waitingThreads)
+      if (work.client === client) backgroundEnded = this.#waitingThreads.delete(threadId);
+    if (backgroundEnded) this.#hooks.emitRuntimeSnapshot();
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
@@ -1558,6 +1580,15 @@ export class TurnLifecycle {
         if (!running) return;
         const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
+        return;
+      }
+      case "openbot/background-work": {
+        if (!threadId || !agentId) return;
+        const runs = isRecord(params) && params.running === true;
+        if (runs === this.#waitingThreads.has(threadId)) return;
+        if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
+        else this.#waitingThreads.delete(threadId);
+        this.#hooks.emitRuntimeSnapshot();
         return;
       }
       case "openbot/context-compaction": {

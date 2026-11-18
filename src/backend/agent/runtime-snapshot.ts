@@ -150,7 +150,7 @@ export interface RuntimeSnapshotSources {
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
   mailbox: Pick<MailboxStore, "listRuntimeWork">;
-  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns">;
+  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
 }
@@ -227,6 +227,7 @@ export function buildRuntimeSnapshot({
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),
     subagentTurns: turn.subagentTurns(new Set(agents.map((agent) => agent.id))),
+    backgroundWork: turn.backgroundWork(new Set(agents.map((agent) => agent.id))),
     ...(contextStates ? { contextStates } : {}),
     ...(threadContextStates ? { threadContextStates } : {}),
   });

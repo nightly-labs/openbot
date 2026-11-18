@@ -13,5 +13,9 @@
 
 ### Changed
 
+- While a Claude agent waits for its background work, its chat or thread shows "Waiting for
+  background work…" with the time since it started. The row goes away when the work wakes the agent.
+  For an agent on a joined server, the server must also be on this version. The iPhone app does not
+  show the row yet.
 - In a thread, the steps of an answer now show beside it, with the reply and menu actions, as in the
   agent's chat. "Show agent steps" still keeps the open list above the answer.

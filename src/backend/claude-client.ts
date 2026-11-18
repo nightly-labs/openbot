@@ -1019,6 +1019,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** Tells the lifecycle that the thread's background work started or ended, so the chat shows that the agent waits. */
+  #emitBackgroundWork(runtime: ThreadRuntime): void {
+    this.emit("notification", {
+      method: "openbot/background-work",
+      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0 },
+    });
+  }
+
   /** The end of each background subagent or command makes the CLI start a turn of its own (#10847). */
   wakesAfterBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
     return this.holdsBackgroundWork(threadId);
@@ -1059,6 +1067,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // A background subagent ends with the process (#1870).
     for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
+    if (runtime.backgroundTasks > 0) {
+      runtime.backgroundTasks = 0;
+      this.#emitBackgroundWork(runtime);
+    }
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
     // from the map, so there is nothing left to report it against.
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
@@ -2272,6 +2284,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // its tool result, so before the result of that turn. The level that ends the work comes with no turn.
       // With no turn, a level holds or frees the idle timer. When the work ends, the CLI starts a turn of its
       // own to answer the result. Until that turn shows output, the idle limit must not close the thread (#6557).
+      if (before > 0 !== runtime.backgroundTasks > 0) this.#emitBackgroundWork(runtime);
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
         else if (before > 0 && runtime.backgroundTasks === 0) {

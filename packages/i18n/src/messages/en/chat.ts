@@ -13,6 +13,7 @@ export const messages = defineMessages("chat", {
   "chat.activity.cookingUp": "Cooking up something useful…",
   "chat.activity.status": "{name} is working: {label}",
   "chat.activity.waitingFor": "Waiting for {provider}…",
+  "chat.activity.backgroundWork": "Waiting for background work…",
   "chat.activity.waitingStatus": "{name} is waiting for {provider}",
   "chat.activity.waitingForAnswer": "Waiting for your answer",
   "chat.activity.waitingForApproval": "Waiting for your approval",

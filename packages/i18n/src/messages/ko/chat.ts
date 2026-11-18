@@ -14,6 +14,7 @@ export const messages = {
   "chat.activity.cookingUp": "쓸 만한 걸 만드는 중…",
   "chat.activity.status": "{name} 작업 중: {label}",
   "chat.activity.waitingFor": "{provider}을(를) 기다리는 중…",
+  "chat.activity.backgroundWork": "백그라운드 작업을 기다리는 중…",
   "chat.activity.waitingStatus": "{name}이(가) {provider}을(를) 기다리는 중",
   "chat.activity.waitingForAnswer": "답변을 기다리는 중",
   "chat.activity.waitingForApproval": "승인을 기다리는 중",

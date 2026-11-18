@@ -14,6 +14,7 @@ export const messages = {
   "chat.activity.cookingUp": "役に立つものを準備しています…",
   "chat.activity.status": "{name} が作業しています: {label}",
   "chat.activity.waitingFor": "{provider} を待っています…",
+  "chat.activity.backgroundWork": "バックグラウンド作業を待っています…",
   "chat.activity.waitingStatus": "{name} は {provider} を待っています",
   "chat.activity.waitingForAnswer": "回答を待っています",
   "chat.activity.waitingForApproval": "承認を待っています",

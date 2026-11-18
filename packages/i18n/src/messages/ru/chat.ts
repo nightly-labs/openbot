@@ -14,6 +14,7 @@ export const messages = {
   "chat.activity.cookingUp": "Готовлю что-нибудь полезное…",
   "chat.activity.status": "{name} работает: {label}",
   "chat.activity.waitingFor": "Ожидание {provider}…",
+  "chat.activity.backgroundWork": "Ожидание фоновой работы…",
   "chat.activity.waitingStatus": "{name} ожидает {provider}",
   "chat.activity.waitingForAnswer": "Ждём вашего ответа",
   "chat.activity.waitingForApproval": "Ждём вашего подтверждения",
