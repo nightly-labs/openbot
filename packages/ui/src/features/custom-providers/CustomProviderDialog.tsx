@@ -14,6 +14,7 @@ import {
   CUSTOM_PROVIDER_LIMITS,
   CUSTOM_PROVIDER_REASONING_EFFORTS,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  PROVIDER_DETECTION_LIMITS,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -37,7 +38,7 @@ import {
   Text,
   X,
 } from "@openbot/ui";
-import { createEffect, createSignal, createStore, Match, onSettled, Show, Switch, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { REASONING_LABEL } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
@@ -430,13 +431,17 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   };
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
-  /** The IDs of the rows that the asked endpoint does not list. A failed or an empty list marks none. */
-  const unlisted = (): string[] => {
+  /**
+   * The IDs of the rows that the asked endpoint does not list. A failed or an empty list marks none,
+   * and so does a list at the limit: main cuts a longer list, so a missing ID can be in the part cut off.
+   */
+  const unlisted = createMemo((): string[] => {
     const models = discovered();
-    if (!models?.length || askedEndpoint() !== endpointKey()) return [];
+    if (!models?.length || models.length >= PROVIDER_DETECTION_LIMITS.models) return [];
+    if (askedEndpoint() !== endpointKey()) return [];
     const found = new Set(models.map((model) => model.id));
     return [...new Set(draft.models.map((row) => row.id.trim()))].filter((id) => id && !found.has(id));
-  };
+  });
   /** The first IDs and a count of the others, so that a long list stays one line. */
   const unlistedNames = (ids: readonly string[]): string => {
     const shown = ids.slice(0, UNLISTED_NAMES_SHOWN);
@@ -832,7 +837,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           <Show when={unlisted().length > 0 ? unlisted() : undefined}>
                             {(ids) => (
                               <div class="custom-provider-discovery-status">
-                                <Text tone="muted" variant="caption" role="status">
+                                <Text tone="muted" variant="caption">
                                   {t("customProvider.discovery.unlisted", {
                                     count: ids().length,
                                     names: unlistedNames(ids()),
