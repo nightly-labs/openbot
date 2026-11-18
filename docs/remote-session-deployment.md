@@ -317,8 +317,22 @@ uses all homes. The value must be empty or name each home one time; an invalid v
 request fail with `503 remote_not_configured`. The entry failover tries the homes in list order, so
 keep `a` and `b` first.
 
-To roll back one machine, remove it from the three Worker variables in one deploy. Its hosts move at
-their next ticket, or after 20 seconds without Signal when the machine is stopped.
+Country rule: `REMOTE_SIGNAL_HOME_COUNTRIES` (`CC=id+id`, with `request.cf.country`) replaces the
+distance rule for the hosts in a listed country. Production sets `CN=us+au`: on 2026-11-18, TCP tests
+from 12 Chinese networks (China Telecom, Unicom, Mobile, Tencent, Alibaba) reached `us` in about
+200 ms and `au` in about 260 ms, but Helsinki in about 340 ms, with packets sent again in 13 of
+72 tests. The distance rule sent most hosts in China to Helsinki. No port was blocked.
+
+To revert the country rule, set `REMOTE_SIGNAL_HOME_COUNTRIES` to `""` in `apps/auth-api/wrangler.jsonc`
+and merge; CI deploys the Worker. Each host in China moves back to the distance rule at its next
+ticket, when its new home answers `/health/ready`, and its members follow. No host or database change
+is necessary. For a faster revert, set the same empty value in the Cloudflare dashboard (Workers,
+`openbot-auth-api`, Settings, Variables). The CI deploy uses `--keep-vars`, but a value in
+`wrangler.jsonc` replaces the dashboard value, so each later push to `main` puts the rule back until
+the empty value is merged.
+
+To roll back one machine, remove it from the Worker variables of the homes in one deploy. Its hosts
+move at their next ticket, or after 20 seconds without Signal when the machine is stopped.
 
 ## Required device validation — pending
 
