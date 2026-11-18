@@ -1406,6 +1406,40 @@ export function createBoard(options: BoardOptions) {
       return focus !== null && (edge.from === focus || edge.to === focus);
     };
     const focusEdges = () => state.edges.filter(isFocusEdge);
+    /** One connection line. Only the layer under the nodes has the hit path that takes the pointer. */
+    const EdgeLine = (props: { edge: WfnEdge; path: string; focus: boolean; hit?: boolean }) => (
+      <g
+        class="wfn-edge"
+        data-type={props.edge.type}
+        data-tone={tone(props.edge)}
+        data-selected={state.edge === props.edge.id ? "" : undefined}
+        data-focus={props.focus ? "" : undefined}
+        data-removing={
+          state.removing === props.edge.id || isDoomed(props.edge.from) || isDoomed(props.edge.to) ? "" : undefined
+        }
+        data-motion={motion ? "" : undefined}
+        data-build={options.buildState?.(props.edge.id)}
+      >
+        <path class="wfn-edge-line" d={props.path} />
+        <Show when={tone(props.edge) === "run"}>
+          <path class="wfn-edge-comet" d={props.path} pathLength="1" />
+        </Show>
+        <Show when={props.hit}>
+          <path
+            class="wfn-edge-hit"
+            data-edge-id={props.edge.id}
+            d={props.path}
+            onPointerDown={() =>
+              setState((draft) => {
+                draft.edge = props.edge.id;
+              })
+            }
+            onPointerMove={(event) => trackEdge(props.edge.id, event)}
+            onPointerLeave={(event) => leaveEdge(props.edge.id, event.relatedTarget)}
+          />
+        </Show>
+      </g>
+    );
     return (
       <>
         <svg ref={edgeLayer} class="wfn-edges" aria-hidden="true">
@@ -1414,37 +1448,7 @@ export function createBoard(options: BoardOptions) {
               <For each={targets(edge)}>
                 {(slot) => (
                   <Show when={endsAt(edge, slot)}>
-                    {(line) => (
-                      <g
-                        class="wfn-edge"
-                        data-type={edge.type}
-                        data-tone={tone(edge)}
-                        data-selected={state.edge === edge.id ? "" : undefined}
-                        data-focus={isFocusEdge(edge) ? "" : undefined}
-                        data-removing={
-                          state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
-                        }
-                        data-motion={motion ? "" : undefined}
-                        data-build={options.buildState?.(edge.id)}
-                      >
-                        <path class="wfn-edge-line" d={line().path} />
-                        <Show when={tone(edge) === "run"}>
-                          <path class="wfn-edge-comet" d={line().path} pathLength="1" />
-                        </Show>
-                        <path
-                          class="wfn-edge-hit"
-                          data-edge-id={edge.id}
-                          d={line().path}
-                          onPointerDown={() =>
-                            setState((draft) => {
-                              draft.edge = edge.id;
-                            })
-                          }
-                          onPointerMove={(event) => trackEdge(edge.id, event)}
-                          onPointerLeave={(event) => leaveEdge(edge.id, event.relatedTarget)}
-                        />
-                      </g>
-                    )}
+                    {(line) => <EdgeLine edge={edge} path={line().path} focus={isFocusEdge(edge)} hit />}
                   </Show>
                 )}
               </For>
@@ -1463,26 +1467,7 @@ export function createBoard(options: BoardOptions) {
             {(edge) => (
               <For each={targets(edge)}>
                 {(slot) => (
-                  <Show when={endsAt(edge, slot)}>
-                    {(line) => (
-                      <g
-                        class="wfn-edge"
-                        data-type={edge.type}
-                        data-tone={tone(edge)}
-                        data-selected={state.edge === edge.id ? "" : undefined}
-                        data-focus=""
-                        data-removing={
-                          state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
-                        }
-                        data-build={options.buildState?.(edge.id)}
-                      >
-                        <path class="wfn-edge-line" d={line().path} />
-                        <Show when={tone(edge) === "run"}>
-                          <path class="wfn-edge-comet" d={line().path} pathLength="1" />
-                        </Show>
-                      </g>
-                    )}
-                  </Show>
+                  <Show when={endsAt(edge, slot)}>{(line) => <EdgeLine edge={edge} path={line().path} focus />}</Show>
                 )}
               </For>
             )}
