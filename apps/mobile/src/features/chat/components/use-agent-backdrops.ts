@@ -1,7 +1,7 @@
 import { CHAT_VISUAL_PAGE_LIMIT, chatBackdropPage, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
 import { File, Paths } from "expo-file-system";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { setAgentBackdrop, useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/workspace-store";
 import { largeDownloadOf } from "../model/large-files";
@@ -47,6 +47,14 @@ export function useAgentBackdrops({
 }): void {
   const { downloadAttachment } = useMobileWorkspaceActions();
   const ready = useChatBackdrop((state) => state.ready);
+  // A page can finish its download after the chat closed. The chat that shows Undo is gone then.
+  const chatOpen = useRef(true);
+  useEffect(() => {
+    chatOpen.current = true;
+    return () => {
+      chatOpen.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (!ready || !messages) return;
     const reader = memberId || null;
@@ -80,6 +88,7 @@ export function useAgentBackdrops({
           { serverId, agentId, messageId: message.id, name: message.text, bubbles: null },
           html,
           time,
+          { offerUndo: chatOpen.current },
         );
       } catch {
         // A page that cannot be read or kept does not change the backdrop.

@@ -16,6 +16,7 @@ const HEIGHT = 40;
  * It stays until Undo, its close button, or the reader leaving the chat.
  */
 export function ChatBackdropUndo({
+  serverId,
   agentId,
   agentName,
   top,
@@ -23,6 +24,7 @@ export function ChatBackdropUndo({
   fallbackBackground,
   foreground,
 }: {
+  serverId: string;
   agentId: string;
   agentName: string;
   top: number;
@@ -32,13 +34,15 @@ export function ChatBackdropUndo({
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
-  const shown = useChatBackdrop((state) => state.undo?.agentId === agentId);
+  // Agent ids are per server: the same id on another server is another agent.
+  const shown = useChatBackdrop((state) => state.undo?.serverId === serverId && state.undo.agentId === agentId);
   // Leaving the chat ends the offer, as a toast ends on desktop.
   useEffect(
     () => () => {
-      if (useChatBackdrop.getState().undo?.agentId === agentId) dismissAgentBackdropUndo();
+      const { undo } = useChatBackdrop.getState();
+      if (undo?.serverId === serverId && undo.agentId === agentId) dismissAgentBackdropUndo();
     },
-    [agentId],
+    [serverId, agentId],
   );
   if (!shown) return null;
   return (

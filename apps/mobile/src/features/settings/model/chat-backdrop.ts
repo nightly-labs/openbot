@@ -39,6 +39,7 @@ export interface ChatBackdropValue {
 
 /** What Undo puts back after an agent set a page: the choice and the page before it. */
 interface AgentBackdropUndo {
+  serverId: string;
   agentId: string;
   messageId: string;
   choice: ChatBackdropChoice;
@@ -66,9 +67,12 @@ export const useChatBackdrop = create<
 
 /** The folder that keeps the agent page and the photo. It is in the app files, not in the cache. */
 function backdropFolder(): Directory {
-  const folder = new Directory(Paths.document, "chat-backdrop");
-  folder.create({ intermediates: true, idempotent: true });
-  return folder;
+  return new Directory(Paths.document, "chat-backdrop");
+}
+
+/** Creates the folder before a write. A read path, such as the address of the photo, does no I/O. */
+function createBackdropFolder(): void {
+  backdropFolder().create({ intermediates: true, idempotent: true });
 }
 
 export function agentBackdropFile(): File {
@@ -149,14 +153,51 @@ async function persist(): Promise<void> {
   await SecureStore.setItemAsync(key, JSON.stringify({ choice, strength, agentPage, photo, mark }));
 }
 
+/**
+ * Cleanups that ran before the stored state loaded: they found no page, so the load applies them.
+ * `all` is a sign-out or the end of a session; `servers` are removed servers; `kept` is the last
+ * confirmed list of servers.
+ */
+const pendingCleanup: { all: boolean; servers: Set<string>; kept: readonly string[] | null } = {
+  all: false,
+  servers: new Set(),
+  kept: null,
+};
+
+/** Whether the phone must not keep the page of this server. */
+function pageServerGone(serverId: string): boolean {
+  return (
+    pendingCleanup.all ||
+    pendingCleanup.servers.has(serverId) ||
+    (pendingCleanup.kept !== null && !pendingCleanup.kept.includes(serverId))
+  );
+}
+
+/**
+ * The stored state, with the cleanups that ran before the load, and with no choice whose file is
+ * gone: on iOS the stored state can outlive an app reinstall that removed the files.
+ */
+function loadedState(value: ChatBackdropValue): ChatBackdropValue {
+  let { choice, agentPage, photo } = value;
+  if (agentPage && (pageServerGone(agentPage.serverId) || !agentBackdropFile().exists)) {
+    deleteQuietly(agentBackdropFile());
+    agentPage = null;
+  }
+  if (photo && !backdropPhotoFile(photo).exists) photo = null;
+  if ((choice === "agent" && !agentPage) || (choice === "photo" && !photo)) choice = "none";
+  return { ...value, choice, agentPage, photo };
+}
+
 export async function loadChatBackdrop(): Promise<void> {
   if (useChatBackdrop.getState().ready) return;
   try {
-    const value = parseStored(await SecureStore.getItemAsync(key));
+    const stored = parseStored(await SecureStore.getItemAsync(key));
+    const value = stored ? loadedState(stored) : null;
     // A second startup read must not overwrite a change made in Settings.
     if (!useChatBackdrop.getState().ready) useChatBackdrop.setState(value ?? { mark: Date.now() });
-    // The first run sets the mark, so the history of each chat stays in the chat.
-    if (!value) await persist();
+    // The first run sets the mark, so the history of each chat stays in the chat. A load that dropped
+    // a page or a photo saves that too.
+    if (!value || value.choice !== stored?.choice || value.agentPage !== stored.agentPage) await persist();
   } finally {
     useChatBackdrop.setState({ ready: true });
   }
@@ -182,23 +223,36 @@ export async function saveBackdropPhoto(source: File, extension: string): Promis
   const state = useChatBackdrop.getState();
   if (!state.ready) return;
   const name = `photo-${Date.now()}.${extension.replace(/[^a-z0-9]/giu, "") || "jpg"}`;
+  createBackdropFolder();
   await source.copy(backdropPhotoFile(name));
   const old = state.photo;
   useChatBackdrop.setState({ photo: name, choice: "photo", undo: null });
-  if (old) deleteQuietly(backdropPhotoFile(old));
   await persist();
+  // Only after the save: a failed save must not leave the stored state on a deleted photo.
+  if (old) deleteQuietly(backdropPhotoFile(old));
 }
 
 /**
  * Puts a page that an agent set behind Home and the chats, and keeps what Undo puts back. `time` is
  * the time of the message; a page older than the mark, or than the last page, changes nothing.
  */
-export async function setAgentBackdrop(page: AgentBackdropPage, html: string, time: number): Promise<boolean> {
+export async function setAgentBackdrop(
+  page: AgentBackdropPage,
+  html: string,
+  time: number,
+  {
+    offerUndo,
+  }: {
+    /** False when the chat of the agent closed while the page downloaded: no chat shows the Undo then. */
+    offerUndo: boolean;
+  },
+): Promise<boolean> {
   const state = useChatBackdrop.getState();
   if (!state.ready || time <= state.mark) return false;
+  createBackdropFolder();
   const file = agentBackdropFile();
   let previousHtml: string | null = null;
-  if (state.agentPage && file.exists) {
+  if (offerUndo && state.agentPage && file.exists) {
     try {
       previousHtml = await file.text();
     } catch {
@@ -211,12 +265,15 @@ export async function setAgentBackdrop(page: AgentBackdropPage, html: string, ti
     agentPage: { ...page, bubbles: chatBackdropBubbles(html) },
     mark: time,
     pageVersion: state.pageVersion + 1,
-    undo: {
-      agentId: page.agentId,
-      messageId: page.messageId,
-      choice: state.choice,
-      page: state.agentPage && previousHtml !== null ? { meta: state.agentPage, html: previousHtml } : null,
-    },
+    undo: offerUndo
+      ? {
+          serverId: page.serverId,
+          agentId: page.agentId,
+          messageId: page.messageId,
+          choice: state.choice,
+          page: state.agentPage && previousHtml !== null ? { meta: state.agentPage, html: previousHtml } : null,
+        }
+      : null,
   });
   await persist();
   return true;
@@ -227,6 +284,7 @@ export async function undoAgentBackdrop(): Promise<void> {
   const { undo, pageVersion } = useChatBackdrop.getState();
   if (!undo) return;
   if (undo.page) {
+    createBackdropFolder();
     await agentBackdropFile().write(undo.page.html);
     useChatBackdrop.setState({ agentPage: undo.page.meta, pageVersion: pageVersion + 1 });
   } else if (undo.choice !== "agent") {
@@ -250,28 +308,37 @@ function deleteQuietly(file: File): void {
   }
 }
 
-/** Removes the agent page, so the phone keeps no copy of a server's file after it lost access to it. */
-function dropAgentPage(): void {
-  const { agentPage, choice } = useChatBackdrop.getState();
-  if (!agentPage) return;
-  deleteQuietly(agentBackdropFile());
-  useChatBackdrop.setState({ agentPage: null, undo: null, ...(choice === "agent" ? { choice: "none" } : {}) });
-  void persist().catch(() => undefined);
+/**
+ * Removes the agent page, and the page that Undo keeps, of each server that `gone` names, so the phone
+ * keeps no copy of a server's file after it lost access to it.
+ */
+function dropAgentPages(gone: (serverId: string) => boolean): void {
+  const { agentPage, choice, undo } = useChatBackdrop.getState();
+  const pageGone = agentPage !== null && gone(agentPage.serverId);
+  const undoGone = undo !== null && (gone(undo.serverId) || (undo.page !== null && gone(undo.page.meta.serverId)));
+  if (!pageGone && !undoGone) return;
+  if (pageGone) deleteQuietly(agentBackdropFile());
+  useChatBackdrop.setState({
+    undo: null,
+    ...(pageGone ? { agentPage: null, ...(choice === "agent" ? { choice: "none" as const } : {}) } : {}),
+  });
+  if (pageGone) void persist().catch(() => undefined);
 }
 
 /** Server removal: the page of a removed server goes. */
 export function forgetAgentBackdrops(serverIds: ReadonlySet<string>): void {
-  const page = useChatBackdrop.getState().agentPage;
-  if (page && serverIds.has(page.serverId)) dropAgentPage();
+  if (!useChatBackdrop.getState().ready) for (const id of serverIds) pendingCleanup.servers.add(id);
+  dropAgentPages((serverId) => serverIds.has(serverId));
 }
 
 /** The confirmed list of servers: the page of a server that is not in it goes. */
 export function retainAgentBackdrops(serverIds: readonly string[]): void {
-  const page = useChatBackdrop.getState().agentPage;
-  if (page && !serverIds.includes(page.serverId)) dropAgentPage();
+  if (!useChatBackdrop.getState().ready) pendingCleanup.kept = serverIds;
+  dropAgentPages((serverId) => !serverIds.includes(serverId));
 }
 
 /** Sign-out and the end of a session: the agent page goes, as the phone's copy of the servers does. */
 export function deleteAgentBackdrops(): void {
-  dropAgentPage();
+  if (!useChatBackdrop.getState().ready) pendingCleanup.all = true;
+  dropAgentPages(() => true);
 }

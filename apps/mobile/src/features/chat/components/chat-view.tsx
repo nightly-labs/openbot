@@ -1344,6 +1344,7 @@ export function ChatView({
               />
               {target.kind === "agent" ? (
                 <ChatBackdropUndo
+                  serverId={target.serverId}
                   agentId={target.id}
                   agentName={target.name}
                   top={insets.top + BACKDROP_UNDO_TOP}

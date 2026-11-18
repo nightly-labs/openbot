@@ -87,7 +87,8 @@ export function AppearancePreview() {
     seeThrough && backdropBase !== null ? `${control}99` : (mixColor(base, control, PLAIN_BUBBLE_SHARE) ?? control);
   const solid = pageColor ?? (mode === "custom" ? customColor : SAMPLE_AGENT_COLOR);
   const bubble =
-    mode === "none" && !pageColor ? plain : style === "tint" ? tintedMessageColor(solid, surface, dark) : solid;
+    // As the chat: with no message color, the color of an agent page does not apply either.
+    mode === "none" ? plain : style === "tint" ? tintedMessageColor(solid, surface, dark) : solid;
   return (
     <View
       className="overflow-hidden rounded-3xl border border-border"

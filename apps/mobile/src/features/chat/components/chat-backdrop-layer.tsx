@@ -95,7 +95,8 @@ export function ChatBackdropLayer({ variant, active }: { variant: "chat" | "head
       style={[StyleSheet.absoluteFill, { backgroundColor: base }]}
     >
       {isChatBackdropScene(choice) ? <ChatBackdropSceneView scene={choice} dark={dark} animate={animate} /> : null}
-      {choice === "agent" && page !== null && HtmlPage ? (
+      {/* The page runs its scripts only on a screen that shows: a hidden screen unmounts its web view. */}
+      {choice === "agent" && page !== null && HtmlPage && active ? (
         <HtmlPage source={page} title={agentName} mode="chat" />
       ) : null}
       {choice === "photo" && photo ? (
@@ -122,9 +123,6 @@ export function ChatBackdropLayer({ variant, active }: { variant: "chat" | "head
   );
 }
 
-/** The backdrop reaches this far below the top of the card, so a pull past the top shows no edge. */
-const HOME_BAND_PULL = 240;
-
 /**
  * The backdrop of Home, behind the list: from the top of the screen to the top of the card
  * (`home-backdrop-card.tsx`), where `height` ends. It does not scroll: it is a fixed layer under the
@@ -136,7 +134,9 @@ export function HomeBackdropBand({ height, active }: { height: number; active: b
   return (
     <View
       pointerEvents="none"
-      style={{ position: "absolute", left: 0, right: 0, top: 0, height: height + HOME_BAND_PULL }}
+      // It ends at the bottom of the card top: under it the clear list shows the card color, also below
+      // a short list and in an empty state, not the scene.
+      style={{ position: "absolute", left: 0, right: 0, top: 0, height }}
     >
       <ChatBackdropLayer variant="header" active={active} />
     </View>
