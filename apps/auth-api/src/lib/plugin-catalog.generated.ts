@@ -271,6 +271,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765",
     },
     {
+      slug: "eksis",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "fcf7ed1a5b4642056e4277baa9a1351624ae16b8a97c3b9dd5ec4177bc88b524",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -3245,6 +3251,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://trypost.it",
     privacyPolicyUrl: "https://trypost.it/en/privacy",
     termsUrl: "https://trypost.it/en/terms",
+    skills: [],
+  },
+  eksis: {
+    slug: "eksis",
+    name: "eksis",
+    tagline: "Social media scheduling",
+    description:
+      "eksis lets agents list the social media channels of a workspace, and draft, schedule, approve and publish posts on Instagram, Facebook, TikTok, YouTube, Threads, LinkedIn, X, Bluesky, Pinterest, DEV, Telegram and Discord. Agents can also manage the queue, media and ideas, reply to comments and direct messages, and read analytics. Sign in to your eksis account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "eksis",
+    iconUrl: "https://media.eksis.io/brand/eksis-logo-white-512.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-channels", text: "Which social media channels are connected to eksis?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+      { id: "prompt-comments", text: "Which comments on my posts from this week still need a reply?" },
+    ],
+    apps: [
+      {
+        id: "app-eksis-mcp",
+        name: "eksis",
+        description:
+          "Channels, posts, queue, media, comments, direct messages and analytics, over the eksis MCP server with browser sign-in.",
+        iconUrl: "https://media.eksis.io/brand/eksis-logo-white-512.png",
+        server: {
+          name: "eksis",
+          transport: "http",
+          url: "https://api.eksis.io/mcp",
+          auth: [{ id: "eksis-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://eksis.io",
+    privacyPolicyUrl: "https://eksis.io/privacy",
+    termsUrl: "https://eksis.io/terms",
     skills: [],
   },
   composio: {
