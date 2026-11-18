@@ -299,6 +299,14 @@
   max-width: 320px;
 }
 
+/* File badges have different widths, so the icons share one column and the names start at one line. */
+.side-panel-hidden-tab-icon {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  inline-size: var(--openbot-space-6);
+}
+
 .side-panel-hidden-tabs .side-panel-menu-item > span:last-child {
   min-width: 0;
   overflow: hidden;

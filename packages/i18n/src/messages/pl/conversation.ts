@@ -58,13 +58,6 @@ export const messages = {
   "conversation.sidePanel.maximize": "Maksymalizuj panel boczny",
   "conversation.sidePanel.restore": "Przywróć panel boczny",
   "conversation.sidePanel.closePane": "Zamknij: {name}",
-  "conversation.sidePanel.moreTabs": {
-    one: "Jeszcze {count} karta",
-    few: "Jeszcze {count} karty",
-    many: "Jeszcze {count} kart",
-    other: "Jeszcze {count} karty",
-  },
-  "conversation.sidePanel.showHiddenTabs": "Pokaż ukryte karty",
   "conversation.sidePanel.openPane": "Otwórz: {name}",
   "conversation.sidePanel.launcher": "Otwórz okienko",
   "conversation.sidePanel.resize": "Zmień rozmiar prawego panelu",

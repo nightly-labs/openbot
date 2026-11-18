@@ -58,11 +58,6 @@ export const messages = {
   "conversation.sidePanel.maximize": "Zijpaneel maximaliseren",
   "conversation.sidePanel.restore": "Zijpaneel herstellen",
   "conversation.sidePanel.closePane": "{name} sluiten",
-  "conversation.sidePanel.moreTabs": {
-    one: "Nog {count} tabblad",
-    other: "Nog {count} tabbladen",
-  },
-  "conversation.sidePanel.showHiddenTabs": "Verborgen tabbladen tonen",
   "conversation.sidePanel.openPane": "{name} openen",
   "conversation.sidePanel.launcher": "Open een paneel",
   "conversation.sidePanel.resize": "Grootte rechterpaneel wijzigen",

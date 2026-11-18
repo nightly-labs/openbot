@@ -58,8 +58,6 @@ export const messages = {
   "conversation.sidePanel.maximize": "사이드 패널 최대화",
   "conversation.sidePanel.restore": "사이드 패널 복원",
   "conversation.sidePanel.closePane": "{name} 닫기",
-  "conversation.sidePanel.moreTabs": { other: "탭 {count}개 더 보기" },
-  "conversation.sidePanel.showHiddenTabs": "숨겨진 탭 보기",
   "conversation.sidePanel.openPane": "{name} 열기",
   "conversation.sidePanel.launcher": "패널 열기",
   "conversation.sidePanel.resize": "오른쪽 패널 크기 조절",

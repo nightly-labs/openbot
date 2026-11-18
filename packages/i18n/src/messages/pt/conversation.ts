@@ -58,11 +58,6 @@ export const messages = {
   "conversation.sidePanel.maximize": "Maximizar painel lateral",
   "conversation.sidePanel.restore": "Restaurar painel lateral",
   "conversation.sidePanel.closePane": "Fechar {name}",
-  "conversation.sidePanel.moreTabs": {
-    one: "Mais {count} aba",
-    other: "Mais {count} abas",
-  },
-  "conversation.sidePanel.showHiddenTabs": "Mostrar abas ocultas",
   "conversation.sidePanel.openPane": "Abrir {name}",
   "conversation.sidePanel.launcher": "Abrir um painel",
   "conversation.sidePanel.resize": "Redimensionar painel direito",

@@ -32,6 +32,9 @@ import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threa
 
 /** A tab starts to move after the pointer moves this far, so a click stays a click. */
 const DRAG_START = 4;
+/** A held tab this near an end of the row scrolls the row; at the end it scrolls this many pixels a frame. */
+const EDGE_ZONE = 40;
+const EDGE_SPEED = 14;
 /** The prefix of a thread tab's value, so a thread id cannot be taken for a pane. */
 const THREAD_VALUE = "thread:";
 /** The prefix of a file tab's value. */
@@ -206,6 +209,11 @@ interface TabHold {
   pointerId: number;
   startX: number;
   startY: number;
+  /** The scroll of the row when the tab starts to move, and the pointer now: a row scroll moves the tab too. */
+  startScroll: number;
+  x: number;
+  /** The frame that scrolls the row while the held tab is near one of its ends. */
+  frame: number;
   /** False until the pointer moves past `DRAG_START`. */
   moving: boolean;
   /**
@@ -250,7 +258,7 @@ interface TabEntry {
  * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
  * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link.
  * The X at the end of a tab closes it. It shows on the selected tab, and on another tab under the
- * pointer or with the focus. A middle click also closes a thread or file tab.
+ * pointer or with the focus. A middle click also closes a tab.
  * All tabs have one width. When they do not fit, the row scrolls (also with a vertical wheel), its
  * edges fade, and a menu lists the tabs out of view. After a close with the pointer, the tabs keep their
  * width until the pointer leaves the row, so the next X is under the pointer.
@@ -328,7 +336,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       .filter((tab) => tab.offsetLeft < start - 1 || tab.offsetLeft + tab.offsetWidth > end + 1)
       .map((tab) => tab.dataset.value ?? "");
     setRow((state) => {
-      if (state.hidden.join() !== hidden.join()) state.hidden = hidden;
+      if (state.hidden.length !== hidden.length || hidden.some((value, i) => value !== state.hidden[i]))
+        state.hidden = hidden;
       state.fadeStart = start > 1;
       state.fadeEnd = end < list.scrollWidth - 1;
     });
@@ -412,7 +421,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
      * Moves the held tab with the pointer, and the other tabs of its kind make room. A tab can be much
      * narrower than the held one, so the leading edge of the held tab, not its center, finds its place.
      */
-    const follow = (current: TabHold, x: number) => {
+    const follow = (current: TabHold) => {
       const tabId = TAB_GROUPS[current.group].id;
       const items = groupTabs(current.group).map((tab) => ({ tab, left: tab.offsetLeft, width: tab.offsetWidth }));
       const index = items.findIndex((item) => tabId(item.tab) === current.id);
@@ -421,7 +430,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       const last = items.at(-1);
       if (!self || !first || !last) return;
       const offset = Math.min(
-        Math.max(x - current.startX, first.left - self.left),
+        Math.max(current.x - current.startX + element.scrollLeft - current.startScroll, first.left - self.left),
         last.left + last.width - self.left - self.width,
       );
       const edge = offset < 0 ? self.left + offset : self.left + self.width + offset;
@@ -462,13 +471,35 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         tab.style.transform = "";
       }
     };
+    /**
+     * Near an end of the row, the row scrolls under the held tab, faster nearer the end, so the tab can go
+     * to a place out of view. The held tab follows each scroll, also one from the wheel.
+     */
+    const edgeScroll = () => {
+      const current = hold;
+      if (!current?.moving) return;
+      if (!current.away) {
+        const bounds = element.getBoundingClientRect();
+        const speed =
+          current.x < bounds.left + EDGE_ZONE
+            ? -(1 - Math.max(0, current.x - bounds.left) / EDGE_ZONE)
+            : current.x > bounds.right - EDGE_ZONE
+              ? 1 - Math.max(0, bounds.right - current.x) / EDGE_ZONE
+              : 0;
+        if (speed) element.scrollLeft += speed * EDGE_SPEED;
+        follow(current);
+      }
+      current.frame = requestAnimationFrame(edgeScroll);
+    };
     const onMove = (event: PointerEvent) => {
       const current = hold;
       if (!current || event.pointerId !== current.pointerId) return;
+      current.x = event.clientX;
       if (!current.moving) {
         if (Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < DRAG_START) return;
         current.moving = true;
         element.setAttribute("data-dragging", "");
+        current.frame = requestAnimationFrame(edgeScroll);
       }
       current.away = overChat(event.clientX, current.rightToLeft);
       // Over the chat, the tab goes back to its place. A thread tab fades, and a copy follows the pointer.
@@ -480,7 +511,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         }
       } else {
         if (current.thread) setCarriedThreadTab(null);
-        follow(current, event.clientX);
+        follow(current);
       }
     };
     const stop = () => {
@@ -493,6 +524,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       if (!current || event.pointerId !== current.pointerId) return;
       hold = null;
       stop();
+      cancelAnimationFrame(current.frame);
       if (!current.moving) return;
       element.removeAttribute("data-dragging");
       tabOf(current)?.removeAttribute("data-dragged");
@@ -526,6 +558,9 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
+        startScroll: element.scrollLeft,
+        x: event.clientX,
+        frame: 0,
         moving: false,
         away: false,
         target: 0,
@@ -556,6 +591,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       element.removeEventListener("scroll", scheduleMeasure);
       element.removeEventListener("transitionend", scheduleMeasure);
       stop();
+      if (hold) cancelAnimationFrame(hold.frame);
       if (hold?.moving && hold.thread) setCarriedThreadTab(null);
     };
   });
@@ -737,8 +773,8 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
             <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-                aria-label={t("conversation.sidePanel.moreTabs", { count: row.hidden.length })}
-                title={t("conversation.sidePanel.showHiddenTabs")}
+                aria-label={t("browser.tabs.more", { count: row.hidden.length })}
+                title={t("browser.tabs.showHidden")}
               >
                 <ChevronDown aria-hidden="true" />
               </DropdownMenu.Trigger>
@@ -754,7 +790,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                           reveal(entry().value);
                         }}
                       >
-                        {entry().icon()}
+                        <span class="side-panel-hidden-tab-icon">{entry().icon()}</span>
                         <span>{entry().label}</span>
                       </DropdownMenu.Item>
                     )}
