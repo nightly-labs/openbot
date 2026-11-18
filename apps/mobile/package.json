@@ -85,6 +85,7 @@
     "katex": "catalog:",
     "lucide-react-native": "^1.61.0",
     "marked": "catalog:",
+    "marked-cjk-friendly": "catalog:",
     "mermaid": "catalog:",
     "pdfjs-dist": "catalog:",
     "react": "19.3.0",
