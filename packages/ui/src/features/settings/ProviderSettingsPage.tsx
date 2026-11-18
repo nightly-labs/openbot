@@ -2654,16 +2654,31 @@ function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
 }
 
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
   const ready = () => servesCustomEndpoints(props);
+  /** OpenBot does not start or check an OpenCode that the user turned off, so Add waits for it (#12259). */
+  const engineOff = () => !ready() && Boolean(engine()?.off);
+  /** The section offers to turn OpenCode on in place of Add, before any download (#12259). */
+  const turnOnOffered = () => engineOff() && Boolean(props.onSetProviderOn);
+  const [turningOn, setTurningOn] = createSignal(false);
+  async function turnEngineOn() {
+    setTurningOn(true);
+    try {
+      await props.onSetProviderOn?.("opencode", true);
+    } catch (error) {
+      toast.error(errorMessage(error, t("error.provider.useChangeFailed")));
+    } finally {
+      setTurningOn(false);
+    }
+  }
   /**
    * While OpenCode is not downloaded, Add can do nothing, so the section offers the download that
    * makes it usable, as the onboarding picker does (#9191).
    */
   const engineAction = () => {
-    if (ready() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
+    if (ready() || turnOnOffered() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
     return customEngineDownloadAction(engine());
   };
   const runsOn = (endpoint: CustomProviderSummary) =>
@@ -2685,7 +2700,9 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
         subtitle={
           ready() || !engine()
             ? t("provider.custom.description")
-            : providerStatusLabel(t, format, engine()?.state ?? "checking")
+            : engineOff()
+              ? t("provider.settings.turnOnFirst", { name: engine()?.name ?? "" })
+              : providerStatusLabel(t, format, engine()?.state ?? "checking")
         }
       />
       <SettingsSection
@@ -2694,17 +2711,33 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
           <Show
             when={engineAction()}
             fallback={
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-label={t("provider.custom.addLabel")}
-                disabled={props.disabled || !ready()}
-                onClick={() => props.onAddCustomProvider?.()}
+              <Show
+                when={turnOnOffered()}
+                fallback={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={t("provider.custom.addLabel")}
+                    disabled={props.disabled || !ready()}
+                    onClick={() => props.onAddCustomProvider?.()}
+                  >
+                    <Plus aria-hidden="true" />
+                    {t("common.add")}
+                  </Button>
+                }
               >
-                <Plus aria-hidden="true" />
-                {t("common.add")}
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  aria-label={t("provider.aria.use", { name: engine()?.name ?? "" })}
+                  loading={turningOn()}
+                  disabled={props.disabled || turningOn()}
+                  onClick={() => void turnEngineOn()}
+                >
+                  {t("provider.settings.useTitle", { name: engine()?.name ?? "" })}
+                </Button>
+              </Show>
             }
           >
             {(action) => (
