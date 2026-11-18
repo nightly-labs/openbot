@@ -1877,7 +1877,8 @@ export class TurnLifecycle {
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs,
    * teammate updates and answered teammate requests, so its completion keeps the text answers as quiet
    * answers; `unanswered` when a teammate's request still waits for its `send_message` reply; `shown`
-   * when a person waits for the answer, as in a Test run; null when no routine run, teammate update,
+   * when a person waits for the answer, as in a Test run or the first wake for a person's background work;
+   * null when no routine run, teammate update,
    * teammate request or teammate's answer to a quiet routine run (`#continuesQuietRun`) started the
    * turn, and it does not answer only background work of quiet turns (`#continuesQuietTurns`). The
    * completion decides again, because a message can join the turn after the call and the
@@ -1897,13 +1898,17 @@ export class TurnLifecycle {
       return "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const running = this.#runningTurns.get(turnId);
     // A turn that the provider started itself to answer the background work of quiet turns (#10847).
-    if (this.#continuesQuietTurns(this.#runningTurns.get(turnId)?.continues, deliveries)) {
+    if (this.#continuesQuietTurns(running?.continues, deliveries)) {
       this.#noUpdateTurns.add(turnId);
       if (this.#reportedFailures.has(turnId)) return "shown";
       this.#armQuietEnd(agentId, turnId);
       return "quiet";
     }
+    // The first wake for a person's work shows its answer. A refusal here made the model stop calling the
+    // tool on the later wakes that can end quiet (#11090).
+    if (deliveries.length === 0 && running?.unprompted && running.continues.length > 0) return "shown";
     if (
       !deliveries.some(
         ({ delivery }) =>

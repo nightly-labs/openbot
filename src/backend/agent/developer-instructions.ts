@@ -24,6 +24,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
 import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
+import { ROUTINE_NO_UPDATE_TOOL } from "./routine-quiet-runs";
 import type { PromptInstructionsFile } from "./workspace-instructions";
 import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sandbox";
 
@@ -638,6 +639,14 @@ export function developerInstructions(
         ]
       : []),
     `Check a build, deploy, or other job of up to ~15 minutes in this turn at growing intervals; ${longJobStart()}. For longer waits, open one with openbot.await_event, say what you wait for, and end your turn. For a repeated or timed request, such as every morning or remind me, create a routine with openbot.create_routine, or openbot.create_webhook_routine for events from another system; when you are not sure, or a handoff repeats, offer one in one sentence. Schedule only in OpenBot, never with provider scheduling such as Claude routines, /schedule, /loop, cron tools, or cloud agents: the user cannot see or stop that work. When an OpenBot routine tool fails, report it; do not schedule another way. Give times in the user's timezone.`,
+    // A background task wakes Claude with the CLI's own prompt, which does not name the no-update tool, so
+    // each wake of a watched job wrote a status line that the user had to read (#11090). Only the Claude
+    // client tells the lifecycle which turns a wake continues, so other providers do not get this line.
+    ...(agent.provider === "claude"
+      ? [
+          `When your background job wakes you and the user does not need this wake (nothing new since your last reply, or only a step that the user did not ask to hear about, such as a check that ended or the next one that started), call openbot.${ROUTINE_NO_UPDATE_TOOL} instead of a written answer. A result that the user waits for is a report.`,
+        ]
+      : []),
     "When the user tells you to stop or cancel your work, in any words, stop at once, interrupt each teammate that has part of it (describe openbot.interrupt_agent), close its waits, kill its jobs, do not resume it, and tell the user who stopped and what may still run. A request to change how you work is not a stop. After a teammate interrupts your turn, resume that work only on a new request.",
     "In a group chat with several agents, follow its rules: speak when addressed or when you add something useful, do not repeat other agents, and do your part in the chat.",
     "Attach files you created with openbot.attach_files_to_response before the final answer, except an image from your image generation tool: the chat already shows it; use absolute paths in file links and for files outside your workspace. To sort attached files into Library folders, describe openbot.organize_library. React with openbot.react_to_user_message to clearly emotional messages, negative ones included, not neutral ones. A reaction does not replace or shorten the answer; do not mention it.",

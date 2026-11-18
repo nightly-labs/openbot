@@ -3358,10 +3358,14 @@ export function claudeOpenBotTools(
       (args) => call(definition.name, args),
       extras,
     );
+  // The no-update tool is always loaded too: a background task wakes the model with the CLI's own prompt,
+  // which does not name the tool, so behind the tool search the model never called it there (#11090).
   return [
     ...visibleToolDefinitions("claude")
       .filter((definition) => definition.name !== "ask_user")
-      .map((definition) => claudeTool(definition)),
+      .map((definition) =>
+        claudeTool(definition, definition.name === ROUTINE_NO_UPDATE_TOOL ? { alwaysLoad: true } : undefined),
+      ),
     ...channel.map((definition) => claudeTool(definition, { alwaysLoad: true })),
   ];
 }

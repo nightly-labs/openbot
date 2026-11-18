@@ -112,7 +112,12 @@ quiet answers (#10847). Work that ends while that turn runs goes to it too
 (`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in
 the chat. That answer is the first one after the request. Work that a turn of the provider's own
 started can end quiet too, so a watcher that a person started and that wakes again does not post each
-time; a result that the agent writes without the no-update call still shows (#11090). The lifecycle
+time; a result that the agent writes without the no-update call still shows (#11090). On the first
+answer after a person's request, the tool returns `shown`, not a refusal: after a refusal, the model
+did not call the tool on the later wakes. The CLI wakes the model with its own prompt, which does not
+name the tool, so a Claude agent always loads the tool (not behind the tool search) and its developer
+instructions say when a wake needs no answer. The model decides: in tests, Sonnet called the tool on
+a wake with nothing new, and Haiku often wrote a status line instead. The lifecycle
 keeps the newest quiet turns and the newest such turns in memory only, so after a restart such a turn
 shows.
 
