@@ -64,7 +64,6 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { createTeamProtocolV2Event } from "@openbot/contracts/team-protocol/v2-adapter";
-import { encodeTeamProtocolV3WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
 import {
   createTeamProtocolV4Event,
   decodeTeamProtocolV4WebRtcHttpRequest,
@@ -861,23 +860,7 @@ export class TeamWebRtcHostPeer {
                   : peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
                       isCompatibilityRead(input.method, input.path, response.status)
                     ? { ...decodeTeamProtocolSupportV9(body) }
-                    : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                        ? encodeTeamProtocolV8WebRtcHttpResponse
-                        : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                          ? encodeTeamProtocolV7WebRtcHttpResponse
-                          : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                            ? encodeTeamProtocolV6WebRtcHttpResponse
-                            : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                              ? encodeTeamProtocolV5WebRtcHttpResponse
-                              : peerCapabilities.has("opencode")
-                                ? encodeTeamProtocolV4WebRtcHttpResponse
-                                : encodeTeamProtocolV3WebRtcHttpResponse)(
-                        input.method,
-                        input.path,
-                        response.status,
-                        body,
-                        responseOptions,
-                      ),
+                    : webRtcResponseEncoder(protocol)(input.method, input.path, response.status, body, responseOptions),
             ),
           }));
         }),
@@ -1246,6 +1229,18 @@ function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {
   if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
   if (capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)) return 5;
   return capabilities.has("opencode") ? 4 : null;
+}
+
+/**
+ * The response encoder of a peer protocol from `webRtcPeerProtocol`. Protocols 9 and 10 use the
+ * protocol 8 encoder; each other protocol uses its own. A request of protocols 1-3 gets 426 before this.
+ */
+function webRtcResponseEncoder(protocol: number) {
+  if (protocol >= 8) return encodeTeamProtocolV8WebRtcHttpResponse;
+  if (protocol === 7) return encodeTeamProtocolV7WebRtcHttpResponse;
+  if (protocol === 6) return encodeTeamProtocolV6WebRtcHttpResponse;
+  if (protocol === 5) return encodeTeamProtocolV5WebRtcHttpResponse;
+  return encodeTeamProtocolV4WebRtcHttpResponse;
 }
 
 function isCompatibilityRead(method: string, path: string, status: number): boolean {

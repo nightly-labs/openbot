@@ -186,8 +186,8 @@ What the deletion PR must still move, because current code uses it:
 
 - 31 files outside the contracts package import `@openbot/contracts/team-protocol/v2`. Point them at
   `team-protocol/webrtc-framing` before `v2.ts` goes.
-- The WebRTC response chain in `src/main/team-webrtc-host-peer.ts` ends with the v3 WebRTC response
-  encoder. No `http.request` reaches it now, but the import stays.
+- The WebRTC response encoders of protocols 4-8 in `src/main/team-webrtc-host-peer.ts`
+  (`webRtcResponseEncoder`, selected by the peer protocol). The v3 encoder is no longer imported there.
 - `current.ts`, `current-agent-keys.ts`, `current-adapter-routes.ts`, `analytics-v1.ts`,
   `host-analytics-v1.ts`, `channels-v1.ts`, `routines-once-v1.ts`, `profile-v1.ts` and
   `http-codecs.ts` import from `v1`, `v1-adapter`, `v3` or `v3-adapter`.
