@@ -326,7 +326,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (request == null || request === lastListRequest) return;
       lastListRequest = request;
       // Back asks before it discards an edit of the routine.
-      if (draft()) requestExit("list");
+      untrack(() => {
+        if (draft()) requestExit("list");
+      });
     },
   );
 
