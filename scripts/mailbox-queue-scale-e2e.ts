@@ -47,6 +47,7 @@ interface Report {
     findDeliveriesByTurnMs?: number;
     pageReads?: number;
     conversationMessagesMs?: number;
+    conversationMessagesAfterChangeMs?: number;
   };
   passed: boolean;
 }
@@ -219,17 +220,28 @@ async function checkPageReads(mailbox: MailboxStore, path: string, shared: strin
   report.checks.push("conversationMessages: a page read after a delivery ends gives its new status");
 }
 
-/** The mailbox reads of chat page reads: each moves the page window, as new chat rows do. */
+/**
+ * The mailbox reads of chat page reads: each moves the page window, as new chat rows do. The second
+ * time is of the first read after a mailbox change. Forgetting a key that no message has is such a
+ * change, with no write.
+ */
 function timePageReads(mailbox: MailboxStore) {
   const windows = pageWindows(mailbox);
-  const started = performance.now();
-  for (let index = 0; index < TIMED_PAGE_READS; index += 1) {
-    const fromCreatedAt = windows[index % windows.length];
-    mailbox.conversationMessages(AGENT, fromCreatedAt === undefined ? {} : { fromCreatedAt });
-  }
+  const perRead = (change: () => void) => {
+    let total = 0;
+    for (let index = 0; index < TIMED_PAGE_READS; index += 1) {
+      change();
+      const fromCreatedAt = windows[index % windows.length];
+      const started = performance.now();
+      mailbox.conversationMessages(AGENT, fromCreatedAt === undefined ? {} : { fromCreatedAt });
+      total += performance.now() - started;
+    }
+    return Number((total / TIMED_PAGE_READS).toFixed(3));
+  };
   return {
     pageReads: TIMED_PAGE_READS,
-    conversationMessagesMs: Number(((performance.now() - started) / TIMED_PAGE_READS).toFixed(3)),
+    conversationMessagesMs: perRead(() => {}),
+    conversationMessagesAfterChangeMs: perRead(() => mailbox.forgetIdempotencyKey("no-such-key")),
   };
 }
 
@@ -289,7 +301,8 @@ try {
 process.stdout.write(
   `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perQueueChangeMs} ms per queue change, ` +
     `${report.timing?.getDeliveryMs} ms per getDelivery, ${report.timing?.findDeliveriesByTurnMs} ms per findDeliveriesByTurn, ` +
-    `${report.timing?.conversationMessagesMs} ms per chat page read. ` +
+    `${report.timing?.conversationMessagesMs} ms per chat page read, ` +
+    `${report.timing?.conversationMessagesAfterChangeMs} ms for the first one after a change. ` +
     `Report: ${join(OUT, "report.json")}\n`,
 );
 if (!report.passed) process.exitCode = 1;

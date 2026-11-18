@@ -202,7 +202,6 @@ interface ConversationIndexEntry {
  * the main thread of a busy server busy (#11884).
  */
 interface ConversationIndex {
-  generation: number;
   state: StoredState;
   messages: StoredMessage[];
   deliveries: StoredDelivery[];
@@ -346,8 +345,10 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
-  /** Grows at each saved change, and at each change that has no row mark, so a kept index is not used. */
-  #stateGeneration = 0;
+  /**
+   * The index of the last saved mailbox state. Each save, and each change that has no row mark, drops it.
+   * A change that waits to be saved has row marks, so no index of it is kept.
+   */
   #keptConversationIndex: ConversationIndex | undefined;
   /**
    * The app start loads the store before the window opens, and the agent service initializes the same
@@ -542,7 +543,7 @@ export class MailboxStore {
           !key.startsWith(prefix) || (createdAt.get(messageId) ?? Number.NEGATIVE_INFINITY) >= cutoff,
       ),
     );
-    this.#stateGeneration += 1;
+    this.#keptConversationIndex = undefined;
   }
 
   /** The receipt of the message an idempotency key already stored, or null. */
@@ -554,7 +555,7 @@ export class MailboxStore {
   /** Forgets one idempotency key. The next persist writes the map without it. */
   forgetIdempotencyKey(key: string): void {
     delete this.#state.idempotency[key];
-    this.#stateGeneration += 1;
+    this.#keptConversationIndex = undefined;
   }
 
   /** The task of the message an idempotency key already stored, or null for a chat message or no message. */
@@ -1807,7 +1808,7 @@ export class MailboxStore {
 
   /**
    * The index of the current mailbox state. A change that is not saved yet can still be undone, so
-   * the store keeps an index only while no change waits: each save makes a new generation.
+   * the store keeps an index only while no change waits.
    */
   #conversationIndex(): ConversationIndex {
     const state = this.#state;
@@ -1815,8 +1816,7 @@ export class MailboxStore {
     const kept = this.#keptConversationIndex;
     if (
       !unsaved &&
-      kept?.generation === this.#stateGeneration &&
-      kept.state === state &&
+      kept?.state === state &&
       kept.messages === state.messages &&
       kept.deliveries === state.deliveries &&
       kept.idempotency === state.idempotency
@@ -1829,7 +1829,6 @@ export class MailboxStore {
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
     const index: ConversationIndex = {
-      generation: this.#stateGeneration,
       state,
       messages: state.messages,
       deliveries: state.deliveries,
@@ -2757,6 +2756,7 @@ export class MailboxStore {
     const persisted = toCurrentMailboxState(this.#database.readMailboxState());
     if (!persisted || !isStoredState(persisted)) throw new Error("Stored mailbox projection is invalid.");
     this.#state = normalizeStoredState(persisted);
+    this.#keptConversationIndex = undefined;
     // Inside a transaction this read sees rows that a later ROLLBACK can still undo, so the keys stay.
     if (!this.#database.connection.isTransaction) this.#clearChanges();
   }
@@ -3907,7 +3907,7 @@ export class MailboxStore {
     fileDeletions: string[] = [],
     replaceAll = false,
   ): void {
-    this.#stateGeneration += 1;
+    this.#keptConversationIndex = undefined;
     const ownsTransaction = !this.#database.connection.isTransaction;
     const wrote = replaceAll
       ? this.#database.replaceMailboxState(commandId, this.#state, eventType, fileDeletions, true)
@@ -3917,7 +3917,7 @@ export class MailboxStore {
 
   #clearChanges(): void {
     for (const keys of Object.values(this.#changes)) keys.clear();
-    this.#stateGeneration += 1;
+    this.#keptConversationIndex = undefined;
   }
 
   #drainFileDeletionOutboxEffect = Effect.fn("MailboxStore.drainFileDeletionOutbox")(function* (this: MailboxStore) {
