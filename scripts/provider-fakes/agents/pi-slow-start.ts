@@ -1,9 +1,13 @@
 // The Pi of `pi-slow-start-e2e.ts`, on Pi's JSONL RPC. It reads no command for `FAKE_START_DELAY_MS`,
 // as a Pi that starts slowly on a busy computer. With `FAKE_HANG=1`, it never answers. It lists one
-// OpenRouter model. `pi update --models` ends at once.
+// OpenRouter model. `pi update --models` and `pi --version` end at once.
 import { createInterface } from "node:readline";
 import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contracts/runtime-values";
 
+if (process.argv.includes("--version")) {
+  process.stdout.write("1.5.2\n");
+  process.exit(0);
+}
 if (process.argv.includes("update")) process.exit(0);
 
 function answer(command: RpcRecord, data: RpcRecord = {}): void {

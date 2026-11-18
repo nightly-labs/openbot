@@ -573,6 +573,11 @@ export class ProviderRuntime implements ProviderPort {
   #errorSerial = 0;
   /** The providers whose model list is read again: after it timed out, or because it is old. */
   readonly #relisting = new Set<AgentProvider>();
+  /**
+   * The serial of the last 5 s list timeout that a pass recorded while another read of the provider
+   * ran. That read can list the models after the timeout, so its fresh list clears the timeout too.
+   */
+  readonly #passTimeoutSerials = new Map<AgentProvider, number>();
   /** When the model lists were last read, for `MODEL_LIST_REREAD_MS`. */
   #modelsReadAt = 0;
   /** The clients whose failed model list was read again. Each client gets these reads one time. */
@@ -4918,6 +4923,7 @@ export class ProviderRuntime implements ProviderPort {
     for (const [provider, cause] of timedOut) {
       if (!this.#relisting.has(provider)) continue;
       this.#recordProviderError(provider, cause);
+      this.#passTimeoutSerials.set(provider, this.#errorSerial);
       changed = true;
     }
     if (changed || sourceChanged) this.#setStatus({});
@@ -4963,11 +4969,25 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const errorSerialAtStart = this.#errorSerial;
     if (!(yield* this.#modelCatalog.relist(provider))) return false;
-    const lastError = this.#lastErrors.get(provider);
-    if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
+    this.#clearErrorAfterFreshList(provider, errorSerialAtStart);
     this.#setStatus({});
     return true;
   });
+
+  /**
+   * Clears the provider's last error after a read that started at `errorSerialAtStart` gave a fresh
+   * model list: an error older than the read, or the timeout of a pass that ran during the read.
+   * Before, that timeout kept "Error" on the row after the read listed the models (#12166). Answers
+   * whether it cleared an error.
+   */
+  #clearErrorAfterFreshList(provider: AgentProvider, errorSerialAtStart: number): boolean {
+    const lastError = this.#lastErrors.get(provider);
+    if (!lastError) return false;
+    if (lastError.serial > errorSerialAtStart && lastError.serial !== this.#passTimeoutSerials.get(provider))
+      return false;
+    this.#lastErrors.delete(provider);
+    return true;
+  }
 
   /**
    * Reads the model list of each running provider with `relistWhileRunning` again when the last read
@@ -5005,11 +5025,7 @@ export class ProviderRuntime implements ProviderPort {
           const before = listOf(provider);
           if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) return;
           if (listOf(provider) !== before) changed = true;
-          const lastError = this.#lastErrors.get(provider);
-          if (lastError && lastError.serial <= errorSerialAtStart) {
-            this.#lastErrors.delete(provider);
-            changed = true;
-          }
+          if (this.#clearErrorAfterFreshList(provider, errorSerialAtStart)) changed = true;
         }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
       { concurrency: "unbounded", discard: true },
     );
