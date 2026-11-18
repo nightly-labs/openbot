@@ -23,6 +23,9 @@ import {
 } from "./diagram-graph";
 import type { DiagramEdge, DiagramNode, DiagramRoutineRun, DiagramStepRun } from "./diagram-model";
 
+/** The intro plays once per app session. Switching agents must not replay it. */
+let introPlayed = false;
+
 /** One step of the loop, in milliseconds. */
 const STEP_MS = 1200;
 /** Steps in one loop. The last `FADE` steps fade the backdrop out. */
@@ -142,14 +145,12 @@ export interface DiagramBoardEmptyProps {
 
 export function DiagramBoardEmpty(props: DiagramBoardEmptyProps) {
   const { t } = useText();
-  const [tick, setTick] = createSignal(0);
-  const [still, setStill] = createSignal(false);
+  const stillFrame = prefersReducedMotion() || introPlayed;
+  const [still] = createSignal(stillFrame);
+  const [tick, setTick] = createSignal(stillFrame ? STILL : 0);
   onSettled(() => {
-    if (prefersReducedMotion()) {
-      setStill(true);
-      setTick(STILL);
-      return;
-    }
+    if (stillFrame) return;
+    introPlayed = true;
     const timer = window.setInterval(() => setTick((value) => value + 1), STEP_MS);
     return () => window.clearInterval(timer);
   });
