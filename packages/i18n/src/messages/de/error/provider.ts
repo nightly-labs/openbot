@@ -89,6 +89,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Die Laufzeitaktualisierung wurde nicht abgeschlossen.",
   "error.provider.downloadHttp": "Der Laufzeitdownload ist mit HTTP {status} fehlgeschlagen.",
   "error.provider.downloadNoData": "Der Laufzeitdownload hat keine Daten zurückgegeben.",
+  "error.provider.downloadStalled":
+    "Der Download wurde angehalten, weil eine Minute lang keine Daten ankamen. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.provider.downloadSize": "Der Laufzeitdownload hat eine unerwartete Größe.",
   "error.provider.downloadIntegrity": "Der Laufzeitdownload hat die Integritätsprüfung nicht bestanden.",
   "error.provider.runtimeReplacing":

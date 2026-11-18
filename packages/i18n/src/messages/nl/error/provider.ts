@@ -85,6 +85,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "De update van de runtime is niet voltooid.",
   "error.provider.downloadHttp": "Download van de runtime is mislukt met HTTP {status}.",
   "error.provider.downloadNoData": "Download van de runtime gaf geen gegevens.",
+  "error.provider.downloadStalled":
+    "De download is gestopt omdat er een minuut lang geen gegevens binnenkwamen. Controleer de internetverbinding en probeer het opnieuw.",
   "error.provider.downloadSize": "De download van de runtime heeft een onverwachte grootte.",
   "error.provider.downloadIntegrity": "De download van de runtime heeft de integriteitscontrole niet doorstaan.",
   "error.provider.runtimeReplacing":

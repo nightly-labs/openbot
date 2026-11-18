@@ -79,6 +79,7 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "运行时更新未完成。",
   "error.provider.downloadHttp": "运行时下载失败，HTTP {status}。",
   "error.provider.downloadNoData": "运行时下载未返回任何数据。",
+  "error.provider.downloadStalled": "由于一分钟内没有收到数据，下载已停止。请检查网络连接，然后重试。",
   "error.provider.downloadSize": "运行时下载的大小异常。",
   "error.provider.downloadIntegrity": "运行时下载未通过完整性校验。",
   "error.provider.runtimeReplacing": "另一个实例正在替换该运行时，无法安装。",

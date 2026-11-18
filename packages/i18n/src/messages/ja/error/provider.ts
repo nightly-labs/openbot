@@ -91,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "ランタイムの更新が完了しませんでした。",
   "error.provider.downloadHttp": "ランタイムのダウンロードが HTTP {status} で失敗しました。",
   "error.provider.downloadNoData": "ランタイムのダウンロードでデータが返されませんでした。",
+  "error.provider.downloadStalled":
+    "1 分間データが届かなかったため、ダウンロードが停止しました。インターネット接続を確認してから、もう一度お試しください。",
   "error.provider.downloadSize": "ランタイムのダウンロードのサイズが予期しないものです。",
   "error.provider.downloadIntegrity": "ランタイムのダウンロードが整合性チェックに失敗しました。",
   "error.provider.runtimeReplacing": "別のインスタンスがランタイムを置き換えているため、インストールできませんでした。",

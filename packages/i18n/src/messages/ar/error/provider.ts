@@ -81,6 +81,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "لم يكتمل تحديث بيئة التشغيل.",
   "error.provider.downloadHttp": "فشل تنزيل بيئة التشغيل برمز HTTP {status}.",
   "error.provider.downloadNoData": "لم يُرجع تنزيل بيئة التشغيل أي بيانات.",
+  "error.provider.downloadStalled":
+    "توقف التنزيل لأنه لم تصل أي بيانات لمدة دقيقة. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.provider.downloadSize": "حجم تنزيل بيئة التشغيل غير متوقع.",
   "error.provider.downloadIntegrity": "فشل تنزيل بيئة التشغيل في فحص السلامة.",
   "error.provider.runtimeReplacing": "تعذّر تثبيت بيئة التشغيل لأن نسخة أخرى تستبدلها.",
