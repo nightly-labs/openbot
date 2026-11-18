@@ -1,6 +1,7 @@
 import {
   type CloudSpeechModelId,
   type CloudSpeechModelInfo,
+  type EdgeTtsVoice,
   type ElevenLabsSpeechVoice,
   type SpeechAudio,
   type SpeechLanguage,
@@ -11,6 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
 import { readLimitedBody } from "../backend/limited-body";
 import { VoiceOperationError } from "./voice-model-service";
+import { speakWithEdgeTts } from "./voice-edge-tts";
 
 /** One request is at most `SPEECH_LIMITS.maximumTextLength` characters: about a minute of speech. */
 const SPEECH_TIMEOUT_MS = 60_000;
@@ -95,16 +97,20 @@ export interface CloudSpeechRequest {
   language: SpeechLanguage;
   elevenLabsVoice: ElevenLabsSpeechVoice;
   xaiVoice: XaiSpeechVoice;
+  edgeTtsVoice: EdgeTtsVoice;
 }
 
 /**
  * Reads one part of a reply at the model's provider, with the user's own key, as 24 kHz 16-bit mono
- * PCM. The key goes only in the request header. An error names the provider, never the key.
+ * PCM. Edge TTS needs no key. The key goes only in the request header. An error names the provider, never the key.
  */
 export function speakInCloud(
   fetcher: SpeechFetch,
   request: CloudSpeechRequest,
 ): Effect.Effect<SpeechAudio, VoiceOperationError> {
+  if (request.model.provider === "edge-tts") {
+    return speakWithEdgeTts(request.text, request.edgeTtsVoice, request.language);
+  }
   if (request.model.provider === "xai") {
     const language = XAI_LANGUAGES[request.language] ?? "auto";
     return exchange(fetcher, request, "https://api.x.ai/v1/tts", {
