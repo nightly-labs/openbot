@@ -2249,9 +2249,11 @@ export class TurnLifecycle {
         };
       });
       // A foreground subagent ends with its turn. A background one works on and reports later, and so
-      // does a Codex subagent that still runs a turn of its own: Codex does not stop it (#11871).
+      // does a Codex subagent that still runs a turn of its own: Codex does not stop it (#11871). Only
+      // the agent's own chat keeps it, because only that chat's Stop reaches it.
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
-      const working = new Set(this.#workingCodexChildren(turnId).map(({ threadId: child }) => child));
+      const ownChat = !routineSession && snapshot.threadId === this.#store.get(agentId)?.threadId;
+      const working = new Set(ownChat ? this.#workingCodexChildren(turnId).map(({ threadId: child }) => child) : []);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false, keep: working });
       if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
       if (routineSession && !this.#subagentsWork(agentId, turnId)) this.#archivableRoutineSessions.add(threadId);
