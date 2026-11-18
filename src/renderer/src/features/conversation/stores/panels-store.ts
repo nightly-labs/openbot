@@ -24,7 +24,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
-import { SHARED_FOLDER_PATH } from "../message-image-files";
+import { decodedPath, SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -820,15 +820,6 @@ function filePreviewKey(source: SidebarFilePreview["source"]): string {
   if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
   if (source.kind === "shared") return `shared\u0000${source.path}`;
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
-}
-
-function decodedPath(path: string): string {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    // A literal percent sign can be part of a file name.
-    return path;
-  }
 }
 
 function filePreviewError(error: unknown, path: string): string {
