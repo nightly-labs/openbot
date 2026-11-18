@@ -236,7 +236,7 @@ export function createWebConversationRuntime(
   // it saw at its start, so a later pick cannot hide the earlier one from Cancel.
   let cancelGeneration = 0;
   // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
-  // files: it has no chips, and the banner says why it failed.
+  // files: it has no chips, and the composer says why it failed.
   const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
     emit({
       type: "started",

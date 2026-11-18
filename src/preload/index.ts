@@ -550,7 +550,7 @@ async function importFiles(files: File[]): Promise<void> {
 
 /**
  * `retryable` imports name their files, so the composer shows a chip for each, and keep them for a
- * retry. A set over a limit names none: a retry cannot pass, and the banner says why.
+ * retry. A set over a limit names none: a retry cannot pass, and the composer says why.
  */
 async function runAttachmentImport(
   requestId: string,
