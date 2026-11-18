@@ -33,7 +33,7 @@ export const messages = {
   "mobile.liveActivity.error.answer": "Không thể gửi câu trả lời",
   "mobile.liveActivity.error.answerFallback": "Mở cuộc trò chuyện và trả lời tại đó.",
   "mobile.liveActivity.error.decision": "Không thể gửi quyết định",
-  "mobile.liveActivity.error.decisionFallback": "Mở yêu cầu trên máy tính.",
+  "mobile.liveActivity.error.decisionFallback": "Mở yêu cầu trong ứng dụng trên máy tính.",
   "mobile.liveActivity.island.taskWorking": "Đang xử lý yêu cầu của bạn",
   "mobile.liveActivity.island.questionHeader": "Câu hỏi từ agent của bạn",
   "mobile.liveActivity.island.questionText": "Mở OpenBot để trả lời câu hỏi này.",

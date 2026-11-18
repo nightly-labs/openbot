@@ -16,7 +16,7 @@ export const messages = {
   "mobile.search.thread.message": "Nhắn tin cho {name}",
   "mobile.search.thread.ideas": "Ý tưởng",
   "mobile.search.thread.ideaHint": "Đưa nội dung này vào ô tin nhắn.",
-  "mobile.search.thread.again": "Lại",
+  "mobile.search.thread.again": "Làm lại",
   "mobile.search.thread.openWith": "Mở các luồng với {name}",
   "mobile.search.thread.noAgent": "Không có agent nào có tên đó.",
   "mobile.search.thread.send": "Bắt đầu luồng",
