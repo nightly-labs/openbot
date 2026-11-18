@@ -232,11 +232,36 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | # | Item | State |
 |---|---|---|
 | 13 | Durable idempotency keys for commands that clients retry | TODO |
-| 14 | Projection check command, invariants, and a sweep of the transfers folder | TODO |
+| 14 | Projection check command, invariants, and a sweep of the transfers folder | RE-SCOPED: developer decision, 2026-11-18 (see below) |
 | 16 | Typed update state machine and one runtime state file | TODO |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |
-| 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | IN REVIEW (#11872; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
+| 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | DONE (#11872, `a694b58a7b`; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
 | 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | DONE (#11643, `d264b0a324`) |
+
+### 14. Projection check and transfers sweep (re-scoped)
+
+Measured on 2026-11-18 on a read-only copy of one real desktop profile (the developer's; schema 63,
+8 threads, 9,666 events). Counts only.
+
+- **Replay is not a correct copy.** No production code calls `ThreadReplay.rebuildThreadProjection`;
+  only E2E scripts do. A rebuild changes the saved rows: `projection_turns.provider_session_id`
+  becomes null in almost every turn, 4 failed or interrupted turns become `completed`, 9 turns are
+  added, 2,011 of 2,274 messages in one thread move, and most turn times move by less than 5 s. No
+  message is lost or added, and no message content changes. So a check against the replay reports
+  every thread, and a repair from the events would damage data.
+- **Saved rows hold simple rules.** Each active turn exists, no running turn is without an active
+  turn, ordinals are unique, no message is without a thread, and `PRAGMA foreign_key_check` is
+  clean. 2 of 22 `thread-message` attachment rows have no message. These rows have an empty `path`
+  by design (`conversation-writer.ts`).
+- **A transfers sweep is not safe.** The desktop app and every dev profile use the same
+  `~/OpenBot/Shared/Transfers` (`openbotRoot` in `agent-store.ts`). On the measured computer, 391
+  profile databases use it and 330 name entries in it. The production profile names none of the
+  11,462 `generated/` entries; dev profiles name 4,280 of them. A sweep that deletes the entries one
+  database does not name deletes files that another profile uses. No `.tmp-*` folder was left.
+
+Decision: no delete sweep, and no check against the replay. Make the replay keep turns, sessions
+and message order first, and only when a repair path needs it. Not confirmed: other users and
+hosted servers. Only one computer was measured.
 
 ## Phase 4: longer term
 
