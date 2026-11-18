@@ -270,7 +270,7 @@ export interface AgentThreadViewProps {
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
-  /** The trace that the steps row above an answer opens, with the token usage and the time of each step. */
+  /** The trace of the turn of an answer. With it, the steps stand beside the answer, as in the agent's chat. */
   traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
@@ -854,19 +854,34 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
             {(message) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              // As in the agent's chat: the steps of an answer stand beside it and open only the trace.
+              // "Show agent steps" keeps the open list above the answer.
+              const stepsInRow = () =>
+                props.traceAbove !== undefined &&
+                !props.stepsOpenByDefault &&
+                message().kind !== "thinking" &&
+                message().questionPrompt === undefined &&
+                !agentMessageMarker(message()) &&
+                !changeMarker(message()) &&
+                !card() &&
+                author(message()).kind === "agent";
+              const stepsDisclosure = () => (
+                <Show when={props.stepsAbove?.(message().id)}>
+                  {(steps) => (
+                    <AgentStepsDisclosure
+                      steps={steps()}
+                      defaultOpen={props.stepsOpenByDefault ?? false}
+                      list={!stepsInRow()}
+                      // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
+                      trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
+                      facts={props.factsAbove?.(message().id)}
+                    />
+                  )}
+                </Show>
+              );
               return (
                 <div class="virtual-chat-row">
-                  <Show when={props.stepsAbove?.(message().id)}>
-                    {(steps) => (
-                      <AgentStepsDisclosure
-                        steps={steps()}
-                        defaultOpen={props.stepsOpenByDefault ?? false}
-                        // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
-                        trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
-                        facts={props.factsAbove?.(message().id)}
-                      />
-                    )}
-                  </Show>
+                  <Show when={!stepsInRow()}>{stepsDisclosure()}</Show>
                   <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
                     {(marker) => (
                       <article data-chat-search-message={message().id}>
@@ -933,6 +948,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                             if (id) showMessage(id);
                           }}
                           actions={messageActions(message())}
+                          steps={stepsInRow() ? stepsDisclosure() : undefined}
+                          actionsBeside={stepsInRow()}
                           menu={messageMenu(message())}
                           data-chat-search-message={message().id}
                         />

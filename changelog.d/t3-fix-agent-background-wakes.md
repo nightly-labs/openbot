@@ -6,3 +6,8 @@
   version.
 - A report that an agent writes after its background work ends now always shows, unless the agent
   says that it has nothing new. Before, after a quiet update, such a report could be hidden.
+
+### Changed
+
+- In a thread, the steps of an answer now show beside it, with the reply and menu actions, as in the
+  agent's chat. "Show agent steps" still keeps the open list above the answer.
