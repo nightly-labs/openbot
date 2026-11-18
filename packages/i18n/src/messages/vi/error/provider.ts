@@ -278,3 +278,277 @@ export const messages = {
   "error.provider.antigravityOverrideInvalid":
     "Máy chủ Gemini trong OPENBOT_ANTIGRAVITY_PATH bị thiếu hoặc không thể thực thi. Hãy sửa đường dẫn hoặc xóa biến, rồi khởi động lại OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Không thể đọc phiên bản máy chủ Gemini.",
+  "error.provider.antigravitySignIn": "Hãy đăng nhập bằng Google để dùng Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google hiện không còn dung lượng trống cho mô hình Gemini này. Hạn mức của gói bạn không phải là nguyên nhân. Hãy thử lại sau vài phút, hoặc chọn mô hình khác.\n{detail}",
+  "error.provider.antigravityRateLimited":
+    "Gemini đã từ chối yêu cầu vì đã chạm giới hạn tốc độ hoặc hạn mức của gói. Hãy chờ vài phút hoặc chọn mô hình khác, rồi thử lại.\n{detail}",
+  "error.provider.antigravityQuotaReached":
+    "Google cho biết đã chạm giới hạn sử dụng Gemini. Giới hạn này có thể chỉ áp dụng cho một mô hình, nên trang mức sử dụng của gói bạn có thể vẫn hiển thị còn hạn mức. Hãy chọn mô hình Gemini khác, hoặc chờ giới hạn được đặt lại.\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini hiện không thể dùng mô hình này. Hãy chọn mô hình khác, rồi thử lại.\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "Dịch vụ Gemini của Google không hoàn tất yêu cầu. Hãy thử lại sau vài phút.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google không chấp nhận thông tin đăng nhập Gemini cho yêu cầu này. Hãy gửi lại tin nhắn. Nếu lỗi vẫn tiếp diễn, hãy kết nối lại Gemini trong Cài đặt.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini đã từ chối yêu cầu này. Hãy chọn mô hình khác, rồi gửi lại tin nhắn. Nếu vẫn thất bại, hãy bắt đầu cuộc trò chuyện mới.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini đã từ chối yêu cầu này mà không nêu nguyên nhân. Một mục trong lịch sử trò chuyện có thể gây ra lỗi này, chẳng hạn hình ảnh mà agent đã mở. OpenBot đã bắt đầu một phiên Gemini mới với lịch sử trò chuyện. Hãy thử lại. Nếu lỗi vẫn tiếp diễn, hãy chọn mô hình khác.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini không thể đọc lịch sử đã lưu của cuộc trò chuyện này. OpenBot đã bắt đầu một phiên Gemini mới với lịch sử trò chuyện. Hãy gửi lại tin nhắn.",
+  "error.provider.antigravityLocationUnsupported":
+    "Google không cho phép Gemini hoạt động từ vị trí mạng của máy tính đang chạy agent này. Hãy dùng Gemini trên máy tính khác, hoặc chọn nhà cung cấp khác cho agent này.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini bị mất kết nối với agent của nó và đã dừng. Hãy gửi một tin nhắn để tiếp tục.",
+  "error.provider.grokServiceFailure":
+    "Dịch vụ Grok đang bận hoặc gặp lỗi. Hãy thử lại sau vài phút, hoặc chọn mô hình khác.",
+  "error.provider.grokConnectionFailed":
+    "Grok không thể kết nối tới dịch vụ của nó. Hãy kiểm tra kết nối internet, rồi gửi lại tin nhắn.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Trên host Windows, Gemini mở trang Google ngay trên host. Hãy kết nối Gemini trên máy tính host.",
+  "error.provider.cursorArchivePath": "Tệp nén Cursor chứa tệp không mong đợi.",
+  "error.provider.cursorChecksum": "Checksum của runtime Cursor không khớp.",
+  "error.provider.cursorReleaseShape": "Bản phát hành Cursor có cấu trúc không như mong đợi.",
+  "error.provider.cursorMissing": "Chưa tải Cursor xuống. Hãy tải xuống trong OpenBot để tiếp tục.",
+  "error.provider.cursorNotStarted": "Đã tìm thấy agent Cursor, nhưng không thể đọc phiên bản của nó.",
+  "error.provider.cursorVersionUnreadable": "Không thể đọc phiên bản agent Cursor.",
+  "error.provider.cursorSignIn": "Hãy đăng nhập bằng Cursor hoặc đặt CURSOR_API_KEY để dùng Cursor.",
+  "error.provider.clineArchivePath": "Tệp nén Cline có đường dẫn không mong đợi.",
+  "error.provider.clinePackageMismatch": "Gói Cline không khớp với danh mục runtime.",
+  "error.provider.clineChecksum": "Checksum của runtime Cline không khớp.",
+  "error.provider.clineLicenseChecksum": "Checksum của giấy phép Cline không khớp.",
+  "error.provider.clineMissing": "Chưa tải Cline xuống. Hãy tải xuống trong OpenBot để tiếp tục.",
+  "error.provider.clineOutdated": "Cline CLI {version} đã quá cũ. OpenBot yêu cầu phiên bản 3.0.68 trở lên.",
+  "error.provider.clineNotStarted": "Cline không thể khởi động. Hãy chạy `cline --version` trong terminal.",
+  "error.provider.clineVersionUnreadable": "Không thể đọc phiên bản Cline CLI.",
+  "error.provider.clineSignIn": "Hãy đăng nhập bằng Cline hoặc đặt CLINE_API_KEY để dùng Cline.",
+  "error.provider.kimiArchivePath": "Tệp nén Kimi có đường dẫn không mong đợi.",
+  "error.provider.kimiChecksum": "Checksum của runtime Kimi không khớp.",
+  "error.provider.kimiLicenseChecksum": "Checksum của giấy phép Kimi không khớp.",
+  "error.provider.kimiMissing": "Chưa tải Kimi xuống. Hãy tải xuống trong OpenBot để tiếp tục.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} đã quá cũ. OpenBot yêu cầu phiên bản 1.52.0 trở lên.",
+  "error.provider.kimiNotStarted": "Kimi không thể khởi động. Hãy chạy `kimi --version` trong terminal.",
+  "error.provider.kimiVersionUnreadable": "Không thể đọc phiên bản Kimi CLI.",
+  "error.provider.kimiSignIn": "Hãy đăng nhập bằng Kimi Code để dùng Kimi.",
+  "error.provider.devinSignIn": "Hãy đăng nhập bằng Devin để dùng Devin.",
+  "error.provider.copilotSignIn": "Hãy đăng nhập bằng GitHub hoặc đặt COPILOT_GITHUB_TOKEN để dùng GitHub Copilot.",
+  "error.provider.mistralSignIn": "Hãy đăng nhập bằng Mistral hoặc đặt MISTRAL_API_KEY để dùng Mistral.",
+  "error.provider.hermesMissing": "Chưa cài đặt Hermes Agent. Hãy cài đặt, rồi thử lại.",
+  "error.provider.hermesNotStarted": "Hermes Agent không thể khởi động. Hãy chạy `hermes --version` trong terminal.",
+  "error.provider.hermesVersionUnreadable": "Không thể đọc phiên bản Hermes Agent.",
+  "error.provider.hermesSignIn": "Hãy đăng nhập bằng Nous Portal, hoặc chạy `hermes setup` trong terminal, để dùng Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes không thể hoàn tất lượt này. Nếu câu trả lời của nó nêu lý do, hãy làm theo. Nếu không, một máy chủ MCP của agent này có thể không khả dụng: hãy kiểm tra trong Cửa hàng, Ứng dụng, rồi gửi lại tin nhắn.",
+  "error.provider.hermesRefused":
+    "Hermes đã từ chối tin nhắn này trước khi bắt đầu. Hãy gửi lại. Nếu Hermes từ chối mọi tin nhắn, hãy khởi động lại OpenBot trên máy tính đang chạy agent này.",
+  "error.provider.hermesConnectionLost":
+    "Hermes bị mất kết nối trong lúc xử lý tin nhắn này, nên không biết công việc đã xong hay chưa. Hãy kiểm tra những gì agent đã làm trước khi gửi lại tin nhắn.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot không thể dùng mô hình này: mô hình không chấp nhận cài đặt suy nghĩ của nó. Hãy chọn mô hình khác cho agent này, rồi gửi lại tin nhắn.",
+  "error.provider.usageLimitReached": "Tài khoản đã chạm giới hạn sử dụng.",
+  "error.provider.claudeContextFull":
+    "Cuộc trò chuyện này đã quá dài đối với Claude. OpenBot đã bắt đầu một phiên Claude Code mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.claudeApiKeyNoCredit":
+    "Số dư tín dụng của khóa API Anthropic quá thấp. Gói Claude không chi trả cho các yêu cầu dùng khóa API. Hãy nạp thêm tín dụng trong Anthropic Console, hoặc đăng nhập Claude trong Cài đặt và chọn tài khoản Claude trong menu mô hình của agent.",
+  "error.provider.claudeServiceBlocked":
+    "Dịch vụ Claude đã chặn yêu cầu này. Đây thường là sự cố ngắn ở phía Claude, không phải vấn đề với tài khoản của bạn. Hãy gửi lại tin nhắn sau vài phút.",
+  "error.provider.foreignReasoning":
+    "{provider} không chấp nhận phần suy luận trước đó trong cuộc trò chuyện này, vì một tài khoản hoặc khóa API khác đã nhận nó. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.codexHistoryItemMissing":
+    "Codex không thể tiếp tục cuộc trò chuyện này vì thiếu một mục trong lịch sử đã lưu. OpenBot đã bắt đầu một phiên Codex mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.codexRequestRefused":
+    "{provider} đã từ chối yêu cầu cho cuộc trò chuyện này mà không nêu nguyên nhân. Điều này có thể xảy ra trong cuộc trò chuyện dài có nhiều hình ảnh. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.codexAudioRefused":
+    "Mô hình không chấp nhận âm thanh trong cuộc trò chuyện này. OpenBot đã bắt đầu một phiên Codex mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.imageTooSmall":
+    "Mô hình không chấp nhận một hình ảnh trong cuộc trò chuyện này vì hình ảnh quá nhỏ. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.imageTooLarge":
+    "Mô hình không chấp nhận một hình ảnh trong cuộc trò chuyện này vì hình ảnh quá lớn. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.imageCountLimit":
+    "Mô hình không chấp nhận cuộc trò chuyện này vì có quá nhiều hình ảnh. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.imageUnreadable":
+    "Mô hình không thể đọc một hình ảnh trong cuộc trò chuyện này. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại. Nếu bạn đã gửi một hình ảnh, hãy gửi hình khác.",
+  "error.provider.requestTooLarge":
+    "Cuộc trò chuyện này đã quá lớn để gửi tới mô hình. Hình ảnh trong cuộc trò chuyện thường là nguyên nhân. OpenBot đã bắt đầu một phiên {provider} mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.opencodeSessionRejected":
+    "OpenCode đã từ chối yêu cầu mà không nêu nguyên nhân. Điều này có thể xảy ra trong cuộc trò chuyện dài hoặc sau khi đổi mô hình. OpenBot đã bắt đầu một phiên OpenCode mới với lịch sử trò chuyện. Hãy thử lại. Nếu lỗi vẫn tiếp diễn, hãy chọn mô hình khác hoặc mức suy luận thấp hơn.",
+  "error.provider.opencodeCompactionFailed":
+    "Mô hình không thể tóm tắt cuộc trò chuyện dài này để giải phóng chỗ trong cửa sổ ngữ cảnh. OpenBot đã bắt đầu một phiên OpenCode mới với lịch sử trò chuyện. Hãy thử lại. Nếu lỗi vẫn tiếp diễn, hãy chọn mô hình mạnh hơn.",
+  "error.provider.museMcpStartupFault":
+    "Muse không thể khởi động một máy chủ MCP và đã chặn MCP trong phiên này. OpenBot đã bắt đầu một phiên Muse mới với lịch sử trò chuyện. Hãy thử lại. Nếu lỗi vẫn tiếp diễn, hãy tắt Điều khiển máy tính hoặc máy chủ MCP bị lỗi cho agent này.",
+  "error.provider.claudeSessionMissing":
+    "Claude Code không tìm thấy phiên đã lưu của cuộc trò chuyện này. OpenBot đã bắt đầu một phiên Claude Code mới với lịch sử trò chuyện. Hãy thử lại.",
+  "error.provider.grokSignIn": "Hãy chạy `grok login` hoặc đặt XAI_API_KEY để dùng Grok.",
+  "error.provider.acpSignInTimedOut": "Đăng nhập đã hết thời gian chờ.",
+  "error.provider.acpSignInStopped": "Đăng nhập đã dừng trước khi hoàn tất.",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini không thể mở trang đăng nhập. Hãy cài đặt trình duyệt và xdg-utils, rồi kết nối từ một phiên desktop trên host này. Máy chủ không có desktop không thể hoàn tất kiểu đăng nhập này.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini không thể mở trang đăng nhập trong trình duyệt của bạn. Hãy kiểm tra trình duyệt mặc định, rồi kết nối lại.",
+  "error.provider.acpSignInFailed": "Đăng nhập chưa hoàn tất.",
+  "error.provider.acpSignInFailedReason": "Đăng nhập chưa hoàn tất: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Quá trình đăng nhập không thể kết nối tới máy chủ của nhà cung cấp. Hãy kiểm tra kết nối mạng và cài đặt DNS của máy tính chạy OpenBot, rồi thử lại.",
+  "error.provider.acpSignOutFailed": "Đăng xuất chưa hoàn tất.",
+  "error.provider.acpSignOutFailedReason": "Đăng xuất chưa hoàn tất: {reason}",
+  "error.provider.acpSignInMethodMissing":
+    "Nhà cung cấp này không hỗ trợ cách đăng nhập này trên máy tính này. Hãy cập nhật nhà cung cấp, rồi thử lại.",
+  "error.provider.httpsSignInLinkOnly": "Chỉ liên kết đăng nhập HTTPS mới có thể mở trong trình duyệt.",
+  "error.provider.geminiKeyRefused":
+    "Gemini đã từ chối khóa API đã lưu. Hãy thay thế hoặc xóa khóa trong Cài đặt, rồi kết nối lại.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini đã từ chối yêu cầu vì khóa API Gemini đã lưu của bạn đã chạm giới hạn tốc độ hoặc hạn mức. Khóa này được dùng thay cho gói Google của bạn. Hãy chờ vài phút hoặc chọn mô hình khác, rồi thử lại. Để dùng gói Google của bạn, hãy xóa khóa trong Cài đặt.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Khóa API Gemini đã lưu của bạn không có hạn mức cho mô hình này. Khóa này được dùng thay cho gói Google của bạn. Hãy chọn mô hình khác, hoặc xóa khóa trong Cài đặt để dùng gói Google của bạn.\n{detail}",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini không thể mở tệp cài đặt của tài khoản này, nên không thể đăng nhập. Hãy xóa tài khoản này và thêm lại.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini không thể mở tệp cài đặt của nó trên máy tính này, nên không thể đăng nhập. Hãy thoát các ứng dụng khác đang dùng Gemini, rồi thoát và mở lại OpenBot.",
+  "error.provider.geminiVerificationRequired":
+    "Google cần xác minh tài khoản của bạn trước khi Gemini có thể trả lời. Hãy xác minh tài khoản Google trong trình duyệt, rồi gửi lại tin nhắn.",
+  "error.provider.keyProviderRefused":
+    "{provider} đã từ chối khóa API đã lưu. Hãy thay thế hoặc xóa khóa trong Cài đặt, rồi thử lại.",
+  "error.provider.keyProviderNoBalance":
+    "Tài khoản {provider} của khóa API đã lưu không còn số dư. Hãy nạp thêm tín dụng vào tài khoản, rồi thử lại.",
+  "error.provider.keyProviderLowCredit":
+    "Tài khoản {provider} của khóa API đã lưu không đủ tín dụng cho một câu trả lời từ mô hình này. Hãy nạp thêm tín dụng vào tài khoản, hoặc chọn mô hình khác, rồi thử lại.",
+  "error.provider.modelServiceRefused":
+    "Dịch vụ mô hình đã từ chối yêu cầu. Hãy chọn mô hình khác, hoặc kiểm tra quyền truy cập của bạn vào mô hình này tại dịch vụ.",
+  "error.provider.modelServiceRefusedReason":
+    "Dịch vụ mô hình đã từ chối yêu cầu: {reason}. Hãy chọn mô hình khác, hoặc kiểm tra quyền truy cập của bạn vào mô hình này tại dịch vụ.",
+  "error.provider.messageTooLarge": "OpenBot đã dừng {provider} vì nó gửi một tin nhắn lớn hơn {limit} MB.",
+  "error.provider.customAgentIdInvalid":
+    "ID agent chỉ được gồm chữ cái thường, chữ số hoặc `-`, và không được trùng ID của nhà cung cấp tích hợp sẵn.",
+  "error.provider.customAgentEnvInvalid":
+    "Tên biến chỉ được gồm chữ cái, chữ số hoặc `_`, và không bắt đầu bằng chữ số. Mỗi tên chỉ dùng một lần, tối đa 16 tên.",
+  "error.provider.customAgentUsagePromptInvalid": "Lệnh xem mức sử dụng phải nằm trên một dòng, tối đa 256 ký tự.",
+  "error.provider.customAgentCommandInvalid":
+    "Lệnh phải là đường dẫn đầy đủ, đường dẫn bắt đầu bằng ~/, hoặc tên lệnh không có dấu cách.",
+  "error.provider.customAgentArgsInvalid": "Đối số không được chứa dấu xuống dòng. Dùng tối đa 32 đối số.",
+  "error.provider.customAgentWindowsScript":
+    "Lệnh .cmd hoặc .bat chỉ nhận chữ cái, chữ số và - _ . , : = @ + / \\ trong các đối số.",
+  "error.provider.customAgentNotFound": "OpenBot không tìm thấy {command}. Hãy nhập đường dẫn đầy đủ của lệnh.",
+  "error.provider.customAgentCheckTimedOut": "Agent không phản hồi trong 20 giây.",
+  "error.provider.customAgentCheckStopped": "Agent đã dừng trước khi phản hồi.",
+  "error.provider.customAgentProtocolVersion": "Agent dùng ACP phiên bản {version}. OpenBot dùng phiên bản 1.",
+  "error.provider.customAgentCheckFailed": "Agent không phản hồi như một agent ACP.",
+  "error.provider.customAgentRemoveBusy":
+    "Hãy chờ lượt đang chạy và hàng đợi hoàn tất trước khi xóa agent tùy chỉnh này.",
+  "error.provider.customAgentNone": "Chưa lưu agent tùy chỉnh nào.",
+  "error.provider.customAgentsUnavailable": "Máy chủ này không thể thay đổi agent tùy chỉnh. Hãy cập nhật OpenBot trên máy chủ.",
+  "error.provider.customAgentMissing": "Agent tùy chỉnh này hiện không còn được lưu. Hãy chọn mô hình khác.",
+  "error.provider.customAgentSignIn": "Hãy đăng nhập bằng lệnh riêng của agent, rồi thử lại.",
+  "error.provider.customAgentsReadOnly":
+    "Các agent tùy chỉnh đã lưu được ghi bởi phiên bản OpenBot mới hơn, hoặc không thể đọc tệp. Hãy cập nhật OpenBot để thay đổi chúng.",
+  "error.provider.customAgentNoSecureStorage":
+    "Máy tính này không có kho lưu trữ an toàn, nên không thể lưu giá trị biến môi trường. Hãy xóa chúng và thử lại.",
+  "error.provider.customAgentNotSaved": "Agent tùy chỉnh này chưa được lưu. Hãy làm mới danh sách và thử lại.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. Chế độ Chỉ không gian làm việc chặn thao tác này. Hãy thử Toàn quyền truy cập.",
+  "error.provider.customAgentTooMany": "Bạn có thể lưu tối đa {count} agent tùy chỉnh.",
+  "error.provider.customAgentEnvValueMissing": "Hãy nhập giá trị cho {name}.",
+  "error.provider.off": "{provider} đang tắt trong OpenBot. Hãy bật trong cài đặt nhà cung cấp trước.",
+  "error.provider.inUse": "Một agent đang dùng {provider}. Hãy đổi mô hình của agent đó trước khi tắt nhà cung cấp này.",
+  "error.provider.useBusy": "Hãy chờ quá trình kiểm tra nhà cung cấp hoặc đăng nhập hoàn tất, rồi thử lại.",
+  "error.provider.useSettingsReadOnly":
+    "Không thể đọc cài đặt nhà cung cấp đã lưu. Hãy cập nhật OpenBot trước khi thay đổi chúng.",
+  "error.provider.useChangeFailed": "OpenBot không thể thay đổi cài đặt nhà cung cấp.",
+  "error.provider.accountsUnsupported": "{provider} chỉ có thể giữ một tài khoản.",
+  "error.provider.accountNeedsConnection": "Hãy kết nối {provider} trước khi thêm tài khoản khác.",
+  "error.provider.usageResetUnsupported": "{provider} không thể đặt lại giới hạn sử dụng.",
+  "error.provider.signOutUnsupported": "OpenBot không thể ngắt kết nối đăng nhập {provider}.",
+  "error.provider.usageResetNotConnected": "Hãy đăng nhập lại tài khoản {provider} này trước khi đặt lại mức sử dụng.",
+  "error.provider.accountLimit": "{provider} có thể giữ tối đa {limit} tài khoản.",
+  "error.provider.accountNotFound": "Tài khoản {provider} này không có trên máy tính này. Hãy làm mới và thử lại.",
+  "error.provider.accountAlreadyAdded": "Tài khoản {provider} này đã được kết nối.",
+  "error.provider.accountDefault": "Không thể xóa tài khoản {provider} đầu tiên.",
+  "error.provider.accountUsesKey":
+    "Tài khoản {provider} này dùng khóa API đã lưu và không có đăng nhập. Hãy thay đổi khóa trong Cài đặt máy chủ → Nhà cung cấp.",
+  "error.provider.accountNeedsKey":
+    "Các tài khoản {provider} sau tài khoản đầu tiên dùng khóa API. Hãy cập nhật OpenBot trên thiết bị này, rồi thử lại.",
+  "error.provider.accountKeyRefused": "{provider} không chấp nhận khóa API này. Hãy kiểm tra khóa, rồi thử lại.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot không thể kết nối tới {provider} để kiểm tra khóa API. Hãy kiểm tra kết nối internet, rồi thử lại.",
+  "error.provider.accountKeySignedOut":
+    "{provider} không còn chấp nhận khóa API của tài khoản này. Hãy cấp khóa mới cho tài khoản.",
+  "error.provider.accountInUse": "Một agent trên tài khoản này đang làm việc. Hãy thử lại khi agent dừng.",
+  "error.provider.accountsReadOnly":
+    "Không thể đọc các tài khoản nhà cung cấp đã lưu. Hãy cập nhật OpenBot trước khi thay đổi chúng.",
+  "error.provider.accountSignedOut": "Tài khoản {provider} này đã đăng xuất. Hãy đăng nhập lại.",
+  "error.provider.sessionSettingUnavailable": "Cài đặt này không khả dụng trong phiên nhà cung cấp hiện tại.",
+  "error.provider.sessionSettingInvalid": "Giá trị này không khả dụng cho cài đặt.",
+  "error.provider.sessionSettingsBusy": "Hãy chờ lượt hiện tại kết thúc trước khi thay đổi cài đặt phiên.",
+  "error.provider.piOutdated": "Pi {version} đã quá cũ. Hãy cài Pi 1.1.0 trở lên để có hỗ trợ RPC gốc và MCP.",
+  "error.provider.nativeMissing": "Chưa cài đặt {provider} CLI. Hãy tải xuống trong Cài đặt.",
+  "error.provider.nativeNotStarted": "{provider} CLI không thể khởi động.",
+  "error.provider.nativeVersionUnreadable": "Không thể đọc phiên bản {provider} CLI.",
+  "error.provider.piSessionBusy": "Hãy chờ lượt Pi hiện tại kết thúc.",
+  "error.provider.acpSessionBusy": "{provider} vẫn đang hoàn tất một lượt đã dừng. Hãy thử lại sau giây lát.",
+  "error.provider.acpModelNotOffered":
+    "{provider} hiện không cung cấp {model}. Hãy chọn mô hình khác cho agent này, rồi thử lại.",
+  "error.provider.piStopped": "Pi không chạy. Hãy kết nối Pi và thử lại.",
+  "error.provider.piSessionMissing": "Tệp phiên Pi không có trên máy tính này.",
+  "error.provider.piResumeCancelled": "Pi đã hủy việc tiếp tục phiên. Hãy thử lại.",
+  "error.provider.piSessionIdentity": "Pi trả về một phiên khác. Phiên đã lưu không bị thay thế.",
+  "error.provider.piExtensionFailed":
+    "Pi đã dừng vì không thể tải một tiện ích mở rộng. Hãy xóa hoặc cập nhật tiện ích mở rộng này, rồi thử lại. {detail}",
+  "error.provider.piThreadStopped": "Pi đã dừng bất ngờ trước khi hoàn tất lượt này. Hãy gửi một tin nhắn để tiếp tục.",
+  "error.provider.piModelInvalid": "Hãy chọn một mô hình Pi có kèm nhà cung cấp của nó.",
+  "error.provider.piToolInvalid": "Công cụ trả về kết quả không hợp lệ.",
+  "error.provider.piSignIn": "Hãy dùng /login trong Pi trên máy tính host. Đóng Pi khi đăng nhập xong.",
+  "error.provider.museBusy": "Phiên Muse đang bận.",
+  "error.provider.museStopped": "Ứng dụng khách Muse không chạy.",
+  "error.provider.museUnexpectedProvider": "Muse trả về nhà cung cấp mô hình không như mong đợi.",
+  "error.provider.museNoActiveTurn": "Muse không có lượt nào đang chạy để định hướng.",
+  "error.provider.museInvalidProtocol": "Muse trả về phản hồi giao thức không hợp lệ.",
+  "error.provider.museNotStarted": "Muse không khởi động.",
+  "error.provider.museNativeWindows": "Muse cần một tệp thực thi gốc trên Windows.",
+  "error.provider.museStartTimeout": "Khởi tạo Muse đã hết thời gian chờ.",
+  "error.provider.museStartStopped": "Muse đã dừng trong lúc khởi tạo.",
+  "error.provider.museProtocolVersion": "Phiên bản giao thức Muse không được hỗ trợ.",
+  "error.provider.museHistoryRequired": "Muse phải giữ lịch sử phiên.",
+  "error.provider.museRequestUnsupported": "Yêu cầu máy chủ Muse không được hỗ trợ.",
+  "error.provider.museConnectionFailed":
+    "Kết nối Muse thất bại. Hãy tiếp tục cuộc trò chuyện để khôi phục lịch sử đã lưu.",
+  "error.provider.museUnknownSession": "Phiên Muse không xác định.",
+  "error.provider.museInvalidToolResult": "Kết quả công cụ OpenBot không hợp lệ.",
+  "error.provider.museMcpRequired": "Muse phải hỗ trợ máy chủ MCP theo phiên.",
+  "error.provider.museSessionMismatch": "Muse trả về một phiên khác.",
+  "error.provider.museCompactRejected": "Muse không chấp nhận việc nén ngữ cảnh.",
+  "error.provider.museTurnMismatch": "Muse trả về một lượt khác.",
+  "error.provider.museHistoryMismatch": "Lịch sử Muse bị lẫn giữa các phiên.",
+  "error.provider.museRecoveryFailed": "Muse không thể khôi phục các sự kiện bị thiếu.",
+  "error.provider.museHistoryStalled": "Con trỏ lịch sử Muse không tiến lên.",
+  "error.provider.museApprovalUnavailable": "Muse không cung cấp phản hồi phê duyệt này.",
+  "error.provider.museHistoryOwner": "Lịch sử Muse thuộc về một phiên khác.",
+  "error.provider.museHistoryMissing": "Muse không trả về lịch sử phiên.",
+  "error.provider.museEmptyInput": "Muse cần văn bản hoặc hình ảnh.",
+  "error.provider.museMethodUnsupported": "Muse không hỗ trợ {method}.",
+  "error.provider.museTurnFailed": "Lượt Muse thất bại.",
+  "error.provider.museModelUnavailable":
+    "Muse không thể dùng mô hình này. Muse có thể không khả dụng tại quốc gia nơi agent này chạy, hoặc tài khoản này không có quyền truy cập mô hình. Hãy chọn mô hình khác, rồi thử lại.\n{detail}",
+  "error.provider.museProfileUnsupported":
+    "Muse không thể tạo hồ sơ khi không có quyền truy cập công cụ bên ngoài. Hãy dùng nhà cung cấp khác để tạo hồ sơ, rồi chọn Muse cho agent.",
+  "error.provider.museAuthUnverified":
+    "Xác thực Muse chưa được xác minh. Hãy kết nối trên máy tính host, hoặc đặt khóa API Meta.",
+  "error.provider.museSignIn": "Hãy đăng nhập Muse trên máy tính host để tiếp tục.",
+  "error.provider.inceptionSignIn": "Hãy thêm khóa API Inception để tiếp tục.",
+  "error.provider.deepseekSignIn": "Hãy thêm khóa API DeepSeek để tiếp tục.",
+  "error.provider.openrouterSignIn": "Hãy thêm khóa API OpenRouter để tiếp tục.",
+  "error.provider.terminalLoginFailed":
+    "Không thể mở terminal đăng nhập. Hãy mở CLI của nhà cung cấp trên host này và đăng nhập tại đó, rồi làm mới danh sách nhà cung cấp.",
+  "error.provider.nativeArchiveInvalid": "Bản tải xuống của nhà cung cấp không chứa bản cài đặt hợp lệ.",
+  "error.provider.nativeChecksum": "Bản cài đặt của nhà cung cấp không vượt qua bước kiểm tra tính toàn vẹn.",
+  "error.provider.registryUnavailable": "Registry ACP không khả dụng. Hãy thử lại.",
+  "error.provider.registryInvalid": "Registry ACP trả về dữ liệu không hợp lệ.",
+  "error.provider.registryMissing": "Agent này không có trong registry ACP.",
+  "error.provider.registryBusy": "Agent này đang được cài đặt.",
+  "error.provider.registryCancelled": "Đã hủy cài đặt agent.",
+  "error.provider.registryPrerequisite": "Hãy cài đặt {tool} trên host trước khi cài đặt agent này.",
+  "error.provider.registryBindingChanged": "Agent tùy chỉnh đã thay đổi trong lúc cài đặt. Hãy thử lại.",
+  "error.provider.registryInstallFailed": "Cài đặt agent thất bại. Bản cài đặt trước đó không thay đổi.",
+  "error.provider.hermesInstallFailed": "Không cài đặt được Hermes Agent. Hãy thử lại, hoặc dùng hướng dẫn cài đặt.",
+  "error.provider.hermesNeedsGitCurl": "Hermes Agent cần git và curl. Hãy cài đặt chúng, rồi thử lại.",
+  "error.provider.registryRemoveBusy":
+    "Hãy chờ quá trình cài đặt agent và các tác vụ ACP đang chạy hoàn tất trước khi xóa agent.",
+} as const satisfies PartialTranslation<typeof source>;
