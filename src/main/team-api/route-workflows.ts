@@ -2,6 +2,7 @@ import {
   type AgentAccessLevel,
   canAdministerServer,
   graphAgentIds,
+  WORKFLOW_GROUP_FIELDS,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowRunDetail,
@@ -105,11 +106,15 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
+/** The fields that put a node in a group of the canvas. Any member that can change the workflow sets them. */
+const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
+
 /**
  * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
  * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
  * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`).
+ * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`). The group
+ * fields are not settings.
  */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
@@ -118,6 +123,7 @@ function adminNodes(graph: WorkflowGraph): Map<string, string> {
     if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
       continue;
     const fields = Object.keys(node.fields)
+      .filter((key) => !GROUP_FIELD_KEYS.has(key))
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
     nodes.set(node.id, JSON.stringify([node.kind, fields]));
