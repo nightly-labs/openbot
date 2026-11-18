@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "L'accesso è stato rifiutato. Torna a OpenBot e riprova.",
   "error.mcp.redirectNoSignIn": "Nessun accesso è in attesa di questo. Potrebbe essere terminato.",
   "error.mcp.redirectSignedIn": "OpenBot ha effettuato l'accesso. Puoi chiudere questa finestra.",
+  "error.mcp.redirectNotSaved": "L'accesso non è stato completato. Torna su OpenBot per vedere il motivo.",
   "error.mcp.signInFileUnreadable": "Il file di accesso MCP non è leggibile.",
   "error.mcp.signInFileTooLarge": "Il file di accesso MCP è troppo grande.",
   "error.mcp.unsupported": "I server MCP non sono supportati da questo server.",

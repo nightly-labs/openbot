@@ -7,6 +7,8 @@ export const messages = {
   "error.mcp.redirectRefused": "Die Anmeldung wurde abgelehnt. Kehre zu OpenBot zurück und versuche es erneut.",
   "error.mcp.redirectNoSignIn": "Keine Anmeldung wartet darauf. Sie wurde möglicherweise bereits beendet.",
   "error.mcp.redirectSignedIn": "OpenBot ist angemeldet. Du kannst dieses Fenster schließen.",
+  "error.mcp.redirectNotSaved":
+    "Die Anmeldung wurde nicht abgeschlossen. Gehe zurück zu OpenBot, um den Grund zu sehen.",
   "error.mcp.signInFileUnreadable": "Die MCP-Anmeldedatei ist nicht lesbar.",
   "error.mcp.signInFileTooLarge": "Die MCP-Anmeldedatei ist zu groß.",
   "error.mcp.unsupported": "Dieser Server unterstützt keine MCP-Server.",

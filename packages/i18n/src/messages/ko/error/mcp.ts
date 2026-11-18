@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "로그인이 거부되었어요. OpenBot으로 돌아가 다시 시도해 주세요.",
   "error.mcp.redirectNoSignIn": "대기 중인 로그인이 없어요. 이미 종료되었을 수 있어요.",
   "error.mcp.redirectSignedIn": "OpenBot에 로그인했어요. 이 창을 닫아도 돼요.",
+  "error.mcp.redirectNotSaved": "로그인이 완료되지 않았어요. OpenBot으로 돌아가 이유를 확인하세요.",
   "error.mcp.signInFileUnreadable": "MCP 로그인 파일을 읽을 수 없어요.",
   "error.mcp.signInFileTooLarge": "MCP 로그인 파일이 너무 커요.",
   "error.mcp.unsupported": "이 서버는 MCP 서버를 지원하지 않아요.",

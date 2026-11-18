@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "O login foi recusado. Volte ao OpenBot e tente novamente.",
   "error.mcp.redirectNoSignIn": "Nenhum login está aguardando isto. Ele pode ter terminado.",
   "error.mcp.redirectSignedIn": "O OpenBot está conectado. Você pode fechar esta janela.",
+  "error.mcp.redirectNotSaved": "O login não foi concluído. Volte ao OpenBot para ver o motivo.",
   "error.mcp.signInFileUnreadable": "O arquivo de login MCP não pode ser lido.",
   "error.mcp.signInFileTooLarge": "O arquivo de login MCP é muito grande.",
   "error.mcp.unsupported": "Este servidor não oferece suporte a servidores MCP.",

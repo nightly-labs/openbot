@@ -8,6 +8,7 @@ export const messages = {
   "error.mcp.redirectRefused": "登录被拒绝，请返回 OpenBot 重试。",
   "error.mcp.redirectNoSignIn": "没有等待处理的登录，它可能已结束。",
   "error.mcp.redirectSignedIn": "OpenBot 已登录，你可以关闭该窗口。",
+  "error.mcp.redirectNotSaved": "登录未完成。请返回 OpenBot 查看原因。",
   "error.mcp.signInFileUnreadable": "MCP 登录文件无法读取。",
   "error.mcp.signInFileTooLarge": "MCP 登录文件过大。",
   "error.mcp.unsupported": "该服务器不支持 MCP 服务器。",
