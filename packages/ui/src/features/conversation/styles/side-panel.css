@@ -135,12 +135,6 @@
   cursor: pointer;
 }
 
-/* A file-type badge of three or four letters is wider than a tab icon, so the slot grows to hold it. */
-.side-panel-file-tab .side-panel-tab-close {
-  width: auto;
-  min-width: var(--openbot-icon-md);
-}
-
 .side-panel-tab-icon,
 .side-panel-tab-x {
   grid-area: 1 / 1;
