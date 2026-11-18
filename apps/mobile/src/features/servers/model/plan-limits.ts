@@ -4,6 +4,7 @@ import {
   type PlanLimitRow,
   type PlanLimits,
   type PlanLimitWindow,
+  type PlanLimitWindowName,
   planLimitRows,
   planLimitWindowKind,
 } from "@openbot/team-client/plan-limits";
@@ -170,8 +171,16 @@ export function planLimitWindowKey(window: PlanLimitWindow, index: number): stri
   return `${index}-${window.durationMins ?? "limit"}`;
 }
 
-/** The name of a limit window, as desktop names it: 5-hour, Weekly, Monthly. */
-export function planLimitWindowLabel(durationMins: number | null, t: Translate): string {
+/** The name of a limit window, as desktop names it: Cursor total, models, 5-hour, Weekly. */
+export function planLimitWindowLabel(durationMins: number | null, t: Translate, name?: PlanLimitWindowName): string {
+  switch (name) {
+    case "total":
+      return t("mobile.server.planLimits.window.total");
+    case "cursorModels":
+      return t("mobile.server.planLimits.window.cursorModels");
+    case "otherModels":
+      return t("mobile.server.planLimits.window.otherModels");
+  }
   const window = planLimitWindowKind(durationMins);
   switch (window.kind) {
     case "limit":

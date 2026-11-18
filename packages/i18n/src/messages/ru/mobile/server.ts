@@ -1425,6 +1425,9 @@ export const messages = {
   "mobile.server.planLimits.window.limit": "Лимит",
   "mobile.server.planLimits.window.weekly": "Неделя",
   "mobile.server.planLimits.window.monthly": "Месяц",
+  "mobile.server.planLimits.window.total": "Всего",
+  "mobile.server.planLimits.window.cursorModels": "Модели Cursor",
+  "mobile.server.planLimits.window.otherModels": "Другие модели",
   "mobile.server.planLimits.window.daily": "День",
   "mobile.server.planLimits.window.fiveHour": "5 ч",
   "mobile.server.planLimits.window.hours": {

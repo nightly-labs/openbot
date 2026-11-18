@@ -13,6 +13,7 @@ import {
   keepUsageCredits,
   type UsageCredits,
   usageQuotaForModel,
+  usageWindowsForModel,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
@@ -24,6 +25,9 @@ import type { TeamApiRequest } from "./team-api-requests";
 
 export type PlanLimitTone = "neutral" | "warning" | "critical";
 
+/** How Cursor names a billing window apart from its length. Every other provider uses duration only. */
+export type PlanLimitWindowName = "total" | "cursorModels" | "otherModels";
+
 /** One limit window that a provider reported, such as its 5-hour or its weekly window. */
 export interface PlanLimitWindow {
   durationMins: number | null;
@@ -31,6 +35,8 @@ export interface PlanLimitWindow {
   tone: PlanLimitTone;
   /** Unix seconds. */
   resetsAt: number | null;
+  /** Cursor names each billing window. */
+  name?: PlanLimitWindowName;
 }
 
 /** The limits of one provider account that reported at least one window. */
@@ -115,18 +121,47 @@ export function reportedUsageWindows(
     );
 }
 
+function planLimitWindowEntries(
+  provider: AgentProviderId,
+  limit: Pick<AccountUsageLimit, "primary" | "secondary" | "tertiary">,
+): Array<{ window: AccountUsageWindow; name?: PlanLimitWindowName }> {
+  if (provider !== "cursor") return reportedUsageWindows(limit).map((window) => ({ window }));
+  const total = limit.tertiary;
+  const split = total && (limit.primary || limit.secondary);
+  if (split && total) {
+    return [
+      { window: total, name: "total" },
+      ...(limit.primary ? [{ window: limit.primary, name: "cursorModels" as const }] : []),
+      ...(limit.secondary ? [{ window: limit.secondary, name: "otherModels" as const }] : []),
+    ];
+  }
+  return reportedUsageWindows(limit).map((window) => ({
+    window,
+    ...(limit.tertiary && window === limit.tertiary
+      ? { name: "total" as const }
+      : limit.primary && limit.secondary
+        ? window === limit.primary
+          ? { name: "cursorModels" as const }
+          : window === limit.secondary
+            ? { name: "otherModels" as const }
+            : {}
+        : {}),
+  }));
+}
+
 /** One row per provider account with a reported window, in the provider picker order. */
 export function planLimitRows(usage: AccountUsage | null | undefined): PlanLimitRow[] {
   const rows: PlanLimitRow[] = [];
   for (const limit of usage?.limits ?? []) {
     if (!isAgentProvider(limit.id)) continue;
-    const windows = reportedUsageWindows(limit).map((window): PlanLimitWindow => {
+    const windows = planLimitWindowEntries(limit.id, limit).map(({ window, name }): PlanLimitWindow => {
       const remainingPercent = usageRemainingPercent(window.usedPercent);
       return {
         durationMins: window.windowDurationMins,
         remainingPercent,
         tone: usageTone(remainingPercent),
         resetsAt: window.resetsAt,
+        ...(name ? { name } : {}),
       };
     });
     if (windows.length === 0) continue;
@@ -276,7 +311,7 @@ export function spentUsageWindow(
     // When two windows are spent, the model can run only after both reset: keep the one that resets
     // last. A window with no reset time never gives the quota back.
     let spent: SpentUsageWindow | null = null;
-    for (const slot of ["primary", "secondary"] as const) {
+    for (const slot of usageWindowsForModel(provider, model, quota)) {
       const window = quota[slot];
       if (!window || window.usedPercent < 100) continue;
       if (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs) continue;

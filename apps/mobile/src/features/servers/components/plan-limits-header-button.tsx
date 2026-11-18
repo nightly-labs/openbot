@@ -45,7 +45,7 @@ export function PlanLimitsHeaderButton({
     .map((row) => {
       const window = row.windows.find((item) => item.remainingPercent === row.remainingPercent) ?? row.windows[0];
       return `${planLimitName(row, accounts, t)} ${t("mobile.server.planLimits.windowLeft", {
-        window: planLimitWindowLabel(window?.durationMins ?? null, t),
+        window: planLimitWindowLabel(window?.durationMins ?? null, t, window?.name),
         percent: row.remainingPercent,
       })}`;
     })
