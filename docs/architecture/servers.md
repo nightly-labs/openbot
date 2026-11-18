@@ -1823,7 +1823,9 @@ the time until the workspace can be used, and the host requests that block that 
   the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
   by the full time and each data-channel send and message by half of it. The desktop Signal socket is
   in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
-  `--latency`.
+  `--latency`. `OPENBOT_DEV_DOWNLINK_KBPS=<kbit/s>` also limits the data that an unpackaged desktop
+  client receives on the data channel to that rate. `scripts/workflow-canvas-pictures-perf-e2e.ts`
+  uses both values to measure the pictures of the Workflows canvas on a joined server.
 - A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
   an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
   or a host.

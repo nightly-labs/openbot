@@ -43,6 +43,7 @@ import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
@@ -344,6 +345,7 @@ export {
   AGENT_WAITS_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  ATTACHMENT_PREVIEW_CAPABILITY,
   BACKGROUND_PROCESSES_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
@@ -794,6 +796,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_CAPABILITY_BASELINE_CAPABILITY, V10],
   [SERVER_SAFE_MODE_CAPABILITY, V10],
   [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
+  [ATTACHMENT_PREVIEW_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

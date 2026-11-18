@@ -300,6 +300,7 @@
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
     "./team-protocol/agent-active-queues-v1": "./src/team-protocol/agent-active-queues-v1.ts",
     "./team-protocol/agent-create-operation-v1": "./src/team-protocol/agent-create-operation-v1.ts",
+    "./team-protocol/attachment-preview-v1": "./src/team-protocol/attachment-preview-v1.ts",
     "./team-protocol/agent-thread-requests-v1": "./src/team-protocol/agent-thread-requests-v1.ts",
     "./team-protocol/agent-usage-limit-v1": "./src/team-protocol/agent-usage-limit-v1.ts",
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",

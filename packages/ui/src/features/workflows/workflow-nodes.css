@@ -501,6 +501,15 @@
   inset: 0;
 }
 
+/* A picture that the host still sends: the card pulses where the picture comes. */
+.wfn-media-loading {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  border-radius: 0;
+  background: var(--wfn-hover);
+}
+
 .wfn-media-empty {
   position: absolute;
   inset: 0;
