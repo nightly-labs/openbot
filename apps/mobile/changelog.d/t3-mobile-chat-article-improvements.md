@@ -1,7 +1,8 @@
 ### Changed
 
-- After you send a long message, such as pasted text, the chat shows only the end of it under the
-  header, so the reply starts on the screen. A message with images is not cut.
+- While the reply to your latest message is short, the chat shows only the end of a long message,
+  such as pasted text, under the header. The reply then starts on the screen. A message with images
+  is not cut.
 
 ### Fixed
 

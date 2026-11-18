@@ -79,18 +79,21 @@ export function MobileChatView({
     [workspace],
   );
   // Under a full screen, such as a subagent, a streamed reply does not render the hidden chat on
-  // each chunk. The store keeps the chat current, and the chat renders it once when it shows again.
+  // each chunk. The store keeps the chat current. The chat keeps the conversation that it showed,
+  // also when another change renders it, and takes the latest one when it shows again.
   const covered = useCoveredByScreen();
-  const coveredRef = useRef(covered);
-  coveredRef.current = covered;
+  const shownConversation = useRef<ReturnType<typeof conversationStore.get>>(undefined);
   const subscribe = useCallback(
     (notify: () => void) =>
       conversationStore.subscribe(agent.id, () => {
-        if (!coveredRef.current) notify();
+        if (!covered.current) notify();
       }),
-    [agent.id, conversationStore],
+    [agent.id, conversationStore, covered],
   );
-  const snapshot = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
+  const snapshot = useCallback(() => {
+    if (!covered.current || !shownConversation.current) shownConversation.current = conversationStore.get(agent.id);
+    return shownConversation.current;
+  }, [agent.id, conversationStore, covered]);
   const stopTurn = useCallback(
     (turnId: string) => workspace().interruptTurn(agent.id, turnId, agent.serverId),
     [agent.id, agent.serverId, workspace],

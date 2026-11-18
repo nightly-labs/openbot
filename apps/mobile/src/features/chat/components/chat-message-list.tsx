@@ -1772,10 +1772,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   const header = topInset + 84;
   const screen = useWindowDimensions();
   // A long message, such as pasted text, shows only its end under the header, so the reply starts
-  // on the screen. A message with files is not cut: the top of its images stays in view.
+  // on the screen. A message with images is not cut: the top of its images stays in view.
   const tailRow = rows[tailIndex];
-  const tailHasFiles = tailRow?.kind === "message" && Boolean(tailRow.attachments?.length);
-  const anchorMaxSize = tailHasFiles ? undefined : Math.round(screen.height * ANCHOR_SHOWN_SHARE);
+  const tailHasImages = tailRow?.kind === "message" && Boolean(tailRow.attachments?.some(isViewableImage));
+  const anchorMaxSize = tailHasImages ? undefined : Math.round(screen.height * ANCHOR_SHOWN_SHARE);
   const onAnchorReady = motion.onAnchorReady;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.
