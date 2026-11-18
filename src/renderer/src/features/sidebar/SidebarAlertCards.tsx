@@ -87,6 +87,8 @@ export function SidebarAlertCards(props: SidebarAlertCardsProps) {
             serverName={props.serverName}
             freeBytes={card().freeBytes}
             totalBytes={card().totalBytes}
+            hostedPlan={card().hostedPlan}
+            thisComputer={card().thisComputer}
             onFreeUpSpace={() => props.onOpenStorage(card().serverId)}
             onDismiss={() => props.cards.storageCard.dismiss(card().serverId)}
           />

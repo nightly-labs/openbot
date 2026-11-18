@@ -186,6 +186,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{used} von {total} belegt auf {server}. Agenten können Dateien eventuell nicht speichern.",
   "sidebar.storage.meterLabel": "Belegter Speicher auf {server}",
+  "sidebar.storage.bodyThisComputer": "{used} von {total} belegt auf diesem Computer.",
+  "sidebar.storage.fullBodyThisComputer":
+    "{used} von {total} belegt auf diesem Computer. Agenten können Dateien eventuell nicht speichern.",
+  "sidebar.storage.meterLabelThisComputer": "Belegter Speicher auf diesem Computer",
   "sidebar.storage.used": "{percent} belegt",
   "sidebar.storage.freeUpSpace": "Platz freigeben",
   "sidebar.storage.dismiss": "Ausblenden, bis der Speicher voll ist",
