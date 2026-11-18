@@ -7,6 +7,7 @@ import { AgentThreadView } from "@openbot/ui/features/conversation/threads/Agent
 import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
@@ -33,7 +34,7 @@ import { useTurnTrace } from "./turn-trace";
  * files, and the question and takeover cards of the thread, stay in the chat. A thread that waits
  * for an answer shows a card that moves it to the chat.
  */
-export function ConversationSideThread(props: { threadId: string }) {
+export function ConversationSideThread(props: { threadId: string; resizer: JSX.Element }) {
   const {
     props: view,
     openExternalMessageUrl,
@@ -189,9 +190,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   };
   return (
     <aside
+      id="side-thread-panel"
       class="browser-panel side-thread-panel"
       aria-label={t("conversation.threads.view.label", { title: item()?.title ?? "" })}
     >
+      {props.resizer}
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView

@@ -7,6 +7,7 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   isAvatarColor,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -294,11 +295,12 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         const conversations: string[] = [];
         const channelPages: string[] = [];
         const pages = [
-          ...value.conversations.map((page) => ({
-            page,
-            at: page.messages.at(-1)?.createdAt ?? "",
-            kept: conversations,
-          })),
+          // A quiet routine answer (`routine-quiet-answers-v1`) stays out: the bundle in the binary, which
+          // a rollback runs, would read it from this file as a new answer.
+          ...value.conversations.map((page) => {
+            const messages = page.messages.filter(({ itemType }) => itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);
+            return { page: { ...page, messages }, at: messages.at(-1)?.createdAt ?? "", kept: conversations };
+          }),
           ...(value.channels?.pages ?? []).map((page) => ({
             page,
             at: page.messages.at(-1)?.message.createdAt ?? "",
