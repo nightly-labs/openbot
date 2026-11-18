@@ -271,7 +271,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
   "error.provider.windowsBlocked":
-    "O Windows bloqueou este provedor porque não consegue confirmar quem o publicou. Use outro provedor ou desative o Controle Inteligente de Aplicativos na Segurança do Windows.",
+    "As configurações de segurança do Windows, como o Controle Inteligente de Aplicativos, impediram que este provedor iniciasse. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
   "error.provider.opencodeNoAnswer":

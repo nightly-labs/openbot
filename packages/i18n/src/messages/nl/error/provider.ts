@@ -269,7 +269,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
   "error.provider.windowsBlocked":
-    "Windows heeft deze provider geblokkeerd, omdat het de uitgever niet kan bevestigen. Gebruik een andere provider of zet Slim app-beheer uit in Windows-beveiliging.",
+    "Windows-beveiligingsinstellingen, zoals Slim app-beheer, hebben het starten van deze provider verhinderd. Gebruik een andere provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
   "error.provider.opencodeNoAnswer":

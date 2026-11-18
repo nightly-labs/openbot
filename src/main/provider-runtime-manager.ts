@@ -1925,9 +1925,10 @@ function unsupportedProcessorFailure(
 /**
  * Windows Smart App Control, or a company application control policy, stops a CLI that has no
  * publisher signature before it starts, such as Pi's `pi.exe` (#12235). Windows reports error 4551,
- * which Node gives as `spawn UNKNOWN`. Another try of the same copy is blocked in the same way, so the
- * row names the cause instead of "Try again". Only provider runtimes get this text, because it names
- * a provider. The log keeps the original failure.
+ * which Node gives as `spawn UNKNOWN`. libuv also gives `UNKNOWN` for other Windows errors it does not
+ * map, so the text names Windows security settings, not one cause. Another try of the same copy is
+ * blocked in the same way, so the row names the cause instead of "Try again". Only provider runtimes
+ * get this text, because it names a provider. The log keeps the original failure.
  */
 function windowsBlockedFailure(runtime: ManagedRuntimeId, failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
   const { cause } = failure;

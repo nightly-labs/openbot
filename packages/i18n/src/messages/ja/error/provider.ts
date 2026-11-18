@@ -276,7 +276,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
   "error.provider.windowsBlocked":
-    "発行元を確認できないため、Windows がこのプロバイダーをブロックしました。別のプロバイダーを使うか、Windows セキュリティでスマート アプリ コントロールをオフにしてください。",
+    "スマート アプリ コントロールなどの Windows のセキュリティ設定により、このプロバイダーを起動できませんでした。別のプロバイダーを使ってください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":

@@ -272,7 +272,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "Il processore di questo computer non può eseguire questo provider. Usa un altro provider.",
   "error.provider.windowsBlocked":
-    "Windows ha bloccato questo provider perché non può confermarne l'editore. Usa un altro provider oppure disattiva Smart App Control in Sicurezza di Windows.",
+    "Le impostazioni di sicurezza di Windows, come Smart App Control, hanno impedito l'avvio di questo provider. Usa un altro provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
   "error.provider.opencodeNoAnswer":

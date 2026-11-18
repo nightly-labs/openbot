@@ -1,5 +1,5 @@
 ### Fixed
 
-- On Windows, when Smart App Control blocks a provider program after an update, such as Pi, the
-  provider row tells you that Windows blocked it and what to do. Before, it showed "Download failed.
-  Try again.", and each try failed in the same way.
+- On Windows, when Windows security settings such as Smart App Control stop a provider program after
+  an update, such as Pi, the provider row now says so and tells you to use a different provider.
+  Before, it showed "Download failed. Try again.", and each try failed in the same way.

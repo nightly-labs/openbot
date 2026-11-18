@@ -278,7 +278,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "Der Prozessor dieses Computers kann diesen Anbieter nicht ausführen. Verwende einen anderen Anbieter.",
   "error.provider.windowsBlocked":
-    "Windows hat diesen Anbieter blockiert, weil es den Herausgeber nicht bestätigen kann. Verwende einen anderen Anbieter oder schalte die Intelligente App-Steuerung in Windows-Sicherheit aus.",
+    "Windows-Sicherheitseinstellungen wie die Intelligente App-Steuerung haben den Start dieses Anbieters verhindert. Verwende einen anderen Anbieter.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode konnte seine Datenbank nicht öffnen, weil eine neuere OpenCode-Version sie geändert hat. Aktualisiere OpenCode auf Version 2 oder neuer und versuche es dann erneut.",
   "error.provider.opencodeNoAnswer":

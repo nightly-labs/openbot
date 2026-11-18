@@ -267,7 +267,7 @@ export const messages = {
   "error.provider.cpuUnsupported":
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
   "error.provider.windowsBlocked":
-    "게시자를 확인할 수 없어 Windows가 이 공급자를 차단했습니다. 다른 공급자를 사용하거나 Windows 보안에서 스마트 앱 컨트롤을 끄세요.",
+    "스마트 앱 컨트롤 같은 Windows 보안 설정 때문에 이 공급자를 시작할 수 없습니다. 다른 공급자를 사용하세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
