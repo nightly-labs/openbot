@@ -3053,6 +3053,12 @@ fieldset.wfn-picker-group {
   translate: -50% -50%;
 }
 
+/* The number of connections that one line stands for. */
+.wfn-edge-count {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
 /*
  * A loop shows where it goes back under its nodes. With no condition to end it, it takes the warning
  * colour: the run repeats it until the user stops the run.

@@ -104,6 +104,8 @@ export const PORT_NAME = {
   file: "workflow.board.port.file",
 } as const satisfies Record<WfnPortType, AppTextKey>;
 
+const PORT_TYPES: readonly WfnPortType[] = ["text", "image", "file"];
+
 /** The name of a port type inside a sentence. */
 const PORT_WORD = {
   text: "workflow.board.portWord.text",
@@ -152,6 +154,19 @@ export interface PortRef {
   type: WfnPortType;
   branch?: string | undefined;
 }
+
+/**
+ * Where the lines of a port end in its place, such as the port of the group that holds the node. Lines
+ * with the same key, from the same source to the same target, draw as one line with a count.
+ */
+export interface WfnAnchor {
+  key: string;
+  /** The point in the world where the lines end. A function, so a move does not change the key. */
+  at: () => WfnPoint | undefined;
+}
+
+/** A change of the fields of several nodes. An undefined value removes the field. */
+export type WfnFieldPatch = Record<string, Record<string, WfnFieldValue | undefined>>;
 
 /** What is under the pointer while a connection is dragged: a port, and why it cannot take the line. */
 interface DropTarget {
@@ -251,6 +266,11 @@ export interface WfnBoard {
    * or in the page, where an image shows its own preview. Rejects when the host refused it.
    */
   upload: (file: File) => Promise<StoredFileRow>;
+  /**
+   * Takes files that the user dropped on a node: the node takes the first, and new nodes beside it take
+   * the others, in one group. Only the canvas has it.
+   */
+  dropFiles?: ((id: string, files: readonly File[]) => void) | undefined;
   /** Whether the nodes show a resize handle. Only the canvas resizes them. */
   resizable: boolean;
   size: (id: string) => WfnSize | undefined;
@@ -270,6 +290,8 @@ export interface WfnBoard {
   viewing: () => number | null;
   view: (run: number | null) => void;
   connected: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
+  /** Whether a line shows at this port: a line that a group draws from its own port does not. */
+  drawsLine: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
   armed: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
   /** While a connection is open: whether this port can take it. */
   accepts: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
@@ -312,6 +334,14 @@ export interface BoardOptions {
   box?: (id: string) => Box | undefined;
   /** The connections that go back to an earlier node, by connection ID. */
   loops?: () => ReadonlyMap<string, WorkflowLoop>;
+  /**
+   * Where the lines of a node port end in its place, such as at the port of its group. `other` is the
+   * node at the other end of the line, or undefined for a line that the user drags now.
+   */
+  anchor?: (port: PortRef, other: string | undefined) => WfnAnchor | undefined;
+  /** Connections that do not show, such as the connections inside a collapsed group. */
+  hides?: (edge: WfnEdge) => boolean;
+  dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
@@ -814,20 +844,24 @@ export function createBoard(options: BoardOptions) {
     cancelDraft();
   };
 
-  const disconnect = (id: string) => {
-    const gone = state.edges.find((edge) => edge.id === id);
-    const held = gone ? heldSlots(gone.to, gone.from, gone.type) : [];
+  /** Removes connections as one change. A named input that a removed source held becomes empty. */
+  const disconnectAll = (ids: readonly string[]) => {
+    const gone = state.edges.filter((edge) => ids.includes(edge.id));
+    if (gone.length === 0) return;
+    const held = gone.map((edge) => ({ to: edge.to, keys: heldSlots(edge.to, edge.from, edge.type) }));
     options.beforeChange?.();
     setState((draft) => {
-      draft.edges = draft.edges.filter((edge) => edge.id !== id);
-      if (gone && held.length > 0)
-        draft.fields[gone.to] = { ...draft.fields[gone.to], ...Object.fromEntries(held.map((key) => [key, ""])) };
+      draft.edges = draft.edges.filter((edge) => !ids.includes(edge.id));
+      for (const { to, keys } of held)
+        if (keys.length > 0)
+          draft.fields[to] = { ...draft.fields[to], ...Object.fromEntries(keys.map((key) => [key, ""])) };
       draft.edge = null;
       draft.hover = null;
       draft.removing = null;
       draft.message = t("workflow.board.live.disconnected");
     });
   };
+  const disconnect = (id: string) => disconnectAll([id]);
 
   const toWorld = (event: { clientX: number; clientY: number }): WfnPoint => {
     const origin = world?.getBoundingClientRect();
@@ -995,6 +1029,7 @@ export function createBoard(options: BoardOptions) {
     step: (id) => options.step?.(id),
     uploads,
     upload,
+    dropFiles: options.dropFiles,
     resizable: options.size !== undefined,
     size: (id) => options.size?.(id),
     stretch: (id) => options.stretch?.(id) ?? "x",
@@ -1028,6 +1063,15 @@ export function createBoard(options: BoardOptions) {
         if (edge.to !== node) return false;
         const slots = slotsOf(edge);
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
+      }),
+    drawsLine: (node, side, type, branch) =>
+      state.edges.some((edge) => {
+        if (edge.type !== type || options.hides?.(edge)) return false;
+        if (side === "out") return edge.from === node && edge.branch === branch && !outAnchor(edge);
+        if (edge.to !== node) return false;
+        const slots = slotsOf(edge);
+        const slot = branch === undefined ? slots.length === 0 : slots.includes(branch);
+        return slot && !inAnchor(edge, branch);
       }),
     armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
@@ -1132,7 +1176,12 @@ export function createBoard(options: BoardOptions) {
     // Menus and popovers are portalled, but Solid still sends their events up the component tree. A port
     // connects and does not select: a selected node can show its missing-input warning, which moves the
     // port away from the pointer before the click.
-    if (target instanceof Element && target.closest("[data-wfn-portal], .wfn-edge-actions, .wfn-port")) return;
+    // A group selects its members itself.
+    if (
+      target instanceof Element &&
+      target.closest("[data-wfn-portal], [data-wfn-group], .wfn-edge-actions, .wfn-port")
+    )
+      return;
     const element = target instanceof Element ? target.closest<HTMLElement>("[data-node-id]") : null;
     const node = element?.dataset.nodeId;
     const onEdge = target instanceof Element && target.closest(".wfn-edge-hit");
@@ -1270,7 +1319,7 @@ export function createBoard(options: BoardOptions) {
       const edge = state.edge;
       if (edge) {
         event.preventDefault();
-        disconnect(edge);
+        disconnectAll(bundledIds(edge));
       } else if (state.selection.length > 0) {
         event.preventDefault();
         deleteNodes(state.selection);
@@ -1350,20 +1399,64 @@ export function createBoard(options: BoardOptions) {
     return makesLoop([pending, ...companionsTo(pending, port)], port);
   };
 
+  /** The inputs that an edge ends on: its named inputs, else the input with no name. */
+  const targets = (edge: WfnEdge): (string | undefined)[] => {
+    const slots = slotsOf(edge);
+    return slots.length > 0 ? slots : [undefined];
+  };
+  const outAnchor = (edge: WfnEdge) =>
+    options.anchor?.({ node: edge.from, side: "out", type: edge.type, branch: edge.branch }, edge.to);
+  const inAnchor = (edge: WfnEdge, slot: string | undefined) =>
+    options.anchor?.({ node: edge.to, side: "in", type: edge.type, branch: slot }, edge.from);
+  const lineId = (edge: WfnEdge, slot: string | undefined) => `${edge.id}\u0000${slot ?? ""}`;
+  /**
+   * The lines that draw as one: lines of the same type from the same port to the same port, after the
+   * anchors. The first edge of a bundle draws the line, with the count of its edges. It is lazy: the
+   * anchors read the groups of the canvas, which the canvas makes after the board.
+   */
+  const bundles = createMemo(
+    () => {
+      const lines = new Map<string, WfnEdge[]>();
+      const bundleOf = new Map<string, WfnEdge[]>();
+      for (const edge of state.edges) {
+        if (options.hides?.(edge)) continue;
+        for (const slot of targets(edge)) {
+          const from = outAnchor(edge)?.key ?? `${edge.from}\u0000${edge.branch ?? ""}`;
+          const to = inAnchor(edge, slot)?.key ?? `${edge.to}\u0000${slot ?? ""}`;
+          const key = `${from}>${to}:${edge.type}`;
+          const bundle = lines.get(key) ?? [];
+          if (!bundle.includes(edge)) bundle.push(edge);
+          lines.set(key, bundle);
+          bundleOf.set(lineId(edge, slot), bundle);
+        }
+      }
+      return bundleOf;
+    },
+    { lazy: true },
+  );
+  /** The edges that draw as one line with this edge, this edge included. */
+  const bundled = (edge: WfnEdge, slot: string | undefined = targets(edge)[0]) =>
+    bundles().get(lineId(edge, slot)) ?? [];
+  /** The ids of the connections that the line of a connection stands for, to remove them together. */
+  const bundledIds = (id: string) => {
+    const edge = state.edges.find((entry) => entry.id === id);
+    const ids = edge ? bundled(edge).map((entry) => entry.id) : [];
+    return ids.length > 0 ? ids : [id];
+  };
+
   /** The connections, under the nodes. Put it first inside the world element. */
   function Edges() {
     /** The line of an edge to one input. A source that fills two named inputs has a line to each. */
     const endsAt = (edge: WfnEdge, slot: string | undefined) => {
-      const from = point(edge.from, "out", edge.type, edge.branch);
-      const to = point(edge.to, "in", edge.type, slot);
+      const from = outAnchor(edge)?.at() ?? point(edge.from, "out", edge.type, edge.branch);
+      const to = inAnchor(edge, slot)?.at() ?? point(edge.to, "in", edge.type, slot);
       return from && to ? shapeOf(edge, from, to) : null;
     };
-    const ends = (edge: WfnEdge) => endsAt(edge, slotsOf(edge)[0]);
-    /** The inputs that an edge ends on: its named inputs, else the input with no name. */
-    const targets = (edge: WfnEdge): (string | undefined)[] => {
-      const slots = slotsOf(edge);
-      return slots.length > 0 ? slots : [undefined];
-    };
+    const ends = (edge: WfnEdge) => endsAt(edge, targets(edge)[0]);
+    /** Whether the edge draws the line of its bundle to this input. */
+    const leads = (edge: WfnEdge, slot: string | undefined) => bundled(edge, slot)[0] === edge;
+    /** How many connections the line of an edge stands for. */
+    const count = (edge: WfnEdge) => bundled(edge).length;
     /** The line follows the pointer, and snaps to a port that can take it. */
     /** The port that the open connection snaps to, if one can take it. */
     const draftTarget = () => (state.target?.reason === null ? state.target.port : null);
@@ -1374,7 +1467,7 @@ export function createBoard(options: BoardOptions) {
     };
     /** The line of the open connection from one port to its end. */
     const draftLine = (from: PortRef) => {
-      const anchor = point(from.node, from.side, from.type, from.branch);
+      const anchor = options.anchor?.(from, undefined)?.at() ?? point(from.node, from.side, from.type, from.branch);
       const end = draftEnd();
       if (!anchor || !end) return null;
       return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
@@ -1386,7 +1479,14 @@ export function createBoard(options: BoardOptions) {
       if (!pending || !state.draft) return [];
       const port = draftTarget();
       const others = port ? companionsTo(pending, port) : pendingCompanions();
-      return others.flatMap((other) => draftLine(other) ?? []);
+      // Ports with one anchor, as the members of a group, draw one line from it.
+      const drawn = new Set([options.anchor?.(pending, undefined)?.key]);
+      return others.flatMap((other) => {
+        const key = options.anchor?.(other, undefined)?.key;
+        if (key !== undefined && drawn.has(key)) return [];
+        drawn.add(key);
+        return draftLine(other) ?? [];
+      });
     };
     const draftState = () => {
       const target = state.target;
@@ -1401,11 +1501,10 @@ export function createBoard(options: BoardOptions) {
       return draftLoops() ? { text: t("workflow.board.loop.makes"), tone: "loop" } : null;
     };
     /** The connections of the focused node. A second layer draws them above the other nodes. */
-    const isFocusEdge = (edge: WfnEdge) => {
+    const isFocusEdge = (edge: WfnEdge, slot: string | undefined) => {
       const focus = options.focus?.() ?? null;
-      return focus !== null && (edge.from === focus || edge.to === focus);
+      return focus !== null && bundled(edge, slot).some((entry) => entry.from === focus || entry.to === focus);
     };
-    const focusEdges = () => state.edges.filter(isFocusEdge);
     /** One connection line. Only the layer under the nodes has the hit path that takes the pointer. */
     const EdgeLine = (props: { edge: WfnEdge; path: string; focus: boolean; hit?: boolean }) => (
       <g
@@ -1447,8 +1546,8 @@ export function createBoard(options: BoardOptions) {
             {(edge) => (
               <For each={targets(edge)}>
                 {(slot) => (
-                  <Show when={endsAt(edge, slot)}>
-                    {(line) => <EdgeLine edge={edge} path={line().path} focus={isFocusEdge(edge)} hit />}
+                  <Show when={leads(edge, slot) ? endsAt(edge, slot) : undefined}>
+                    {(line) => <EdgeLine edge={edge} path={line().path} focus={isFocusEdge(edge, slot)} hit />}
                   </Show>
                 )}
               </For>
@@ -1463,11 +1562,13 @@ export function createBoard(options: BoardOptions) {
         </svg>
         {/* The lines only: the hit paths stay in the layer under the nodes. */}
         <svg class="wfn-edges wfn-edges-focus" aria-hidden="true">
-          <For each={focusEdges()}>
+          <For each={state.edges}>
             {(edge) => (
               <For each={targets(edge)}>
                 {(slot) => (
-                  <Show when={endsAt(edge, slot)}>{(line) => <EdgeLine edge={edge} path={line().path} focus />}</Show>
+                  <Show when={leads(edge, slot) && isFocusEdge(edge, slot) ? endsAt(edge, slot) : undefined}>
+                    {(line) => <EdgeLine edge={edge} path={line().path} focus />}
+                  </Show>
                 )}
               </For>
             )}
@@ -1507,13 +1608,30 @@ export function createBoard(options: BoardOptions) {
                       aria-label={t("workflow.board.removeConnection")}
                       onPointerEnter={() => aimDisconnect(edge.id)}
                       onPointerLeave={() => aimDisconnect(null)}
-                      onClick={() => disconnect(edge.id)}
+                      onClick={() => disconnectAll(bundledIds(edge.id))}
                     >
                       <X />
                     </Button>
                   </div>
                 );
               }}
+            </Show>
+          )}
+        </For>
+        <For each={state.edges}>
+          {(edge) => (
+            <Show
+              when={count(edge) > 1 && leads(edge, targets(edge)[0]) && !showsActions(edge.id) ? ends(edge) : undefined}
+            >
+              {(line) => (
+                <span
+                  class="wfn-edge-label wfn-edge-count"
+                  aria-hidden="true"
+                  style={{ left: `${line().middle.x}px`, top: `${line().middle.y}px` }}
+                >
+                  {count(edge)}
+                </span>
+              )}
             </Show>
           )}
         </For>
@@ -1585,6 +1703,31 @@ export function createBoard(options: BoardOptions) {
     },
     /** The fields of a node, to copy it. */
     fields: (id: string): WfnFields => ({ ...state.fields[id] }),
+    /**
+     * Changes the fields of several nodes as one change. Each change of one `burst` of typing joins the
+     * same change; give it as `<node id>:<field>`.
+     */
+    patchFields: (changes: WfnFieldPatch, burst?: string) => {
+      const differs = Object.entries(changes).some(([id, values]) =>
+        Object.entries(values).some(([key, value]) => state.fields[id]?.[key] !== value),
+      );
+      if (!differs) return;
+      if (burst === undefined || typing !== burst) options.beforeChange?.();
+      typing = burst ?? null;
+      setState((draft) => {
+        for (const [id, values] of Object.entries(changes)) {
+          const next = { ...draft.fields[id] };
+          for (const [key, value] of Object.entries(values)) {
+            if (value === undefined) delete next[key];
+            else next[key] = value;
+          }
+          draft.fields[id] = next;
+        }
+      });
+    },
+    /** The output types of a node that have no branch, from its measured ports. */
+    outputs: (node: string): WfnPortType[] =>
+      PORT_TYPES.filter((type) => state.points[portKey(node, "out", type)] !== undefined),
     /** Gives a new node the fields of the node it copies. */
     putFields: (id: string, fields: WfnFields) => {
       if (Object.keys(fields).length === 0) return;
@@ -1593,6 +1736,7 @@ export function createBoard(options: BoardOptions) {
       });
     },
     disconnect,
+    disconnectAll,
     attach,
     cancelDraft,
     selectFrom,

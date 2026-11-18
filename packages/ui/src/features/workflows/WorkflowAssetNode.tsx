@@ -78,6 +78,26 @@ function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefin
   return preview(file.id);
 }
 
+/** The file of an asset node: by its id, else by its name for a graph saved before the id. */
+function assetFile(board: WfnBoard, id: string): StoredFileRow | undefined {
+  const fileId = board.field(id, "fileId");
+  const name = board.field(id, "file");
+  const files = libraryFiles(board);
+  return (
+    (typeof fileId === "string" && fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
+    (typeof name === "string" && name ? files.find((candidate) => candidate.name === name) : undefined) ??
+    (typeof fileId === "string" && fileId
+      ? hostPicture(board, fileId, typeof name === "string" ? name : "")
+      : undefined)
+  );
+}
+
+/** The thumbnail address of the picture of an asset node, or undefined when it has no picture to show. */
+export function assetPicture(board: WfnBoard, id: string): string | undefined {
+  const file = assetFile(board, id);
+  return file?.previewKind === "image" ? (thumbUrl(board, file) ?? undefined) : undefined;
+}
+
 /** The picture or the file icon of a file. On a card, a picture pulses until it shows. */
 function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   const board = useBoard();
@@ -364,13 +384,20 @@ export function AssetNode(props: { id: string; file?: string }) {
       .then(setFile, () => undefined)
       .finally(() => setSending(false));
   };
-  /** A file from the computer, dropped on the card, goes into the library and becomes the asset. */
+  /**
+   * A file from the computer, dropped on the card, goes into the library and becomes the asset. With
+   * more files, the canvas puts the others in new asset nodes beside this one, in one group.
+   */
   const onDrop = (event: DragEvent) => {
     setDropping(false);
-    const [dropped] = draggedFiles(event);
+    const files = draggedFiles(event);
+    const [dropped] = files;
     if (!dropped || locked() || !uploads() || sending()) return;
     event.preventDefault();
-    send(dropped);
+    // The canvas does not take the drop again.
+    event.stopPropagation();
+    if (files.length > 1 && board.dropFiles) board.dropFiles(props.id, files);
+    else send(dropped);
   };
   return (
     <>
