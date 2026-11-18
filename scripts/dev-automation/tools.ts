@@ -271,8 +271,9 @@ export async function typeByRole(
 export function resolveWritablePath(root: string, requested: string, extension: string, subject: string): string {
   const base = resolve(root);
   if (requested === "") throw new Error("--out=<path> cannot be empty.");
-  const target = resolve(base, requested);
-  if (target !== base && !target.startsWith(`${base}${sep}`)) {
+  const inside = (path: string) => path === base || path.startsWith(`${base}${sep}`);
+  const target = inside(resolve(requested)) ? resolve(requested) : resolve(base, requested);
+  if (!inside(target)) {
     throw new Error(`--out must stay inside ${base}. ${subject} never write outside the build directory.`);
   }
   if (!target.endsWith(extension)) throw new Error(`--out must name a ${extension} file.`);
