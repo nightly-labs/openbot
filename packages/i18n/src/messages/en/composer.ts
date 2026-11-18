@@ -128,6 +128,7 @@ export const messages = defineMessages("composer", {
   "composer.voice.noSpeechRecorded": "No speech was recorded.",
   "composer.voice.noSpeechDetected": "No speech was detected.",
   "composer.voice.readFailed": "Could not read the reply aloud.",
+  "composer.voice.languageUnsupported": "Could not read the reply aloud. This language is not available yet.",
   "composer.error.saveEditTryAgain": "Could not save this edit on this computer. Try again.",
   "composer.error.saveUnconfirmed": "Save is not confirmed. Retry Save to check the result.",
   "composer.error.changeModel": "Could not change model. Try again.",

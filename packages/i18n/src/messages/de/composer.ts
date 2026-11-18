@@ -137,6 +137,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",
   "composer.voice.readFailed": "Die Antwort konnte nicht vorgelesen werden.",
+  "composer.voice.languageUnsupported":
+    "Die Antwort konnte nicht vorgelesen werden. Diese Sprache ist noch nicht verfügbar.",
   "composer.error.saveEditTryAgain":
     "Diese Änderung konnte nicht auf diesem Computer gespeichert werden. Versuche es erneut.",
   "composer.error.saveUnconfirmed":

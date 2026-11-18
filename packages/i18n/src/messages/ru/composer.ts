@@ -132,6 +132,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Речь не записана.",
   "composer.voice.noSpeechDetected": "Речь не обнаружена.",
   "composer.voice.readFailed": "Не удалось прочитать ответ вслух.",
+  "composer.voice.languageUnsupported": "Не удалось прочитать ответ вслух. Этот язык пока недоступен.",
   "composer.error.saveEditTryAgain": "Не удалось сохранить это изменение на этом компьютере. Повторите попытку.",
   "composer.error.saveUnconfirmed":
     "Сохранение не подтверждено. Нажмите «Сохранить» ещё раз, чтобы проверить результат.",

@@ -136,7 +136,7 @@ function isOwn(message: AgentMessage): boolean {
  * True when the host's copy of a pending message has arrived. An earlier message with the same text is
  * not the copy. When the mark is no longer in the list, all the messages are later.
  */
-function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
+export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
   return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
@@ -174,7 +174,9 @@ export function AgentDockChat(props: {
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
-  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const pending = createMemo(() =>
+    props.pending.filter((message) => !pendingMessageDelivered(message, props.chat.messages)),
+  );
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
   const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);

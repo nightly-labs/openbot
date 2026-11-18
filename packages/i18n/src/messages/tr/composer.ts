@@ -134,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",
   "composer.voice.readFailed": "Yanıt sesli okunamadı.",
+  "composer.voice.languageUnsupported": "Yanıt sesli okunamadı. Bu dil henüz desteklenmiyor.",
   "composer.error.saveEditTryAgain": "Bu düzenleme bu bilgisayarda kaydedilemedi. Tekrar deneyin.",
   "composer.error.saveUnconfirmed": "Kaydetme doğrulanmadı. Sonucu kontrol etmek için Kaydet'i tekrar deneyin.",
   "composer.error.changeModel": "Model değiştirilemedi. Tekrar deneyin.",

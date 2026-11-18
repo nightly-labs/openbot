@@ -492,9 +492,10 @@ export class TurnLifecycle {
    * Running turns whose own compaction lost the connection, with the error in plain words. `stalled`:
    * the compaction deadline stopped the turn, so its `interrupted` end is a failure. The end of the
    * turn continues it once, or shows the error. `loop`: OpenBot stopped a turn whose provider
-   * compacted again and again with no use (#8985); it does not continue.
+   * compacted again and again with no use (#8985); it does not continue. `exited`: the Claude CLI of
+   * the turn's chat exited, as when Claude Code crashed (#12175); it continues as after a provider exit.
    */
-  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true; loop?: true }>();
+  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true; loop?: true; exited?: true }>();
   /** The deadline of the compaction that runs inside a turn, by provider thread. */
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   /**
@@ -1732,6 +1733,24 @@ export class TurnLifecycle {
           this.#holdCompactionFailure(errorTurnId, context, false, source);
           return;
         }
+        // The Claude CLI of this chat exited during the turn, and the other chats keep theirs (#12175).
+        // The end of the turn continues it once, as after a provider exit (#9729), or shows the error.
+        if (
+          notification.method === "error" &&
+          source.provider === "claude" &&
+          agentId &&
+          errorTurnId !== null &&
+          this.#runningTurns.has(errorTurnId) &&
+          context.causeCode === "provider_exited"
+        ) {
+          // A compaction that failed or looped keeps its own reason.
+          const held = this.#compactionFailures.get(errorTurnId);
+          const reason = held?.message ?? sourceText("error.agent.answerCutOff");
+          if (!held) this.#compactionFailures.set(errorTurnId, { message: reason, context, exited: true });
+          // The failed delivery keeps this reason. The exit code and the CLI's stderr stay in the log.
+          this.#turnErrors.set(errorTurnId, reason);
+          return;
+        }
         // A spent quota passes over the pooled account at once, so the pool moves the agent to its next
         // account. The pool read only the usage readings, and Google's reading of a spent Antigravity
         // account can still show room, so each turn went to the spent account again (#11255). With no
@@ -2178,7 +2197,7 @@ export class TurnLifecycle {
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
         this.#planContinues(agentId, laneTaskId, turnId, deliveries, undefined)
-          ? this.#planContinuation.afterFailedCompaction({
+          ? this.#planContinuation[compactionFailure.exited ? "afterProviderExit" : "afterFailedCompaction"]({
               agentId,
               taskId: laneTaskId,
               deliveryIds: deliveries.map(({ delivery }) => delivery.id),
@@ -2558,13 +2577,15 @@ export class TurnLifecycle {
           text:
             continuation.kind === "compaction"
               ? sourceText("status.agent.compactionContinues")
-              : sourceText(
-                  continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
-                  {
-                    current: continuation.current,
-                    limit: continuation.limit,
-                  },
-                ),
+              : continuation.kind === "providerExit"
+                ? sourceText("status.agent.providerExitContinues")
+                : sourceText(
+                    continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+                    {
+                      current: continuation.current,
+                      limit: continuation.limit,
+                    },
+                  ),
         });
       }
       this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });

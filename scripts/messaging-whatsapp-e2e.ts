@@ -2,11 +2,12 @@
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
 // alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
 // guard against another OpenBot on the same number and against a loop in the owner's own chat,
-// numbered approval answers, the saved history and its search, held messages after a wake, the
-// journal replay after a restart, each close code, the send queue while the socket is down, a post
-// sent again when its socket closed before the ack, a file with its text as the caption, and the
-// disconnect. Runs the real agent service, messaging service, WhatsApp driver, runtime, session and
-// store on a temporary profile. Only the Baileys socket is fake: no message leaves this computer.
+// numbered approval answers, an answer with an email address, the saved history and its search,
+// held messages after a wake, the journal replay after a restart, each close code, the send queue
+// while the socket is down, a post sent again when its socket closed before the ack, a file with its
+// text as the caption, and the disconnect. Runs the real agent service, messaging service, WhatsApp
+// driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
+// message leaves this computer.
 // `bun scripts/messaging-whatsapp-e2e.ts`.
 // Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
@@ -409,6 +410,7 @@ interface Booted {
   messaging: MessagingService;
   runtime: WhatsAppRuntime;
   mailbox: MailboxStore;
+  database: OpenBotDatabase;
 }
 
 async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
@@ -449,7 +451,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   });
   await runCauseEffect(messaging.start());
   try {
-    return await use({ agents, messaging, runtime, mailbox });
+    return await use({ agents, messaging, runtime, mailbox, database });
   } finally {
     await runCauseEffect(messaging.stop());
     await runCauseEffect(agents.stop());
@@ -590,7 +592,7 @@ try {
     return { sealed: true };
   });
 
-  await boot(async ({ agents, messaging, runtime, mailbox }) => {
+  await boot(async ({ agents, messaging, runtime, mailbox, database }) => {
     await step("link without network: the link fails as unavailable, not as an expired code", async () => {
       phone.offline = true;
       await runCauseEffect(messaging.startWhatsAppLink(parseStartWhatsAppLinkInput({ method: "qr", ownNumber: true })));
@@ -833,6 +835,51 @@ try {
         await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `request again ${index}`);
       }
       return { reason: signIn, general };
+    });
+
+    await step("answer: an email address and a link stay, and a secret is masked", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-answer-with-address" };
+      agents.messaging.event({ type: "turn-started", ...turn }, scope);
+      // No provider runs here, so the step stores the agent's answer as the turn lifecycle does.
+      const answer = "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2";
+      const snapshot = database.readConversation(link.agentId, link.threadId);
+      snapshot.messages.push({
+        id: `${turn.turnId}:answer`,
+        turnId: turn.turnId,
+        author: "assistant",
+        text: answer,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+      database.persistStreamingMessage({ snapshot, messageId: `${turn.turnId}:answer`, eventType: "item.completed" });
+      await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+      agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+      const expected =
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=[redacted]";
+      // Posts and edits: the answer takes the place of the status post.
+      const texts = () =>
+        phone.sent.flatMap((sent) =>
+          sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
+            ? [sent.content.text]
+            : [],
+        );
+      await until(() => texts().some((text) => text.includes("kontakt")), "the answer");
+      const posted = texts().find((text) => text.includes("kontakt"));
+      assert.equal(posted, expected, "The answer changed on its way to WhatsApp.");
+      assert.ok(!texts().some((text) => text.includes("hunter2")), "A secret reached WhatsApp.");
+      // The steps below expect the owner to have as many waiting requests as the limit permits.
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `answer request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `answer request again ${index}`);
+      }
+      return { posted };
     });
 
     await step(

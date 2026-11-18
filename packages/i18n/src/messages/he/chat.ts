@@ -484,6 +484,7 @@ export const messages = {
   "chat.suggestion.undo": "ביטול",
   "chat.suggestion.localOnly": "יש לחבר את {name} ב-OpenBot במחשב שלך.",
   "chat.suggestion.unavailable": "השרת הזה לא יכול לחבר את {name}.",
+  "chat.suggestion.notAllowed": "רק הבעלים או מנהל של השרת יכולים לחבר את {name}.",
   "chat.mcpSignIn.signIn": "התחברות",
   "chat.mcpSignIn.signInNamed": "התחברות ל-{name}",
   "chat.mcpSignIn.signedIn": "מחובר",
