@@ -85,6 +85,13 @@ export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFai
 
 type BranchFailure = AgentTaskBranchFailed["reason"];
 
+/** The agent has the most open threads that it can have. The message tells the person what to do. */
+export class AgentThreadLimitError extends Error {
+  constructor() {
+    super(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+  }
+}
+
 function branchStep<A>(reason: BranchFailure, run: () => A): Effect.Effect<A, AgentTaskBranchFailed> {
   return Effect.try({ try: run, catch: (cause) => new AgentTaskBranchFailed({ reason, cause }) });
 }
@@ -353,8 +360,7 @@ export class AgentTasks implements TaskLanes {
 
   /** The task list holds `INPUT_LIMITS.agentTasks` tasks, open ones first, so more open tasks could not be seen or stopped. */
   #requireRoom(agentId: string): void {
-    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks)
-      throw new Error(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) throw new AgentThreadLimitError();
   }
 
   /** Removes a new task that took no message, because the move into it was refused. */
