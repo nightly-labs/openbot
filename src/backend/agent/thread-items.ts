@@ -631,7 +631,7 @@ export function toolFailureText(item: ThreadItem, redact: (text: string) => stri
   const window = raw.length <= FAILURE_WINDOW ? raw : tail ? raw.slice(-FAILURE_WINDOW) : raw.slice(0, FAILURE_WINDOW);
   const text = redact(window).trim();
   const limit = CONVERSATION_TRACE_TEXT_LIMIT;
-  if (text.length <= limit) return text || null;
+  if (text.length <= limit) return text || toolFailureReason(item);
   // A cut between the two halves of a surrogate pair leaves half a character, which goes.
   return tail
     ? `…${text.slice(1 - limit).replace(/^[\uDC00-\uDFFF]/u, "")}`

@@ -359,7 +359,8 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     const kept = new Set<string>();
     const parents = parentOf();
     for (const span of view().spans) {
-      const haystack = `${span.name} ${span.detail ?? ""} ${span.error ?? ""}`.toLocaleLowerCase();
+      // The error as the row shows it, so a search for the shown reason finds the row.
+      const haystack = `${span.name} ${span.detail ?? ""} ${text.sourceText(span.error ?? "")}`.toLocaleLowerCase();
       if (!haystack.includes(query)) continue;
       for (let id: string | undefined = span.id; id !== undefined && !kept.has(id); id = parents.get(id)) kept.add(id);
     }
