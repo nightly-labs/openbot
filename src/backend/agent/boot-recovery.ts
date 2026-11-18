@@ -35,7 +35,7 @@ export interface BootRecoveryHooks {
   /** Tells the external conversation of a delivery that the recovery settled it. */
   deliverySettled?(deliveryId: string, terminal: "completed" | "failed" | "interrupted"): void;
   /** Whether this task is still open, so the note for a stopped teammate request can go to its thread. */
-  taskOpen?(taskId: string): boolean;
+  taskOpen(taskId: string): boolean;
   /**
    * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
    * routine, whose record is gone. A Test, script or webhook run cannot.
@@ -335,7 +335,7 @@ export class BootRecovery {
         const requesterId = yield* this.#mailbox
           .answerFailedRequest(
             id,
-            (taskId) => this.#hooks.taskOpen?.(taskId) ?? false,
+            (taskId) => this.#hooks.taskOpen(taskId),
             (agentId) => this.#store.list().some((agent) => agent.id === agentId),
             true,
           )
