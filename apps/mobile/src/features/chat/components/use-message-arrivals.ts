@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useRef } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 
 // Only messages appended to an already visible conversation get an entrance.
 // Opening history, reconnecting, and returning from the background establish a new baseline.
 export function useMessageArrivals(agentId: string, messages: ChatMessage[], enabled: boolean) {
-  const [snapshot, setSnapshot] = useState(() => ({
-    agentId,
-    messages,
-    enabled,
-    arriving: new Set<string>(),
-  }));
+  // The result of the last render, kept in a ref: a state update here would make React render the
+  // whole message list a second time for each streamed chunk.
+  const kept = useRef<ArrivalSnapshot | null>(null);
+  kept.current ??= { agentId, messages, enabled, arriving: new Set<string>() };
+  const snapshot = kept.current;
   if (snapshot.agentId !== agentId || snapshot.enabled !== enabled || snapshot.messages !== messages) {
     const arriving = new Set<string>();
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
@@ -42,8 +41,15 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
       arriving.size === snapshot.arriving.size && [...arriving].every((id) => snapshot.arriving.has(id))
         ? snapshot.arriving
         : arriving;
-    setSnapshot({ agentId, messages, enabled, arriving: next });
+    kept.current = { agentId, messages, enabled, arriving: next };
     return next;
   }
   return snapshot.arriving;
+}
+
+interface ArrivalSnapshot {
+  agentId: string;
+  messages: ChatMessage[];
+  enabled: boolean;
+  arriving: Set<string>;
 }

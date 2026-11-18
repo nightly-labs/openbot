@@ -347,12 +347,27 @@ export function LargeTitleBar({
   );
 }
 
+/** The props of the scroll view of a large-title page: its side insets, its header clearance and its scroll handler. */
+export interface LargeTitleScrollProps {
+  className: string;
+  style: { marginLeft: number; marginRight: number };
+  alwaysBounceVertical: boolean;
+  contentInsetAdjustmentBehavior: "never" | "always";
+  contentContainerClassName: string;
+  contentContainerStyle: { paddingTop: number } | undefined;
+  keyboardShouldPersistTaps: "handled";
+  scrollEventThrottle: number;
+  showsVerticalScrollIndicator: boolean;
+  onScroll: LargeTitleScroll["onScroll"];
+}
+
 /** A full screen of grouped content under a big header, such as Routines and Usage. */
 export function LargeTitleScrollView({
   title,
   caption,
   contentContainerClassName,
   barButtonsRight = 1,
+  renderScroll,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -360,31 +375,42 @@ export function LargeTitleScrollView({
   contentContainerClassName?: string;
   /** The number of bar buttons at the right: the small title stops before them. */
   barButtonsRight?: number;
+  /**
+   * Draws another scroll view, such as a virtualized list, in place of the scroll view. It gets the props
+   * of the scroll view and the big title, which goes first in its content. `children` are then not used.
+   */
+  renderScroll?: (scrollProps: LargeTitleScrollProps, largeTitle: ReactNode) => ReactNode;
 }>) {
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
   const blurTarget = useRef<ViewInstance>(null);
+  const scrollProps: LargeTitleScrollProps = {
+    className: "flex-1",
+    // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
+    // `always`, iOS would also inset the content by them, and the content would go off the other side.
+    style: { marginLeft: insets.left, marginRight: insets.right },
+    alwaysBounceVertical: false,
+    contentInsetAdjustmentBehavior: scroll.ownsInset ? "never" : "always",
+    contentContainerClassName: "pb-safe-offset-5",
+    // Without a content inset from iOS, the content starts below the transparent header.
+    contentContainerStyle: scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined,
+    keyboardShouldPersistTaps: "handled",
+    scrollEventThrottle: 16,
+    showsVerticalScrollIndicator: false,
+    onScroll: scroll.onScroll,
+  };
+  const largeTitle = <LargeTitle scroll={scroll} title={title} caption={caption} />;
   return (
     <View className="flex-1 bg-sheet">
       <AndroidBlurTarget target={blurTarget} surface="sheet">
-        <Animated.ScrollView
-          className="flex-1"
-          // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
-          // `always`, iOS would also inset the content by them, and the content would go off the other side.
-          style={{ marginLeft: insets.left, marginRight: insets.right }}
-          alwaysBounceVertical={false}
-          contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-          contentContainerClassName="pb-safe-offset-5"
-          // Without a content inset from iOS, the content starts below the transparent header.
-          contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          onScroll={scroll.onScroll}
-        >
-          <LargeTitle scroll={scroll} title={title} caption={caption} />
-          <View className={contentContainerClassName}>{children}</View>
-        </Animated.ScrollView>
+        {renderScroll ? (
+          renderScroll(scrollProps, largeTitle)
+        ) : (
+          <Animated.ScrollView {...scrollProps}>
+            {largeTitle}
+            <View className={contentContainerClassName}>{children}</View>
+          </Animated.ScrollView>
+        )}
       </AndroidBlurTarget>
       <LargeTitleBar
         scroll={scroll}
