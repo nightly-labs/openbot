@@ -111,7 +111,14 @@ import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
-import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
+import {
+  type MessageFileTarget,
+  messageChipFileNames,
+  messageFileDirectory,
+  messageFileTarget,
+  messageLinkFileTarget,
+  messageTargetFileName,
+} from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
@@ -165,6 +172,8 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
+/** While the reply is short, the latest user message shows at most this part of the screen height. */
+const ANCHOR_SHOWN_SHARE = 0.25;
 /** A user's text bubble is at most this part of the list width, as `max-w-[92%]` on its row. */
 const USER_BUBBLE_WIDTH = 0.92;
 
@@ -480,7 +489,11 @@ interface MessageRowShared {
   openSubagents: ((messageId: string) => void) | undefined;
   /** Opens the memory changes of a turn in their sheet. Unset where no sheet can show them. */
   openMemoryChanges: ((messageId: string) => void) | undefined;
-  openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
+  openFile: (
+    file: MessageFileTarget,
+    written: MessageFileTarget | null,
+    attachment: AttachmentSummary | undefined,
+  ) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     branch: (message: ChatBubbleMessage) => void;
@@ -800,13 +813,25 @@ const MessageRow = memo(function MessageRow({
   // so the selectable text can cover it.
   const tableOutside = useMemo(() => chatMarkdownHasTable(fileBody, finishedBody), [fileBody, finishedBody]);
   const openFile = shared.openFile;
+  const fileAttachments = message.kind === "message" && message.author === "agent" ? message.attachments : undefined;
   const openMessageFile = useMemo<OpenMessageFile>(() => {
     const directory = messageFileDirectory(fileBody);
-    return (text) => {
-      const target = messageFileTarget(text, directory, fileAgentId);
-      return target ? () => void openFile(target.file, target.written) : null;
+    // A chip with the name of an attachment of the message opens the attachment, whose card does not show.
+    const attachmentOf = (file: MessageFileTarget) => {
+      const name = messageTargetFileName(file);
+      return fileAttachments?.find((attachment) => attachment.name === name);
     };
-  }, [fileBody, fileAgentId, openFile]);
+    return {
+      code: (text) => {
+        const target = messageFileTarget(text, directory, fileAgentId);
+        return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
+      },
+      link: (href) => {
+        const target = messageLinkFileTarget(href, fileAgentId);
+        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
+      },
+    };
+  }, [fileBody, fileAgentId, fileAttachments, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
@@ -816,11 +841,23 @@ const MessageRow = memo(function MessageRow({
       ? shared.bubbleTone
       : undefined;
   const textColor = tone ? userForeground : foreground;
+  // A file of an agent's message that the text opens with a chip does not show again as a card, as on
+  // desktop: the chip opens the attachment. The text is finished, so a chip that streams in does not
+  // hide its card early.
+  const chipFiles = useMemo(
+    () =>
+      message.kind === "message" && message.author === "agent" && finishedBody && message.attachments?.length
+        ? messageChipFileNames(fileBody, fileAgentId)
+        : null,
+    [message, finishedBody, fileBody, fileAgentId],
+  );
   // A generation owns its first attachment, the image or the video; any further files follow in order.
   const files =
     message.kind === "message"
-      ? ((message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
-        [])
+      ? (
+          (message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
+          []
+        ).filter((attachment) => !chipFiles?.has(attachment.name))
       : [];
   // Two or more images in one message show together, as on desktop. A message that is still
   // sending shows the same stack at once, with the progress on each card, so it does not change
@@ -1768,18 +1805,31 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
   }, [unreadRowMissing, shownWithoutUnread]);
   const header = topInset + 84;
+  const screen = useWindowDimensions();
+  // A long message, such as pasted text, shows only its end under the header, so the reply starts
+  // on the screen. A message with images is not cut: the top of its images stays in view.
+  const tailRow = rows[tailIndex];
+  const tailHasImages = tailRow?.kind === "message" && Boolean(tailRow.attachments?.some(isStackImage));
+  const anchorMaxSize = tailHasImages ? undefined : Math.round(screen.height * ANCHOR_SHOWN_SHARE);
+  const onAnchorReady = motion.onAnchorReady;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.
   const anchoredEndSpace = useMemo<AnchoredEndSpaceConfig | undefined>(
     () =>
-      tailIndex >= 0 ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady } : undefined,
-    [tailIndex, header, motion.onAnchorReady],
+      tailIndex >= 0
+        ? {
+            anchorIndex: tailIndex,
+            anchorOffset: header,
+            anchorMaxSize,
+            onReady: (info) => onAnchorReady(info, anchorMaxSize),
+          }
+        : undefined,
+    [tailIndex, header, anchorMaxSize, onAnchorReady],
   );
   const sharedValues = useMemo(
     () => ({ scrollOffset: motion.scrollOffset, isAtEnd: motion.atEnd }),
     [motion.scrollOffset, motion.atEnd],
   );
-  const screen = useWindowDimensions();
   const columnWidth = useColumnWidth();
   const insets = useSafeAreaInsets();
   const estimatedListSize = useMemo(

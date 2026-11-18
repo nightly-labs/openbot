@@ -133,7 +133,8 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "isso",
       "está",
     ]),
-    letters: /[ãõç]/gu,
+    // French also counts ç, ê and the à of às: Portuguese writes them in você, faça, três and às.
+    letters: /[ãõçê]|(?:^|\P{L})às(?!\p{L})/gu,
   },
   {
     language: "nl",
@@ -436,10 +437,11 @@ export function speechLanguageOf(text: string, fallback: SpeechLanguage): Speech
     return "ru";
   }
   if (share(/\p{Script=Latin}/gu) < 0.5) return null;
-  return latinLanguage(text) ?? fallback;
+  return latinLanguage(text, fallback) ?? fallback;
 }
 
-function latinLanguage(text: string): SpeechLanguage | null {
+/** A tie goes to `fallback` when it is one of the tied languages, else to the first in the list. */
+function latinLanguage(text: string, fallback: SpeechLanguage): SpeechLanguage | null {
   const lower = text.toLowerCase();
   const words = lower.match(/\p{L}+/gu) ?? [];
   let best: SpeechLanguage | null = null;
@@ -447,7 +449,7 @@ function latinLanguage(text: string): SpeechLanguage | null {
   for (const { language, words: known, letters } of LATIN_LANGUAGES) {
     let score = words.filter((word) => known.has(word)).length;
     if (letters) score += 2 * count(lower, letters);
-    if (score > bestScore) {
+    if (score > bestScore || (score > 0 && score === bestScore && language === fallback)) {
       best = language;
       bestScore = score;
     }
