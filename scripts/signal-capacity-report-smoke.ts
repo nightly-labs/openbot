@@ -6,7 +6,9 @@
 // generic webhook requests that Signal refuses (404, 415, 401, 503) and checks the second event: the
 // answers of that interval only, by status. It also gives the reporter its own `/proc/net/route` and
 // `/proc/net/dev` files, adds traffic to the public interface after the first event, and checks that the
-// second event has that traffic, and nothing of the Docker bridge. Then runs the reporter without the
+// second event has that traffic, and nothing of the Docker bridge. Then removes the counters for one
+// sample, which sends no traffic and keeps the base, so that the next event has the traffic of both
+// intervals. Then runs the reporter without the
 // OpenPanel client and checks that it stops and sends nothing.
 // Writes .openbot-build/signal-capacity-report/report.json.
 import assert from "node:assert/strict";
@@ -44,6 +46,7 @@ const ROUTE_PAGE = [
 ].join("\n");
 const NETWORK_BASE = { received: 7_000_000_000_000, sent: 6_500_000_000_000 };
 const NETWORK_ADDED = { received: 123_456_789, sent: 987_654_321 };
+const NETWORK_ADDED_LATER = { received: 5_000_000, sent: 7_000_000 };
 const devicePage = (received: number, sent: number) =>
   [
     "Inter-|   Receive                                                |  Transmit",
@@ -222,6 +225,17 @@ try {
     devicePage(NETWORK_BASE.received + NETWORK_ADDED.received, NETWORK_BASE.sent + NETWORK_ADDED.sent),
   );
   const networkEvent = JSON.parse((await Promise.race([captured(2), reporterFailed])).text);
+  // The next sample cannot read the counters. The sample after it can, with more traffic.
+  rmSync(networkDevicePath);
+  const unreadEvent = JSON.parse((await Promise.race([captured(3), reporterFailed])).text);
+  writeFileSync(
+    networkDevicePath,
+    devicePage(
+      NETWORK_BASE.received + NETWORK_ADDED.received + NETWORK_ADDED_LATER.received,
+      NETWORK_BASE.sent + NETWORK_ADDED.sent + NETWORK_ADDED_LATER.sent,
+    ),
+  );
+  const restoredEvent = JSON.parse((await Promise.race([captured(4), reporterFailed])).text);
 
   // The first sample set the base. These requests come after the second event, in a later interval.
   const json = { "content-type": "application/json" };
@@ -243,7 +257,7 @@ try {
   // A sample can start while the requests run, so the event that counts all of them can be a later one.
   // The reporter sends string and number properties only (`capacity-report.ts`).
   let webhookEvent: { payload: { properties: Record<string, string | number> } } | null = null;
-  for (let count = 3; count <= 5 && !webhookEvent; count += 1) {
+  for (let count = 5; count <= 7 && !webhookEvent; count += 1) {
     const next = JSON.parse((await Promise.race([captured(count), reporterFailed])).text);
     if (next.payload.properties.webhook_answers_503 === 2) webhookEvent = next;
   }
@@ -253,6 +267,12 @@ try {
   const networkProperties = networkEvent.payload.properties;
   assert.equal(networkProperties.network_in_bytes, NETWORK_ADDED.received, "The second event has the traffic in.");
   assert.equal(networkProperties.network_out_bytes, NETWORK_ADDED.sent, "The second event has the traffic out.");
+  assert.ok(
+    !("network_in_bytes" in unreadEvent.payload.properties || "network_out_bytes" in unreadEvent.payload.properties),
+    "An event with no counters has no traffic.",
+  );
+  assert.equal(restoredEvent.payload.properties.network_in_bytes, NETWORK_ADDED_LATER.received);
+  assert.equal(restoredEvent.payload.properties.network_out_bytes, NETWORK_ADDED_LATER.sent);
   const webhookProperties = webhookEvent.payload.properties;
   assert.deepEqual(
     Object.fromEntries(Object.entries(webhookProperties).filter(([key]) => key.startsWith("webhook_"))),
@@ -321,6 +341,8 @@ try {
         webhookStatuses,
         webhookEvent: webhookEvent.payload,
         networkEvent: networkEvent.payload,
+        unreadEvent: unreadEvent.payload,
+        restoredEvent: restoredEvent.payload,
         offPathExitCode: 0,
         eventsSent: captures.length,
       },

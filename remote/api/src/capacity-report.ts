@@ -14,7 +14,9 @@ import { Effect, Schedule, Schema } from "effect";
 // Generation 3 adds the public network traffic of the interval: the bytes in and out of the interface of
 // the default route, from the kernel counters. The provider bills this traffic (the AU machine has a
 // 5 TB pack), and its own metrics give only days. The first sample sets the base. A sample that is not
-// sent keeps the base, so the next one has its traffic too.
+// sent, or that could not read the counters, keeps the base, so the next one has its traffic too. When
+// OpenPanel keeps an event but answers after the timeout, the next event counts that traffic again: a
+// small count that is too high is better than a lost interval for a traffic cap.
 
 const SCHEMA_VERSION = 3;
 const SAMPLE_INTERVAL_MILLISECONDS = 5 * 60 * 1_000;
@@ -200,9 +202,9 @@ const report = Effect.fn("CapacityReport.report")(function* (
   config: ReporterConfig,
   base: { webhook: Map<string, number> | null; network: NetworkSample | null },
 ) {
-  const network = yield* readNetwork(config);
-  const [turn, signal] = yield* Effect.all(
+  const [network, turn, signal] = yield* Effect.all(
     [
+      readNetwork(config),
       request(config.turnMetricsUrl, "turn"),
       request(config.signalMetricsUrl, "signal", {
         headers: { Authorization: `Bearer ${config.signalMetricsToken}` },
@@ -239,7 +241,7 @@ const report = Effect.fn("CapacityReport.report")(function* (
     },
     body: JSON.stringify({ type: "track", payload: { name: "signal_capacity", properties } }),
   });
-  base.network = network;
+  if (network) base.network = network;
 });
 
 const main = Effect.gen(function* () {

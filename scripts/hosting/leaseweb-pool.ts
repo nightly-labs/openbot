@@ -1238,25 +1238,41 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     const today = new Date().toISOString().slice(0, 10);
     const start = from ?? `${today.slice(0, 8)}01`;
     const end = to ?? today;
-    if (!DATE_PATTERN.test(start) || !DATE_PATTERN.test(end) || start > end)
+    const isDay = (day: string) =>
+      DATE_PATTERN.test(day) && !Number.isNaN(Date.parse(day)) && new Date(day).toISOString().startsWith(day);
+    if (!isDay(start) || !isDay(end) || start > end)
       throw new Error("--from and --to must be days as YYYY-MM-DD, and --from must not be after --to.");
+    const missing = LEASEWEB_ACCOUNTS.filter(
+      (account) => !this.#keys.some(({ name }) => name === `LEASEWEB_API_KEY_${account}`),
+    );
+    if (missing.length > 0)
+      logger.warn(`No key for the account ${missing.join(", ")}: its VPS are not in the traffic.`);
     const machines = await this.#allReferences(false);
     const rows: { vps: (typeof machines)[number]; down: number; up: number; pack: number | null }[] = [];
     let next = 0;
+    // After one failure the other workers take no new VPS: the command stops with that failure.
+    let failed = false;
     const work = async () => {
-      for (let index = next++; index < machines.length; index = next++) {
+      for (let index = next++; index < machines.length && !failed; index = next++) {
         const vps = machines[index];
         if (!vps) continue;
-        const detail = await this.#leaseweb(vps.key, `/${vps.id}`, {}, 60_000);
-        if (!detail.ok) throw new Error(`Leaseweb answered ${detail.status} for VPS ${vps.id}.`);
+        const [detail, response] = await Promise.all([
+          this.#leaseweb(vps.key, `/${vps.id}`, {}, 60_000),
+          this.#leaseweb(
+            vps.key,
+            `/${vps.id}/metrics/datatraffic?from=${start}&to=${end}&granularity=DAY&aggregation=SUM`,
+            {},
+            60_000,
+          ),
+        ]).catch((error: unknown) => {
+          failed = true;
+          throw error;
+        });
+        if (!detail.ok || !response.ok) {
+          failed = true;
+          throw new Error(`Leaseweb answered ${detail.status} and ${response.status} for VPS ${vps.id}.`);
+        }
         const pack = packBytes(contractSchema.parse(await detail.json()).contract?.dataTraffic);
-        const response = await this.#leaseweb(
-          vps.key,
-          `/${vps.id}/metrics/datatraffic?from=${start}&to=${end}&granularity=DAY&aggregation=SUM`,
-          {},
-          60_000,
-        );
-        if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for the traffic of VPS ${vps.id}.`);
         const summary = trafficSchema.parse(await response.json())._metadata.summary;
         rows.push({ vps, down: summary?.downPublic?.total ?? 0, up: summary?.upPublic?.total ?? 0, pack });
       }
