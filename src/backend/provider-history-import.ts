@@ -305,6 +305,12 @@ function importCompletedTurn(
         : "none";
     // One for the whole turn: a repeated note on a later page stays out, as at the turn completion.
     const keep = routine === "none" ? null : keptRoutineMessage(routine, input.provider);
+    // A turn that the live client stored under another ID gets its messages under that ID.
+    const liveTurnId = fragment.liveTurnId ?? fragment.turnId;
+    const toLiveTurn = (message: ConversationMessage): ConversationMessage =>
+      liveTurnId !== fragment.turnId && message.turnId === fragment.turnId
+        ? { ...message, turnId: liveTurnId }
+        : message;
     let importedCount = 0;
     let afterIndex = -1;
     let complete = false;
@@ -353,14 +359,14 @@ function importCompletedTurn(
       };
       // The turn completion dropped these answers from the chat, or kept them as quiet answers, so the
       // import does the same.
-      const pageMessages = keep === null ? partial.messages : partial.messages.flatMap(keep);
+      const pageMessages = (keep === null ? partial.messages : partial.messages.flatMap(keep)).map(toLiveTurn);
       const reconciled =
         input.provider === "claude"
           ? mergeProviderHistoryMessages(
               // Claude can use a new provider ID for a reply that OpenBot already published under the
               // live turn ID. Read only matching IDs from SQLite, so reconciliation never materializes
               // the full chat or the full turn.
-              readStoredTurnMessages(input.database, input.publicThreadId, fragment.turnId, pageMessages),
+              readStoredTurnMessages(input.database, input.publicThreadId, liveTurnId, pageMessages),
               pageMessages,
               input.provider,
             )

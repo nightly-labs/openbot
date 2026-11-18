@@ -10,6 +10,11 @@ export interface ProviderHistoryFragment {
   /** Stable offset within the turn. This is not a provider cursor. */
   itemOffset?: number;
   items: ThreadItem[];
+  /**
+   * The ID that the live client gave this turn, when it is not `turnId`. The import stores the turn's
+   * messages under it, so they join the messages that the live turn stored.
+   */
+  liveTurnId?: string;
   /** The provider has no stable OpenBot turn identity; retain this record for reads and recovery only. */
   recordsOnly?: boolean;
   /** The last fragment of this turn in this scan. */

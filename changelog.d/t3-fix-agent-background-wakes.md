@@ -6,6 +6,8 @@
   version.
 - A report that an agent writes after its background work ends now always shows, unless the agent
   says that it has nothing new. Before, after a quiet update, such a report could be hidden.
+- After a restart, a thread no longer shows a second copy of the answers that a Claude agent gave
+  when its background work ended, or a loose steps row.
 
 ### Changed
 

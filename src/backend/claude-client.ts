@@ -69,7 +69,12 @@ import {
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
 import { claudeContextCategories } from "./claude-context-categories";
-import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
+import {
+  type ClaudeHistoryOptions,
+  claudeHistoryFromMessages,
+  claudeHistoryReader,
+  claudeTaskTurnId,
+} from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
 import {
   CLAUDE_WORKSPACE_MANAGED_SETTINGS,
@@ -685,6 +690,8 @@ interface ClaudeStreamMessage {
   tasks?: unknown;
   /** `task_started`, `task_updated` and `task_notification`: the CLI's id of the background task. */
   task_id?: unknown;
+  /** `task_*`: the id of one run of the task. Absent from CLIs that predate it. */
+  run_id?: unknown;
   /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
   command_uuid?: unknown;
   state?: unknown;
@@ -2278,8 +2285,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       else if (message.subtype === "task_notification") {
         const origin = runtime.taskTurns.get(message.task_id) ?? null;
         runtime.taskTurns.delete(message.task_id);
-        if (!turn) runtime.endedTaskTurns.push(origin);
-        else if (turn.unprompted && origin !== turn.id)
+        if (!turn) {
+          runtime.endedTaskTurns.push(origin);
+          // The turn that the CLI starts to answer this end gets an ID that the history import makes too.
+          if (isString(message.run_id))
+            runtime.nextTurnId = claudeTaskTurnId(
+              isString(message.session_id) ? message.session_id : runtime.id,
+              message.task_id,
+              message.run_id,
+            );
+        } else if (turn.unprompted && origin !== turn.id)
           this.emit("notification", {
             method: "openbot/turn-continues",
             params: { threadId: runtime.id, turnId: turn.id, continues: origin },
