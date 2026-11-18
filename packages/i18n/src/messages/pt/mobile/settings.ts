@@ -578,7 +578,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Escolher agente",
   "mobile.settings.shortcuts.card.locked.title": "O OpenBot está bloqueado",
   "mobile.settings.shortcuts.card.locked.action": "Abrir OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message no app Atalhos envia para este agente. O app não abre.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message no app Atalhos envia para este agente. O app não abre. Open Agent abre o chat dele.",
   "mobile.settings.shortcuts.send.sent": "Enviado",
   "mobile.settings.shortcuts.send.failed": "O OpenBot não conseguiu enviar isto.",
   "mobile.settings.shortcuts.send.unconfirmed": "Sem resposta do servidor. A mensagem pode estar no chat.",
