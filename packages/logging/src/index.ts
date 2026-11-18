@@ -180,11 +180,21 @@ export function redactText(value: string): string {
 /**
  * `redactText` without the email rule, for text that goes back to the agent that the user gave it
  * to: its memories and its own chat history. An address there is user data that the agent needs to
- * do its task, not a secret, and the provider already received it with the original message. Logs,
- * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
+ * do its task, not a secret, and the provider already received it with the original message. Logs
+ * and diagnostics keep `redactText`, and a chat app post uses `redactPostText`.
  */
 export function redactSecrets(value: string): string {
   return redact(value, false, true);
+}
+
+/**
+ * `redactText` without the email rule, for what an agent posts in a chat app, such as its WhatsApp
+ * answer. The agent wrote the address for the people in that chat, often because the user asked for
+ * it, so it stays. The post leaves this computer, so the rest of a line past the scan bound is still
+ * dropped, as `redactText` does.
+ */
+export function redactPostText(value: string): string {
+  return redact(value, false);
 }
 
 function redact(value: string, emails: boolean, keepUnscanned = false): string {

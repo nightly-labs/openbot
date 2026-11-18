@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenBotLogger,
   type LogValue,
+  redactPostText,
   redactSecrets,
   redactText,
   redactValue,
@@ -183,6 +184,16 @@ describe("redactText", () => {
       'note {"email":"jan@example.com","apiKey":"[redacted]"}',
     );
     expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
+  });
+
+  // An agent's chat app answer keeps the address it wrote for the people there, never a secret.
+  it("keeps emails and redacts secrets in a chat app post", () => {
+    expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
+      "Write to jan@example.com, password=[redacted]",
+    );
+    expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
+      "[redacted-unscanned]",
+    );
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {
