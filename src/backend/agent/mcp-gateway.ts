@@ -26,7 +26,14 @@ import {
   mcpOAuthAccountKey,
 } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { hasCredentialHeader, inspectMcpServer, type McpProbeOutcome, type McpSignInPlace } from "../mcp-probe";
+import {
+  callMcpServerTool,
+  hasCredentialHeader,
+  inspectMcpServer,
+  type McpProbeOutcome,
+  type McpSignInPlace,
+  type McpToolArguments,
+} from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -187,12 +194,8 @@ export class McpGateway {
     config: McpServerConfig,
     agentId: string | null = null,
   ): Effect.fn.Return<McpEndpoint | McpEndpointRefusal, McpGatewayFailed> {
-    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID) {
-      const github = this.#githubConnector;
-      const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
-      if (token) this.#handoff.recordSecret(token);
-      return { url: config.url, authorization: token, proxied: false };
-    }
+    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID)
+      return { url: config.url, authorization: yield* this.#githubAuthorization(), proxied: false };
     if (!this.#proxied(config))
       return { url: withoutMcpAccountFragment(config.url), authorization: null, proxied: false };
     const route = yield* this.#proxy
@@ -204,6 +207,14 @@ export class McpGateway {
     }
     this.#handoff.recordSecret(route.success.bearer);
     return { url: route.success.url, authorization: route.success.bearer, proxied: true };
+  });
+
+  /** The bearer of the GitHub connection, recorded so that `redact` masks it. */
+  readonly #githubAuthorization = Effect.fnUntraced(function* (this: McpGateway) {
+    const github = this.#githubConnector;
+    const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
+    if (token) this.#handoff.recordSecret(token);
+    return token;
   });
 
   /**
@@ -410,7 +421,8 @@ export class McpGateway {
    * this run did not see from that row. A provider lists a server's tools when it loads a session,
    * and a server can add tools behind the same address: no saved value changes, so nothing else
    * replaces a session that has the old list (#6199). The first test of a row in a run refreshes
-   * too, because a loaded session can be older than the change. A draft refreshes nothing.
+   * too, because a loaded session can be older than the change. So does a test after a provider's
+   * start through the sign-in proxy failed for that row. A draft refreshes nothing.
    */
   readonly #refreshForTestedTools = Effect.fnUntraced(function* (
     this: McpGateway,
@@ -422,9 +434,14 @@ export class McpGateway {
     const [key] = saved ? mcpFingerprintValues([saved]) : [];
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
-    if (this.#testedTools.get(key) === tools) return;
+    // A provider whose start through the proxy failed keeps the server without tools until its
+    // session gets the new address (`McpOAuthProxy.route`), also when the tools did not change (#9526).
+    const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
+    const failedStart = route !== null && this.#proxy.failedStart(route);
+    if (this.#testedTools.get(key) === tools && !failedStart) return;
     // Recorded after the refresh, so a refresh that fails is tried again at the next test.
     yield* this.#hooks.refreshAllAgentRuntimes();
+    if (route !== null && failedStart) this.#proxy.reportedFailedStart(route);
     this.#testedTools.set(key, tools);
   });
 
@@ -448,6 +465,32 @@ export class McpGateway {
     );
     if (tested) yield* this.#refreshForTestedTools(normalized, outcome);
     return outcome;
+  });
+
+  /**
+   * One tool of a saved server or of the GitHub connection, for an agent whose provider left the tool
+   * out. Silent like `inspect`: the sign-in of the row's address, which is also the token that the
+   * agent's own route spends. The GitHub connection uses the bearer that `endpoint` gives (#12035).
+   */
+  readonly callTool = Effect.fnUntraced(function* (
+    this: McpGateway,
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ) {
+    const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
+    const stored = this.#oauth;
+    return yield* callMcpServerTool(
+      config,
+      name,
+      args,
+      this.#toolRuntimes(),
+      config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
+        ? { accessToken: () => Effect.succeed(github) }
+        : stored
+          ? { accessToken: (url) => stored.accessToken(url) }
+          : undefined,
+    ).pipe(toMcpGatewayFailed);
   });
 
   /**
@@ -667,7 +710,9 @@ export class McpGateway {
       });
       this.#hooks.emitError(
         "mcp_server_not_started",
-        `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
+        drop.reason === "failed_in_provider"
+          ? drop.detail
+          : `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
       );
     }
   }

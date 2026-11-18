@@ -26,6 +26,13 @@ export const messages = {
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -46,6 +53,19 @@ export const messages = {
   "settings.chatBackground.light": "Arrière-plan du chat en thème Clair",
   "settings.chatBackground.dark": "Arrière-plan du chat en thème Sombre",
   "settings.chatBackground.default": "Par défaut",
+  "settings.chatBackdrop.title": "Arrière-plan de la fenêtre",
+  "settings.chatBackdrop.description":
+    "Une scène, une image ou un GIF derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
+  "settings.chatBackdrop.none": "Aucun",
+  "settings.chatBackdrop.pond": "Bassin à koïs",
+  "settings.chatBackdrop.jellyfish": "Méduses",
+  "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
+  "settings.chatBackdrop.snowfall": "Chute de neige",
+  "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.upload": "Importer une image…",
+  "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
+  "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
+  "settings.chatBackdrop.removeFailed": "L’arrière-plan n’a pas été supprimé.",
   "settings.chatColor.title": "Couleur du chat",
   "settings.chatColor.description": "Teinte les bulles de vos messages. Les personnes de vos serveurs la voient aussi.",
   "settings.chatColor.yours": "Votre couleur de chat",
@@ -112,7 +132,7 @@ export const messages = {
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
   "settings.chatOrder.description":
-    "Choisissez où la barre latérale affiche les discussions non lues sur cet appareil. Manuel désactive le groupe Non lues.",
+    "Choisissez comment la barre latérale trie les discussions sur cet appareil. Manuel et Activité récente désactivent le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",
@@ -685,6 +705,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.automatic": "Automatique",
+  "settings.voice.pause.title": "Pause avant l’envoi",
+  "settings.voice.pause.description":
+    "Dans une conversation vocale, OpenBot envoie vos mots quand vous arrêtez de parler pendant cette durée. Choisissez une pause plus longue si vous parlez lentement ou vous arrêtez pour réfléchir. La voix en direct Codex détecte la fin elle-même.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Impossible de lire les modèles vocaux.",
   "settings.voice.saveFailed": "Impossible d’enregistrer le réglage vocal. Réessayez.",
   "settings.voice.downloadFailed": "Impossible de lancer le téléchargement. Réessayez.",
@@ -779,6 +803,13 @@ export const messages = {
   "settings.transfer.import.lede": "Choisissez le fichier exporté depuis l’autre serveur. Son nom se termine par .zip.",
   "settings.transfer.import.choose": "Choisir un fichier…",
   "settings.transfer.import.reading": "Lecture du fichier…",
+  "settings.transfer.upload.label": "Envoi vers le serveur",
+  "settings.transfer.upload.sending": "Envoi du fichier…",
+  "settings.transfer.upload.sent": "{sent} sur {total} envoyés",
+  "settings.transfer.upload.serverReading": "Le serveur lit le fichier…",
+  "settings.transfer.upload.etaSoon": "Moins d’une minute restante",
+  "settings.transfer.upload.etaMinutes": "Environ {minutes} min restantes",
+  "settings.transfer.upload.etaHours": "Environ {hours} h {minutes} min restantes",
   "settings.transfer.import.openFailed": "Impossible d’ouvrir le fichier",
   "settings.transfer.import.contains": "Ce fichier contient",
   "settings.transfer.import.source": "OpenBot {version} · exporté le {date}",
@@ -816,7 +847,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ce serveur n’a aucun agent.",
   "settings.transfer.copy.new": "Nouveau",
   "settings.transfer.copy.notCopied":
-    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {

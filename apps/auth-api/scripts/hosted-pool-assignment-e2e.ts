@@ -201,6 +201,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
         plan,
         interval: "month",
         currency: currency === "usd" ? "usd" : "eur",
+        storageTier: 0,
       }),
     );
     await Promise.all(work.splice(0));
@@ -289,12 +290,12 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   check(
     "a start on boat alerts the operator once, with the plan, the currency, the server and the reason",
     alertsAbout("eur-2").length === 1 &&
-      alertsAbout("eur-2")[0] === "A standard server (eur, eur-2) starts on boat: no ready VPS02 in AMS-01.",
+      alertsAbout("eur-2")[0] === "⛵ **Boat start** · standard server · eur · eur-2 · no ready VPS02 in AMS-01",
     alerts,
   );
   check(
     "a purchase that takes the last free machine of its group alerts the operator",
-    alertsAbout("Pool WDC-02 VPS02: 0 free machines left.").length === 1,
+    alertsAbout("🔴 **Pool** WDC-02 VPS02 · 0 free left").length === 1,
     alerts,
   );
   const serversOn = (hostId: string) =>
@@ -483,7 +484,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
 
   check(
     "a retry of an earlier boat attempt sends no alert: it never asks the pool",
-    alertsAbout("(eur, retry)").length === 0,
+    alertsAbout("eur · retry").length === 0,
     alerts,
   );
 
@@ -525,10 +526,15 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     alerts.length === alertsBefore + 2 * unsigned.length &&
       unsigned.every(
         (serverId) =>
-          alertsAbout(`(${serverId.slice(0, 8)}) did not start on pool machine`).length === 1 &&
+          alertsAbout(`**Pool start lost** · `).filter((alert) =>
+            alert.includes(` · ${serverId.slice(0, 8)} · machine `),
+          ).length === 1 &&
           alerts
             .slice(alertsBefore)
-            .filter((alert) => alert.includes(`${serverId.slice(0, 8)}) starts on boat: pool machine`)).length === 1,
+            .filter(
+              (alert) =>
+                alert.startsWith("⛵ **Boat start**") && alert.includes(`${serverId.slice(0, 8)} · pool machine`),
+            ).length === 1,
       ),
     alerts.slice(alertsBefore),
   );
@@ -599,6 +605,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       plan: "standard",
       interval: "month",
       currency: "eur",
+      storageTier: 0,
     }),
   );
   await Promise.all(work.splice(0));
@@ -616,8 +623,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       released.desired_state === "stopped" &&
       sandboxOf("lapsed").length === 0 &&
       machineRow(lapsing)?.assign_token_hash === null &&
-      alerts.at(-1) ===
-        `A standard server (lapsed) did not start on pool machine ${lapsing}. Prepare the machine again.`,
+      alerts.at(-1) === `🛠️ **Pool start lost** · standard server · lapsed · machine ${lapsing} · prepare it again`,
     { ended, endedPoll, released, machine: machineRow(lapsing), alert: alerts.at(-1) },
   );
 }

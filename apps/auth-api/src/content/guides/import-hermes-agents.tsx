@@ -309,9 +309,9 @@ export function ImportHermesAgents() {
       </p>
 
       <p>
-        If you allowed MCP settings, check them in OpenBot's MCP settings, supply any required values and enable the
-        connection when ready. Messaging connections and Hermes terminal backends also need to be set up for the way you
-        work in OpenBot.
+        If you allowed MCP settings, check them in OpenBot in Marketplace, Apps, supply any required values and enable
+        the connection when ready. Messaging connections and Hermes terminal backends also need to be set up for the way
+        you work in OpenBot.
       </p>
 
       <p>

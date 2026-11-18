@@ -23,7 +23,7 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { isConversationSkillSuggestion, SKILL_SUGGESTION_ITEM_TYPE_PREFIX } from "../skill-suggestion-events";
 import { adminRoute, boolean, empty, fields, identifier, list, type OptionalRouteCodec, string } from "./admin-wire";
-import { decodeTeamProtocolV2Json } from "./v2";
+import { decodeTeamProtocolV2Json } from "./webrtc-framing";
 
 export const SKILL_LEARNING_CAPABILITY = "skill-learning-v1";
 

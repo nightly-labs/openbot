@@ -18,9 +18,17 @@ export const messages = {
     "OpenBot kon de 1Password-CLI niet installeren. Controleer de internetverbinding en probeer het opnieuw.",
   "error.connector.onePasswordCliSignedOut":
     "De 1Password-CLI is niet ingelogd. Zet de integratie aan in de 1Password-app en verbind opnieuw.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot kan de 1Password-app niet bereiken. Open 1Password en ontgrendel het. Controleer in Instellingen > Ontwikkelaar dat “Integreren met 1Password CLI” aan staat. Probeer het dan opnieuw.",
   "error.connector.onePasswordCliFailed": "De 1Password-CLI is mislukt: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Je 1Password-account staat niet toe dat je de gedeelde kluis of een serviceaccount maakt. Vraag een eigenaar of beheerder van het account om deze toestemming, of vraag om een token van een serviceaccount en klik op “Gebruik token”.",
   "error.connector.onePasswordUnexpected": "1Password gaf een onverwacht antwoord: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password heeft het token van het serviceaccount niet geaccepteerd.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot kon geen verbinding maken met 1Password. Controleer de internetverbinding en probeer het opnieuw.",
+  "error.connector.onePasswordRateLimited":
+    "1Password heeft te veel verzoeken ontvangen. Wacht een paar minuten en probeer het opnieuw.",
   "error.connector.onePasswordNoVault":
     "Het serviceaccount kan geen kluis lezen. Geef het toegang tot een kluis en probeer het opnieuw.",
   "error.connector.onePasswordFileUnreadable": "Het verbindingsbestand van 1Password is onleesbaar.",
@@ -46,6 +54,8 @@ export const messages = {
     "Kan de Proton Pass CLI niet installeren. Controleer de netwerkverbinding en verbind daarna opnieuw.",
   "error.connector.protonPassPlan":
     "Je Proton-abonnement staat de Proton Pass CLI niet toe. Wijzig het abonnement en verbind daarna opnieuw.",
+  "error.connector.protonPassPlanMissing":
+    "Je Proton-abonnement bevat de Proton Pass CLI niet. Daarvoor is een Proton-abonnement nodig waarin Pass Plus zit. Wijzig het abonnement en verbind daarna opnieuw.",
   "error.connector.protonPassExpired": "De toegang tot Proton Pass is beëindigd. Verbind opnieuw.",
   "error.connector.protonPassKeyInvalid": "Voer een Proton Pass-toegangssleutel in die met pst_ begint.",
   "error.connector.protonPassExtraPassword": "Het extra wachtwoord is onjuist. Voer het opnieuw in.",

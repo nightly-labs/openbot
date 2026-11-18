@@ -377,6 +377,12 @@ export function WorkflowStepScreen() {
             label={t("mobile.workflow.step.prompt")}
             placeholder={t("mobile.workflow.step.promptDefault")}
           />
+          <TextField
+            node={node}
+            name="system"
+            label={t("mobile.workflow.step.system")}
+            placeholder={t("mobile.workflow.step.systemPlaceholder")}
+          />
         </>
       ) : null}
       {node.kind === "condition" ? (

@@ -35,7 +35,7 @@ import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
 import { WHATSAPP_ORCHESTRATOR_AVATAR } from "@openbot/contracts/whatsapp-app";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactPostText, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Result, Schedule, Schema, Scope } from "effect";
 import type { AgentLifecycleFailed } from "../agent-service";
 import { causeHelpers } from "../effect-boundary";
@@ -60,6 +60,7 @@ import {
   type MessagingThreads,
 } from "./messaging-threads";
 import {
+  CANCEL_TEXT,
   type ConnectionIdentity,
   DiscordApiError,
   type HistoryFilter,
@@ -76,6 +77,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   type RecentMessages,
+  type StatusReaction,
   TelegramCallError,
   WhatsAppAnswerPartlySent,
   WhatsAppRefusedError,
@@ -185,7 +187,6 @@ const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "remove
 const APPROVAL_TEXT_LIMIT = 2_500;
 /** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
 const PROGRESS_TEXT_LIMIT = 1_000;
-const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
 const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
@@ -325,6 +326,9 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
+    this.#threads.setOwnerPostSource(
+      (link) => this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true,
+    );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
@@ -359,6 +363,7 @@ export class MessagingService {
     // The kept deliveries that wait for a connection go now: nothing will start it.
     for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
+    this.#threads.setOwnerPostSource(null);
     this.#threads.setHistorySource(null);
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
@@ -471,6 +476,16 @@ export class MessagingService {
     yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
   }).bind(this);
 
+  /** Turns the status reactions of one WhatsApp number on or off. A request that runs loses its 👀 at its end. */
+  readonly setWhatsAppStatusReactions = Effect.fn("MessagingService.setWhatsAppStatusReactions")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    statusReactions: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setStatusReactions(workspaceId, statusReactions).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
   /** Turns the "Working on it…" post of one WhatsApp number on or off. A request that runs keeps its post. */
   readonly setWhatsAppWorkingMessage = Effect.fn("MessagingService.setWhatsAppWorkingMessage")(function* (
     this: MessagingService,
@@ -552,9 +567,27 @@ export class MessagingService {
   }
 
   /**
+   * Sets or takes back the status reaction on a person's message. A WhatsApp number whose owner turned
+   * the reactions off gets none: a request that already has its 👀 keeps it. A failed reaction is
+   * ignored, because the posts still show the state of the request.
+   */
+  #react(
+    live: LiveConnection,
+    target: MessageTarget,
+    messageId: string,
+    reaction: StatusReaction,
+    on: boolean,
+  ): Effect.Effect<void> {
+    // Only a WhatsApp number stores this value, so another platform always reads true here. A removal
+    // still goes out, so a 👀 from before the setting went off does not stay on the message.
+    if (on && this.#whatsapp?.statusReactions(live.record.connectionId) === false) return Effect.void;
+    return live.adapter.react(target, messageId, reaction, on).pipe(Effect.catch(() => Effect.void));
+  }
+
+  /**
    * True for a chat where a post shows as the owner's own message: another person's chat on the
-   * owner's personal WhatsApp number. A request that fails or stops there leaves only its reaction,
-   * and the owner sees the failure in OpenBot. The owner did not write a notice to that person.
+   * owner's personal WhatsApp number. A request that fails or stops there leaves only its reaction
+   * (none with status reactions off), and the owner sees the failure in OpenBot. The owner did not write a notice to that person.
    */
   #quietEnd(connectionId: string, target: MessageTarget): boolean {
     return this.#whatsapp?.postsAsOwner(connectionId, target.platformChannelId) === true;
@@ -1428,9 +1461,7 @@ export class MessagingService {
     }
     if (existing && CANCEL_TEXT.test(message.text) && message.files.length === 0) {
       if (yield* this.#threads.stop(existing.linkId, message.authorId).pipe(toMessagingOperationFailed)) {
-        yield* live.adapter
-          .react(message.target, message.platformMessageId, "stopped", true)
-          .pipe(Effect.catch(() => Effect.void));
+        yield* this.#react(live, message.target, message.platformMessageId, "stopped", true);
         return;
       }
     }
@@ -1457,10 +1488,11 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
-        // Only Discord's earlier messages have files, such as an image that a person posted without a
-        // mention just before this message. The agent gets them with this message. Slack is not asked:
-        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
-        adapter.platform === "discord" && !message.isDirect
+        // Only Discord's and Telegram's earlier messages have files, such as an image or a voice note
+        // that a person posted without a mention just before this message. The agent gets them with
+        // this message. Slack is not asked: before Marketplace approval it allows one thread read a
+        // minute, which the prompt needs.
+        (adapter.platform === "discord" || adapter.platform === "telegram") && !message.isDirect
           ? adapter
               .history(
                 message.platformChannelId,
@@ -1551,6 +1583,9 @@ export class MessagingService {
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
     if (!agentId) {
+      // On WhatsApp, only the owner can add the orchestrator, and only in their own chat do they write
+      // as the number. A contact or a group that the owner allowed gets no setup text from their number.
+      if (live.record.platform === "whatsapp" && message.authorId !== live.identity.botUserId) return;
       const noAgent =
         live.record.platform === "discord"
           ? "status.messaging.discordNoAgent"
@@ -1591,13 +1626,16 @@ export class MessagingService {
             [...message.files, ...earlierFiles.map((item) => item.file)],
             staging,
           );
-          const given = earlierFiles.filter((item) => !skipped.includes(item.file)).map((item) => item.label);
-          const notGiven = earlierFiles.filter((item) => skipped.includes(item.file)).map((item) => item.label);
-          const missing = skipped.filter((file) => message.files.includes(file));
+          const given = earlierFiles.filter((item) => !skipped.has(item.file)).map((item) => item.label);
+          const notGiven = earlierFiles.filter((item) => skipped.has(item.file)).map((item) => item.label);
+          const missing = message.files.flatMap((file) => {
+            const reason = skipped.get(file);
+            return reason ? [`${file.name} (${reason})`] : [];
+          });
           const notes = [
             given.length ? `(Files of earlier messages, given with this one: ${given.join(", ")})` : "",
             notGiven.length ? `(Files of earlier messages that were not given: ${notGiven.join(", ")})` : "",
-            missing.length ? `(Files that did not arrive: ${missing.map((file) => file.name).join(", ")})` : "",
+            missing.length ? `(Files that did not arrive: ${missing.join(", ")})` : "",
           ].filter(Boolean);
           const text = notes.length ? `${named}\n\n${notes.join("\n")}` : named;
           const result = yield* this.#threads
@@ -1625,15 +1663,11 @@ export class MessagingService {
             yield* adapter
               .post(message.target, { text: sourceText("status.messaging.busy") })
               .pipe(toMessagingOperationFailed);
-            yield* adapter
-              .react(message.target, message.platformMessageId, "failed", true)
-              .pipe(Effect.catch(() => Effect.void));
+            yield* this.#react(live, message.target, message.platformMessageId, "failed", true);
             return;
           }
           this.#targets.set(key, message.target);
-          yield* adapter
-            .react(message.target, message.platformMessageId, "received", true)
-            .pipe(Effect.catch(() => Effect.void));
+          yield* this.#react(live, message.target, message.platformMessageId, "received", true);
           // In the same order as the turn's own posts: a turn that already started has its status post.
           if (result.waiting)
             yield* this.#serial(
@@ -1683,7 +1717,10 @@ export class MessagingService {
     return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
   }
 
-  /** Downloads files into `staging`, in their order, within the attachment limits. */
+  /**
+   * Downloads files into `staging`, in their order, within the attachment limits. `skipped` gives,
+   * for each file that did not arrive, the reason that the agent reads.
+   */
   readonly #download = Effect.fn("MessagingService.download")(function* (
     this: MessagingService,
     adapter: MessagingAdapter,
@@ -1691,15 +1728,15 @@ export class MessagingService {
     staging: string,
   ) {
     const paths: string[] = [];
-    const skipped: InboundFile[] = [];
+    const skipped = new Map<InboundFile, string>();
     let total = 0;
     for (const [index, file] of files.entries()) {
-      if (
-        paths.length >= INPUT_LIMITS.attachments ||
-        file.size > ATTACHMENT_LIMITS.fileBytes ||
-        total + file.size > ATTACHMENT_LIMITS.totalBytes
-      ) {
-        skipped.push(file);
+      if (paths.length >= INPUT_LIMITS.attachments) {
+        skipped.set(file, `more than ${INPUT_LIMITS.attachments} files`);
+        continue;
+      }
+      if (file.size > ATTACHMENT_LIMITS.fileBytes || total + file.size > ATTACHMENT_LIMITS.totalBytes) {
+        skipped.set(file, "too large");
         continue;
       }
       const downloaded = yield* Effect.result(
@@ -1713,8 +1750,11 @@ export class MessagingService {
           return destination;
         }),
       );
-      if (Result.isFailure(downloaded)) skipped.push(file);
-      else {
+      if (Result.isFailure(downloaded)) {
+        const cause = downloaded.failure.cause;
+        skipped.set(file, tooLarge(cause) ? "too large" : "the download failed; the sender can send it again");
+        this.#warn(cause, "A messaging file did not download.");
+      } else {
         total += file.size;
         paths.push(downloaded.success);
       }
@@ -1771,7 +1811,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
+      Effect.map((list) => (whatsApp ? { ...list, note: WHATSAPP_ALLOWED_PLACES } : list)),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1791,7 +1831,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const platform = live.record.platform;
     return yield* Effect.gen(function* () {
-      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      const place = (yield* live.adapter.places()).places.find((candidate) => candidate.id === placeId);
       if (!place)
         return {
           error:
@@ -1833,8 +1873,9 @@ export class MessagingService {
       };
     // A Discord workspace id is the guild id, which a link to the post needs.
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
-    // The place is outside this computer, so a secret in the text must not reach it.
-    const text = redactText(markdown);
+    // The place is outside this computer, so a secret in the text must not reach it. An email
+    // address stays: the agent wrote it for the people in that place.
+    const text = redactPostText(markdown);
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
@@ -1860,6 +1901,20 @@ export class MessagingService {
         ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
       };
+    }
+    // One file takes the text as its caption: apart, the text can go missing while the file arrives.
+    const single = files.length === 1 && !embeds.length ? files[0] : undefined;
+    if (single && live.adapter.postFileWithText) {
+      const captioned = yield* Effect.result(live.adapter.postFileWithText(target, text, single));
+      if (Result.isFailure(captioned))
+        return {
+          error: refusal(captioned.failure),
+          failure: "unknown" as const,
+        };
+      if (captioned.success) {
+        live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
+        return { posted: true as const, messageId: captioned.success };
+      }
     }
     const posted = yield* (
       postEmbeds && embeds.length
@@ -2005,7 +2060,7 @@ export class MessagingService {
       // request that already ended, or whose status post failed, gets no edit.
       if (!live || !post?.messageId || !post.stopToken || post.final) return;
       // Only the host makes a platform mention, so the mention markers go.
-      const text = redactText(activity.text).replace(MENTION_MARKERS, "");
+      const text = redactPostText(activity.text).replace(MENTION_MARKERS, "");
       yield* live.adapter
         .edit(target, post.messageId, {
           text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
@@ -2057,6 +2112,8 @@ export class MessagingService {
       this.#threads.awaitsTeammate(activity.link.linkId),
       this.#quietEnd(activity.link.connectionId, target),
       this.#withoutStatusPost(activity.link.connectionId),
+      // The files go out below only when this connection runs now.
+      live !== undefined,
     );
     // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
     if (final.answer && live?.record.platform === "slack") {
@@ -2118,10 +2175,8 @@ export class MessagingService {
       if (final.reaction) {
         // `linkId` has no colon, so the rest of the key is the person's message.
         const platformMessageId = key.slice(key.indexOf(":") + 1);
-        yield* adapter.react(post.target, platformMessageId, "received", false).pipe(Effect.catch(() => Effect.void));
-        yield* adapter
-          .react(post.target, platformMessageId, final.reaction, true)
-          .pipe(Effect.catch(() => Effect.void));
+        yield* this.#react(live, post.target, platformMessageId, "received", false);
+        yield* this.#react(live, post.target, platformMessageId, final.reaction, true);
       }
       if (final.answer)
         yield* adapter.postAnswer(post.target, final.text, placeholder).pipe(toMessagingOperationFailed);
@@ -2494,15 +2549,28 @@ export class MessagingService {
     }
   }
 
-  #warn(error: unknown): void {
+  #warn(error: unknown, message = "A messaging action failed."): void {
     // Only the kind of failure and the platform's error code: a Slack error message can quote
     // message text, and its code cannot.
     const code = isDynamicRecord(error) && isString(error.code) ? error.code : undefined;
-    logger.warn("A messaging action failed.", {
+    logger.warn(message, {
       error: error instanceof Error ? error.name : "unknown",
       ...(code ? { code } : {}),
     });
   }
+}
+
+/**
+ * True when a platform refused a file for its size: Slack and Discord give the code `too_large`, and
+ * Telegram and WhatsApp the message `file_too_large`, or Telegram's "file is too big".
+ */
+function tooLarge(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  return (
+    (isDynamicRecord(cause) && cause.code === "too_large") ||
+    cause.message === "file_too_large" ||
+    cause.message.endsWith("file is too big")
+  );
 }
 
 /** The sidebar section that holds the orchestrators. It is found by its name. */
@@ -2521,7 +2589,7 @@ function linkTarget(link: MessagingLink): MessageTarget {
  * that the mask breaks, so the post fails and the secret stays here.
  */
 function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
-  const mask = (value: string | undefined) => (value === undefined ? undefined : redactText(value));
+  const mask = (value: string | undefined) => (value === undefined ? undefined : redactPostText(value));
   return {
     title: mask(embed.title),
     description: mask(embed.description),
@@ -2529,16 +2597,16 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
     color: embed.color,
     timestamp: embed.timestamp,
     author: embed.author && {
-      name: redactText(embed.author.name),
+      name: redactPostText(embed.author.name),
       url: mask(embed.author.url),
       icon_url: mask(embed.author.icon_url),
     },
-    footer: embed.footer && { text: redactText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
-    thumbnail: embed.thumbnail && { url: redactText(embed.thumbnail.url) },
-    image: embed.image && { url: redactText(embed.image.url) },
+    footer: embed.footer && { text: redactPostText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
+    thumbnail: embed.thumbnail && { url: redactPostText(embed.thumbnail.url) },
+    image: embed.image && { url: redactPostText(embed.image.url) },
     fields: embed.fields?.map((field) => ({
-      name: redactText(field.name),
-      value: redactText(field.value),
+      name: redactPostText(field.name),
+      value: redactPostText(field.value),
       inline: field.inline,
     })),
   };
@@ -2563,6 +2631,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
+  [
+    "not_confirmed",
+    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+  ],
 ]);
 
 const DISCORD_NOT_LINKED =
@@ -2608,13 +2680,14 @@ function token(): string {
  * The last post of a request and the reaction on the person's message, from how its turn ended. In a
  * quiet chat, a failed or stopped request posts no text: an empty text takes back the status post.
  * With `answerOnly`, a stopped request, or one that ends without an answer, posts no text either; a
- * failed one still does.
+ * failed one still does. A request that ends with files and no text has its answer in the files.
  */
 function finalPost(
   activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
   awaitsTeammate: boolean,
   quiet: boolean,
   answerOnly: boolean,
+  sendsFiles: boolean,
 ): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
@@ -2624,22 +2697,27 @@ function finalPost(
       text: quiet || answerOnly ? "" : sourceText("status.messaging.stopped"),
       reaction: reacts ? "stopped" : null,
     };
-  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
+  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
+  // the catalog text of a start or a turn that failed, such as an expired sign-in, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
-      text: quiet ? "" : sourceText("status.messaging.failed"),
+      text: quiet ? "" : (activity.reason ?? sourceText("status.messaging.failed")),
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;
   // A quiet answer posts nothing: an empty text takes back the status post.
   if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
-  // The platform is outside this computer, so a secret in the answer must not reach it.
-  if (activity.answer) return { answer: true, text: redactText(activity.answer), reaction };
+  // The platform is outside this computer, so a secret in the answer must not reach it. An email
+  // address that the agent wrote stays.
+  if (activity.answer) return { answer: true, text: redactPostText(activity.answer), reaction };
   if (answerOnly) return { answer: false, text: "", reaction };
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
+  // The files are the answer, such as an edited image: an empty text takes back the status post where
+  // the platform can delete it.
+  if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };
   return { answer: false, text: sourceText("status.messaging.noAnswer"), reaction };
 }
 

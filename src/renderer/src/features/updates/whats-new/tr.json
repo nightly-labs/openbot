@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Bu sürümü kurduktan sonra bu bilgisayarda veya sunucuda OpenBot'un eski bir sürümüne dönemezsiniz. Bu sürüm veritabanını küçültür ve eski bir sürüm onu açamaz.",
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda özel resim boyutları, Sunra ve Higgsfield modelleri ile fiyatları ve çok sayıda ajanın daha hızlı yüklenmesi yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Her ajanın yan ileti dizilerini kenar çubuğunda görün. Bir ajan satırının sonundaki oku seçin ya da tüm ileti dizilerini görmek için imleci satırın üzerinde tutun.",
+          "Kenar çubuğunu arama alanının sonundaki filtre düğmesiyle süzün. Yalnızca ajanları veya kanalları, yalnızca okunmamış sohbetleri veya çalışan ajanları ya da yalnızca seçtiğiniz klasörlerdeki sohbetleri gösterin.",
+          "İş akışı tuvalindeki bir Görsel adımına piksel cinsinden özel bir boyut verin ya da 4:5 veya 5:4 en-boy oranını kullanın.",
+          "İş akışı tuvali Sunra ve Higgsfield'in tüm görsel ve video modellerini gösterir. Çalıştır düğmesi fiyatı kredi olarak gösterir.",
+          "Yavaş bir bilgisayarda OpenBot'u daha hızlı yapmak için Ayarlar → Görünüm → Hareket bölümünden Arka plan bulanıklığı ile Hareketli ajan yüzleri seçeneklerini kapatın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Birden fazla kişi aynı iş akışını aynı anda düzenleyebilir. Tuval, diğer kişilerin değişikliklerini kaydettikçe ekler.",
+          "OpenBot, birçok ajan çalışırken çok daha az CPU kullanır ve gecikme olmadan yazabilirsiniz.",
+          "Ajanlar, banka 3-D Secure kodu istediğinde ödemeyi tamamlar. Kod, ajanın okuyabildiği bir e-postada ya da SMS'te olduğunda ajan kodu yazar.",
+          "Sunucu ayarları → Aktarım → Başka bir sunucuya kopyala artık ajanların iş akışlarını ve rutin akışlarını da kopyalar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot veritabanı çok daha az yer kaplar. Güncellemeden sonra OpenBot, eski sohbet iletilerinin kopyalarını küçük adımlarla kaldırır.",
+          "Windows'ta bir güncelleme ilerlemesini yeniden gösterir.",
+          "Katıldığınız, çok sayıda ajanı olan bir sunucu ve büyük bir kanal daha hızlı açılır.",
+          "Çok sayıda görsel içeren ya da uzun geçmişi olan Gemini sohbetleri artık durmaz ve yeni bir sohbet başladığında Gemini sizden yeniden oturum açmanızı istemez.",
+          "Masaüstü uygulaması, OpenBot v0.34.1 veya daha eski bir sürümdeki sunucuya yeniden bağlanır."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Bir sunucuda CRM, Kodla hesap ekle, bir ajanın ayarladığı arka plan, ajanların düzenlediği Kitaplık klasörleri ve çalışan bir Devin turuna giden iletiler yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Tüm pencerenin arkasında canlandırılmış bir arka plan oynatın. Ayarlar → Pencere arka planı bölümünden Koi göleti ya da Ateş böcekleri gibi bir sahne seçin ya da bir ajandan sizin için bir tane yapmasını isteyin.",
+          "Potansiyel müşterileri, müşterileri ve ödemeleri yeni CRM sayfasında tutun. Bu özellik deneyseldir: bir sahip ya da yönetici bunu Sunucu ayarları → Deneysel bölümünden açar. Stripe'tan içe aktarabilir ve ajanlar, bir sahip ya da yöneticinin onayladığı değişiklikler önerir.",
+          "Ajan yuvası sohbetinde bir ajana yanıt verin. Bir komuta izin verin ya da reddedin, bir soruyu yanıtlayın ya da bir tarayıcı adımını ana pencere olmadan tamamlayın.",
+          "Kitaplığı klasör kutucukları, Favoriler, Son ve Geri al ile düzenleyin. Bir klasör oluşturmak için dosyaları Yeni klasör'e sürükleyin ya da bir ajandan klasörlerini düzenlemesini isteyin.",
+          "Kodla bir ChatGPT (Codex), Grok ya da Claude hesabı ekleyin. Hesap ekle'nin yanındaki menüyü açın ve Kodla hesap ekle'yi seçin.",
+          "Bir Devin ya da OpenCode ajanı çalışırken gönderdiğiniz ileti, çalışan tura girer. Bunun için Devin CLI 3000.12.57 ya da OpenCode 2.3.0 veya daha yeni bir sürüm gerekir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ayarların yeni bir düzeni var. Bölümler etiketli gruplarda yer alır ve Sunucu ayarları'nda yeni Bellek ile Ajan varsayılanları bölümleri vardır. macOS'te OpenBot sistem yazı tipini kullanır.",
+          "Özel MCP sunucularını Pazaryeri → Uygulamalar bölümünden ekleyin ve düzenleyin. Sunucu ayarları'nda artık MCP bölümü yok.",
+          "Bir ajanla yaptığınız sohbette balonlarınız artık ajanın avatarının rengini alır. Bunu Ayarlar → Görünüm → Balonlarınız bölümünden değiştirin.",
+          "Sesli konuşma artık yan paneli açmaz. Sohbetin üstündeki küçük bir çubuk ses denetimlerini gösterir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Kayıtlı oturumunu kaybeden ya da çok büyüyen bir sohbet artık bozuk kalmaz. Ajan, sohbet geçmişiyle yeni bir oturum başlatır ve mesajınızı yanıtlar.",
+          "Bir kullanım sınırı ya da bir sağlayıcı hatası bir turu durdurduğunda daha fazla ajan yedek modeline geçer; buna Grok, Hermes ve Claude ajanları da dahildir.",
+          "Ajanlar, bir çerçevedeki oturum açma formu gibi daha fazla yerde kayıtlı girişi kullanabilir.",
+          "Bir rutin, başarısız bir çalıştırmadan sonra açık kalır; sağlayıcı başlayamadığında vakti gelen bir çalıştırma daha sonra çalışır.",
+          "OpenBot daha az CPU ve pil kullanır: sohbetteki ve gizli tarayıcı sekmelerindeki videolar, siz görmediğinizde duraklatılır."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

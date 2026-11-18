@@ -1,14 +1,12 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import AudioLines from "lucide-react-native/icons/audio-lines";
 import Blocks from "lucide-react-native/icons/blocks";
 import Globe from "lucide-react-native/icons/globe";
 import Link from "lucide-react-native/icons/link";
-import Mic from "lucide-react-native/icons/mic";
-import MicOff from "lucide-react-native/icons/mic-off";
 import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
 import Sparkles from "lucide-react-native/icons/sparkles";
@@ -45,6 +43,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
@@ -66,15 +65,15 @@ import { END_X, fieldDirectionStyle, layoutDirection, MIRROR_IN_RTL, textDirecti
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
-import { deleteComposerFiles } from "../model/composer-requests";
 import { createComposerSendGate } from "../model/composer-send";
 import { composerAction } from "../model/voice-dictation";
 import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
-import { DictationMic, DictationStrip } from "./composer-dictation";
-import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
+import type { ComposerContextMeter } from "./composer-context-ring";
+import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
+import { addPastedFiles, ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
 import type { ChatAttachments } from "./use-chat-attachments";
 import type { ComposerDictation } from "./use-composer-dictation";
@@ -112,23 +111,9 @@ const REST_TEXT_GAP = 10;
 // the bar: only the drawing scales, and it then slides out to the bar's edge.
 const REST_CONTROL_SCALE = 0.8;
 
-// The voice mode turns the composer into one round button of this size. Stop
-// splits it: Cancel and Send come out of its sides, and it stays as Continue.
-export const VOICE_BUTTON_SIZE = 64;
-const VOICE_SIDE_SIZE = 56;
-const VOICE_SIDE_GAP = 20;
-const VOICE_SIDE_OFFSET = VOICE_BUTTON_SIZE / 2 + VOICE_SIDE_GAP + VOICE_SIDE_SIZE / 2;
+// A live conversation turns the composer into a call bar of this height.
+const VOICE_BUTTON_SIZE = 64;
 const CARD_RADIUS = 24;
-// The mic sits at the end of the toolbar. These move it to the centre of the
-// round button, which is where the card's own shrinking takes it most of the way.
-const VOICE_CONTROL_SHIFT_X = TOOLBAR_PADDING - (VOICE_BUTTON_SIZE - CONTROL_SIZE) / 2;
-const VOICE_CONTROL_SHIFT_Y = -(VOICE_BUTTON_SIZE - TOOLBAR_HEIGHT) / 2;
-// The glyph grows with the button instead of changing size, so the mic is the
-// same drawing when the composer comes back.
-const VOICE_CONTROL_SCALE = 1.15;
-// The voice glyph and the fill switch with the stage on this timing.
-const VOICE_FILL_DURATION = 220;
-const VOICE_BARS = [0.55, 1, 0.75, 0.4] as const;
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView);
 const SHAPE_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -202,6 +187,11 @@ interface ChatComposerProps {
   voiceAvatar?: ReactNode;
   /** The agent's colours for the glow in the call bar. */
   voicePalette?: VoicePalette;
+  /**
+   * How full the chat's context is, for a host that reports it. The ring is a row of the attachment
+   * menu, so the bar keeps its four controls; the plus carries a dot from the warning level on.
+   */
+  contextMeter?: ComposerContextMeter;
 }
 
 const NO_FILES: ChatAttachments["items"] = [];
@@ -240,34 +230,6 @@ const TAG_GROUPS = [
   { kind: "skill", title: "mobile.chat.composer.skills", label: "mobile.chat.composer.useSkill", Icon: Sparkles },
   { kind: "mcp", title: "mobile.chat.composer.apps", label: "mobile.chat.composer.useApp", Icon: Blocks },
 ] as const;
-
-/** Bars that follow the microphone level, drawn in the listening voice button. */
-function VoiceLevelBars({ level, color }: { level: SharedValue<number>; color: string }) {
-  return (
-    <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", gap: 3, height: 24 }}>
-      {VOICE_BARS.map((weight) => (
-        <VoiceLevelBar key={weight} level={level} weight={weight} color={color} />
-      ))}
-    </View>
-  );
-}
-
-function VoiceLevelBar({ level, weight, color }: { level: SharedValue<number>; weight: number; color: string }) {
-  const reducedMotion = useReducedMotion();
-  const style = useAnimatedStyle(() => ({
-    height: reducedMotion ? 12 : 6 + 18 * Math.min(1, 0.12 + level.get() * weight * 1.4),
-  }));
-  return <Animated.View style={[{ width: 4, borderRadius: 2, backgroundColor: color }, style]} />;
-}
-
-/** Send for dictation, Interrupt for a live conversation. */
-function VoiceSideGlyph({ icon, color }: { icon: ComposerVoice["trailing"]["icon"]; color: string }) {
-  return icon === "send" ? (
-    <ArrowUp color={color} size={24} strokeWidth={2.2} />
-  ) : (
-    <Square color={color} fill={color} size={16} strokeWidth={2} />
-  );
-}
 
 /** How long a handoff focus keeps asking for the keyboard, and how often. */
 const FOCUS_RETRY_MS = 1500;
@@ -313,13 +275,13 @@ export const ChatComposer = memo(function ChatComposer({
   voiceAccent,
   voiceAvatar,
   voicePalette,
+  contextMeter,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
   // A text-only composer has no menu or voice motion of its own; these stay at rest.
   const still = useSharedValue(0);
   const menuMotion = menuProgress ?? still;
   const morph = voice?.presence ?? still;
-  const voiceSplit = voice?.split ?? still;
   const files = attachments?.items ?? NO_FILES;
   const preparing = attachments?.preparing ?? false;
   const display = mentionDraft(draft);
@@ -358,12 +320,9 @@ export const ChatComposer = memo(function ChatComposer({
   const isFocused = useIsFocused();
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
-  // The chat owns the voice mode. The composer only changes shape for it: the
-  // round button of dictation, or the call bar of a live conversation.
+  // The chat owns the live conversation. The composer only changes shape for it: the call bar of the
+  // full width.
   const voiceOpen = voice?.open ?? false;
-  // A live conversation turns the card into a call bar of the full width, not the round button.
-  const voiceBar = voice?.bar;
-  const barMode = Boolean(voiceBar);
   // Dictation keeps the composer: the words go into the field, and a strip takes the toolbar's place.
   const dictating = dictation?.active ?? false;
   // Until the last words land, the recognizer owns the draft: a key typed then stops dictation.
@@ -404,26 +363,7 @@ export const ChatComposer = memo(function ChatComposer({
     }, FOCUS_RETRY_INTERVAL_MS);
     return () => clearInterval(retry);
   }, [isFocused, disabled, handoffFocusVersion]);
-  // The copies are read as attachments in the same way as a share from another app, then deleted.
-  const pasteFiles = ({ files: pasted, failed }: PastedFiles) => {
-    if (!attachments) {
-      deleteComposerFiles(pasted);
-      return;
-    }
-    void attachments
-      .addShared("", pasted, () => {})
-      .finally(() => {
-        deleteComposerFiles(pasted);
-        if (failed === 0) return;
-        void haptics.notification("error");
-        showFailureAlert(
-          undefined,
-          "turn",
-          t("mobile.chat.attachment.addFailed"),
-          t("mobile.chat.attachment.unavailable"),
-        );
-      });
-  };
+  const pasteFiles = (pasted: PastedFiles) => addPastedFiles(attachments, pasted);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -601,83 +541,39 @@ export const ChatComposer = memo(function ChatComposer({
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidthValue.get(), cardWidth]);
     return {
-      width: width + ((barMode ? cardWidth : VOICE_BUTTON_SIZE) - width) * voiced,
+      width: width + (cardWidth - width) * voiced,
       borderRadius: CARD_RADIUS + (VOICE_BUTTON_SIZE / 2 - CARD_RADIUS) * voiced,
     };
   });
   // Both controls stay visible and pressable in the smaller bar, so the shape
   // change owes them only a position and the size they are drawn at. Both are
   // transforms: neither control re-lays-out on a single frame of the change.
-  // In the voice mode the control rides on to the centre of the round button,
-  // so the mic the user pressed is the button they speak with.
   const controlStyle = useAnimatedStyle(() => {
     const progress = expansion.get();
-    // The call bar has its own controls, so there the control stays at the end and fades out.
-    const voiced = barMode ? 0 : morph.get();
     const x = interpolate(progress, [0, 1], [restControlShift, 0]);
     const y = interpolate(progress, [0, 1], [restControlOffset, 0]);
-    const restScale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
-    const scale = restScale + (VOICE_CONTROL_SCALE - restScale) * voiced;
+    const scale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
     return {
       transform: [
         // The row scales about its centre, which the dictation mic moves left of the main control. This
         // keeps the main control where a row of the main control alone would put it.
-        { translateX: END_X * (x + (VOICE_CONTROL_SHIFT_X - x) * voiced + micSlack * (1 - scale)) },
-        { translateY: y + (VOICE_CONTROL_SHIFT_Y - y) * voiced },
+        { translateX: END_X * (x + micSlack * (1 - scale)) },
+        { translateY: y },
         { scale },
       ],
-      opacity: barMode ? interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP) : 1,
+      // The call bar has its own controls, so there the control stays at the end and fades out.
+      opacity: interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP),
     };
   });
-  // The round button has room for one control: the dictation mic leaves in the first part of the morph.
+  // The call bar has its own controls: the dictation mic leaves in the first part of the morph.
   const dictationMicStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
   }));
-  // With Liquid Glass the round button stays glass, so the glow under it shows
-  // through and spreads on it. Without glass the card is opaque, so the agent's
-  // colour fills it while it listens. Continue is the card again.
-  const voiceFilled = !liquidGlassAvailable && voiceAccent !== undefined;
-  const listeningGlyph = voiceFilled && voiceAccent ? voiceAccent.glyph : String(foreground);
-  const voiceFill = useSharedValue(0);
-  const listening = voice?.hearing ?? false;
-  useEffect(() => {
-    voiceFill.set(
-      withTiming(listening ? 1 : 0, {
-        duration: VOICE_FILL_DURATION,
-        easing: SHAPE_EASING_FN,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-  }, [listening, voiceFill]);
-  const voiceFillStyle = useAnimatedStyle(() => ({ opacity: barMode ? 0 : voiceFill.get() * morph.get() }));
-  // Cancel and Send start behind the round button and come out of its sides.
-  // Glass does not fade: iOS does not draw a glass effect under a parent with
-  // an opacity below 1. The round button is glass too, so the two show through
-  // it, and they are hidden while they are fully in.
-  const sideOpacity = (open: number) => {
-    "worklet";
-    if (liquidGlassAvailable) return open > 0 ? 1 : 0;
-    return interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP);
-  };
-  const cancelSideStyle = useAnimatedStyle(() => {
-    const open = voiceSplit.get();
-    return {
-      opacity: sideOpacity(open),
-      transform: [{ translateX: -END_X * VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
-    };
-  });
-  const sendSideStyle = useAnimatedStyle(() => {
-    const open = voiceSplit.get();
-    return {
-      opacity: sideOpacity(open),
-      transform: [{ translateX: END_X * VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
-    };
-  });
   const plusStyle = useAnimatedStyle(() => {
     const progress = expansion.get();
     const voiced = morph.get();
     const openWidth = interpolate(progress, [0, 1], [restWidthValue.get(), cardWidth]);
-    const width = openWidth + ((barMode ? cardWidth : VOICE_BUTTON_SIZE) - openWidth) * voiced;
+    const width = openWidth + (cardWidth - openWidth) * voiced;
     return {
       // Dictation has no attachments: the plus leaves the strip's corner to Cancel.
       opacity: interpolate(voiced, [0, 0.3], [1, 0], Extrapolation.CLAMP) * (1 - dictationPresence.get()),
@@ -721,7 +617,7 @@ export const ChatComposer = memo(function ChatComposer({
     return {
       // The text and the placeholder leave in the first part of the morph.
       opacity: interpolate(voiced, [0, 0.4], [1, 0], Extrapolation.CLAMP),
-      // The voice mode closes the card to the round button's height.
+      // The call bar closes the card to its own height.
       height: height + (VOICE_BUTTON_SIZE - height) * voiced,
       // The controls hold the bottom of the card. In a single row they overlay
       // the field, so the text clears their width instead.
@@ -825,12 +721,17 @@ export const ChatComposer = memo(function ChatComposer({
   const busy = preparing;
   const attachmentsBlocked = disabled || preparing;
   const leadingBlocked = attachmentsBlocked;
-  // The card covers this glyph and draws the same corner, so the two trade
-  // places on one progress: the glyph is gone by the time the card is drawn,
-  // and back on the frames the card fades out. Waiting for the card to
-  // unmount left the corner empty for the whole length of its collapse.
+  // The card opens above the bar, so the plus stays in view. It turns into a close mark on the
+  // card's own progress, so a dismissal turns it back frame by frame.
+  // The bar shows no ring, so the plus warns when the context nears its limit. The menu row gives the number.
+  const [warningColor, dangerColor] = useCSSVariable(["--openbot-warning", "--openbot-danger"]);
+  const contextAlert =
+    contextMeter && !contextMeter.compacting && (contextMeter.level === "warning" || contextMeter.level === "danger")
+      ? contextMeter
+      : undefined;
   const plusGlyphStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(menuMotion.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (leadingBlocked ? 0.45 : 1),
+    opacity: leadingBlocked ? 0.45 : 1,
+    transform: [{ rotate: `${45 * menuMotion.get()}deg` }],
   }));
   // Where the plus is drawn, in either shape, from the constants that draw it.
   // Measuring it cannot work: `measureInWindow` reads the layout tree, and the
@@ -850,6 +751,14 @@ export const ChatComposer = memo(function ChatComposer({
       (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
     bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
     size: plusDrawn,
+    barStart: (END_X === 1 ? insets.left : insets.right) + BAR_INSET + (restingPlus ? (cardWidth - restWidth) / 2 : 0),
+    // The card's height from the same constants that draw it. The reply row is out of flow and
+    // measured, so the press adds its height from the shared value.
+    barTop:
+      composerBottomGap(bottomInset) +
+      (restingPlus
+        ? restHeight
+        : fieldHeight + (stacked ? TOOLBAR_HEIGHT : 0) + (attachmentsOpen ? ATTACHMENT_BLOCK_HEIGHT : 0)),
   };
   const control = composerAction({
     disabled,
@@ -923,6 +832,16 @@ export const ChatComposer = memo(function ChatComposer({
         requestSend();
     }
   }
+
+  // A press and hold on the mic or the waveform opens the voice settings over the chat.
+  const openVoiceSettings = useCallback(() => {
+    // A Stop just before the hold must not open the keyboard behind Settings > Voice.
+    editAfterDictation.current = false;
+    void haptics.selection();
+    inputRef.current?.blur();
+    router.push("/settings/voice");
+  }, []);
+  const voiceSettingsLabel = t("mobile.chat.composer.voiceSettings");
 
   const controlLabel = {
     send: sendLabel ?? t("mobile.chat.composer.send"),
@@ -1073,93 +992,6 @@ export const ChatComposer = memo(function ChatComposer({
         >
           {placeholderText}
         </NativeText>
-        {voiceOpen && voice && !barMode ? (
-          // Drawn before the card, so the two buttons come out from under it.
-          <View
-            pointerEvents={voice.sides ? "box-none" : "none"}
-            style={{
-              position: "absolute",
-              left: insets.left,
-              right: insets.right,
-              bottom: Math.max(bottomInset, 10),
-              height: VOICE_BUTTON_SIZE,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Animated.View style={[{ position: "absolute" }, cancelSideStyle]}>
-              <GlassView
-                glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-                style={{
-                  width: VOICE_SIDE_SIZE,
-                  height: VOICE_SIDE_SIZE,
-                  borderRadius: VOICE_SIDE_SIZE / 2,
-                  overflow: "hidden",
-                  backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-                }}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={voice.leading.label}
-                  className="flex-1 items-center justify-center"
-                  onPress={voice.leading.onPress}
-                >
-                  <X color={String(foreground)} size={24} strokeWidth={1.8} />
-                </Pressable>
-              </GlassView>
-            </Animated.View>
-            <Animated.View style={[{ position: "absolute" }, sendSideStyle]}>
-              {liquidGlassAvailable ? (
-                // Glass in the agent's colour. Without a send to make it is
-                // plain glass, and only the glyph dims: an opacity on the glass
-                // would stop iOS from drawing it.
-                <GlassView
-                  glassEffectStyle="regular"
-                  tintColor={voice.trailing.enabled ? voiceAccent?.tint : undefined}
-                  style={{
-                    width: VOICE_SIDE_SIZE,
-                    height: VOICE_SIDE_SIZE,
-                    borderRadius: VOICE_SIDE_SIZE / 2,
-                    overflow: "hidden",
-                  }}
-                >
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={voice.trailing.label}
-                    accessibilityState={{ disabled: !voice.trailing.enabled }}
-                    disabled={!voice.trailing.enabled}
-                    className="flex-1 items-center justify-center"
-                    onPress={voice.trailing.onPress}
-                  >
-                    {/* The tint lets the glass and the glow through, so the glyph
-                        takes the text colour, like Cancel and Continue. */}
-                    <VoiceSideGlyph
-                      icon={voice.trailing.icon}
-                      color={String(voice.trailing.enabled ? foreground : muted)}
-                    />
-                  </Pressable>
-                </GlassView>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={voice.trailing.label}
-                  accessibilityState={{ disabled: !voice.trailing.enabled }}
-                  disabled={!voice.trailing.enabled}
-                  className="items-center justify-center rounded-full"
-                  style={{
-                    width: VOICE_SIDE_SIZE,
-                    height: VOICE_SIDE_SIZE,
-                    backgroundColor: voiceAccent?.fill ?? action,
-                    opacity: voice.trailing.enabled ? 1 : 0.45,
-                  }}
-                  onPress={voice.trailing.onPress}
-                >
-                  <VoiceSideGlyph icon={voice.trailing.icon} color={voiceAccent?.glyph ?? String(actionForeground)} />
-                </Pressable>
-              )}
-            </Animated.View>
-          </View>
-        ) : null}
         <GestureDetector gesture={pan}>
           <AnimatedGlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -1174,12 +1006,6 @@ export const ChatComposer = memo(function ChatComposer({
               cardStyle,
             ]}
           >
-            {voiceFilled && voiceAccent ? (
-              <Animated.View
-                pointerEvents="none"
-                style={[{ position: "absolute", inset: 0, backgroundColor: voiceAccent.fill }, voiceFillStyle]}
-              />
-            ) : null}
             {/* Measure wrapping independently of UITextView's constrained contentSize.
                 This node keeps the field's width whatever shape the card is in, so
                 its line count gives the height and its widest line says whether the
@@ -1467,7 +1293,7 @@ export const ChatComposer = memo(function ChatComposer({
                 ) : null}
                 <Animated.View
                   style={[{ flexDirection: "row", alignItems: "center", gap: CONTROL_GAP }, controlStyle]}
-                  pointerEvents={barMode && voiceOpen ? "none" : "auto"}
+                  pointerEvents={voiceOpen ? "none" : "auto"}
                 >
                   {dictationMic && dictation ? (
                     <Animated.View
@@ -1484,72 +1310,60 @@ export const ChatComposer = memo(function ChatComposer({
                         label={t(dictating ? "mobile.chat.composer.stopDictation" : "mobile.chat.composer.dictate")}
                         foreground={String(foreground)}
                         onPress={toggleDictation}
+                        onLongPress={openVoiceSettings}
+                        longPressLabel={voiceSettingsLabel}
                       />
                     </Animated.View>
                   ) : null}
-                  {voiceOpen && voice && !barMode ? (
-                    <Pressable
-                      key="voice"
-                      accessibilityLabel={voice.center.label}
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: !voice.center.pressable, busy: voice.center.busy }}
-                      disabled={!voice.center.pressable}
-                      // The round button is larger than the control, and all of it presses.
-                      hitSlop={(VOICE_BUTTON_SIZE - CONTROL_SIZE * VOICE_CONTROL_SCALE) / 2}
-                      className="size-10 items-center justify-center rounded-full"
-                      onPress={voice.center.onPress}
-                    >
-                      {voice.center.glyph === "spinner" ? (
-                        <Spinner size="sm" color={voice.hearing ? listeningGlyph : String(foreground)} />
-                      ) : voice.center.glyph === "level" ? (
-                        <VoiceLevelBars
-                          level={voice.level}
-                          color={voice.hearing ? listeningGlyph : String(foreground)}
-                        />
-                      ) : voice.center.glyph === "micOff" ? (
-                        <MicOff color={String(foreground)} size={21} strokeWidth={1.8} />
-                      ) : (
-                        <Mic color={String(foreground)} size={21} strokeWidth={1.8} />
-                      )}
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      key="control"
-                      accessibilityLabel={controlLabel}
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: !controlReady, busy: control.spinner }}
-                      // Words still arrive into the draft: a send now would leave them behind.
-                      disabled={!controlReady}
-                      className="size-10 items-center justify-center rounded-full"
-                      style={{
-                        // Nothing to send reads as a bare glyph on the card, not as a
-                        // filled control the user could press. The voice mode is always filled:
-                        // it sets it apart from the dictation mic beside it.
-                        backgroundColor: control.primed || control.mode === "dictate" ? accentFill : "transparent",
-                        // The card dims as a whole when the composer is disabled.
-                        // Dim only this control for a state the card does not show.
-                        opacity: disabled || controlReady ? 1 : 0.45,
-                      }}
-                      onPress={pressControl}
-                    >
-                      {control.spinner ? (
-                        <Spinner size="sm" color={accentGlyph} />
-                      ) : control.mode === "stop" ? (
-                        <Square color={accentGlyph} fill={accentGlyph} size={14} strokeWidth={2} />
-                      ) : control.mode === "dictate" ? (
-                        <AudioLines color={accentGlyph} size={20} strokeWidth={2} />
-                      ) : (
-                        <ArrowUp color={control.primed ? accentGlyph : String(muted)} size={21} strokeWidth={2.2} />
-                      )}
-                    </Pressable>
-                  )}
+                  <Pressable
+                    key="control"
+                    accessibilityLabel={controlLabel}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !controlReady, busy: control.spinner }}
+                    // Words still arrive into the draft: a send now would leave them behind.
+                    disabled={!controlReady}
+                    className="size-10 items-center justify-center rounded-full"
+                    style={{
+                      // Nothing to send reads as a bare glyph on the card, not as a
+                      // filled control the user could press. The voice mode is always filled:
+                      // it sets it apart from the dictation mic beside it.
+                      backgroundColor: control.primed || control.mode === "dictate" ? accentFill : "transparent",
+                      // The card dims as a whole when the composer is disabled.
+                      // Dim only this control for a state the card does not show.
+                      opacity: disabled || controlReady ? 1 : 0.45,
+                    }}
+                    onPress={pressControl}
+                    onLongPress={control.mode === "dictate" ? openVoiceSettings : undefined}
+                    delayLongPress={LONG_PRESS_MS}
+                    accessibilityActions={
+                      control.mode === "dictate" && controlReady
+                        ? [{ name: "activate" }, { name: "longpress", label: voiceSettingsLabel }]
+                        : undefined
+                    }
+                    onAccessibilityAction={({ nativeEvent }) => {
+                      if (!controlReady) return;
+                      if (nativeEvent.actionName === "activate") pressControl();
+                      else if (nativeEvent.actionName === "longpress" && control.mode === "dictate")
+                        openVoiceSettings();
+                    }}
+                  >
+                    {control.spinner ? (
+                      <Spinner size="sm" color={accentGlyph} />
+                    ) : control.mode === "stop" ? (
+                      <Square color={accentGlyph} fill={accentGlyph} size={14} strokeWidth={2} />
+                    ) : control.mode === "dictate" ? (
+                      <AudioLines color={accentGlyph} size={20} strokeWidth={2} />
+                    ) : (
+                      <ArrowUp color={control.primed ? accentGlyph : String(muted)} size={21} strokeWidth={2.2} />
+                    )}
+                  </Pressable>
                 </Animated.View>
               </View>
             </View>
-            {voiceOpen && voice && voiceBar ? (
+            {voiceOpen && voice ? (
               <VoiceCallBar
                 voice={voice}
-                bar={voiceBar}
+                bar={voice.bar}
                 avatar={voiceAvatar}
                 palette={voicePalette}
                 accent={voiceAccent}
@@ -1576,6 +1390,7 @@ export const ChatComposer = memo(function ChatComposer({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.chat.composer.addAttachment")}
+              accessibilityValue={contextAlert ? { text: contextAlert.label } : undefined}
               accessibilityState={{ disabled: leadingBlocked }}
               disabled={leadingBlocked}
               hitSlop={4}
@@ -1583,12 +1398,29 @@ export const ChatComposer = memo(function ChatComposer({
               onPress={() => {
                 void haptics.selection();
                 setOpenedWith({ expanded: !restingPlus, focused });
-                attachments?.openMenu(attachmentAnchor);
+                attachments?.openMenu({
+                  ...attachmentAnchor,
+                  barTop: attachmentAnchor.barTop + (replyActive ? replyRowHeight.get() : 0),
+                });
               }}
             >
               <Animated.View style={plusGlyphStyle}>
                 <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
               </Animated.View>
+              {contextAlert ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    end: 6,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: String(contextAlert.level === "danger" ? dangerColor : warningColor),
+                  }}
+                />
+              ) : null}
             </Pressable>
           </Animated.View>
         ) : null}

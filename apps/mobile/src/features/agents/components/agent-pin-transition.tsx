@@ -14,7 +14,7 @@ import { Easing, ReduceMotion, useSharedValue, withTiming } from "react-native-r
 import { scheduleOnRN } from "react-native-worklets";
 import { AgentPinTransitionOverlay } from "@/features/agents/components/agent-pin-transition-overlay";
 import { type MobileAgent, useMobileWorkspaceReader } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 
@@ -159,7 +159,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
       options?: { haptic: boolean },
     ) => {
       const { pinnedAgentIds, pinnedChannelIds } = workspace();
-      if (transitionRef.current || !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], chatId)) return;
+      if (transitionRef.current || !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, chatId)) return;
       const source: AgentAvatarLocation = isPinned ? "pinned" : "row";
       const target: AgentAvatarLocation = isPinned ? "row" : "pinned";
       const sourceNode = avatarRefs.get(chatId)?.[source];

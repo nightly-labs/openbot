@@ -482,6 +482,11 @@ export interface CreateAgentInput {
    * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
    */
   providerAccountId?: string;
+  /**
+   * The id of one create, which a Team API client sends again when the answer got lost
+   * (`agent-create-operation-v1`). Team API only: the IPC parser does not read it.
+   */
+  operationId?: string;
 }
 
 export interface UpdateAgentInput {

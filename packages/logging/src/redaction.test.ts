@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenBotLogger,
   type LogValue,
+  redactPostText,
   redactSecrets,
   redactText,
   redactValue,
@@ -41,6 +42,7 @@ describe("redactText", () => {
       `gsk_${run(52)}`,
       `ASIA${"A1".repeat(8)}`,
       `rk_live_${run(24)}`,
+      `rk_test_${run(24)}`,
       `whsec_${run(32)}`,
       // A Standard Webhooks secret in base64 has `+`, `/` and `=`.
       `whsec_${run(10)}+${run(10)}/${run(10)}=`,
@@ -184,6 +186,22 @@ describe("redactText", () => {
     expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
   });
 
+  // An agent's chat app answer keeps the address it wrote for the people there, never a secret.
+  it("keeps emails and redacts secrets in a chat app post", () => {
+    expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
+      "Write to jan@example.com, password=[redacted]",
+    );
+    // Only the email rule hid a URL password before, as a part of an address.
+    expect(redactPostText("postgres://admin:s3cretpw@db.example.com/app")).toBe(
+      "postgres://admin:[redacted]@db.example.com/app",
+    );
+    expect(redactText("https://user:s3cretpw@db.example.com/x")).toBe("https://user:[redacted]@db.example.com/x");
+    expect(redactSecrets("redis://:s3cretpw@cache:6379")).toBe("redis://:[redacted]@cache:6379");
+    expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
+      "[redacted-unscanned]",
+    );
+  });
+
   it("redacts secrets inside a payload that arrives as one string", () => {
     expect(redactText('{"apiKey":"pk_live_9f2b3c4d5e"}')).not.toContain("pk_live_9f2b3c4d5e");
     expect(redactText('{"machineToken":"mt_abc123def456"}')).not.toContain("mt_abc123def456");
@@ -270,6 +288,15 @@ describe("redactText", () => {
     const redacted = redactText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`);
     expect(redacted).not.toContain("tenant-secret");
     expect(redacted).toContain("[redacted-unscanned]");
+  });
+
+  // The agent reads its own replies back. Code has far more bracket runs than the bound, and a cut
+  // reply made the agent send broken code again (#10122).
+  it("keeps the rest of the agent's own text past the scan bound", () => {
+    const code = Array.from({ length: 40 }, (_, index) => `v${index} = close[${index}] > open[${index}]`).join("\n");
+    expect(redactSecrets(code)).toBe(code);
+    expect(redactSecrets(`${code}\ntoken = Bearer abcdef123456`)).toBe(`${code}\ntoken = [redacted]`);
+    expect(redactSecrets(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(`${code}\n{"apiKey":"[redacted]"}`);
   });
 
   // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
@@ -366,6 +393,20 @@ describe("registerSecretValue", () => {
     registerSecretValue("Basic c2VjcmV0");
 
     expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
+  });
+
+  // A saved password such as a company name made every link to the company's site `https:[redacted]`.
+  it("keeps the host of a web address, and masks its user part and path", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+    registerSecretValue("feedtoken42x");
+
+    expect(redactText("see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl")).toBe(
+      "see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl",
+    );
+    expect(redactText("https://example.com/feed/feedtoken42x")).toBe("https://example.com[redacted]");
+    expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
+    expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
+    expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

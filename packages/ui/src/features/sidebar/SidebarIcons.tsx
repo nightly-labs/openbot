@@ -21,15 +21,6 @@ export function PlusIcon() {
   );
 }
 
-export function SidebarToggleIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="sidebar-toggle-icon ui-glyph-20">
-      <rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.25" />
-      <path d="M7.25 3.75v12.5" />
-    </svg>
-  );
-}
-
 export function EditIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="agent-context-icon ui-glyph-20 size-4 fill-none stroke-current">
