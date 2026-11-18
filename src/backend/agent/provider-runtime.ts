@@ -125,10 +125,12 @@ import {
 } from "./provider-diagnostics";
 import {
   isProviderTimeout,
+  orNewSavedSignIn,
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
   waitForSignInProcess,
+  watchSavedSignIn,
 } from "./provider-status";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
@@ -1894,17 +1896,19 @@ export class ProviderRuntime implements ProviderPort {
           .start(provider, (cli) =>
             Effect.gen(function* () {
               const browser = signInPageByOpenBot(onHost, signIn.command) ? yield* captureBrowser(openExternal) : {};
-              const { argv } = signIn.command;
+              const { argv, savedSignIn } = signIn.command;
               const target = cliSpawnTarget(
                 cli.executable,
                 typeof argv === "function" ? yield* argv(cli, region) : argv,
               );
+              const env = { ...process.env, ...signIn.command.env(cli, region), ...browser };
+              const watch = yield* watchSavedSignIn(savedSignIn?.(cli, env));
               const child = yield* Effect.acquireRelease(
                 Effect.try({
                   try: () =>
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
-                      env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
+                      env,
                       stdio: signIn.command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
@@ -1914,7 +1918,7 @@ export class ProviderRuntime implements ProviderPort {
                 }),
                 (child) => stopProcessTree(child).pipe(Effect.orDie),
               );
-              return { child, done: waitForSignInProcess(child, signIn.command) };
+              return { child, done: orNewSavedSignIn(waitForSignInProcess(child, signIn.command), watch, undefined) };
             }),
           )
           .pipe(toProviderOperationFailed);
@@ -2412,13 +2416,15 @@ export class ProviderRuntime implements ProviderPort {
         (cli) =>
           Effect.gen(function* () {
             const argv = typeof command.argv === "function" ? yield* command.argv(cli, "global") : command.argv;
+            const env = { ...cliPathEnvironment(cli), ...command.env(cli, "global") };
             return yield* startCliCodeLogin({
               flow,
               executable: cli.executable,
               argv,
-              env: { ...cliPathEnvironment(cli), ...command.env(cli, "global") },
+              env,
               timeoutMs: command.timeoutMs,
               ...(command.closeInput ? { closeInput: true } : {}),
+              ...(command.savedSignIn ? { savedSignIn: command.savedSignIn(cli, { ...process.env, ...env }) } : {}),
             });
           }),
         command.timeoutMs,
