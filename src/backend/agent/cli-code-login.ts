@@ -114,19 +114,19 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     ),
     { startImmediately: true },
   );
-  // A CLI that saved a new sign-in and then failed signed in with no prompt, as one that exits with
-  // success: `done` decides, and a failure keeps the prompt's own message.
-  const prompted = readCodePrompt(child, options.flow).pipe(
-    Effect.catch((failure) =>
-      watch
-        ? Fiber.join(done).pipe(
-            Effect.as(null),
-            Effect.mapError(() => failure),
-          )
-        : Effect.fail(failure),
-    ),
-  );
-  yield* Effect.forkScoped(Deferred.complete(prompt, prompted), { startImmediately: true });
+  // A CLI that saved a new sign-in and then stopped with a failure code signed in with no prompt, as
+  // one that exits with success: `done` decides. A timeout keeps the prompt's own message.
+  const afterFailedExit = watch
+    ? Fiber.join(done).pipe(
+        Effect.as(null),
+        Effect.mapError(
+          () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) }),
+        ),
+      )
+    : undefined;
+  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow, afterFailedExit)), {
+    startImmediately: true,
+  });
   return {
     child,
     done: Fiber.join(done),
@@ -148,7 +148,11 @@ export class CliCodeLoginFailed extends Schema.TaggedError<CliCodeLoginFailed>()
 }) {}
 
 // Output contains credentials and must not become a trace payload.
-const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: CliCodePrompt["flow"]) {
+const readCodePrompt = Effect.fnUntraced(function* (
+  child: ChildProcess,
+  flow: CliCodePrompt["flow"],
+  afterFailedExit?: Effect.Effect<null, CliCodeLoginFailed>,
+) {
   return yield* Effect.callback<CliCodePrompt | null, CliCodeLoginFailed>((resume) => {
     let output = "";
     let settled = false;
@@ -165,7 +169,13 @@ const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: C
       resume(result instanceof Error ? Effect.fail(new CliCodeLoginFailed({ cause: result })) : Effect.succeed(result));
     };
     const unavailable = () => settle(new Error(sourceText("error.provider.codeLoginNoLink")));
-    const exited = (code: number | null) => (code === 0 ? settle(null) : unavailable());
+    const exited = (code: number | null) => {
+      if (code === 0) return settle(null);
+      if (!afterFailedExit || settled) return unavailable();
+      settled = true;
+      cleanup();
+      resume(afterFailedExit);
+    };
     const read = (chunk: Buffer) => {
       if (output.length >= MAX_OUTPUT_CHARS) return;
       output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);
