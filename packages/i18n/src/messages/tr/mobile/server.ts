@@ -1357,7 +1357,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} bekleniyor.",
   "mobile.server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "mobile.server.update.disabledDescription":
-    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya o bilgisayarda Ayarlar > Güncellemeler bölümünü açıp “Sunucu üyelerinin güncelleme yapmasına izin ver” seçeneğini açmasını isteyin.",
   "mobile.server.update.managedTitle": "Güncellemeleri OpenBot Host Manager yönetiyor",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager, {name} sunucusunu günceller. Ana makine yöneticisiyle iletişime geçin.",

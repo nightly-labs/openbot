@@ -1488,7 +1488,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Oczekiwanie na: {reasons}.",
   "mobile.server.update.disabledTitle": "Zdalne aktualizacje są wyłączone",
   "mobile.server.update.disabledDescription":
-    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub włączenie tego ustawienia.",
+    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub o otwarcie sekcji Ustawienia > Aktualizacje na jego komputerze i włączenie „Zezwalaj członkom serwera na aktualizacje”.",
   "mobile.server.update.managedTitle": "Aktualizacjami zarządza Host Manager",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager aktualizuje serwer {name}. Skontaktuj się z administratorem hosta.",

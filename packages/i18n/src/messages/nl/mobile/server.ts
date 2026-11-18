@@ -1334,7 +1334,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Wachten op {reasons}.",
   "mobile.server.update.disabledTitle": "Externe updates staan uit",
   "mobile.server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates door serverleden uitgezet. Vraag deze persoon OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates door serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "mobile.server.update.managedTitle": "Een Host Manager beheert updates",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de hostbeheerder.",
