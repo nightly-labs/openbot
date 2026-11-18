@@ -14,7 +14,7 @@ import {
 } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { documentFocused } from "../../document-focus";
-import { documentSoftwareRendering } from "../../document-rendering";
+import { documentStillFaces } from "../../document-rendering";
 import { observeOnScreen } from "../../on-screen";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
@@ -256,9 +256,9 @@ function GeneratedAvatar(props: {
   const [interacting, setInteracting] = createSignal(false);
   const [prefersReduced, setPrefersReduced] = createSignal(prefersReducedMotion());
   const [onScreen, setOnScreen] = createSignal(true);
-  // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
-  // avatars of reduced motion, which run no animation loop.
-  const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
+  // On the CPU, six moving avatars took a third of a core. When faces stay still (by default on the
+  // CPU), avatars show as in reduced motion, with no animation loop.
+  const reducedMotion = () => prefersReduced() || documentStillFaces();
   const ambientMotion = useAmbientMotion();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));

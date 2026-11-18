@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Czcionka kodu",
   "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
   "settings.codeFont.default": "Domyślna",
+  "settings.motion.title": "Ruch",
+  "settings.backgroundBlur.title": "Rozmycie tła",
+  "settings.backgroundBlur.description":
+    "Rozmycie za menu i oknami dialogowymi. Na komputerze bez GPU jest na początku wyłączone.",
+  "settings.movingFaces.title": "Ruchome twarze agentów",
+  "settings.movingFaces.description":
+    "Twarze agentów mrugają i się ruszają. Na komputerze bez GPU są na początku nieruchome.",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",

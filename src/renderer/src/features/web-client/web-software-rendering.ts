@@ -1,5 +1,5 @@
 import { isString } from "@openbot/contracts/runtime-values";
-import { SOFTWARE_RENDERING_ATTRIBUTE } from "@openbot/ui/document-rendering";
+import { setDrawsOnCpu } from "../../motion-preference";
 
 /**
  * WebGL renderer names of the CPU: Chromium's SwiftShader, Mesa's llvmpipe, softpipe and lavapipe,
@@ -28,10 +28,11 @@ function browserDrawsOnCpu(): boolean {
 }
 
 /**
- * Sets the root attribute of the desktop's software rendering (`platform.tsx`) when this browser
- * draws on the CPU, as in a remote desktop on a server with no GPU. Each backdrop blur, the moving
- * avatars and the loading crew then stop. Call it before the loading screen shows.
+ * Tells the motion setting, as the desktop does (`platform.tsx`), when this browser draws on the CPU,
+ * as in a remote desktop on a server with no GPU. Each backdrop blur, the moving avatars and the
+ * loading crew then stop, unless the user turned them on in Settings. Call it before the loading
+ * screen shows.
  */
 export function markSoftwareRendering(): void {
-  if (browserDrawsOnCpu()) document.documentElement.setAttribute(SOFTWARE_RENDERING_ATTRIBUTE, "");
+  if (browserDrawsOnCpu()) setDrawsOnCpu(true);
 }
