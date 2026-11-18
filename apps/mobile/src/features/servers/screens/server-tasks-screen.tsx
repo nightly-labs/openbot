@@ -11,18 +11,16 @@ import { useNavigationState, useRoute } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Plus from "lucide-react-native/icons/plus";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Pressable, View, type ViewInstance } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DRAFT_THREAD_ID } from "@/features/chat/components/chat-thread-menu";
 import { useServerThreadReads } from "@/features/chat/components/use-agent-thread-reads";
 import { TaskListRow } from "@/features/servers/components/task-list-row";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
-import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
+import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -90,9 +88,6 @@ export function ServerTasksScreen() {
   const agent = agentId ? agentById.get(agentId) : undefined;
   const title = agent ? t("mobile.server.threads.agentTitle", { name: agent.name }) : t("mobile.app.route.threads");
   const canStart = hasServer && online && supported && agents.length > 0;
-  const scroll = useLargeTitleScroll();
-  const insets = useSafeAreaInsets();
-  const blurTarget = useRef<ViewInstance>(null);
   // The rows fill the width of the list, so they take it from here and do not measure themselves.
   const [listWidth, setListWidth] = useState<number>();
 
@@ -211,26 +206,16 @@ export function ServerTasksScreen() {
           />
         </Stack.Toolbar>
       )}
-      {/* The layout of `LargeTitleScrollView`, with a virtualized list in place of the scroll view. */}
-      <View className="flex-1 bg-sheet">
-        <AndroidBlurTarget target={blurTarget} surface="sheet">
+      {/* A virtualized list in place of the scroll view, so a long list of threads does not mount at once. */}
+      <LargeTitleScrollView
+        title={title}
+        caption={serverName}
+        renderScroll={(scrollProps, largeTitle) => (
           <Animated.FlatList
-            className="flex-1"
-            // The side insets (the iPhone Duo rail, the landscape cutout) go outside the list. With
-            // `always`, iOS would also inset the content by them, and the content would go off the other side.
-            style={{ marginLeft: insets.left, marginRight: insets.right }}
-            alwaysBounceVertical={false}
-            contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-            contentContainerClassName="pb-safe-offset-5"
-            // Without a content inset from iOS, the content starts below the transparent header.
-            contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
-            keyboardShouldPersistTaps="handled"
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator={false}
+            {...scrollProps}
             // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
             // crash with "The specified child already has a parent". iOS does not clip by default.
             removeClippedSubviews={false}
-            onScroll={scroll.onScroll}
             onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
             data={items}
             keyExtractor={itemKey}
@@ -238,7 +223,7 @@ export function ServerTasksScreen() {
             initialNumToRender={INITIAL_ROWS}
             ListHeaderComponent={
               <>
-                <LargeTitle scroll={scroll} title={title} caption={serverName} />
+                {largeTitle}
                 <View className="pt-1">
                   {note ? <EmptyNote text={note} /> : null}
                   {retry ? (
@@ -260,9 +245,8 @@ export function ServerTasksScreen() {
               </>
             }
           />
-        </AndroidBlurTarget>
-        <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
-      </View>
+        )}
+      />
     </>
   );
 }

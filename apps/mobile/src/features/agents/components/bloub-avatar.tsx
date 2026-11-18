@@ -30,7 +30,7 @@ import {
   plushPictureName,
   savedPlushPicture,
 } from "@/features/agents/model/plush/plush-picture";
-import { useAgentActivity, useAgentListActivity } from "@/features/workspace/components/use-agent-activity";
+import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import {
   DISCONNECTED_APPEARANCE,
   useConnectionAppearance,
@@ -54,8 +54,6 @@ interface BloubAvatarProps extends AgentPhotoProps {
   paused?: boolean;
   /** Turns the orbit rings around an agent photo while the agent works. A plush shows its felt dots. */
   rings?: boolean;
-  /** The face also shows the work and the waits of the agent's side threads, as the home list does. */
-  withThreads?: boolean;
 }
 
 /**
@@ -66,26 +64,22 @@ interface BloubAvatarProps extends AgentPhotoProps {
 type PlushTransition = "pop" | "cut";
 
 export function BloubAvatar({
-  withThreads = false,
   activityMood,
   ...props
 }: BloubAvatarProps & {
   /**
-   * The mood of the agent's activity (`agentActivityMood`), when the caller already reads the activity.
-   * The avatar then reads no activity itself, and `withThreads` has no effect.
+   * The mood of the agent's activity (`agentActivityMood`), when the caller already reads the activity,
+   * as the home list does with the work and the waits of the side threads. The avatar then reads no
+   * activity itself.
    */
   activityMood?: AvatarMood;
 }) {
   if (activityMood !== undefined) return <LiveBloubAvatar {...props} activityMood={activityMood} />;
-  return withThreads ? <ListBloubAvatar {...props} /> : <ChatBloubAvatar {...props} />;
+  return <ChatBloubAvatar {...props} />;
 }
 
-function ChatBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
+function ChatBloubAvatar(props: BloubAvatarProps) {
   return <LiveBloubAvatar {...props} activityMood={agentActivityMood(useAgentActivity(props.agentId))} />;
-}
-
-function ListBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
-  return <LiveBloubAvatar {...props} activityMood={agentActivityMood(useAgentListActivity(props.agentId))} />;
 }
 
 function LiveBloubAvatar({
@@ -100,7 +94,7 @@ function LiveBloubAvatar({
   paused = false,
   rings = false,
   activityMood,
-}: Omit<BloubAvatarProps, "withThreads"> & { activityMood: AvatarMood }) {
+}: BloubAvatarProps & { activityMood: AvatarMood }) {
   const serverId = useMobileWorkspaceSelector(
     (workspace) => hostId ?? workspace.agents.find((agent) => agent.id === agentId)?.serverId,
   );
