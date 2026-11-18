@@ -80,11 +80,17 @@ export function routineStatusForDelivery({ status, error }: Pick<QueueDelivery, 
 }
 
 /**
- * The reason a failed run keeps. A provider can end a turn as failed and send no error; the run then
- * showed "Routine failed" with no reason anywhere (#11627).
+ * The reason a run that fails keeps. A provider can end a turn as failed and send no error; the run
+ * then showed "Routine failed" with no reason anywhere (#11627). A run that failed already keeps the
+ * reason it has, so a run that failed before this change keeps its row and its finish time.
  */
-export function failedRunReason(error: string | null): string {
-  return error?.trim() ? error : sourceText("error.backend.routineRunFailedNoReason");
+export function failedRunReason(
+  error: string | null,
+  current: { status: string; error: string | null },
+): string | null {
+  if (error?.trim()) return error;
+  if (current.status === "failed") return current.error;
+  return sourceText("error.backend.routineRunFailedNoReason");
 }
 
 export type DeliveryInputItem =

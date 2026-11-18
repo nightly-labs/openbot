@@ -920,10 +920,9 @@ export class RoutineScheduler implements RoutineDueSource {
     if (!run || run.status === "cancelled") return false;
     const status = routineStatusForDelivery(delivery);
     if (run.status === "needs-attention" && ["starting", "running"].includes(delivery.status)) return false;
-    const error = status === "failed" ? failedRunReason(delivery.error) : delivery.error;
+    const error = status === "failed" ? failedRunReason(delivery.error, run) : delivery.error;
     if (run.status === status && run.error === error) return false;
-    // A new reason alone, such as the fallback for an older failed run, adds no second marker to the chat.
-    if (status === "queued" || run.status === status) this.#routines.updateRunStatus(run.id, status, error);
+    if (status === "queued") this.#routines.updateRunStatus(run.id, status, error);
     else this.#transitionRunWithConversation(run, status, error);
     return true;
   }

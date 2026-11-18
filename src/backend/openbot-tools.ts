@@ -521,7 +521,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_routines",
     description:
-      "List routines for this agent, or for another local agent when agentId is provided. Use this before updating or deleting a routine. routines has the schedule routines; webhookRoutines has the webhook routines with their event type, filters and URL. lastRun is the newest run: its status, time and, when it failed, the reason.",
+      "List routines for this agent, or for another local agent when agentId is provided. Use this before updating or deleting a routine. routines has the schedule routines; webhookRoutines has the webhook routines with their event type, filters and URL. lastRun is the newest run: its status, its time and, when there is one, its reason.",
     shape: { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
   },
   {

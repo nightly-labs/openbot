@@ -15,8 +15,9 @@
 // until the next change of the routine, also after a restart (#10048), and that the routine prompt
 // says that a request to a teammate is not a failure (#10928), and that a stop that the user asked
 // for is not a failure, which Test and script runs do not get (#11578). A run whose turn fails with no
-// error keeps a reason that says so, with one failed marker also after a later queue change, and
-// list_routines gives each routine its newest run with that reason (#11627).
+// error keeps a reason that says so, with one failed marker also after a later queue change, that an
+// older failed run with no reason stays as it was, and that list_routines gives each routine its
+// newest run with that reason (#11627).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -750,6 +751,21 @@ try {
     "list_routines gives the newest run with its reason",
     silentListed?.lastRun?.status === "failed" && silentListed.lastRun.reason === NO_REASON,
     silentListed?.lastRun ?? laterList,
+  );
+  // A run that failed with no reason before this change keeps its row and its finish time when a queue
+  // change reconciles its delivery again.
+  const olderRun = new AgentRoutineStore(store.database).updateRunStatus(silentRun.run.id, "failed", null);
+  const olderReceipt = await runCauseEffect(agents.sendMessage({ agentId: checker.id, text: "One more thing?" }));
+  const olderId = olderReceipt.deliveries[0]?.id;
+  assert.ok(olderId);
+  await waitFor("the next chat turn", () => ended(mailbox.getDelivery(olderId)?.delivery.status));
+  const olderAfter = agents
+    .listRoutineRuns({ agentId: checker.id, routineId: silent.id })
+    .find((run) => run.id === silentRun.run.id);
+  pass(
+    "An older failed run with no reason stays as it was",
+    olderAfter?.status === "failed" && olderAfter.error === null && olderAfter.updatedAt === olderRun.updatedAt,
+    olderAfter,
   );
   const healthAfter = agents
     .listRoutineRuns({ agentId: checker.id, routineId: health.id })

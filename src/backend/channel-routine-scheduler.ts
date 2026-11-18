@@ -487,7 +487,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   /** Writes only on a change, so a channel that publishes often does not rewrite every run row. */
   #settle(run: ChannelRoutineRun, next: { status: ChannelRoutineRunStatus; error: string | null }): boolean {
-    const error = next.status === "failed" ? failedRunReason(next.error) : next.error;
+    const error = next.status === "failed" ? failedRunReason(next.error, run) : next.error;
     if (run.status === next.status && run.error === error) return false;
     this.#routines.updateRunStatus(run.id, next.status, error);
     return true;
