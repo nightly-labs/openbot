@@ -17,11 +17,11 @@ import { documentFocused } from "../../document-focus";
 import { documentSoftwareRendering } from "../../document-rendering";
 import { observeOnScreen } from "../../on-screen";
 
-// Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
-// for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
-// The bloub patch in `patches/` waits between capped frames instead of asking for every display
-// frame. Each of those frames also restyled every running CSS animation in the window.
-const AVATAR_FPS = 30;
+// Cap avatar animation at 60fps. Uncapped bloub clocks asked for every display frame and
+// measured 30% renderer / 24% GPU for two visible avatars. The bloub patch in `patches/` waits
+// between capped frames instead. With 100 working agents, 60fps against 30fps
+// measured renderer 74% -> 79% and GPU 25% -> 30% of one core; the main process did not change.
+const AVATAR_FPS = 60;
 
 interface PlushMood {
   state: PlushState;
