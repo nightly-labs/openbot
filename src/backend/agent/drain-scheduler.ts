@@ -85,6 +85,18 @@ const TURN_START_GRACE_MS = 5 * 60_000;
  */
 const PROVIDER_SESSION_BUSY_RETRY_MS = 15_000;
 const PROVIDER_SESSION_BUSY_RETRY_MAX_MS = 2 * 60_000;
+/** How many times in a row a session that did not open in time tries again before its message fails. */
+const SESSION_RESUME_TIMEOUT_RETRIES = 3;
+
+/**
+ * The retries of an agent whose provider could not open a session: the busy refusals in a row, whether
+ * a retry waits, and the sessions in a row that did not open in time (#11607).
+ */
+interface SessionRetry {
+  refusals: number;
+  waiting: boolean;
+  resumeTimeouts: number;
+}
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -262,8 +274,9 @@ export class DrainScheduler {
   /**
    * Agents whose provider refused to open a session because a stopped prompt still runs in it, with
    * the refusals in a row and whether a retry waits. No event tells when that prompt ends (#9938).
+   * A session that did not open in time waits here too (#11607).
    */
-  readonly #busyRetries = new Map<string, { refusals: number; waiting: boolean }>();
+  readonly #busyRetries = new Map<string, SessionRetry>();
   /**
    * The `scheduleDrain` calls of each agent. A start that a call overtook is not held: the call can
    * be the end of the provider's turn, and no later one would come.
@@ -559,12 +572,11 @@ export class DrainScheduler {
   }
 
   /**
-   * Drains the agent again after a wait, once for all its lanes that the busy session refused. A
-   * turn that starts, `forgetAgent` and `dispose` end the retry.
+   * Drains the agent again after a wait, once for all its lanes that the busy session refused or
+   * whose session did not open in time. A turn that starts, `forgetAgent` and `dispose` end the retry.
    */
   #retryBusySession(agentId: string): Effect.Effect<void> {
-    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false };
-    this.#busyRetries.set(agentId, entry);
+    const entry = this.#busyRetryEntry(agentId);
     if (entry.waiting) return Effect.void;
     entry.waiting = true;
     entry.refusals += 1;
@@ -578,6 +590,26 @@ export class DrainScheduler {
       this.scheduleDrain(agentId);
     });
     return Effect.asVoid(Effect.forkDetach(retry.pipe(Effect.delay(delay))));
+  }
+
+  /**
+   * Counts one session that did not open in time. False after the last try: that message fails, and
+   * the next message gets all its tries and the shortest wait again, as after a turn that starts.
+   */
+  #mayRetryResume(agentId: string): boolean {
+    const entry = this.#busyRetryEntry(agentId);
+    if (entry.resumeTimeouts >= SESSION_RESUME_TIMEOUT_RETRIES) {
+      this.#busyRetries.delete(agentId);
+      return false;
+    }
+    entry.resumeTimeouts += 1;
+    return true;
+  }
+
+  #busyRetryEntry(agentId: string): SessionRetry {
+    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: 0 };
+    this.#busyRetries.set(agentId, entry);
+    return entry;
   }
 
   /**
@@ -1270,18 +1302,30 @@ export class DrainScheduler {
           // agent's provider signed out. Nothing ran, and `mayDrain` holds the messages until that turn
           // ends or the provider is signed in again.
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
+          // The session did not open in time. Codex opens the sessions of all its agents one at a time,
+          // so when many agents start together, the last ones wait behind the others past the request
+          // timeout (#11607). Nothing ran, so the messages wait and try again, a limited number of times.
+          const resumeTimedOut =
+            isRequestTimeout(error, "thread/resume") && this.#mayRetryResume(delivery.recipientAgentId);
           if (
             error instanceof ProviderTurnActiveError ||
+            resumeTimedOut ||
             (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
           ) {
             if (
-              error instanceof ProviderTurnActiveError &&
+              (error instanceof ProviderTurnActiveError || resumeTimedOut) &&
               (this.#drainCalls.get(delivery.recipientAgentId) ?? 0) === drainCallsAtStart
             )
               this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-            if (error instanceof ProviderSessionBusyError) yield* this.#retryBusySession(delivery.recipientAgentId);
+            if (resumeTimedOut)
+              logger.warn("A session did not open in time. Its messages try again.", {
+                agentId: delivery.recipientAgentId,
+                provider: error.providerName,
+              });
+            if (error instanceof ProviderSessionBusyError || resumeTimedOut)
+              yield* this.#retryBusySession(delivery.recipientAgentId);
             return;
           }
           // The provider of a routine run did not start, such as with no internet connection. Nothing
