@@ -271,6 +271,13 @@ export interface AcpFlavor {
    */
   thoughtsInsideAnswer?: true;
   /**
+   * The agent continues a dropped answer in a new model step of the same turn, so a thought after
+   * answer text, with no tool call between, does not end the answer. A tool call or the end of the
+   * turn still does. A line break joins the two parts when neither side has a space at the seam.
+   * `report` is the agent's notice of the dropped stream, which shows as a thought.
+   */
+  resumesAnswerAfterThought?: { report: RegExp };
+  /**
    * `session/prompt` stays open with no update while background tasks run, so a silent turn is not
    * stalled and OpenBot does not end it (`ACP_TURN_STALL_MS`). A prompt that gets no update at all
    * is sent again once, and then fails (`ACP_FIRST_UPDATE_MS`).

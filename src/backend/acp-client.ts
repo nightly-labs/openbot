@@ -289,6 +289,8 @@ interface AcpTurn {
   sdkFailureAt: number | null;
   /** Where the answer text stood when a tool call that the model wrote as text started (`AcpFlavor.sdkHarness.textToolCall`). */
   textToolCallAt: number | null;
+  /** A thought came after the open answer text (`AcpFlavor.resumesAnswerAfterThought`). */
+  answerPaused: boolean;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -2794,6 +2796,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       sessionLost: false,
       sdkFailureAt: null,
       textToolCallAt: null,
+      answerPaused: false,
       answerOptional,
       messages: [],
       toolNames: new Map(),
@@ -3634,6 +3637,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.providerError = quota;
         return;
       }
+      // Antigravity reports a dropped stream and continues the same answer in a new step (#11805).
+      // The report is a thought, so the answer before it stays in the answer.
+      if (this.#flavor.resumesAnswerAfterThought?.report.test(update.content.text)) {
+        turn.receivedOutput = true;
+        this.#appendThought(thread, turn, update.content.text.trim());
+        this.#completeThought(thread, turn);
+        return;
+      }
       // A harness reports a dropped stream as answer text, and then sends the retried answer (#1471).
       // The report gets its own muted item, so it is not joined to the answer around it. When no
       // retried answer comes, the partial reply and the report become the answer.
@@ -3699,6 +3710,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
       }
       const held = turn.sdkFailureAt !== null || turn.textToolCallAt !== null;
+      // The answer goes on after a thought. Joined with no space, "the quick" and "brown fox" were one word.
+      if (turn.answerPaused && text) {
+        turn.answerPaused = false;
+        if (!/\s$/u.test(turn.text) && !/^\s/u.test(text)) text = `\n${text}`;
+      }
       if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
@@ -3852,6 +3868,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // CLI's warning line ("\n⚠ ...") made the next step's answer the error (#7479).
     turn.sdkFailureAt = null;
     turn.textToolCallAt = null;
+    turn.answerPaused = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
     turn.messageChunks = 0;
@@ -3872,7 +3889,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #appendThought(thread: AcpThread, turn: AcpTurn, text: string): void {
-    if (!this.#flavor.thoughtsInsideAnswer) this.#completeMessage(thread, turn, "commentary");
+    // Held text (a failure or a tool call written as text) still ends at a thought, as before.
+    const resumes =
+      this.#flavor.resumesAnswerAfterThought !== undefined &&
+      turn.text.trim() !== "" &&
+      turn.sdkFailureAt === null &&
+      turn.textToolCallAt === null;
+    if (resumes) turn.answerPaused = true;
+    else if (!this.#flavor.thoughtsInsideAnswer) this.#completeMessage(thread, turn, "commentary");
     /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
        thought lands in an ordinary agentMessage and renders as a chat bubble. */
     if (!turn.thoughtStarted) {
