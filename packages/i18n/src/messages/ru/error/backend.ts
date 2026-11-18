@@ -270,8 +270,7 @@ export const messages = {
     "Этот сервер просит войти, а OpenBot входит только по https. Измените URL на {url}.",
   "error.backend.mcpSignInCancelled": "Вход отменён.",
   "error.backend.mcpSignInTimedOut": "Вход в браузере не был завершён.",
-  "error.backend.mcpSignInRefused":
-    "Страница входа не дала доступ. Войдите снова или проверьте свою учётную запись в этом сервисе.",
+  "error.backend.mcpSignInRefused": "Страница входа отказала в доступе. Войдите снова.",
   "error.backend.mcpSignInResponseTimedOut": "Ответ на вход не пришёл вовремя.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot не удалось прочитать сведения о входе для этого сервера. Проверьте адрес сервера и повторите попытку.",

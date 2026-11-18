@@ -261,8 +261,7 @@ export const messages = {
     "이 서버에 로그인해야 하는데, OpenBot은 https로만 로그인해요. URL을 {url}(으)로 변경하세요.",
   "error.backend.mcpSignInCancelled": "로그인이 취소되었어요.",
   "error.backend.mcpSignInTimedOut": "브라우저에서 로그인을 마치지 않았어요.",
-  "error.backend.mcpSignInRefused":
-    "로그인 페이지에서 접근을 허용하지 않았어요. 다시 로그인하거나 해당 서비스의 계정을 확인하세요.",
+  "error.backend.mcpSignInRefused": "로그인 페이지에서 접근을 거부했어요. 다시 로그인하세요.",
   "error.backend.mcpSignInResponseTimedOut": "로그인 응답이 제시간에 도착하지 않았어요.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",
