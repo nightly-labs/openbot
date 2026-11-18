@@ -6,3 +6,4 @@
 - Channel transcripts update at most four times a second while agents write in them, and the unread
   counts on the web client and the phone app update at most once a second while events arrive. Before,
   each streamed piece of text read the channel and the unread counts again.
+- The window no longer stops updating when an agent's badge in the sidebar goes away.
