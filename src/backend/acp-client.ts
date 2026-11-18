@@ -1223,7 +1223,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* thread.relays;
     if (thread.transport) return yield* thread.transport.stop(Effect.void);
     yield* providerCall(() =>
-      this.#transport.connection?.closeSession({ sessionId: thread.id }).catch(() => undefined),
+      this.#transport.connection?.closeSession({ sessionId: thread.id, ...this.#forcedClose }).catch(() => undefined),
     );
   });
 
@@ -1829,6 +1829,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close);
   }
 
+  /**
+   * The `_meta` of a `session/close` that unloads the session, for an agent that advertises it. Devin
+   * CLI 3000.14.30821 keeps a session after a plain close, and a later `session/load` keeps the MCP
+   * servers that the session got first. OpenBot then refused their old token, and each OpenBot tool
+   * call of that agent failed until Devin stopped (#12082).
+   */
+  get #forcedClose(): { _meta?: { "cognition.ai/force": true } } {
+    const meta = this.#initialization?.agentCapabilities?.sessionCapabilities?.close?._meta;
+    return meta?.["cognition.ai/force"] === true ? { _meta: { "cognition.ai/force": true } } : {};
+  }
+
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
@@ -1934,10 +1945,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
     else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
       this.#stopThreadSubagents(requestedThreadId);
-      yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
-        this.#backgroundTimeout("session/close"),
-        Effect.ignore,
-      );
+      yield* providerCall(() =>
+        this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
+      ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
+    }
+    // Devin CLI 3000.14.30821 runs its sessions in a background process that outlives OpenBot for
+    // about 10 minutes, and a load joins a session that it still holds, with the MCP servers of the
+    // OpenBot that opened it. After a restart, each OpenBot tool call failed (#12082).
+    else if (!held && this.#forcedClose._meta) {
+      yield* providerCall(() =>
+        this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
+      ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
     }
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
