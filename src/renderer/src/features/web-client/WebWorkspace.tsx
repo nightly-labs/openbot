@@ -295,6 +295,7 @@ import {
   remoteMcpSignIn,
   remoteUpdateServer,
   serverCanAdminister,
+  serverCanManageMcp,
   serverRoleCanAdminister,
   serverRotatesHostKey,
 } from "../servers/server-capabilities";
@@ -2112,11 +2113,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return;
       }
       const description = readableAgentError(event.message);
-      if (claimErrorToast(description))
-        toast.error(t("webClient.error.hostReported"), {
+      if (!claimErrorToast(description)) return;
+      // As on desktop: an MCP server that a provider could not use is not a failure of the server,
+      // and the button opens the Marketplace, which holds the MCP servers, for a user who can manage them.
+      if (event.code === "mcp_server_not_started") {
+        toast.error(t("agent.error.mcpNotStarted"), {
           ...{ description },
-          report: { operation: "other", source: "system", cause_code: "unknown" },
+          ...(serverCanManageMcp(server())
+            ? { action: { label: t("agent.error.openMarketplace"), onClick: openMarketplace } }
+            : {}),
+          report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
         });
+        return;
+      }
+      toast.error(t("webClient.error.hostReported"), {
+        ...{ description },
+        report: { operation: "other", source: "system", cause_code: "unknown" },
+      });
     }),
   );
   const channelOpen = () => channels.state.selectedId !== null;

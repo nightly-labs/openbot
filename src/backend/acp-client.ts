@@ -53,6 +53,7 @@ import {
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
+import { MCP_PROVIDER_FAILURE_TEXT, mcpProviderFailureKind } from "./agent/provider-diagnostics";
 import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
@@ -3468,6 +3469,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * other dropped servers are reported. A server of the agent's own settings is not OpenBot's to
    * report, and OpenBot's own servers are in no settings that the user can change: theirs goes to the
    * diagnostics only.
+   *
+   * A server that asks for a sign-in, or that did not answer in time, gets the sentence that the
+   * provider runtime shows for the agent's stderr line of the same failure. Grok writes both, and the
+   * user got two toasts, one of them with the `rmcp` transport text. The reason goes to the log.
    */
   #reportMcpServerFailure(thread: AcpThread, { name, reason }: AcpMcpServerFailure): void {
     const server = thread.restore.mcpServers.find((entry) => entry.name === name);
@@ -3476,18 +3481,40 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.emit("diagnostic", this.#redact(`${this.#label} could not start OpenBot's MCP server ${name}: ${reason}`));
       return;
     }
-    this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
+    const kind = mcpProviderFailureKind(reason);
+    if (kind === "failed") {
+      this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
+      return;
+    }
+    const saved = this.#savedMcpServerName(thread.cwd, name);
+    logger.warn("An ACP agent could not start an MCP server.", {
+      provider: this.provider,
+      server: saved,
+      reason: this.#redact(reason),
+    });
+    this.options.reportMcpDrops?.(this.provider, [
+      {
+        name: saved,
+        reason: "failed_in_provider",
+        detail: sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: this.#label, name: saved }),
+      },
+    ]);
   }
 
   /** Reports a server that OpenBot gave and the agent did not start, by the name that the user saved. */
   #reportFailedMcpServer(cwd: string, name: string, detail: string): void {
+    this.options.reportMcpDrops?.(this.provider, [
+      { name: this.#savedMcpServerName(cwd, name), reason: "failed_to_start", detail },
+    ]);
+  }
+
+  /** The name that the user saved for the server that the agent knows as `name`. */
+  #savedMcpServerName(cwd: string, name: string): string {
     const own = this.#ownMcpServerNames(cwd);
     const configured = this.options
       .mcpServers?.()
       .find((config) => acpMcpServerName(config, own, this.#flavor.mcpServerName) === name);
-    this.options.reportMcpDrops?.(this.provider, [
-      { name: configured?.name ?? name, reason: "failed_to_start", detail },
-    ]);
+    return configured?.name ?? name;
   }
 
   /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
