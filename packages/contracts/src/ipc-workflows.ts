@@ -503,51 +503,93 @@ export interface WorkflowGraph {
   strokes: WorkflowStroke[];
 }
 
+type LoopEdge = { id: string; from: string; to: string; branch?: WorkflowBranch };
+
 /**
  * The edges that go back to an earlier step and so close a loop. The host runs them as the next
- * pass of the loop and the canvas draws them as loops, so both must pick the same edges. A walk goes
- * depth first from the nodes that no edge enters, then from the rest, each in canvas order; an edge
- * to a node that the walk is still inside is a loop edge. Without the loop edges, the graph has no
- * loop.
+ * pass of the loop and the canvas draws them as loops, so both must pick the same edges.
+ *
+ * A loop is a group of nodes that each reach all the others. Its loop edges are the edges from inside
+ * the group to its start node. When edges from outside enter the group at more than one node, the
+ * start is the one that a condition branch inside the group goes back to, so that an extra edge into
+ * the loop, such as the task to a reviewer, does not move the start. Otherwise, as before, the start
+ * is the node of the group that a walk reaches first: depth first from the nodes that no edge enters,
+ * then from the rest, each in canvas order. The group without its loop edges can hold smaller loops,
+ * which get their loop edges the same way. Without the loop edges, the graph has no loop.
  */
-export function workflowLoopEdges(
-  nodes: readonly { id: string }[],
-  edges: readonly { id: string; from: string; to: string }[],
-): Set<string> {
-  const next = new Map<string, { id: string; to: string }[]>();
-  const entered = new Set<string>();
-  for (const edge of edges) {
-    const list = next.get(edge.from);
-    if (list) list.push(edge);
-    else next.set(edge.from, [edge]);
-    entered.add(edge.to);
-  }
-  const loops = new Set<string>();
-  const done = new Set<string>();
-  const open = new Set<string>();
-  const starts = [...nodes.filter((node) => !entered.has(node.id)), ...nodes.filter((node) => entered.has(node.id))];
-  // Without recursion: a long chain must not reach the stack limit.
-  for (const { id: start } of starts) {
-    if (done.has(start)) continue;
-    const stack = [{ id: start, index: 0 }];
-    open.add(start);
-    for (let top = stack.at(-1); top; top = stack.at(-1)) {
-      const edge = next.get(top.id)?.[top.index];
-      if (!edge) {
-        stack.pop();
-        open.delete(top.id);
-        done.add(top.id);
-        continue;
-      }
-      top.index += 1;
-      if (open.has(edge.to)) loops.add(edge.id);
-      else if (!done.has(edge.to)) {
-        open.add(edge.to);
-        stack.push({ id: edge.to, index: 0 });
-      }
+export function workflowLoopEdges(nodes: readonly { id: string }[], edges: readonly LoopEdge[]): Set<string> {
+  const order = walkOrder(nodes, edges);
+  const loops = new Set(edges.filter((edge) => edge.from === edge.to).map((edge) => edge.id));
+  const pending = [new Set(nodes.map((node) => node.id))];
+  for (let group = pending.pop(); group; group = pending.pop()) {
+    const inside = edges.filter((edge) => group.has(edge.from) && group.has(edge.to) && !loops.has(edge.id));
+    for (const loop of loopGroups(group, inside)) {
+      const entries = [...loop].filter((id) => edges.some((edge) => edge.to === id && !loop.has(edge.from)));
+      const decided = entries.filter((id) =>
+        inside.some((edge) => edge.to === id && edge.branch !== undefined && loop.has(edge.from)),
+      );
+      const rank = (id: string) => order.get(id) ?? Number.MAX_SAFE_INTEGER;
+      const start = (decided.length > 0 ? decided : [...loop]).reduce((a, b) => (rank(b) < rank(a) ? b : a));
+      for (const edge of inside) if (edge.to === start && loop.has(edge.from)) loops.add(edge.id);
+      pending.push(loop);
     }
   }
   return loops;
+}
+
+/** The nodes in the order of a depth-first walk from the nodes that no edge enters, then from the rest. */
+function walkOrder(nodes: readonly { id: string }[], edges: readonly LoopEdge[]): Map<string, number> {
+  const next = edgesFrom(edges);
+  const entered = new Set(edges.map((edge) => edge.to));
+  const starts = [...nodes.filter((node) => !entered.has(node.id)), ...nodes.filter((node) => entered.has(node.id))];
+  const order = new Map<string, number>();
+  // Without recursion: a long chain must not reach the stack limit.
+  for (const { id: start } of starts) {
+    const stack = [start];
+    for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+      if (order.has(id)) continue;
+      order.set(id, order.size);
+      for (const edge of [...(next.get(id) ?? [])].reverse()) if (!order.has(edge.to)) stack.push(edge.to);
+    }
+  }
+  return order;
+}
+
+/** The groups of more than one node of `group` in which each node reaches all the others by `inside`. */
+function loopGroups(group: ReadonlySet<string>, inside: readonly LoopEdge[]): Set<string>[] {
+  const next = edgesFrom(inside);
+  const back = edgesFrom(inside.map((edge) => ({ ...edge, from: edge.to, to: edge.from })));
+  const placed = new Set<string>();
+  const loops: Set<string>[] = [];
+  for (const id of group) {
+    if (placed.has(id)) continue;
+    const behind = reachable(id, back);
+    const loop = new Set([...reachable(id, next)].filter((each) => behind.has(each)));
+    for (const each of loop) placed.add(each);
+    if (loop.size > 1) loops.push(loop);
+  }
+  return loops;
+}
+
+function edgesFrom(edges: readonly LoopEdge[]): Map<string, LoopEdge[]> {
+  const map = new Map<string, LoopEdge[]>();
+  for (const edge of edges) {
+    const list = map.get(edge.from);
+    if (list) list.push(edge);
+    else map.set(edge.from, [edge]);
+  }
+  return map;
+}
+
+function reachable(origin: string, next: ReadonlyMap<string, readonly LoopEdge[]>): Set<string> {
+  const seen = new Set([origin]);
+  for (let pending = [origin], id = pending.pop(); id !== undefined; id = pending.pop())
+    for (const edge of next.get(id) ?? [])
+      if (!seen.has(edge.to)) {
+        seen.add(edge.to);
+        pending.push(edge.to);
+      }
+  return seen;
 }
 
 export type WorkflowGraphProblem = "annotation" | "port" | "branch" | "condition-branch" | "duplicate";
