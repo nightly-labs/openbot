@@ -151,16 +151,11 @@ function ProviderUpdateFlow(props: {
     const update = updates().find((update) => update.provider === id);
     if (update) showProviderUpdateToast(update, () => startUpdate(id));
     running.add(id);
-    const waitMs = props.waitMs;
-    if (waitMs === undefined) {
-      runDownload(id);
-      return;
-    }
-    setRuntime(id, { phase: "downloading", progress: 0, message: sourceText("status.provider.updateWaiting") });
-    timers.add(window.setTimeout(() => runDownload(id), waitMs));
+    runDownload(id, props.waitMs);
   }
 
-  function runDownload(id: ManagedProviderId): void {
+  /** With `waitMs`, the download ends first, and the install waits that long for Claude's turn (#11613). */
+  function runDownload(id: ManagedProviderId, waitMs?: number): void {
     setRuntime(id, { phase: "downloading", progress: 0, message: null });
     let progress = 0;
     const interval = window.setInterval(() => {
@@ -178,12 +173,20 @@ function ProviderUpdateFlow(props: {
       setRuntime(id, { phase: "downloading", progress });
       if (progress < 100) return;
       clearTimers();
-      setRuntime(id, { phase: "finishing", progress: 100 });
-      timers.add(
-        window.setTimeout(() => {
-          setRuntime(id, { phase: "ready", progress: 100, version: AVAILABLE[id] ?? INSTALLED[id] });
-        }, FINISHING_DELAY),
-      );
+      const finish = () => {
+        setRuntime(id, { phase: "finishing", progress: 100, message: null });
+        timers.add(
+          window.setTimeout(() => {
+            setRuntime(id, { phase: "ready", progress: 100, version: AVAILABLE[id] ?? INSTALLED[id] });
+          }, FINISHING_DELAY),
+        );
+      };
+      if (waitMs === undefined) {
+        finish();
+        return;
+      }
+      setRuntime(id, { phase: "downloading", progress: 100, message: sourceText("status.provider.updateWaiting") });
+      timers.add(window.setTimeout(finish, waitMs));
     }, PROGRESS_INTERVAL);
     timers.add(interval);
   }
@@ -326,7 +329,7 @@ export const Playground: Story = {
 /** The offer, on both surfaces at once. */
 export const UpdateAvailable: Story = {};
 
-/** Press Update: Claude runs a turn, so the update waits for it on both surfaces, then downloads. */
+/** Press Update: Claude runs a turn, so the update downloads, then waits for the turn on both surfaces, then installs. */
 export const WaitsForTurn: Story = {
   render: () => <ProviderUpdateFlow controls waitMs={3_000} />,
 };
