@@ -473,8 +473,13 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   /** A file that cannot be deleted only uses disk space, so the model stays ready. */
   #removeRetiredFilesOrWarn(): Effect.Effect<void> {
     return this.removeRetiredFiles().pipe(
-      Effect.catch(() =>
-        Effect.sync(() => logger.warn(`Could not remove the old files of the ${this.modelId} model.`)),
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          logger.warn(
+            `Could not remove the old files of the ${this.modelId} model.`,
+            downloadFailureReason(error.cause),
+          ),
+        ),
       ),
     );
   }
