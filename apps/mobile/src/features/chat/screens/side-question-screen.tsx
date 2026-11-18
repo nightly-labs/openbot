@@ -175,9 +175,14 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     if (failures > 0) cancelSend.current();
   }, [failures]);
 
+  // A Send that asks nothing, such as while the last question waits for its answer, keeps Send open.
+  const [ignoredSends, setIgnoredSends] = useState(0);
   const ask = (value: string) => {
     const question = value.trim();
-    if (!question || !canAsk || asking) return;
+    if (!question || !canAsk || asking) {
+      setIgnoredSends((count) => count + 1);
+      return;
+    }
     Keyboard.dismiss();
     void haptics.impact();
     motion.beginSend();
@@ -284,7 +289,7 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
             </Typography.Paragraph>
           ) : null}
           <ChatComposer
-            sendRetryVersion={failures}
+            sendRetryVersion={failures + ignoredSends}
             replyTarget={null}
             replyFocusVersion={0}
             onCancelReply={() => {}}
