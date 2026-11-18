@@ -186,6 +186,7 @@ import type {
   WorkflowWebhookSecret,
 } from "@openbot/contracts/ipc";
 import type {
+  AgentWebhookSecret,
   EventActivity,
   EventRoutine,
   EventRoutineOwner,
@@ -866,6 +867,8 @@ export interface MobileWorkspaceContextValue {
   canManageMissedRuns: (serverId: string) => boolean;
   /** An owner or admin of a host with `routine-results-v1`: an agent routine can send its answers on. */
   canManageRoutineResults: (serverId: string) => boolean;
+  /** An owner or admin of a host with `webhook-agent-secret-v1`: an agent can get its routine's secret. */
+  canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   /** The host's enabled messaging connections, with the places that each one can post in. */
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
   loadRoutineResultDestination: (
@@ -883,6 +886,8 @@ export interface MobileWorkspaceContextValue {
   deleteEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
   testEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
   rotateEventRoutineSecret: (input: EventRoutineRef, serverId: string) => Promise<WebhookSecret>;
+  /** Gives a new signing secret to the routine's agent as an API key. The result has only the key name. */
+  giveEventRoutineSecretToAgent: (input: EventRoutineRef, serverId: string) => Promise<AgentWebhookSecret>;
   listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemorySelection: (agentId: string, serverId: string) => Promise<AgentMemorySelectionState | null>;
@@ -1388,6 +1393,7 @@ type ServerCheckKey =
   | "canManageEvents"
   | "canManageMissedRuns"
   | "canManageRoutineResults"
+  | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"
   | "canManageSharedTables"
   | "canManageAgentFolders"

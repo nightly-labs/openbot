@@ -469,6 +469,7 @@ export const messages = defineMessages("chat", {
   "chat.suggestion.undo": "Undo",
   "chat.suggestion.localOnly": "Connect {name} in OpenBot on your own computer.",
   "chat.suggestion.unavailable": "This server cannot connect {name}.",
+  "chat.suggestion.notAllowed": "Only the server owner or an admin can connect {name}.",
   "chat.mcpSignIn.signIn": "Sign in",
   "chat.mcpSignIn.signInNamed": "Sign in to {name}",
   "chat.mcpSignIn.signedIn": "Signed in",

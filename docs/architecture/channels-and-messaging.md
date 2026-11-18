@@ -739,7 +739,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   from a direct message. The two outbound tools, `messaging_list_places` and `messaging_post`, are
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
-  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
+  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
+  (the secret rules of `redactText`; an email address that the agent wrote stays).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a

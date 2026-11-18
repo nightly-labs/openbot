@@ -641,9 +641,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents können sich erst wieder mit Ihren geteilten Zugangsdaten anmelden, wenn Sie sich erneut anmelden.",
   "connector.protonPass.reconnect": "Neu verbinden",
-  "connector.protonPass.planTitle": "Proton Pass braucht einen bezahlten Plan",
+  "connector.protonPass.planTitle": "Proton Pass braucht einen Plan mit Pass Plus",
   "connector.protonPass.planDescription":
-    "Die Proton Pass CLI funktioniert nur mit einem bezahlten Proton-Plan. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
+    "Die Proton Pass CLI braucht einen Proton-Plan, der Pass Plus enthält. Andere bezahlte Pläne wie Mail Plus enthalten sie nicht. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
   "connector.protonPass.vaultTitle": "Geteilter Tresor",
   "connector.protonPass.vaultDescription":
     "Agents können sich mit den Zugangsdaten in diesem Tresor anmelden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",

@@ -26,6 +26,8 @@ import {
   IconButton,
   Maximize2,
   PanelRight,
+  Pin,
+  PinOff,
   Plus,
   X,
 } from "@openbot/ui";
@@ -136,7 +138,7 @@ function isOwn(message: AgentMessage): boolean {
  * True when the host's copy of a pending message has arrived. An earlier message with the same text is
  * not the copy. When the mark is no longer in the list, all the messages are later.
  */
-function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
+export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
   return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
@@ -153,6 +155,10 @@ export function AgentDockChat(props: {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onClose: () => void;
+  /** True while the chat stays open when the dock window loses the focus. The pin's label says what a click does. */
+  pinned?: boolean | undefined;
+  /** The header shows "Keep open" only when it is set. */
+  onPinChange?: ((pinned: boolean) => void) | undefined;
   onRemove: () => void;
   /** Puts a temporary seat on the dock. */
   onAdd: () => void;
@@ -174,7 +180,9 @@ export function AgentDockChat(props: {
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
-  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const pending = createMemo(() =>
+    props.pending.filter((message) => !pendingMessageDelivered(message, props.chat.messages)),
+  );
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
   const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);
@@ -383,6 +391,20 @@ export function AgentDockChat(props: {
           <strong>{name()}</strong>
           <span>{subtitle()}</span>
         </div>
+        <Show when={props.onPinChange}>
+          {(change) => (
+            <IconButton
+              label={props.pinned ? t("agent.dock.closeOnLeave") : t("agent.dock.keepOpen")}
+              variant="ghost"
+              class="agent-dock-icon"
+              onClick={() => change()(!props.pinned)}
+            >
+              <Show when={props.pinned} fallback={<Pin aria-hidden="true" />}>
+                <PinOff aria-hidden="true" />
+              </Show>
+            </IconButton>
+          )}
+        </Show>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger class="agent-dock-icon" aria-label={t("agent.dock.more")}>
             <Ellipsis aria-hidden="true" />

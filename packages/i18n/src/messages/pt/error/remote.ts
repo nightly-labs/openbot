@@ -86,7 +86,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Somente o proprietário pode remover este servidor.",
   "error.remote.requestTimeout": "O tempo da solicitação remota esgotou.",
   "error.remote.requestFailed": "A solicitação remota falhou.",
-  "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",
+  "error.remote.hostKeyMissing":
+    "O OpenBot não pode verificar este servidor porque a chave de segurança dele está ausente ou mudou. Peça ao proprietário do servidor para verificá-lo.",
+  "error.remote.connectionNotStarted":
+    "O OpenBot não conseguiu iniciar a conexão com este servidor. Se isso continuar, feche o OpenBot e abra-o novamente.",
   "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
   "error.remote.hostDisconnected":

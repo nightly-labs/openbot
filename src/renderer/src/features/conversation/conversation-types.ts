@@ -10,6 +10,7 @@ import type {
   AgentTask,
   AgentWait,
   AttachmentSummary,
+  AvatarColor,
   AvatarImageInput,
   BrowserControlState,
   BrowserTab,
@@ -302,6 +303,11 @@ export interface ConversationProps {
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
   /**
+   * The chat color on the reader's account, or null for none. Undefined when the account service is
+   * from before chat colors; then the reader's member on the server gives it.
+   */
+  currentUserChatColor?: AvatarColor | null | undefined;
+  /**
    * Is the stamped sender of a message the reader? Only another person's message draws a face and a
    * name; a message with no sender is the reader's own, as every message was before senders.
    */
@@ -334,6 +340,8 @@ export interface ConversationProps {
    * limit. The waiting block names it for each agent that this agent asked.
    */
   agentWaits?: Record<string, SidebarAgentWait> | undefined;
+  /** The page of the browser takeover in each agent's own chat, by agent. "Take over" in the waiting block opens it. */
+  agentTakeoverTabIds?: Record<string, string> | undefined;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
   /**

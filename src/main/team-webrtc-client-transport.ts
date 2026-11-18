@@ -135,6 +135,33 @@ interface TeamWebRtcClientTransportOptions {
    * direction, and each account service read waits all of it. The Signal socket does not wait.
    */
   developmentRoundTripMs?: number;
+  /**
+   * Development only (`OPENBOT_DEV_DOWNLINK_KBPS`, 0 in a packaged app): the speed of the link from the
+   * host, in kilobits per second, to measure a large download on a real network. A message waits until
+   * the bytes before it and its own bytes have come in at this speed, in order.
+   */
+  developmentDownlinkKbps?: number;
+}
+
+type DataListener = (
+  hostId: string,
+  channel: "rpc" | "events" | "files" | "desktop",
+  data: string | ArrayBuffer,
+) => void;
+
+/**
+ * Development only: delays each message by half the added round trip and, with a speed, by the time
+ * that its bytes take on that link after the bytes before it. The order stays.
+ */
+function developmentLink(listener: DataListener, halfRoundTripMs: number, downlinkKbps: number): DataListener {
+  if (halfRoundTripMs <= 0 && downlinkKbps <= 0) return listener;
+  let linkFreeAt = 0;
+  return (hostId, channel, data) => {
+    const now = performance.now();
+    const bytes = typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
+    linkFreeAt = Math.max(now, linkFreeAt) + (downlinkKbps > 0 ? (bytes * 8) / downlinkKbps : 0);
+    setTimeout(() => listener(hostId, channel, data), linkFreeAt - now + halfRoundTripMs);
+  };
 }
 
 interface ActiveHost {
@@ -256,10 +283,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
     options.bridge.on("connected", this.#onConnected);
     options.bridge.on("disconnected", this.#onDisconnected);
-    options.bridge.on(
-      "data",
-      half > 0 ? (...args) => void setTimeout(() => this.#onData(...args), half) : this.#onData,
-    );
+    options.bridge.on("data", developmentLink(this.#onData, half, options.developmentDownlinkKbps ?? 0));
     options.bridge.on("path", this.#onPath);
     options.bridge.on("error", this.#onError);
     options.bridge.on("signalReady", this.#onSignalReady);
@@ -956,8 +980,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
       hostPublicKey = this.#hostPublicKeys.get(hostId);
     }
+    // The failure has its own code, so the user is not told that the host is down (#11530).
     if (!hostPublicKey)
-      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.pinnedKeyMissing")) });
+      return yield* new RemoteWorkflowError({
+        cause: new TeamWebRtcConnectError("host_key_missing", sourceText("error.remote.hostKeyMissing")),
+      });
     const connectTrace = this.#options.connectTrace;
     // The hidden window of the bridge loads while the control plane makes the session and the ticket.
     // `bridge.connect` below waits for the same start. A failure here is not this attempt's failure:
@@ -1152,6 +1179,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           peer: "client",
           ...(waitForHost ? { waitForHost: true } : {}),
         }),
+      ).pipe(
+        // The connect command fails only on this computer: the bridge window did not start or did not
+        // answer. Signal and the host report their failures later, as events with their own codes.
+        Effect.mapError(
+          () =>
+            new RemoteWorkflowError({
+              cause: new TeamWebRtcConnectError("bridge_failed", sourceText("error.remote.connectionNotStarted")),
+            }),
+        ),
       );
       yield* this.#assertCurrentEffect(hostId, active, connectedSessionId);
       yield* Deferred.await(connected);
@@ -1336,7 +1372,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     // The handshake started on the channel that closed, and a new channel does not start it again.
     // Without this, the attempt and each caller that joined it waited for the 30 s timeout.
     if (!active.connected && active.authentication?.started)
-      active.cancelConnectionWait?.(new Error(sourceText("error.remote.hostDisconnected")));
+      active.cancelConnectionWait?.(
+        new TeamWebRtcConnectError("host_disconnected", sourceText("error.remote.hostDisconnected")),
+      );
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
     this.#lastEventSequence.delete(hostId);

@@ -77,8 +77,8 @@ import { VideoGeneration } from "./VideoGeneration";
 let lastContentBlocks: { body: string; streaming: boolean; blocks: MessageContentBlock[] } | undefined;
 
 /**
- * The content blocks of a body. The bubble variant and the message body both split the same body
- * for each streamed step, so the last result is kept. Callers do not change the result.
+ * The content blocks of a body. The last result is kept, so a step that does not change the body
+ * does not split it again. Callers do not change the result.
  */
 function sharedContentBlocks(body: string, streaming: boolean): MessageContentBlock[] {
   if (lastContentBlocks?.body !== body || lastContentBlocks.streaming !== streaming) {
@@ -107,9 +107,8 @@ export function conversationBubbleVariant(message: AgentMessage): BubbleVariant 
   if (message.author === "you") return "secondary";
   if (message.imageGeneration || message.videoGeneration || (!message.body.trim() && message.attachments?.length))
     return "ghost";
-  const contentBlocks = sharedContentBlocks(message.body, message.streaming === true);
-  if (contentBlocks.some((block) => block.type === "table" || block.type === "comparison-table")) return "muted";
-  return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
+  // Code and tables stay in the bubble, so each reply of an agent has the same shape and chat color.
+  return "muted";
 }
 
 function cssDurationMs(style: CSSStyleDeclaration, property: string, fallback: number): number {
@@ -587,7 +586,7 @@ export function MessageBody(props: {
       previous ?? [],
       props.message.author !== "agent"
         ? [{ type: "text", text }]
-        : // The preview stays out of the shared cache, which the bubble variant fills with the full body.
+        : // The preview stays out of the shared cache, which holds the full body.
           folded
           ? messageContentBlocks(text, false)
           : sharedContentBlocks(text, streamingBody.revealing()),

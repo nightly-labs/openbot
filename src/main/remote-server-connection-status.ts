@@ -78,10 +78,18 @@ export function hostUnreachable(
  * A WebRTC attempt to connect that ended with no transport error event, such as a timeout. It stays
  * a network issue, so the workspace stays on screen and the app tries again. The failure gives the
  * reference, and also the sentence when it is one of our fixed connection sentences (#6873).
+ * A failure with no reference ended before the attempt reached the host, so its sentence does not
+ * say that the host is not reachable (#11530).
  */
 export function classifyConnectFailure(failure: unknown): RemoteConnectionOutcome {
-  const message = failure instanceof Error && isSafeConnectionError(failure.message) ? failure.message : undefined;
-  return hostUnreachable(errorReference(failure) ?? "transport/connect_failed", message);
+  const reference = errorReference(failure);
+  const message =
+    failure instanceof Error && isSafeConnectionError(failure.message)
+      ? failure.message
+      : reference === null
+        ? sourceText("error.remote.connectionNotStarted")
+        : undefined;
+  return hostUnreachable(reference ?? "transport/connect_failed", message);
 }
 
 export function classifyRemoteConnectionError(error: unknown): RemoteConnectionOutcome {

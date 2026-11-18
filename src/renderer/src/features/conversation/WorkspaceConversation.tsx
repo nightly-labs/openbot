@@ -33,7 +33,7 @@ import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
-import { agentThreadAttention } from "../agents/agent-thread-attention";
+import { agentTakeoverTabIds, agentThreadAttention } from "../agents/agent-thread-attention";
 import { useAgents } from "../agents/agents-context";
 import { agentsPort } from "../agents/agents-port";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
@@ -237,6 +237,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       usageLimits: usageLimits(),
     }),
   );
+  /** The browser takeovers that wait on the server. */
+  const pendingTakeovers = createMemo(() =>
+    Object.values(pendingPrompts()).flatMap((event) =>
+      event?.type === "browser-takeover-requested" ? [event.request] : [],
+    ),
+  );
+  const agentTakeoverTabs = createMemo(() => agentTakeoverTabIds(agentList(), pendingTakeovers()));
 
   const activeApproval = createMemo(() => {
     const agent = activeAgent();
@@ -463,9 +470,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       tabs: agentThreads,
       approvals: approvals(),
       prompts: Object.values(pendingPrompts()).filter((event) => event?.type === "prompt"),
-      takeovers: Object.values(pendingPrompts()).flatMap((event) =>
-        event?.type === "browser-takeover-requested" ? [event.request] : [],
-      ),
+      takeovers: pendingTakeovers(),
       newThreadTitle: t("conversation.threads.new"),
       onRespondApproval: (approval, decision, options) =>
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
@@ -638,6 +643,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
+        currentUserChatColor={props.account().chatColor}
         isOwnSender={isOwnSender}
         // The browser and the remote desktop show in the main window only.
         browserEnabled={
@@ -676,6 +682,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         messageFocusRequest={messageFocusRequest()}
         onSelectAgent={selectAgent}
         agentWaits={agentWaits()}
+        agentTakeoverTabIds={agentTakeoverTabs()}
         onUpdateAgent={updateConversationAgent}
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}

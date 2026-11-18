@@ -315,6 +315,8 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import {
+  type AgentWebhookSecret,
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -392,6 +394,7 @@ import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
+import { WEBHOOK_AGENT_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
@@ -720,6 +723,17 @@ export function setEventRoutineSecret(
   input: SetWebhookSecretInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WEBHOOK_SENDER_SECRET_ROUTES.set, ignoreResponse, eventBody(input)));
+}
+
+/**
+ * Gives the agent of the routine a new signing secret as an API key. Only a host with
+ * `webhook-agent-secret-v1` answers it.
+ */
+export function giveEventRoutineSecretToAgent(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<AgentWebhookSecret, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, decodeAgentWebhookSecret, eventBody(input)));
 }
 
 /** Asks the host to send one signed test event to the routine. Only a host with `webhook-tests-v1` answers it. */

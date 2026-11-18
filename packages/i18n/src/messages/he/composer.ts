@@ -128,6 +128,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "לא הוקלט דיבור.",
   "composer.voice.noSpeechDetected": "לא זוהה דיבור.",
   "composer.voice.readFailed": "לא ניתן להקריא את התשובה.",
+  "composer.voice.languageUnsupported": "לא ניתן להקריא את התשובה. השפה הזו עדיין לא זמינה.",
   "composer.error.saveEditTryAgain": "לא ניתן לשמור את העריכה הזו במחשב הזה. יש לנסות שוב.",
   "composer.error.saveUnconfirmed": "השמירה לא אושרה. יש לנסות לשמור שוב כדי לבדוק את התוצאה.",
   "composer.error.changeModel": "לא ניתן לשנות מודל. יש לנסות שוב.",

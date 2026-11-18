@@ -20,6 +20,8 @@
  *   custom-limit server still gets sites.
  * - `replace-retry`: two failed replaces of a site fill the upload slots. A third replace of that site frees
  *   the oldest one and publishes; the uploads of new sites keep their slots (#11929).
+ * - `idle-new-upload`: a new site whose first upload stopped holds the free pool's slot, and the list does not show
+ *   it. A new site of the pool takes the slot when the upload had no file upload for a minute (#12207).
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -41,6 +43,7 @@ const SCENARIOS = [
   "race",
   "account-cap",
   "replace-retry",
+  "idle-new-upload",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 
@@ -206,6 +209,23 @@ class Account {
         z.unknown(),
       );
     }
+  }
+
+  /** Moves the start and the file uploads of the account's uploads `ms` into the past. */
+  backdateUploads(ms: number, files: boolean) {
+    const id = quote(this.id);
+    d1(
+      [
+        `UPDATE site_deployments SET created_at = created_at - ${ms} WHERE user_id = ${id} AND status = 'uploading'`,
+        ...(files
+          ? [
+              `UPDATE site_upload_files SET uploaded_at = uploaded_at - ${ms}
+               WHERE deployment_id IN (SELECT id FROM site_deployments WHERE user_id = ${id})`,
+            ]
+          : []),
+      ].join("; "),
+      z.unknown(),
+    );
   }
 
   private headers(server: Server | null, extra: Record<string, string> = {}): Record<string, string> {
@@ -495,6 +515,45 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       !refused.ok && refused.code === "upload_session_limit",
       refused.ok ? "a slot was freed" : refused.code,
     );
+  },
+
+  async "idle-new-upload"(account) {
+    const pool = account.addServer("pool");
+    const stopped = await account.start(pool);
+    if (!stopped.ok) throw new Error(`The upload was refused: ${stopped.code} ${stopped.message}`);
+    await expectList("idle-new-upload", "the stopped upload holds the slot, not shown", account, pool, {
+      limit: 1,
+      used: 1,
+      reason: "shared",
+      sites: 0,
+    });
+    // A live publish keeps its slot: a second publish at the same time is refused, as in `race`.
+    expectRefused(
+      "idle-new-upload",
+      "a live upload keeps the slot",
+      await account.publish(pool),
+      "share 1 active site",
+    );
+    const put = await account.put(stopped.upload, stopped.body);
+    record("idle-new-upload", "the stopped upload sends its file", put.ok, String(put.status));
+    account.backdateUploads(61_000, false);
+    expectRefused(
+      "idle-new-upload",
+      "a recent file upload keeps the slot",
+      await account.publish(pool),
+      "share 1 active site",
+    );
+    account.backdateUploads(61_000, true);
+    expectPublished("idle-new-upload", "a new site takes the slot of the idle upload", await account.publish(pool));
+    const late = await account.put(stopped.upload, stopped.body);
+    const code = late.ok ? "accepted" : errorSchema.parse(await late.json()).error.code;
+    record("idle-new-upload", "the idle upload is closed", code === "upload_expired", code);
+    await expectList("idle-new-upload", "the pool holds 1 site", account, pool, {
+      limit: 1,
+      used: 1,
+      reason: "shared",
+      sites: 1,
+    });
   },
 };
 

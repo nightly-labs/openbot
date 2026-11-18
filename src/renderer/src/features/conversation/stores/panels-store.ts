@@ -6,10 +6,12 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
+import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
 import { createAttachmentDownloads } from "../attachment-downloads";
@@ -488,6 +490,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     );
   }
 
+  /**
+   * Opens a file that a message of a side thread links to, as the chat does. A file name that a chip joins
+   * to a folder opens as written, from the workspace of `agentId`, when the folder has no such file.
+   */
+  function openThreadFile(kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) {
+    const written = asWritten && agentId ? () => openWorkspaceFile(asWritten, undefined, agentId) : undefined;
+    if (kind === "shared") openSharedFile(path, "tab", written);
+    else if (agentId) openWorkspaceFile(path, undefined, agentId, "tab", undefined, written);
+  }
+
   /** The agent whose workspace the shown file or folder is in, so that its links open there too. */
   function previewWorkspaceAgentId(): string | undefined {
     const source = deps.sidebarFilePreview()?.source;
@@ -799,6 +811,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentAction,
     attachmentDownloads,
     openSharedFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
@@ -827,8 +840,19 @@ function filePreviewError(error: unknown, path: string): string {
   if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
     return t("attachment.error.fileNotFound", { name });
   }
-  return errorMessage(error, t("attachment.error.previewFile", { name }));
+  const fallback = t("attachment.error.previewFile", { name });
+  const message = errorMessage(error, fallback);
+  // The host names the missing path. A sentence with a full path shows only the fallback, and a retry
+  // does not find the path either (#9010).
+  return message === fallback && matchingSourceKeys(normalizeMessage(error)).some((key) => MISSING_PATH_KEYS.has(key))
+    ? t("attachment.error.fileNotFound", { name })
+    : message;
 }
+
+const MISSING_PATH_KEYS = new Set([
+  "error.backend.workspacePathMissing",
+  "error.backend.workspacePathMissingForMember",
+]);
 
 /** The same file content, so a read again need not replace the shown one. */
 function samePreview(next: FilePreview, shown: FilePreview): boolean {

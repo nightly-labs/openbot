@@ -1012,6 +1012,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "ב-Proton Pass יש ליצור מפתח גישה שיכול לקרוא רק את הכספת שמשותפת עם OpenBot, ואז להדביק אותו כאן. {host} שומר את המפתח; הטלפון הזה לא.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "המסלול שלך ב-Proton לא כולל את כלי שורת הפקודה של Proton Pass. נדרש מסלול Proton שכולל Pass Plus. מסלולים בתשלום אחרים, כמו Mail Plus, לא כוללים אותו. יש לשנות את מסלול החשבון ולהתחבר שוב.",
   // A password manager that the host connects through its CLI. {name} is the manager, such as
   // Proton Pass. {date} is a date, such as 5 Nov 2026.
   "mobile.server.connectors.passwordManager.unavailable": "{name} לא זמין בשרת הזה.",
@@ -1046,8 +1048,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "קריאה בלבד",
   "mobile.server.connectors.passwordManager.keyExpires": "קריאה בלבד. תוקף עד {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "פג תוקף ב-{date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "כלי שורת הפקודה של {name} דורש מסלול בתשלום. יש לשנות את מסלול החשבון ולהתחבר שוב.",
   "mobile.server.connectors.passwordManager.expiredTitle": "תוקף המפתח של {name} פג",
   "mobile.server.connectors.passwordManager.expiredBody":
     "סוכנים ב-{host} לא יוכלו להתחבר עם ההתחברויות המשותפות שלך עד להתחברות מחדש.",

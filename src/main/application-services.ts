@@ -50,6 +50,7 @@ import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
+import { AttachmentPreviews } from "./attachment-previews";
 import {
   type BrowserProfileService,
   browserProxyConnection,
@@ -286,7 +287,12 @@ import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
+import {
+  agentWebhookRoutineWriter,
+  HostEventsService,
+  hostAgentWebhookKeys,
+  type WebhookDeliveryReport,
+} from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
@@ -448,7 +454,12 @@ import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
-import { macShipItDirectory, UPDATE_HANDOVER_FILE } from "./update-install-guard";
+import {
+  macShipItDirectory,
+  readNotInstalledUpdate,
+  UPDATE_HANDOVER_FILE,
+  UPDATE_INSTALL_RECORD_FILE,
+} from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
@@ -1893,12 +1904,15 @@ export async function createApplicationServices({
     preferredPort: MCP_OAUTH_REDIRECT_PORT,
     deliver: (state, code, query) => {
       const elsewhere = mcpOAuthAuthority?.openedElsewhere(state) ?? false;
+      // Read before the grant is handed over, which ends the wait that holds it. A relayed sign-in
+      // and one opened elsewhere end on another computer, which no answer reports back to here.
+      const exchange = elsewhere ? null : (mcpOAuthAuthority?.grantExchange(state) ?? null);
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code))
         return signInRelayClient.deliver(state, query) ? "relayed" : false;
       if (elsewhere) return true;
       const current = windows.getMainWindow();
       if (current && !current.isDestroyed()) showMainWindow(current);
-      return true;
+      return exchange ? Effect.runPromise(exchange) : true;
     },
     relayRefusal: (state, query) => {
       signInRelayClient.deliver(state, query);
@@ -3065,6 +3079,10 @@ export async function createApplicationServices({
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
+    agentKeys: hostAgentWebhookKeys(
+      agentApiKeys,
+      (agentId) => store.list().find((agent) => agent.id === agentId)?.name,
+    ),
     workflows: {
       receive: (delivery) => workflowRuntime.receiveWebhook(delivery),
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
@@ -3525,6 +3543,8 @@ export async function createApplicationServices({
   // start gives it to Sunshine again. So it stays in memory: the remote desktop also starts when the
   // system keyring or the macOS Keychain is not available.
   const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
+  // Small copies of image attachments, for the cards of the Workflows canvas here and on joined clients.
+  const attachmentPreviews = new AttachmentPreviews(join(app.getPath("userData"), "attachment-previews"));
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3535,6 +3555,7 @@ export async function createApplicationServices({
     skills,
     sidebarLayout,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: teamChatStore,
     channels: service.channels,
@@ -4060,6 +4081,8 @@ export async function createApplicationServices({
   );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
+  // Development only: the speed of the link from a host, for `scripts/workflow-canvas-pictures-perf-e2e.ts`.
+  const developmentDownlinkKbps = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_DOWNLINK_KBPS) || 0);
   installRemoteSyncProfileSink(
     remoteSyncProfileFile({
       isPackaged: app.isPackaged,
@@ -4142,6 +4165,7 @@ export async function createApplicationServices({
         connectTrace,
         sessionCache: remoteSessionCache,
         developmentRoundTripMs,
+        developmentDownlinkKbps,
       }),
     },
   );
@@ -4509,6 +4533,10 @@ export async function createApplicationServices({
       ? {
           shipItDirectory: macShipItDirectory(),
           handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE),
+          installRecordPath: join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE),
+          notInstalledVersion: Effect.runSync(
+            readNotInstalledUpdate(join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE), app.getVersion()),
+          ),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
         }
       : {}),

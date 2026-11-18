@@ -133,6 +133,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "No se grabó ninguna voz.",
   "composer.voice.noSpeechDetected": "No se detectó ninguna voz.",
   "composer.voice.readFailed": "No se pudo leer la respuesta en voz alta.",
+  "composer.voice.languageUnsupported": "No se pudo leer la respuesta en voz alta. Este idioma aún no está disponible.",
   "composer.error.saveEditTryAgain": "No se pudo guardar esta edición en este equipo. Vuelve a intentarlo.",
   "composer.error.saveUnconfirmed":
     "No se ha confirmado que se haya guardado. Vuelve a pulsar Guardar para comprobar el resultado.",

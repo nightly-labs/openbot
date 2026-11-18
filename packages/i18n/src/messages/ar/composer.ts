@@ -128,6 +128,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "لم يتم تسجيل أي كلام.",
   "composer.voice.noSpeechDetected": "لم يتم اكتشاف أي كلام.",
   "composer.voice.readFailed": "تعذّرت قراءة الرد بصوت عالٍ.",
+  "composer.voice.languageUnsupported": "تعذّرت قراءة الرد بصوت عالٍ. هذه اللغة غير متاحة بعد.",
   "composer.error.saveEditTryAgain": "تعذّر حفظ هذا التعديل على هذا الحاسوب. حاول مرة أخرى.",
   "composer.error.saveUnconfirmed": "الحفظ غير مؤكد. أعد محاولة الحفظ للتحقق من النتيجة.",
   "composer.error.changeModel": "تعذّر تغيير النموذج. حاول مرة أخرى.",

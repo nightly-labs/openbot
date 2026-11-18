@@ -123,6 +123,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "没有录到语音。",
   "composer.voice.noSpeechDetected": "未检测到语音。",
   "composer.voice.readFailed": "无法朗读回复。",
+  "composer.voice.languageUnsupported": "无法朗读回复。暂不支持这种语言。",
   "composer.error.saveEditTryAgain": "无法在这台电脑上保存这次编辑，请重试。",
   "composer.error.saveUnconfirmed": "保存未确认，请再次点击保存以检查结果。",
   "composer.error.changeModel": "无法切换模型，请重试。",

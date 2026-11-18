@@ -743,6 +743,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Erstelle in Proton Pass einen Zugriffsschlüssel, der nur den mit OpenBot geteilten Tresor lesen kann, und füge ihn hier ein. {host} speichert den Schlüssel, dieses Telefon nicht.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Dein Proton-Tarif enthält das Befehlszeilentool von Proton Pass nicht. Es braucht einen Proton-Tarif, der Pass Plus enthält. Andere bezahlte Tarife wie Mail Plus enthalten es nicht. Ändere den Tarif deines Kontos und verbinde dann erneut.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} ist auf diesem Server nicht verfügbar.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Melde dich auf diesem Telefon bei {name} an. Dann erstellt {host} einen geteilten Tresor und einen schreibgeschützten Zugriffsschlüssel dafür und speichert nur diesen Schlüssel. Agenten sehen nie ein Passwort.",
@@ -772,8 +774,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Nur Lesen",
   "mobile.server.connectors.passwordManager.keyExpires": "Nur Lesen. Läuft am {date} ab.",
   "mobile.server.connectors.passwordManager.keyExpired": "Abgelaufen am {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Das Befehlszeilentool von {name} erfordert einen kostenpflichtigen Tarif. Ändere den Tarif deines Kontos und verbinde dann erneut.",
   "mobile.server.connectors.passwordManager.expiredTitle": "Der Schlüssel für {name} ist abgelaufen",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agenten auf {host} können sich erst wieder mit deinen geteilten Logins anmelden, wenn du erneut verbindest.",

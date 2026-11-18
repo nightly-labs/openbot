@@ -478,6 +478,7 @@ export const messages = {
   "chat.suggestion.undo": "Ongedaan maken",
   "chat.suggestion.localOnly": "Koppel {name} in OpenBot op je eigen computer.",
   "chat.suggestion.unavailable": "Deze server kan {name} niet koppelen.",
+  "chat.suggestion.notAllowed": "Alleen de servereigenaar of een beheerder kan {name} verbinden.",
   "chat.mcpSignIn.signIn": "Inloggen",
   "chat.mcpSignIn.signInNamed": "Inloggen bij {name}",
   "chat.mcpSignIn.signedIn": "Ingelogd",

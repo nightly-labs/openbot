@@ -81,7 +81,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Удалить этот сервер может только владелец.",
   "error.remote.requestTimeout": "Время удалённого запроса истекло.",
   "error.remote.requestFailed": "Удалённый запрос не удался.",
-  "error.remote.pinnedKeyMissing": "У удалённого хоста нет закреплённого ключа устройства.",
+  "error.remote.hostKeyMissing":
+    "OpenBot не может проверить этот сервер: его ключ безопасности отсутствует или изменился. Попросите владельца сервера проверить сервер.",
+  "error.remote.connectionNotStarted":
+    "OpenBot не удалось начать подключение к этому серверу. Если проблема повторяется, закройте OpenBot и откройте его снова.",
   "error.remote.hostDidNotConnect": "Хост WebRTC не подключился.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
   "error.remote.hostDisconnected":

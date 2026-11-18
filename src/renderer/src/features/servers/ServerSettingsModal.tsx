@@ -39,6 +39,7 @@ import {
   ShieldCheck,
   Smile,
   Sparkles,
+  Store,
   Tabs,
   Text,
   UsersRound,
@@ -314,6 +315,11 @@ export interface ServerSettingsModalProps {
   openFirstSectionRequest?: number | undefined;
   /** Called when a request opened a section. The page then clears its search. */
   onFirstSectionOpened?: (() => void) | undefined;
+  /**
+   * Opens Marketplace > Apps of this server. Connectors and MCP servers moved there from these
+   * settings, so the search shows a result that opens it. Absent: the search does not show it.
+   */
+  onOpenMarketplaceApps?: (() => void) | undefined;
 }
 
 export interface ServerHostedSitesOptions {
@@ -644,7 +650,16 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       (item) => matchingSections().includes(item) || (item.value === section() && sectionSupported(item.value)),
     ),
   );
-  /** Each new request of the page opens the first section that the search finds, and the page clears its search. */
+  /** Whether the search finds "Connectors and MCP servers", which opens Marketplace > Apps. */
+  const marketplaceAppsMatches = () => {
+    const needle = props.sectionQuery?.trim().toLocaleLowerCase();
+    if (!needle || !props.onOpenMarketplaceApps) return false;
+    return t("app.settingsPage.marketplaceApps").toLocaleLowerCase().includes(needle);
+  };
+  /**
+   * Each new request of the page opens the first section that the search finds, or else Marketplace >
+   * Apps when the search finds only that, and the page clears its search.
+   */
   let handledOpenFirstRequest = untrack(() => props.openFirstSectionRequest ?? 0);
   createEffect(
     () => props.openFirstSectionRequest ?? 0,
@@ -652,15 +667,16 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       if (request === handledOpenFirstRequest) return;
       handledOpenFirstRequest = request;
       const first = untrack(matchingSections)[0];
-      if (!first) return;
-      setSection(first.value);
+      if (first) setSection(first.value);
+      else if (untrack(marketplaceAppsMatches)) untrack(() => props.onOpenMarketplaceApps?.());
+      else return;
       untrack(() => props.onFirstSectionOpened?.());
     },
   );
   /** What a screen reader hears while the user types a search. */
   const searchStatus = () => {
     if (!props.sectionQuery?.trim()) return "";
-    const count = matchingSections().length;
+    const count = matchingSections().length + (marketplaceAppsMatches() ? 1 : 0);
     return count > 0 ? t("app.settingsPage.resultCount", { count }) : t("app.settingsPage.noResults");
   };
   const members = createServerMembersSection(
@@ -929,7 +945,26 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 }}
               </For>
             </Tabs.List>
-            <Show when={matchingSections().length === 0}>
+            {/* As in the user settings search: the result names the Marketplace, then the row. */}
+            <Show when={marketplaceAppsMatches()}>
+              <ul class="settings-page-results" aria-label={t("app.settingsPage.results")}>
+                <li>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="settings-page-result"
+                    onClick={() => props.onOpenMarketplaceApps?.()}
+                  >
+                    <span class="settings-page-result-section">
+                      <Store aria-hidden="true" />
+                      {t("marketplace.title")}
+                    </span>
+                    <span class="settings-page-result-title">{t("app.settingsPage.marketplaceApps")}</span>
+                  </Button>
+                </li>
+              </ul>
+            </Show>
+            <Show when={matchingSections().length === 0 && !marketplaceAppsMatches()}>
               <p class="settings-page-empty">{t("app.settingsPage.noResults")}</p>
             </Show>
             <span class="sr-only" role="status">

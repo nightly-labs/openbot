@@ -137,6 +137,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Aucune parole n’a été enregistrée.",
   "composer.voice.noSpeechDetected": "Aucune parole n’a été détectée.",
   "composer.voice.readFailed": "Impossible de lire la réponse à voix haute.",
+  "composer.voice.languageUnsupported":
+    "Impossible de lire la réponse à voix haute. Cette langue n’est pas encore disponible.",
   "composer.error.saveEditTryAgain": "Impossible d’enregistrer cette modification sur cet ordinateur. Réessayez.",
   "composer.error.saveUnconfirmed":
     "L’enregistrement n’est pas confirmé. Relancez l’enregistrement pour vérifier le résultat.",

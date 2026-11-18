@@ -79,7 +79,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "يمكن للمالك فقط إزالة هذا الخادم.",
   "error.remote.requestTimeout": "انتهت مهلة الطلب البعيد.",
   "error.remote.requestFailed": "فشل الطلب البعيد.",
-  "error.remote.pinnedKeyMissing": "لا يملك المضيف البعيد مفتاح جهاز مثبّتًا.",
+  "error.remote.hostKeyMissing":
+    "لا يمكن لـ OpenBot التحقق من هذا الخادم لأن مفتاح الأمان الخاص به مفقود أو تغيّر. اطلب من مالك الخادم فحص الخادم.",
+  "error.remote.connectionNotStarted":
+    "تعذّر على OpenBot بدء الاتصال بهذا الخادم. إذا استمرت المشكلة، فأغلق OpenBot ثم افتحه مرة أخرى.",
   "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
   "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",

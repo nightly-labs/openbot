@@ -191,6 +191,11 @@ export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined)
   return serverCanAdminister(server, "webhook-sender-secret-v1");
 }
 
+/** Whether a person can give the signing secret of an agent's webhook routine to that agent: this computer, or a joined server with `webhook-agent-secret-v1`. */
+export function serverGivesWebhookSecretToAgent(server: ServerSummary | undefined): boolean {
+  return serverCanAdminister(server, "webhook-agent-secret-v1");
+}
+
 /**
  * Whether the Marketplace can sign in to a joined server's MCP server for this computer: the user
  * manages the host's MCP servers, and the host relays its sign-ins (`sign-in-relay-v1`), so the page

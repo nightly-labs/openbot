@@ -77,6 +77,14 @@ export interface AttachmentProtocolDependencies {
   remoteServers: RemoteServerManager;
 }
 
+/**
+ * True when the address asks for the small copy of a picture: `?preview=1`. Only a joined server's
+ * file has one. A file of this computer reads from its disk in some milliseconds.
+ */
+function asksForPreview(url: URL): boolean {
+  return url.searchParams.get("preview") === "1";
+}
+
 export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
   const logger = createOpenBotLogger("attachment-protocol");
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
@@ -110,7 +118,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
       const attachment = await runCauseEffect(
-        remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
+        asksForPreview(url)
+          ? remoteServers.downloadAttachmentPreview(attachmentId, serverId)
+          : remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
       );
       return bytesResponse(
         attachment.bytes,

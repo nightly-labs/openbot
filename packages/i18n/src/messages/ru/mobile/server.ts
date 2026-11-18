@@ -810,6 +810,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Создайте в Proton Pass ключ доступа, который может читать только хранилище, открытое для OpenBot, и вставьте его сюда. {host} хранит ключ; этот телефон — нет.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Ваш тариф Proton не включает инструмент командной строки Proton Pass. Нужен тариф Proton, который включает Pass Plus. Другие платные тарифы, например Mail Plus, его не включают. Измените тариф аккаунта, затем подключитесь снова.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} недоступен на этом сервере.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Войдите в {name} на этом телефоне. Затем {host} создаст общее хранилище и ключ доступа только для чтения к нему и будет хранить только этот ключ. Агенты никогда не видят пароль.",
@@ -843,8 +845,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Только чтение",
   "mobile.server.connectors.passwordManager.keyExpires": "Только чтение. Истекает {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Истёк {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Для инструмента командной строки {name} нужен платный тариф. Измените тариф аккаунта, затем подключитесь снова.",
   "mobile.server.connectors.passwordManager.expiredTitle": "Срок действия ключа {name} истёк",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Агенты на {host} не смогут входить с вашими общими логинами, пока вы не подключитесь снова.",
