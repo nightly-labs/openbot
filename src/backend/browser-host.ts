@@ -663,6 +663,7 @@ export class BrowserHost {
   readonly #quitShortcut: (input: Input) => boolean;
   readonly #siteMemories: (agentId: string, hostname: string) => BrowserSiteMemory[];
   readonly #userBrowsing: BrowserUserBrowsing | null;
+  readonly #hideFromWindowSwitchers: (window: BaseWindow) => void;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   /** The state path, or the fallback file while the state path holds the file of a newer release. */
@@ -769,6 +770,11 @@ export class BrowserHost {
        * on. Omitted, nothing is recorded.
        */
       userBrowsing?: BrowserUserBrowsing;
+      /**
+       * Keeps the background window out of macOS window switchers, such as AltTab. The window of a local
+       * server is never shown, so its background window stays on screen while that server runs.
+       */
+      hideFromWindowSwitchers?: (window: BaseWindow) => void;
     } = {},
   ) {
     this.#window = window;
@@ -792,6 +798,7 @@ export class BrowserHost {
     this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#siteMemories = options.siteMemories ?? (() => []);
     this.#userBrowsing = options.userBrowsing ?? null;
+    this.#hideFromWindowSwitchers = options.hideFromWindowSwitchers ?? (() => {});
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
@@ -4646,6 +4653,7 @@ export class BrowserHost {
    */
   #openBackgroundWindow(): BaseWindow {
     const background = createBackgroundWindow();
+    this.#hideFromWindowSwitchers(background);
     background.once("closed", () => {
       if (this.#backgroundWindow !== background) return;
       this.#backgroundWindow = null;

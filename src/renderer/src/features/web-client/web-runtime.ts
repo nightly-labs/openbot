@@ -165,7 +165,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -195,6 +195,12 @@ import {
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+  type ServerSafeModeReason,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
+import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -207,7 +213,6 @@ import {
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -273,6 +278,7 @@ import { toast } from "@openbot/ui/toast";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
+import { readWebHostCompatibility } from "./web-host-compatibility";
 import {
   createWebHostConnections,
   type WebHostConnections,
@@ -446,6 +452,8 @@ export interface WebWorkspaceRuntime {
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
   download(attachmentId: string): Promise<WebFile>;
+  /** A small copy of an image attachment (`attachment-preview-v1`), or the file when the host makes none. */
+  downloadPreview(attachmentId: string): Promise<WebFile>;
   /** A file under the host's shared folder. */
   sharedFile(path: string): Promise<WebFile>;
   /** A file in one agent's workspace on the host. */
@@ -546,14 +554,21 @@ export interface WebRuntimeEvents {
   hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
 
-/** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
+/**
+ * The host speaks no Team API protocol that this web build speaks, or it is in safe mode
+ * (`server-safe-mode-v1`) and answers only with the reason. The workspace shows it in full.
+ */
 export class WebHostIncompatibleError extends Error {
-  readonly code: "client_update_required" | "host_update_required";
+  readonly code: "client_update_required" | "host_update_required" | "server_safe_mode";
   readonly hostAppVersion: string;
   readonly hostProtocol: TeamProtocolSupportV1["protocol"];
 
-  constructor(support: TeamProtocolSupportV1, code: WebHostIncompatibleError["code"]) {
-    super(currentText().t("webClient.error.incompatible"));
+  constructor(
+    support: TeamProtocolSupportV1,
+    code: WebHostIncompatibleError["code"],
+    message = currentText().t("webClient.error.incompatible"),
+  ) {
+    super(message);
     this.code = code;
     this.hostAppVersion = support.appVersion;
     this.hostProtocol = support.protocol;
@@ -573,6 +588,14 @@ export class WebHostConnectionError extends Error {
     );
     this.reference = reference;
   }
+}
+
+/** The sentence for the reason of a host in safe mode. */
+function serverSafeModeText({ reason, appVersion }: ServerSafeModeReason): string {
+  return currentText().t(
+    reason === "newer_database" ? "error.team.serverSafeModeNewerDatabase" : "error.team.serverSafeModeStartFailed",
+    { version: appVersion },
+  );
 }
 
 interface WebConnectionDependencies {
@@ -707,7 +730,14 @@ export function createWebWorkspaceRuntime(
   };
   function createOpenedPeer() {
     const actions = { current: openedActions };
-    return { peer: dependencies.createPeer(actions, { waitForHost: true, hostProtocols }), actions };
+    return {
+      peer: dependencies.createPeer(actions, {
+        waitForHost: true,
+        hostProtocols,
+        clientProtocol: TEAM_WEB_CLIENT_PROTOCOL,
+      }),
+      actions,
+    };
   }
   // Each host switch replaces the peer, so the old host's session can end while the new host connects.
   let { peer, actions: peerActions } = createOpenedPeer();
@@ -738,7 +768,7 @@ export function createWebWorkspaceRuntime(
         channel: hostChannel,
         actions: sessionActions,
         createPeer: dependencies.createPeer,
-        peerOptions: { hostProtocols },
+        peerOptions: { hostProtocols, clientProtocol: TEAM_WEB_CLIENT_PROTOCOL },
         acquireHostLock: dependencies.acquireHostLock,
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
@@ -1221,10 +1251,20 @@ export function createWebWorkspaceRuntime(
         );
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
-      const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      const negotiated = teamWebRtcClientProtocol(support.protocol);
+      const { support, negotiated } = await readWebHostCompatibility(() =>
+        request("GET", TEAM_API_ROUTES.compatibility),
+      );
       if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
       if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
+      if (support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
+        throw new WebHostIncompatibleError(
+          support,
+          "server_safe_mode",
+          await request("GET", SERVER_SAFE_MODE_ROUTES.reason).then(
+            (value) => serverSafeModeText(decodeServerSafeModeReason(value)),
+            () => currentText().t("error.team.serverSafeMode"),
+          ),
+        );
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;
@@ -1704,6 +1744,11 @@ export function createWebWorkspaceRuntime(
     },
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
+    },
+    async downloadPreview(id) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachmentPreview(id), {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });

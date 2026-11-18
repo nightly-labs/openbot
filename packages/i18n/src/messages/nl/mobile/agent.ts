@@ -224,6 +224,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "Het huidige geheim werkt niet meer. De host weigert verzoeken die het gebruiken.",
   "mobile.agent.webhook.rotateConfirm": "Opnieuw genereren",
   "mobile.agent.webhook.rotateFailed": "Kan het geheim niet opnieuw genereren. Probeer het opnieuw.",
+  "mobile.agent.webhook.giveToAgent": "Ondertekeningsgeheim aan {name} geven",
+  "mobile.agent.webhook.giveTitle": "Nieuw ondertekeningsgeheim aan {name} geven?",
+  "mobile.agent.webhook.giveBody":
+    "Het huidige geheim werkt niet meer. {name} slaat het nieuwe geheim op als API-sleutel en kan het aan de afzender toevoegen.",
+  "mobile.agent.webhook.giveConfirm": "Geven",
+  "mobile.agent.webhook.giveFailed": "Kan het ondertekeningsgeheim niet aan de agent geven. Probeer het opnieuw.",
+  "mobile.agent.webhook.given": "{name} heeft het nieuwe ondertekeningsgeheim.",
   "mobile.agent.webhook.activity": "Activiteit",
   "mobile.agent.webhook.activityFailed": "Kan de activiteit niet laden. Probeer het opnieuw.",
   "mobile.agent.webhook.activity.ignored": "Genegeerd",

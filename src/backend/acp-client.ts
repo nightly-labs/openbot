@@ -27,14 +27,14 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import type { AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
-import { sourceText } from "@openbot/i18n/source";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
   foldOpenCodeChildUpdate,
@@ -53,6 +53,7 @@ import {
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
+import { MCP_PROVIDER_FAILURE_TEXT, mcpProviderFailureKind } from "./agent/provider-diagnostics";
 import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
@@ -190,6 +191,13 @@ const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new S
   "session_info_update",
   "user_message_chunk",
 ]);
+
+/** The chat's text for a retry of a failed model request, by why it failed (`AcpFlavor.retryUpdate`). */
+const MODEL_RETRY_STATUS = {
+  unreachable: "status.provider.modelRetryUnreachable",
+  outOfMemory: "status.provider.modelRetryOutOfMemory",
+  serverError: "status.provider.modelRetryServerError",
+} as const satisfies Record<AcpRetryCause, keyof SourceMessages>;
 
 /** How long a stopped turn may take to end before OpenBot ends it itself. */
 const ACP_STOP_GRACE_MS = 10_000;
@@ -1223,7 +1231,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* thread.relays;
     if (thread.transport) return yield* thread.transport.stop(Effect.void);
     yield* providerCall(() =>
-      this.#transport.connection?.closeSession({ sessionId: thread.id }).catch(() => undefined),
+      this.#transport.connection?.closeSession({ sessionId: thread.id, ...this.#forcedClose }).catch(() => undefined),
     );
   });
 
@@ -1656,7 +1664,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout),
         ),
       );
-      this.#models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+      let discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      // Cursor can fail to reach its server for a moment, and a second session then opens.
+      if (Result.isFailure(discovered) && this.#signInUnusable(discovered.failure.cause))
+        discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      this.#models = providerResult(discovered);
       if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
         this.#signedIn = false;
         return;
@@ -1685,9 +1697,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#signedIn = false;
         return;
       }
+      // Not a broken CLI: the user can sign in again, and the row offers that. The log keeps the cause.
+      const unusable = this.#signInUnusable(error);
+      if (unusable) {
+        logger.warn("An ACP agent could not use its sign-in.", {
+          provider: this.provider,
+          message: this.#redact(failureText(error)),
+        });
+        return yield* providerFailure(new ProviderSignInError({ message: unusable }));
+      }
       return yield* providerFailure(this.#withFailureDetail(error));
     }
   });
+
+  /** The text for a session that the agent's server refused with its sign-in (`AcpFlavor.signInUnusable`). */
+  #signInUnusable(error: unknown): string | null {
+    return error instanceof RequestError ? (this.#flavor.signInUnusable?.(error) ?? null) : null;
+  }
 
   #startTimeout(timeoutMs: number) {
     return Effect.timeoutOrElse({
@@ -1833,6 +1859,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close);
   }
 
+  /**
+   * The `_meta` of a `session/close` that unloads the session, for an agent that advertises it. Devin
+   * CLI 3000.14.30821 keeps a session after a plain close, and a later `session/load` keeps the MCP
+   * servers that the session got first. OpenBot then refused their old token, and each OpenBot tool
+   * call of that agent failed until Devin stopped (#12082).
+   */
+  get #forcedClose(): { _meta?: { "cognition.ai/force": true } } {
+    const meta = this.#initialization?.agentCapabilities?.sessionCapabilities?.close?._meta;
+    return meta?.["cognition.ai/force"] === true ? { _meta: { "cognition.ai/force": true } } : {};
+  }
+
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
@@ -1936,12 +1973,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
     // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
     // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
-    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
+    // Devin CLI 3000.14.30821 runs its sessions in a background process that outlives OpenBot for
+    // about 10 minutes, and a load joins a session that it still holds, with the MCP servers of the
+    // OpenBot that opened it. After a restart, each OpenBot tool call failed (#12082). An idle
+    // release already closed its session.
+    else if (
+      (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) ||
+      (!held && this.#loadsSessions && this.#forcedClose._meta && !this.#threads.isReleased(requestedThreadId))
+    ) {
       this.#stopThreadSubagents(requestedThreadId);
-      yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
-        this.#backgroundTimeout("session/close"),
-        Effect.ignore,
-      );
+      yield* providerCall(() =>
+        this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
+      ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
     }
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
@@ -1982,7 +2025,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           requestedThreadId ?? randomUUID(),
           dynamicTools,
           () => threadRef?.activeTurn?.id ?? null,
-          (call, signal, detachAfterMs) => this.#callDynamicTool(call, signal, detachAfterMs),
+          (call, signal, detachAfterMs, subagent) => this.#callDynamicTool(call, signal, detachAfterMs, subagent),
           this.#flavor.mcpServersPerDirectory ? cwd : undefined,
         )
         .pipe(toProviderClientOperationError),
@@ -3455,6 +3498,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * other dropped servers are reported. A server of the agent's own settings is not OpenBot's to
    * report, and OpenBot's own servers are in no settings that the user can change: theirs goes to the
    * diagnostics only.
+   *
+   * A server that asks for a sign-in, or that did not answer in time, gets the sentence that the
+   * provider runtime shows for the agent's stderr line of the same failure. Grok writes both, and the
+   * user got two toasts, one of them with the `rmcp` transport text. The reason goes to the log. The
+   * sentence names the provider as the runtime does, not by the label of a custom agent, so the two
+   * texts stay the same.
    */
   #reportMcpServerFailure(thread: AcpThread, { name, reason }: AcpMcpServerFailure): void {
     const server = thread.restore.mcpServers.find((entry) => entry.name === name);
@@ -3463,18 +3512,43 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.emit("diagnostic", this.#redact(`${this.#label} could not start OpenBot's MCP server ${name}: ${reason}`));
       return;
     }
-    this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
+    const kind = mcpProviderFailureKind(reason);
+    if (kind === "failed") {
+      this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
+      return;
+    }
+    const saved = this.#savedMcpServerName(thread.cwd, name);
+    logger.warn("An ACP agent could not start an MCP server.", {
+      provider: this.provider,
+      server: saved,
+      reason: this.#redact(reason),
+    });
+    this.options.reportMcpDrops?.(this.provider, [
+      {
+        name: saved,
+        reason: "failed_in_provider",
+        detail: sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], {
+          provider: agentProviderName(this.provider),
+          name: saved,
+        }),
+      },
+    ]);
   }
 
   /** Reports a server that OpenBot gave and the agent did not start, by the name that the user saved. */
   #reportFailedMcpServer(cwd: string, name: string, detail: string): void {
+    this.options.reportMcpDrops?.(this.provider, [
+      { name: this.#savedMcpServerName(cwd, name), reason: "failed_to_start", detail },
+    ]);
+  }
+
+  /** The name that the user saved for the server that the agent knows as `name`. */
+  #savedMcpServerName(cwd: string, name: string): string {
     const own = this.#ownMcpServerNames(cwd);
     const configured = this.options
       .mcpServers?.()
       .find((config) => acpMcpServerName(config, own, this.#flavor.mcpServerName) === name);
-    this.options.reportMcpDrops?.(this.provider, [
-      { name: configured?.name ?? name, reason: "failed_to_start", detail },
-    ]);
+    return configured?.name ?? name;
   }
 
   /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
@@ -3580,10 +3654,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(
         thread,
         turn,
-        sourceText(
-          retry.unreachable ? "status.provider.modelRetryUnreachable" : "status.provider.modelRetryServerError",
-          { provider: this.#label, attempt: retry.attempt },
-        ),
+        sourceText(MODEL_RETRY_STATUS[retry.cause], { provider: this.#label, attempt: retry.attempt }),
       );
     }
     // The first output after a retry replaces the retry in the chat.
@@ -4538,6 +4609,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
           this.options.savedKey?.(thread.currentModelId) ?? false,
           (provider) => this.options.providerKeyStored?.(provider) ?? false,
+          this.#label,
         ) ??
         detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
@@ -4900,6 +4972,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     },
     signal: AbortSignal,
     detachAfterMs: number | undefined,
+    subagent: boolean,
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
     if (this.#historyReplays.has(params.threadId)) {
       return { success: false, contentItems: [{ type: "inputText", text: "History replay cannot execute tools." }] };
@@ -4919,7 +4992,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ].filter((ms) => ms !== undefined)
         : [];
     const result = yield* this.#serverRequests
-      .call("item/tool/call", params, signal, detachAfterMs, deadlines.length > 0 ? Math.min(...deadlines) : undefined)
+      .call(
+        "item/tool/call",
+        params,
+        signal,
+        detachAfterMs,
+        deadlines.length > 0 ? Math.min(...deadlines) : undefined,
+        subagent,
+      )
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));

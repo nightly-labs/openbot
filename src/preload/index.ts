@@ -98,6 +98,7 @@ import {
   type Untyped,
 } from "@openbot/contracts/ipc";
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -1663,6 +1664,7 @@ const openbotApi: OpenBotDesktopApi = {
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
     setSecret: decodeVoid,
+    giveSecretToAgent: decodeAgentWebhookSecret,
     sendTestEvent: decodeWebhookTestResult,
     listActivity: decodeEventActivity,
     listRoutineRuns: decodeEventRoutineRuns,

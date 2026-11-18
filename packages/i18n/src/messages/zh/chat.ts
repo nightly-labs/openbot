@@ -467,6 +467,7 @@ export const messages = {
   "chat.suggestion.undo": "撤销",
   "chat.suggestion.localOnly": "请在你自己的电脑上通过 OpenBot 连接 {name}。",
   "chat.suggestion.unavailable": "该服务器无法连接 {name}。",
+  "chat.suggestion.notAllowed": "只有服务器所有者或管理员可以连接 {name}。",
   "chat.mcpSignIn.signIn": "登录",
   "chat.mcpSignIn.signInNamed": "登录 {name}",
   "chat.mcpSignIn.signedIn": "已登录",

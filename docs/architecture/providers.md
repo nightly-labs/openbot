@@ -1162,6 +1162,12 @@ change with `session/set_model` does not write a file. Devin answers a lost sess
 and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
 session.
 
+Devin CLI 3000.14.30821 keeps a session after a plain `session/close`, also in the background process
+that outlives OpenBot for about 10 minutes, and a later `session/load` keeps the MCP servers that the
+session got first. It advertises `sessionCapabilities.close._meta["cognition.ai/force"]`, so the ACP
+client sends that `_meta` with each `session/close`, and a forced close before it loads a session that
+it does not hold. The session then gets the new token of the OpenBot bridge (#12082).
+
 No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
 

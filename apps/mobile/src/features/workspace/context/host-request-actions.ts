@@ -243,6 +243,7 @@ import {
   getRoutineResultDestination,
   githubConnectorRepositories,
   githubConnectorRequest,
+  giveEventRoutineSecretToAgent,
   importHostVaultCsv,
   includeAgentFolder,
   installAgentSkill,
@@ -432,6 +433,7 @@ type HostRequestActions = Pick<
   | "deleteEventRoutine"
   | "testEventRoutine"
   | "rotateEventRoutineSecret"
+  | "giveEventRoutineSecretToAgent"
   | "listEventActivity"
   | "loadHostAnalytics"
   | "searchMessages"
@@ -1146,6 +1148,8 @@ export function createHostRequestActions({
     testEventRoutine: (input, serverId) => runTeamRequest(testEventRoutine(eventsAdmin(serverId), input)),
     rotateEventRoutineSecret: (input, serverId) =>
       runTeamRequest(rotateEventRoutineSecret(eventsAdmin(serverId), input)),
+    giveEventRoutineSecretToAgent: (input, serverId) =>
+      runTeamRequest(giveEventRoutineSecretToAgent(eventsAdmin(serverId), input)),
     listEventActivity: (input, serverId) => runTeamRequest(listEventActivity(eventsAdmin(serverId), input)),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, agentId, "memories"), () =>

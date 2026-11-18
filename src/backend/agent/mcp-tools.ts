@@ -108,6 +108,8 @@ export interface AgentMcpServers {
   /** The servers that OpenBot gives the agents itself and no row holds: the GitHub connection, Computer Use. */
   builtIn(): readonly McpServerConfig[];
   signIns(): McpSignInState[];
+  /** Why the user's last sign-in to this http server failed in this run, or `null`. */
+  signInFailure(config: McpServerConfig): string | null;
   save(config: McpServerConfig): Effect.Effect<unknown, ToolOperationFailed>;
   setEnabled(mcpServerId: string, enabled: boolean): Effect.Effect<unknown, ToolOperationFailed>;
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
@@ -120,7 +122,10 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
+  /**
+   * The saved, enabled servers and the GitHub connection that the agent gets and that
+   * `mcpFallbackRunsServer` allows.
+   */
   forAgent(agentId: string): McpServerConfig[];
   /** Whether the agents that the user selected for this saved server include the agent. */
   allowsAgent(mcpServerId: string, agentId: string): boolean;
@@ -206,6 +211,7 @@ export function mcpServersFromGateway(
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
     signIns: () => gateway.signIns(),
+    signInFailure: (config) => gateway.signInFailure(config.url),
     save: (config) => gateway.save({ config }).pipe(toToolFailure),
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
@@ -416,8 +422,23 @@ const findServer = (servers: AgentMcpServers, name: string) => {
   return Effect.fail(new ToolOperationFailed({ cause: new Error(sourceText(key, { name })) }));
 };
 
+// Only the user sees the card. An agent that got needs_sign_in again, or a user who said that no card
+// showed, made the agent report an OpenBot bug while the card was in the chat (#9184).
 const SIGN_IN_NEXT =
-  "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
+  "A Sign in card is in this conversation. Only the user sees it: do not check it, and do not test again in this turn. Tell the user to press Sign in on it, end your turn, and test again when the user says it is done. Another needs_sign_in means only that the sign-in is not done; it is not an OpenBot fault. If the user sees no card, tell them to sign in from Marketplace, Apps, the server's page, and end your turn. Do not send openbot.send_feedback about the card unless the user asks for it, or says that the sign-in there failed too.";
+
+/**
+ * The fields of a `needs_sign_in` answer. After a failed sign-in, the reason that only the sign-in
+ * page showed, so the agent tells the user why instead of asking for the same sign-in again (#12017).
+ */
+function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, when = "") {
+  const failure = servers.signInFailure(config);
+  if (failure === null) return { next: `${when}${SIGN_IN_NEXT}` };
+  return {
+    lastSignInError: servers.redact(failure),
+    next: `${when}The user's last sign-in to this server failed with lastSignInError. Tell the user this reason in plain words first. ${SIGN_IN_NEXT}`,
+  };
+}
 
 /**
  * A silent test of each saved http server that a tool search names and that has no sign-in on this
@@ -445,7 +466,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
         return {
           status: "needs_sign_in",
           server: describeServer(config, signIns),
-          next: `When the user's request needs this server: ${SIGN_IN_NEXT}`,
+          ...signInNeeded(servers, config, "When the user's request needs this server: "),
         };
       }),
     { concurrency: "unbounded" },
@@ -479,7 +500,7 @@ const report = Effect.fnUntraced(function* (
     return openBotToolResult({
       status: "needs_sign_in",
       server,
-      next: SIGN_IN_NEXT,
+      ...signInNeeded(servers, saved),
     });
   }
   if (outcome.needs === "key")

@@ -1,0 +1,4 @@
+{
+  "capabilities": ["long-capability-lists-v1", "capability-baseline-v1"],
+  "absent": []
+}

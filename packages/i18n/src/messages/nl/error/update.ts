@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "De download van de update reageert niet meer. Probeer het opnieuw.",
   "error.update.installFailed":
     "Kan de update niet installeren. Stop OpenBot, open het opnieuw en probeer het nog eens.",
+  "error.update.notInstalled":
+    "Bij de laatste herstart is de update niet geïnstalleerd. Start opnieuw om het nog eens te proberen.",
   "error.update.downloadFailed": "Kan de update niet downloaden. Probeer het opnieuw.",
   "error.update.checkFailed": "Kan niet controleren op updates. Probeer het opnieuw.",
   "error.update.checkStalled": "De controle op updates reageert niet meer. Probeer het opnieuw.",

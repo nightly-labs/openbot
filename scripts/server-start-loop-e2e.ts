@@ -16,8 +16,10 @@
 // 0. A normal start, so that the profile has its database.
 // 1-2. A migration fails: a failed start, and no halt.
 // 3. The main process crashes before the database opens (`OPENBOT_E2E_FORCE_START_FAILURE=crash`).
-// 4. No flag: three failures, so the server stops its start loop before the start. It exits with 78
-//    and writes the reason `start_failed`. It does not count as a fourth failure.
+// 4. No flag: three failures, so the server stops its start loop before the start. It writes the
+//    reason `start_failed` and runs its safe mode (`src/main/server-safe-mode.ts`), which the test
+//    stops with `bun run dev:stop`. A profile with no team has no safe mode: it exits with 78. The halt
+//    does not count as a fourth failure.
 // 5. No flag: the start after a halt tries once more. It removes the reason file and finishes.
 // 6-7. Two crashes.
 // 8. A migration fails: the third failure in a row, so the server stops its start loop at once.
@@ -25,6 +27,7 @@
 // 10. The database has a migration version that is newer than this build: the server stops at once
 //    with `newer_database`. The test then removes that version.
 // 11. No flag: the start tries again and finishes.
+// Each halt (4, 8 and 10) runs the safe mode or exits with 78.
 // It writes .openbot-build/server-start-loop-e2e/report.json, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
@@ -93,6 +96,8 @@ interface RunReport {
   run: number;
   mode: Mode;
   exitCode: number | null;
+  /** The halt ran the safe mode, and the test stopped it. */
+  safeMode: boolean;
   attemptsAfter: Attempts | null;
   /** The reason file after the run. */
   haltAfter: Halt | null;
@@ -145,9 +150,18 @@ function startStack(run: number, mode: Mode): { child: ChildProcess; exit: Promi
   if (mode === "crash") env.OPENBOT_E2E_FORCE_START_FAILURE = mode;
   else delete env.OPENBOT_E2E_FORCE_START_FAILURE;
   const child = spawn("bun", ["run", "dev"], { cwd: ROOT, env, stdio: ["ignore", logFile, logFile] });
+  logPath = join(OUT, `run-${run}.log`);
   const exit = new Promise<number | null>((done) => child.once("exit", (code) => done(code)));
   void exit.then(() => closeSync(logFile));
   return { child, exit };
+}
+
+let logPath: string | null = null;
+/** The line of `server-safe-mode.ts` when the safe mode is up. */
+const SAFE_MODE_ON = /\[server-safe-mode\] Safe mode is on \((start_failed|newer_database)\)/u;
+
+function safeModeIsOn(): boolean {
+  return logPath !== null && existsSync(logPath) && SAFE_MODE_ON.test(readFileSync(logPath, "utf8"));
 }
 
 function stopStack(): void {
@@ -403,31 +417,49 @@ async function finishingRun(run: number): Promise<Attempts> {
   stopStack();
   const exitCode = await stack.running.exit;
   stack.running = null;
-  runs.push({ run, mode: "none", exitCode, attemptsAfter: readAttempts(), haltAfter: readHalt() });
+  runs.push({ run, mode: "none", exitCode, safeMode: false, attemptsAfter: readAttempts(), haltAfter: readHalt() });
   return begun;
 }
 
-/** A start that ends by itself: a forced crash, a failed migration, or a halt. */
-async function endingRun(run: number, mode: Mode, expectedFailures: number): Promise<number | null> {
+/**
+ * A start that ends by itself: a forced crash, a failed migration, or a halt. A halt that runs the
+ * safe mode does not end by itself: the test stops it.
+ */
+async function endingRun(run: number, mode: Mode, expectedFailures: number): Promise<RunReport> {
   const startedAt = Date.now();
   if (mode === "migration") brokenMigration = breakLatestMigration();
   stack.running = startStack(run, mode);
   const begun = await waitFor(`run ${run} records its attempt`, () => startedAfter(startedAt));
   assert.equal(begun.appVersion, appVersion, `run ${run} has the version of run 0`);
   assert.equal(begun.consecutiveFailures, expectedFailures, `run ${run} counts the earlier failures`);
-  const exitCode = await stack.running.exit;
+  const running = stack.running;
+  let exited = false;
+  void running.exit.then(() => {
+    exited = true;
+  });
+  await waitFor(`run ${run} ends or runs the safe mode`, () => exited || safeModeIsOn());
+  const safeMode = !exited;
+  if (safeMode) stopStack();
+  const exitCode = await running.exit;
   stack.running = null;
   if (brokenMigration) {
     repairLatestMigration(brokenMigration);
     brokenMigration = null;
   }
-  runs.push({ run, mode, exitCode, attemptsAfter: readAttempts(), haltAfter: readHalt() });
-  return exitCode;
+  const report: RunReport = { run, mode, exitCode, safeMode, attemptsAfter: readAttempts(), haltAfter: readHalt() };
+  runs.push(report);
+  return report;
+}
+
+/** A halt runs the safe mode, or exits with the start-loop status when it cannot (no team). */
+function assertHalted(report: RunReport, message: string): void {
+  assert.ok(report.safeMode || report.exitCode === START_LOOP_EXIT_CODE, message);
 }
 
 /** A migration fails before the third failure: a failed start, and the server does not stop its loop. */
 async function migrationFailureWithoutHalt(run: number, expectedFailures: number): Promise<void> {
-  const exitCode = await endingRun(run, "migration", expectedFailures);
+  const { exitCode, safeMode } = await endingRun(run, "migration", expectedFailures);
+  assert.equal(safeMode, false, `run ${run}: no safe mode`);
   assert.notEqual(exitCode, START_LOOP_EXIT_CODE, `run ${run}: a failed migration alone does not stop the loop`);
   assert.equal(existsSync(haltPath), false, `run ${run} writes no reason file`);
   const attempts = readAttempts();
@@ -462,8 +494,7 @@ try {
   await endingRun(3, "crash", 2);
   assert.equal(existsSync(haltPath), false, "a crash writes no reason file");
 
-  const haltCode = await endingRun(4, "none", 3);
-  assert.equal(haltCode, START_LOOP_EXIT_CODE, "the halted start exits with the start-loop status");
+  assertHalted(await endingRun(4, "none", 3), "the halted start runs the safe mode or exits with 78");
   assertHalt("start_failed", version);
   const afterHalt = readAttempts();
   assert.equal(afterHalt?.attempt?.state, "quitting", "the halt is not a failed start");
@@ -473,8 +504,7 @@ try {
 
   await endingRun(6, "crash", 0);
   await endingRun(7, "crash", 1);
-  const migrationHaltCode = await endingRun(8, "migration", 2);
-  assert.equal(migrationHaltCode, START_LOOP_EXIT_CODE, "a failed migration as the third failure stops the loop");
+  assertHalted(await endingRun(8, "migration", 2), "a failed migration as the third failure stops the loop");
   assertHalt("start_failed", version);
   assert.equal(readAttempts()?.attempt?.state, "failed", "the third failure counts");
 
@@ -482,8 +512,7 @@ try {
 
   setNewerDatabase(true);
   newerDatabase = true;
-  const newerCode = await endingRun(10, "none", 0);
-  assert.equal(newerCode, START_LOOP_EXIT_CODE, "data from a newer version stops the loop at once");
+  assertHalted(await endingRun(10, "none", 0), "data from a newer version stops the loop at once");
   assertHalt("newer_database", version);
   setNewerDatabase(false);
   newerDatabase = false;

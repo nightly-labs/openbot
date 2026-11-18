@@ -988,6 +988,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "في Proton Pass، أنشئ مفتاح وصول يمكنه قراءة الخزنة التي تشاركها مع OpenBot فقط، ثم الصقه هنا. يحتفظ {host} بالمفتاح؛ ولا يحتفظ به هذا الهاتف.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "لا تتضمن خطة Proton الخاصة بك أداة سطر الأوامر في Proton Pass. تحتاج إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} غير متاح على هذا الخادم.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "سجّل الدخول إلى {name} على هذا الهاتف. بعد ذلك ينشئ {host} خزنة مشتركة ومفتاح وصول للقراءة فقط لها، ويحتفظ بهذا المفتاح فقط. لا يرى الوكلاء أي كلمة مرور.",
@@ -1023,8 +1025,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "للقراءة فقط",
   "mobile.server.connectors.passwordManager.keyExpires": "للقراءة فقط. تنتهي صلاحيته في {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "انتهت صلاحيته في {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "تتطلب أداة سطر الأوامر في {name} خطة مدفوعة. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.expiredTitle": "انتهت صلاحية مفتاح {name}",
   "mobile.server.connectors.passwordManager.expiredBody":
     "لا يستطيع الوكلاء على {host} تسجيل الدخول ببيانات تسجيل الدخول المشتركة حتى تعيد الربط.",
@@ -1276,7 +1276,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "mobile.server.connectors.whatsapp.add": "إضافة",
   "mobile.server.connectors.whatsapp.groupTitle": "إضافة مجموعة",
-  "mobile.server.connectors.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "mobile.server.connectors.whatsapp.groupSearch": "بحث في المجموعات",
   "mobile.server.connectors.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",

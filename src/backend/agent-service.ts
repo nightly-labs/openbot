@@ -147,6 +147,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
   isReservedMcpServerName,
@@ -284,7 +285,7 @@ import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-c
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
-import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { removeWebhookSecretKey, type WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import { workflowGenerationError } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
@@ -359,6 +360,7 @@ import {
 } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
+
 /** Its lines also go to `main.log`, so a support report can show why channel routing failed (#3041). */
 const routingLogger = createOpenBotLogger("channel-routing");
 /** Its lines also go to `providers.log`: the screen can show a general sentence in place of the cause (#5222). */
@@ -449,6 +451,8 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   /** Whether a member who is not an owner or admin can see the agent; the `crm_*` tools then refuse it. */
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
+  /** Whether a person who sent a message can change the server settings: an owner or admin. */
+  personCanAdminister?: ((personId: string) => boolean) | undefined;
   sidebarLayout?: AgentSidebar | null;
   /** The Library folders of this host, for the `folder` of an attach call, `list_library_folders` and `organize_library`. */
   libraryFolders?: AgentLibraryFolders | null;
@@ -979,13 +983,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           !this.#poolBackup(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
+          const keys = options.agentApiKeys;
+          const removeKey = keys ? removeWebhookSecretKey(keys, agentId, routineId) : Effect.void;
           const thread = this.#tasks.threadOfRoutine(agentId, routineId);
-          if (thread?.closedAt !== null) return Effect.void;
+          if (thread?.closedAt !== null) return removeKey;
           // The routine is gone already, so a thread that does not close stays open for the user.
           return this.closeTask({ agentId, taskId: thread.taskId }).pipe(
             Effect.catch((failure) =>
               Effect.sync(() => this.#emitError("routine_thread_archive_failed", failure.cause, agentId)),
             ),
+            Effect.andThen(removeKey),
           );
         },
       },
@@ -1668,7 +1675,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.get(agentId);
         return (
           agent !== undefined &&
-          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
+          this.#usageLimits.passesOver(agentId) &&
           (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
         );
       },
@@ -2142,9 +2149,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
-      // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
-      // stdio server of a Workspace only agent.
+      // The saved rows that the agent gets, and the GitHub connection, whose bearer the gateway gets
+      // from the main process (#12035). Computer Use is left out: OpenBot gives its tools another way.
+      // `mcpFallbackRunsServer` leaves out a stdio server of a Workspace only agent.
       mcpServers: mcpServersFromGateway(
         this.#mcp,
         options.prepareMcpTest,
@@ -2154,7 +2161,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const saved = new Set(this.#mcp.list().map((config) => config.id));
           return this.enabledMcpServers(agentId).filter(
             (config) =>
-              saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
+              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
+                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
+              mcpFallbackRunsServer(config, agent),
           );
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
@@ -2170,6 +2179,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.crmAgentVisibleToMembers === undefined
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
+      ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -3848,10 +3858,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     queueWhileBusy = true,
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
-      .runExclusive(() =>
-        this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
-      )
+      .runExclusive(() => {
+        const before = this.#store.get(input.agentId);
+        return this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy).pipe(
+          Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))),
+        );
+      })
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
+  }
+
+  /**
+   * A requested change moved the agent to another model, now or when it is next idle, so a provider
+   * error that holds that model gets one try. Automatic moves do not come through here.
+   */
+  #modelChosen(before: AgentSummary | undefined, after: AgentSummary): void {
+    const chosen = (agent: AgentSummary): AgentModelChoice => agent.pendingRuntime ?? agentModelChoice(agent);
+    if (before && !sameAgentModelChoice(chosen(before), chosen(after)))
+      this.#usageLimits.chosen(after.id, usageLimitOf(chosen(after)));
   }
 
   /**
@@ -4365,7 +4388,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // A message from the user tries the held model first: the limit can have ended outside OpenBot.
     // A refused try holds the agent again, and the drain after it moves (#7068).
     if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
-    const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
+    // A model that a person or an agent chose gets one turn before the agent leaves it again (#11992).
+    const failed = !limited && this.#usageLimits.passesOver(agentId);
     if (!limited && !failed) return null;
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#hasWaitingWork(agentId)) return null;
@@ -4401,6 +4425,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       model: choice.model,
       ...(pick === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: pick }),
     };
+  }
+
+  /**
+   * Whether a pool move waits for the agent's background work. The move closes the Claude session, and
+   * its background subagents and commands end with it (#12117). The pool moves early, while the
+   * current account can still run the next turn, so that turn runs there, and the drain after the
+   * work tries the move again. An account at a limit or after a provider error cannot run it, so the
+   * agent moves.
+   */
+  #poolMoveWaits(agentId: string): Effect.Effect<boolean> {
+    const agent = this.#store.get(agentId);
+    if (!agent || !this.#usageLimits.mayDrain(agentId) || !this.#usageLimitReady(agentModelChoice(agent)))
+      return Effect.succeed(false);
+    return this.#threads.mainRunsBackgroundWork(agent);
   }
 
   /** Whether a provider error moves this agent to a backup model or to another account of its pool. */
@@ -4694,6 +4732,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
+          if (move.move === "next-turn" && (yield* this.#poolMoveWaits(agentId))) {
+            logger.info("A pool move waits: the agent's Claude session still runs background work.", { agentId });
+            return false;
+          }
           yield* this.#applyAgentUpdate(move.input, undefined, move.move);
           return true;
         }),

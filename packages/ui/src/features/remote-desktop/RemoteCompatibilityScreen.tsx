@@ -18,6 +18,9 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
       return t("server.compatibility.updateHostTitle", { name: props.server.name });
     }
     if (props.server.issue?.code === "protocol_error") return t("server.compatibility.unsafeDataTitle");
+    if (props.server.issue?.code === "server_safe_mode") {
+      return t("server.compatibility.safeModeTitle", { name: props.server.name });
+    }
     return t("server.compatibility.cannotConnectTitle", { name: props.server.name });
   };
   const description = () => {

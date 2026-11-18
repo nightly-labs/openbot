@@ -243,6 +243,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "يتوقف السر الحالي عن العمل. يرفض المضيف الطلبات التي تستخدمه.",
   "mobile.agent.webhook.rotateConfirm": "إعادة الإنشاء",
   "mobile.agent.webhook.rotateFailed": "تعذّرت إعادة إنشاء السر. حاول مرة أخرى.",
+  "mobile.agent.webhook.giveToAgent": "إعطاء سر التوقيع إلى {name}",
+  "mobile.agent.webhook.giveTitle": "هل تريد إعطاء سر توقيع جديد إلى {name}؟",
+  "mobile.agent.webhook.giveBody":
+    "يتوقف السر الحالي عن العمل. يحفظ {name} السر الجديد كمفتاح API ويمكنه إضافته إلى المُرسِل.",
+  "mobile.agent.webhook.giveConfirm": "إعطاء السر",
+  "mobile.agent.webhook.giveFailed": "تعذّر إعطاء سر التوقيع إلى الوكيل. حاول مرة أخرى.",
+  "mobile.agent.webhook.given": "أصبح لدى {name} سر التوقيع الجديد.",
   "mobile.agent.webhook.activity": "النشاط",
   "mobile.agent.webhook.activityFailed": "تعذّر تحميل النشاط. حاول مرة أخرى.",
   "mobile.agent.webhook.activity.ignored": "متجاهَل",

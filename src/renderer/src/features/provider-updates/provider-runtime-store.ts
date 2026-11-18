@@ -8,6 +8,7 @@ import {
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
   type ProviderRuntimesDesktopApi,
+  type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
 import {
@@ -72,6 +73,14 @@ function downloadFailureCode(message: string | null): string {
   return (key && DOWNLOAD_FAILURE_CODES[key]) ?? "runtime_download_failed";
 }
 
+/**
+ * `hostConnection` for the open server: the desktop app counts the connections of a joined server,
+ * and the web client, which does not, goes through a state other than online before it connects again.
+ */
+export function hostConnection(server: ServerSummary | undefined): number | undefined {
+  return server?.kind === "remote" && server.state === "online" ? (server.connectionSequence ?? 0) : undefined;
+}
+
 export interface ProviderCliOwners {
   /** The version of the CLI the user installed for this provider, or `null` for a managed one. */
   systemCliVersion?: (provider: AgentProviderId) => string | null;
@@ -91,6 +100,12 @@ export interface ProviderCliOwners {
    * change a runtime the user is not looking at, unless `api` reaches that server's host.
    */
   managesRuntimes?: () => boolean;
+  /**
+   * A value that changes each time a joined server's host connects again, and `undefined` while it
+   * is not connected. A host that restarted counts its revisions from 0 again, so the first snapshot
+   * after a new connection replaces the shown one, also with a lower revision (#12227).
+   */
+  hostConnection?: () => number | undefined;
 }
 
 /**
@@ -121,6 +136,8 @@ export function createProviderRuntimeStore(
   /** What the user was last told about, so one offer is not announced twice. */
   let announced: ProviderUpdate[] = [];
   let disposed = false;
+  /** The host connected again: its next snapshot counts from the host's new start. */
+  let hostReconnected = false;
   const isLocalServer = owners.isLocalServer ?? (() => true);
   const managesRuntimes = owners.managesRuntimes ?? isLocalServer;
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
@@ -230,7 +247,8 @@ export function createProviderRuntimeStore(
   function applyProviderRuntimeSnapshot(snapshot: ProviderRuntimeSnapshot): void {
     if (disposed) return;
     const current = providerRuntimeSnapshot();
-    if (snapshot.revision < current.revision) return;
+    if (snapshot.revision < current.revision && !hostReconnected) return;
+    hostReconnected = false;
     for (const provider of MANAGED_RUNTIME_PROVIDERS) {
       const previousPhase = current.providers[provider].phase;
       const nextPhase = snapshot.providers[provider].phase;
@@ -482,6 +500,19 @@ export function createProviderRuntimeStore(
       .catch(() => undefined);
     return unsubscribe;
   });
+
+  // The first value is the connection that the read above already loads from.
+  let firstConnection = true;
+  createEffect(
+    () => owners.hostConnection?.(),
+    (connection) => {
+      const first = firstConnection;
+      firstConnection = false;
+      if (first || connection === undefined) return;
+      hostReconnected = true;
+      refreshProviderRuntimes();
+    },
+  );
 
   onSettled(() => {
     return () => {

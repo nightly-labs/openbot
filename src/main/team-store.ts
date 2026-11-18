@@ -71,6 +71,10 @@ class TeamStoreFiles extends Context.Service<
 }
 
 const scrypt = promisify(scryptCallback);
+/** The team file in userData: one host per account. */
+export const TEAM_STORE_FILE = "openbot-team-server-v2.json";
+/** The file of the last build without accounts. `initialize` moves it into `TEAM_STORE_FILE`. */
+export const LEGACY_TEAM_STORE_FILE = "openbot-team-server-v1.json";
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
@@ -228,6 +232,8 @@ export class TeamStore {
    * so writing would destroy the user's only copy. Nothing here is backed up.
    */
   #unreadableFile = false;
+  /** Set by `loadReadOnly`: each write fails, so the server safe mode changes no user data. */
+  #readOnly = false;
 
   /**
    * `legacyPath` is the single-host file shipped builds read and write. This store never
@@ -242,6 +248,35 @@ export class TeamStore {
     this.#logoRoot = join(dirname(path), `${basename(path)}.assets`, "logo");
     this.#legacyLogoRoot = legacyPath ? join(dirname(legacyPath), `${basename(legacyPath)}.assets`, "logo") : null;
   }
+
+  /**
+   * Reads the host of the active account and writes nothing, also later: each write of this store
+   * then fails. The server safe mode (`server-safe-mode.ts`) uses it, because it must not change user
+   * data. It does no legacy import, no logo copy and no session prune, and it does not set aside an
+   * empty file. A missing, empty or unreadable file leaves the store unconfigured.
+   */
+  readonly loadReadOnly = Effect.fn("TeamStore.loadReadOnly")(function* (
+    this: TeamStore,
+  ): Effect.fn.Return<void, never, TeamStoreFiles> {
+    this.#readOnly = true;
+    const contents = yield* TeamStoreFiles.use((files) => files.readText(this.#path)).pipe(
+      Effect.orElseSucceed(() => null),
+    );
+    if (contents === null || isEmptyStoredFile(contents)) return;
+    let parsed: StoredTeamFile | null = null;
+    try {
+      parsed = parseStoredJson(this.#path, contents, (value) => (isStoredTeamFile(value) ? value : null));
+    } catch {
+      return;
+    }
+    if (!parsed) return;
+    this.#file = parsed;
+    const activeAccountId = parsed.activeAccountId;
+    this.#state =
+      (activeAccountId === null
+        ? parsed.hosts.find((host) => ownerAccountId(host) === null)
+        : parsed.hosts.find((host) => ownerAccountId(host) === activeAccountId)) ?? null;
+  }, Effect.provide(TeamStoreFiles.layer)).bind(this);
 
   readonly initialize = Effect.fn("TeamStore.initialize")(
     function* (this: TeamStore): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
@@ -1631,7 +1666,7 @@ export class TeamStore {
   readonly #persistFileEffect = Effect.fn("TeamStore.persistFile")(function* (
     this: TeamStore,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
-    if (this.#unreadableFile) {
+    if (this.#unreadableFile || this.#readOnly) {
       return yield* new RemoteWorkflowError({
         cause: new TeamStoreError(sourceText("error.team.serverFileUnreadable")),
       });

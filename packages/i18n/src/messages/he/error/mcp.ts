@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "ההתחברות נדחתה. יש לחזור אל OpenBot ולנסות שוב.",
   "error.mcp.redirectNoSignIn": "אין התחברות שממתינה לזה. ייתכן שהיא הסתיימה.",
   "error.mcp.redirectSignedIn": "OpenBot מחובר. אפשר לסגור את החלון הזה.",
+  "error.mcp.redirectNotSaved": "ההתחברות לא הסתיימה. חזרו ל-OpenBot כדי לראות למה.",
   "error.mcp.signInFileUnreadable": "לא ניתן לקרוא את קובץ ההתחברות של MCP.",
   "error.mcp.signInFileTooLarge": "קובץ ההתחברות של MCP גדול מדי.",
   "error.mcp.unsupported": "שרתי MCP אינם נתמכים בשרת הזה.",

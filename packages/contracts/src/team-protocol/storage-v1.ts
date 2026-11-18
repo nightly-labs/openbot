@@ -10,7 +10,7 @@
 // totals: the wire `source` is `attachment` or `generated`. Widening any of it needs a second
 // capability string, never an edit to this one.
 import { isDynamicRecord, isString } from "../runtime-values";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const STORAGE_ROUTES = {
   usage: "/v1/storage/usage",

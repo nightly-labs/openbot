@@ -71,6 +71,8 @@ export const messages = {
     "L'accesso al microfono è bloccato. Consenti a OpenBot di usare il microfono nelle impostazioni di sistema.",
   "composer.voice.noMicrophone": "Nessun microfono disponibile.",
   "composer.voice.startFailed": "OpenBot non è riuscito ad avviare la registrazione vocale.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot non è riuscito ad aprire il microfono. Chiudi le altre app che lo usano, verifica che sia collegato e consentito nelle impostazioni di sistema, poi riprova.",
   "composer.voice.transcribeFailed": "OpenBot non è riuscito a trascrivere questa registrazione.",
   "composer.reply.toYou": "Risposta al tuo messaggio",
   "composer.reply.toAgent": "Risposta all'agente",
@@ -132,6 +134,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Nessuna voce registrata.",
   "composer.voice.noSpeechDetected": "Nessuna voce rilevata.",
   "composer.voice.readFailed": "Impossibile leggere la risposta ad alta voce.",
+  "composer.voice.languageUnsupported":
+    "Impossibile leggere la risposta ad alta voce. Questa lingua non è ancora disponibile.",
   "composer.error.saveEditTryAgain": "Impossibile salvare questa modifica su questo computer. Riprova.",
   "composer.error.saveUnconfirmed": "Il salvataggio non è confermato. Riprova a salvare per controllare il risultato.",
   "composer.error.changeModel": "Impossibile cambiare modello. Riprova.",

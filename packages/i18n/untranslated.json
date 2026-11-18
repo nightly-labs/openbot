@@ -503,7 +503,6 @@
   "error.provider.removeWhileOn": ["nl"],
   "error.remote.localServerLimit": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.remote.localServerNotFound": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
-  "error.remote.localServerStartFailed": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.remote.localServersReadOnly": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.team.agentAccessStale": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.team.agentAccessUnsupported": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],

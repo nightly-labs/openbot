@@ -554,6 +554,8 @@ export interface OpenBotToolRouterOptions {
   crm?: (() => CrmHandle | null) | undefined;
   /** Whether a member who is not an owner or admin can see the agent. Without it, the CRM tools refuse every agent. */
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
+  /** Whether a person who sent a message can change the server settings. Without it, everyone can. */
+  personCanAdminister?: ((personId: string) => boolean) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -618,6 +620,7 @@ export class OpenBotToolRouter {
   readonly #browserProfiles: () => AgentBrowserProfiles | null;
   readonly #crm: () => CrmHandle | null;
   readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
+  readonly #personCanAdminister: (personId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -681,6 +684,7 @@ export class OpenBotToolRouter {
     this.#browserProfiles = options.browserProfiles ?? (() => null);
     this.#crm = options.crm ?? (() => null);
     this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
+    this.#personCanAdminister = options.personCanAdminister ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -1151,9 +1155,10 @@ export class OpenBotToolRouter {
   }
 
   /**
-   * A `tool_call` that names a tool of one of the agent's saved MCP servers (`forAgent`). Antigravity 1.5 leaves the
-   * tools over its schema budget out of the tool list, with no `call_mcp_tool` for them (#7427), so
-   * OpenBot runs the tool itself, with the sign-in of the server's address. The user approves it as a
+   * A `tool_call` that names a tool of one of the agent's saved MCP servers or of the GitHub connection
+   * (`forAgent`, #12035). Antigravity 1.5 leaves the tools over its schema budget out of the tool list,
+   * with no `call_mcp_tool` for them (#7427), so OpenBot runs the tool itself, with the sign-in of the
+   * server's address or the GitHub connection's bearer. The user approves it as a
    * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
    */
   readonly #userMcpTool = Effect.fn("OpenBotToolRouter.userMcpTool")(function* (
@@ -2660,6 +2665,9 @@ export class OpenBotToolRouter {
         listAgents: () => this.#hooks.listAgents(),
         profiles: this.#browserProfiles(),
         requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        requestersCanAdminister: this.#turnRequesters(senderAgentId, params.turnId).every((personId) =>
+          this.#personCanAdminister(personId),
+        ),
         approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });

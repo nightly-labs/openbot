@@ -164,7 +164,8 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     // A story keeps the picture only in the page: its preview is a blob address.
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     // A story makes no files.
-    mediaUrl: () => undefined,
+    mediaUrl: () => null,
+    mediaPreviewUrl: () => null,
     githubConnector: createMockGitHubConnector(),
     hostName: () => undefined,
     // A story opens no browser.

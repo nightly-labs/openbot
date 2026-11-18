@@ -15,6 +15,11 @@ export const HOSTED_SITE_LIMITS = {
   uploadAttemptMultiplier: 2,
   creationsPerHour: 20,
   creationsPerDay: 100,
+  /**
+   * A new site's first upload with no file upload for this long is stopped, and a new site of its bucket can take
+   * its slot. A live publish sends its files one after the other, so it is never idle for this long.
+   */
+  idleUploadMs: 60_000,
   accountSites: HOSTED_SITE_ACCOUNT_LIMIT,
   ...HOSTED_SITE_UPLOAD_LIMITS,
   siteLifetimeMs: 30 * 24 * 60 * 60_000,

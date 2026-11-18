@@ -21,8 +21,11 @@ export interface HostedUpdatePaths {
   readonly stagedReady: string;
 }
 
+/** The runtime directory of openbot.service (`RuntimeDirectory=openbot`). */
+export const HOSTED_RUNTIME_DIRECTORY = "/run/openbot";
+
 const HOSTED_UPDATE_PATHS: HostedUpdatePaths = {
-  requests: "/run/openbot",
+  requests: HOSTED_RUNTIME_DIRECTORY,
   state: "/run/openbot-update.state",
   stagedReady: "/opt/OpenBot/staged.ready",
 };

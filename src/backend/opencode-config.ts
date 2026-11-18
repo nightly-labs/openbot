@@ -20,6 +20,12 @@ export interface CustomProviderConfig {
   readonly headers: readonly CustomProviderHeader[];
   /** The provider that runs the endpoint. Absent: OpenCode, as before the choice existed. */
   readonly harness?: CustomProviderHarness;
+  /**
+   * The ids of the models that the endpoint's server reports as not able to reason (#8381). Not
+   * saved: the main process asks an Ollama server for it. Absent: nothing is known, and each model
+   * keeps the efforts of its harness.
+   */
+  readonly withoutReasoning?: readonly string[];
 }
 
 /**
@@ -66,7 +72,8 @@ interface OpenCodeModelEntry {
   /**
    * The efforts of the model's effort menu, each sent as `reasoning_effort`. OpenCode 2.2.5 gives a
    * custom model without `variants` its own Low, Medium and High, and it drops a `reasoning` key
-   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set.
+   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set,
+   * and an empty record leaves the model with no effort (#8381).
    */
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
   /**
@@ -239,7 +246,12 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
         ? { headers: Object.fromEntries(provider.headers.map((header) => [header.name, header.value])) }
         : {}),
     },
-    models: Object.fromEntries(provider.models.map((model) => [model.id, modelEntry(model)])),
+    models: Object.fromEntries(
+      provider.models.map((model) => [
+        model.id,
+        modelEntry(model, provider.withoutReasoning?.includes(model.id) === true),
+      ]),
+    ),
   };
 }
 
@@ -255,7 +267,11 @@ export function customModelOutputLimit(model: CustomProviderModel, contextWindow
   return model.maxOutput ?? Math.min(DEFAULT_OUTPUT_LIMIT, Math.floor(contextWindow / 2));
 }
 
-function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
+/**
+ * `withoutReasoning`: the server says that the model cannot reason. Ollama refuses a
+ * `reasoning_effort` for such a model, so it gets no effort. Efforts that the user saved stay.
+ */
+function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): OpenCodeModelEntry {
   return {
     name: model.name,
     // With no window, the entry keeps OpenCode's own defaults, and a saved cap is not written.
@@ -263,7 +279,9 @@ function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
       ? {}
       : { limit: { context: model.contextWindow, output: customModelOutputLimit(model, model.contextWindow) } }),
     ...(model.reasoningEfforts === undefined
-      ? {}
+      ? withoutReasoning
+        ? { variants: {} }
+        : {}
       : {
           variants: Object.fromEntries(model.reasoningEfforts.map((effort) => [effort, { reasoningEffort: effort }])),
         }),

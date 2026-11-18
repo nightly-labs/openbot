@@ -107,7 +107,7 @@ async function run() {
     assert.equal(teamCapabilitiesForProtocol(8).includes(TEAM_SVG_ATTACHMENTS_CAPABILITY), false);
     assert.equal(teamCapabilitiesForProtocol(9).includes(TEAM_SVG_ATTACHMENTS_CAPABILITY), true);
     assert.ok(teamCapabilitiesForProtocol(8).length <= 128);
-    assert.ok(TEAM_CURRENT_CAPABILITIES.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
+    assert.ok(teamCapabilitiesForProtocol(9).length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
 
     return {
       status: "pass",

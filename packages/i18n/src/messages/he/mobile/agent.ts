@@ -216,6 +216,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "הסוד הנוכחי יפסיק לפעול. המארח דוחה בקשות שמשתמשות בו.",
   "mobile.agent.webhook.rotateConfirm": "יצירה",
   "mobile.agent.webhook.rotateFailed": "לא ניתן ליצור סוד חדש. יש לנסות שוב.",
+  "mobile.agent.webhook.giveToAgent": "מסירת סוד החתימה ל-{name}",
+  "mobile.agent.webhook.giveTitle": "למסור סוד חתימה חדש ל-{name}?",
+  "mobile.agent.webhook.giveBody":
+    "הסוד הנוכחי יפסיק לפעול. {name} שומר את הסוד החדש כמפתח API ויכול להוסיף אותו לשולח.",
+  "mobile.agent.webhook.giveConfirm": "מסירת הסוד",
+  "mobile.agent.webhook.giveFailed": "לא ניתן למסור את סוד החתימה לסוכן. יש לנסות שוב.",
+  "mobile.agent.webhook.given": "ל-{name} יש את סוד החתימה החדש.",
   "mobile.agent.webhook.activity": "פעילות",
   "mobile.agent.webhook.activityFailed": "לא ניתן לטעון את הפעילות. יש לנסות שוב.",
   "mobile.agent.webhook.activity.ignored": "התעלמות",

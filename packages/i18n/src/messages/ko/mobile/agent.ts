@@ -220,6 +220,13 @@ export const messages = {
     "현재 시크릿은 더 이상 사용할 수 없어요. 호스트가 해당 시크릿을 사용한 요청을 거부해요.",
   "mobile.agent.webhook.rotateConfirm": "재생성",
   "mobile.agent.webhook.rotateFailed": "시크릿을 재생성할 수 없어요. 다시 시도해 주세요.",
+  "mobile.agent.webhook.giveToAgent": "{name}에게 서명 시크릿 전달",
+  "mobile.agent.webhook.giveTitle": "{name}에게 새 서명 시크릿을 전달할까요?",
+  "mobile.agent.webhook.giveBody":
+    "현재 시크릿은 작동하지 않게 돼요. {name}이(가) 새 시크릿을 API 키로 저장하고 보낸 쪽에 추가할 수 있어요.",
+  "mobile.agent.webhook.giveConfirm": "전달",
+  "mobile.agent.webhook.giveFailed": "에이전트에게 서명 시크릿을 전달하지 못했어요. 다시 시도해 주세요.",
+  "mobile.agent.webhook.given": "{name}에게 새 서명 시크릿을 전달했어요.",
   "mobile.agent.webhook.activity": "활동",
   "mobile.agent.webhook.activityFailed": "활동을 불러올 수 없어요. 다시 시도해 주세요.",
   "mobile.agent.webhook.activity.ignored": "무시됨",

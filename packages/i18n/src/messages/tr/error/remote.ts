@@ -82,7 +82,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "error.remote.requestTimeout": "Uzak istek zaman aşımına uğradı.",
   "error.remote.requestFailed": "Uzak istek başarısız oldu.",
-  "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",
+  "error.remote.hostKeyMissing":
+    "Güvenlik anahtarı eksik olduğu veya değiştiği için OpenBot bu sunucuyu doğrulayamıyor. Sunucu sahibinden sunucuyu kontrol etmesini isteyin.",
+  "error.remote.connectionNotStarted":
+    "OpenBot bu sunucuyla bağlantıyı başlatamadı. Sorun devam ederse OpenBot'tan çıkın ve yeniden açın.",
   "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
   "error.remote.hostDisconnected":
@@ -205,6 +208,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
   "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.serverNotLoaded": "OpenBot sunucuyu yükleyemedi. Tekrar deneyin.",
+  "error.remote.localServerNotStarted":
+    "Bu bilgisayardaki sunucu başlamadı. Tekrar deneyin. Başlamazsa OpenBot'u bu bilgisayarda yeniden başlatın.",
   "error.remote.localServerAccountRemovalFailed":
     "Sunucu kendi bilgisayarında silindi ancak hesap onu hâlâ listeliyor. Hesaptan kaldırmak için yeniden silin.",
 } as const satisfies PartialTranslation<typeof source>;

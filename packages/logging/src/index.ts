@@ -74,6 +74,11 @@ const COOKIE_HEADER =
 // or a template is not taken for a secret. The search for the digit is bounded, so a line of
 // repeated `?key=` with no digit does not scan the rest of the line once each.
 const QUERY_SECRET = /([?&](?:key|code|ticket|sig)=)(?!\[redacted\])(?=[^&#\s"'<>)\]]{0,256}\d)[^&#\s"'<>)\]]{8,}/giu;
+// The password of a URL such as `postgres://admin:password@db.example.com`. The user name and the
+// host stay. The email rule hides it only as a part of an address, and `redactSecrets` and
+// `redactPostText` do not have that rule. Each run is bounded and cannot hold an `@`, so a long
+// line cannot backtrack far.
+const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s:/?#@[\]"'<>]{0,256}:)[^\s/?#@"'<>]{1,256}(?=@)/giu;
 // Bounded for the same reason as the label above, and more sharply: with `+`
 // on the local part, every character of a long payload consumed the rest of
 // the run looking for an `@` and then backtracked over all of it.
@@ -180,11 +185,21 @@ export function redactText(value: string): string {
 /**
  * `redactText` without the email rule, for text that goes back to the agent that the user gave it
  * to: its memories and its own chat history. An address there is user data that the agent needs to
- * do its task, not a secret, and the provider already received it with the original message. Logs,
- * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
+ * do its task, not a secret, and the provider already received it with the original message. Logs
+ * and diagnostics keep `redactText`, and a chat app post uses `redactPostText`.
  */
 export function redactSecrets(value: string): string {
   return redact(value, false, true);
+}
+
+/**
+ * `redactText` without the email rule, for what an agent posts in a chat app, such as its WhatsApp
+ * answer. The agent wrote the address for the people in that chat, often because the user asked for
+ * it, so it stays. The post leaves this computer, so the rest of a line past the scan bound is still
+ * dropped, as `redactText` does.
+ */
+export function redactPostText(value: string): string {
+  return redact(value, false);
 }
 
 function redact(value: string, emails: boolean, keepUnscanned = false): string {
@@ -252,6 +267,7 @@ function applyTextRules(value: string, emails: boolean): string {
     // After the assignment rule: its value runs over `&`, and a query value redacted first would
     // leave a `]` behind it.
     .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(URL_PASSWORD, "$1[redacted]")
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(JSON_WEB_TOKEN, "[redacted]");
   return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;

@@ -81,7 +81,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Удалить этот сервер может только владелец.",
   "error.remote.requestTimeout": "Время удалённого запроса истекло.",
   "error.remote.requestFailed": "Удалённый запрос не удался.",
-  "error.remote.pinnedKeyMissing": "У удалённого хоста нет закреплённого ключа устройства.",
+  "error.remote.hostKeyMissing":
+    "OpenBot не может проверить этот сервер: его ключ безопасности отсутствует или изменился. Попросите владельца сервера проверить сервер.",
+  "error.remote.connectionNotStarted":
+    "OpenBot не удалось начать подключение к этому серверу. Если проблема повторяется, закройте OpenBot и откройте его снова.",
   "error.remote.hostDidNotConnect": "Хост WebRTC не подключился.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
   "error.remote.hostDisconnected":
@@ -205,6 +208,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
+  "error.remote.serverNotLoaded": "Не удалось загрузить сервер. Повторите попытку.",
+  "error.remote.localServerNotStarted":
+    "Сервер на этом компьютере не запустился. Повторите попытку. Если он не запустится, перезапустите OpenBot на этом компьютере.",
   "error.remote.localServerAccountRemovalFailed":
     "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -27,7 +27,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { remoteCall } from "../remote-service-effects";
-import type { TeamApiAgents, TeamApiMailbox } from "./dependencies";
+import type { TeamApiAgents, TeamApiAttachmentPreviews, TeamApiMailbox } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { pathIdentifier, readBinary } from "./request-helpers";
@@ -89,11 +89,13 @@ export interface FileRouteDependencies {
     | "resolveLocalWorkspaceFile"
   >;
   mailbox: TeamApiMailbox;
+  /** `attachment-preview-v1`: absent, the preview route is not served. */
+  attachmentPreviews?: TeamApiAttachmentPreviews | undefined;
 }
 
 export async function routeFiles(
   context: TeamApiRequestContext,
-  { agents, mailbox }: FileRouteDependencies,
+  { agents, mailbox, attachmentPreviews }: FileRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, json, empty } = context;
 
@@ -133,6 +135,26 @@ export async function routeFiles(
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(basename(attachment.path))}`,
       }));
     }
+  }
+  // `attachment-preview-v1`: a small copy of an image, with the access of the file itself.
+  const previewMatch = url.pathname.match(/^\/v1\/attachments\/([^/]+)\/preview$/);
+  if (previewMatch && method === "GET" && attachmentPreviews) {
+    const attachmentId = pathIdentifier(previewMatch[1], "attachmentId");
+    const attachment = await runCauseEffect(mailbox.resolveAttachment(attachmentId));
+    if (!attachment) throw new HttpError(404, sourceText("error.team.attachmentNotFound"));
+    if (!attachment.mimeType.startsWith("image/")) throw new HttpError(415, "The attachment is not an image.");
+    const preview = await runCauseEffect(
+      attachmentPreviews.file(attachmentId, { path: attachment.path, mimeType: attachment.mimeType }),
+    );
+    // The client reads the whole file instead, so no user sees this text.
+    if (!preview) throw new HttpError(415, "The attachment has no preview.");
+    // As for the file itself: the WebRTC host sends an answer with this header as a file, whatever its type.
+    return sendFile(response, preview.path, null, (size) => ({
+      "Content-Type": preview.mimeType,
+      "Content-Length": String(size),
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(basename(preview.path))}`,
+      "X-Content-Type-Options": "nosniff",
+    }));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.sharedFiles) {
     const sharedPath = url.searchParams.get("path");

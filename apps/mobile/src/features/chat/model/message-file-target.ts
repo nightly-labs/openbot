@@ -107,7 +107,8 @@ function workspaceLinkPath(value: string): string | null {
 export function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
   if (webLink(href)) return null;
   const fileUrl = fileUrlPath(href);
-  const shared = (fileUrl === null ? href : decodedFileUrlPath(fileUrl)).trim();
+  // The host does not decode a shared path, so a target such as `a%20b.md` is decoded here once (#12104).
+  const shared = decodedFileUrlPath(fileUrl ?? href).trim();
   if (shared && !/[\0\r\n]/u.test(shared) && isSharedPath(shared)) return { kind: "shared", path: shared };
   const workspace = workspaceLinkPath(fileUrl ?? href);
   return workspace && agentId ? { kind: "workspace", agentId, path: workspace } : null;

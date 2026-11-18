@@ -632,9 +632,15 @@ failed started again each 10 seconds, without an end, in earlier releases. Now m
   (a full disk, a lock). A start that fails with an error stops the loop at once; after a crash,
   the next start stops it. This is the count of the desktop recovery window (`start-attempts.ts`).
 
-Main then writes `openbot-start-halt-v1.json` in its user data folder and exits with 78. The file
-has the reason word, the app version and a time only. `openbot.service` has
-`RestartPreventExitStatus=78`, so systemd does not start it again. The journal shows the reason.
+Main then writes `openbot-start-halt-v1.json` in its user data folder. The file has the reason
+word, the app version and a time only. The journal shows the reason. Then main runs its safe mode
+(`src/main/server-safe-mode.ts`): it keeps a minimal Team API up, so each member's app shows why
+the server does not start and which version it runs. The safe mode opens no database and changes
+no user data. It writes the empty file `/run/openbot/server-safe-mode` while it runs. See
+[Team API](architecture/team-api.md#server-safe-mode).
+
+When the safe mode cannot start (no team, or no host credential), main exits with 78 as before.
+`openbot.service` has `RestartPreventExitStatus=78`, so systemd does not start it again.
 
 The next start reads and removes the file, logs the reason, and tries once more. A failure of that
 start stops the loop again. These start OpenBot again:
@@ -642,20 +648,23 @@ start stops the loop again. These start OpenBot again:
 - a restart or a resume of the server, or `sudo openbot restart` or `start`;
 - `sudo openbot update`;
 - `check` of `openbot-update.timer`, about each hour: when `openbot.service` is stopped with
-  status 78, it runs `stage` and starts the service again, after `apply` when a newer release is
-  staged. A hosted
+  status 78, or runs its safe mode, it runs `stage`, stops the safe mode, and starts the service
+  again, after `apply` when a newer release is staged. A hosted
   owner has no shell, and a failure can be temporary (a full disk, no network), so each run tries
-  once more. It reads only the state of the unit (`ActiveState`, `ExecMainStatus`), never a file of
-  the service user.
+  once more. It reads only the state of the unit (`ActiveState`, `ExecMainStatus`) and the
+  existence of the empty safe-mode file, never the content of a file of the service user.
 
-When OpenBot is not running, `openbot` commands that need the control socket say that the start
-loop stopped it, and name `openbot logs`, `sudo openbot update` and `sudo openbot restart`.
+When OpenBot is not running or runs its safe mode, `openbot` commands that need the control socket
+say that the start loop stopped it, and name `openbot logs`, `sudo openbot update` and
+`sudo openbot restart`. The safe mode has no control socket.
 
-A Docker container has no systemd. Its restart policy starts it again after exit 78 too, with the
-backoff of Docker. Each second start after a halt tries again.
+A Docker container has no systemd and no `openbot-update.timer`. There the safe mode ends after one
+hour with exit 78, and the restart policy starts the container again, with the backoff of Docker.
+Each second start after a halt tries again.
 
-Not done yet: a safe mode that keeps a minimal Team API open while the start loop is stopped, so
-that the app can show the reason and the version to the owner.
+There is no install or rollback action in the safe mode: a newer release is the fix, through the
+update paths above. `copy_release` of `openbot-hosted-update` still removes the old copy before it
+copies (`rm -rf`, then `cp -a`); see plan 011 item 3.
 
 A server that has no updater, such as one made from a template before 0.26.0, needs one upgrade by
 hand. With a boat key that has command and file access: upload `scripts/hosting/` to

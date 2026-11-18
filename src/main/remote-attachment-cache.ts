@@ -33,6 +33,33 @@ const REMOTE_ATTACHMENT_CACHE_TTL_MS = 10 * 60_000;
 // 4 MB send buffer, where the host stops and sends again from the last acknowledgement.
 const REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER = 2;
 
+/** The limits of one cache. The defaults are those of the files that a chat shows. */
+export interface RemoteAttachmentCacheLimits {
+  /** The bytes that the cache holds. */
+  bytes: number;
+  /** How long a copy stays. */
+  ttlMs: number;
+  /** The previews that download at the same time from one server. */
+  previewsPerServer: number;
+}
+
+const FILE_LIMITS: RemoteAttachmentCacheLimits = {
+  bytes: REMOTE_ATTACHMENT_CACHE_BYTES,
+  ttlMs: REMOTE_ATTACHMENT_CACHE_TTL_MS,
+  previewsPerServer: REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER,
+};
+
+/**
+ * The limits of the small copies of pictures (`attachment-preview-v1`). A copy is at most about 150
+ * KB, and the host sends a file with no copy only when it is at most 256 KB, so six can download
+ * together and stay far under the channel's send buffer. 48 MB holds some hundreds of them. They stay for an hour: a canvas that the user opens again shows at once.
+ */
+export const REMOTE_ATTACHMENT_PREVIEW_LIMITS: RemoteAttachmentCacheLimits = {
+  bytes: 48 * 1024 * 1024,
+  ttlMs: 60 * 60_000,
+  previewsPerServer: 6,
+};
+
 /** The user stopped the download. The open or the save that waited for it does nothing. */
 export class AttachmentDownloadStopped extends Error {
   constructor() {
@@ -65,10 +92,12 @@ export class RemoteAttachmentCache {
   readonly #generations = new Map<string, number>();
   #epoch = 0;
   readonly #now: () => number;
+  readonly #limits: RemoteAttachmentCacheLimits;
   #bytes = 0;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, limits: RemoteAttachmentCacheLimits = FILE_LIMITS) {
     this.#now = now;
+    this.#limits = limits;
   }
 
   readonly get = Effect.fn("RemoteAttachments.get")(function* (
@@ -139,7 +168,7 @@ export class RemoteAttachmentCache {
   #downloadPermits(serverId: string): Semaphore.Semaphore {
     let permits = this.#downloads.get(serverId);
     if (!permits) {
-      permits = Semaphore.makeUnsafe(REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER);
+      permits = Semaphore.makeUnsafe(this.#limits.previewsPerServer);
       this.#downloads.set(serverId, permits);
     }
     return permits;
@@ -152,8 +181,7 @@ export class RemoteAttachmentCache {
   // A use moves an entry to the end without a new `storedAt`, so an expired entry can be anywhere.
   #removeExpired(): void {
     const now = this.#now();
-    for (const [key, entry] of this.#entries)
-      if (now - entry.storedAt >= REMOTE_ATTACHMENT_CACHE_TTL_MS) this.#delete(key, entry);
+    for (const [key, entry] of this.#entries) if (now - entry.storedAt >= this.#limits.ttlMs) this.#delete(key, entry);
   }
 
   #store(key: string, serverId: string, attachment: RemoteAttachment, preview = false): void {
@@ -163,7 +191,7 @@ export class RemoteAttachmentCache {
     const previous = this.#entries.get(key);
     if (previous) this.#delete(key, previous);
     for (const [oldestKey, oldest] of this.#entries) {
-      if (this.#bytes + size <= REMOTE_ATTACHMENT_CACHE_BYTES) break;
+      if (this.#bytes + size <= this.#limits.bytes) break;
       this.#delete(oldestKey, oldest);
     }
     this.#entries.set(key, { serverId, attachment, storedAt: this.#now() });

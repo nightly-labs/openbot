@@ -355,6 +355,9 @@ const Conversation = createSimpleContext({
     // raw body of a streamed message: the next delta would append to the preview, not to the text.
     // Main adds text to a message before it sends the buffered delta, so the preview can hold text
     // that the first delta also holds. A message added from the preview starts with an empty raw body.
+    // A window around an old message, from a search, does not reach the end of the thread: the
+    // preview would show there as a cut copy below older messages (#11539). Its snapshot does not
+    // add new messages either; "Scroll to latest message" loads them.
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
@@ -362,6 +365,7 @@ const Conversation = createSimpleContext({
         // Most snapshots repeat messages that are loaded. Only a new message, or an agent that is not
         // open and holds more than a page, has work.
         const pending = messages.filter((message) => {
+          if (current[message.agentId]?.windowMode === "around") return false;
           const loaded = current[message.agentId]?.messages;
           if (!loaded?.some((candidate) => candidate.id === message.id)) return true;
           return message.agentId !== activeAgentId() && loaded.length > LATEST_PAGE_SIZE;
