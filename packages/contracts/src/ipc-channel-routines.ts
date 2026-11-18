@@ -192,8 +192,10 @@ const CHANNEL_ROUTINE_AUTHOR_PREFIX = "routine:";
  * The run of a channel routine request, for a view that shows the request as a routine marker, as an
  * agent chat does. Its text is the routine instruction, and for a webhook the event data (#11686).
  * The status is the one the host keeps in the run history, from the tasks of the request. A page has
- * no assignments, so a task that waits for its first turn shows as queued. A remote page sends only
- * the tasks of open runs and of its first messages (`pageTasks`), so a request with no task on the
+ * no assignments, so a task that waits for its first turn shows as queued. A person's message that
+ * continues the request's task takes the task to its own request: the task stays on the page, and
+ * the run is cancelled, as the host says. A remote page sends only the tasks of open runs and of its
+ * first messages (`pageTasks`), and an older page adds none, so a request whose task is not on the
  * page shows as invoked, as a routine message with no run state does in an agent chat.
  */
 export function channelRoutineRequest(
@@ -202,10 +204,11 @@ export function channelRoutineRequest(
 ): { routineId: string; runId: string; routineName: string; status: ChannelRoutineRunStatus } | null {
   if (entry.author.kind !== "member" || !entry.author.id.startsWith(CHANNEL_ROUTINE_AUTHOR_PREFIX)) return null;
   const owned = tasks.filter((task) => task.requestMessageId === entry.id);
+  const known = owned.length > 0 || tasks.some((task) => task.id === entry.taskId);
   return {
     routineId: entry.author.id.slice(CHANNEL_ROUTINE_AUTHOR_PREFIX.length),
     runId: entry.id,
     routineName: entry.author.name,
-    status: owned.length ? channelRunStatusForTasks(owned, false).status : "queued",
+    status: known ? channelRunStatusForTasks(owned, false).status : "queued",
   };
 }
