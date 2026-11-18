@@ -204,7 +204,7 @@ export const messages = {
   "error.provider.startStopped":
     "{provider} n’a pas démarré plusieurs fois de suite, OpenBot a donc arrêté d’essayer. Actualisez les fournisseurs pour réessayer.",
   "error.provider.startPaused":
-    "{provider} n’a pas démarré plusieurs fois de suite. OpenBot réessaiera plus tard. Pour réessayer maintenant, actualisez les fournisseurs.",
+    "{provider} n’a pas démarré plusieurs fois de suite. OpenBot réessaiera au prochain message ou à la prochaine routine. Pour réessayer maintenant, actualisez les fournisseurs.",
   "error.provider.tempDiskSpace":
     "{provider} a besoin d’au moins 1 Go d’espace disque libre pour démarrer. Libérez de l’espace, puis actualisez les fournisseurs.",
   "error.provider.noCodeSignIn": "{provider} ne permet pas de se connecter avec un code.",

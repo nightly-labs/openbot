@@ -186,7 +186,7 @@ export const messages = {
   "error.provider.startStopped":
     "{provider} art arda birkaç kez başlamadı, bu yüzden OpenBot denemeyi bıraktı. Tekrar denemek için sağlayıcıları yenileyin.",
   "error.provider.startPaused":
-    "{provider} art arda birkaç kez başlamadı. OpenBot daha sonra yeniden deneyecek. Şimdi denemek için sağlayıcıları yenileyin.",
+    "{provider} art arda birkaç kez başlamadı. OpenBot bir sonraki mesajda veya rutinde yeniden deneyecek. Şimdi denemek için sağlayıcıları yenileyin.",
   "error.provider.tempDiskSpace":
     "{provider} başlamak için en az 1 GB boş disk alanı gerektirir. Yer açın, ardından sağlayıcıları yenileyin.",
   "error.provider.noCodeSignIn": "{provider} için kodla oturum açılamaz.",
