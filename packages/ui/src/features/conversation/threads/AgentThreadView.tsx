@@ -24,6 +24,7 @@ import {
   type AgentStep,
   AgentStepsDisclosure,
   type AgentStepsFacts,
+  type AgentStepsTrace,
 } from "@openbot/ui/features/conversation/AgentSteps";
 import {
   AttachmentCards,
@@ -261,6 +262,8 @@ export interface AgentThreadViewProps {
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
+  /** The trace that the steps row above an answer opens, with the token usage and the time of each step. */
+  traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
   /** The "Show agent steps" setting: the steps are open at first. */
@@ -835,6 +838,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       <AgentStepsDisclosure
                         steps={steps()}
                         defaultOpen={props.stepsOpenByDefault ?? false}
+                        // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
+                        trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
                         facts={props.factsAbove?.(message().id)}
                       />
                     )}

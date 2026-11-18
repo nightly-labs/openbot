@@ -48,7 +48,6 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery, serverSupportsCapability } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -86,6 +85,7 @@ import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggesti
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
 import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -234,7 +234,7 @@ export function ConversationTimeline() {
     sideThreadOpen,
     messagePins,
   } = useConversationViewScope();
-  const { t, format, sourceText } = useText();
+  const { t, format } = useText();
   const controller = useConversationController();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
@@ -734,26 +734,10 @@ export function ConversationTimeline() {
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
   const bubbleStyle = useChatBubbleStyle();
-  const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
+  const turnTrace = useTurnTrace({ turnSteps, agentName: () => props.agent?.name, agents: () => props.agents });
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
-    spans: () =>
-      turnSteps.traceAbove(messageId, {
-        agent: agentName ?? props.agent?.name ?? t("chat.message.agentFallback"),
-        thinking: t("chat.trace.step.thinking"),
-        answer: t("chat.trace.step.answer"),
-        progress: sourceText,
-        message: (agents) => t("chat.trace.step.message", { agents }),
-        subagent: (title) => t("chat.trace.step.subagent", { title }),
-        reply: t("chat.trace.step.reply"),
-        agentNames: (ids) =>
-          format.list(
-            ids.map(
-              (id) => props.agents.find((candidate) => candidate.id === id)?.name ?? t("chat.message.agentFallback"),
-            ),
-          ),
-      }),
-    keyboard: traceKeyboard,
+    ...turnTrace(messageId, agentName),
     // The chat shows a subagent of the trace in the side panel, as its card in the chat does.
     canSelectSpan: (id) => id.startsWith(SUBAGENT_SPAN_PREFIX),
     onSelectSpan: (id) => {
