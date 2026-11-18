@@ -19,6 +19,12 @@ export function useHomeCard(): boolean {
  * `top + edge`, so that it keeps its round corners while a new list mounts and moves smoothly when the
  * header changes height. A pull past the top moves the card top down with the list and stretches the
  * scene from the top, so the title and the pinned agents stay on the scene.
+ *
+ * Keep the card top and the pull stretch here. Do not give the band a fixed height again, and do not
+ * make the list header the only part that draws the card top. With a fixed band, a pull moves the
+ * title and the pinned agents off the scene onto the card. With the card top only in the list, a
+ * change of server shows a straight band edge while the new list mounts, and the edge jumps to the
+ * new height.
  */
 export function HomeCardBackdrop({
   height,

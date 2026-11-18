@@ -984,7 +984,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     <View className="flex-1 bg-background">
       {/* The bar blurs the home content. */}
       <AndroidBlurTarget target={barBlurTarget} surface="canvas">
-        {/* The backdrop is fixed under the list, so the scroll moves nothing in it. */}
+        {/* The backdrop is fixed under the list, so the scroll moves nothing in it. It draws the card top
+            and follows a pull past the top; see `HomeCardBackdrop` before you change it. */}
         {homeCard && !onboarding.active && !sceneShows ? (
           <HomeCardBackdrop
             height={headerHeight + stageHeight}
