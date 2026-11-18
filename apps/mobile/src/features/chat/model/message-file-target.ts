@@ -123,6 +123,11 @@ export function messageLinkFilePath(href: string): string {
   return decodedFileUrlPath(fileUrlPath(href) ?? href);
 }
 
+/** The name of the file at a target, as a chip and an attachment of the message name it. */
+export function messageTargetFileName(file: MessageFileTarget): string {
+  return fileReferenceName(decodedFileUrlPath(file.path));
+}
+
 /**
  * The names of the files that a message opens with a chip: a Markdown link to a path, or a code span
  * that names a file. An attachment of an agent's message with one of these names does not show again
@@ -140,7 +145,7 @@ export function messageChipFileNames(body: string, agentId: string | undefined):
         : token.type === "codespan" && typeof token.text === "string"
           ? (messageFileTarget(token.text, directory, agentId)?.file ?? null)
           : null;
-    if (file) names.add(fileReferenceName(decodedFileUrlPath(file.path)));
+    if (file) names.add(messageTargetFileName(file));
   });
   return names;
 }

@@ -117,6 +117,7 @@ import {
   messageFileDirectory,
   messageFileTarget,
   messageLinkFileTarget,
+  messageTargetFileName,
 } from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
@@ -486,7 +487,11 @@ interface MessageRowShared {
   openSubagents: ((messageId: string) => void) | undefined;
   /** Opens the memory changes of a turn in their sheet. Unset where no sheet can show them. */
   openMemoryChanges: ((messageId: string) => void) | undefined;
-  openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
+  openFile: (
+    file: MessageFileTarget,
+    written: MessageFileTarget | null,
+    attachment: AttachmentSummary | undefined,
+  ) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     branch: (message: ChatBubbleMessage) => void;
@@ -806,19 +811,25 @@ const MessageRow = memo(function MessageRow({
   // so the selectable text can cover it.
   const tableOutside = useMemo(() => chatMarkdownHasTable(fileBody, finishedBody), [fileBody, finishedBody]);
   const openFile = shared.openFile;
+  const fileAttachments = message.kind === "message" && message.author === "agent" ? message.attachments : undefined;
   const openMessageFile = useMemo<OpenMessageFile>(() => {
     const directory = messageFileDirectory(fileBody);
+    // A chip with the name of an attachment of the message opens the attachment, whose card does not show.
+    const attachmentOf = (file: MessageFileTarget) => {
+      const name = messageTargetFileName(file);
+      return fileAttachments?.find((attachment) => attachment.name === name);
+    };
     return {
       code: (text) => {
         const target = messageFileTarget(text, directory, fileAgentId);
-        return target ? () => void openFile(target.file, target.written) : null;
+        return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
       },
       link: (href) => {
         const target = messageLinkFileTarget(href, fileAgentId);
-        return target ? () => void openFile(target, null) : null;
+        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
       },
     };
-  }, [fileBody, fileAgentId, openFile]);
+  }, [fileBody, fileAgentId, fileAttachments, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
@@ -829,7 +840,8 @@ const MessageRow = memo(function MessageRow({
       : undefined;
   const textColor = tone ? userForeground : foreground;
   // A file of an agent's message that the text opens with a chip does not show again as a card, as on
-  // desktop. The text is finished, so a chip that streams in does not hide its card early.
+  // desktop: the chip opens the attachment. The text is finished, so a chip that streams in does not
+  // hide its card early.
   const chipFiles = useMemo(
     () =>
       message.kind === "message" && message.author === "agent" && finishedBody && message.attachments?.length
