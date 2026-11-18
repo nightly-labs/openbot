@@ -1125,9 +1125,13 @@ export class SignalService {
     return true;
   }
 
-  /** False while a socket holds the chat, a link of it just landed, or it got the notice in the last day. */
+  /**
+   * False while a socket holds the chat, for a chat that this Signal saw linked, revoked or named in a
+   * route ticket, and for a chat that got the notice in the last day. The floor is kept, so a lookup
+   * that started before a link and answered after it cannot send the notice.
+   */
   #unlinkedNoticeDue(route: string, now: number): boolean {
-    if (this.#telegramChats.has(route) || (this.#telegramLinks.get(route)?.expiresAt ?? 0) > now) return false;
+    if (this.#telegramChats.has(route) || this.#telegramRouteFloor.has(route)) return false;
     const last = this.#telegramNotices.get(route);
     return last === undefined || now - last >= TELEGRAM_UNLINKED_NOTICE_MILLISECONDS;
   }

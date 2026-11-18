@@ -76,6 +76,8 @@ const LINK_CODE = randomBytes(32).toString("base64url");
 const OFFLINE_LINKED_CHAT = "-700";
 const FAILED_LOOKUP_CHAT = "-701";
 const UNLINKED_CHAT = "-702";
+// One more chat with no link. Its notice comes after the work of the updates before it.
+const LAST_UNLINKED_CHAT = "-709";
 // The account service fails for the sessions of this host, and calls the sessions of the next one inactive.
 const UNAVAILABLE_HOST_ID = "host-unavailable-e2e";
 const INACTIVE_HOST_ID = "host-inactive-e2e";
@@ -818,6 +820,10 @@ try {
         botApiCalls.filter((call) => call.method === "sendMessage" && call.chatId === Number(chatId));
       while (noticeOf(UNLINKED_CHAT).length === 0 && Date.now() < deadline)
         await new Promise((next) => setTimeout(next, 20));
+      // A second notice of the unlinked chat would come before this one.
+      expect((await postUpdate(JSON.stringify(message(LAST_UNLINKED_CHAT, mention)))).status === 200, "update refused");
+      while (noticeOf(LAST_UNLINKED_CHAT).length === 0 && Date.now() < deadline)
+        await new Promise((next) => setTimeout(next, 20));
       const notice = noticeOf(UNLINKED_CHAT);
       expect(notice.length === 1, `${notice.length} notices in the unlinked chat`);
       expect(
@@ -827,7 +833,7 @@ try {
       );
       // The earlier checks addressed OpenBot in chats with no link too: a mention, a caption mention and a direct chat.
       const noticed = [...new Set(botApiCalls.map((call) => String(call.chatId)))].sort();
-      const expected = ["-602", "-603", "606", UNLINKED_CHAT].sort();
+      const expected = ["-602", "-603", "606", UNLINKED_CHAT, LAST_UNLINKED_CHAT].sort();
       expect(JSON.stringify(noticed) === JSON.stringify(expected), `notices in ${noticed.join(", ")}`);
       expect(
         botApiCalls.every((call) => call.method === "sendMessage"),

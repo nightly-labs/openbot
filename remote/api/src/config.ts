@@ -136,11 +136,13 @@ function readTelegramConfig(environment: Record<string, string | undefined>): Te
   const origin = optional(environment.TELEGRAM_WEBHOOK_ORIGIN);
   const webhookOrigin = origin ? httpsOrigin(origin) : null;
   if (origin && !webhookOrigin) return off("TELEGRAM_WEBHOOK_ORIGIN must be an https origin.");
-  // The bot token goes to this origin, so only a loopback address is accepted.
+  // The bot token goes to this origin, so only a loopback address is accepted. Any other value is
+  // ignored, so that a test setting cannot turn off Telegram.
   const testOrigin = optional(environment.TELEGRAM_TEST_API_ORIGIN);
-  if (testOrigin && !/^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/u.test(testOrigin))
-    return off("TELEGRAM_TEST_API_ORIGIN must be http://127.0.0.1:<port>.");
-  return { bots, webhookSecret, webhookOrigin, apiOrigin: testOrigin ?? null };
+  const apiOrigin = testOrigin && /^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/u.test(testOrigin) ? testOrigin : null;
+  if (testOrigin && !apiOrigin)
+    console.error("TELEGRAM_TEST_API_ORIGIN must be http://127.0.0.1:<port>. It is ignored.");
+  return { bots, webhookSecret, webhookOrigin, apiOrigin };
 }
 
 function httpsOrigin(value: string): string | null {
