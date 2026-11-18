@@ -9,6 +9,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { pendingRuntimeAfterUpdate } from "../src/backend/agent/pending-runtime";
 import { AgentStore } from "../src/backend/agent-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -84,6 +85,95 @@ try {
     assert.equal(moved.provider, pendingProvider);
     assert.equal(moved.pendingRuntime, undefined);
     return { provider: moved.provider, pendingRuntime: moved.pendingRuntime ?? null };
+  });
+
+  const accountId = "a0000000000000001";
+  const sweptModel = "pending-model-swept";
+
+  await step("An account switch queues while the agent works", async () => {
+    const updated = await runCauseEffect(
+      store.updateAgent({
+        agentId: agent.id,
+        pendingRuntime: {
+          provider: pendingProvider,
+          model: "pending-model",
+          reasoningEffort: "high",
+          providerAccountId: accountId,
+        },
+      }),
+    );
+    assert.equal(updated.providerAccountId, undefined);
+    assert.equal(updated.pendingRuntime?.providerAccountId, accountId);
+    return updated.pendingRuntime;
+  });
+
+  await step("A model sweep that names no account keeps the account switch", async () => {
+    const before = store.get(agent.id);
+    assert.ok(before);
+    const pendingRuntime = pendingRuntimeAfterUpdate({
+      update: {},
+      previous: before,
+      next: { provider: before.provider, model: sweptModel, reasoningEffort: before.reasoningEffort },
+      runtime: true,
+      queueWhileBusy: true,
+      handover: false,
+    });
+    assert.ok(pendingRuntime);
+    const swept = await runCauseEffect(
+      store.updateAgent({
+        agentId: agent.id,
+        provider: before.provider,
+        model: sweptModel,
+        reasoningEffort: before.reasoningEffort,
+        pendingRuntime,
+      }),
+    );
+    assert.equal(swept.model, sweptModel);
+    assert.equal(swept.providerAccountId, undefined);
+    assert.deepEqual(swept.pendingRuntime, {
+      provider: before.provider,
+      model: sweptModel,
+      reasoningEffort: before.reasoningEffort,
+      providerAccountId: accountId,
+    });
+    return swept.pendingRuntime;
+  });
+
+  await step("The account switch applies before the next turn", async () => {
+    const queued = store.get(agent.id)?.pendingRuntime;
+    assert.ok(queued);
+    const applied = await runCauseEffect(
+      store.updateAgent({
+        agentId: agent.id,
+        provider: queued.provider,
+        model: queued.model,
+        reasoningEffort: queued.reasoningEffort,
+        providerAccountId: queued.providerAccountId ?? null,
+      }),
+    );
+    assert.equal(applied.providerAccountId, accountId);
+    assert.equal(applied.pendingRuntime, undefined);
+    return { providerAccountId: applied.providerAccountId ?? null, model: applied.model };
+  });
+
+  await step("An account change that is not the queued one leaves the switch queued", async () => {
+    const second = "a0000000000000002";
+    const third = "a0000000000000003";
+    await runCauseEffect(
+      store.updateAgent({
+        agentId: agent.id,
+        pendingRuntime: {
+          provider: pendingProvider,
+          model: sweptModel,
+          reasoningEffort: "high",
+          providerAccountId: second,
+        },
+      }),
+    );
+    const moved = await runCauseEffect(store.updateAgent({ agentId: agent.id, providerAccountId: third }));
+    assert.equal(moved.providerAccountId, third);
+    assert.equal(moved.pendingRuntime?.providerAccountId, second);
+    return { providerAccountId: moved.providerAccountId ?? null, pendingRuntime: moved.pendingRuntime ?? null };
   });
 
   report.passed = true;

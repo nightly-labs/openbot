@@ -246,6 +246,7 @@ import {
   type AgentServerClaims,
   OpenBotToolRouter,
 } from "./agent/openbot-tool-router";
+import { pendingRuntimeAfterUpdate } from "./agent/pending-runtime";
 import { PlanContinuation } from "./agent/plan-continuation";
 import { ProfileClients } from "./agent/profile-clients";
 import {
@@ -4231,6 +4232,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
+    // A Team API client cannot see the queued change, so only a handover from it ends the change. A
+    // queued account switch outlives an update that names no account, such as the model sweep of a
+    // bulk change: the sweep lands now and the account still waits for the next turn.
+    const pendingAfterUpdate =
+      previous === undefined
+        ? runtimeFields && (queueWhileBusy || handoverNeeded)
+          ? null
+          : undefined
+        : pendingRuntimeAfterUpdate({
+            update: input,
+            previous,
+            next: {
+              provider: requestedProvider ?? previous.provider,
+              model: requestedModel?.id ?? previous.model,
+              reasoningEffort: input.reasoningEffort ?? previous.reasoningEffort,
+            },
+            runtime: runtimeFields,
+            queueWhileBusy,
+            handover: handoverNeeded,
+            move,
+          });
     const agent = yield* this.#store.updateAgent(
       {
         ...input,
@@ -4239,8 +4261,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ? { providerAccountId: requestedAccount }
           : {}),
         ...(usageLimitReturn !== undefined ? { usageLimitReturn } : {}),
-        // A Team API client cannot see the queued change, so only a handover from it ends the change.
-        ...(runtimeFields && (queueWhileBusy || handoverNeeded) ? { pendingRuntime: null } : {}),
+        ...(pendingAfterUpdate === undefined ? {} : { pendingRuntime: pendingAfterUpdate }),
         ...pin,
       },
       initiatingAgentId,

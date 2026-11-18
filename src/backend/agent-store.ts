@@ -886,8 +886,14 @@ export class AgentStore {
       else if (input.pendingRuntime !== undefined) {
         if (!isAgentPendingRuntime(input.pendingRuntime)) throw new Error("Invalid pending runtime.");
         next.pendingRuntime = { ...input.pendingRuntime };
-      } else if (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) {
-        // A handover that landed ends the queued change.
+      } else if (
+        next.provider !== agent.provider ||
+        // A handover that landed ends the queued change. An account the change did not queue leaves
+        // a queued account switch waiting for the next turn.
+        (next.providerAccountId !== agent.providerAccountId &&
+          (next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) ===
+            (agent.pendingRuntime?.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID))
+      ) {
         delete next.pendingRuntime;
       }
       if (input.pinnedAccountId === null) delete next.pinnedAccountId;
