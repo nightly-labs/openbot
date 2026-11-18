@@ -16,4 +16,6 @@ export const messages = defineMessages("error.kind", {
   "error.kind.permission": "You do not have permission to complete this action. Ask the owner for access.",
   "error.kind.rateLimit": "Too many requests. Wait a moment, then try again.",
   "error.kind.service": "The service is unavailable. Wait a moment, then try again.",
+  "error.kind.clock":
+    "A secure connection failed because the date or time on the computer running OpenBot is probably wrong. Correct the date and time, then try again.",
 });

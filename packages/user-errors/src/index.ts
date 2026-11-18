@@ -28,6 +28,7 @@ export type UserErrorKind =
   | "read-only"
   | "conflict"
   | "service"
+  | "clock"
   | "unknown";
 
 /** The catalog key for each kind's sentence. The text lives in `@openbot/i18n` (`error.kind.*`). */
@@ -43,6 +44,7 @@ const USER_ERROR_COPY = {
   permission: "error.kind.permission",
   "rate-limit": "error.kind.rateLimit",
   service: "error.kind.service",
+  clock: "error.kind.clock",
 } as const satisfies Record<Exclude<UserErrorKind, "unknown">, keyof SourceMessages>;
 
 const NETWORK_CODES = [
@@ -80,6 +82,14 @@ const AUTH_SIGNALS =
  */
 const RATE_LIMIT_SIGNALS = /\b429\s+too many requests\b|\blast status:\s*429\b|"status"\s*:\s*429\b/iu;
 
+/**
+ * A server certificate that is not valid yet: the computer's clock is behind, such as when the
+ * Windows Time service is stopped. A provider CLI reports it as `Internal error: CERT_NOT_YET_VALID:
+ * certificate is not yet valid`, and the chat showed that text with no way forward (#7467). An
+ * expired certificate is left out: a server can really have one, and the clock is then not the cause.
+ */
+const CLOCK_SIGNALS = /\bCERT_NOT_YET_VALID\b|\bcertificate is not yet valid\b/iu;
+
 /** Runtime output, stack traces, paths and serialized objects: never shown, whatever the kind. */
 const TECHNICAL_OUTPUT =
   /(?:\bSQLITE_\w+|\bERR_\w+|^E[A-Z_]+:|^Command failed|^spawn |\n\s*at |\[object Object\]|^\s*[<{[]|\/(?:Users|home|tmp|private|var|etc|usr)\/|[A-Za-z]:\\)/u;
@@ -110,6 +120,7 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (/^(?:HTTP )?429(?:\b|:)/u.test(message)) return "rate-limit";
   if (/^(?:HTTP )?5\d\d(?:\b|:)/u.test(message)) return "service";
   if (RATE_LIMIT_SIGNALS.test(message)) return "rate-limit";
+  if (CLOCK_SIGNALS.test(message)) return "clock";
   // Unanchored, and last: a 429 body that happens to mention a token is still a rate limit.
   if (AUTH_SIGNALS.test(message)) return "auth";
   return "unknown";

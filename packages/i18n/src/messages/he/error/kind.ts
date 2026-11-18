@@ -13,4 +13,6 @@ export const messages = {
   "error.kind.permission": "אין לך הרשאה להשלים את הפעולה. יש לבקש גישה מהבעלים.",
   "error.kind.rateLimit": "יותר מדי בקשות. יש להמתין רגע ולנסות שוב.",
   "error.kind.service": "השירות אינו זמין. יש להמתין רגע ולנסות שוב.",
+  "error.kind.clock":
+    "החיבור המאובטח נכשל כי התאריך או השעה במחשב שמריץ את OpenBot כנראה שגויים. יש לתקן את התאריך והשעה ולנסות שוב.",
 } as const satisfies PartialTranslation<typeof source>;

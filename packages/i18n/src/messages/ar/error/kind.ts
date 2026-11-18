@@ -14,4 +14,6 @@ export const messages = {
   "error.kind.permission": "ليس لديك إذن لإكمال هذا الإجراء. اطلب الوصول من المالك.",
   "error.kind.rateLimit": "طلبات كثيرة جدًا. انتظر قليلًا، ثم أعد المحاولة.",
   "error.kind.service": "الخدمة غير متاحة. انتظر قليلًا، ثم أعد المحاولة.",
+  "error.kind.clock":
+    "تعذّر الاتصال الآمن لأن تاريخ أو وقت الحاسوب الذي يشغّل OpenBot غير صحيح على الأرجح. صحّح التاريخ والوقت، ثم أعد المحاولة.",
 } as const satisfies PartialTranslation<typeof source>;

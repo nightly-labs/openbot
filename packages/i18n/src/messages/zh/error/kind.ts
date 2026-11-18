@@ -14,4 +14,5 @@ export const messages = {
   "error.kind.permission": "你没有权限完成该操作，请向所有者申请访问权限。",
   "error.kind.rateLimit": "请求过于频繁，请稍等片刻后重试。",
   "error.kind.service": "服务暂时不可用，请稍等片刻后重试。",
+  "error.kind.clock": "运行 OpenBot 的电脑的日期或时间可能不正确，因此无法建立安全连接。请更正日期和时间，然后重试。",
 } as const satisfies PartialTranslation<typeof source>;

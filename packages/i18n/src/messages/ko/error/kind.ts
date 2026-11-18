@@ -14,4 +14,6 @@ export const messages = {
   "error.kind.permission": "이 작업을 할 권한이 없어요. 소유자에게 접근 권한을 요청하세요.",
   "error.kind.rateLimit": "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
   "error.kind.service": "서비스를 사용할 수 없어요. 잠시 후 다시 시도해 주세요.",
+  "error.kind.clock":
+    "OpenBot을 실행 중인 컴퓨터의 날짜나 시간이 잘못된 것 같아 보안 연결에 실패했어요. 날짜와 시간을 바로잡은 후 다시 시도해 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -18,4 +18,6 @@ export const messages = {
   "error.kind.permission": "Je hebt geen toestemming om deze actie uit te voeren. Vraag de eigenaar om toegang.",
   "error.kind.rateLimit": "Te veel verzoeken. Wacht even en probeer het opnieuw.",
   "error.kind.service": "De service is niet beschikbaar. Wacht even en probeer het opnieuw.",
+  "error.kind.clock":
+    "Een beveiligde verbinding is mislukt, omdat de datum of tijd op de computer waarop OpenBot draait waarschijnlijk onjuist is. Corrigeer de datum en tijd en probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;
