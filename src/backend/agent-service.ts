@@ -1669,7 +1669,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.get(agentId);
         return (
           agent !== undefined &&
-          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
+          this.#usageLimits.passesOver(agentId) &&
           (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
         );
       },
@@ -3851,10 +3851,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     queueWhileBusy = true,
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
-      .runExclusive(() =>
-        this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
-      )
+      .runExclusive(() => {
+        const before = this.#store.get(input.agentId);
+        return this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy).pipe(
+          Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))),
+        );
+      })
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
+  }
+
+  /**
+   * A requested change moved the agent to another model, now or when it is next idle, so a provider
+   * error that holds that model gets one try. Automatic moves do not come through here.
+   */
+  #modelChosen(before: AgentSummary | undefined, after: AgentSummary): void {
+    const chosen = (agent: AgentSummary): AgentModelChoice => agent.pendingRuntime ?? agentModelChoice(agent);
+    if (before && !sameAgentModelChoice(chosen(before), chosen(after)))
+      this.#usageLimits.chosen(after.id, usageLimitOf(chosen(after)));
   }
 
   /**
@@ -4368,7 +4381,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // A message from the user tries the held model first: the limit can have ended outside OpenBot.
     // A refused try holds the agent again, and the drain after it moves (#7068).
     if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
-    const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
+    // A model that a person or an agent chose gets one turn before the agent leaves it again (#11992).
+    const failed = !limited && this.#usageLimits.passesOver(agentId);
     if (!limited && !failed) return null;
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#hasWaitingWork(agentId)) return null;
