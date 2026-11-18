@@ -313,6 +313,7 @@ export const messages = {
     "Google no aceptó el inicio de sesión de Gemini para esta solicitud. Envía tu mensaje de nuevo. Si el error continúa, vuelve a conectar Gemini en Ajustes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini rechazó esta solicitud. Elige otro modelo y vuelve a enviar tu mensaje. Si vuelve a fallar, inicia un nuevo chat.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini perdió la conexión con Google. Vuelve a enviar tu mensaje. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini rechazó esta solicitud y no indicó la causa. Un elemento del historial del chat puede causarlo, como una imagen que abrió el agente. OpenBot inició una nueva sesión de Gemini con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo.",
   "error.provider.antigravityHistoryUnreadable":
