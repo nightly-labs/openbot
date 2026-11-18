@@ -2357,6 +2357,7 @@ export class TurnLifecycle {
               snapshot,
               turnId,
               noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
+              running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       if (quiet && quietTurn) {
