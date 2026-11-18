@@ -272,6 +272,8 @@ const TOOL_QUEUE_WAIT_MS = 120_000;
  * and the close then removes the page under it (#11918).
  */
 const CLOSE_QUEUE_WAIT_MS = 10_000;
+/** After that close, the time for the queued operations to end on the closed page. */
+const CLOSED_PAGE_DRAIN_MS = 2_000;
 /** The `keyCode` of `sendInputEvent` for a key whose `Input.key` name is different. */
 const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left", ArrowRight: "Right" };
 /**
@@ -1500,7 +1502,9 @@ export class BrowserHost {
     tab.engine.releaseDialogs();
     const destroy = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
-        const drained = Option.isSome(yield* Deferred.await(tab.queue).pipe(Effect.timeoutOption(CLOSE_QUEUE_WAIT_MS)));
+        const queueDrains = (milliseconds: number) =>
+          Deferred.await(tab.queue).pipe(Effect.timeoutOption(milliseconds), Effect.map(Option.isSome));
+        let drained = yield* queueDrains(CLOSE_QUEUE_WAIT_MS);
         if (!drained) {
           logger.warn("A browser tab closed before an earlier operation on it finished.", {
             tabId,
@@ -1511,13 +1515,15 @@ export class BrowserHost {
           yield* browserSync(() => {
             if (!tab.contents.isDestroyed()) tab.contents.close();
           });
+          drained = yield* queueDrains(CLOSED_PAGE_DRAIN_MS);
         }
         yield* Effect.all(childDrains, { concurrency: "unbounded", discard: true });
         const discarded = yield* Effect.exit(this.#recorder.discard(tabId, "tab-closed"));
         yield* tab.engine.destroy();
-        // The scope waits for the queued operations, so the close does not wait for one that never ends.
+        // The scope waits for the queued operations. Neither the close nor the host shutdown waits for one
+        // that never ends.
         if (drained) yield* Scope.close(tab.scope, Exit.void);
-        else yield* Effect.forkIn(Scope.close(tab.scope, Exit.void), this.#scope, { startImmediately: true });
+        else yield* Effect.forkDetach(Scope.close(tab.scope, Exit.void), { startImmediately: true });
         yield* browserSync(() => {
           if (!tab.contents.isDestroyed()) tab.contents.close();
         });
