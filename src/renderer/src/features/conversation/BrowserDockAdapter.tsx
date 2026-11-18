@@ -53,6 +53,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     respondToBrowserTakeover,
     takeBrowserControl,
     releaseBrowserControl,
+    localSignIn,
     openExternalMessageUrl,
     setActiveRightPanel,
   } = useConversationViewScope();
@@ -163,7 +164,12 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     const tab = adapterProps.tab;
     const content = island();
     if (!tab || content?.kind !== "activity") return undefined;
-    if (content.control === "request") return async () => void (await respondToBrowserTakeover("complete"));
+    if (content.control === "request") {
+      // A page that refused the server's sign-in needs the sign-in on this computer, which the full view
+      // offers. Done here ended the step with no sign-in, and the agent asked again (#12108).
+      if (takeover()?.reason === "sign-in-blocked" && localSignIn.canStart(tab)) return undefined;
+      return async () => void (await respondToBrowserTakeover("complete"));
+    }
     if (content.control === "user") return () => releaseBrowserControl(tab.id);
     if (!serverSupportsCapability(props.server, BROWSER_USER_CONTROL_CAPABILITY)) return undefined;
     return () => takeBrowserControl(tab.id);

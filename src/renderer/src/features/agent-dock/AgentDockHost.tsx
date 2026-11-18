@@ -21,6 +21,7 @@ import {
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  LOCAL_SERVER_ID,
   sameAgentModelChoice,
 } from "@openbot/contracts/ipc";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
@@ -792,6 +793,8 @@ function WindowAgentDock(props: { serverId: string }) {
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    // As in the dock window: the sign-in for a page that refused a joined server is in the main chat (#12108).
+    takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     // Main sends the secret to the server of the dock, this computer or a joined server.
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),

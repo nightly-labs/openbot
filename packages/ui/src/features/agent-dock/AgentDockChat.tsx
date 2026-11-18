@@ -84,6 +84,8 @@ export interface AgentDockChatAnswers {
   /** An empty record cancels the question. */
   prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
   takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  /** False when Done in the dock cannot finish the takeover. The card then offers Open, and no Done. */
+  takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
   /** Sends a password or a code that the agent asked for. */
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   /** Moves the held message to another model. A failure rejects, and the card shows it. */
@@ -506,7 +508,11 @@ export function AgentDockChat(props: {
                         preview={null}
                         previewStatus="idle"
                         onOpen={() => props.onOpenInMain()}
-                        onComplete={() => respondTakeover(current(), "complete")}
+                        onComplete={
+                          props.answers?.takeoverDone?.(current()) === false
+                            ? undefined
+                            : () => respondTakeover(current(), "complete")
+                        }
                         onCancel={() => respondTakeover(current(), "cancel")}
                         browserSecret={takeoverSecret(current())}
                       />
