@@ -2,24 +2,27 @@ import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import { Typography } from "heroui-native";
+import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import AppWindow from "lucide-react-native/icons/app-window";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import CodeXml from "lucide-react-native/icons/code-xml";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import FileCode from "lucide-react-native/icons/file-code";
 import FileText from "lucide-react-native/icons/file-text";
 import Sheet from "lucide-react-native/icons/sheet";
 import Workflow from "lucide-react-native/icons/workflow";
-import { type ReactNode, useEffect, useState } from "react";
-import { ScrollView, View, type ViewStyle } from "react-native";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { FlatList, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { shareLocalAttachment } from "@/features/chat/components/attachment-preview";
-import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
+import { ScrollingCodeBlock } from "@/features/chat/components/chat-code-block";
+import { ChatGlassIconButton, ChatGlassLabel } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { CodeDocument } from "@/features/chat/components/code-document";
 import DiagramCanvas from "@/features/chat/components/diagram-canvas.dom";
@@ -27,9 +30,10 @@ import { SpreadsheetFilePreview } from "@/features/chat/components/file-document
 import { HtmlPage } from "@/features/chat/components/html-page";
 import HtmlPreview from "@/features/chat/components/html-preview.dom";
 import { PdfPreview } from "@/features/chat/components/pdf-preview";
-import { PREVIEW_TEXT_LIMIT } from "@/features/chat/model/attachment-file-preview";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
+import { type MarkdownPreviewPart, markdownPreviewSeries } from "@/features/chat/model/markdown-preview-parts";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { textPreviewParts } from "@/features/chat/model/text-preview-parts";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
@@ -52,6 +56,8 @@ const TITLE_ENTER = new Keyframe({
 /** The floating header: its buttons are 48 points high, 8 points under the safe area, as in the chat. */
 const HEADER_OFFSET = 8;
 const HEADER_HEIGHT = 48;
+/** The part buttons of a long text float this far above the bottom safe area. */
+const PART_BAR_OFFSET = 8;
 
 function webLink(href: string): string | null {
   try {
@@ -91,6 +97,10 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   const switchable = entry.kind === "html" || entry.kind === "mermaid" || entry.kind === "markdown";
   const documentFile = entry.kind === "pdf" || entry.kind === "spreadsheet";
   const [view, setView] = useState<PreviewView>(entry.kind === "text" ? "code" : "preview");
+  // The code view mounts when it first shows, not under the preview: a long file draws its text and
+  // its colours only when the reader asks for them.
+  const [codeOpened, setCodeOpened] = useState(view === "code");
+  if (view === "code" && !codeOpened) setCodeOpened(true);
   const [wrap, setWrap] = useState(false);
   const headerBottom = insets.top + HEADER_OFFSET + HEADER_HEIGHT + HEADER_OFFSET;
   const title =
@@ -122,12 +132,16 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             : entry.kind === "spreadsheet"
               ? Sheet
               : FileText;
-  // An HTML page keeps its whole source for the page view; the code view shows only the first part.
-  const codeText = entry.source.slice(0, PREVIEW_TEXT_LIMIT);
-  const truncatedNote =
-    entry.truncated || codeText.length < entry.source.length
-      ? t("mobile.chat.preview.truncated", { limit: format.number(PREVIEW_TEXT_LIMIT) })
-      : null;
+  // The code view shows a long text one part at a time, with buttons for the parts around it.
+  const textParts = useMemo(() => (codeOpened ? textPreviewParts(entry.source) : null), [codeOpened, entry.source]);
+  const [textPart, setTextPart] = useState(0);
+  const partCount = textParts?.length ?? 0;
+  const shownPart = textParts?.[Math.min(textPart, partCount - 1)];
+  const selectPart = (next: number) => {
+    void haptics.impact("soft");
+    setTextPart(next);
+  };
+  const codeText = shownPart ? entry.source.slice(shownPart.start, shownPart.end) : "";
   const file = entry.file;
 
   const select = (next: PreviewView) => {
@@ -211,11 +225,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             dom={{ ...expoGoDomOptions, style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
           />
         ) : entry.kind === "markdown" ? (
-          <MarkdownPreview
-            source={entry.source}
-            note={truncatedNote}
-            insets={{ top: headerBottom, bottom: insets.bottom }}
-          />
+          <MarkdownPreview source={entry.source} insets={{ top: headerBottom, bottom: insets.bottom }} />
         ) : entry.kind === "mermaid" ? (
           <DiagramPreview
             source={entry.source}
@@ -226,19 +236,57 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
           />
         ) : null}
       </SwitchLayer>
-      {documentFile ? null : (
+      {documentFile || !codeOpened ? null : (
         <SwitchLayer shown={view === "code"} reducedMotion={reducedMotion}>
           <CodeDocument
+            // A new part opens at its top.
+            key={textPart}
             text={codeText}
+            firstLine={shownPart?.firstLine ?? 1}
             language={entry.language}
             title={headerTitle}
             wrap={wrap}
             topInset={headerBottom}
-            bottomInset={insets.bottom}
-            note={truncatedNote}
+            // The last lines scroll clear of the part buttons.
+            bottomInset={partCount > 1 ? insets.bottom + PART_BAR_OFFSET + HEADER_HEIGHT : insets.bottom}
           />
         </SwitchLayer>
       )}
+      {view === "code" && partCount > 1 ? (
+        <View
+          className="absolute inset-x-0 z-20 flex-row items-center justify-center gap-2"
+          pointerEvents="box-none"
+          style={{
+            bottom: insets.bottom + PART_BAR_OFFSET,
+            paddingLeft: insets.left + 16,
+            paddingRight: insets.right + 16,
+          }}
+        >
+          <ChatGlassIconButton
+            accessibilityLabel={t("mobile.chat.preview.previousPart")}
+            disabled={textPart === 0}
+            fallbackBackground={fieldBackground}
+            liquidGlassAvailable={liquidGlass}
+            onPress={() => selectPart(textPart - 1)}
+          >
+            <ChevronLeft color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+          </ChatGlassIconButton>
+          <ChatGlassLabel fallbackBackground={fieldBackground} liquidGlassAvailable={liquidGlass}>
+            <Typography.Paragraph type="body-sm" className="font-semibold text-foreground">
+              {t("mobile.chat.preview.part", { part: format.number(textPart + 1), total: format.number(partCount) })}
+            </Typography.Paragraph>
+          </ChatGlassLabel>
+          <ChatGlassIconButton
+            accessibilityLabel={t("mobile.chat.preview.nextPart")}
+            disabled={textPart === partCount - 1}
+            fallbackBackground={fieldBackground}
+            liquidGlassAvailable={liquidGlass}
+            onPress={() => selectPart(textPart + 1)}
+          >
+            <ChevronRight color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+          </ChatGlassIconButton>
+        </View>
+      ) : null}
 
       <View
         className="absolute inset-x-0 z-20 flex-row items-center gap-2"
@@ -332,20 +380,29 @@ function GlassCapsule({
   );
 }
 
-/** A Markdown file, drawn as the chat draws a reply, with selectable text. */
-function MarkdownPreview({
-  source,
-  note,
-  insets,
-}: {
-  source: string;
-  /** Says that the file goes on past what the screen shows. */
-  note: string | null;
-  insets: { top: number; bottom: number };
-}) {
+/** The space between two blocks of a Markdown part, as `ChatMarkdown` puts between its blocks. */
+const PART_GAP = 10;
+
+/**
+ * A Markdown file, drawn as the chat draws a reply, with selectable text. The file is a list of
+ * rows, so the list draws only the rows near the screen, and a long file reads its next part as the
+ * reader scrolls to it. A code block of more than 25 lines scrolls inside a box of 25 lines.
+ */
+function MarkdownPreview({ source, insets }: { source: string; insets: { top: number; bottom: number } }) {
   const sides = useSafeAreaInsets();
+  // The parser counts `\n` line ends, so the parts start where it says.
+  const text = useMemo(() => source.replace(/\r\n?/gu, "\n"), [source]);
+  const [series, setSeries] = useState(() => markdownPreviewSeries(text));
+  const readNext = () =>
+    setSeries((current) => {
+      if (current.next === null) return current;
+      const next = markdownPreviewSeries(text, current.next, current.definitions);
+      return { ...next, parts: [...current.parts, ...next.parts] };
+    });
   return (
-    <ScrollView
+    <FlatList<MarkdownPreviewPart>
+      data={series.parts}
+      keyExtractor={(part) => part.key}
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
         paddingTop: insets.top,
@@ -354,14 +411,22 @@ function MarkdownPreview({
         paddingRight: sides.right + 20,
       }}
       scrollIndicatorInsets={{ top: insets.top, bottom: insets.bottom }}
-    >
-      <ChatMarkdown body={source} color={undefined} finished selectable />
-      {note ? (
-        <Typography.Paragraph type="body-sm" className="pt-4 text-muted">
-          {note}
-        </Typography.Paragraph>
-      ) : null}
-    </ScrollView>
+      initialNumToRender={4}
+      windowSize={5}
+      removeClippedSubviews
+      onEndReached={readNext}
+      onEndReachedThreshold={2}
+      renderItem={({ item, index }) => (
+        <View style={{ paddingTop: index === 0 ? 0 : PART_GAP }}>
+          {item.kind === "code" ? (
+            <ScrollingCodeBlock text={item.text} pieces={item.pieces} language={item.language} />
+          ) : (
+            <ChatMarkdown body={item.source} color={undefined} finished selectable />
+          )}
+        </View>
+      )}
+      ListFooterComponent={series.next === null ? undefined : <Spinner className="self-center pt-4" />}
+    />
   );
 }
 

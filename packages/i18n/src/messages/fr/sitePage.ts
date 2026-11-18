@@ -93,6 +93,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Je déclare accepter {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "la politique de confidentialité",
   "sitePage.pricing.consent.terms": "les conditions et le droit de rétractation",
+  "sitePage.pricing.consent.earlyStart":
+    "Je demande que le service d'hébergement commence avant la fin du délai de rétractation de 14 jours. Je reconnais que si je me rétracte avant l'exécution complète du service, je devrai payer les services fournis jusqu'au moment de la rétractation, et qu'une fois le service entièrement exécuté, je perdrai mon droit de rétractation.",
   "sitePage.marketplace.agents.title": "Agents — OpenBot Marketplace",
   "sitePage.marketplace.agents.description":
     "Des agents créés par d’autres personnes dans OpenBot. Ajoutez-en un à OpenBot avec ses compétences et ses routines.",

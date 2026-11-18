@@ -1,0 +1,81 @@
+/* The tooltips of the sidebar rows: the wait tooltip in "Needs you" and the name tooltip in the
+ * compact sidebar. */
+
+/* The tooltip anchors to this wrapper, so it needs a box of its own. */
+.sidebar-agent-tooltip-trigger {
+  display: block;
+}
+
+.sidebar-wait-tooltip,
+.sidebar-name-tooltip {
+  z-index: var(--openbot-layer-tooltip);
+  display: grid;
+  max-width: min(260px, calc(100vw - 16px));
+  gap: 2px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  pointer-events: none;
+}
+
+.sidebar-wait-tooltip-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-warning-text);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.sidebar-wait-tooltip-title svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-wait-tooltip-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-wait-tooltip-hint {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The name tooltip has a title badge beside the name, so it is wider. */
+.sidebar-name-tooltip {
+  max-width: min(280px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+}
+
+.sidebar-name-tooltip-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.sidebar-name-tooltip-name {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.sidebar-name-tooltip-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.sidebar-name-tooltip-detail {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}

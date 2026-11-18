@@ -1,6 +1,7 @@
 "use dom";
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteTeamPeer,
@@ -39,6 +40,8 @@ export type RemoteTeamBridgeHandle = {
    * WebView's `online` event does not fire for that move, and the old path and socket can be dead.
    */
   networkChanged: (value: BridgeJson) => void;
+  /** The user cancelled the upload in progress. The peer stops it and tells the host. */
+  cancelUpload: (value: BridgeJson) => void;
 };
 
 interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
@@ -97,7 +100,8 @@ export default function RemoteTeamBridge({
     },
   };
   const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
-  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions);
+  // The workspace speaks protocol 10 with a host of protocol 10, and protocol 9 with an older host.
+  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
   const peer = runtime.current;
   if (!browserView.current)
     browserView.current = createBrowserViewBridge(
@@ -158,6 +162,9 @@ export default function RemoteTeamBridge({
     };
   const setActive = applyActive.current;
   const networkChanged = useRef(() => peer.networkMoved()).current;
+  const cancelUpload = useRef(() => {
+    void peer.cancelUpload().catch(() => undefined);
+  }).current;
 
   useDOMImperativeHandle<RemoteTeamBridgeHandle>(
     ref ?? null,
@@ -167,8 +174,9 @@ export default function RemoteTeamBridge({
       teamCommands,
       setActive,
       networkChanged,
+      cancelUpload,
     }),
-    [views, desktopStreams, teamCommands, setActive, networkChanged],
+    [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload],
   );
 
   // After the handle effect above, so the native side knows the handle before it sends the commands.

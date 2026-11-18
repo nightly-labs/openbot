@@ -114,6 +114,7 @@ export function AgentRuntimeFields({
   onAccountChange,
   fastMode,
   modelPickerRoute,
+  workspaceOnly = false,
 }: {
   serverId: string;
   /** The model list page in the stack of this form. */
@@ -138,6 +139,8 @@ export function AgentRuntimeFields({
   onAccountChange?: (accountId: string) => void;
   /** An existing agent. Its Speed choice shows when the chosen model has a fast tier. */
   fastMode?: AgentHostFieldsProps;
+  /** The agent has Workspace only access: a provider that the host refuses for it gets a note. */
+  workspaceOnly?: boolean;
 }) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -156,6 +159,11 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
+  // The host refuses to save such a provider for a Workspace only agent, so the form says why first.
+  const workspaceOnlyNote =
+    workspaceOnly && options.some((option) => option.workspaceOnlyUnavailable)
+      ? t("mobile.agent.runtime.workspaceOnlyUnavailable")
+      : undefined;
   const openModelPicker = useAgentModelPicker((state) => state.open);
   const chooseModel = (next: AgentModelOption) => {
     onChange({
@@ -168,7 +176,7 @@ export function AgentRuntimeFields({
   };
   return (
     <>
-      <SettingsSection title={title} footer={spentLimit}>
+      <SettingsSection title={title} footer={[workspaceOnlyNote, spentLimit].filter(Boolean).join(" ") || undefined}>
         <SettingsRow
           trailing={
             <SettingsPicker<string>

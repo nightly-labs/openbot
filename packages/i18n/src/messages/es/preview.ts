@@ -20,6 +20,9 @@ export const messages = {
   "preview.unsupported.title": "Vista previa no disponible",
   "preview.unsupported.description": "Este tipo de archivo se puede abrir en su aplicación predeterminada.",
   "preview.unsupported.openExternally": "Abrir externamente",
+  "preview.tooLarge.title": "Archivo demasiado grande para la vista previa",
+  "preview.tooLarge.description":
+    "La vista previa llega hasta 100 MB. Puedes abrir este archivo en su aplicación predeterminada.",
   "preview.spreadsheet.readFailed": "No se pudo leer esta hoja de cálculo.",
   "preview.spreadsheet.truncated": "Vista previa limitada a las primeras {rows} filas y {columns} columnas.",
 } as const satisfies PartialTranslation<typeof source>;

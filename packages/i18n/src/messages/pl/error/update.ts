@@ -27,6 +27,10 @@ export const messages = {
   "error.update.siblingCheckFailed": "Nie udało się sprawdzić innych sesji OpenBot. Spróbuj ponownie przed instalacją.",
   "error.update.readOnlyLocation":
     "OpenBot nie może instalować aktualizacji z tej lokalizacji. Zamknij OpenBot. W Finderze przeciągnij OpenBot do folderu Aplikacje (jeśli już tam jest, przeciągnij go na zewnątrz i z powrotem). Następnie otwórz OpenBot i zainstaluj aktualizację ponownie.",
+  "error.update.appImageMissing":
+    "OpenBot nie może zainstalować aktualizacji, ponieważ jego plik AppImage został przeniesiony, zmieniono jego nazwę lub go zastąpiono. Zamknij OpenBot, a następnie ponownie otwórz plik AppImage.",
+  "error.update.appImageReadOnly":
+    "OpenBot nie może instalować aktualizacji w folderze swojego pliku AppImage. Zamknij OpenBot, przenieś plik AppImage do folderu w swoim folderze domowym, a następnie otwórz go i ponownie zainstaluj aktualizację.",
   "error.update.remoteDisabled": "Aktualizacje od administratorów serwera są wyłączone na tym komputerze.",
   "error.update.restartStarted": "OpenBot już uruchamia się ponownie, aby zainstalować aktualizację.",
   "error.update.alreadyRestarting": "OpenBot już uruchamia się ponownie.",

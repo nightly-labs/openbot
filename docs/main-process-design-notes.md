@@ -104,9 +104,11 @@ There is no configuration for a developer or for a packaged build:
   back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
   that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,
   and then `localhost`.
-  A relayed sign-in, or one that an in-app tab shows, keeps the two loopback names: the deep link
-  opens only in the browser of the computer that runs OpenBot, and only while the operating system
-  opens `openbot://` in this app (`app.isDefaultProtocolClient`). The deep link is sent only in the
+  A sign-in that an in-app tab shows keeps the two loopback names: the deep link opens only in a
+  browser of a computer that runs OpenBot, and only while the operating system opens `openbot://`
+  in that app (`app.isDefaultProtocolClient`). A relayed sign-in does the same, except when the
+  client starts it with `sign-in-relay-deep-link-v1`: its computer opens the link, and passes the
+  callback to the relay by `state` (#9209). The web client and the phone do not. The deep link is sent only in the
   attempt that registered it, because builds before the loopback listener registered it too and
   Canva refuses it at `/authorize`.
 

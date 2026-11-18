@@ -85,7 +85,7 @@ export function BrowserPageMenu(props: { view: BrowserFullViewProps; narrow: boo
             )}
           </Show>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item onSelect={props.view.onBack}>{t("browser.hide")}</DropdownMenu.Item>
+          <DropdownMenu.Item onSelect={props.view.onBack}>{t("browser.backToChat")}</DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

@@ -2,11 +2,14 @@ import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
+import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import {
@@ -15,10 +18,12 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { openTurnActivity } from "@/features/workspace/model/agent-activity";
+import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { currentText, useText } from "@/shared/lib/text";
 import {
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
   withFailureReasons,
@@ -31,20 +36,17 @@ import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { useAgentBackdrops } from "./use-agent-backdrops";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
+import { useComposerContextMeter } from "./use-context-usage";
+import { useCoveredByScreen } from "./use-covered-by-screen";
 import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
 const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
-
-/** `previous` when it holds exactly `ids`, else a new set of them. */
-function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
-  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
-  return new Set(ids);
-}
 
 /** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({
@@ -58,7 +60,9 @@ export function MobileChatView({
 }) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
-  const agents = useMobileWorkspaceSelector((current) => current.agents);
+  // The chat does not show the latest message of each agent, so a new message keeps the same list and
+  // the messages do not render again.
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === agent.serverId));
   const loadConversation = useMobileWorkspaceSelector((current) => current.loadConversation);
@@ -77,11 +81,22 @@ export function MobileChatView({
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
   );
+  // Under a full screen, such as a subagent, a streamed reply does not render the hidden chat on
+  // each chunk. The store keeps the chat current. The chat keeps the conversation that it showed,
+  // also when another change renders it, and takes the latest one when it shows again.
+  const covered = useCoveredByScreen();
+  const shownConversation = useRef<ReturnType<typeof conversationStore.get>>(undefined);
   const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agent.id, notify),
-    [agent.id, conversationStore],
+    (notify: () => void) =>
+      conversationStore.subscribe(agent.id, () => {
+        if (!covered.current) notify();
+      }),
+    [agent.id, conversationStore, covered],
   );
-  const snapshot = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
+  const snapshot = useCallback(() => {
+    if (!covered.current || !shownConversation.current) shownConversation.current = conversationStore.get(agent.id);
+    return shownConversation.current;
+  }, [agent.id, conversationStore, covered]);
   const stopTurn = useCallback(
     (turnId: string) => workspace().interruptTurn(agent.id, turnId, agent.serverId),
     [agent.id, agent.serverId, workspace],
@@ -95,6 +110,13 @@ export function MobileChatView({
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
+  useAgentBackdrops({
+    serverId: agent.serverId,
+    agentId: agent.id,
+    messages: conversation?.messages,
+    memberId,
+    accountUserId,
+  });
   const projected = useMemo(
     () =>
       withQuestionContext(
@@ -109,6 +131,7 @@ export function MobileChatView({
   );
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
+  const contextMeter = useComposerContextMeter({ serverId: agent.serverId, agentId: agent.id });
   // The pins of the agent's own chat, on a host with `message-pins-v1`.
   const pins = useMessagePins(agent.serverId, agent.id);
   const pinnedMessageIds = useMemo(
@@ -147,11 +170,14 @@ export function MobileChatView({
   );
   // The history and the queue load again when the connection is back, so they read the live state.
   const online = server?.state === "online";
+  // As on desktop, an agent that cannot steer offers Send now: the message goes first and the turn stops.
+  const { steers } = useAgentSteers(agent);
   const queue = useChatQueue(
     agent.id,
     agent.serverId,
     online,
     conversation?.activeTurnId ?? null,
+    steers,
     conversation?.messages,
   );
   const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
@@ -403,6 +429,27 @@ export function MobileChatView({
     showsOnline(server) && !viewOnly,
     respondToPrompt,
   );
+  // The swipe away from Back opens the screen chosen in Settings, on top of this chat, so Back returns
+  // here. It is off while the host cannot open that screen, as the header hides the same action.
+  const swipeAction = useChatSwipePreference((state) => state.action);
+  const browserAllowed = useBrowserFeature();
+  const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(agent.serverId).view);
+  const browserShown = browserAllowed && showsOnline(server) && browserView;
+  const threadsShown = threadMenu !== undefined;
+  const swipeForward = useMemo(() => {
+    const params = { agentId: agent.id, serverId: agent.serverId };
+    if (swipeAction === "off") return null;
+    if (swipeAction === "threads")
+      return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
+    return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;
+  }, [swipeAction, threadsShown, browserShown, agent.id, agent.serverId]);
+  // A pull past the latest message opens the agent's info sheet on top of this chat, unless Settings
+  // turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }),
+    [agent.id, agent.serverId],
+  );
   const workActivity = workChannel ? liveActivity : undefined;
   // One element while its inputs stay, so a new render of this screen does not draw the list again.
   // The agent's threads are in the thread menu of the header, not in this chat.
@@ -445,6 +492,7 @@ export function MobileChatView({
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}
+      contextMeter={contextMeter}
       threadId={threadId}
       approvals={approvals}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}
@@ -464,6 +512,8 @@ export function MobileChatView({
       detached={detached}
       showLatestMessages={showLatestMessages}
       onLeave={onLeave}
+      onSwipeForward={swipeForward}
+      onPullPastEnd={pullOn ? openInfo : null}
     />
   );
 }

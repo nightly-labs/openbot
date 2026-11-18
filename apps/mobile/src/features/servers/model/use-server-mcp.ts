@@ -10,7 +10,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
-/** The MCP server list of one host, for a user who manages it. The Server settings row needs only this. */
+/** The MCP server list of one host, for a user who manages it. The Marketplace and the chat composer need only this. */
 export function useMcpServerList(serverId: string) {
   // A selector, not the whole workspace: the chat composer reads this list, and must not render again
   // for every workspace change.
@@ -27,8 +27,8 @@ export function useMcpServerList(serverId: string) {
 }
 
 /**
- * The MCP servers of one host, as the MCP and MCP server pages of the server sheet show them. The
- * pages use the same queries, so a change on one page shows on the other.
+ * The MCP servers of one host, as the MCP server page shows them. The Marketplace uses the same list
+ * query, so a change on the page shows in the Marketplace.
  */
 export function useServerMcp(serverId: string) {
   const { servers } = useMobileWorkspace();

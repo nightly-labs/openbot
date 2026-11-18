@@ -8,6 +8,7 @@
 // socket, and the host calls the Bot API through Signal, which holds the bot token. No transport needs
 // a public endpoint on the host.
 
+import { AGENT_PROVIDERS, agentProviderName } from "@openbot/contracts/agent-providers";
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
 import type { DiscordApiRequest, DiscordDelivery, DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import type {
@@ -15,6 +16,7 @@ import type {
   TelegramCallParams,
   TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Effect, Schema } from "effect";
 import type { MessagingOperationFailed } from "./messaging-service";
 import type { MessagingAnswerFile } from "./messaging-threads";
@@ -32,15 +34,41 @@ export interface MessagingPlace {
   kind: "channel" | "private" | "thread" | "chat";
 }
 
+/** The answer of `places`. `note` tells the agent what the list leaves out, such as places past a limit. */
+export interface MessagingPlaces {
+  places: MessagingPlace[];
+  note?: string;
+}
+
 export interface InboundFile {
   id: string;
   name: string;
   mimeType: string;
   size: number;
   url: string;
+  /** A copy on this computer, when the connection saved the file at arrival (WhatsApp). */
+  path?: string;
 }
 
 /** One message that addresses OpenBot, in the same shape for every platform. */
+/** A message that stops the running request of its conversation instead of starting a new one. */
+export const CANCEL_TEXT = /^(cancel|stop)$/i;
+
+/**
+ * The chat text for the stored failure of a turn, or null for the general text. The platform is
+ * outside this computer, and a provider's own text can hold paths or keys, so only an error from the
+ * catalog goes there: one with no placeholder, such as a spent usage limit, or an expired sign-in that
+ * names a provider (#11303). The WhatsApp loop guard knows these texts as OpenBot's own posts.
+ */
+export function chatFailureReason(error: string | null | undefined): string | null {
+  if (!error) return null;
+  if (isFixedSourceText(error)) return matchingSourceKeys(error).some((key) => key.startsWith("error.")) ? error : null;
+  const signInExpired = AGENT_PROVIDERS.some(
+    (provider) => error === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }),
+  );
+  return signInExpired ? error : null;
+}
+
 export interface InboundMessage {
   /** Stable for one message across redeliveries. */
   dedupKey: string;
@@ -74,6 +102,9 @@ interface InboundQuote {
   mentionedUserIds: string[];
   /** ISO time. */
   sentAt: string;
+  /** The replied-to message's id and files, for a platform that keeps them apart from the message's own files. */
+  messageId?: string;
+  files?: InboundFile[];
 }
 
 interface InboundActionBase {
@@ -124,6 +155,18 @@ export interface ContextEntry {
   files?: InboundFile[];
 }
 
+/** Keeps only the messages sent before `before` (an ISO time) whose text or author has each word of `query`. */
+export interface HistoryFilter {
+  query?: string;
+  before?: string;
+}
+
+/** What the history tool reads of a place. `note` says why the platform gave fewer messages, when it knows. */
+export interface RecentMessages {
+  messages: ContextEntry[];
+  note?: string;
+}
+
 /** A failure the connection cannot recover from alone. The user must act. */
 export class MessagingConnectionError extends Error {
   constructor(readonly state: Extract<MessagingConnectionState, "invalid_token">) {
@@ -137,6 +180,8 @@ export class MessagingAdapterError extends Schema.TaggedError<MessagingAdapterEr
 
 export interface MessagingAdapter {
   readonly platform: MessagingPlatform;
+  /** True when `recent` applies its filter to all the messages that the platform keeps. */
+  readonly searchesHistory?: boolean;
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
@@ -177,8 +222,23 @@ export interface MessagingAdapter {
    * message of its place, for a platform whose history this device cannot read (WhatsApp).
    */
   rememberPost?(target: MessageTarget, postId: string, text: string): void;
-  /** Uploads files to the conversation, and returns the names it did not send. */
-  upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
+  /**
+   * Uploads files to the conversation. Returns the names it did not send, and the id of the first
+   * message it sent when the platform gives one (WhatsApp, Telegram).
+   */
+  upload(
+    target: MessageTarget,
+    files: MessagingAnswerFile[],
+  ): Effect.Effect<{ skipped: string[]; firstId: string | null }, MessagingAdapterError>;
+  /**
+   * Posts one file with the text as its caption, in one message, for a platform that sends text and
+   * files apart otherwise (WhatsApp). Null when they must go apart, such as for a long text.
+   */
+  postFileWithText?(
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ): Effect.Effect<string | null, MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,
@@ -189,19 +249,20 @@ export interface MessagingAdapter {
   /**
    * The newest messages of a place, oldest first, posts by bots included, for the agent's history
    * tool. With `threadKey`, only that conversation; with null, the whole channel or chat. At most
-   * `limit` messages; the platform can give fewer.
+   * `limit` messages; the platform can give fewer. A platform with `searchesHistory` applies `filter` to all that it saved; the others ignore it.
    */
   recent(
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
+    filter?: HistoryFilter,
+  ): Effect.Effect<RecentMessages, MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError>;
   /**
    * The id of a place that an agent named, as `places` lists it, for a platform where one place has
    * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
@@ -353,10 +414,21 @@ export interface MessagingIngress {
   ): Effect.Effect<A, MessagingAdapterError>;
   /**
    * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
-   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   * sends a session, and when Signal refuses a call because it no longer routes a guild here. A guild
+   * of this host that is not in it was linked to another host, unlinked, or the bot left it.
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
+  /**
+   * Calls `listener` with the Slack workspaces or the Telegram chats that Signal routes to the socket:
+   * at once when the open socket knows them, and each time Signal accepts a new socket. A workspace or
+   * chat of this host that is not in them is linked to another host, or to none. Null when the socket's
+   * account service named no IDs: then nothing is known.
+   */
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void;
 }
+
+/** The platforms whose route ticket the host reads: Discord gets its guilds from Signal's session. */
+export type LinkedRoutePlatform = "slack" | "telegram";
 
 /** The bytes of one `upload` call. */
 export interface DiscordUploadFile {

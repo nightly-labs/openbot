@@ -227,7 +227,8 @@ available member. These selections use no model. Other requests use
 the lead's provider, model, and reasoning setting in a separate session with no work tools. The
 request supplies the accepted result schema and the channel summary in place of the transcript.
 Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
-request in the area of one member goes to that member. A greeting, a question about the channel, an
+request in the area of one member goes to that member. A request that tells one member to get parts from
+other members or to combine their answers goes to that member only, and it gives out the parts. A greeting, a question about the channel, an
 unclear request, or a request in the area of no member goes to the lead only (the prompt names the
 lead), and the lead can ask the person in its own reply. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
@@ -272,7 +273,8 @@ them. A lead change does not move a task that already has an owner. The member p
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
 Only assignments and awaited results start turns. Completed child results are combined before the
-owner returns. The limit is eight automatic assignments per root request and two active assignments
+owner returns. `channel_assign` and `channel_transfer` refuse a member that answers the same request in a root
+task of its own: another task made it post the same answer again (#11082). The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
 An agent can also give work to a channel from another conversation, such as its direct chat with
@@ -639,6 +641,12 @@ the answer. Every answer comes from OpenBot.
   one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
   like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
+- **Not linked.** The account service names the workspace IDs beside the ticket, and the host keeps
+  them for the open socket (`SignalIngress.onLinkedRoutes`). A workspace connection that is not in them
+  reports `not_linked`, not `connected`: Signal sends its events to another host, such as after the
+  workspace moved or the saved settings were copied to a new server. It is not fatal and unlinks
+  nothing. Reconnect opens the Slack install page, which links the workspace to this host. A new
+  workspace opens a new socket before its connection starts, so an older list does not judge it.
 
 Telegram uses the same socket with one difference: one OpenBot bot serves every user, so its token
 must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the contract is
@@ -658,7 +666,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
   answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
-  and `telegram-route-revoked` work as the Slack ones do.
+  and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
+  reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat
+  that Signal links on the open socket joins the socket's list at once.
 - **Calls.** The host sends `telegram-call` only to a Signal whose `ready` names the `telegram`
   capability, because Signal closes a socket on a frame it does not know. Signal accepts only the
   methods and parameters of `TelegramCallParams`, as strict objects, only for a chat routed to that
@@ -713,8 +723,12 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from
   a Slack turn carries `messagingReturn`, the origin of that turn; `MailboxStore.enqueue` gives the
   answer to it that origin as `messaging`, so the answer runs in the same execution thread, and its
-  turn posts to Slack as a follow-up. `DrainScheduler` asks `MessagingThreads.prepare` for the thread
-  and the prompt, which frames the text as external input and adds earlier messages of the thread
+  turn posts to Slack as a follow-up. These deliveries run in one lane of the agent,
+  `MESSAGING_LANE`, beside its own chat: a turn of the own chat, such as one that waits on a card,
+  does not hold external messages (#9890). The external conversations still run one turn at a time.
+  A conversation whose thread is also the agent's own chat (#2120), and each conversation of an agent
+  whose provider runs one turn at a time, keep the own chat's lane (`MailboxStore.useMessagingLane`).
+  `DrainScheduler` asks `MessagingThreads.prepare` for the thread and the prompt, which frames the text as external input and adds earlier messages of the thread
   and the connection's facts, rebuilt each turn, so a new fact needs no provider-thread reload.
   `MessagingService.#receive` names each user mention (`InboundMessage.mentionedUserIds`) with the
   adapter's name cache; the adapters do the same for context messages.
@@ -725,7 +739,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   from a direct message. The two outbound tools, `messaging_list_places` and `messaging_post`, are
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
-  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
+  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
+  (the secret rules of `redactText`; an email address that the agent wrote stays).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
@@ -753,8 +768,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   reports `WhatsAppAnswerPartlySent`: the status post holds the first part, so OpenBot leaves it.
   The owner's "Message yourself" chat, a number only for OpenBot, Slack, Telegram and Discord still
   get the text.
-- **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
-  work and behind channel work that holds the host. The Slack thread shows a waiting post.
+- **Order.** The external conversations of an agent run one turn at a time in `MESSAGING_LANE`, beside
+  its own chat. On a provider that runs one turn at a time (`concurrentTurns: false`) they keep the own
+  chat's lane, so Slack requests wait behind the agent's own work, in queue order, and behind its
+  channel work. A waiting request gets a waiting post in its Slack thread.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status
   with a Stop button, replaces it with the answer, uploads the files the agent attached, and sets
   reactions. It serializes the posts of one conversation, so a fast turn cannot race its status. No
@@ -866,6 +883,17 @@ is one linked number (`workspace_id` is the number in digits).
   before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
   the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
   the quoted menu or the newest one of the conversation.
+- **Saved history.** WhatsApp sends no history to a linked device. `WhatsAppArchive` saves each
+  message of an allowed chat, also one that does not mention the number, in
+  `projection_messaging_history` (migration 62, `MessagingHistoryStore`), and downloads its file one at
+  a time to `<userData>/whatsapp/files/<connection id>/`. `seq` keeps the arrival order. The context of
+  a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
+  download copies the saved file, and waits for the download at arrival when it did not finish. A
+  download stops after 10 minutes or when the connection closes. The copies of one connection stay
+  under 2 GB (`trimFiles`, the oldest first, by the size on disk). A delete for everyone deletes the row
+  and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
+  chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
+  each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 

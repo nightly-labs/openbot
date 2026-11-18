@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "يوجد اختبار نشط لسطح المكتب البعيد. أعد المحاولة عند انتهائه.",
   "error.remote.screenRecordingDenied":
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
+  "error.remote.windowsSessionDisconnected":
+    "جلسة Windows على المضيف غير متصلة، لذلك لا توجد شاشة لمشاركتها. سجّل الدخول إلى Windows على شاشة المضيف، ثم أعد المحاولة.",
   "error.remote.teamSessionExpired": "انتهت صلاحية جلسة الفريق.",
   "error.remote.finishTestBeforeSwitch": "أنهِ اختبار سطح المكتب البعيد قبل تبديل الشاشات.",
   "error.remote.displayNotFound": "الشاشة البعيدة غير موجودة.",
@@ -80,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "لا يملك المضيف البعيد مفتاح جهاز مثبّتًا.",
   "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
-  "error.remote.hostDisconnected": "انقطع اتصال مضيف WebRTC.",
+  "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
   "error.remote.eventGap": "يوجد انقطاع في تسلسل أحداث المضيف.",
   "error.remote.malformedKnownEvent": "أعاد المضيف حدثًا معروفًا مشوّهًا.",
   "error.remote.fileTransportIsStopped": "نقل الملفات عبر WebRTC متوقف.",
@@ -145,6 +147,7 @@ export const messages = {
   "error.remote.attachmentRejected": "رفض المضيف المرفق.",
   "error.remote.attachmentTooLarge": "يجب ألا يتجاوز حجم المرفقات 10 MB.",
   "error.remote.attachmentBusy": "انتظر حتى يكتمل المرفق الحالي.",
+  "error.remote.attachmentChanged": "تغيّر الملف أو أنه غير متاح. حدده مرة أخرى.",
   "error.remote.uploadTimeout": "انتهت مهلة رفع المرفق.",
   "error.remote.hostSessionActive": "لدى المضيف بالفعل جلسة بعيدة نشطة.",
   "error.remote.tooManyConnections": "عدد كبير جدًا من الاتصالات البعيدة النشطة.",
@@ -193,7 +196,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "حدّث خادم الحاسوب المكتبي هذا لحذف القنوات.",
   "error.remote.historyRefreshFailed": "أُرسلت الرسالة، لكن تعذّر تحديث سجل الدردشة.",
   "error.remote.taskHistoryRefreshFailed": "تغيّرت المهمة، لكن تعذّر تحديث سجل الدردشة.",
-  "error.remote.localServerStartFailed": "لم يبدأ الخادم على هذا الحاسوب.",
+  "error.remote.serverNotLoaded": "تعذّر على OpenBot تحميل الخادم. حاول مرة أخرى.",
+  "error.remote.localServerNotStarted":
+    "لم يبدأ الخادم على هذا الحاسوب. حاول مرة أخرى. إذا لم يبدأ، فأعد تشغيل OpenBot على هذا الحاسوب.",
   "error.remote.localServerNotFound": "هذا الخادم ليس على هذا الحاسوب.",
   "error.remote.localServerAccountRemovalFailed":
     "حُذف الخادم على حاسوبه، لكن الحساب لا يزال يُدرجه. احذفه مرة أخرى لإزالته من الحساب.",

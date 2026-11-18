@@ -15,13 +15,24 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.agentMissing": "Choose an agent for this step.",
   "error.workflow.handoffFailed": "OpenBot could not send this step to its agent.",
   "error.workflow.agentStepEnded": "The agent's message for this step was removed before it answered.",
+  "error.workflow.agentStepStopped": "The agent stopped before it answered this step. Run the step again.",
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
+  "error.workflow.modelTimedOut":
+    "The model did not answer in time. Choose a lower effort or a faster model for this step, then run it again.",
+  "error.workflow.modelToolUse":
+    "The model tried to use a tool, but this step can only answer with text. Run the step again, or choose a different model for it.",
+  "error.workflow.modelUnavailable": "The model of this step is not available. Choose a different model for this step.",
+  "error.workflow.providerBusy": "The provider is busy. Wait a few minutes, then run the step again.",
+  "error.workflow.providerOffline":
+    "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaEmptyRequest":
+    "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",
@@ -79,4 +90,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.sunraFailed": "Sunra could not make the file: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra did not finish the file in time. Look in the OpenBot project on sunra.ai before you run the step again.",
+  "error.workflow.higgsfieldSignIn": "Sign in to Higgsfield in Apps to use Higgsfield models.",
+  "error.workflow.higgsfieldNoCredits":
+    "Your Higgsfield account does not have sufficient credits. Add credits at higgsfield.ai/pricing, then run the step again.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "This Higgsfield model needs a Higgsfield plan. Get a plan at higgsfield.ai/pricing, or select a different model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield did not make the file because its content check stopped it. Change the prompt or the input pictures, then run the step again.",
+  "error.workflow.higgsfieldFailed": "Higgsfield could not make the file: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield did not finish the file in time. Look in your history on higgsfield.ai before you run the step again.",
 });

@@ -748,9 +748,12 @@ export class SunshineMoonlightRuntime {
       this.#options.stateDirectory,
       this.#options.platform === "win32" ? "openbot-ice-helper.cmd" : "openbot-ice-helper.sh",
     );
+    // Moonlight reads a JSON list of ICE servers from the helper's output. Both helpers copy the
+    // endpoint's body unchanged: Windows PowerShell 5.1 `ConvertTo-Json` writes a list again as an
+    // object, and Moonlight then has no ICE servers.
     const contents =
       this.#options.platform === "win32"
-        ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
+        ? "@powershell.exe -NoProfile -NonInteractive -Command \"(Invoke-WebRequest -UseBasicParsing -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL).Content\"\r\n"
         : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
     yield* desktopCall(() => writeFile(path, contents, { mode: 0o700 }));
     if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o700));
