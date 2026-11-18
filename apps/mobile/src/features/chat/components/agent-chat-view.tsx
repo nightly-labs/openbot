@@ -11,7 +11,11 @@ import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
-import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useAgentFirstUnreadMessageId,
+  useApprovalRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
   useMobileWorkspaceReader,
@@ -20,6 +24,7 @@ import {
 import { openTurnActivity } from "@/features/workspace/model/agent-activity";
 import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import { currentText, useText } from "@/shared/lib/text";
 import {
   chatRowIndex,
@@ -160,6 +165,7 @@ export function MobileChatView({
       ? undefined
       : liveActivity;
   const serverApprovals = useApprovalRequests(agent.serverId);
+  const threadWaits = useThreadWaits(agent.serverId);
   // As on the desktop, only this chat's thread. A channel task of the same agent asks in the channel.
   const approvals = useMemo(
     () =>
@@ -383,12 +389,13 @@ export function MobileChatView({
           );
     return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation?.messages]);
+  // The open question of the running turn, or one that the host still waits for after its turn (#11440).
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
       !message.prompt.resolution &&
-      Boolean(conversation?.activeTurnId) &&
-      message.turnId === conversation?.activeTurnId,
+      ((Boolean(conversation?.activeTurnId) && message.turnId === conversation?.activeTurnId) ||
+        hostAwaitsQuestion(threadWaits, agent.id, message.turnId, message.prompt.requestId)),
   );
   const viewOnly = useAgentViewOnly(agent.serverId, agent.id);
   const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });
