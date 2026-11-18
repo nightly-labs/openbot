@@ -989,7 +989,7 @@ export const messages = {
     "في Proton Pass، أنشئ مفتاح وصول يمكنه قراءة الخزنة التي تشاركها مع OpenBot فقط، ثم الصقه هنا. يحتفظ {host} بالمفتاح؛ ولا يحتفظ به هذا الهاتف.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
   "mobile.server.connectors.protonPass.plan":
-    "لا تتضمن خطة Proton الخاصة بك أداة سطر الأوامر في Proton Pass. تحتاج إلى خطة تتضمن Pass Plus، مثل Pass Plus أو Pass Family أو Proton Unlimited. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطة حسابك، ثم أعد الربط.",
+    "لا تتضمن خطة Proton الخاصة بك أداة سطر الأوامر في Proton Pass. تحتاج إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} غير متاح على هذا الخادم.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "سجّل الدخول إلى {name} على هذا الهاتف. بعد ذلك ينشئ {host} خزنة مشتركة ومفتاح وصول للقراءة فقط لها، ويحتفظ بهذا المفتاح فقط. لا يرى الوكلاء أي كلمة مرور.",

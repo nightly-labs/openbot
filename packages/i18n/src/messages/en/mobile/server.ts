@@ -976,7 +976,7 @@ export const messages = defineMessages("mobile.server", {
     "In Proton Pass, make an access key that can read only the vault you share with OpenBot, then paste it here. {host} keeps the key; this phone does not.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
   "mobile.server.connectors.protonPass.plan":
-    "Your Proton plan does not include the Proton Pass command-line tool. It needs a plan with Pass Plus, such as Pass Plus, Pass Family or Proton Unlimited. Other paid plans, such as Mail Plus, do not include it. Change the plan of your account, then connect again.",
+    "Your Proton plan does not include the Proton Pass command-line tool. It needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change the plan of your account, then connect again.",
   // A password manager that the host connects through its CLI. {name} is the manager, such as
   // Proton Pass. {date} is a date, such as 5 Nov 2026.
   "mobile.server.connectors.passwordManager.unavailable": "{name} is not available on this server.",

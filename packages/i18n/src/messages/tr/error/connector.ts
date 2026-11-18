@@ -56,7 +56,7 @@ export const messages = {
   "error.connector.protonPassPlan":
     "Proton planınız Proton Pass CLI kullanımına izin vermiyor. Planı değiştirin, ardından yeniden bağlanın.",
   "error.connector.protonPassPlanMissing":
-    "Proton planınız Proton Pass CLI'yi içermiyor. Pass Plus içeren bir plan gerekir; örneğin Pass Plus, Pass Family veya Proton Unlimited. Planı değiştirin, ardından yeniden bağlanın.",
+    "Proton planınız Proton Pass CLI'yi içermiyor. Pass Plus içeren bir Proton planı gerekir. Planı değiştirin, ardından yeniden bağlanın.",
   "error.connector.protonPassExpired": "Proton Pass erişimi sona erdi. Yeniden bağlanın.",
   "error.connector.protonPassKeyInvalid": "pst_ ile başlayan bir Proton Pass erişim anahtarı girin.",
   "error.connector.protonPassExtraPassword": "Ek parola doğru değil. Yeniden girin.",

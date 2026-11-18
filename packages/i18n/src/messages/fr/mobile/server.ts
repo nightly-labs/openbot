@@ -719,7 +719,7 @@ export const messages = {
     "Dans Proton Pass, créez une clé d’accès qui peut lire uniquement le coffre partagé avec OpenBot, puis collez-la ici. {host} garde la clé ; ce téléphone non.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
   "mobile.server.connectors.protonPass.plan":
-    "Votre offre Proton n’inclut pas l’outil en ligne de commande de Proton Pass. Il nécessite une offre avec Pass Plus, comme Pass Plus, Pass Family ou Proton Unlimited. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez l’offre de votre compte, puis reconnectez-vous.",
+    "Votre offre Proton n’inclut pas l’outil en ligne de commande de Proton Pass. Il nécessite une offre Proton qui inclut Pass Plus. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez l’offre de votre compte, puis reconnectez-vous.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} n’est pas disponible sur ce serveur.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Connectez-vous à {name} sur ce téléphone. Ensuite, {host} crée un coffre partagé et une clé d’accès en lecture seule pour ce coffre, et ne garde que cette clé. Les agents ne voient jamais de mot de passe.",

@@ -64,7 +64,7 @@ export const messages = defineMessages("error.connector", {
   "error.connector.protonPassPlan":
     "Your Proton plan does not allow the Proton Pass CLI. Change the plan, then connect again.",
   "error.connector.protonPassPlanMissing":
-    "Your Proton plan does not include the Proton Pass CLI. It needs a plan with Pass Plus, such as Pass Plus, Pass Family or Proton Unlimited. Change the plan, then connect again.",
+    "Your Proton plan does not include the Proton Pass CLI. It needs a Proton plan that includes Pass Plus. Change the plan, then connect again.",
   "error.connector.protonPassExpired": "The Proton Pass access ended. Connect again.",
   "error.connector.protonPassKeyInvalid": "Enter a Proton Pass access key that starts with pst_.",
   "error.connector.protonPassExtraPassword": "The extra password is not correct. Enter it again.",

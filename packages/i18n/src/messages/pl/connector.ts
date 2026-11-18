@@ -664,7 +664,7 @@ export const messages = {
   "connector.protonPass.reconnect": "Połącz ponownie",
   "connector.protonPass.planTitle": "Proton Pass wymaga planu z Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI wymaga planu Proton z Pass Plus, na przykład Pass Plus, Pass Family lub Proton Unlimited. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan, a potem połącz ponownie.",
+    "Proton Pass CLI wymaga planu Proton, który obejmuje Pass Plus. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan, a potem połącz ponownie.",
   "connector.protonPass.vaultTitle": "Udostępniony sejf",
   "connector.protonPass.vaultDescription":
     "Agenci mogą logować się danymi z tego sejfu. Przenieś do niego dane logowania, aby je udostępnić.",

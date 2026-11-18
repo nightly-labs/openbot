@@ -662,7 +662,7 @@ export const messages = {
   "connector.protonPass.reconnect": "חיבור מחדש",
   "connector.protonPass.planTitle": "Proton Pass דורש תוכנית עם Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI דורש תוכנית Proton עם Pass Plus, כמו Pass Plus, Pass Family או Proton Unlimited. תוכניות בתשלום אחרות, כמו Mail Plus, לא כוללות אותו. יש לשנות את התוכנית ואז להתחבר שוב.",
+    "Proton Pass CLI דורש תוכנית Proton שכוללת Pass Plus. תוכניות בתשלום אחרות, כמו Mail Plus, לא כוללות אותו. יש לשנות את התוכנית ואז להתחבר שוב.",
   "connector.protonPass.vaultTitle": "כספת משותפת",
   "connector.protonPass.vaultDescription":
     "סוכנים יכולים להתחבר עם פרטי הכניסה שבכספת הזו. כדי לשתף פרטי כניסה, יש להעביר אותם אליה.",

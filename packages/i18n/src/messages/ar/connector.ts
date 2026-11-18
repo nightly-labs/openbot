@@ -672,7 +672,7 @@ export const messages = {
   "connector.protonPass.reconnect": "إعادة الاتصال",
   "connector.protonPass.planTitle": "يحتاج Proton Pass إلى خطة تتضمن Pass Plus",
   "connector.protonPass.planDescription":
-    "تحتاج Proton Pass CLI إلى خطة Proton تتضمن Pass Plus، مثل Pass Plus أو Pass Family أو Proton Unlimited. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطتك، ثم اتصل مرة أخرى.",
+    "تحتاج Proton Pass CLI إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطتك، ثم اتصل مرة أخرى.",
   "connector.protonPass.vaultTitle": "الخزنة المشتركة",
   "connector.protonPass.vaultDescription":
     "يستطيع الوكلاء تسجيل الدخول ببيانات الدخول في هذه الخزنة. انقل بيانات دخول إليها لمشاركتها.",

@@ -632,7 +632,7 @@ export const messages = {
   "connector.protonPass.reconnect": "Reconnecter",
   "connector.protonPass.planTitle": "Proton Pass nécessite une offre avec Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI Proton Pass nécessite une offre Proton avec Pass Plus, comme Pass Plus, Pass Family ou Proton Unlimited. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez d’offre, puis connectez à nouveau.",
+    "La CLI Proton Pass nécessite une offre Proton qui inclut Pass Plus. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez d’offre, puis connectez à nouveau.",
   "connector.protonPass.vaultTitle": "Coffre partagé",
   "connector.protonPass.vaultDescription":
     "Les agents peuvent se connecter avec les identifiants de ce coffre. Déplacez-y un identifiant pour le partager.",

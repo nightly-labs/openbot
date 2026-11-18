@@ -672,7 +672,7 @@ export const messages = {
   "connector.protonPass.reconnect": "Yeniden bağla",
   "connector.protonPass.planTitle": "Proton Pass, Pass Plus içeren bir plan gerektirir",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI, Pass Plus içeren bir Proton planı gerektirir; örneğin Pass Plus, Pass Family veya Proton Unlimited. Mail Plus gibi diğer ücretli planlar bunu içermez. Planınızı değiştirin, sonra yeniden bağlanın.",
+    "Proton Pass CLI, Pass Plus içeren bir Proton planı gerektirir. Mail Plus gibi diğer ücretli planlar bunu içermez. Planınızı değiştirin, sonra yeniden bağlanın.",
   "connector.protonPass.vaultTitle": "Paylaşılan kasa",
   "connector.protonPass.vaultDescription":
     "Ajanlar bu kasadaki oturum bilgileriyle oturum açabilir. Paylaşmak için bir oturum bilgisini buraya taşıyın.",

@@ -800,7 +800,7 @@ export const messages = {
     "W Proton Pass utwórz klucz dostępu, który może czytać tylko sejf udostępniony OpenBotowi, i wklej go tutaj. {host} przechowuje klucz; ten telefon nie.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
   "mobile.server.connectors.protonPass.plan":
-    "Twój plan Proton nie obejmuje narzędzia wiersza poleceń Proton Pass. Potrzebny jest plan z Pass Plus, na przykład Pass Plus, Pass Family lub Proton Unlimited. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan konta, a potem połącz ponownie.",
+    "Twój plan Proton nie obejmuje narzędzia wiersza poleceń Proton Pass. Potrzebny jest plan Proton, który obejmuje Pass Plus. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan konta, a potem połącz ponownie.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} nie jest dostępny na tym serwerze.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Zaloguj się do {name} na tym telefonie. Potem {host} tworzy udostępniony sejf i klucz dostępu tylko do odczytu dla niego, i przechowuje tylko ten klucz. Agenci nigdy nie widzą hasła.",

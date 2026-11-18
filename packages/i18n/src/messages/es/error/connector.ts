@@ -55,7 +55,7 @@ export const messages = {
   "error.connector.protonPassPlan":
     "Tu plan de Proton no permite la CLI de Proton Pass. Cambia el plan y vuelve a conectar.",
   "error.connector.protonPassPlanMissing":
-    "Tu plan de Proton no incluye la CLI de Proton Pass. Necesita un plan con Pass Plus, como Pass Plus, Pass Family o Proton Unlimited. Cambia el plan y vuelve a conectar.",
+    "Tu plan de Proton no incluye la CLI de Proton Pass. Necesita un plan de Proton que incluya Pass Plus. Cambia el plan y vuelve a conectar.",
   "error.connector.protonPassExpired": "El acceso a Proton Pass ha terminado. Vuelve a conectar.",
   "error.connector.protonPassKeyInvalid": "Introduce una clave de acceso de Proton Pass que empiece por pst_.",
   "error.connector.protonPassExtraPassword": "La contraseña adicional no es correcta. Introdúcela de nuevo.",

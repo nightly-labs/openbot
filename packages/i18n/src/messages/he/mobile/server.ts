@@ -1003,7 +1003,7 @@ export const messages = {
     "ב-Proton Pass יש ליצור מפתח גישה שיכול לקרוא רק את הכספת שמשותפת עם OpenBot, ואז להדביק אותו כאן. {host} שומר את המפתח; הטלפון הזה לא.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
   "mobile.server.connectors.protonPass.plan":
-    "המסלול שלך ב-Proton לא כולל את כלי שורת הפקודה של Proton Pass. נדרש מסלול עם Pass Plus, כמו Pass Plus, Pass Family או Proton Unlimited. מסלולים בתשלום אחרים, כמו Mail Plus, לא כוללים אותו. יש לשנות את מסלול החשבון ולהתחבר שוב.",
+    "המסלול שלך ב-Proton לא כולל את כלי שורת הפקודה של Proton Pass. נדרש מסלול Proton שכולל Pass Plus. מסלולים בתשלום אחרים, כמו Mail Plus, לא כוללים אותו. יש לשנות את מסלול החשבון ולהתחבר שוב.",
   // A password manager that the host connects through its CLI. {name} is the manager, such as
   // Proton Pass. {date} is a date, such as 5 Nov 2026.
   "mobile.server.connectors.passwordManager.unavailable": "{name} לא זמין בשרת הזה.",

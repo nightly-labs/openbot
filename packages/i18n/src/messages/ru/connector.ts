@@ -656,7 +656,7 @@ export const messages = {
   "connector.protonPass.reconnect": "Переподключить",
   "connector.protonPass.planTitle": "Для Proton Pass нужен план с Pass Plus",
   "connector.protonPass.planDescription":
-    "Для Proton Pass CLI нужен план Proton с Pass Plus, например Pass Plus, Pass Family или Proton Unlimited. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
+    "Для Proton Pass CLI нужен план Proton, который включает Pass Plus. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
   "connector.protonPass.vaultTitle": "Общее хранилище",
   "connector.protonPass.vaultDescription":
     "Агенты могут входить с учётными данными из этого хранилища. Переместите в него учётные данные, чтобы поделиться ими.",

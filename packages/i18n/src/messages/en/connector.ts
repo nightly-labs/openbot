@@ -663,7 +663,7 @@ export const messages = defineMessages("connector", {
   "connector.protonPass.reconnect": "Reconnect",
   "connector.protonPass.planTitle": "Proton Pass needs a plan with Pass Plus",
   "connector.protonPass.planDescription":
-    "The Proton Pass CLI needs a Proton plan with Pass Plus, such as Pass Plus, Pass Family or Proton Unlimited. Other paid plans, such as Mail Plus, do not include it. Change your plan, then connect again.",
+    "The Proton Pass CLI needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change your plan, then connect again.",
   "connector.protonPass.vaultTitle": "Shared vault",
   "connector.protonPass.vaultDescription":
     "Agents can sign in with the logins in this vault. Move a login into it to share it.",
