@@ -1,7 +1,8 @@
 // Electron side of `scripts/linux-secret-storage-e2e.ts`. It runs one step with the secret storage of
 // `src/main/secret-storage-cipher.ts`, writes the result to `--ready-file` and quits.
 // Steps: `write` encrypts `--value=` into `--blob=`; `read` decrypts `--blob=`; `legacy-write` encrypts
-// with `safeStorage` only, as a release before the key file did.
+// with `safeStorage` only, as a release before the key file did. `--platform=darwin` gives the
+// secret storage the macOS rules, on the Linux `safeStorage`.
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, safeStorage } from "electron";
@@ -34,7 +35,11 @@ process.stderr.on("error", () => undefined);
 app.setPath("userData", argument("user-data"));
 configureLinuxPasswordStore();
 const keyPath = join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE);
-const storage = createSecretStorage({ keyPath });
+const platformArgument = process.argv.find((item) => item.startsWith("--platform="));
+const storage = createSecretStorage({
+  keyPath,
+  ...(platformArgument === "--platform=darwin" ? { platform: "darwin" as const } : {}),
+});
 const cipher = storage.cipher(() => "No secret storage.");
 const canPersistBeforeReady = cipher.canPersist();
 const keyFileBeforeReady = existsSync(keyPath);

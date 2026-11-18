@@ -117,6 +117,16 @@ export interface CopyInstanceAgentsInput {
   agentIds: string[];
 }
 
+/**
+ * The bytes of a transfer file that this computer has sent to a joined server. `serverId` is the
+ * server that receives the file. When `sent` equals `total`, the server reads the file.
+ */
+export interface InstanceTransferUploadProgress {
+  serverId: string;
+  sent: number;
+  total: number;
+}
+
 export interface InstanceTransferResult {
   agents: ClientAgentSummary[];
   skipped: AgentImportSkipped[];
@@ -271,6 +281,15 @@ export function decodeInstanceTransferResult(value: unknown): InstanceTransferRe
     signIn: result.signIn,
     warnings: messages(result.warnings, "transfer warnings"),
   };
+}
+
+export function decodeInstanceTransferUploadProgress(value: unknown): InstanceTransferUploadProgress {
+  const progress = record(value, "transfer upload progress");
+  if (!isIdentifier(progress.serverId)) invalid("transfer upload progress");
+  const sent = count(progress.sent, "transfer upload progress");
+  const total = count(progress.total, "transfer upload progress");
+  if (sent > total) invalid("transfer upload progress");
+  return { serverId: progress.serverId, sent, total };
 }
 
 /** A remote host's summary: `instance-transfer-v1` carries no avatar addresses. */

@@ -37,11 +37,24 @@ const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
 <label style="position:absolute;top:260px;left:10px">Remember me <input style="position:static" type="checkbox" value="checkbox-value-fixture"></label>
 <script>window.presses = 0; addEventListener("mousedown", () => { window.presses += 1; }, true);</script>`;
 
+// A control in an open shadow root, and one in a frame of another site, which runs in its own process.
+const framesPage = (frameOrigin: string) => `<!doctype html><meta charset="utf-8"><title>Frames</title>
+<style>body{margin:0}</style>
+<div id="host" style="position:absolute;top:10px;left:10px;width:200px;height:30px"></div>
+<iframe src="${frameOrigin}/frame-content" style="position:absolute;top:100px;left:0;width:300px;height:100px;border:0"></iframe>
+<script>document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<button style="width:200px;height:30px;margin:0">Shadow import</button>';</script>`;
+const frameContentPage = `<!doctype html><meta charset="utf-8"><style>body{margin:0}</style>
+<button style="position:absolute;top:10px;left:10px;width:200px;height:30px;margin:0">Import in frame</button>`;
+
 // `/slow` never answers, so only a stop ends its load.
 const server = createServer((request, response) => {
   if (request.url === "/slow") return;
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   if (request.url?.startsWith("/capture")) return response.end(capturePage);
+  const address = server.address();
+  if (request.url === "/frames" && address && typeof address === "object")
+    return response.end(framesPage(`http://localhost:${address.port}`));
+  if (request.url === "/frame-content") return response.end(frameContentPage);
   response.end('<!doctype html><meta charset="utf-8"><title>Fixture</title><button>Fixture button</button>');
 });
 
@@ -493,6 +506,65 @@ async function main(): Promise<void> {
         assert(!stored.includes(secret), `A step kept ${secret}.`);
       recordCases("capture-skips-password-and-text", "capture-keeps-field-label-not-value");
 
+      // A press in an open shadow root, and in a frame of another process (#10912).
+      const frameLoaded = new Promise<void>((resolve) => {
+        const loaded = (_event: unknown, isMainFrame: boolean) => {
+          if (isMainFrame) return;
+          contents.off("did-frame-finish-load", loaded);
+          resolve();
+        };
+        contents.on("did-frame-finish-load", loaded);
+      });
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/frames`));
+      await frameLoaded;
+      const [childFrame] = contents.mainFrame.frames;
+      assert(
+        childFrame && childFrame.osProcessId !== contents.mainFrame.osProcessId,
+        "The frame shares the page's process.",
+      );
+      const framesClick = (name: string) => ({
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/frames",
+        role: "button",
+        name,
+      });
+      const sendPress = (y: number) => {
+        for (const type of ["mouseMove", "mouseDown", "mouseUp"] as const)
+          contents.sendInputEvent({ type, x: 50, y, button: "left", clickCount: 1 });
+      };
+      const shadowButton = nextClick();
+      sendPress(25);
+      assert.deepEqual(await shadowButton, framesClick("Shadow import"));
+      recordCases("capture-records-shadow-root-click");
+      const frameButton = nextClick();
+      sendPress(125);
+      assert.deepEqual(await frameButton, framesClick("Import in frame"));
+      // A live view's press reaches the frame in the frame's own pixels and gives no input event. Its
+      // moves do not change `:hover` in the page, which still names the shadow host here.
+      contents.sendInputEvent({ type: "mouseMove", x: 50, y: 25 });
+      await contents.executeJavaScript(
+        `new Promise((resolve) => { const hovered = () => (document.getElementById("host").matches(":hover") ? resolve() : requestAnimationFrame(hovered)); hovered(); })`,
+      );
+      const viewButton = nextClick();
+      for (const action of ["move", "down", "up"] as const)
+        await runCauseEffect(
+          host.dispatchViewInput(tab.id, {
+            type: "pointer",
+            action,
+            x: 60,
+            y: 130,
+            button: "left",
+            clickCount: 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          }),
+        );
+      assert.deepEqual(await viewButton, framesClick("Import in frame"));
+      recordCases("capture-records-frame-click", "capture-records-frame-click-from-view");
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture`));
+
       host.releaseUserControl(tab.id);
       const count = captured.length;
       await press(25);
@@ -501,9 +573,9 @@ async function main(): Promise<void> {
 
       // Teach a task: the steps go to the recording of the tab, not to the log of the agent.
       const settled = async () => {
-        // The page answers the host's read of the pressed control before it answers this call.
-        await contents.executeJavaScript("0");
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        // The host reads the pressed control through the debugger, and lets it go after the step.
+        await turn();
+        while (contents.debugger.isAttached()) await turn();
       };
       const held = () => host.listTabs().find((item) => item.id === tab.id)?.userControl === true;
       const pageStep = { kind: "page", host: "127.0.0.1", path: "/capture", title: "Capture" };

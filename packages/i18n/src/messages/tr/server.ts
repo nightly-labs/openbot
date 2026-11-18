@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} üzerindeki OpenBot'u güncelleyin",
   "server.compatibility.unsafeDataTitle": "Ana makine güvenli olmayan veri döndürdü",
   "server.compatibility.cannotConnectTitle": "{name} ile bağlantı kurulamıyor",
+  "server.compatibility.safeModeTitle": "{name} başlamıyor",
   "server.compatibility.updateClientDescription":
     "Bu uygulama yalnızca ana makineden daha eski protokolleri destekliyor. Bu uygulamayı güncelleyin, ardından tekrar deneyin.",
   "server.compatibility.updateHostDescription":
@@ -120,6 +121,8 @@ export const messages = {
   "server.local.create": "Sunucu oluştur",
   "server.local.creating": "Sunucu oluşturuluyor…",
   "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.createFailedRetry":
+    "Bir sorun oluştu. Tekrar deneyin. Yine başarısız olursa OpenBot'u yeniden başlatın.",
   "server.local.limitReached":
     "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
   "server.local.deleteConfirmTitle": "{name} silinsin mi?",
@@ -263,9 +266,6 @@ export const messages = {
   "server.settings.membersDescription": "Bu sunucuyu yayımlayın, kişileri davet edin ve erişimi yönetin.",
   "server.settings.desktopTitle": "Uzak masaüstü",
   "server.settings.desktopDescription": "Bu sunucunun masaüstünü yapılandırın veya masaüstüne bağlanın.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "MCP sunucularını bağlayın ve bu sunucunun ajanlarının hangilerini kullanabileceğini seçin.",
   "server.settings.storageTitle": "Depolama",
   "server.settings.storageDescription": "OpenBot'un bu sunucunun diskinde ne sakladığını ve boş alanı görün.",
   "server.settings.hostedSitesTitle": "Siteler",
@@ -307,13 +307,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "Kopyalama başarısız oldu",
   "server.settings.copyFailed": "OpenBot bu değeri kopyalayamadı.",
   "server.settings.unavailableTitle": "Sunucu ayarları kullanılamıyor",
-  "server.settings.unsavedMcpChanges": "Kaydedilmemiş MCP değişiklikleri",
   "server.settings.reset": "Sıfırla",
   "server.settings.unsavedChanges": "Kaydedilmemiş değişiklikler",
   "server.settings.changesNotSaved": "Değişiklikler kaydedilmedi",
   "server.settings.group.agents": "Ajanlar",
   "server.settings.group.people": "Kişiler",
   "server.settings.group.server": "Sunucu",
+  "server.settings.experimentalTitle": "Deneysel",
+  "server.settings.experimentalDescription": "Henüz tamamlanmamış özellikleri açın.",
+  "server.settings.experimentalFeatures": "Özellikler",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "CRM sayfasını sahiplere ve yöneticilere gösterin, ajanların CRM'i okumasına izin verin ve Stripe'ı eşitleyin. Kapattığınızda veriler kalır.",
   "server.settings.agentDefaultsTitle": "Ajan varsayılanları",
   "server.settings.threadsCard": "Mesaj dizileri ve saat dilimi",
   "server.settings.memoryTitle": "Bellek",
@@ -352,7 +357,7 @@ export const messages = {
     "Bir ajan için ayarlamadığınızda bu sunucudaki ajanların neler yapabileceğini seçin.",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
-    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
+    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",

@@ -9,6 +9,7 @@ import { startActionSounds } from "./action-sounds";
 import { syncAppearance } from "./appearance-choice";
 // A dev build shows the color and the branch of its worktree.
 import "./dev-worktree";
+import { WindowBackdropBubbles } from "./features/window/backdrop-bubbles";
 import { readChatWindowTarget } from "./features/window/chat-window";
 import { syncLogoColor } from "./logo-color";
 import { startRendererTiming } from "./renderer-timing";
@@ -31,4 +32,11 @@ startRendererTiming();
 // `App` must stay a static import. Main sends the first runtime snapshot on `did-finish-load`,
 // which does not wait for a dynamic import, and `App` would subscribe after it. The helper windows
 // load `helper.html` instead.
-render(() => <App chatWindow={readChatWindowTarget(window.location.search)} />, root);
+render(
+  () => (
+    <WindowBackdropBubbles>
+      <App chatWindow={readChatWindowTarget(window.location.search)} />
+    </WindowBackdropBubbles>
+  ),
+  root,
+);

@@ -179,6 +179,20 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       .map((file) => ({ ...file, path: file.path.slice(prefix.length) }));
   }
 
+  /** The files of a skill folder that a download takes. A file that a skill package must not carry stays on GitHub. */
+  function packageFiles(files: TreeEntry[], folder: string): TreeEntry[] {
+    return filesIn(files, folder).filter((file) => !isUnsafeArchivePath(file.path));
+  }
+
+  /** Why a download refuses these files, or null. The read checks it too, so it does not offer a skill that cannot be added (#9908). */
+  function packageProblem(own: TreeEntry[]): string | null {
+    if (own.some((file) => file.link)) return sourceText("error.skill.symlinks");
+    if (own.length > MAX_FILES) return sourceText("error.skill.tooManyFiles", { limit: MAX_FILES });
+    if (own.reduce((total, file) => total + file.size, 0) > MAX_BYTES)
+      return sourceText("error.skill.expandedTooLarge");
+    return null;
+  }
+
   const resolve = Effect.fn("GithubSkillSource.resolve")(function* (link: GithubLink) {
     const repository = `${link.owner}/${link.repo}`;
     const notFound = () => failure(sourceText("error.skill.githubNotFound", { repository }));
@@ -260,6 +274,10 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
             folder: [`${link.owner}/${link.repo}`, resolved.path].filter(Boolean).join("/"),
           }),
         );
+      // When no skill here can be added, say why now, not after the user chose the agents.
+      const problems = found.map((skill) => packageProblem(packageFiles(files, skill.path)));
+      const problem = problems.find((text) => text !== null);
+      if (problem && problems.every(Boolean)) return yield* failure(problem);
       const source: GithubSkillSource = {
         owner: link.owner,
         repo: link.repo,
@@ -288,12 +306,9 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
             folder: [`${address.owner}/${address.repo}`, address.path].filter(Boolean).join("/"),
           }),
         );
-      // A file that a skill package must not carry stays on GitHub.
-      const own = filesIn(files, address.path).filter((file) => !isUnsafeArchivePath(file.path));
-      if (own.some((file) => file.link)) return yield* failure(sourceText("error.skill.symlinks"));
-      if (own.length > MAX_FILES) return yield* failure(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES }));
-      if (own.reduce((total, file) => total + file.size, 0) > MAX_BYTES)
-        return yield* failure(sourceText("error.skill.expandedTooLarge"));
+      const own = packageFiles(files, address.path);
+      const problem = packageProblem(own);
+      if (problem) return yield* failure(problem);
       const contents = yield* Effect.forEach(
         own,
         (file) =>

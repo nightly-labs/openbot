@@ -1,6 +1,6 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional channel-task-waits-v1 contract: why a queued channel task does not start (#6067).

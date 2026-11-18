@@ -28,6 +28,7 @@ export function SidebarPinnedGroup() {
     dragOffset,
     dragOverPinnedKey,
     draggedPinnedKey,
+    listFiltered,
     movePinnedItem,
     pinnedDropActive,
     props,
@@ -108,7 +109,7 @@ export function SidebarPinnedGroup() {
                   ]}
                   style={`--sidebar-drag-x: ${dragOffset(key()).x}px; --sidebar-drag-y: ${dragOffset(key()).y}px;`}
                   data-pinned-key={key()}
-                  draggable="true"
+                  draggable={listFiltered() ? "false" : "true"}
                   onDragStart={(event) => {
                     startNativeItemDragging(event, {
                       className: "sidebar-pinned-drag-preview",

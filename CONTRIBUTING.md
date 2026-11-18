@@ -111,10 +111,9 @@ guide.
 Every push to a branch in this repository runs the automated reviewer, and it blocks the merge on
 an unresolved P0 or P1 finding. A pull request from a fork is the exception: GitHub gives a fork's
 push run a read-only token, so it could not publish a review even if it produced one. Ask a
-maintainer to add the `norbiai` label, or to comment `/norbiai review`. Both run this
-repository's own copy of the workflow, where the token can publish, and either can be repeated
-after a push — the label is removed once the review runs, so re-applying it asks again. Two ways
-past a finding:
+maintainer to comment `/norbiai review`. The comment runs this repository's own copy of the
+workflow, where the token can publish, and it can be repeated after a push. A draft gets no review
+on push either; the same comment asks for one. Two ways past a finding:
 
 1. Fix it and push. The next review classifies the finding `[RESOLVED]`.
 2. Show it is wrong. Comment the concrete reason — the guard it misses, the line that already
@@ -128,8 +127,7 @@ comments from someone who can merge the pull request are read — organization m
 is not enough, and on a fork that means the recheck has to be asked for by a maintainer rather than
 by you — and only those written after the review being answered, plus the comment that asked for
 the recheck whatever its timestamp says. That one is passed to the reviewer whole; the older
-responses share a size budget and are dropped from the oldest end. A label carries no argument of
-its own, so write the rebuttal as a comment first and label afterwards.
+responses share a size budget and are dropped from the oldest end.
 
 ### The reviewer
 
@@ -142,8 +140,8 @@ large diff can reach the job's time limit: split the pull request.
 A review after a push reads only the commits since the last successful review, and rechecks the
 earlier findings against the full current code. A rebuttal on an unchanged commit reads no new code.
 The first review, a review after a rebase or a merge of the base branch, and a review asked for with
-the `norbiai` label read the whole pull request. Add the label when a change since the last review
-needs the whole pull request read again.
+a `/norbiai full review` comment read the whole pull request. Use that comment when a change since
+the last review needs the whole pull request read again.
 
 Claude Code can only read: it gets the Read, Grep and Glob tools and the `git diff`, `git show`,
 `git log` and `git ls-files` commands. It does not load the pull request's own settings, hooks,

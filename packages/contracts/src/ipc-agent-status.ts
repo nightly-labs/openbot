@@ -62,6 +62,11 @@ export interface AgentProviderStatus {
    */
   cliSource?: "system" | "managed";
   /**
+   * With `cliSource: "system"`: the user's CLI runs, but a part that some models need is missing,
+   * such as the code-mode host of a bare `codex` (#9139). OpenBot's copy, when downloaded, runs instead.
+   */
+  cliIncomplete?: boolean;
+  /**
    * The version of the other CLI the user can run instead (`chooseInstalledCli`): the one they
    * installed while OpenBot's copy runs, or OpenBot's newer copy while theirs runs by their choice.
    */
@@ -96,6 +101,74 @@ export interface AgentProviderStatus {
   accounts?: ProviderAccountStatus[];
   /** The pool of `accounts`. Absent while the pool is off. Local only, like `accounts`. */
   accountPool?: ProviderAccountPool;
+  /**
+   * Codex: the user's Codex settings give the models from another source than OpenAI, so the
+   * provider's model list can hold models that are not OpenAI's (#9956). Absent on OpenAI's own list.
+   * Released Team API adapters omit it; a joined server gives it on `provider-model-source-v1`.
+   */
+  modelSource?: ProviderModelSource;
+}
+
+/** The longest model provider name that a status row carries. A longer name is cut. */
+export const PROVIDER_MODEL_SOURCE_NAME_LIMIT = 80;
+
+/**
+ * Where a provider CLI gets its models when its own settings select a source that is not the
+ * provider's own: `provider` is a model provider, such as Ollama, by the name the settings give it;
+ * `catalog` is a model list file that the settings name. The file path stays on the host.
+ */
+export type ProviderModelSource = { kind: "provider"; name: string } | { kind: "catalog" };
+
+export function isProviderModelSource(value: unknown): value is ProviderModelSource {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "catalog") return true;
+  return (
+    value.kind === "provider" &&
+    isBoundedString(value.name, PROVIDER_MODEL_SOURCE_NAME_LIMIT) &&
+    value.name.trim().length > 0
+  );
+}
+
+/** One provider's source, as the `provider-model-source-v1` route lists it. */
+export interface ProviderModelSourceEntry {
+  provider: string;
+  source: ProviderModelSource;
+}
+
+/** The most providers that one `provider-model-source-v1` list holds. */
+const AGENT_PROVIDER_LIMIT = 64;
+
+/** The `provider-model-source-v1` list. A malformed list fails closed, as the other model routes do. */
+export function decodeProviderModelSources(value: unknown): ProviderModelSourceEntry[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.sources) ||
+    value.sources.length > AGENT_PROVIDER_LIMIT ||
+    !value.sources.every(
+      (entry: unknown) =>
+        isDynamicRecord(entry) &&
+        isBoundedString(entry.provider, INPUT_LIMITS.identifier) &&
+        isProviderModelSource(entry.source),
+    )
+  )
+    throw new Error("Invalid model source list.");
+  return value.sources.map((entry: ProviderModelSourceEntry) => ({
+    provider: entry.provider,
+    source: entry.source.kind === "provider" ? { kind: "provider", name: entry.source.name } : { kind: "catalog" },
+  }));
+}
+
+/** The status with the model source of each provider that a joined server lists. */
+export function withModelSources(status: AgentStatus, sources: readonly ProviderModelSourceEntry[]): AgentStatus {
+  if (!status.providers || sources.length === 0) return status;
+  const byProvider = new Map(sources.map((entry) => [entry.provider, entry.source]));
+  return {
+    ...status,
+    providers: status.providers.map((row) => {
+      const source = byProvider.get(row.id);
+      return source ? { ...row, modelSource: source } : row;
+    }),
+  };
 }
 
 /**
@@ -170,6 +243,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.cliIncomplete === undefined || typeof value.cliIncomplete === "boolean") &&
     (value.otherCliVersion === undefined || isBoundedString(value.otherCliVersion, 160)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
@@ -181,7 +255,8 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
       (Array.isArray(value.accounts) &&
         value.accounts.length <= MAX_PROVIDER_ACCOUNTS &&
         value.accounts.every(isProviderAccountStatus))) &&
-    (value.accountPool === undefined || isProviderAccountPool(value.accountPool))
+    (value.accountPool === undefined || isProviderAccountPool(value.accountPool)) &&
+    (value.modelSource === undefined || isProviderModelSource(value.modelSource))
   );
 }
 
@@ -240,7 +315,10 @@ export function isAccountUsageWindow(value: unknown): value is AccountUsageWindo
 export interface AccountUsageGroup {
   /** The provider's name for the group, such as "Gemini Models". */
   name: string;
-  /** The model names that the provider lists for the group, such as "Gemini Flash". */
+  /**
+   * The model names that the provider lists for the group, such as "Gemini Flash". A group with no list,
+   * such as "Gemini 4 Argon", has its own name when other groups list theirs.
+   */
   models: string[];
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
@@ -501,6 +579,11 @@ export interface SubmitProviderCodeLoginInput {
   code: string;
 }
 
+/** As `SubmitProviderCodeLoginInput`, for the `paste` sign-in of one account of a provider. */
+export interface SubmitProviderAccountCodeLoginInput extends SubmitProviderCodeLoginInput {
+  accountId: string;
+}
+
 /**
  * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
  * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
@@ -553,6 +636,20 @@ export type ProviderCodeLoginStart =
       expiresAt: number;
     }
   | { kind: "connected" };
+
+/**
+ * A started code sign-in of one account of a provider. `accountId` is the account that signs in: a
+ * new one when the request named none. Its status and its cancel name it.
+ */
+export interface ProviderAccountCodeLoginStart {
+  accountId: string;
+  start: ProviderCodeLoginStart;
+}
+
+/** The code sign-in of one account of a provider: `result` is `null` while it goes on. */
+export interface ProviderAccountCodeLoginStatus {
+  result: { error: string | null } | null;
+}
 
 /**
  * A sign-in that a joined server's host runs in its own browser (`provider-host-sign-in-v1`). `tabId`

@@ -11,8 +11,9 @@ import {
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
-  isWorkflowMediaCredits,
-  isWorkflowMediaProviders,
+  isWorkflowMediaCatalogModel,
+  isWorkflowMediaCreditBalance,
+  isWorkflowMediaPrice,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
@@ -23,6 +24,7 @@ import {
   WORKFLOW_GITHUB_DELIVERY_OUTCOMES,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_GITHUB_SKIP_REASONS,
+  WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
@@ -31,7 +33,9 @@ import {
   WORKFLOW_STEP_STATUSES,
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
-  type WorkflowMediaCredits,
+  type WorkflowMediaCatalog,
+  type WorkflowMediaCreditBalance,
+  type WorkflowMediaPrice,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -156,14 +160,64 @@ export function decodeRemoteWorkflowPicture(value: unknown): string {
 
 /** The `workflows-sunra-v1` providers route answers `{ sunra }`. */
 export function decodeRemoteWorkflowMediaProviders(value: unknown): { sunra: boolean } {
-  if (!isWorkflowMediaProviders(value)) throw new Error("Invalid remote workflow providers.");
+  if (!isDynamicRecord(value) || typeof value.sunra !== "boolean")
+    throw new Error("Invalid remote workflow providers.");
   return { sunra: value.sunra };
 }
 
+/** The `workflows-higgsfield-v1` providers route answers `{ higgsfield }`. */
+export function decodeRemoteHiggsfieldProviders(value: unknown): { higgsfield: boolean } {
+  if (!isDynamicRecord(value) || typeof value.higgsfield !== "boolean")
+    throw new Error("Invalid remote workflow providers.");
+  return { higgsfield: value.higgsfield };
+}
+
+/** One service's credits in a credits route answer: null when the host has no credits to show. */
+function remoteCreditBalance(value: unknown): WorkflowMediaCreditBalance | null {
+  if (value === null) return null;
+  if (!isWorkflowMediaCreditBalance(value)) throw new Error("Invalid remote workflow credits.");
+  return { available: value.available, quota: value.quota };
+}
+
 /** The `workflows-sunra-v1` credits route answers `{ sunra }`, with null when the host has no credits to show. */
-export function decodeRemoteWorkflowMediaCredits(value: unknown): WorkflowMediaCredits {
-  if (!isWorkflowMediaCredits(value)) throw new Error("Invalid remote workflow credits.");
-  return { sunra: value.sunra ? { available: value.sunra.available, quota: value.sunra.quota } : null };
+export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { sunra: remoteCreditBalance(value.sunra) };
+}
+
+/** The `workflows-higgsfield-v1` credits route answers `{ higgsfield }`, as the Sunra route does. */
+export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { higgsfield: remoteCreditBalance(value.higgsfield) };
+}
+
+/**
+ * The `workflows-media-catalog-v1` catalog route answers `{ models }`. The app drops a model that it
+ * cannot read, so one odd entry does not hide the others.
+ */
+export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaCatalog {
+  if (!isDynamicRecord(value) || !Array.isArray(value.models) || value.models.length > WORKFLOW_MEDIA_CATALOG_MAX)
+    throw new Error("Invalid remote workflow catalog.");
+  return {
+    models: value.models.filter(isWorkflowMediaCatalogModel).map((model) => ({
+      id: model.id,
+      provider: model.provider,
+      providerModel: model.providerModel,
+      name: model.name,
+      maker: model.maker,
+      kinds: [...model.kinds],
+      aspects: [...model.aspects],
+      durations: [...model.durations],
+      resolutions: [...model.resolutions],
+      transparent: model.transparent,
+    })),
+  };
+}
+
+/** The `workflows-media-catalog-v1` price route answers `{ credits }`, with null when there is no quote. */
+export function decodeRemoteWorkflowMediaPrice(value: unknown): WorkflowMediaPrice {
+  if (!isWorkflowMediaPrice(value)) throw new Error("Invalid remote workflow price.");
+  return { credits: value.credits };
 }
 
 /** The `workflows-v1` list route wraps its list as `{ workflows }`. */

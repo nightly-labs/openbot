@@ -229,6 +229,8 @@ async function start(): Promise<void> {
         controller.setInputRegion(rendererId, rects);
       },
     },
+    // This test opens no chat window.
+    chatRendererIds: () => new Set(),
     setXWayland: () => Effect.void,
     keepXWayland: () => Effect.void,
   });

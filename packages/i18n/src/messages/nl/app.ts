@@ -55,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Gebruik",
   "app.rail.library": "Bibliotheek",
+  "app.rail.providers": "Aanbieders",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marktplaats",
   "app.rail.settings": "Instellingen",
   "app.rail.settingsNotice": "Instellingen. {notice}",
@@ -106,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Instellingen zoeken…",
   "app.settingsPage.results": "Zoekresultaten in instellingen",
   "app.settingsPage.noResults": "Geen overeenkomende instellingen.",
+  "app.settingsPage.marketplaceApps": "Connectors en MCP-servers",
   "app.settingsPage.resultCount": {
     one: "{count} overeenkomende instelling.",
     other: "{count} overeenkomende instellingen.",

@@ -79,10 +79,13 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "רק הבעלים יכול להסיר את השרת הזה.",
   "error.remote.requestTimeout": "הבקשה המרוחקת חרגה ממגבלת הזמן.",
   "error.remote.requestFailed": "הבקשה המרוחקת נכשלה.",
-  "error.remote.pinnedKeyMissing": "למארח המרוחק אין מפתח מכשיר מוצמד.",
+  "error.remote.hostKeyMissing":
+    "OpenBot לא יכול לאמת את השרת הזה, כי מפתח האבטחה שלו חסר או השתנה. בקשו מבעל השרת לבדוק את השרת.",
+  "error.remote.connectionNotStarted":
+    "OpenBot לא הצליח להתחיל את החיבור לשרת הזה. אם הבעיה נמשכת, צאו מ-OpenBot ופתחו אותו שוב.",
   "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
-  "error.remote.hostDisconnected": "מארח ה-WebRTC התנתק.",
+  "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",
   "error.remote.eventGap": "ברצף האירועים של המארח יש פער.",
   "error.remote.malformedKnownEvent": "המארח החזיר אירוע מוכר שגוי.",
   "error.remote.fileTransportIsStopped": "שכבת העברת הקבצים של WebRTC נעצרה.",
@@ -147,6 +150,7 @@ export const messages = {
   "error.remote.attachmentRejected": "המארח דחה את הקובץ המצורף.",
   "error.remote.attachmentTooLarge": "קבצים מצורפים צריכים להיות בגודל 10 MB לכל היותר.",
   "error.remote.attachmentBusy": "יש להמתין לסיום הקובץ המצורף הנוכחי.",
+  "error.remote.attachmentChanged": "הקובץ השתנה או שאינו זמין. יש לבחור אותו שוב.",
   "error.remote.uploadTimeout": "העלאת הקובץ המצורף חרגה ממגבלת הזמן.",
   "error.remote.hostSessionActive": "במארח כבר יש סשן מרוחק פעיל.",
   "error.remote.tooManyConnections": "יותר מדי חיבורים מרוחקים פעילים.",
@@ -195,7 +199,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "יש לעדכן את שרת שולחן העבודה הזה כדי למחוק ערוצים.",
   "error.remote.historyRefreshFailed": "ההודעה נשלחה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
   "error.remote.taskHistoryRefreshFailed": "המשימה שונתה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
-  "error.remote.localServerStartFailed": "השרת במחשב הזה לא הופעל.",
+  "error.remote.serverNotLoaded": "לא ניתן היה לטעון את השרת. יש לנסות שוב.",
+  "error.remote.localServerNotStarted":
+    "השרת במחשב הזה לא הופעל. יש לנסות שוב. אם הוא לא מופעל, יש להפעיל מחדש את OpenBot במחשב הזה.",
   "error.remote.localServerNotFound": "השרת הזה אינו במחשב הזה.",
   "error.remote.localServerAccountRemovalFailed":
     "השרת נמחק במחשב שלו, אבל החשבון עדיין מציג אותו. יש למחוק אותו שוב כדי להסיר אותו מהחשבון.",

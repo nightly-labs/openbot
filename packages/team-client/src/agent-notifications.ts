@@ -125,6 +125,20 @@ export function notificationRequestKey(serverId: string, event: AgentEvent): str
   }
 }
 
+/**
+ * Whether a teammate's message started the turn that ended: a request from another agent, or its
+ * answer. Such a turn is work between agents, so its answer stays in the chat and shows no
+ * notification and plays no sound. A prompt, an approval, a browser step and a failed turn still
+ * notify, because the user must act or the work stopped.
+ *
+ * Pass the event as it arrived. A task that an agent starts with `start_task` also has the origin
+ * "agent", because the agent sends its brief to itself. Its turn arrives in a `thread-turn-completed`
+ * event, which this does not match, so the result of a task still notifies.
+ */
+export function teammateTurnCompleted(event: AgentEvent): boolean {
+  return event.type === "turn-completed" && event.status === "completed" && event.origin === "agent";
+}
+
 /** Whether the event waits for the user, so that the "needs-me" level keeps it. */
 export function agentEventNeedsUser(event: AgentEvent): boolean {
   return event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested";

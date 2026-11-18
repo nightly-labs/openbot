@@ -21,6 +21,7 @@ import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
+import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("dynamic-island-window");
 
@@ -78,6 +79,8 @@ export interface DynamicIslandWindowControllerOptions {
   showContextMenu?: (window: BrowserWindow) => void;
   /** Windows: forwards the pointer moves to an island window only while the cursor is on it. */
   pointerForwarding?: PointerForwardingGate | null;
+  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
+  topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
@@ -93,6 +96,8 @@ export class DynamicIslandWindowController {
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** X11: the parts of each window that the island renderer reported last. */
   readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
+  /** X11: the shape that each window has now. Chromium applies it again after a move or a resize. */
+  readonly #appliedShapes = new WeakMap<BrowserWindow, string>();
   /** macOS: for each display whose panel has the keyboard, the OpenBot window that had it before. */
   readonly #keyboardReturn = new Map<number, BrowserWindow | null>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
@@ -265,12 +270,24 @@ export class DynamicIslandWindowController {
   }
 
   #applyShape(displayId: number, window: BrowserWindow): void {
+    const scaleFactor = this.#options.getDisplays().find((candidate) => candidate.id === displayId)?.scaleFactor;
     if (this.#interactiveDisplays.has(displayId) || this.#collapseTimers.has(displayId)) {
       const { width, height } = window.getBounds();
-      window.setShape([{ x: 0, y: 0, width, height }]);
+      this.#setShape(window, [{ x: 0, y: 0, width, height }], scaleFactor);
       return;
     }
-    window.setShape(this.#inputRegions.get(displayId) ?? []);
+    this.#setShape(window, this.#inputRegions.get(displayId) ?? [], scaleFactor);
+  }
+
+  /**
+   * Only a change goes to X11: each shape request also wakes the main thread (#11666). Chromium keeps the
+   * shape in pixels, so a new display scale applies the same shape again.
+   */
+  #setShape(window: BrowserWindow, shape: Rectangle[], scaleFactor: number | undefined): void {
+    const key = `${scaleFactor ?? ""}:${JSON.stringify(shape)}`;
+    if (this.#appliedShapes.get(window) === key) return;
+    window.setShape(shape);
+    this.#appliedShapes.set(window, key);
   }
 
   /** On X11 the island stays below the top panel of the desktop, as the clock and the tray do. */
@@ -450,7 +467,10 @@ export class DynamicIslandWindowController {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
-    window.setAlwaysOnTop(true, "status");
+    // Only macOS uses the level. On Windows, Electron puts a "status" window just behind the taskbar, and
+    // the window then goes under other apps when a full-screen app makes the taskbar not topmost.
+    window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "status" : "normal");
+    this.#options.topmost?.keep(window);
     // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
     // defined on Windows, so a call there throws.
     if (this.#options.windowKind === "panel") {
@@ -464,7 +484,7 @@ export class DynamicIslandWindowController {
     }
     if (this.#options.windowKind === "x11") {
       // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
-      window.setShape([]);
+      this.#setShape(window, [], display.scaleFactor);
     } else {
       letPointerThrough(this.#options.pointerForwarding, window, true);
     }

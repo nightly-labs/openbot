@@ -207,4 +207,10 @@ export const messages = {
   "billing.license.invite.max": {
     other: "你的许可证已有 {count} 位用户，已达上限。如需更大的许可证，请联系我们。新成员无法加入你的服务器。",
   },
+  "billing.details.country": "账单国家/地区",
+  "billing.details.countryPlaceholder": "选择国家/地区",
+  "billing.details.vatId": "欧盟增值税号（可选）",
+  "billing.details.vatIdInvalid": "这不是所选国家/地区的增值税号。",
+  "billing.details.countryMissing": "请选择账单国家/地区。",
+  "billing.details.saveFailed": "无法保存账单信息",
 } as const satisfies PartialTranslation<typeof source>;

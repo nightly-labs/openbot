@@ -56,6 +56,8 @@ export const messages = defineMessages("app", {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Usage",
   "app.rail.library": "Library",
+  "app.rail.providers": "Providers",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Settings",
   "app.rail.settingsNotice": "Settings. {notice}",
@@ -107,6 +109,7 @@ export const messages = defineMessages("app", {
   "app.settingsPage.searchPlaceholder": "Search settings…",
   "app.settingsPage.results": "Settings search results",
   "app.settingsPage.noResults": "No matching settings.",
+  "app.settingsPage.marketplaceApps": "Connectors and MCP servers",
   "app.settingsPage.resultCount": {
     one: "{count} matching setting.",
     other: "{count} matching settings.",

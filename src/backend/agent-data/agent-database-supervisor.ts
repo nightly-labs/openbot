@@ -17,11 +17,25 @@ export interface AgentDatabaseSupervisorOptions {
   /** Input, not a wait: a test sets it low to reach a host that never reports ready. */
   hostStartDeadlineMs?: number;
   queueWaitMs?: number;
+  /** Input, not a wait: a test sets it low to reach the end of the wait after failed starts. */
+  hostStartRetryDelayMs?: number;
+  /** Reports each host that did not start, so the log keeps the reason (#10463). */
+  onHostStartFailed?: (failure: AgentDatabaseHostStartFailure) => void;
   /**
    * Reports how long the host took to answer one statement, or to be ended for it. The time starts
    * when the statement is sent, which is never before the host reported ready.
    */
   onStatementSettled?: (durationMs: number) => void;
+}
+
+export interface AgentDatabaseHostStartFailure {
+  /** It did not report ready in time, or it exited first, with its exit code. */
+  reason: string;
+  /** The end of the host's stderr, or empty when the transport keeps none. */
+  output: string;
+  consecutiveFailures: number;
+  /** How long new calls fail at once without a start. 0 when the next call starts a host. */
+  retryAfterMs: number;
 }
 
 /** The answer to one statement. A failure is a value, never a rejection: every one of these is a
@@ -52,6 +66,13 @@ const EXITED_MESSAGE = "The database process stopped unexpectedly. Try the call 
 const NOT_STARTED_MESSAGE = "The database process did not start. Nothing was run. Try the call again.";
 
 /**
+ * After a second failed start in a row. A retry does not help for some time, and an agent that
+ * read "Try the call again" retried without end (#10463).
+ */
+const UNAVAILABLE_MESSAGE =
+  "The database process could not start, so shared tables are not available now. Nothing was run. Do not retry now: keep these records in a file in your workspace, and try shared tables again later.";
+
+/**
  * Owns the one database host and the statement deadline.
  *
  * Knows nothing about agents, names, or tools: it takes an already-resolved request and answers with
@@ -69,7 +90,8 @@ const NOT_STARTED_MESSAGE = "The database process did not start. Nothing was run
  * statement, they ended that statement as a runaway one and reported the start as database time.
  * A host that does not report ready in time, or exits first, fails the requests that waited for it
  * and is discarded. The next request starts a new host, so a host that cannot start is not
- * restarted in a loop.
+ * restarted in a loop. After a second failed start in a row, requests fail at once until a delay
+ * that doubles with each failure ends, and the next request after it tries one new start.
  */
 export class AgentDatabaseSupervisor {
   readonly #spawnHost: () => AgentDatabaseHostProcess;
@@ -77,6 +99,8 @@ export class AgentDatabaseSupervisor {
   readonly #hostStartDeadlineMs: number;
   readonly #queueWaitMs: number;
   readonly #onStatementSettled: ((durationMs: number) => void) | undefined;
+  readonly #hostStartRetryDelayMs: number;
+  readonly #onHostStartFailed: ((failure: AgentDatabaseHostStartFailure) => void) | undefined;
   readonly #queue: PendingRequest[] = [];
 
   #host: AgentDatabaseHostProcess | null = null;
@@ -90,6 +114,10 @@ export class AgentDatabaseSupervisor {
   #generation = 0;
   #nextId = 1;
   #disposed = false;
+  /** Failed starts since the last host that reported ready. */
+  #startFailures = 0;
+  /** No host is started before this time. */
+  #retryNotBefore = 0;
 
   constructor(options: AgentDatabaseSupervisorOptions) {
     this.#spawnHost = options.spawnHost;
@@ -97,6 +125,8 @@ export class AgentDatabaseSupervisor {
     this.#hostStartDeadlineMs = options.hostStartDeadlineMs ?? AGENT_DATABASE_LIMITS.hostStartDeadlineMs;
     this.#queueWaitMs = options.queueWaitMs ?? AGENT_DATABASE_LIMITS.queueWaitMs;
     this.#onStatementSettled = options.onStatementSettled;
+    this.#hostStartRetryDelayMs = options.hostStartRetryDelayMs ?? AGENT_DATABASE_LIMITS.hostStartRetryDelayMs;
+    this.#onHostStartFailed = options.onHostStartFailed;
   }
 
   send(request: AgentDatabaseRequestInput): Effect.Effect<AgentDatabaseOutcome> {
@@ -128,7 +158,7 @@ export class AgentDatabaseSupervisor {
    * start. Does nothing when a host exists. A start that fails here fails no request.
    */
   prewarm(): void {
-    if (this.#disposed) return;
+    if (this.#disposed || this.#waitingToRetry()) return;
     this.#ensureHost();
   }
 
@@ -147,6 +177,10 @@ export class AgentDatabaseSupervisor {
 
   #pump(): void {
     if (this.#inFlight || this.#disposed || this.#queue.length === 0) return;
+    if (this.#waitingToRetry()) {
+      for (const entry of this.#queue.splice(0)) entry.settle(failed("internal", UNAVAILABLE_MESSAGE));
+      return;
+    }
     const host = this.#ensureHost();
     // `#hostReady` pumps again when the ready message comes.
     if (!this.#hostReady) return;
@@ -173,10 +207,13 @@ export class AgentDatabaseSupervisor {
     const host = this.#spawnHost();
     const generation = this.#generation;
     host.onMessage((message) => this.#message(message, generation));
-    host.onExit(() => this.#exited(generation));
+    host.onExit((code) => this.#exited(generation, code));
     this.#host = host;
     this.#hostReady = false;
-    this.#deadline = setTimeout(() => this.#abandonStart(generation), this.#hostStartDeadlineMs);
+    this.#deadline = setTimeout(
+      () => this.#abandonStart(generation, `did not report ready in ${this.#hostStartDeadlineMs} ms`),
+      this.#hostStartDeadlineMs,
+    );
     this.#deadline.unref();
     return host;
   }
@@ -190,12 +227,14 @@ export class AgentDatabaseSupervisor {
     if (generation !== this.#generation || this.#hostReady) return;
     this.#clearDeadline();
     this.#hostReady = true;
+    this.#startFailures = 0;
+    this.#retryNotBefore = 0;
     this.#pump();
   }
 
-  #exited(generation: number): void {
+  #exited(generation: number, code: number | null): void {
     if (this.#hostReady) this.#discardHost(generation, EXITED_MESSAGE);
-    else this.#abandonStart(generation);
+    else this.#abandonStart(generation, `exited with code ${code ?? "unknown"} before it reported ready`);
   }
 
   #receive(response: { id: number } & AgentDatabaseOutcome, generation: number): void {
@@ -230,13 +269,32 @@ export class AgentDatabaseSupervisor {
    * The host did not report ready in time, or exited first. No statement was sent to it, so every
    * waiting request fails with that reason and none starts another host here: a host that cannot
    * start would otherwise be started again at once, without end.
+   *
+   * One failed start can be a busy moment, so the next request starts a host at once. A second in
+   * a row has a cause that a retry does not change soon, so requests fail at once for a delay.
    */
-  #abandonStart(generation: number): void {
+  #abandonStart(generation: number, reason: string): void {
     if (generation !== this.#generation || this.#disposed) return;
+    const output = this.#host?.recentOutput?.() ?? "";
     this.#endHost();
+    this.#startFailures += 1;
+    const retryAfterMs =
+      this.#startFailures < 2
+        ? 0
+        : Math.min(
+            this.#hostStartRetryDelayMs * 2 ** (this.#startFailures - 2),
+            AGENT_DATABASE_LIMITS.maxHostStartRetryDelayMs,
+          );
+    this.#retryNotBefore = Date.now() + retryAfterMs;
+    this.#onHostStartFailed?.({ reason, output, consecutiveFailures: this.#startFailures, retryAfterMs });
+    const message = retryAfterMs === 0 ? NOT_STARTED_MESSAGE : UNAVAILABLE_MESSAGE;
     // Emptied before the callers hear, so a caller that sends again starts one new host for it.
     const waiting = this.#queue.splice(0);
-    for (const entry of waiting) entry.settle(failed("internal", NOT_STARTED_MESSAGE));
+    for (const entry of waiting) entry.settle(failed("internal", message));
+  }
+
+  #waitingToRetry(): boolean {
+    return this.#host === null && Date.now() < this.#retryNotBefore;
   }
 
   #endHost(): void {

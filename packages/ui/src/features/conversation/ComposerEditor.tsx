@@ -1,6 +1,10 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
-import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
-import { EVERYONE_MENTION, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { attachmentReferenceIds, expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import {
+  EVERYONE_MENTION,
+  expandChatTagReferences,
+  serializeChatTagReference,
+} from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { AppWindow, Badge, Blocks, Listbox, Puzzle, Split, UsersRound } from "@openbot/ui";
@@ -17,7 +21,15 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
+import { normalizedSearchText, snippetAround } from "../../components/global-search-text";
+import type {
+  ComposerAgent,
+  ComposerBrowserTab,
+  ComposerMcpServer,
+  ComposerSkill,
+  ComposerThread,
+  ComposerThreadMessageMatch,
+} from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -91,6 +103,11 @@ interface ComposerEditorProps {
   browserTabs?: ComposerBrowserTab[] | undefined;
   /** The agent's side threads that `@` offers, newest first. A tag lets the agent read the thread. */
   threads?: ComposerThread[] | undefined;
+  /**
+   * Finds the messages of the agent's side threads that contain the `@` query, newest first. Each
+   * listed thread with a match shows under "In messages". Absent when the host cannot search threads.
+   */
+  onSearchThreads?: ((query: string) => Promise<ComposerThreadMessageMatch[]>) | undefined;
   /** Shows the browser tab, or opens the thread by its task id, that a chip in the draft names. */
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   value: string;
@@ -172,6 +189,13 @@ interface MentionContext {
 const DICTATION_INTERIM_WORDS = 2;
 const EMPTY_TABS: ComposerBrowserTab[] = [];
 const EMPTY_THREADS: ComposerThread[] = [];
+/*
+ * The `@` search of thread messages. A shorter query matches almost every message, so it waits for
+ * three letters; it waits for a pause in the typing, and it shows a few threads. Search finds more.
+ */
+const THREAD_SEARCH_MIN_QUERY = 3;
+const THREAD_SEARCH_DELAY_MS = 150;
+const THREAD_SEARCH_ROWS = 5;
 /** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
 
@@ -300,6 +324,62 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     return threads().filter((thread) => referenceMatches({ thread }, query));
   });
+  /** The `@` query that the thread message search answers, or an empty string when it does not run. */
+  const threadSearchQuery = createMemo(() => {
+    const context = mention();
+    const query = context?.trigger === "@" ? context.query.trim() : "";
+    return query.length >= THREAD_SEARCH_MIN_QUERY ? query : "";
+  });
+  /* The last answer. It stays while the user types on, so its rows do not blink for each letter. */
+  const [threadMessageMatches, setThreadMessageMatches] = createSignal<ComposerThreadMessageMatch[]>([]);
+  let threadSearchRequest = 0;
+  // A boolean, so that a new thread list (for example a task state change during a turn) does not
+  // start the search again.
+  const hasListedThreads = createMemo(() => threads().length > 0);
+  createEffect(
+    () => ({ query: threadSearchQuery(), search: props.onSearchThreads, listed: hasListedThreads() }),
+    ({ query, search, listed }) => {
+      const request = ++threadSearchRequest;
+      // A thread that is not listed cannot be tagged, so with no listed thread nothing can show.
+      if (!query || !search || !listed) {
+        setThreadMessageMatches([]);
+        return;
+      }
+      const timer = setTimeout(() => {
+        search(query).then(
+          (matches) => {
+            if (request === threadSearchRequest) setThreadMessageMatches(matches);
+          },
+          // The title matches still show; the rows of a failed search are only absent.
+          () => {
+            if (request === threadSearchRequest) setThreadMessageMatches([]);
+          },
+        );
+      }, THREAD_SEARCH_DELAY_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /**
+   * The listed threads that have the query in a message, but not in the title: one row for each
+   * thread, with its newest match. A match that no longer has the query, from an earlier answer, goes.
+   */
+  const matchingThreadMessages = createMemo(() => {
+    const query = threadSearchQuery();
+    const needle = normalizedSearchText(query);
+    if (!needle) return [];
+    const titled = new Set(matchingThreads().map((thread) => thread.id));
+    const listed = new Map(threads().map((thread) => [thread.id, thread]));
+    const rows: { thread: ComposerThread; snippet: string }[] = [];
+    for (const match of threadMessageMatches()) {
+      if (rows.length === THREAD_SEARCH_ROWS) break;
+      const thread = listed.get(match.threadId);
+      if (!thread || titled.has(thread.id) || rows.some((row) => row.thread.id === thread.id)) continue;
+      const text = threadMessagePreview(match.body);
+      if (!normalizedSearchText(text).includes(needle)) continue;
+      rows.push({ thread, snippet: snippetAround(text, query) });
+    }
+    return rows;
+  });
   /*
    * The `@` list has a group for each kind. A title over each group shows only when the list has
    * more than one, so a list of agents alone looks as it did.
@@ -343,6 +423,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         title: "composer.picker.section.threads",
         options: matchingThreads().map((thread) => ({ type: "thread" as const, thread })),
       },
+      {
+        id: "messages",
+        title: "composer.picker.section.messages",
+        options: matchingThreadMessages().map((row) => ({ type: "thread" as const, ...row })),
+      },
     ];
     return sections.filter((section) => section.options.length > 0);
   });
@@ -367,6 +452,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
   /** The `@` or `$` query, which the rows mark in their names. */
   const pickerQuery = () => mention()?.query.trim() ?? "";
+  const descriptionMatchQuery = (option: PickerOption) =>
+    option.type === "tab" || (option.type === "thread" && option.snippet !== undefined) ? pickerQuery() : "";
   const pickerOptionElements = new Map<string, HTMLElement>();
   /* Set by an arrow key and read once by the highlight, so only a key press slides it. */
   let keyMove = false;
@@ -1275,8 +1362,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       <Show when={pickerOptionDescription(option, t, format)}>
                         {(description) => (
                           <span class="mention-picker-description">
-                            {/* A tab matches its address too, so its address shows the match. */}
-                            <MatchedText text={description()} query={option.type === "tab" ? pickerQuery() : ""} />
+                            {/* A tab matches its address, and a thread its message, so they show the match. */}
+                            <MatchedText text={description()} query={descriptionMatchQuery(option)} />
                           </span>
                         )}
                       </Show>
@@ -1305,6 +1392,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
       </Show>
     </div>
   );
+}
+
+/** A thread message as one line of plain text, as the search dialog shows it. */
+function threadMessagePreview(body: string): string {
+  return expandAttachmentReferences(
+    expandChatTagReferences(body, (reference) => (reference.kind === "quote" ? `“${reference.name}”` : undefined)),
+  )
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 /** Text with the part that matches the picker query marked, as the search dialog marks it. */

@@ -7,6 +7,13 @@ import { devWorktree } from "./scripts/dev-worktree-vite-plugin";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
 
+// `bun run dev` rebuilds the main process and preload scripts when a file changes (`--watch`); a
+// production build ignores this. Do not watch installed packages: Bun links them to one shared
+// cache, so an install in another worktree changes their link count. The watcher then rebuilds and
+// restarts the app, and the restart fails while the old app holds the single-instance lock. After
+// you install or update a package, restart `bun run dev`.
+const devWatch = { exclude: ["**/node_modules/**"] };
+
 export default defineConfig({
   main: {
     // Workspace sources ship as TypeScript and must be bundled for the packaged app.
@@ -26,6 +33,7 @@ export default defineConfig({
       }),
     ],
     build: {
+      watch: devWatch,
       rollupOptions: {
         // Optional peers of the vendored Baileys that OpenBot does not install: Baileys imports them
         // when it runs and goes on without them (no thumbnails, link previews or audio waveforms).
@@ -48,6 +56,7 @@ export default defineConfig({
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts"] })],
     build: {
+      watch: devWatch,
       rollupOptions: {
         input: {
           index: resolve("src/preload/index.ts"),

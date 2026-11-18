@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { web } from "@e2e-dev/web";
 import type { E2EConfig } from "e2e";
 import {
+  BENCH_ENV,
+  BENCH_PROVIDERS,
   DEVTOOLS_ENDPOINT_FILE,
   LIVE_PROVIDERS,
   type LiveProvider,
@@ -20,9 +22,11 @@ function devToolsEndpoint(provider: LiveProvider): string {
   return readFileSync(endpointFile, "utf8").trim();
 }
 
+const providers = process.env[BENCH_ENV] === "1" ? BENCH_PROVIDERS : LIVE_PROVIDERS;
+
 export default {
   tests: "*.e2e.ts",
-  targets: LIVE_PROVIDERS.map((provider) => ({
+  targets: providers.map((provider) => ({
     name: provider,
     engine: web({
       // The page fills the app window: the app has its own window size.
@@ -49,7 +53,7 @@ export default {
     },
   })),
   // One app for each provider, and the tests at the same time.
-  workers: LIVE_PROVIDERS.length,
+  workers: providers.length,
   // An app serves one attempt: a second attempt would need a new app.
   retries: 0,
   // A first run also downloads the provider CLI.

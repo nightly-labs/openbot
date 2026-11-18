@@ -5,8 +5,9 @@
 // rewrites them in place on a decoded payload before it leaves the main process. `src/main/index.ts`
 // registers the matching protocol handlers, and they parse exactly what these builders emit.
 
+import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import type { ConversationPageAnchor, DirectConversationPageAnchor } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4 } from "@openbot/contracts/validation";
 
 export function pageQuery(anchor: ConversationPageAnchor | DirectConversationPageAnchor, limit: number): string {
@@ -33,7 +34,13 @@ export function addRemotePreviewUrls<T>(value: T, serverId: string): T {
   if (!isDynamicRecord(value)) return value;
   const record = value;
   if ("previewUrl" in record && isString(record.id)) {
-    Reflect.set(record, "previewUrl", remoteAttachmentPreviewUrl(serverId, record.id));
+    // A player loads the whole file before it plays. With the size, that load reports its bytes, so a
+    // download that waits for it shows them (#10075).
+    const mediaSize =
+      isString(record.mimeType) && playableMediaKind(record.mimeType) && isNumber(record.size)
+        ? record.size
+        : undefined;
+    Reflect.set(record, "previewUrl", remoteAttachmentPreviewUrl(serverId, record.id, mediaSize));
   }
   if (isString(record.avatarUrl) && record.avatarUrl.startsWith("openbot-avatar:") && isString(record.id)) {
     Reflect.set(record, "avatarUrl", remoteAgentAvatarUrl(serverId, record.id, record.avatarUrl));
@@ -46,8 +53,15 @@ export function addRemotePreviewUrls<T>(value: T, serverId: string): T {
   return value;
 }
 
-function remoteAttachmentPreviewUrl(serverId: string, attachmentId: string): string {
-  return `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+function remoteAttachmentPreviewUrl(serverId: string, attachmentId: string, size?: number): string {
+  const url = `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  return size === undefined ? url : `${url}?size=${size}`;
+}
+
+/** The size that `addRemotePreviewUrls` puts on a media preview URL, or undefined. */
+export function remoteAttachmentPreviewSize(url: URL): number | undefined {
+  const size = Number(url.searchParams.get("size"));
+  return Number.isSafeInteger(size) && size > 0 ? size : undefined;
 }
 
 function remoteAgentAvatarUrl(serverId: string, agentId: string, sourceUrl: string): string {

@@ -230,4 +230,11 @@ export const messages = defineMessages("billing", {
     other:
       "Your license has {count} users, the maximum. Contact us for a larger license. New people cannot join your servers.",
   },
+  // The billing country and the EU VAT ID before the payment page. They decide the VAT.
+  "billing.details.country": "Billing country",
+  "billing.details.countryPlaceholder": "Select a country",
+  "billing.details.vatId": "EU VAT ID (optional)",
+  "billing.details.vatIdInvalid": "This is not a VAT ID of the selected country.",
+  "billing.details.countryMissing": "Select your billing country.",
+  "billing.details.saveFailed": "Could not save the billing details",
 });

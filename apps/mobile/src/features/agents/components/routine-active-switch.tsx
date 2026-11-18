@@ -1,6 +1,7 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { fixedSize, labelsHidden } from "@expo/ui/swift-ui/modifiers";
 import { useUniwind } from "uniwind";
+import { AppSwitch } from "@/shared/components/app-switch";
 import type { RoutineActiveSwitchProps } from "./routine-active-switch.types";
 
 const MODIFIERS = [labelsHidden(), fixedSize()];
@@ -10,7 +11,7 @@ export function RoutineActiveSwitch({ label, value, disabled, onValueChange }: R
   const { theme } = useUniwind();
   return (
     <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-      <Switch label={label} value={value} disabled={disabled} modifiers={MODIFIERS} onValueChange={onValueChange} />
+      <AppSwitch label={label} value={value} disabled={disabled} modifiers={MODIFIERS} onValueChange={onValueChange} />
     </Host>
   );
 }

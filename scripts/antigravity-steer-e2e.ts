@@ -2,7 +2,8 @@
 // to check that a steered message goes into the running turn through a second `session/prompt`.
 // `agy acp` 1.5.0 and later answers the open prompt with `end_turn` at once and goes on under the new one.
 // Cases: one steer, two steers in a row, a steer for a turn that is not the running one, a steer after
-// the turn ended, a steer while a permission card is open, and a CLI older than 1.5.0. Each refused
+// the turn ended, a steer while a permission card is open, a steer that the CLI refuses because its
+// prompt waits for an approval that has not reached OpenBot yet (#11107), and a CLI older than 1.5.0. Each refused
 // steer must send nothing to the agent and must not stop the running turn, so the message can wait in
 // the queue. `bun run test:antigravity-steer`. Writes .openbot-build/antigravity-steer-e2e/report.json.
 import assert from "node:assert/strict";
@@ -41,6 +42,7 @@ interface Report {
   wrongTurn?: { refused: string; prompts: number };
   afterTurn?: { refused: string; prompts: number };
   waitingOnUser?: { refused: string; prompts: number; reply: string; status: string | null };
+  refusedByCli?: { refused: string; cliRefusals: number; reply: string; status: string | null };
   oldCli?: { refused: string; prompts: number; status: string | null };
   heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
   failure?: string;
@@ -179,6 +181,7 @@ try {
   const { client, log } = await open("native", {});
   /** The permission request that the test holds open, and how to answer it. */
   let heldApproval: (() => void) | undefined;
+  let approvals = 0;
   let approvalAsked: () => void = () => undefined;
   const approval = new Promise<void>((asked) => {
     approvalAsked = asked;
@@ -189,6 +192,7 @@ try {
       return;
     }
     heldApproval = () => client.respond(request.id, { decision: "accept" });
+    approvals += 1;
     approvalAsked();
   });
   client.start();
@@ -268,6 +272,37 @@ try {
     reply: asked.reply,
     status: asked.status,
   };
+
+  // The CLI waits for an approval before its request reaches OpenBot, and refuses the steer prompts
+  // (#11107). The steers are refused, so the messages wait in the queue, and the turn goes on.
+  const toolShown = new Promise<void>((shown) => {
+    const listener = (notification: AppServerNotification) => {
+      if (notification.method !== "item/started" || getString(notification.params, "threadId") !== thread) return;
+      client.off("notification", listener);
+      shown();
+    };
+    client.on("notification", listener);
+  });
+  const approvalsBefore = approvals;
+  const holding = await startTurn(client, thread, log, "hold");
+  await toolShown;
+  // Two messages at the same time: the second steer must not take the refusal of the first for its own answer.
+  const [cliRefused] = await Promise.all([
+    refusal(steer(client, thread, holding.id, "do this too")),
+    refusal(steer(client, thread, holding.id, "and this")),
+  ]);
+  const cliRefusals = (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "refused").length;
+  assert.equal(cliRefusals, 2, "Both steers must reach the CLI before its permission request.");
+  const deadline = Date.now() + 10_000;
+  while (approvals === approvalsBefore) {
+    if (Date.now() > deadline) throw new Error("The CLI did not ask for the permission.");
+    await new Promise((settle) => setTimeout(settle, 25));
+  }
+  heldApproval?.();
+  const holdFinished = await holding.done;
+  assert.equal(holdFinished.status, "completed");
+  assert.match(holdFinished.reply, /held: done/u);
+  report.refusedByCli = { refused: cliRefused, cliRefusals, reply: holdFinished.reply, status: holdFinished.status };
 
   // An `agy` older than 1.5.0 cancels the open prompt on a second one, so the steer is refused.
   const old = await open("old-cli", { FAKE_VERSION: "1.4.5" });

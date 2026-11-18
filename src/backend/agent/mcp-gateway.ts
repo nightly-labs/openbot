@@ -12,7 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
-import { sourceText } from "@openbot/i18n/source";
+import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
@@ -26,7 +26,14 @@ import {
   mcpOAuthAccountKey,
 } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { hasCredentialHeader, inspectMcpServer, type McpProbeOutcome, type McpSignInPlace } from "../mcp-probe";
+import {
+  callMcpServerTool,
+  hasCredentialHeader,
+  inspectMcpServer,
+  type McpProbeOutcome,
+  type McpSignInPlace,
+  type McpToolArguments,
+} from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -126,6 +133,12 @@ export class McpGateway {
   readonly #reportedDrops = new Set<string>();
   /** The tools that the last test of each saved, enabled row found in this run, by the row's fingerprint. */
   readonly #testedTools = new Map<string, string>();
+  /**
+   * Why the last sign-in to each address failed in this run, by `mcpOAuthAccountKey`. The reason
+   * shows only on the page that started the sign-in, so an agent that tests again reads it here
+   * and tells the user, rather than asking for the same sign-in again (#12017).
+   */
+  readonly #signInFailures = new Map<string, string>();
   /** The loopback address that holds the OAuth tokens for the agents. Its listener starts at first use. */
   readonly #proxy: McpOAuthProxy;
   readonly #logger: Logger;
@@ -187,12 +200,8 @@ export class McpGateway {
     config: McpServerConfig,
     agentId: string | null = null,
   ): Effect.fn.Return<McpEndpoint | McpEndpointRefusal, McpGatewayFailed> {
-    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID) {
-      const github = this.#githubConnector;
-      const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
-      if (token) this.#handoff.recordSecret(token);
-      return { url: config.url, authorization: token, proxied: false };
-    }
+    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID)
+      return { url: config.url, authorization: yield* this.#githubAuthorization(), proxied: false };
     if (!this.#proxied(config))
       return { url: withoutMcpAccountFragment(config.url), authorization: null, proxied: false };
     const route = yield* this.#proxy
@@ -204,6 +213,14 @@ export class McpGateway {
     }
     this.#handoff.recordSecret(route.success.bearer);
     return { url: route.success.url, authorization: route.success.bearer, proxied: true };
+  });
+
+  /** The bearer of the GitHub connection, recorded so that `redact` masks it. */
+  readonly #githubAuthorization = Effect.fnUntraced(function* (this: McpGateway) {
+    const github = this.#githubConnector;
+    const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
+    if (token) this.#handoff.recordSecret(token);
+    return token;
   });
 
   /**
@@ -317,6 +334,7 @@ export class McpGateway {
       removedResource &&
       !list.some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === removedResource)
     ) {
+      this.#signInFailures.delete(removedResource);
       if (this.#oauth) yield* this.#oauth.forget(removed.url).pipe(toMcpGatewayFailed);
     }
     return list;
@@ -457,6 +475,32 @@ export class McpGateway {
   });
 
   /**
+   * One tool of a saved server or of the GitHub connection, for an agent whose provider left the tool
+   * out. Silent like `inspect`: the sign-in of the row's address, which is also the token that the
+   * agent's own route spends. The GitHub connection uses the bearer that `endpoint` gives (#12035).
+   */
+  readonly callTool = Effect.fnUntraced(function* (
+    this: McpGateway,
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ) {
+    const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
+    const stored = this.#oauth;
+    return yield* callMcpServerTool(
+      config,
+      name,
+      args,
+      this.#toolRuntimes(),
+      config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
+        ? { accessToken: () => Effect.succeed(github) }
+        : stored
+          ? { accessToken: (url) => stored.accessToken(url) }
+          : undefined,
+    ).pipe(toMcpGatewayFailed);
+  });
+
+  /**
    * The test that may open a browser: the user pressed Sign in. A sign-in that ends with a working
    * connection to an address an enabled row names marks every agent's session for refresh, so the
    * next turn is handed the new token rather than the tools staying absent until a restart. A draft
@@ -481,8 +525,20 @@ export class McpGateway {
         .listEnabled()
         .some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
     if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes();
+    if (resource !== null) {
+      if (result.error === null) this.#signInFailures.delete(resource);
+      // A cancel is what the user did, not a failure to report: the reason found before stays.
+      else if (matchingSourceKeys(result.error)[0] !== "error.backend.mcpSignInCancelled")
+        this.#signInFailures.set(resource, result.error);
+    }
     return result;
   });
+
+  /** Why the last sign-in to this address failed in this run, or `null`. */
+  signInFailure(url: string): string | null {
+    const resource = mcpOAuthAccountKey(url);
+    return (resource !== null && this.#signInFailures.get(resource)) || null;
+  }
 
   /** Stops the sign-in waiting for this address's browser. Nothing happens when none is waiting. */
   cancelSignIn(url: string): void {
@@ -503,6 +559,8 @@ export class McpGateway {
     const config = this.#httpRow(input.mcpServerId);
     if (config && this.#oauth) {
       this.#oauth.cancelSignIn(config.url);
+      const resource = mcpOAuthAccountKey(config.url);
+      if (resource !== null) this.#signInFailures.delete(resource);
       yield* this.#oauth.signOut(config.url).pipe(toMcpGatewayFailed);
       yield* this.#hooks.refreshAllAgentRuntimes();
     }
@@ -678,7 +736,9 @@ export class McpGateway {
       });
       this.#hooks.emitError(
         "mcp_server_not_started",
-        `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
+        drop.reason === "failed_in_provider"
+          ? drop.detail
+          : `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
       );
     }
   }

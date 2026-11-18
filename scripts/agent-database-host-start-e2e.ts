@@ -5,6 +5,8 @@
 // - a host that never reports ready fails the waiting request with the start message and is ended;
 // - a host that exits before ready fails the waiting request and is not started again in a loop;
 // - a prewarmed host answers the first statement with no second start;
+// - a second failed start in a row tells the agent not to retry, starts no host until the retry delay
+//   ends, and reports each failure with its reason; a host that starts after the delay answers;
 // - through the real `AgentTables`, an agent adds a trigger to its own table in one statement, but
 //   not to a table of another agent, the owner record, or a TEMP trigger, and a trigger that a
 //   foreign-key cascade fires inside OpenBot's own `DROP TABLE` cannot reassign a table's owner.
@@ -35,6 +37,8 @@ const STATEMENT_DEADLINE_MS = 1_000;
 const READY_DELAY_MS = 2_000;
 const START_DEADLINE_MS = 3_000;
 const NOT_STARTED = "The database process did not start. Nothing was run. Try the call again.";
+const UNAVAILABLE =
+  "The database process could not start, so shared tables are not available now. Nothing was run. Do not retry now: keep these records in a file in your workspace, and try shared tables again later.";
 
 interface Case {
   ok: boolean;
@@ -56,6 +60,7 @@ interface Report {
   neverReady?: Case & { elapsedMs: number };
   exitBeforeReady?: Case;
   prewarm?: Case;
+  repeatedFailure?: { failures: string[]; starts: number; reasons: string[]; recovered: string[] };
   triggers?: TriggerStep[];
   failure?: string;
 }
@@ -82,7 +87,7 @@ function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   return {
     send: (request) => child.stdin.write(`${JSON.stringify(request)}\n`),
     onMessage: (listener) => listeners.push(listener),
-    onExit: (listener) => child.once("exit", () => listener()),
+    onExit: (listener) => child.once("exit", (code) => listener(code)),
     kill: () => child.kill("SIGKILL"),
   };
 }
@@ -178,6 +183,56 @@ try {
   report.prewarm = prewarm;
   assert.equal(prewarm.failure, null);
   assert.equal(prewarm.starts, 1, "the statement after a prewarm started a second host");
+
+  children.length = 0;
+  let failingStarts = 0;
+  const reasons: string[] = [];
+  const failing = new AgentDatabaseSupervisor({
+    spawnHost: () => {
+      failingStarts += 1;
+      return stdioHost(["-e", "process.exit(3)"]);
+    },
+    hostStartDeadlineMs: START_DEADLINE_MS,
+    // Longer than this case runs, so the third call is inside the delay.
+    hostStartRetryDelayMs: 60_000,
+    onHostStartFailed: (failure) => reasons.push(`${failure.reason}; retry after ${failure.retryAfterMs} ms`),
+  });
+  const failures: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(failing);
+    failures.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  failing.prewarm();
+  const startsInDelay = failingStarts;
+  failing.dispose();
+  await waitForExits();
+
+  // With no delay, the next call after two failed starts starts the real host and is answered.
+  children.length = 0;
+  const hosts = [
+    ["-e", "process.exit(3)"],
+    ["-e", "process.exit(3)"],
+  ];
+  const recovering = new AgentDatabaseSupervisor({
+    spawnHost: () => stdioHost(hosts.shift() ?? ["--disable-warning=ExperimentalWarning", HOST]),
+    hostStartRetryDelayMs: 0,
+  });
+  const recovered: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(recovering);
+    recovered.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  recovering.dispose();
+  await waitForExits();
+
+  report.repeatedFailure = { failures, starts: startsInDelay, reasons, recovered };
+  assert.deepEqual(failures, [NOT_STARTED, UNAVAILABLE, UNAVAILABLE]);
+  assert.equal(startsInDelay, 2, "a call or a prewarm inside the retry delay started a host");
+  assert.deepEqual(reasons, [
+    "exited with code 3 before it reported ready; retry after 0 ms",
+    "exited with code 3 before it reported ready; retry after 60000 ms",
+  ]);
+  assert.equal(recovered.at(-1), "ok", "the host did not answer after the failed starts");
 
   const steps: TriggerStep[] = [];
   report.triggers = steps;

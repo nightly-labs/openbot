@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "קבצים",
   "conversation.threads.new": "שרשור חדש",
   "conversation.threads.all": "כל השרשורים",
+  "conversation.threads.allUnread": "כל השרשורים, תשובות חדשות",
   "conversation.threads.open": "שרשורים פתוחים",
   "conversation.threads.current": "שרשור: {title}",
   "conversation.threads.actions": "פעולות שרשור",

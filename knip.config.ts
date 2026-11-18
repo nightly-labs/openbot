@@ -16,6 +16,9 @@ const config: KnipConfig = {
     "packages/contracts/src/team-protocol/v*.ts": ["exports", "types"],
     "packages/contracts/src/team-protocol/*-v*.ts": ["exports", "types"],
     "packages/contracts/src/team-protocol/provider-aware-codec.ts": ["exports", "types"],
+    // A released database migration does not change, also when no other code reads its exports
+    // (src/backend/AGENTS.md).
+    "src/backend/migrations/[0-9]*.ts": ["exports"],
     // A generator writes this file.
     "apps/auth-api/src/lib/plugin-catalog.generated.ts": ["exports", "types"],
   },

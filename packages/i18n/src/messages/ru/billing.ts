@@ -235,4 +235,10 @@ export const messages = {
     other:
       "В вашей лицензии максимум пользователей: {count}. Свяжитесь с нами, чтобы получить лицензию больше. Новые люди не могут присоединиться к вашим серверам.",
   },
+  "billing.details.country": "Страна для счёта",
+  "billing.details.countryPlaceholder": "Выберите страну",
+  "billing.details.vatId": "Номер НДС ЕС (необязательно)",
+  "billing.details.vatIdInvalid": "Это не номер НДС выбранной страны.",
+  "billing.details.countryMissing": "Выберите страну для счёта.",
+  "billing.details.saveFailed": "Не удалось сохранить платёжные данные",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,6 +10,7 @@ import type { AgentInstructionsFiles } from "../agent-instructions-files";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
+import type { PreviewFile } from "../attachment-previews";
 import type { listBackgroundProcesses, stopBackgroundProcess } from "../background-processes";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
@@ -31,6 +32,7 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderDetection } from "../provider-detection";
 import type { ProviderDetectionSettingsStore } from "../provider-detection-settings-store";
+import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
@@ -74,6 +76,7 @@ import type {
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
+import type { CrmPeopleOperations } from "../../backend/crm/crm-handle";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import type { RoutineFlowsHandle } from "../../backend/routine-flows/routine-flows";
@@ -120,6 +123,7 @@ type TeamApiAgentMethods = Pick<
   | "generateProfile"
   | "askSideQuestion"
   | "saveSkillSuggestion"
+  | "withdrawFeedback"
   | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"
@@ -168,6 +172,7 @@ type TeamApiAgentMethods = Pick<
   | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
+  | "listActiveQueues"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"
@@ -273,6 +278,7 @@ export interface TeamApiConnectors {
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
   >;
 }
 
@@ -303,6 +309,10 @@ export type TeamApiProviderAccounts = Pick<
   | "signInStatus"
   | "cancelSignIn"
   | "connectKey"
+  | "startCodeSignIn"
+  | "submitCodeSignIn"
+  | "codeSignInStatus"
+  | "cancelCodeSignIn"
   | "rename"
   | "remove"
   | "setAgentAccount"
@@ -337,7 +347,10 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
-/** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
+/**
+ * `routine-run-place-v1` and `routine-pause-reasons-v1`: the routine records of each agent, of every
+ * trigger kind.
+ */
 export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
 
 /**
@@ -466,6 +479,8 @@ export type TeamApiWorkflows = Pick<
   | "keepPicture"
   | "mediaProviders"
   | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**
@@ -474,6 +489,12 @@ export type TeamApiWorkflows = Pick<
      */
     github?: WorkflowGitHubDirectory;
   };
+
+/**
+ * Its presence is what `#protocolSupport` advertises `crm-v1` on. Only owners and admins use it; see
+ * `crm-v1.ts` for the grant.
+ */
+export type TeamApiCrm = CrmPeopleOperations;
 
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {
@@ -590,6 +611,8 @@ export interface TeamApiAdmin {
   claudeUserSetup?: ClaudeUserSetupControl;
   /** `claude-compact-window-v1`: the size at which Claude Code compacts the chats of this computer's agents. */
   claudeCompactWindow?: ClaudeCompactWindowControl;
+  /** `provider-environment-v1`: the variables that each process of a provider of this computer starts with. */
+  providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   /** `provider-detection-v1`: the local model servers and ACP agent commands that this computer finds. */
   providerDetection?: {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
@@ -646,6 +669,11 @@ interface TeamApiProviders {
 }
 
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
+/** `attachment-preview-v1`: the file to send as the small copy of an image attachment (`AttachmentPreviews`). */
+export interface TeamApiAttachmentPreviews {
+  /** Null when the host has no copy and the file is too large to send as its own preview. */
+  file(attachmentId: string, source: PreviewFile): Effect.Effect<PreviewFile | null>;
+}
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,
   "getSnapshot" | "mutate" | "removeAgent" | "placeDuplicateAfter" | "withProfileAssignment"
@@ -764,6 +792,7 @@ export interface TeamApiOptions {
   instanceTransfer?: TeamApiInstanceTransfer;
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
+  crm?: TeamApiCrm;
   hiddenAgents?: TeamApiHiddenAgents;
   routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
@@ -787,6 +816,8 @@ export interface TeamApiOptions {
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags"> | undefined;
   sidebarLayout?: TeamApiSidebarLayout | undefined;
   mailbox: TeamApiMailbox;
+  /** Present, so the host advertises `attachment-preview-v1` and serves small copies of its pictures. */
+  attachmentPreviews?: TeamApiAttachmentPreviews | undefined;
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView | undefined;
   remoteScreen?: TeamApiRemoteScreen | undefined;

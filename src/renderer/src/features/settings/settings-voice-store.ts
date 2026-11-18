@@ -17,6 +17,7 @@ import {
   type VoiceServerInput,
   type VoiceServerSettings,
   type VoiceSettings,
+  type VoiceTurnPause,
   type XaiSpeechVoice,
 } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
@@ -272,6 +273,11 @@ export function createSettingsVoiceStore(active: () => boolean) {
     void saveSpeech({ codexLiveVoice });
   }
 
+  /** The pause that ends a turn of a voice conversation. A conversation that runs keeps the pause it started with. */
+  function setTurnPause(turnPauseMs: VoiceTurnPause): void {
+    void saveSpeech({ turnPauseMs });
+  }
+
   /** Supertonic is the model in the settings, and it is not on this computer. A cloud model downloads nothing. */
   function supertonicMissing(): boolean {
     const phase = state.speech.status?.phase;
@@ -379,6 +385,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setReadReplies,
     setCodexLive,
     setCodexLiveVoice,
+    setTurnPause,
     setSpeechVoice: (voice: SpeechVoice) =>
       void saveSpeech({ voice }).then((saved) =>
         desktopAnalytics.track("speech_settings_action", {

@@ -1,4 +1,10 @@
-import { FEEDBACK_REPOSITORY, feedbackComment, feedbackIssue, parseFeedback } from "@openbot/contracts/feedback";
+import {
+  FEEDBACK_REPOSITORY,
+  feedbackComment,
+  feedbackIssue,
+  feedbackLacksPhone,
+  parseFeedback,
+} from "@openbot/contracts/feedback";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { runApiResponse } from "../../server/effect-runtime";
@@ -8,19 +14,24 @@ import {
   enforceFeedbackRateLimit,
   githubInstallationTokensErrorResponse,
   json,
+  requestFeedbackOwner,
   requestGitHubInstallationTokens,
   requestUser,
   uncountFeedback,
 } from "../../server/request-auth";
 
-/** A report with each text field full of non-Latin text, in UTF-8. */
-const FEEDBACK_BODY_LIMIT = 32 * 1024;
+/** A report with each text field and the phone's log lines full of non-Latin text, in UTF-8. */
+const FEEDBACK_BODY_LIMIT = 64 * 1024;
 
 /**
  * Opens a bug report or a feature idea from the app as an issue by `openbotgit[bot]`, so that a user
  * with no GitHub account can send feedback. Only a signed-in account can send, a few times a day.
  * With `sameAs`, the report is a comment on that open issue instead. The issue names no account, and the Worker does not store
- * or log the text: GitHub keeps it, in public.
+ * or log the text: GitHub keeps it, in public. An owner mark at the end lets only this account withdraw it.
+ *
+ * A bug report about the phone app must have the phone's version, system and support log, which the
+ * phone adds when the user sends the report there. An app that cannot add them, such as an older
+ * version, gets `feedback_needs_phone`, and no issue is opened.
  *
  * `/v1/feedback/similar` finds the open issues with similar titles, so that the agent can add to one of them.
  */
@@ -34,14 +45,27 @@ export const Route = createFileRoute("/v1/feedback")({
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const feedback = parseFeedback(yield* readJsonObject(request, FEEDBACK_BODY_LIMIT));
             if (!feedback) return apiError(400, "invalid_feedback", "The feedback is invalid.");
+            if (feedbackLacksPhone(feedback))
+              return apiError(
+                400,
+                "feedback_needs_phone",
+                "A report about the phone app needs the phone's version, system and support log.",
+              );
             const github = requestGitHubInstallationTokens();
+            // The mark lets this account take the report back later. See `/v1/feedback/withdraw`.
+            const owner = yield* requestFeedbackOwner(user.id);
+            const report = feedbackIssue(feedback);
             const day = yield* enforceFeedbackRateLimit(user.id);
-            const open = github.openIssue(FEEDBACK_REPOSITORY, feedbackIssue(feedback));
+            const open = owner
+              .mark(report.body)
+              .pipe(Effect.flatMap((body) => github.openIssue(FEEDBACK_REPOSITORY, { ...report, body })));
             // An issue that closed after the search gets a new issue: the user approved the report.
+            const sameAs = feedback.sameAs;
             const sent = yield* (
-              feedback.sameAs === null
+              sameAs === null
                 ? open.pipe(Effect.map((issue) => ({ issue, comment: false })))
-                : github.commentIssue(FEEDBACK_REPOSITORY, feedback.sameAs, feedbackComment(feedback)).pipe(
+                : owner.mark(feedbackComment(feedback)).pipe(
+                    Effect.flatMap((comment) => github.commentIssue(FEEDBACK_REPOSITORY, sameAs, comment)),
                     Effect.map((issue) => ({ issue, comment: true })),
                     Effect.catchIf(
                       (error) => error.code === "issue_not_open",

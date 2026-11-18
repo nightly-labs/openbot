@@ -13,6 +13,11 @@ The overlays that both clients raise - join, marketplace, shared agent, server s
 search and channel creation - are prop-driven views in `WorkspaceOverlayViews.tsx`.
 `WorkspaceOverlays` fills them from the desktop contexts, and the web client fills them from its
 host connection, so what an overlay decides from its server is decided in one place.
+An open overlay hides the page of a local tab, because that page is a native view above the window.
+A toast does not hide the page. While the full view shows the page of a local tab, the toasts are
+hidden (`native-browser-page.ts`), so the page does not cut them. A toast that stays until the user
+closes it shows again when the page is hidden; a toast with a timer can end while it is hidden, and
+it is then not reported as shown. A host's tab shows in the window, under the toasts.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
 On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
@@ -36,7 +41,7 @@ checks still apply. `web-account.ts` makes these calls, and the Profile tab of t
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives
-`ServerSettingsModal` the host identity, MCP, and storage routes through
+`ServerSettingsModal` the host identity and storage routes through
 `@openbot/team-client/team-admin-requests`, and member and invitation calls through the closed
 `/api/browser/*` list. The Worker applies the same `RemoteControlPlane` role checks as the bearer
 routes. A member or role change revokes every session on the host; the browser reconnects once when
@@ -100,9 +105,9 @@ object URL has the origin of the app. Remote support is additive through the
 A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
 `previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
 sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
-block that a provider refuses. Only the voice recording keeps its `audio/webm` type. Delivery sends
-the path as a mention. The desktop app
-never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
+block that a provider refuses. For the same reason, a HEIF photo with an image name, such as `.jpg`,
+is also an opaque file: the host reads its first bytes. Only the voice recording keeps its
+`audio/webm` type. Delivery sends the path as a mention. The desktop app never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
 additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
 the extension list for a host without it.
 
@@ -252,8 +257,12 @@ while a person holds the tab (takeover or Take control), so no step is the agent
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
 a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
 path part that looks like a code, such as a reset token, with `:id`) or a press on a control
-(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
-with a 1 second limit). A press outside a control, on a password field, or on a field whose
+(`before-mouse-event` mouseDown; `browser-user-click.ts` reads the role and the name in the CDP
+automation world, with a 1 second limit). The read goes into open shadow roots and into frames, also
+frames of another process. A press in such a frame gives no `input-event` and its point is in the
+frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A live
+view's press does not move `:hover`; the engine gives its point in the page's pixels. A press
+outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
 never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
 `openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
@@ -682,7 +691,17 @@ no native menu: that menu would show on the host's screen. Only http and https a
 message. A host with `browser-view-viewport` holds the page at the size a socket asks for with
 `viewport=WxH` while that socket is open, through the same device metrics override as an agent's
 `set_environment`, so a resize of the host's window does not change the page. A tab with a custom
-size from `set_environment` keeps it. The phone asks for 1280x800. On the phone, the view runs in the
+size from `set_environment` keeps it. A host with `browser-view-page-copy-v1` sends the text that the
+page itself copies (a "Copy code" button: `navigator.clipboard.writeText` or `write`, or a trusted
+`copy` event) as a `pageCopied` message to a socket opened with `pageCopy=1`. While that view runs,
+the CDP engine keeps one `Runtime.evaluate` with `awaitPromise` open in the page's main world. It hooks
+those calls, and trusted `copy` events in the capture phase, once a document. It answers every open
+view with the text of the next one made during a user action. It turns on no CDP domain:
+`Runtime.enable` is a sign of automation that bot checks look for. The host sends the text only
+within 5 seconds of that socket's own click or key, and the client also drops it after that time.
+So a copy with no recent input from that member, such as one an agent makes alone, stays on the host. The desktop client writes it with Electron's clipboard, the web
+client with `navigator.clipboard` (a toast with a Copy button when the browser refuses), and the
+phone with `expo-clipboard`. The phone asks for 1280x800. On the phone, the view runs in the
 hidden page that holds the Team peer (`features/browser/model/browser-view-bridge.ts`). That page
 sends each frame to the screen as base64 and holds the newest frame until the screen has drawn the
 previous one. Back, forward, reload, new tab and close tab use the released `browser-control`
@@ -727,4 +746,13 @@ URL with GET to replace the document without replaying a form POST. Failure reta
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
-passkeys, and payment confirmation use takeover.
+passkeys, and a payment confirmation that the agent cannot complete, such as approval in a bank app,
+use takeover.
+
+A bank's payment code at checkout (3-D Secure) is not an OpenBot secret. When the code is in an email
+or SMS that the agent can read, such as a mail tab that it reloads, the agent types it into the bank's frame, so a weekly order
+does not wait for a person. The browser core guidance (`tool-guidance.ts`) limits this to a checkout
+that the user approved, and to a message that names the same merchant and amount; the agent types the
+newest code once. Any other case, or a refused code, goes to takeover, or in a routine run to the report.
+`bun run bench:browser-tools --variants=S --tasks=checkout-3ds-inbox-tab,checkout-3ds,checkout-3ds-mismatch`
+checks these cases on a loopback shop, bank frame and inbox.

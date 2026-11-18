@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "Pliki",
   "conversation.threads.new": "Nowy wątek",
   "conversation.threads.all": "Wszystkie wątki",
+  "conversation.threads.allUnread": "Wszystkie wątki, nowe odpowiedzi",
   "conversation.threads.open": "Otwarte wątki",
   "conversation.threads.current": "Wątek: {title}",
   "conversation.threads.actions": "Działania wątku",

@@ -82,6 +82,17 @@ export const Saving: Story = { args: { state: "saving" } };
 
 export const Saved: Story = { args: { action: "updated", state: "saved" } };
 
+/** A scheduled run of the routine paused it, so the card says which run and gives no next run. */
+export const PausedByItsRun: Story = {
+  args: {
+    action: "updated",
+    routineName: "Check buyer chats",
+    schedule: { kind: "custom", expression: "0 8-22/2 * * *" },
+    nextRunLabel: undefined,
+    pausedLabel: "Paused by its 8:00 AM run",
+  },
+};
+
 /** The routine runs in a zone that is not the viewer's, for example a teammate's computer. */
 export const OtherTimeZone: Story = { args: { timeZoneLabel: "Warsaw time" } };
 

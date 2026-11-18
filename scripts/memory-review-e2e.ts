@@ -318,8 +318,10 @@ function logged(method: string): { text: string; model: string; result: unknown 
   } catch {
     return [];
   }
+  // The fake appends while this reads: a last line with no newline is not complete yet.
   return text
     .split("\n")
+    .slice(0, -1)
     .filter(Boolean)
     .map((line): { method: string; text: string; model: string; result: unknown } => JSON.parse(line))
     .filter((entry) => entry.method === method);
@@ -431,11 +433,19 @@ async function send(agentId: string, text: string, taskId?: string) {
   assert.equal(status, "completed", `"${text}" completes.`);
 }
 
-/** Starts a side thread and waits for its first turn to end. */
+/**
+ * Starts a side thread and waits for its first turn to end. The answer shows before the turn ends,
+ * and the review counts the turn only at its end: a close before that finds no turn to review.
+ */
 async function startTask(agentId: string, text: string) {
+  const since = events.length;
   const task = await runCauseEffect(service.startTask({ agentId, text }));
   await waitFor(`"${text}" to end`, () =>
+    events.slice(since).some((event) => event.type === "thread-turn-completed" && event.taskId === task.id),
+  );
+  assert.ok(
     service.readTask(agentId, task.id).messages.some((message) => message.text === "Done."),
+    `"${text}" has its answer.`,
   );
   return task;
 }

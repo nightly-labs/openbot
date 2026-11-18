@@ -5,6 +5,7 @@ import {
   isSpeechModelId,
   isSpeechSpeed,
   isSpeechVoice,
+  isVoiceTurnPause,
   isXaiSpeechVoice,
   type SpeechSettings,
 } from "@openbot/contracts/ipc";
@@ -21,7 +22,8 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * are not read aloud. A file with no known speed, such as one from an earlier version, reads at normal
  * speed. The speed is an extra field of version 1, so an earlier version still reads the file. Codex
  * live voice is one more extra field, and a file without it reads as off. The model and the cloud
- * voices are extra fields too: a file without a known model reads as Supertonic 3.
+ * voices are extra fields too: a file without a known model reads as Supertonic 3. The pause that ends a
+ * turn of a voice conversation is one more: a file without a known pause reads as the default.
  */
 export class SpeechPreferenceStore {
   readonly #path: string;
@@ -51,6 +53,9 @@ export class SpeechPreferenceStore {
                 speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
                 codexLive: parsed.codexLive === true,
                 codexLiveVoice: isCodexLiveVoice(parsed.codexLiveVoice) ? parsed.codexLiveVoice : null,
+                turnPauseMs: isVoiceTurnPause(parsed.turnPauseMs)
+                  ? parsed.turnPauseMs
+                  : DEFAULT_SPEECH_SETTINGS.turnPauseMs,
               }
             : null,
         ),
@@ -76,6 +81,7 @@ export class SpeechPreferenceStore {
       speed: input.speed,
       codexLive: input.codexLive,
       codexLiveVoice: input.codexLiveVoice,
+      turnPauseMs: input.turnPauseMs,
     };
     yield* this.#writes.withPermit(
       Effect.uninterruptible(

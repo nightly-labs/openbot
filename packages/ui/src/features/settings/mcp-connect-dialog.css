@@ -116,7 +116,14 @@
 
 /* A relayed sign-in: the page is in the user's own browser, so the dialog holds only the address field. */
 .mcp-sign-in-relay-open {
+  display: flex;
+  gap: var(--openbot-space-2);
   margin-top: var(--openbot-space-4);
+}
+
+/* The provider sign-in dialog gives the open button the width that the copy button leaves. */
+.provider-code-login-body > .mcp-sign-in-relay-open > :first-child {
+  flex: 1;
 }
 
 .mcp-sign-in-relay-form {

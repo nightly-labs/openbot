@@ -420,6 +420,7 @@ export function SettingsModal(props: SettingsModalProps) {
                 store={license}
                 onManagePayment={() => void billing.openPortal({ flow: "manage" })}
                 onContactUs={licenseContactUs(props.onContactUs)}
+                billingDetails={props.billingApi}
               />
             }
           />

@@ -24,11 +24,9 @@
   --openbot-text-grouped-secondary: #96969b;
   --openbot-border-grouped: #333335;
   --openbot-radius-grouped: 16px;
-  /* The milky chrome of the native app where it has no Liquid Glass: the search field and bar buttons. */
+  /* The milky chrome of the iPhone app where it has no Liquid Glass: the bar buttons. */
   --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
   --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
-  /* The fill of that chrome over a real blur, lighter than the solid glass. */
-  --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
 
   /* Neutral color system. Keep UI colors here, not in components. */
   --openbot-bg-canvas: #1a1a1a;
@@ -518,5 +516,9 @@
 }
 
 [data-provider="sunra"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="higgsfield"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

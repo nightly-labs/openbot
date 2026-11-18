@@ -46,7 +46,7 @@ const EU_COUNTRIES: ReadonlySet<string> = new Set([
   "SK",
 ]);
 
-/** True for a `CF-IPCountry` value in the EU. A missing or unknown country is not in the EU. */
+/** True for a Cloudflare country code in the EU. A missing or unknown country is not in the EU. */
 export function isEuCountry(country: string | undefined): boolean {
   return country !== undefined && EU_COUNTRIES.has(country.toUpperCase());
 }

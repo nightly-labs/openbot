@@ -218,4 +218,10 @@ export const messages = {
     other:
       "La tua licenza ha {count} utenti, il massimo. Contattaci per una licenza più grande. Le nuove persone non possono unirsi ai tuoi server.",
   },
+  "billing.details.country": "Paese di fatturazione",
+  "billing.details.countryPlaceholder": "Scegli un paese",
+  "billing.details.vatId": "Partita IVA UE (facoltativa)",
+  "billing.details.vatIdInvalid": "Non è una partita IVA del paese scelto.",
+  "billing.details.countryMissing": "Scegli il paese di fatturazione.",
+  "billing.details.saveFailed": "Impossibile salvare i dati di fatturazione",
 } as const satisfies PartialTranslation<typeof source>;

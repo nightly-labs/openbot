@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "Dosyalar",
   "conversation.threads.new": "Yeni mesaj dizisi",
   "conversation.threads.all": "Tüm mesaj dizileri",
+  "conversation.threads.allUnread": "Tüm mesaj dizileri, yeni yanıtlar",
   "conversation.threads.open": "Açık mesaj dizileri",
   "conversation.threads.current": "Mesaj dizisi: {title}",
   "conversation.threads.actions": "Mesaj dizisi işlemleri",

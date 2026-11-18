@@ -1,4 +1,5 @@
 import type { AgentTaskInput, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import { noteAgentRequest } from "../../agent-requests";
 
 /** What the side thread state reaches on a server: the list, a thread's conversation, and the thread actions. */
 export interface AgentTasksPort
@@ -59,9 +60,18 @@ export function agentTasksPort(server: string): AgentTasksPort {
     readTask: (input) => agent.readTask(input, server),
     readTaskPage: (input) => agent.readTaskPage(input, server),
     readTaskAround: (input) => agent.readTaskAround(input, server),
-    startTask: (input) => agent.startTask(input, server),
-    sendToTask: (input) => agent.sendMessage(input, server),
-    runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input, server),
+    startTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.startTask(input, server);
+    },
+    sendToTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.sendMessage(input, server);
+    },
+    runQueuedMessageAsTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.runQueuedMessageAsTask(input, server);
+    },
     branchTask: (input) => agent.branchTask(input, server),
     stopTask: (input) => agent.stopTask(input, server),
     closeTask: (input, serverId) => agent.closeTask(input, serverId ?? server),

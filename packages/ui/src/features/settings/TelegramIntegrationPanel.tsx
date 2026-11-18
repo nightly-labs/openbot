@@ -18,6 +18,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import { type IntegrationPageSlots, Stepper, UNKNOWN_STATUS, WizardDialog, type WizardLink } from "./IntegrationLayout";
 import { messagingStateUnknown } from "./SlackIntegrationPanel";
@@ -129,7 +130,9 @@ export function telegramIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.telegram.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.telegram.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.telegram.statusConnected", attention }
+  );
 }
 
 /** Where the connect dialog starts: at the chat link, or at the orchestrator of the linked chats. */

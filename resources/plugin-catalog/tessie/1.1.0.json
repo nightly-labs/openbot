@@ -1,0 +1,50 @@
+{
+  "slug": "tessie",
+  "name": "Tessie",
+  "tagline": "Tesla vehicle data",
+  "description": "Tessie lets agents read the state of the user's Tesla vehicles, such as battery, charging, location, and drive history, and send vehicle commands that the account allows. Each user connects with an access token from their own Tessie account. The token can control the vehicles, so give it only to agents that you trust.",
+  "category": "other",
+  "creatorName": "Tessie",
+  "iconUrl": "https://cdn.prod.website-files.com/636438cc25b4915a5b7bc573/6552b78d94db7398c3281d27_square_crop_centered.png",
+  "version": "1.1.0",
+  "prompts": [
+    { "id": "prompt-battery", "text": "What is my car's battery level and range right now?" },
+    { "id": "prompt-drives", "text": "Summarize my drives from last week, with distance and energy used." },
+    { "id": "prompt-charging", "text": "How much did I charge at home this month?" }
+  ],
+  "apps": [
+    {
+      "id": "app-tessie-mcp",
+      "name": "Tessie",
+      "description": "Vehicle state, drive history, and vehicle commands, over Tessie's MCP server with an access token.",
+      "iconUrl": "https://cdn.prod.website-files.com/636438cc25b4915a5b7bc573/6552b78d94db7398c3281d27_square_crop_centered.png",
+      "server": {
+        "name": "tessie",
+        "transport": "http",
+        "url": "https://mcp.tessie.com",
+        "auth": [
+          {
+            "id": "tessie-key",
+            "kind": "key",
+            "label": "Access token",
+            "fields": [
+              {
+                "id": "token",
+                "label": "Access token",
+                "header": "Authorization",
+                "prefix": "Bearer ",
+                "hint": "In Tessie, open Settings > Developer and create an access token."
+              }
+            ],
+            "docsUrl": "https://dash.tessie.com/settings/developer",
+            "docsLabel": "Create a token"
+          }
+        ]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.tessie.com",
+  "privacyPolicyUrl": "https://www.tessie.com/privacy",
+  "termsUrl": "https://www.tessie.com/terms",
+  "skills": []
+}

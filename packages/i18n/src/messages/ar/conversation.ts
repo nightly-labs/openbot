@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "الملفات",
   "conversation.threads.new": "سلسلة جديدة",
   "conversation.threads.all": "كل السلاسل",
+  "conversation.threads.allUnread": "كل السلاسل، ردود جديدة",
   "conversation.threads.open": "السلاسل المفتوحة",
   "conversation.threads.current": "السلسلة: {title}",
   "conversation.threads.actions": "إجراءات السلسلة",

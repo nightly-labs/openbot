@@ -3,6 +3,7 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { EMPTY_TEAM_PRESENCE } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { useServers } from "../servers/servers-context";
 import { teamPort } from "./team-port";
 
 /**
@@ -45,9 +46,22 @@ const Presence = createSimpleContext({
       return teamPresence().members.filter((member) => member.id !== currentMemberId && !member.disabled);
     });
 
+    /**
+     * The member id that the reader writes as, or null when it is not known. This app always signs in
+     * to a server on this computer as its owner, a password member with no email, so the owner there
+     * is the reader also when no address matches.
+     */
+    const { activeServer } = useServers();
+    const readerMemberId = createMemo((): string | null => {
+      const matched = currentTeamMember()?.id;
+      if (matched) return matched;
+      if (!activeServer()?.thisComputer) return null;
+      return teamPresence().members.find((member) => member.role === "owner")?.id ?? null;
+    });
+
     onSettled(() => teamPort().servers.onPresence((snapshot) => flush(() => setTeamPresence(snapshot))));
 
-    return { teamPresence, setTeamPresence, currentTeamMember, directPeople };
+    return { teamPresence, setTeamPresence, currentTeamMember, readerMemberId, directPeople };
   },
 });
 

@@ -29,7 +29,7 @@ import type {
   MessagingDriver,
   MessagingDriverOptions,
   MessagingIngress,
-  MessagingPlace,
+  MessagingPlaces,
   RecentMessages,
   StatusReaction,
 } from "../messaging-types";
@@ -505,15 +505,16 @@ class DiscordAdapter implements MessagingAdapter {
   });
 
   /** A Signal that predates `listChannels` refuses it as an invalid request. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return this.#call({ op: "listChannels", guildId: this.#guildId }, decodeDiscordChannels).pipe(
-      Effect.map((channels) =>
-        channels.map((channel) => ({
+      Effect.map(({ channels, omitted }) => ({
+        places: channels.map((channel) => ({
           id: channel.id,
           name: channel.kind === "channel" ? `#${channel.name}` : channel.name,
           kind: channel.kind,
         })),
-      ),
+        ...(omitted > 0 ? { note: omittedPlaces(omitted) } : {}),
+      })),
     );
   }
 
@@ -569,6 +570,11 @@ function buttons(body: MessageBody): DiscordButton[] {
     label: button.label,
     style: button.style ? BUTTON_STYLES[button.style] : "secondary",
   }));
+}
+
+/** Why a large server lists fewer places than it has. A post goes to any place of the server by its id. */
+function omittedPlaces(count: number): string {
+  return `This server has ${count} more places that this list leaves out: the oldest threads first. messaging_post also takes the id of a place that is not listed, such as the last number of its Discord link. messaging_history reads only listed places.`;
 }
 
 /** Status text is written by the host and is short; this keeps it within Discord's limit. */

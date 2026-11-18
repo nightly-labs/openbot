@@ -33,6 +33,8 @@ type TransferError = ArchiveOperationError | RemoteWorkflowError;
 
 /** How many more times one part is sent or read after it fails. */
 const PART_RETRIES = 3;
+/** The shortest time between two progress reports inside a part. */
+const PROGRESS_INTERVAL_MS = 200;
 
 interface UploadState {
   uploadId: string;
@@ -119,11 +121,32 @@ async function hashFile(handle: FileHandle, size: number, buffer: Buffer): Promi
   return hash.digest("hex");
 }
 
-/** Sends the file at `path` to the host and answers the preview of `instance-transfer-v1` stage. */
+/**
+ * Reports the bytes that the host has, never fewer than the last report. A part that is sent again
+ * starts from its first byte, so the count stays until the new try passes it.
+ */
+function progressReporter(size: number, report: ((sent: number, total: number) => void) | undefined) {
+  let reported = -1;
+  let reportedAt = 0;
+  return (sent: number, force = false) => {
+    if (!report || sent <= reported) return;
+    const now = Date.now();
+    if (!force && now - reportedAt < PROGRESS_INTERVAL_MS) return;
+    reported = sent;
+    reportedAt = now;
+    report(Math.min(sent, size), size);
+  };
+}
+
+/**
+ * Sends the file at `path` to the host and answers the preview of `instance-transfer-v1` stage.
+ * `onProgress` gets the bytes that the host has; when they are all there, the host reads the file.
+ */
 export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(function* (
   remote: Remote,
   serverId: string,
   path: string,
+  onProgress?: (sent: number, total: number) => void,
 ): Effect.fn.Return<InstanceTransferPreview, TransferError> {
   const handle = yield* archiveCall(() => open(path, "r"));
   return yield* Effect.gen(function* () {
@@ -142,15 +165,24 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
       timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
     });
     const received = new Set(upload.received);
+    const partLength = (index: number) => Math.min(upload.chunkBytes, size - index * upload.chunkBytes);
+    const report = progressReporter(size, onProgress);
+    // The parts that a failed upload left on the host count at once.
+    let done = 0;
+    for (const index of received) if (index * upload.chunkBytes < size) done += partLength(index);
+    report(done, true);
     const buffer = Buffer.allocUnsafe(Math.min(upload.chunkBytes, size));
     for (let index = 0; index * upload.chunkBytes < size; index++) {
       if (received.has(index)) continue;
       const position = index * upload.chunkBytes;
-      const bytes = yield* archiveCall(() =>
-        readFully(handle, buffer, position, Math.min(upload.chunkBytes, size - position)),
-      );
+      const bytes = yield* archiveCall(() => readFully(handle, buffer, position, partLength(index)));
       const part = { uploadId: upload.uploadId, index, sha256: sha256Hex(bytes) };
-      yield* retryPart(remote.sendInstanceTransferPart(serverId, part, bytes));
+      const before = done;
+      yield* retryPart(
+        remote.sendInstanceTransferPart(serverId, part, bytes, (sent) => report(before + Math.min(sent, bytes.length))),
+      );
+      done += bytes.length;
+      report(done, true);
     }
     return yield* remote.request(
       serverId,

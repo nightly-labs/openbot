@@ -1,4 +1,9 @@
-import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationAspectRatio,
+  imageAspectRatioOf,
+  imagePixelSize,
+} from "@openbot/contracts/ipc";
 import { Button, Download, Maximize2 } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -90,15 +95,30 @@ export function ImageGeneration(props: ImageGenerationProps) {
     isAttachment()
       ? t("chat.image.download", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
       : t("chat.image.downloadGenerated");
-  /** The real size of the image once it loads. The size that the model was asked for until then. */
+  /**
+   * The size of the loaded image. Until it loads, the size that the host read from the file, or the
+   * size that the model was asked for while it makes the image.
+   */
+  const knownSize = () => imageSize() ?? imagePixelSize(props.resolution);
   const size = () => {
+    const known = knownSize();
+    return known ? t("chat.media.size", { width: known.width, height: known.height }) : props.resolution;
+  };
+  /**
+   * The size of the frame. The host writes the size and the frame of the file together. An older row
+   * has a size that the model was asked for, which can disagree with its frame; that row keeps its frame.
+   */
+  const frameSize = () => {
     const loaded = imageSize();
-    return loaded ? t("chat.media.size", { width: loaded.width, height: loaded.height }) : props.resolution;
+    if (loaded) return loaded;
+    const host = imagePixelSize(props.resolution);
+    return host && imageAspectRatioOf(host) === props.aspectRatio ? host : null;
   };
   const stageRatio = () => {
-    const loaded = imageSize();
-    if (hasImage() && loaded) return `${loaded.width} / ${loaded.height}`;
+    const known = frameSize();
     if (hasFailure() && !isAttachment()) return FAILED_MEDIA_RATIO;
+    // A file that is on its way has the frame of its size, so the chat does not move when it shows.
+    if (props.status === "completed" && known) return `${known.width} / ${known.height}`;
     return mediaRatioValue(props.aspectRatio, "image");
   };
   const preview = (event: MouseEvent & { currentTarget: HTMLElement }) => {

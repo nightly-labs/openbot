@@ -407,10 +407,13 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Personal number",
   "connector.whatsapp.ownNumberDescription":
-    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+    "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "connector.whatsapp.workingMessage": "“Working on it…” message",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+  "connector.whatsapp.statusReactions": "Status reactions",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -427,9 +430,10 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.kindLabel": "Number",
   "connector.whatsapp.kindPersonal": "My personal number",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+    "OpenBot answers only your “Message yourself” chat and the people you allow. Other people get no reply.",
   "connector.whatsapp.kindDedicated": "A number only for OpenBot",
-  "connector.whatsapp.kindDedicatedDescription": "Unknown people get a code to give you. You approve them here.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot replies from this number to each unknown person, with a code to give you. You approve them here.",
   "connector.whatsapp.methodLabel": "How to link",
   "connector.whatsapp.methodQr": "QR code",
   "connector.whatsapp.methodCode": "Pairing code",
@@ -493,7 +497,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "connector.whatsapp.add": "Add",
   "connector.whatsapp.groupTitle": "Add a group",
-  "connector.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "connector.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "connector.whatsapp.groupSearch": "Search groups",
   "connector.whatsapp.groupsLoading": "Reading the groups…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
@@ -656,9 +661,9 @@ export const messages = defineMessages("connector", {
   "connector.protonPass.expiredTitle": "The Proton Pass key expired",
   "connector.protonPass.expiredDescription": "Agents cannot sign in with your shared logins until you sign in again.",
   "connector.protonPass.reconnect": "Reconnect",
-  "connector.protonPass.planTitle": "Proton Pass needs a paid plan",
+  "connector.protonPass.planTitle": "Proton Pass needs a plan with Pass Plus",
   "connector.protonPass.planDescription":
-    "The Proton Pass CLI works only with a paid Proton plan. Change your plan, then connect again.",
+    "The Proton Pass CLI needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change your plan, then connect again.",
   "connector.protonPass.vaultTitle": "Shared vault",
   "connector.protonPass.vaultDescription":
     "Agents can sign in with the logins in this vault. Move a login into it to share it.",

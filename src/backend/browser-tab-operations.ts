@@ -538,7 +538,9 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                 Effect.gen(function* () {
                   if (!(error instanceof TimeoutError)) return yield* error;
                   cancellationConfirmed = tab.engine.cancelPendingCommands();
-                  if (dispatched && !cancellationConfirmed) yield* Fiber.await(completion);
+                  // Stop the input too: it would attach again and wait on a page that does not answer.
+                  if (cancellationConfirmed) completion.interruptUnsafe();
+                  else if (dispatched) yield* Fiber.await(completion);
                   return yield* browserFailure(error);
                 }),
               ),

@@ -97,10 +97,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.bubbleStyle.title", descriptionKey: "settings.bubbleStyle.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
+      { titleKey: "settings.chatBackdrop.title", descriptionKey: "settings.chatBackdrop.description" },
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
       { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
       { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
+      { titleKey: "settings.backgroundBlur.title", descriptionKey: "settings.backgroundBlur.description" },
+      { titleKey: "settings.movingFaces.title", descriptionKey: "settings.movingFaces.description" },
     ],
   },
   {
@@ -125,6 +128,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.voice.dictation.section" },
       { titleKey: "settings.voice.language.section", descriptionKey: "settings.voice.language.description" },
+      { titleKey: "settings.voice.pause.title", descriptionKey: "settings.voice.pause.description" },
       {
         titleKey: "settings.voice.speech.readReplies.title",
         descriptionKey: "settings.voice.speech.readReplies.description",

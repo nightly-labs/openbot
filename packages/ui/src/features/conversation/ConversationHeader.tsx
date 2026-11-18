@@ -10,6 +10,7 @@ import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps, JSX } from "@solidjs/web";
 import { createEffect, onSettled, Show } from "solid-js";
+import { modelPickerFit } from "./model-picker-fit";
 
 export interface ConversationHeaderProps {
   agent: AgentProfile | null | undefined;
@@ -116,12 +117,47 @@ function AgentTitle(props: { title: string }) {
   );
 }
 
+/**
+ * Makes the model picker smaller when the header parts do not fit, also in a chat with no thread tab.
+ * The thread tabs fit the picker while they show (ThreadTabs.tsx), so the header leaves it to them.
+ */
+function fitHeaderPicker(header: HTMLElement) {
+  // The picker can also overflow its own box onto the next action, inside the actions.
+  const parts = () =>
+    header.querySelectorAll<HTMLElement>(
+      ":scope > .conversation-heading-group, :scope > .conversation-header-actions, :scope > .conversation-header-actions > *",
+    );
+  const overflows = () => [...parts()].some((part) => part.scrollWidth - part.clientWidth > 1);
+  const picker = modelPickerFit(header, overflows, () => measure());
+  const measure = () => {
+    // A part can mount after the header, such as the picker. Observing a part again has no effect.
+    for (const part of parts()) observer.observe(part);
+    // When the last thread tab closes, only the thread row changes its width: the group fills the header.
+    const row = header.querySelector(":scope > .conversation-heading-group > .agent-threads-header");
+    if (row) observer.observe(row);
+    // A thread row that is not in its tab mode shows the picker as its icon (header-controls.css).
+    if (header.querySelector('.agent-threads-tabs, .agent-threads-header:not([data-mode="tabs"])')) return;
+    // A chat with no agent, such as a channel, has no picker, so no step stays from an agent's chat.
+    if (header.querySelector(".provider-model-trigger")) picker.fit();
+    else delete header.dataset.modelFit;
+  };
+  const observer = new ResizeObserver(measure);
+  observer.observe(header);
+  measure();
+  return () => {
+    observer.disconnect();
+    picker.stop();
+  };
+}
+
 export function ConversationHeader(props: ConversationHeaderProps) {
   const { t } = useText();
   const titleTab = () => (props.titleSelected === undefined ? undefined : "");
   const titleSelected = () => (props.titleSelected ? "" : undefined);
+  let header: HTMLElement | undefined;
+  onSettled(() => (header ? fitHeaderPicker(header) : undefined));
   return (
-    <header class="window-drag conversation-header">
+    <header ref={header} class="window-drag conversation-header">
       <div class="conversation-heading-group">
         <Show when={props.agent} fallback={props.title}>
           {(agent) => (

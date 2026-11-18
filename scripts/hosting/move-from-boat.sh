@@ -440,13 +440,16 @@ customer_units() {
 # service user owns /opt and /usr/local, and `added_trees` finds what the customer added there. A file
 # that the customer made as root is not found. The search goes into other mounts, because a folder of
 # the customer can be one. When it fails, it fails `packages`, so that a move never continues on a part
-# of the search.
+# of the search. It also skips the folders of the boat agent in /var/lib, where the service user owns
+# files: `ascii-lazy` (the lazy restore of the home, which the archive copies), `ascii-lazy-bin`,
+# `ascii-snapshot-staging` and `ariana` (seen on 2026-11-15 in an archived sandbox).
 customer_folders() {
   local uid
   uid=$(id -u "$SERVICE_USER")
   find / \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
     -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /snap -o -path /var/spool/cron \
-    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \) -prune \
+    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \
+    -o -path '/var/lib/ascii*' -o -path /var/lib/ariana \) -prune \
     -o ! -type d -uid "$uid" -print |
     awk -F/ '{ n = $2 == "var" ? 4 : 3; if (n > NF - 1) n = NF - 1; f = ""
       for (i = 2; i <= n; i++) f = f "/" $i; print f == "" ? $0 : f }' | sort -u

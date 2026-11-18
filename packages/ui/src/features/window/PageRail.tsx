@@ -2,16 +2,22 @@ import { AppLogo, type AppLogoVariant, ProviderLogo } from "@openbot/brand";
 import { usageTone } from "@openbot/team-client/plan-limits";
 import {
   Bot,
+  BriefcaseBusiness,
   Button,
+  buttonVariants,
   CalendarClock,
   ChartArea,
+  ContextMenu,
   DropdownMenu,
   Ellipsis,
   GalleryVerticalEnd,
   ListChecks,
   MotionTooltip,
   Pin,
+  PinOff,
+  Plug,
   Settings,
+  Sparkles,
   Store,
   Waypoints,
   Workflow,
@@ -22,30 +28,110 @@ import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
-/** One rail button. Its name shows as a tooltip, unless it has a `card`: the card shows instead. */
+/** An item of the right-click menu of a rail button. */
+interface RailMenuItem {
+  label: string;
+  icon: typeof Bot;
+  open: (button: HTMLElement) => void;
+}
+
+/** The right-click menu of a pinned rail button: the actions of its page, then Unpin. */
+function RailContextMenu(props: {
+  label: string;
+  items: readonly RailMenuItem[];
+  button: () => HTMLElement | undefined;
+}) {
+  return (
+    <ContextMenu.Portal>
+      <ContextMenu.Content class="agent-context-menu" aria-label={props.label}>
+        <For each={props.items}>
+          {(item) => (
+            <ContextMenu.Item
+              onSelectAfterClose={() => {
+                const button = props.button();
+                if (button) item.open(button);
+              }}
+            >
+              <Dynamic component={item.icon} class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{item.label}</span>
+            </ContextMenu.Item>
+          )}
+        </For>
+      </ContextMenu.Content>
+    </ContextMenu.Portal>
+  );
+}
+
+/**
+ * One rail button. Its name shows as a tooltip, unless it has a `card`: the card shows instead. With
+ * `menu`, a right-click opens a menu of more actions of the page.
+ */
 function RailButton(props: {
   label: string;
   /** Renders the card while it is open. */
   card?: () => JSX.Element;
   current?: boolean;
   class?: string;
+  menu?: readonly RailMenuItem[] | undefined;
   onClick: (button: HTMLElement) => void;
+  /** Starts to load the page when the pointer or the focus comes to the button, before the click. */
+  onPreload?: (() => void) | undefined;
   children: JSX.Element;
 }) {
-  const button = () => (
+  // The open menu hides the tooltip, as the More menu does.
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  const plain = () => (
     <Button
       variant="ghost"
       type="button"
       class={props.class ? `window-rail-button ${props.class}` : "window-rail-button"}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
+      onPointerEnter={() => props.onPreload?.()}
+      onFocus={() => props.onPreload?.()}
       onClick={(event) => props.onClick(event.currentTarget)}
     >
       {props.children}
     </Button>
   );
+  const button = () => (
+    <Show when={props.menu} fallback={plain()}>
+      {(items) => {
+        let element: HTMLElement | undefined;
+        return (
+          <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
+            <ContextMenu.Trigger
+              as="button"
+              type="button"
+              ref={(trigger: HTMLElement) => {
+                element = trigger;
+              }}
+              class={`${buttonVariants({ variant: "ghost" })} window-rail-button`}
+              aria-label={props.label}
+              aria-current={props.current ? "page" : undefined}
+              onPointerEnter={() => props.onPreload?.()}
+              onFocus={() => props.onPreload?.()}
+              onClick={(event: MouseEvent) => {
+                if (event.currentTarget instanceof HTMLElement) props.onClick(event.currentTarget);
+              }}
+            >
+              {props.children}
+            </ContextMenu.Trigger>
+            <RailContextMenu label={props.label} items={items()} button={() => element} />
+          </ContextMenu.Root>
+        );
+      }}
+    </Show>
+  );
   return (
-    <Show when={props.card} fallback={<MotionTooltip content={props.label}>{button()}</MotionTooltip>}>
+    <Show
+      when={props.card}
+      fallback={
+        <MotionTooltip content={props.label} suppressed={menuOpen()}>
+          {button()}
+        </MotionTooltip>
+      }
+    >
       {(card) => (
         <MotionTooltip
           content={card()()}
@@ -226,9 +312,9 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
   );
 }
 
-/** The credits of a media service that a canvas step spends, such as Sunra. */
+/** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
-  provider: "sunra";
+  provider: "sunra" | "higgsfield";
   name: string;
   /** The credits that the account can spend now. */
   available: number;
@@ -238,8 +324,8 @@ export interface MediaCreditsRailRow {
 
 /**
  * The credits of one media service. A team quota draws a ring with the part that is left, as the
- * plan limits of a provider do. An account with no limit of its own shows the logo alone, as a custom
- * agent does. The hover card shows the number.
+ * plan limits of a provider do. An account with no limit of its own shows the logo with the number of
+ * credits under it. The hover card shows the full number.
  */
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
@@ -285,6 +371,7 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
                     }),
                     remainingPercent: percent(),
                     tone: usageTone(percent()),
+                    durationMins: null,
                     resetsAt: null,
                     resetsAtLabel: null,
                   },
@@ -301,7 +388,10 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       <Show
         when={props.row.quota !== null}
         fallback={
-          <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo window-rail-agent-usage-logo" />
+          <span class="window-rail-credits" aria-hidden="true">
+            <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+            <span class="window-rail-credits-count">{format.compact(props.row.available)}</span>
+          </span>
         }
       >
         <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
@@ -341,6 +431,8 @@ export type PageRailPage =
   | "schedule"
   | "usage"
   | "library"
+  | "providers"
+  | "crm"
   | "marketplace"
   | "settings";
 
@@ -352,6 +444,8 @@ export const PAGE_RAIL_PINNABLE_PAGES = [
   "schedule",
   "usage",
   "library",
+  "providers",
+  "crm",
 ] as const satisfies readonly PageRailPage[];
 export type PageRailPinnablePage = (typeof PAGE_RAIL_PINNABLE_PAGES)[number];
 
@@ -375,6 +469,8 @@ export interface PageRailProps {
   onRoutines?: (() => void) | undefined;
   /** Absent when the server has no workflows. */
   onWorkflows?: (() => void) | undefined;
+  /** Starts to load the code of the Workflows page before a click opens it. */
+  onPreloadWorkflows?: (() => void) | undefined;
   /** Absent where the server keeps no tasks. */
   onTasks?: ((button: HTMLElement) => void) | undefined;
   /** Absent where there is no schedule page. */
@@ -382,6 +478,12 @@ export interface PageRailProps {
   onUsage: (button: HTMLElement) => void;
   /** Absent where the server keeps no files, such as the web client. */
   onLibrary?: ((button: HTMLElement) => void) | undefined;
+  /** Opens the Providers settings of the server. Absent when this account cannot manage them. */
+  onProviders?: ((button: HTMLElement) => void) | undefined;
+  /** Absent for a member, and on a joined server without the CRM. */
+  onCrm?: ((button: HTMLElement) => void) | undefined;
+  /** Opens the CRM with its connectors, from the right-click menu of the CRM button. */
+  onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
   /** Absent while Marketplace cannot open. */
   onMarketplace?: (() => void) | undefined;
   onSettings: (button: HTMLElement) => void;
@@ -404,6 +506,10 @@ interface RailPage {
   label: string;
   icon: typeof Bot;
   open: (button: HTMLElement) => void;
+  /** Starts to load the page before a click opens it. */
+  preload?: (() => void) | undefined;
+  /** The right-click menu of its rail button. */
+  menu?: readonly RailMenuItem[] | undefined;
 }
 
 /**
@@ -454,7 +560,11 @@ function RailMoreMenu(props: {
             {(page) => (
               // The pin is its own menu item beside the page, so the keyboard reaches it.
               <div role="none" class="window-rail-more-row" data-pinned={pinned(page().id) ? "" : undefined}>
-                <DropdownMenu.Item onSelectAfterClose={() => trigger && page().open(trigger)}>
+                <DropdownMenu.Item
+                  onPointerEnter={() => page().preload?.()}
+                  onFocus={() => page().preload?.()}
+                  onSelectAfterClose={() => trigger && page().open(trigger)}
+                >
                   <Dynamic component={page().icon} class="agent-context-icon size-4" aria-hidden="true" />
                   <span>{page().label}</span>
                 </DropdownMenu.Item>
@@ -584,6 +694,7 @@ export function PageRail(props: PageRailProps) {
         label: t("app.rail.workflows"),
         icon: Waypoints,
         open: () => onWorkflows(),
+        preload: props.onPreloadWorkflows,
       });
     }
     if (onTasks) {
@@ -601,6 +712,21 @@ export function PageRail(props: PageRailProps) {
     const onLibrary = props.onLibrary;
     if (onLibrary) {
       list.push({ id: "library", label: t("app.rail.library"), icon: GalleryVerticalEnd, open: onLibrary });
+    }
+    const onProviders = props.onProviders;
+    if (onProviders) {
+      list.push({ id: "providers", label: t("app.rail.providers"), icon: Sparkles, open: onProviders });
+    }
+    const onCrm = props.onCrm;
+    if (onCrm) {
+      const onConnectors = props.onCrmConnectors;
+      list.push({
+        id: "crm",
+        label: t("app.rail.crm"),
+        icon: BriefcaseBusiness,
+        open: onCrm,
+        menu: onConnectors && [{ label: t("crm.connectors.title"), icon: Plug, open: onConnectors }],
+      });
     }
     return list;
   });
@@ -625,7 +751,16 @@ export function PageRail(props: PageRailProps) {
         </RailButton>
         <For each={pages().filter((page) => props.pinned.includes(page.id))} keyed={(page) => page.id}>
           {(page) => (
-            <RailButton label={page().label} current={props.current === page().id} onClick={page().open}>
+            <RailButton
+              label={page().label}
+              current={props.current === page().id}
+              menu={[
+                ...(page().menu ?? []),
+                { label: t("sidebar.unpin"), icon: PinOff, open: () => props.onPinChange(page().id, false) },
+              ]}
+              onClick={page().open}
+              onPreload={page().preload}
+            >
               <Dynamic component={page().icon} aria-hidden="true" />
             </RailButton>
           )}

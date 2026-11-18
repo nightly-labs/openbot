@@ -1,5 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
-import { isBoundedString } from "./ipc-bounded-values";
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "./ipc-chat-channels";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 /**
@@ -83,6 +85,114 @@ export function chatVisualReply<Attachment extends { mimeType: string }>(message
   if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return null;
   const height = message.itemType.slice(CHAT_VISUAL_ITEM_TYPE_PREFIX.length);
   return /^\d{1,4}$/u.test(height) ? { attachment, height: clampHeight(Number(height)) } : { attachment };
+}
+
+/**
+ * The `itemType` of a message whose page an agent put behind the window with `set_backdrop`. The
+ * message text is the page title, and its one attachment is the page. A client shows the newest one
+ * behind its window once. A client that does not know the type shows the title and the HTML file.
+ */
+export const CHAT_BACKDROP_ITEM_TYPE = "window-backdrop";
+
+/** The page of a backdrop message, or null for any other message. */
+export function chatBackdropPage<Attachment extends { mimeType: string }>(message: {
+  itemType?: string | null | undefined;
+  attachments?: readonly Attachment[] | null | undefined;
+}): Attachment | null {
+  if (message.itemType !== CHAT_BACKDROP_ITEM_TYPE) return null;
+  const attachment = message.attachments?.length === 1 ? message.attachments[0] : undefined;
+  return attachment && isChatVisualMimeType(attachment.mimeType) ? attachment : null;
+}
+
+/**
+ * The chat bubble colors that a backdrop page brings: the reader's own bubbles (`yours`) and the
+ * agents' bubbles (`agents`), each `#rrggbb` in lower case. They show only while that page is the
+ * backdrop, so a new backdrop or Undo takes them away with the scene.
+ */
+export interface ChatBackdropBubbles {
+  yours?: AvatarColor;
+  agents?: AvatarColor;
+}
+
+/**
+ * The page keeps its bubble colors in one tag, `<meta name="openbot-bubbles" content="yours=#rrggbb;
+ * agents=#rrggbb">`, so they go with the page file to each client, to a joined server's clients and
+ * into the saved backdrop with no other field.
+ */
+const BUBBLES_META_NAME = "openbot-bubbles";
+const BUBBLES_META_PATTERN = /<meta\b[^>]*\bname\s*=\s*["']openbot-bubbles["'][^>]*>/iu;
+const META_CONTENT_PATTERN = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/iu;
+const DOCTYPE_PATTERN = /^\s*<!doctype\b[^>]*>/iu;
+
+/** The bubble colors of a backdrop page, or null when it has none. Unknown or bad values are left out. */
+export function chatBackdropBubbles(html: string): ChatBackdropBubbles | null {
+  const tag = BUBBLES_META_PATTERN.exec(html)?.[0];
+  const content = tag ? META_CONTENT_PATTERN.exec(tag) : null;
+  const value = content?.[1] ?? content?.[2];
+  if (value === undefined) return null;
+  const bubbles: ChatBackdropBubbles = {};
+  for (const part of value.split(";")) {
+    const [key, color] = part.split("=", 2).map((text) => text.trim().toLowerCase());
+    if (!isAvatarColor(color)) continue;
+    if (key === "yours") bubbles.yours = color;
+    else if (key === "agents") bubbles.agents = color;
+  }
+  return bubbles.yours === undefined && bubbles.agents === undefined ? null : bubbles;
+}
+
+/**
+ * Puts the bubble colors in the page, in place of a tag that it has. The tag goes after the doctype:
+ * a tag before it puts the page in quirks mode.
+ */
+export function withChatBackdropBubbles(html: string, bubbles: ChatBackdropBubbles): string {
+  const parts = [
+    bubbles.yours === undefined ? undefined : `yours=${bubbles.yours}`,
+    bubbles.agents === undefined ? undefined : `agents=${bubbles.agents}`,
+  ].filter((part) => part !== undefined);
+  const page = html.replace(BUBBLES_META_PATTERN, "");
+  if (parts.length === 0) return page;
+  return withLeadingMeta(page, `<meta name="${BUBBLES_META_NAME}" content="${parts.join("; ")}">`);
+}
+
+/** Puts a tag first in the page. It goes after the doctype: a tag before it puts the page in quirks mode. */
+function withLeadingMeta(page: string, tag: string): string {
+  const doctype = DOCTYPE_PATTERN.exec(page)?.[0];
+  return doctype === undefined ? `${tag}${page}` : `${doctype}${tag}${page.slice(doctype.length)}`;
+}
+
+/**
+ * The people who asked for a backdrop page, as the `senderMember` ids of the messages of its turn, in
+ * `<meta name="openbot-backdrop-for" content="id id">`. On a joined server, members share one agent
+ * chat, so each client shows a page only when its reader asked for it. A message with no sender, such
+ * as one from a person on the host who is signed out, counts as `SIGNED_OUT_CHANNEL_MEMBER_ID`.
+ */
+const REQUESTERS_META_NAME = "openbot-backdrop-for";
+const REQUESTERS_META_SOURCE = String.raw`<meta\b[^>]*\bname\s*=\s*["']openbot-backdrop-for["'][^>]*>`;
+/** Member ids and `local-user:` ids. Other characters could end the attribute. */
+const REQUESTER_ID_PATTERN = /^[\w.:@-]+$/u;
+
+function isRequesterId(value: string): boolean {
+  return isIdentifier(value) && REQUESTER_ID_PATTERN.test(value);
+}
+
+/** The people who asked for a backdrop page. A page with no tag counts as one from the host's signed-out person. */
+export function chatBackdropRequesters(html: string): string[] {
+  const tag = new RegExp(REQUESTERS_META_SOURCE, "iu").exec(html)?.[0];
+  const content = tag ? META_CONTENT_PATTERN.exec(tag) : null;
+  const ids = (content?.[1] ?? content?.[2] ?? "").split(/\s+/u).filter(isRequesterId);
+  return ids.length > 0 ? ids : [SIGNED_OUT_CHANNEL_MEMBER_ID];
+}
+
+/**
+ * Puts the requesters first in the page, and removes each tag of that name that the agent wrote. The
+ * removal repeats until no tag is left: one pass can join the parts of a nested tag into a new tag.
+ */
+export function withChatBackdropRequesters(html: string, ids: readonly string[]): string {
+  const tags = new RegExp(REQUESTERS_META_SOURCE, "giu");
+  let page = html;
+  for (let next = page.replace(tags, ""); next !== page; next = page.replace(tags, "")) page = next;
+  const content = ids.filter(isRequesterId).join(" ") || SIGNED_OUT_CHANNEL_MEMBER_ID;
+  return withLeadingMeta(page, `<meta name="${REQUESTERS_META_NAME}" content="${content}">`);
 }
 
 /** CSS custom properties that the page can use, such as `--foreground` or `--chart-1`. */

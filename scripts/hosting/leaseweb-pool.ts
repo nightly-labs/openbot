@@ -11,7 +11,12 @@
 //       Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes
 //       back a cancel, or pays a past-due plan, comes back on this list.
 //   bun scripts/hosting/leaseweb-pool.ts free
-//       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
+//       Read only. Each VPS with no reference on the five Leaseweb accounts, such as a VPS just bought.
+//   bun scripts/hosting/leaseweb-pool.ts traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>]
+//       Read only. The public traffic in and out of each VPS on the five accounts, from the first day of
+//       this month (UTC) to today, the most first. Also the traffic pack of the contract, and the part of
+//       it that the outgoing traffic used: Leaseweb counts only that against the pack of a VPS. Then the
+//       sum of each account.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
 //       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
 //       with no reference gets `pool`. The reference does not say whether a server has the machine: D1 does.
@@ -122,9 +127,12 @@ const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 // boat restores the disk of an archived sandbox after the resume. Seen on 2026-11-12: some minutes.
 const RESTORE_WAIT_MS = 30 * 60_000;
 /** Each Leaseweb account. `custom` reads all of them, so that a `custom-<NN>` number is never used again. */
-const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU"];
+const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
 const CUSTOM_NUMBER_PATTERN = /^custom-(\d{2,}) /u;
 const CUSTOMER_PATTERN = /^[a-z0-9]{1,32}$/u;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+/** The Leaseweb metrics requests at the same time. */
+const TRAFFIC_CONCURRENCY = 6;
 // No quote and no space, so that the email can go in a D1 literal and in a reference.
 const EMAIL_PATTERN = /^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/u;
 // The server name of `openbot name`: 6 to 32 characters. Only characters that need no shell quote.
@@ -360,6 +368,39 @@ function writeFileCommand(path: string, content: string) {
 function seconds(milliseconds: number) {
   return Math.round(milliseconds / 1000);
 }
+
+/** The reference of a VPS with no email, for the output: `pool`, `custom-01 acme`, `openbot-signal-au`, `server`. */
+function referenceLabel(reference: string) {
+  if (reference === "") return "no reference";
+  if (isOwnerReference(reference)) return "server";
+  return reference
+    .split(" ")
+    .filter((word) => !word.includes("@"))
+    .join(" ");
+}
+
+const gigabytes = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+
+/** The traffic pack of a VPS contract in bytes. Leaseweb counts in decimal units. */
+function packBytes(pack: { value: number; unit: string } | null | undefined) {
+  const scale = { GB: 1e9, TB: 1e12 }[pack?.unit ?? ""];
+  return pack && scale ? pack.value * scale : null;
+}
+
+const trafficTotalSchema = z.object({ total: z.number().nonnegative() }).optional();
+// The list of VPS does not have the contract: only the VPS itself has it.
+const contractSchema = z.object({
+  contract: z
+    .object({ dataTraffic: z.object({ value: z.number(), unit: z.string() }).nullable().optional() })
+    .nullable()
+    .optional(),
+});
+// A VPS with no traffic in the period has no summary.
+const trafficSchema = z.object({
+  _metadata: z.object({
+    summary: z.object({ downPublic: trafficTotalSchema, upPublic: trafficTotalSchema }).optional(),
+  }),
+});
 
 const ipSchema = z.object({ ip: z.string(), version: z.number(), mainIp: z.boolean() });
 const vpsSchema = z.object({
@@ -1155,6 +1196,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
       location: string;
       product: string;
       address: string;
+      key: string;
     }[] = [];
     for (const account of this.#keys) {
       for (let offset = 0; ; offset += 50) {
@@ -1171,6 +1213,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
             location: vps.datacenter,
             product: vps.pack,
             address: vps.ips.find((ip) => ip.version === 4 && ip.mainIp)?.ip ?? "",
+            key: account.key,
           });
         if (page.vps.length === 0 || offset + page.vps.length >= page._metadata.totalCount) break;
       }
@@ -1181,11 +1224,76 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
   /** Read only. Each VPS with no reference on all accounts: a new VPS that an operator can take. */
   async free() {
     const free = (await this.#allReferences()).filter(({ reference }) => reference === "");
-    if (free.length === 0) logger.info("No VPS on the four Leaseweb accounts is without a reference.");
+    if (free.length === 0) logger.info("No VPS on the five Leaseweb accounts is without a reference.");
     for (const vps of free)
       logger.info(
         `VPS ${vps.id} has no reference: account ${vps.account}, ${vps.location}, ${vps.product}, ${vps.state}, address ${vps.address || "none"}.`,
       );
+  }
+
+  /**
+   * The public traffic of each VPS from `from` to `to` (both UTC days, both in the period), from the Leaseweb
+   * metrics. Leaseweb gives only days. Its traffic of today stops some minutes before now.
+   */
+  async traffic(from: string | undefined, to: string | undefined) {
+    const today = new Date().toISOString().slice(0, 10);
+    const start = from ?? `${today.slice(0, 8)}01`;
+    const end = to ?? today;
+    const isDay = (day: string) =>
+      DATE_PATTERN.test(day) && !Number.isNaN(Date.parse(day)) && new Date(day).toISOString().startsWith(day);
+    if (!isDay(start) || !isDay(end) || start > end)
+      throw new Error("--from and --to must be days as YYYY-MM-DD, and --from must not be after --to.");
+    const missing = LEASEWEB_ACCOUNTS.filter(
+      (account) => !this.#keys.some(({ name }) => name === `LEASEWEB_API_KEY_${account}`),
+    );
+    if (missing.length > 0)
+      logger.warn(`No key for the account ${missing.join(", ")}: its VPS are not in the traffic.`);
+    const machines = await this.#allReferences(false);
+    const rows: { vps: (typeof machines)[number]; down: number; up: number; pack: number | null }[] = [];
+    let next = 0;
+    // After one failure the other workers take no new VPS: the command stops with that failure.
+    let failed = false;
+    const work = async () => {
+      for (let index = next++; index < machines.length && !failed; index = next++) {
+        const vps = machines[index];
+        if (!vps) continue;
+        const [detail, response] = await Promise.all([
+          this.#leaseweb(vps.key, `/${vps.id}`, {}, 60_000),
+          this.#leaseweb(
+            vps.key,
+            `/${vps.id}/metrics/datatraffic?from=${start}&to=${end}&granularity=DAY&aggregation=SUM`,
+            {},
+            60_000,
+          ),
+        ]).catch((error: unknown) => {
+          failed = true;
+          throw error;
+        });
+        if (!detail.ok || !response.ok) {
+          failed = true;
+          throw new Error(`Leaseweb answered ${detail.status} and ${response.status} for VPS ${vps.id}.`);
+        }
+        const pack = packBytes(contractSchema.parse(await detail.json()).contract?.dataTraffic);
+        const summary = trafficSchema.parse(await response.json())._metadata.summary;
+        rows.push({ vps, down: summary?.downPublic?.total ?? 0, up: summary?.upPublic?.total ?? 0, pack });
+      }
+    };
+    await Promise.all(Array.from({ length: TRAFFIC_CONCURRENCY }, work));
+    rows.sort((a, b) => b.down + b.up - (a.down + a.up) || a.vps.id.localeCompare(b.vps.id));
+    logger.info(`Public traffic from ${start} to ${end} (UTC days), the most first:`);
+    for (const { vps, down, up, pack: packSize } of rows) {
+      // Leaseweb counts only the outgoing traffic of a VPS against its pack (kb.leaseweb.com, "Metering and Billing").
+      const pack = packSize ? `, out is ${Math.round((up / packSize) * 100)}% of the ${packSize / 1e12} TB pack` : "";
+      logger.info(
+        `VPS ${vps.id} (${vps.account}, ${vps.location}, ${referenceLabel(vps.reference)}): in ${gigabytes(down)}, out ${gigabytes(up)}${pack}.`,
+      );
+    }
+    for (const account of new Set(rows.map(({ vps }) => vps.account))) {
+      const own = rows.filter(({ vps }) => vps.account === account);
+      const down = own.reduce((sum, row) => sum + row.down, 0);
+      const up = own.reduce((sum, row) => sum + row.up, 0);
+      logger.info(`Account ${account}: ${own.length} VPS, in ${gigabytes(down)}, out ${gigabytes(up)}.`);
+    }
   }
 
   /** The next `custom-<NN>`: one more than the highest number on all accounts. */
@@ -1887,7 +1995,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | boat | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1897,6 +2005,7 @@ async function main(args: string[]) {
   if (command === "status") pool.status();
   else if (command === "boat") pool.boat();
   else if (command === "free") await pool.free();
+  else if (command === "traffic") await pool.traffic(option("from"), option("to"));
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
   else if (command === "sync") await pool.sync();

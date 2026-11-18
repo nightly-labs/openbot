@@ -911,7 +911,10 @@ export class RemoteScreenGateway {
       };
       client.once("close", close);
       upstream.once("close", close);
-      upstream.once("error", () => client.close(1011, "Moonlight stream failed"));
+      // `ws` throws an `error` that has no listener, and a bad frame or a write to a dropped viewer can
+      // send more than one. Each socket keeps a listener, so the error ends the stream, not the main process.
+      client.on("error", () => client.close(1011, "Moonlight stream failed"));
+      upstream.on("error", () => client.close(1011, "Moonlight stream failed"));
     });
   }
 

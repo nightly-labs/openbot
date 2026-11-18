@@ -22,6 +22,14 @@ export const messages = {
   "error.billing.licenseOneUser": "Bu lisans 1 kullanıcı içindir. Kullanıcı eklemek için Team'e geçin.",
   "error.billing.licensePlanChange": "Bu lisans o plana geçemez. Lisansı iptal edip yeni planı satın alın.",
   "error.billing.noLicense": "Bu hesabın lisansı yok.",
+  "error.billing.countryRequired":
+    "Ödemeden önce fatura ülkenizi belirtin. Bunun için OpenBot'u güncelleyin ve yeniden deneyin.",
+  "error.billing.detailsInvalid": "Ülkeyi ve KDV numarasını kontrol edin. KDV numarası seçilen ülkeye ait olmalıdır.",
+  "error.billing.vatIdInvalid":
+    "AB KDV sistemi bu KDV numarasını tanımıyor. Numarayı kontrol edin veya KDV numarası olmadan devam edin.",
+  "error.billing.vatIdUnverified":
+    "AB KDV sistemi şu anda KDV numarasını kontrol edemiyor. Daha sonra yeniden deneyin veya KDV numarası olmadan devam edin.",
+  "error.billing.vatUnavailable": "Ödeme şu anda kullanılamıyor. Daha sonra yeniden deneyin.",
   "error.billing.invalidRequest": "Faturalandırma isteği geçersiz.",
   "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",
   "error.billing.notStripePage": "Faturalandırma sayfası bir Stripe sayfası değil.",

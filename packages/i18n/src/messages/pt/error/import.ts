@@ -95,7 +95,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: digite a chave de API de novo em Configurações.",
   "error.import.transferAgentEnv": "{name}: digite os valores de {names} de novo em Configurações.",
   "error.import.transferMcpValues":
-    "{name}: o servidor MCP foi adicionado desativado. Verifique o comando, digite os valores e o endereço completo de novo e ative-o nas configurações de MCP.",
+    "{name}: o servidor MCP foi adicionado desativado. Verifique o comando, digite os valores e o endereço completo de novo e ative-o na Loja, Apps.",
   "error.import.transferValuesCleared":
     "{name}: valores que podem conter um segredo foram removidos dos argumentos ou do endereço. Digite-os de novo em Configurações.",
   "error.import.transferSharedKept": "{number} arquivos da pasta Shared já estão aqui, então são mantidos como estão.",

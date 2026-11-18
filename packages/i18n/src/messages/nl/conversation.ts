@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "Bestanden",
   "conversation.threads.new": "Nieuwe thread",
   "conversation.threads.all": "Alle threads",
+  "conversation.threads.allUnread": "Alle threads, nieuwe antwoorden",
   "conversation.threads.open": "Open threads",
   "conversation.threads.current": "Thread: {title}",
   "conversation.threads.actions": "Threadacties",

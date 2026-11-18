@@ -182,8 +182,18 @@ export async function installAppUpdate(update: AppUpdate, reloadColor: string): 
     });
     return;
   }
+  await openStorePage();
+}
+
+/**
+ * Opens the store page of the app. `review` opens the App Store's review form; Google Play has no
+ * link to its form, so it opens the app page there. The web page is the fallback when the store app
+ * does not open.
+ */
+export async function openStorePage({ review = false }: { review?: boolean } = {}): Promise<void> {
+  const query = review && isIOS ? "?action=write-review" : "";
   const [url, webUrl] = isIOS ? [IOS_STORE_URL, IOS_STORE_WEB_URL] : [ANDROID_STORE_URL, ANDROID_STORE_WEB_URL];
-  await Linking.openURL(url).catch(() => Linking.openURL(webUrl));
+  await Linking.openURL(`${url}${query}`).catch(() => Linking.openURL(`${webUrl}${query}`));
 }
 
 async function fetchReleaseNotes(apiUrl: string, after: string | null, signal: AbortSignal) {

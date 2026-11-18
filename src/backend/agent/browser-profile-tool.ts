@@ -13,6 +13,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { DynamicToolCallParams } from "../protocol";
+import type { ToolApprovalDecision } from "./attention-registry";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -97,8 +98,13 @@ export interface SetBrowserProfileToolOptions {
   profiles: AgentBrowserProfiles | null;
   /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
+  /**
+   * Whether each person who sent a message of the turn is an owner or admin, who sees the profile in
+   * the agent's settings. A member does not, so the refusal tells them to ask an owner or admin.
+   */
+  requestersCanAdminister: boolean;
   /** Waits for the owner's answer to a card with this text. */
-  approve(reason: string): Effect.Effect<"accept" | "decline" | "cancel" | string, ToolOperationFailed>;
+  approve(reason: string): Effect.Effect<ToolApprovalDecision, ToolOperationFailed>;
   redactMcp(text: string): string;
 }
 
@@ -121,7 +127,9 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
     // to the sign-ins of another profile.
     if (!options.requestedByPerson)
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can change a browser profile. Tell the user that they can change it in the agent's settings, Advanced, Browser profile.",
+        options.requestersCanAdminister
+          ? "Only a person's message, in your OpenBot chat or a thread they opened, can change a browser profile. Tell the user that they can change it in the agent's settings, Advanced, Browser profile."
+          : "A server member who is not an owner or admin sent this request. Only an owner or admin can change a browser profile or its proxy, and a member does not see the Browser profile setting. Tell the user to ask an owner or admin of the server to change it.",
       );
     const agents = options.listAgents();
     const targets = agentIds.map((agentId) => {

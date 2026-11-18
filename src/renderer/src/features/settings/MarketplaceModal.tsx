@@ -5,10 +5,12 @@ import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
 import { createMarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
 import { McpConnectDialog } from "@openbot/ui/features/settings/McpConnectDialog";
-import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
+import { McpSignInPageDialog, McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { McpServerControls } from "../servers/McpServerControls";
+import { McpServerForm } from "../servers/McpServerForm";
 import {
   createMarketplaceController,
   type MarketplaceControllerProps,
@@ -45,7 +47,10 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const { t } = useText();
   const nav = createMarketplaceNavigation();
-  const controller = createMarketplaceController(props);
+  const controller = createMarketplaceController(props, (tools) => ({
+    form: (form) => <McpServerForm tools={tools} id={form.id} onClose={form.onClose} />,
+    controls: (controls) => <McpServerControls tools={tools} id={controls.id} />,
+  }));
   const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
     t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
   const skillConfirmBody = (confirm: PendingSkillConfirm) =>
@@ -114,6 +119,23 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             draft.missingListing = link.kind;
           });
       });
+    },
+  );
+
+  /* Sign in on an agent's card opens the row's page once the rows are read. A custom row's card
+     then starts the sign-in; an app's page has its own Reconnect. The page id, not an object, so a
+     new read of the rows does not open the page again. */
+  createEffect(
+    () => {
+      const id = props.open ? props.mcpSignInRequest : undefined;
+      return id ? controller.mcpServerApp(id) : undefined;
+    },
+    (app) => {
+      if (app === undefined) return;
+      nav.reset();
+      if (app) nav.go({ kind: "app", id: app });
+      // Only a custom row's card takes the request; another page, or no row, ends it here.
+      if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 
@@ -237,20 +259,34 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             onCopySignInLink={props.pluginHostName ? undefined : controller.copySignInLink()}
             signInExtra={
               /* The page opens in this computer's browser; the paste field is the way back when the
-                 browser cannot reach this computer's listener. */
-              <Show when={controller.signInRelayed()} keyed>
-                {(relay) => (
-                  <McpSignInRelayDialog
-                    name={pending.subject.name}
-                    iconUrl={pending.subject.iconUrl}
-                    hostName={props.pluginHostName ?? ""}
-                    page={relay.page}
-                    onOpen={controller.openSignInRelay}
-                    onPaste={controller.pasteSignInRelay}
-                    onCancel={controller.cancelSignIn}
-                  />
-                )}
-              </Show>
+                 browser cannot reach this computer's listener. A page that only the joined server can
+                 reach shows in the server's own tab instead. */
+              <>
+                <Show when={controller.signInHostPage()} keyed>
+                  {(page) => (
+                    <McpSignInPageDialog
+                      name={pending.subject.name}
+                      iconUrl={pending.subject.iconUrl}
+                      hostName={props.pluginHostName ?? ""}
+                      page={page}
+                      onCancel={controller.cancelSignIn}
+                    />
+                  )}
+                </Show>
+                <Show when={controller.signInRelayed()} keyed>
+                  {(relay) => (
+                    <McpSignInRelayDialog
+                      name={pending.subject.name}
+                      iconUrl={pending.subject.iconUrl}
+                      hostName={props.pluginHostName ?? ""}
+                      page={relay.page}
+                      onOpen={controller.openSignInRelay}
+                      onPaste={controller.pasteSignInRelay}
+                      onCancel={controller.cancelSignIn}
+                    />
+                  )}
+                </Show>
+              </>
             }
           />
         )}

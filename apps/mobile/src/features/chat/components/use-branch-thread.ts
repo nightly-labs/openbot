@@ -1,4 +1,4 @@
-import type { AgentTasksSnapshot, ConversationMessage } from "@openbot/contracts/ipc";
+import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
@@ -10,7 +10,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { queryKeys } from "@/features/workspace/model/query-keys";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 import { branchPointIds } from "../model/branch-points";
@@ -74,11 +74,7 @@ export function useBranchThread({
           serverId,
         );
         // The thread shows in the menu before its list event arrives.
-        queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
-          stored && !stored.tasks.some((entry) => entry.id === task.id)
-            ? { ...stored, tasks: [task, ...stored.tasks] }
-            : stored,
-        );
+        addStartedTask(queryClient, queryScope, serverId, task);
         void haptics.notification("success");
         // From a thread, the branch replaces it on the screen, so Back still returns to the agent's chat.
         if (sourceTaskId === null)

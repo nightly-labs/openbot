@@ -136,4 +136,10 @@ export const messages = {
     other:
       "Je licentie heeft {count} gebruikers, het maximum. Neem contact met ons op voor een grotere licentie. Nieuwe mensen kunnen niet meedoen op je servers.",
   },
+  "billing.details.country": "Factuurland",
+  "billing.details.countryPlaceholder": "Kies een land",
+  "billing.details.vatId": "EU-btw-nummer (optioneel)",
+  "billing.details.vatIdInvalid": "Dit is geen btw-nummer van het gekozen land.",
+  "billing.details.countryMissing": "Kies je factuurland.",
+  "billing.details.saveFailed": "Kan de factuurgegevens niet opslaan",
 } as const satisfies PartialTranslation<typeof source>;

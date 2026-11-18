@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "Fichiers",
   "conversation.threads.new": "Nouveau fil",
   "conversation.threads.all": "Tous les fils",
+  "conversation.threads.allUnread": "Tous les fils, nouvelles réponses",
   "conversation.threads.open": "Fils ouverts",
   "conversation.threads.current": "Fil : {title}",
   "conversation.threads.actions": "Actions du fil",

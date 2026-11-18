@@ -127,6 +127,33 @@
     padding: 0;
   }
 
+  /* The buttons of the top row have the shape and the fill of the chat header buttons, so the sidebar
+   * toggle matches the side panel toggle at the other end of the row. */
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar .sidebar-topbar-actions > .sidebar-icon-button {
+    border-radius: var(--openbot-radius-md);
+  }
+
+  /* The update button keeps its accent colour on hover (`app-shell.css`). */
+  @media (hover: hover) and (pointer: fine) {
+    .app-window
+      > .window-rail:not([hidden])
+      ~ .app-frame-edge
+      > .sidebar
+      .sidebar-topbar-actions
+      > .sidebar-icon-button:hover:not(:disabled) {
+      background: var(--openbot-bg-control-hover);
+    }
+
+    .app-window
+      > .window-rail:not([hidden])
+      ~ .app-frame-edge
+      > .sidebar
+      .sidebar-topbar-actions
+      > .sidebar-icon-button:hover:not(:disabled, .sidebar-update-button) {
+      color: var(--openbot-text-primary);
+    }
+  }
+
   /* The rail also opens the marketplace. */
   .app-window
     > .window-rail:not([hidden])
@@ -138,6 +165,27 @@
 
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar .sidebar-topbar {
     justify-content: flex-start;
+  }
+
+  /* With the sidebar open, its toggle is at the end of the sidebar, as far from it as the side panel
+   * toggle is from the end of the chat, above the New button. Back and Forward stay at the start. The
+   * compact sidebar is too narrow, so there the toggle stays after Forward. */
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar {
+    gap: 3px;
+    padding-inline-end: var(--openbot-space-3);
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar-actions {
+    display: contents;
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-toggle-button {
+    order: 1;
+    margin-inline-start: auto;
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .dev-worktree-label {
+    margin-inline-start: calc(var(--openbot-space-2) - 3px);
   }
 
   /* The compact sidebar is narrower than the controls, so its top row goes past its end, in one row
@@ -203,7 +251,7 @@
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
     .conversation-panel
     > .conversation-header {
-    margin-inline-start: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
+    --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
   /* The chat header has the centre line of the buttons of the frame, as each page header has. */
@@ -216,14 +264,18 @@
   }
 
   /* The frame animates the width of the sidebar column. The start of the chat header moves in the
-   * same time, so the tabs do not jump when the sidebar closes or opens. */
+   * same time, so the tabs do not jump when the sidebar closes or opens. A moved header also ends at
+   * the end of the chat: a full-width header (`panel-layout.css`) would go under the side panel. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
     .conversation-panel
     > .conversation-header {
-    transition: margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay))
-      cubic-bezier(0.32, 0.72, 0, 1);
+    max-width: calc(100% - var(--conversation-header-shift, 0px));
+    margin-inline-start: var(--conversation-header-shift, 0px);
+    transition:
+      margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1),
+      max-width var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   /* The sidebar button of the top row closes the agent list. The sidebar column has no width; only
@@ -262,7 +314,7 @@
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed
     .conversation-panel
     > .conversation-header {
-    margin-inline-start: var(--top-row-tabs-start);
+    --conversation-header-shift: var(--top-row-tabs-start);
   }
 
   /* One card holds the sidebar, the chat and the side panel, below the top row. The frame draws the
@@ -884,13 +936,14 @@
     visibility: hidden;
   }
 
-  /* New agent and New section add to the agent list, so the button shows only on the agents page. */
-  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .sidebar-new-button {
+  /* New and the filter act on the agent list, so the buttons show only on the agents page. */
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar :is(.sidebar-new-button, .sidebar-filter-button) {
     display: none;
   }
 
-  /* The page spans the sidebar, so the line at the end of the sidebar does not show. */
-  .app-frame-edge[data-window-page-kind="titled"] > .sidebar::before {
+  /* The page spans the sidebar, so the line at the end of the sidebar does not show. The section list of a
+   * settings page has its own line, at a minimum width, so a narrow sidebar would show a second line. */
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar::before {
     display: none;
   }
 

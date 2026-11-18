@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import type { AgentTask, QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -9,7 +9,9 @@ import { actionToast } from "../../../action-toast";
 import {
   clearStoredThreadQueueEdit,
   copyComposerDraft,
+  draftAfterEndedEdit,
   EMPTY_DRAFT,
+  queueEditChanged,
   type StoredThreadQueueEdit,
   storeThreadQueueEdit,
 } from "../composer-draft";
@@ -112,6 +114,7 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
       deliveryId: delivery.id,
       editId: crypto.randomUUID(),
       originalAttachmentIds: delivery.attachments.map((attachment) => attachment.id),
+      originalText: delivery.text,
       backup,
     };
     const edited: ComposerDraft = {
@@ -220,7 +223,9 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
           );
       } catch (error) {
         setBusy(false);
-        actionToast.error(errorMessage(error, t("composer.error.holdQueued")));
+        // The host refuses a hold that is over: the message started, or another edit has it.
+        if (isQueueEditRejected(error)) end(new Set());
+        else actionToast.error(errorMessage(error, t("composer.error.holdQueued")));
         return false;
       }
       pendingSave = {
@@ -244,7 +249,11 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
     try {
       await runtime().editQueuedMessage({ agentId: edit.agentId, ...pendingSave }, edit.serverId);
     } catch (error) {
-      actionToast.error(errorMessage(error, t("composer.error.updateQueued")));
+      // A Save that comes after the end of its edit cannot apply. Its text stays in the box.
+      if (isQueueEditRejected(error)) {
+        setBusy(false);
+        end(new Set(pendingSave.attachmentDraftIds));
+      } else actionToast.error(errorMessage(error, t("composer.error.updateQueued")));
       return false;
     } finally {
       setBusy(false);
@@ -264,6 +273,31 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
     return true;
   }
 
+  /**
+   * Ends an edit whose message left the queue: it started, or somebody deleted it. A thread queue shows
+   * only waiting messages, so the edit cannot tell which. Changes stay in the draft
+   * (`draftAfterEndedEdit`) with a note. `gone` are files that a refused Save discarded.
+   */
+  function end(gone: ReadonlySet<string>): void {
+    const edit = deps.edit();
+    if (!edit) return;
+    const current = draft(edit.draftKey);
+    const changed = queueEditChanged(current, edit.originalText, edit.originalAttachmentIds);
+    const { next, dropped } = draftAfterEndedEdit(
+      { ...current, attachments: current.attachments.filter((attachment) => !gone.has(attachment.id)) },
+      edit.backup,
+      edit.originalAttachmentIds,
+      changed,
+    );
+    discard(
+      dropped.map((attachment) => attachment.id),
+      edit.serverId,
+    );
+    setDraft(edit.draftKey, next);
+    finish();
+    if (changed) actionToast.warning(t("composer.queueEdit.endedKept"));
+  }
+
   // A queued message that left its thread while it was edited, such as a delete on another device,
   // ends the edit. Only a thread that shows its queue can tell.
   createEffect(
@@ -276,7 +310,7 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
       return Boolean(editOf(task?.id) && task?.queue && !task.queue.some((item) => item.id === edit.deliveryId));
     },
     (gone) => {
-      if (gone) void cancel();
+      if (gone) end(new Set());
     },
   );
 
@@ -295,7 +329,9 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
       editingDeliveryId: edit?.deliveryId ?? null,
       editBusy: busy(),
       onSteer:
-        agent && providerSteersTurns(agent.provider) ? (deliveryId) => actions.steer(task, deliveryId) : undefined,
+        agent && agentSteersTurns(agent, deps.props.modelOptions)
+          ? (deliveryId) => actions.steer(task, deliveryId)
+          : undefined,
       onCancel: (deliveryId) => actions.cancel(deliveryId),
       onEdit: (delivery) => void begin(task, delivery, key),
       onCancelEdit: () => void cancel(),

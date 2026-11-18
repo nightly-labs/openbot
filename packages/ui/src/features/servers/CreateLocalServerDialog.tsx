@@ -41,7 +41,8 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
       await props.onCreate(trimmedName());
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, t("server.local.createFailed")));
+      // The title already says that the create failed. A cause with no useful text gets a next step.
+      setError(errorMessage(cause, t("server.local.createFailedRetry")));
       setCreating(false);
     }
   }

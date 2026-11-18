@@ -64,6 +64,7 @@ export const messages = defineMessages("conversation", {
   "conversation.sidePanel.pane.files": "Files",
   "conversation.threads.new": "New thread",
   "conversation.threads.all": "All threads",
+  "conversation.threads.allUnread": "All threads, new replies",
   "conversation.threads.open": "Open threads",
   "conversation.threads.current": "Thread: {title}",
   "conversation.threads.actions": "Thread actions",

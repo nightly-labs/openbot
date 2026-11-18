@@ -11,6 +11,7 @@ import {
   type WAMessageKey,
 } from "@openbot/whatsapp/baileys";
 import { Effect, Result } from "effect";
+import { imageSize } from "../../image-size";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import {
   type ConnectionIdentity,
@@ -24,9 +25,11 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type MessagingPlaces,
   type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
+  WhatsAppRefusedError,
 } from "../messaging-types";
 import { WhatsAppArchive } from "./whatsapp-archive";
 import {
@@ -36,7 +39,6 @@ import {
   whatsAppQuoteId,
   whatsAppThreadKey,
 } from "./whatsapp-events";
-import { imageSize } from "./whatsapp-image-size";
 import { downloadWhatsAppMedia } from "./whatsapp-media";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
@@ -45,9 +47,22 @@ import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
 const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
+/** The longest caption that WhatsApp's own API takes; a longer text goes before the file, apart. */
+const WHATSAPP_CAPTION_LIMIT = 1_024;
+/**
+ * The adapter's own reasons that a post did not go, which a second post would meet too. The last one
+ * says that WhatsApp can have the post already.
+ */
+const WHATSAPP_POST_STOPS = new Set(["place_not_allowed", "not_linked", "not_connected", "not_confirmed"]);
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
+/**
+ * Why a history read has fewer messages than it asked for. Without it, an empty read looks like a
+ * broken connection. The rules are in `senderDecision` and `whatsAppInbound`.
+ */
+const SAVED_HISTORY_NOTE =
+  "WhatsApp sends no older messages to OpenBot. OpenBot has only the messages that it received after the number was linked and the chat was allowed, up to 1 day old on arrival, for 90 days. In a chat with a contact, the messages that the user sent from their phone are not saved. Fewer messages here does not mean that the connection has a problem: tell the user what OpenBot can read.";
 
 /** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
@@ -77,6 +92,8 @@ export interface WhatsAppCredentials {
   ownNumber: boolean;
   /** False when the owner turned off the "Working on it…" post: a request then gets only its answer. */
   workingMessage: boolean;
+  /** False when the owner turned off the status reactions: a request then gets no 👀, ✅, ❌ or 🫡. */
+  statusReactions: boolean;
 }
 
 export function whatsAppCredentials(values: Record<string, string>): WhatsAppCredentials {
@@ -85,6 +102,7 @@ export function whatsAppCredentials(values: Record<string, string>): WhatsAppCre
     storeKey: Buffer.from(values.whatsappStoreKey ?? "", "base64"),
     ownNumber: values.ownNumber !== "0",
     workingMessage: values.workingMessage !== "0",
+    statusReactions: values.statusReactions !== "0",
   };
 }
 
@@ -263,21 +281,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
-          const size = yield* Effect.tryPromise({
-            try: () => stat(file.path).then((info) => info.size),
-            catch: (cause) => new MessagingAdapterError({ cause }),
-          });
-          if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return false;
-          const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
-          // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
-          const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
-          const content: AnyMessageContent = image
-            ? { image: { url: file.path }, mimetype: image, ...dimensions }
-            : {
-                document: { url: file.path },
-                fileName: file.name.slice(0, 255) || "file",
-                mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
-              };
+          const content = yield* this.#fileContent(file);
+          if (!content) return false;
           const messageId = yield* this.#send(target, content);
           if (messageId) firstId ??= messageId;
           return true;
@@ -286,6 +291,56 @@ class WhatsAppAdapter implements MessagingAdapter {
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
     return { skipped, firstId };
+  });
+
+  /**
+   * One message: the file with the text as its caption, so that the text cannot go missing while the
+   * file arrives. Null when they must go apart: the text is too long, the file cannot be read, or its
+   * send failed on the way.
+   */
+  readonly postFileWithText = Effect.fnUntraced(function* (
+    this: WhatsAppAdapter,
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ) {
+    const chunks = whatsAppChunks(markdown);
+    const caption = chunks.length === 1 ? (chunks[0] ?? "") : "";
+    if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
+    // An unreadable file goes apart, so the text is still posted and the result names the file.
+    const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (!content) return null;
+    // A refusal, or a reason that a second post would meet too, fails the post: WhatsApp counts each
+    // refused post against the number. Any other failure, such as a media upload, sent nothing: the
+    // text and the file then go apart, so the text is still posted.
+    return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) }).pipe(
+      Effect.catch((failure) => {
+        const cause = failure.cause;
+        const stops =
+          cause instanceof WhatsAppRefusedError || (cause instanceof Error && WHATSAPP_POST_STOPS.has(cause.message));
+        return stops ? Effect.fail(failure) : Effect.succeed(null);
+      }),
+    );
+  });
+
+  /** The message of a file: an image shows in the chat, any other file is a document. Null when it cannot go. */
+  readonly #fileContent = Effect.fnUntraced(function* (this: WhatsAppAdapter, file: MessagingAnswerFile) {
+    const size = yield* Effect.tryPromise({
+      try: () => stat(file.path).then((info) => info.size),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
+    if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return null;
+    const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
+    // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
+    const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
+    const content: AnyMessageContent = image
+      ? { image: { url: file.path }, mimetype: image, ...dimensions }
+      : {
+          document: { url: file.path },
+          fileName: file.name.slice(0, 255) || "file",
+          mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
+        };
+    return content;
   });
 
   history(
@@ -308,7 +363,10 @@ class WhatsAppAdapter implements MessagingAdapter {
     filter?: HistoryFilter,
   ): Effect.Effect<RecentMessages, MessagingAdapterError> {
     return Effect.try({
-      try: () => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit, filter) }),
+      try: () => {
+        const messages = this.#handle.chats.recent(platformChannelId, threadKey, limit, filter);
+        return messages.length < limit ? { messages, note: SAVED_HISTORY_NOTE } : { messages };
+      },
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
   }
@@ -350,19 +408,21 @@ class WhatsAppAdapter implements MessagingAdapter {
       }
       const known = this.#handle.chats.groupName(platformChannelId);
       if (known) return known;
-      const metadata = yield* this.#handle.session
-        .groupMetadata(platformChannelId)
-        .pipe(Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }));
+      // A name is not worth a failed list: a slow or refused lookup gives the fallback name, and the next call asks again.
+      const metadata = yield* this.#handle.session.groupMetadata(platformChannelId).pipe(
+        Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+        Effect.orElseSucceed(() => null),
+      );
       this.#handle.chats.rememberGroup(platformChannelId, metadata?.subject);
       return this.#handle.chats.groupName(platformChannelId) ?? "WhatsApp group";
     });
   }
 
   /** The owner's own chat and the allowed chats. OpenBot posts nowhere else. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       const identity = whatsAppIdentity(this.#handle);
-      if (!identity) return [];
+      if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
       const places: MessagingPlace[] = [];
       if (rules.ownNumber)
@@ -371,14 +431,15 @@ class WhatsAppAdapter implements MessagingAdapter {
           name: sourceText("status.messaging.whatsappOwnChat"),
           kind: "chat",
         });
-      for (const contact of rules.contacts)
+      // The name that the user saved in the app settings comes first, so an agent finds the contact by it.
+      for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),
-          name: this.#handle.chats.name(contact) ?? maskedNumber(contact),
+          name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
         });
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
-      return places;
+      return { places };
     });
   }
 

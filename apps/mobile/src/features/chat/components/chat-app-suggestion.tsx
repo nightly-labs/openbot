@@ -71,6 +71,7 @@ function blockedState(access: { online: boolean; administers: boolean }): Sugges
 function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; messageId: string; slug: string }) {
   const { session } = useMobileSession();
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
+  const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   // A member reads no MCP list, so the app shows as not connected; the card then says who can connect it.
   const { canManage, list: mcpServers } = useMcpServerList(serverId);
   const access = useServerAccess(serverId);
@@ -83,16 +84,20 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
   const { plugin } = listing;
   const app = plugin.apps[0] ?? null;
   const method = app ? pluginConnectMethod(app, canRelay) : null;
-  const state: SuggestionState = !canManage
-    ? blockedState(access)
-    : mcpServers.data
-      ? pluginInstalled(plugin, mcpServers.data)
-        ? "connected"
-        : "available"
-      : // A failed read cannot tell; Connect opens the listing, which shows the real state.
-        mcpServers.isError
-        ? "available"
-        : "pending";
+  // An app that drives Apple apps does not run on a server that is not a Mac.
+  const state: SuggestionState =
+    macUnavailable && plugin.apps.some((entry) => entry.needsMac)
+      ? "unavailable"
+      : !canManage
+        ? blockedState(access)
+        : mcpServers.data
+          ? pluginInstalled(plugin, mcpServers.data)
+            ? "connected"
+            : "available"
+          : // A failed read cannot tell; Connect opens the listing, which shows the real state.
+            mcpServers.isError
+            ? "available"
+            : "pending";
   return (
     <SuggestionCard
       messageId={messageId}
@@ -144,7 +149,8 @@ function ConnectorSuggestion({
           ? "unavailable"
           : row.status === "connected"
             ? "connected"
-            : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
+            : // `attention` needs a new sign-in, `paused` needs Resume, and `unknown` failed to read: the
+              // connector page shows each.
               "available";
   return (
     <SuggestionCard

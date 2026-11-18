@@ -46,12 +46,12 @@ function useDebounced(value: string, delay: number): string {
  * owner or admin can set up from the phone, and each MCP server that the user added. A member reads
  * neither, so a member sees only the plugin apps.
  */
-function useServerApps(serverId: string): MarketplaceListing[] {
+function useServerApps(serverId: string) {
   const { t } = useText();
   const rows = useConnectorRows(serverId);
   const { list: mcpServers } = useMcpServerList(serverId);
-  return useMemo(
-    () => [
+  const apps = useMemo(
+    (): MarketplaceListing[] => [
       ...rows.flatMap(
         (row) => connectorListing(row, t(CONNECTOR_TITLE_KEYS[row.id]), t(CONNECTOR_TAGLINES[row.id])) ?? [],
       ),
@@ -61,6 +61,8 @@ function useServerApps(serverId: string): MarketplaceListing[] {
     ],
     [rows, mcpServers.data, t],
   );
+  // The Marketplace is the only list of the custom MCP servers, so a failed read shows with a retry.
+  return { apps, mcpServers };
 }
 
 /**
@@ -78,7 +80,7 @@ export function useMarketplaceCatalog({
   filter: MarketplaceFilter;
 }) {
   const { session } = useMobileSession();
-  const serverApps = useServerApps(serverId);
+  const { apps: serverApps, mcpServers } = useServerApps(serverId);
   const apiUrl = session?.apiUrl ?? null;
   const search = useDebounced(query.trim(), SEARCH_DEBOUNCE_MS);
   const category = filter.category;
@@ -130,11 +132,11 @@ export function useMarketplaceCatalog({
     search,
     pending,
     /**
-     * A catalog read failed with nothing to show for it. The bundled apps always list, so the listings
-     * are never empty and cannot tell this.
+     * A catalog read failed with nothing to show for it, or the MCP server list of the server failed.
+     * The bundled apps always list, so the listings are never empty and cannot tell this.
      */
-    failed: (agents.isError && !agents.data) || (skills.isError && !skills.data),
-    refetch: () => Promise.all([agents.refetch(), skills.refetch()]),
+    failed: (agents.isError && !agents.data) || (skills.isError && !skills.data) || mcpServers.isError,
+    refetch: () => Promise.all([agents.refetch(), skills.refetch(), mcpServers.isError ? mcpServers.refetch() : null]),
     /** The catalog has more agents or skills than the listings show. */
     hasMore: agentsMore || skillsMore,
     loadingMore: agents.isFetchingNextPage || skills.isFetchingNextPage,

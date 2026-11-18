@@ -488,6 +488,13 @@
   width: 168px;
 }
 
+/* The backdrop row: Remove, "Upload image…" and the select, on one line. */
+.settings-backdrop-control {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
 /* Long choices, such as browser names, voice models and timezones. */
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-link-select {
   width: 220px;

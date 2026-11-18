@@ -51,7 +51,7 @@ import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-app
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
-import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
+import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -1110,7 +1110,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ticket: string,
     ): Effect.fn.Return<VerifiedRemoteSessionTicket, CentralAuthOperationError, CentralAuthTransport> {
       const verify = Effect.gen({ self: this }, function* () {
-        if (!this.#remoteTicketJwks) this.#remoteTicketJwks = yield* Effect.cached(this.#fetchRemoteTicketJwks());
+        // Keep only a loaded key set. A failed load must not refuse every later client until a restart.
+        if (!this.#remoteTicketJwks)
+          this.#remoteTicketJwks = yield* this.#fetchRemoteTicketJwks().pipe(
+            Effect.cachedWithTTL((exit) => (Exit.isSuccess(exit) ? Duration.infinity : 0)),
+          );
         const jwks = yield* this.#remoteTicketJwks;
         const keySet = yield* authDecode(() => createLocalJWKSet(jwks));
         return yield* authCall(() =>
@@ -2588,6 +2592,11 @@ export function authApiRateLimit(error: unknown): { code: string; retryAfterSeco
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
 }
 
+/** The error code that the account service sent, such as `feedback_not_yours`, or null for another failure. */
+export function authApiErrorCode(error: unknown): string | null {
+  return error instanceof AuthApiError ? error.code : null;
+}
+
 /**
  * A client error that the same request cannot change, such as a machine token that the account service
  * no longer accepts (401). A timeout and a rate limit can pass later.
@@ -2654,6 +2663,9 @@ const INTERCEPTED_TLS_CODES = new Set([
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
   "CERT_UNTRUSTED",
   "ERR_TLS_CERT_ALTNAME_INVALID",
+  // Chromium's names for the same failures, when the app sends the requests through `net.fetch`.
+  "ERR_CERT_AUTHORITY_INVALID",
+  "ERR_CERT_COMMON_NAME_INVALID",
 ]);
 
 function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
@@ -2712,7 +2724,8 @@ function authApiIssue(error: AuthApiError): CentralAuthIssue {
 
 /**
  * Why the account service did not answer: no network, no answer in time, or a 5xx. The errno of a
- * network failure is a fixed token, such as `ECONNREFUSED`, so it can go in the reference.
+ * network failure is a fixed token, such as `ECONNREFUSED` or Chromium's `ERR_CONNECTION_REFUSED`, so
+ * it can go in the reference.
  */
 function serviceUnavailableText(error: unknown): { message: string; reference: string | null } {
   if (error instanceof AuthApiError) {

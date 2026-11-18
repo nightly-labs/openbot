@@ -86,10 +86,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Seul le propriétaire peut supprimer ce serveur.",
   "error.remote.requestTimeout": "La requête distante a expiré.",
   "error.remote.requestFailed": "La requête distante a échoué.",
-  "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",
+  "error.remote.hostKeyMissing":
+    "OpenBot ne peut pas vérifier ce serveur, car sa clé de sécurité est absente ou a changé. Demandez au propriétaire du serveur de le vérifier.",
+  "error.remote.connectionNotStarted":
+    "OpenBot n’a pas pu démarrer la connexion à ce serveur. Si le problème persiste, quittez OpenBot et rouvrez-le.",
   "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
-  "error.remote.hostDisconnected": "L’hôte WebRTC s’est déconnecté.",
+  "error.remote.hostDisconnected":
+    "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",
   "error.remote.eventGap": "La séquence d’événements de l’hôte présente un trou.",
   "error.remote.malformedKnownEvent": "L’hôte a renvoyé un événement connu mal formé.",
   "error.remote.fileTransportIsStopped": "Le transport de fichiers WebRTC est arrêté.",
@@ -155,6 +159,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L’hôte a refusé la pièce jointe.",
   "error.remote.attachmentTooLarge": "Les pièces jointes doivent faire 10 Mo au maximum.",
   "error.remote.attachmentBusy": "Attendez la fin de l’envoi de la pièce jointe en cours.",
+  "error.remote.attachmentChanged": "Le fichier a changé ou n’est pas disponible. Sélectionnez-le à nouveau.",
   "error.remote.uploadTimeout": "L’envoi de la pièce jointe a expiré.",
   "error.remote.hostSessionActive": "L’hôte a déjà une session distante active.",
   "error.remote.tooManyConnections": "Trop de connexions distantes actives.",
@@ -209,6 +214,9 @@ export const messages = {
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.serverNotLoaded": "OpenBot n'a pas pu charger le serveur. Réessayez.",
+  "error.remote.localServerNotStarted":
+    "Le serveur sur cet ordinateur n'a pas démarré. Réessayez. S'il ne démarre toujours pas, redémarrez OpenBot sur cet ordinateur.",
   "error.remote.localServerAccountRemovalFailed":
     "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

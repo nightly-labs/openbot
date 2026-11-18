@@ -1,3 +1,4 @@
+import { hostedPlanMachineMetrics } from "@openbot/contracts/hosted-servers";
 import {
   DEFAULT_MACHINE_ALERT_SETTINGS,
   type MachineMetric,
@@ -20,6 +21,7 @@ import Svg, { Circle, G } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { RingArc } from "@/features/servers/components/plan-limit-ring";
 import { useMachineMetrics } from "@/features/servers/model/use-machine-metrics";
+import { useServerDisk } from "@/features/servers/model/use-server-storage";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
@@ -52,14 +54,26 @@ const TONE_TEXT = {
  * CPU, memory and disk side by side, each with a ring and, beside it, its percentage and name. The disk opens
  * Storage. Only an owner or admin of a host with `machine-resources-v1` sees it. It is live while the
  * screen is on top. A failed read hides it, so an old reading does not look live. The colours follow
- * the default machine alert levels.
+ * the default machine alert levels. A hosted server shows its disk against the plan storage, as Storage
+ * does: its VPS disk is much larger than the plan.
  */
 export function MachineUsageSummary({ serverId }: { serverId: string }) {
   const { t } = useText();
-  const { canReadServerStorage } = useMobileWorkspace();
+  const { canReadServerStorage, servers } = useMobileWorkspace();
   const { available, query } = useMachineMetrics(serverId);
-  const metrics = query.data;
-  if (!available || !metrics || query.isError) return null;
+  const server = servers.find((item) => item.id === serverId);
+  const planGb = server?.hosted === true ? (server.storageGb ?? null) : null;
+  // The size of the users' files. A failed read counts them from the free space.
+  const disk = useServerDisk(serverId, available && planGb !== null);
+  const reading = query.data;
+  if (!available || !reading || query.isError) return null;
+  // Until the first answer comes, the disk is unknown, so the whole VPS disk never shows.
+  const metrics =
+    planGb === null
+      ? reading
+      : disk.isPending
+        ? { ...reading, diskUsedBytes: null, diskFreeBytes: null, diskTotalBytes: null }
+        : hostedPlanMachineMetrics(reading, planGb, disk.data?.userBytes ?? null);
   if (METRIC_ORDER.every((metric) => machineMetricPercent(metrics, metric) === null)) return null;
   const openStorage = canReadServerStorage(serverId)
     ? () => {

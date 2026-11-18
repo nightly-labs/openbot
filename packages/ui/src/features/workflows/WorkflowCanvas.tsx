@@ -152,6 +152,7 @@ import {
   union,
 } from "./workflow-ink";
 import { workflowLoops } from "./workflow-loops";
+import { mergeWorkflowGraphs } from "./workflow-merge";
 import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 import {
   BLOCK_RESIZE,
@@ -179,11 +180,14 @@ import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./work
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
-  /** The open workflow. The canvas reads its graph only when it opens, or when `resetKey` changes. */
+  /**
+   * The open workflow. The canvas loads its graph when it opens, or when `resetKey` changes. A newer
+   * graph of the same workflow, from another device or an agent, merges into the canvas edits.
+   */
   workflow: WorkflowDetail;
   /**
-   * A new value loads `workflow.graph` again, as after a restore or a change from another device. Undo
-   * then puts back the canvas from before. A save of the changes of this canvas must not change it.
+   * A new value loads `workflow.graph` again in place of the canvas edits, as after a restore. Undo then
+   * puts back the canvas from before. A save of the changes of this canvas must not change it.
    */
   resetKey?: number | undefined;
   runs: WorkflowRunView;
@@ -347,6 +351,8 @@ const GRID = 20;
 const DUPLICATE_OFFSET = 32;
 /** The room that a new node takes before it renders and has a measured size. */
 const NEW_NODE = { width: 300, height: 240 };
+/** The distance in screen pixels between the places that a new node can take in the view. */
+const PLACE_STEP = 40;
 /** The fields of each kind that hold text that the user wrote, in the order that the card shows them. */
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
@@ -563,7 +569,14 @@ const fillMenu = (t: AppTranslate): readonly PickerGroup<CanvasColor>[] => [
 ];
 
 /** A graph as the canvas saves it, so a graph from the host and the same graph from the canvas compare equal. */
-const savedJson = (graph: WorkflowGraph) => stableJson(graphFromSnapshot(snapshotFromGraph(graph)));
+const asSaved = (graph: WorkflowGraph) => graphFromSnapshot(snapshotFromGraph(graph));
+const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
+
+/**
+ * The saves that the canvas remembers until the host sends them back. The canvas sends each change, and
+ * the host saves only the last one before the pause, so many changes can come before an echo.
+ */
+const SENT_LIMIT = 200;
 
 /**
  * The workflow canvas.
@@ -619,8 +632,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** The trigger whose schedule the open undo step changes. */
   let scheduleEdit: string | undefined;
   const [dropHeight, setDropHeight] = createSignal(0);
+  /** The node under the pointer. */
+  const [hoveredNode, setHoveredNode] = createSignal<string | null>(null);
 
   const canvas = createBoard({
+    focus: () => focusAsset(),
     catalogs: () => props.catalogs,
     buildState: (id) => buildState(id),
     github: () => props.github,
@@ -889,6 +905,37 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** The nodes on the canvas. Many views read the list, so it is made once for each change. */
   const live = createMemo(() => nodes().filter((node) => !board.isRemoved(node.id)));
   const kindOf = (id: string) => nodes().find((node) => node.id === id)?.kind;
+  /**
+   * The asset that the user works on: the hovered asset, else the selected one. Its reference lines
+   * draw above the other nodes, and the nodes that it does not connect to fade a little.
+   */
+  const focusAsset = createMemo(() => {
+    const hovered = hoveredNode();
+    if (hovered !== null && kindOf(hovered) === "asset" && !board.isRemoved(hovered)) return hovered;
+    const selected = board.selected();
+    return selected !== null && kindOf(selected) === "asset" && !board.isRemoved(selected) ? selected : null;
+  });
+  /** A node that goes away under the pointer gets no pointerleave, so its hover ends here. */
+  createEffect(
+    () => {
+      const hovered = hoveredNode();
+      return hovered !== null && (board.isRemoved(hovered) || kindOf(hovered) === undefined);
+    },
+    (gone) => {
+      if (gone) setHoveredNode(null);
+    },
+  );
+  /** The nodes that the focused asset connects to, with the asset itself. */
+  const focusSet = createMemo(() => {
+    const focus = focusAsset();
+    if (focus === null) return null;
+    const linked = new Set([focus]);
+    for (const edge of canvas.edges()) {
+      if (edge.from === focus) linked.add(edge.to);
+      else if (edge.to === focus) linked.add(edge.from);
+    }
+    return linked;
+  });
   /** The saved trigger of each trigger node, by node id. The first trigger of a node wins, as before. */
   const triggers = createMemo(() => {
     const byNode = new Map<string, WorkflowDetail["triggers"][number]>();
@@ -1069,17 +1116,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   );
   onCleanup(() => cancelAnimationFrame(snapFrame));
-  /** The graph that the host has, as the canvas saves it. */
+  /** The last graph that the canvas sent to the host, or that the host sent, as the canvas saves it. */
   let savedGraph = untrack(() => savedJson(props.workflow.graph));
+  /** The graph of the host that the canvas edits are on. A newer graph of the host merges with it. */
+  let baseGraph = untrack(() => asSaved(props.workflow.graph));
+  let baseJson = savedGraph;
+  /** The saves that the host did not send back yet, so that their echo does not merge as another edit. */
+  let sent: string[] = [];
+  const send = (next: WorkflowGraph) => {
+    const json = stableJson(next);
+    if (json === savedGraph) return;
+    savedGraph = json;
+    sent = [...sent, json].slice(-SENT_LIMIT);
+    // The host reads its own state in the callback. That read must not track.
+    untrack(() => props.onGraphChange(next));
+  };
   createEffect(
     () => (frozen() || deleted() ? undefined : graph()),
     (next) => {
-      if (!next) return;
-      const json = stableJson(next);
-      if (json === savedGraph) return;
-      savedGraph = json;
-      // The host reads its own state in the callback. That read must not track.
-      untrack(() => props.onGraphChange(next));
+      if (next) send(next);
     },
   );
 
@@ -1090,7 +1145,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
     const snapshot = snapshotFromGraph(next);
-    savedGraph = savedJson(next);
+    baseGraph = graphFromSnapshot(snapshot);
+    savedGraph = stableJson(baseGraph);
+    baseJson = savedGraph;
+    sent = [];
     liveCanvas = undefined;
     scheduleEdit = undefined;
     canvas.endTyping();
@@ -1116,12 +1174,96 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   // what its compute function reads, even when the value is the same.
   const resetToken = createMemo(() => `${props.workflow.summary.id}\u0000${props.resetKey ?? ""}`);
   let openedId: string | undefined;
-  createEffect(resetToken, () => {
+  /** The reset token of the graph in `baseGraph`. A graph with another token waits for its reset. */
+  let baseToken: string | undefined;
+  createEffect(resetToken, (token) => {
     const id = untrack(() => props.workflow.summary.id);
     const before = openedId;
     openedId = id;
+    baseToken = token;
     if (before !== undefined) untrack(() => reset(props.workflow.graph, before === id));
   });
+
+  /** Puts a merged graph on the canvas, and writes only what changed: typing, a drag and the view stay. */
+  const mergeIn = (merged: WorkflowGraph) => {
+    const snapshot = snapshotFromGraph(merged);
+    const ids = new Set(snapshot.nodes.map((node) => node.id));
+    // The same item objects, so that a node that did not change does not mount again.
+    const known = new Map(nodes().map((node) => [node.id, node]));
+    const items = snapshot.nodes.map((item) => {
+      const old = known.get(item.id);
+      return old && stableJson(old) === stableJson(item) ? old : item;
+    });
+    const later = nodes().filter((node) => !ids.has(node.id));
+    const next = [...items, ...later];
+    if (next.some((node, index) => nodes()[index] !== node) || next.length !== nodes().length) setNodes(next);
+    setPositions((draft) => {
+      for (const id of Object.keys(draft)) if (!(id in snapshot.positions)) delete draft[id];
+      for (const [id, at] of Object.entries(snapshot.positions)) {
+        if (draft[id]?.x !== at.x || draft[id]?.y !== at.y) draft[id] = { ...at };
+      }
+    });
+    setSizes((draft) => {
+      for (const id of Object.keys(draft)) if (!(id in snapshot.sizes)) delete draft[id];
+      for (const [id, size] of Object.entries(snapshot.sizes)) {
+        if (stableJson(draft[id]) !== stableJson(size)) draft[id] = { ...size };
+      }
+    });
+    canvas.sync({ ...snapshot.board, removed: later.map((node) => node.id) });
+    const drawn = new Map(strokes().map((stroke) => [stroke.id, stroke]));
+    const lines = snapshot.strokes.map((stroke) => {
+      const old = drawn.get(stroke.id);
+      return old && stableJson(old) === stableJson(stroke) ? old : stroke;
+    });
+    if (lines.length !== strokes().length || lines.some((stroke, index) => strokes()[index] !== stroke)) {
+      setStrokes(lines);
+    }
+  };
+  /**
+   * Takes a newer graph of the host for the open workflow. The echo of a save of this canvas only moves
+   * the base. Another edit merges with the canvas edits, and with each snapshot of undo and redo, so
+   * undo takes back only the edits of this device. The merged graph then saves, as the host does not
+   * have the edits of this canvas yet.
+   */
+  const takeHostGraph = (incoming: WorkflowGraph) => {
+    const theirs = asSaved(incoming);
+    const json = stableJson(theirs);
+    if (json === baseJson) return;
+    const before = baseGraph;
+    baseGraph = theirs;
+    baseJson = json;
+    savedGraph = json;
+    const echo = sent.indexOf(json);
+    if (echo !== -1) {
+      // The later saves are still on their way, so the canvas compares with the last of them.
+      sent = sent.slice(echo + 1);
+      savedGraph = sent.at(-1) ?? json;
+      return;
+    }
+    sent = [];
+    const rebase = (snapshot: CanvasSnapshot): CanvasSnapshot => {
+      const graphOf = mergeWorkflowGraphs(before, graphFromSnapshot(snapshot), theirs);
+      const next = snapshotFromGraph(graphOf);
+      const ids = new Set(graphOf.nodes.map((node) => node.id));
+      return { ...next, board: { ...next.board, selection: snapshot.board.selection.filter((id) => ids.has(id)) } };
+    };
+    edits.rebase(rebase);
+    if (liveCanvas) {
+      liveCanvas = rebase(liveCanvas);
+      return;
+    }
+    const merged = asSaved(mergeWorkflowGraphs(before, graphFromSnapshot(capture()), theirs));
+    mergeIn(merged);
+    // The canvas reads its stores again only after the flush, so the save takes the merged graph, not
+    // `capture()`. A drag sends its graph when it ends.
+    if (!frozen() && !deleted() && !gesturing()) send(merged);
+  };
+  createEffect(
+    () => [resetToken(), props.workflow.graph] as const,
+    ([token, incoming]) => {
+      if (token === baseToken) untrack(() => takeHostGraph(incoming));
+    },
+  );
   // The host opens another workflow when a delete is kept, so the canvas shows again. A switch while
   // the Undo toast is open keeps that delete.
   const workflowId = createMemo(() => props.workflow.summary.id);
@@ -1377,30 +1519,67 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   /**
-   * Adds a node with its top-left corner at a world point, or centred in the view. A node centred in the
-   * view moves to the right past each card that it would cover, so it does not hide them.
+   * The place in the view nearest to its centre where a box of this size covers no card, on the grid. A
+   * place with a gap to each card comes first. A card that has no measured size yet takes the room of
+   * NEW_NODE. The margin of a fit stays free at the edges, so the bars over the canvas do not hide the
+   * box. When the view has no free place, the box goes to the centre. The view is where the camera stops
+   * after a glide.
+   */
+  const freePlace = (size: { width: number; height: number }, except: string): WfnPoint => {
+    const { width, height } = view();
+    const { x, y, scale } = target();
+    const cards = untrack(() =>
+      live().flatMap((node) => {
+        if (node.kind === "text" || node.kind === "shape" || node.id === except) return [];
+        const at = positions[node.id];
+        const box = boxOf(node.id) ?? (at && { ...at, ...NEW_NODE });
+        return box ? [box] : [];
+      }),
+    );
+    const margin = FIT_MARGIN / scale;
+    const left = -x / scale + margin;
+    const top = -y / scale + margin;
+    const right = left + width / scale - 2 * margin - size.width;
+    const bottom = top + height / scale - 2 * margin - size.height;
+    const center = snapPoint({ x: (left + right) / 2, y: (top + bottom) / 2 });
+    if (right < left || bottom < top) return center;
+    // The places are some screen pixels apart, so their count does not change with the zoom.
+    const step = Math.max(SNAP, Math.round(PLACE_STEP / scale / SNAP) * SNAP);
+    const across = Math.floor((right - left) / 2 / step);
+    const down = Math.floor((bottom - top) / 2 / step);
+    const places: WfnPoint[] = [];
+    for (let column = -across; column <= across; column++)
+      for (let row = -down; row <= down; row++) places.push({ x: center.x + column * step, y: center.y + row * step });
+    const distance = (at: WfnPoint) => Math.hypot(at.x - center.x, at.y - center.y);
+    places.sort((one, other) => distance(one) - distance(other));
+    const free = (gap: number) => (at: WfnPoint) =>
+      !cards.some((box) =>
+        overlaps({ x: at.x - gap, y: at.y - gap, width: size.width + gap * 2, height: size.height + gap * 2 }, box),
+      );
+    return places.find(free(GRID * 2)) ?? places.find(free(0)) ?? center;
+  };
+
+  /**
+   * Adds a node with its top-left corner at a world point, or in a free place in the view. The place in
+   * the view uses the size of the node after its first layout, before the node shows.
    */
   const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
-    const { width, height } = view();
-    const center = toWorld({ x: width / 2, y: height / 2 });
     const id = `${kind}-${crypto.randomUUID()}`;
-    let at = snapPoint(point ?? { x: center.x - NEW_NODE.width / 2, y: center.y - NEW_NODE.height / 2 });
-    if (!point) {
-      const cards = untrack(() =>
-        boxesOf(live().flatMap((node) => (node.kind === "text" || node.kind === "shape" ? [] : [node.id]))),
-      );
-      // Each move passes one card, so the loop ends after one move for each card at most.
-      for (let hit = cards.find((box) => overlaps({ ...at, ...NEW_NODE }, box)); hit; ) {
-        at = snapPoint({ x: hit.x + hit.width + GRID * 2, y: at.y });
-        hit = cards.find((box) => overlaps({ ...at, ...NEW_NODE }, box));
-      }
-    }
     setPositions((draft) => {
-      draft[id] = at;
+      draft[id] = point ? snapPoint(point) : freePlace(NEW_NODE, id);
     });
     canvas.putFields(id, { ...fields, ...hostDefaults(kind, props.catalogs, props.features, fields) });
     setNodes((list) => [...list, kind === "trigger" ? { id, kind, schedule: newTriggerSchedule() } : { id, kind }]);
+    if (!point)
+      afterLayout(() => {
+        const element = slot(id);
+        if (!element) return;
+        const next = freePlace({ width: element.offsetWidth, height: element.offsetHeight }, id);
+        setPositions((draft) => {
+          draft[id] = next;
+        });
+      });
     return id;
   };
 
@@ -2907,6 +3086,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       data-kind={node().kind}
                       data-peer={ringOn(node().id) ? "" : undefined}
                       data-build={buildState(node().id)}
+                      data-focus={focusSet()?.has(node().id) ? "" : undefined}
+                      data-dim={focusSet()?.has(node().id) === false ? "" : undefined}
+                      // A drag (a connection, a move, a frame) that passes over a node does not change the focus.
+                      onPointerEnter={(event) => {
+                        if (event.buttons === 0) setHoveredNode(node().id);
+                      }}
+                      onPointerLeave={() => {
+                        if (hoveredNode() === node().id) setHoveredNode(null);
+                      }}
                       style={{
                         left: `${positions[node().id]?.x ?? 0}px`,
                         top: `${positions[node().id]?.y ?? 0}px`,

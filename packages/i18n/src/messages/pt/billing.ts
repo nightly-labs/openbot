@@ -211,4 +211,10 @@ export const messages = {
     other:
       "Sua licença tem {count} usuários, o máximo. Fale conosco para uma licença maior. Novas pessoas não podem entrar nos seus servidores.",
   },
+  "billing.details.country": "País de cobrança",
+  "billing.details.countryPlaceholder": "Escolha um país",
+  "billing.details.vatId": "Número de IVA da UE (opcional)",
+  "billing.details.vatIdInvalid": "Este não é um número de IVA do país escolhido.",
+  "billing.details.countryMissing": "Escolha o país de cobrança.",
+  "billing.details.saveFailed": "Não foi possível salvar os dados de cobrança",
 } as const satisfies PartialTranslation<typeof source>;

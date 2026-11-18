@@ -18,9 +18,17 @@ export const messages = {
     "OpenBot не смог установить CLI 1Password. Проверьте подключение к интернету и повторите попытку.",
   "error.connector.onePasswordCliSignedOut":
     "В CLI 1Password не выполнен вход. Включите его интеграцию в приложении 1Password и подключитесь снова.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot не может связаться с приложением 1Password. Откройте 1Password и разблокируйте его. В разделе «Настройки» > «Разработчик» проверьте, что параметр «Integrate with 1Password CLI» включён. Затем повторите попытку.",
   "error.connector.onePasswordCliFailed": "CLI 1Password завершился с ошибкой: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Ваш аккаунт 1Password не позволяет вам создать общее хранилище или сервисный аккаунт. Попросите владельца или администратора аккаунта дать это разрешение или выдать токен сервисного аккаунта, затем нажмите «Использовать токен».",
   "error.connector.onePasswordUnexpected": "1Password прислал неожиданный ответ: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password не принял токен сервисного аккаунта.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot не смог подключиться к 1Password. Проверьте подключение к интернету и повторите попытку.",
+  "error.connector.onePasswordRateLimited":
+    "1Password получил слишком много запросов. Подождите несколько минут и повторите попытку.",
   "error.connector.onePasswordNoVault":
     "Сервисный аккаунт не может читать ни одно хранилище. Дайте ему доступ к хранилищу и повторите попытку.",
   "error.connector.onePasswordFileUnreadable": "Файл подключения 1Password не читается.",
@@ -46,6 +54,8 @@ export const messages = {
     "Не удалось установить Proton Pass CLI. Проверьте сетевое подключение и подключитесь снова.",
   "error.connector.protonPassPlan":
     "Ваш тариф Proton не разрешает Proton Pass CLI. Смените тариф и подключитесь снова.",
+  "error.connector.protonPassPlanMissing":
+    "Ваш тариф Proton не включает Proton Pass CLI. Нужен тариф Proton, который включает Pass Plus. Смените тариф и подключитесь снова.",
   "error.connector.protonPassExpired": "Доступ к Proton Pass закончился. Подключитесь снова.",
   "error.connector.protonPassKeyInvalid": "Введите ключ доступа Proton Pass, который начинается с pst_.",
   "error.connector.protonPassExtraPassword": "Дополнительный пароль неверен. Введите его снова.",

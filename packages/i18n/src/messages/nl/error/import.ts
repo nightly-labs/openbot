@@ -105,7 +105,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: voer de API-sleutel opnieuw in bij Instellingen.",
   "error.import.transferAgentEnv": "{name}: voer de waarden van {names} opnieuw in bij Instellingen.",
   "error.import.transferMcpValues":
-    "{name}: de MCP-server is uitgeschakeld toegevoegd. Controleer de opdracht, voer de waarden en het volledige adres opnieuw in, en zet hem aan in de MCP-instellingen.",
+    "{name}: de MCP-server is uitgeschakeld toegevoegd. Controleer de opdracht, voer de waarden en het volledige adres opnieuw in, en zet hem aan in Marktplaats, Apps.",
   "error.import.transferValuesCleared":
     "{name}: waarden die een geheim kunnen bevatten, zijn verwijderd uit de argumenten of het adres. Voer ze opnieuw in bij Instellingen.",
   "error.import.transferSharedKept": "{number} bestanden in de map Shared staan hier al, dus ze blijven zoals ze zijn.",

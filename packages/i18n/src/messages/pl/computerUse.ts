@@ -20,6 +20,10 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot widzi aplikacje na tym komputerze i może ich używać. Ten system nie wymaga dodatkowych uprawnień.",
   "computerUse.openSettingsFailed.title": "Nie udało się otworzyć Ustawień systemowych",
+  "computerUse.restartRequired.title": "Wymagane ponowne uruchomienie",
+  "computerUse.restartRequired.description":
+    "macOS nadal blokuje klikanie i pisanie. Jeśli to wróci po ponownym uruchomieniu, usuń OpenBot z Dostępności i dodaj go ponownie.",
+  "computerUse.restartRequired.action": "Uruchom ponownie OpenBot",
   "computerUse.compact.title": "Włącz Sterowanie komputerem",
   "computerUse.compact.description": "Pozwól OpenBot widzieć aplikacje na tym komputerze i ich używać.",
   "computerUse.granted": "Przyznano",

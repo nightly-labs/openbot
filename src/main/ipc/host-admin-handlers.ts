@@ -38,11 +38,16 @@ import {
   hostSkillLearning,
   isClaudeCompactWindowTokens,
   isPromptCacheTtl,
+  isProviderEnvironmentProvider,
   isSkillLearningMode,
   LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
+  PROVIDER_ENVIRONMENT_LIMITS,
   type PromptCacheTtl,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
+  type ProviderEnvironmentVariableInput,
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
   parseHostTurnLimitsInput,
@@ -110,6 +115,11 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  decodeProviderEnvironmentResponse,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -125,6 +135,7 @@ import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
+import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { ServerAuditStore } from "../server-audit-store";
@@ -136,6 +147,7 @@ import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { parseHostIdentity } from "./server-inputs";
 import { withLocalHostSummary } from "./team-handlers";
+import { isObject } from "./validation";
 
 interface HostAdminRemoteServers {
   list(): ServerSummary[];
@@ -167,6 +179,7 @@ interface HostAdminIpcDependencies {
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
+  providerEnvironment: Pick<ProviderEnvironmentControl, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
@@ -197,6 +210,7 @@ export function hostAdminIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   claudeCompactWindow,
+  providerEnvironment,
   modelVisibility,
   agentAccess,
   serverAudit,
@@ -273,6 +287,17 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.claudeCompactWindowUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeClaudeCompactWindowResponse, { method: "POST", body }),
+    );
+  }
+  function remoteProviderEnvironment(
+    serverId: string,
+    route: string,
+    body: ProviderEnvironmentUpdate | { provider: ProviderEnvironmentProvider },
+  ) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_ENVIRONMENT_CAPABILITY))
+      throw new Error(sourceText("error.team.providerEnvironmentUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeProviderEnvironmentResponse, { method: "POST", body }),
     );
   }
   function remoteModelVisibility(
@@ -534,6 +559,15 @@ export function hostAdminIpcHandlers({
         remote: (tokens, serverId) =>
           remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.update, { tokens }),
       }),
+      getProviderEnvironment: scopedHandler(parseProviderEnvironmentProvider, {
+        local: (provider) => providerEnvironment.get(provider),
+        remote: (provider, serverId) =>
+          remoteProviderEnvironment(serverId, PROVIDER_ENVIRONMENT_ROUTES.settings, { provider }),
+      }),
+      setProviderEnvironment: scopedHandler(parseProviderEnvironmentUpdate, {
+        local: (update) => runCauseEffect(providerEnvironment.set(update)),
+        remote: (update, serverId) => remoteProviderEnvironment(serverId, PROVIDER_ENVIRONMENT_ROUTES.update, update),
+      }),
       getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
         local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
         remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
@@ -607,6 +641,34 @@ function parseClaudeUserSetup(value: unknown): boolean {
 function parseClaudeCompactWindow(value: unknown): number | null {
   if (!isClaudeCompactWindowTokens(value)) throw new Error("Invalid Claude compaction size.");
   return value;
+}
+
+function parseProviderEnvironmentProvider(value: unknown): ProviderEnvironmentProvider {
+  if (!isProviderEnvironmentProvider(value)) throw new Error("A provider with variables is required.");
+  return value;
+}
+
+/** The renderer's change. A value can be a secret: no error here quotes one. */
+function parseProviderEnvironmentUpdate(value: unknown): ProviderEnvironmentUpdate {
+  if (
+    !isObject(value) ||
+    !Array.isArray(value.variables) ||
+    value.variables.length > PROVIDER_ENVIRONMENT_LIMITS.variables
+  )
+    throw new Error("Invalid provider variables.");
+  const provider = parseProviderEnvironmentProvider(value.provider);
+  const variables: ProviderEnvironmentVariableInput[] = value.variables.map((item: unknown) => {
+    if (
+      !isObject(item) ||
+      typeof item.name !== "string" ||
+      item.name.length > PROVIDER_ENVIRONMENT_LIMITS.name ||
+      typeof item.sensitive !== "boolean" ||
+      (item.value !== null && (typeof item.value !== "string" || item.value.length > PROVIDER_ENVIRONMENT_LIMITS.value))
+    )
+      throw new Error("Invalid provider variables.");
+    return { name: item.name, value: item.value, sensitive: item.sensitive };
+  });
+  return { provider, variables };
 }
 
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {

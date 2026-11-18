@@ -10,6 +10,8 @@ import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { sameAgentApartFromMessage } from "@/features/workspace/model/directory-agents";
+import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
@@ -28,9 +30,11 @@ export function AgentChatScreen() {
   const insets = useSafeAreaInsets();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
   const resolvedMessageId = Array.isArray(messageId) ? messageId[0] : messageId;
-  // Only this agent: a change elsewhere in the workspace does not render the whole chat again.
-  const agent = useMobileWorkspaceSelector((current) =>
-    current.agents.find((candidate) => candidate.id === resolvedAgentId),
+  // Only this agent: a change elsewhere in the workspace does not render the whole chat again. The
+  // chat does not show the agent's latest message preview, so a new message keeps the same agent.
+  const agent = useMobileWorkspaceSelector(
+    (current) => current.agents.find((candidate) => candidate.id === resolvedAgentId),
+    sameChatAgent,
   );
   const openedAgentId = agent?.id;
   // The app icon offers the chats that the user opened last.
@@ -76,4 +80,8 @@ export function AgentChatScreen() {
       </Pressable>
     </View>
   );
+}
+
+function sameChatAgent(previous: MobileAgent | undefined, next: MobileAgent | undefined): boolean {
+  return previous !== undefined && next !== undefined && sameAgentApartFromMessage(previous, next);
 }

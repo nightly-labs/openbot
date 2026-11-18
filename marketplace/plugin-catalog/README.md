@@ -24,6 +24,11 @@ Rules for a new entry:
   credential goes (`header` for http, `env` for stdio); the user types the
   value in the connect dialog.
 - `http` servers take a `url`. `stdio` servers take a `command` and `args`.
+  A `stdio` server can also take `env`, an object of variable names and values
+  that it always starts with, such as the address of a local app. A value is
+  never a credential, and a key cannot be a variable that an auth field types.
+  When the user connects an installed app again, the row gets each listed key
+  that it does not have. A value that the row has stays.
 - When a new version moves an `http` server to a different address, list the
   earlier address in `earlierUrls`. A row with the catalog name on one of these
   hosts, or on a subdomain, is then still the app's row. Composio lists
@@ -62,23 +67,29 @@ The listing runs `npx -y obsidian-mcp-server@3.7.2`
 (<https://github.com/cyanheads/obsidian-mcp-server>). A third party publishes
 this package and it gets write access to the vault, so the listing names one
 version. Move it only in a reviewed commit, after you check that the release
-keeps `OBSIDIAN_API_KEY` and the `http://127.0.0.1:27123` default. The server talks to the
+keeps `OBSIDIAN_API_KEY`, `OBSIDIAN_BASE_URL`, and `OBSIDIAN_VERIFY_SSL=false` as
+the default. The server talks to the
 Local REST API community plugin in the Obsidian app
 (<https://github.com/coddingtonbear/obsidian-local-rest-api>). The user types the
 plugin's API key in the connect dialog, and OpenBot gives it to the server as
 `OBSIDIAN_API_KEY`.
 
-The server uses `http://127.0.0.1:27123` by default. A listing cannot set other
-environment values, so the user turns on the plugin's HTTP server:
+The server uses `http://127.0.0.1:27123` by default, and the plugin keeps that
+HTTP server off by default. The listing sets
+`OBSIDIAN_BASE_URL=https://127.0.0.1:27124`, the plugin's HTTPS server, which is
+on by default. The plugin signs it with its own certificate, and the server
+accepts that certificate because `OBSIDIAN_VERIFY_SSL` is `false` by default.
 
 1. In Obsidian, install and enable the Local REST API plugin (version 4 or later).
 2. Open Settings > Local REST API. Copy the API key.
-3. Turn on "Enable non-encrypted (HTTP) server". Keep the port at 27123.
-4. Keep Obsidian open while agents use the vault.
+3. Keep Obsidian open while agents use the vault.
+
+Rows that version 1.0.0 saved have no `OBSIDIAN_BASE_URL` and still use port
+27123. They get the setting when the user connects the app again with the key.
 
 Troubleshooting:
 
-- The connection is refused: Obsidian is closed, or the HTTP server is off.
+- The connection is refused: Obsidian is closed, or its HTTPS server is off.
 - The server replies 401: the API key is wrong. Copy it again from the plugin settings.
 
 ## Apple apps
@@ -133,23 +144,31 @@ Troubleshooting:
 ## Omnisend
 
 The listing connects to Omnisend's own MCP server at `https://mcp.omnisend.com/mcp`
-(<https://api-docs.omnisend.com/reference/mcp-server>). The server uses OAuth with
-dynamic client registration, so the user signs in through the browser and types
-no key. The user selects the access level on Omnisend's consent screen. The
-account needs the Owner, Admin, Manager or Partner role.
+(<https://api-docs.omnisend.com/reference/mcp-server>) with an Omnisend API key in an
+`X-Api-Key` header. The user creates the key at
+<https://app.omnisend.com/integrations/api-keys>.
+
+The listing has no browser sign-in (#7722, #9372). Omnisend's documentation names only OAuth
+with dynamic client registration, but the registration endpoint accepts only the client
+names that Omnisend approved and answers OpenBot with 400 `invalid_client_metadata`
+("unknown application: OpenBot"). `/v2/mcp` names the same metadata. The server's 401
+challenge asks for "Authorization or X-Api-Key", and a tool call with a wrong key returns
+the Omnisend API's own 401, so the server passes the key to the API. No Omnisend document
+says that an API key works for MCP, and the listing was not tested with a real key. Add a
+`link` flow again when Omnisend registers OpenBot.
 
 The server shows four tools: `search`, `tool_schema`, `tool_documentation` and
 `execute`. The agent finds an Omnisend operation with `search` and runs it with
-`execute`. With write access, the operations include sending and deleting
-campaigns, automations and segments.
+`execute`. The operations include sending and deleting campaigns, automations and
+segments, when the key allows them.
 
 Troubleshooting:
 
-- A write fails with "Permission denied": the user granted read-only access.
-  Disconnect and sign in again with write access.
-- The account has more than one brand: one connection works on one brand.
-  Omnisend's guide adds a separate server for each brand with a `?brand=` query
-  parameter; add it in the MCP servers settings and select Sign in.
+- A tool answers "downstream returned 401": the key is wrong or was deleted. Create a
+  new key and connect again. The connection test does not find a wrong key: the server
+  lists its tools with any key and checks the key only when `execute` runs.
+- The account has more than one brand: one key works on one brand. Add a separate
+  server for each brand, with the key of that brand, in the MCP servers settings.
 
 ## Honcho
 
@@ -358,3 +377,79 @@ Troubleshooting:
   Sign out, sign in, and select it.
 - HTTP 429 when the connection opens: the user has 10 open sessions. Wait for old sessions to end.
 - Deleting needs 2FA on the Cloud 66 account.
+
+## HighLevel
+
+The listing connects to HighLevel's MCP server at `https://services.leadconnectorhq.com/mcp` with a
+Private Integration token (<https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html>)
+in `Authorization: Bearer pit-…` and the sub-account ID in a `locationId` header. Some tools take
+`locationId` as an argument, and other tools have no location input.
+
+The listing has no browser sign-in (#7595). The server's metadata lists 154 scopes, and its
+authorization page refuses 8 of them ("Invalid scope(s): emails/templates.readonly, …"), so a
+sign-in with the published scope list never finishes. The per-client addresses in HighLevel's guide
+(`/mcp/anthropic/v2`, `/mcp/openai/v2`, `/mcp/cursor/v2`) list the same 8 scopes and refuse a client
+that they do not recognize (#7753). Add a `link` flow again only when a sign-in with the published
+scopes finishes.
+
+Troubleshooting:
+
+- A tool answers "Invalid Private Integration token": the token is wrong, was rotated, or belongs to
+  another sub-account. Create a new token and connect again.
+- HighLevel refuses one tool but not others: the token may not have the scope that the tool needs.
+  Edit the Private Integration in HighLevel and select that scope.
+
+## HubSpot
+
+The listing starts HubSpot's own local server, `@hubspot/mcp-server`
+(<https://www.npmjs.com/package/@hubspot/mcp-server>, MIT), through `npx`. The version is pinned
+because the server can write to the CRM. To update it, review the release, change the version in
+`args`, and increase the listing `version`. The server is in beta under HubSpot's Early Adopter
+Program terms.
+
+The server reads one token from `PRIVATE_APP_ACCESS_TOKEN` and sends it as a `Bearer` token to
+`https://api.hubspot.com`. HubSpot stopped the creation of new legacy private apps on 2026-10-26, so
+the connect dialog asks for a service key
+(<https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys>).
+Only a Super admin can create one. An existing private app token also works. Not confirmed with a
+HubSpot account: that the server accepts a service key. HubSpot documents service keys for REST API
+requests with a `Bearer` header, which is what the server sends.
+
+The tools search, read, create and update CRM objects, associations and properties, create and
+update notes and tasks, and read workflows. There are no delete tools. The scopes of the key limit
+the objects that agents can read and change.
+
+HubSpot's remote server, `https://mcp.hubspot.com/`, is not in the listing. Its authorization server
+has no registration endpoint and no client metadata document, and its token endpoint needs a client
+secret (`client_secret_post`), so the smoke refuses a `link` flow. A user who wants it creates an MCP
+connector in HubSpot (Development > MCP Connectors) with the callback URL
+`http://127.0.0.1:28417/mcp-auth`, adds `https://mcp.hubspot.com/` in the MCP servers settings, enters
+the connector in the Sign-in app section, and selects Sign in.
+
+Troubleshooting:
+
+- "HubSpot access token is required": the key is empty. Connect again and paste the key.
+- A tool answers 401: the key was rotated or deleted. Create a new key and connect again.
+- A tool answers 403: the key does not have the scope for that object. Edit the key in HubSpot and
+  add the scope.
+
+## Tessie
+
+The listing connects to Tessie's MCP server at `https://mcp.tessie.com`
+(<https://developer.tessie.com/reference/mcp>) with a Tessie access token in
+`Authorization: Bearer …`. The user creates the token in Tessie's Developer Settings
+(<https://dash.tessie.com/settings/developer>). This is what Tessie's guide gives for
+agents other than Claude, ChatGPT and Grok.
+
+The listing has no browser sign-in (#9372). The authorization server
+`https://auth.tessie.com` lists a registration endpoint, but it registers only the
+clients that match its templates. It answers OpenBot with 400 `invalid_client_metadata`
+("No dynamic client registration template matched this request."). Add a `link` flow
+again only when a registration for OpenBot succeeds.
+
+The token can read the vehicles and send commands, such as unlock and remote start.
+
+Troubleshooting:
+
+- Connect shows "The server answered 401": the token is wrong or was deleted. Create a
+  new token and connect again.
