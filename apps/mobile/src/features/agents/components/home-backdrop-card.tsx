@@ -73,10 +73,7 @@ interface CardFill {
   serverId: string;
   /** The server whose card is in place. Until it is `serverId`, the part is clear. */
   cardServer: SharedValue<string>;
-  /**
-   * The list reveal has ended, after the card top is in place. The part then takes a plain opaque
-   * style: a later render cannot put back the clear first-render value of the animated style.
-   */
+  /** The list reveal has ended, after the card top is in place. When true, the fill is opaque. */
   settled: boolean;
 }
 
