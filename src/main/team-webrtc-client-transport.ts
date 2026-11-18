@@ -956,8 +956,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
       hostPublicKey = this.#hostPublicKeys.get(hostId);
     }
+    // The failure has its own code, so the user is not told that the host is down (#11530).
     if (!hostPublicKey)
-      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.pinnedKeyMissing")) });
+      return yield* new RemoteWorkflowError({
+        cause: new TeamWebRtcConnectError("host_key_missing", sourceText("error.remote.hostKeyMissing")),
+      });
     const connectTrace = this.#options.connectTrace;
     // The hidden window of the bridge loads while the control plane makes the session and the ticket.
     // `bridge.connect` below waits for the same start. A failure here is not this attempt's failure:
@@ -1152,6 +1155,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           peer: "client",
           ...(waitForHost ? { waitForHost: true } : {}),
         }),
+      ).pipe(
+        // The connect command fails only on this computer: the bridge window did not start or did not
+        // answer. Signal and the host report their failures later, as events with their own codes.
+        Effect.mapError(
+          () =>
+            new RemoteWorkflowError({
+              cause: new TeamWebRtcConnectError("bridge_failed", sourceText("error.remote.connectionNotStarted")),
+            }),
+        ),
       );
       yield* this.#assertCurrentEffect(hostId, active, connectedSessionId);
       yield* Deferred.await(connected);
@@ -1336,7 +1348,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     // The handshake started on the channel that closed, and a new channel does not start it again.
     // Without this, the attempt and each caller that joined it waited for the 30 s timeout.
     if (!active.connected && active.authentication?.started)
-      active.cancelConnectionWait?.(new Error(sourceText("error.remote.hostDisconnected")));
+      active.cancelConnectionWait?.(
+        new TeamWebRtcConnectError("host_disconnected", sourceText("error.remote.hostDisconnected")),
+      );
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
     this.#lastEventSequence.delete(hostId);

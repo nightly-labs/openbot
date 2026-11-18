@@ -81,7 +81,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.ownerOnlyRemove": "Only the owner can remove this server.",
   "error.remote.requestTimeout": "The remote request timed out.",
   "error.remote.requestFailed": "The remote request failed.",
-  "error.remote.pinnedKeyMissing": "The remote host does not have a pinned device key.",
+  "error.remote.hostKeyMissing":
+    "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
+  "error.remote.connectionNotStarted":
+    "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
   "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
   "error.remote.hostDisconnected":
