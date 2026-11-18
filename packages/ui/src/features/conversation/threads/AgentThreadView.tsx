@@ -54,7 +54,7 @@ import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerSta
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
-import { continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import {
   preferredMessageScrollBehavior,
   ScrollToLatestButton,
@@ -91,8 +91,6 @@ const HOLD_TEXT = {
 
 /** The list stays at its end while new text comes in, when the user has not scrolled up. */
 const STICK_DISTANCE = 48;
-/** As in the agent's chat: with the compact action row, a pause this long gets a time separator. */
-const THREAD_TIME_GAP_MS = 60 * 60 * 1000;
 /** A message this many view heights from the middle of the view or nearer slides into place. */
 const NEAR_SCROLL_VIEWS = 2;
 
@@ -736,7 +734,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
    */
   const timeMarkers = createMemo(() => {
     const labels = new Map<string, string>();
-    const gap = props.compactMessageActions === false ? {} : { gapMs: THREAD_TIME_GAP_MS };
+    const gap = props.compactMessageActions === false ? {} : { gapMs: CHAT_TIME_GAP_MS };
     let previous: AgentMessage | undefined;
     for (const message of shownRows()) {
       const label =
@@ -802,7 +800,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
-  const backgroundWorkSince = () => (running() ? undefined : props.backgroundWorkSince);
+  // As in the agent's chat: a live turn hides the row, also while it waits for an approval or an answer.
+  const backgroundWorkSince = () => (props.task?.state === "running" ? undefined : props.backgroundWorkSince);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
   const sendLabel = () =>

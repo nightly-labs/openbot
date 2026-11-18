@@ -24,7 +24,7 @@ import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conve
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
-import { continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -108,9 +108,6 @@ function frozenUiBlock(message: AgentMessage | undefined): ConversationUiBlock |
  * draw a card instead of a message row. None shows the header a run continues under, so none can
  * hold a run open.
  */
-/** In the agent chat, a separator with the time stands above a message that comes this long after the one before it. */
-const AGENT_CHAT_TIME_GAP_MS = 60 * 60 * 1000;
-
 function rowDrawsTime(message: AgentMessage): boolean {
   return (
     !markerOnlyMessage(message) &&
@@ -952,7 +949,7 @@ export function ConversationTimeline() {
                     return dayMarkerLabel(previous?.createdAt, current.createdAt, {
                       t,
                       format,
-                      ...(channel || !compactActions() ? {} : { gapMs: AGENT_CHAT_TIME_GAP_MS }),
+                      ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
                     });
                   return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });

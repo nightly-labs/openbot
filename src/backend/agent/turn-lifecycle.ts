@@ -619,8 +619,15 @@ export class TurnLifecycle {
   /** The chats of the agents in `agentIds` whose background work runs, by task, or null for the agent's own chat. */
   backgroundWork(agentIds: ReadonlySet<string>): Array<{ agentId: string; taskId: string | null; since: number }> {
     const work: Array<{ agentId: string; taskId: string | null; since: number }> = [];
-    for (const [threadId, { agentId, since }] of this.#waitingThreads)
-      if (agentIds.has(agentId)) work.push({ agentId, taskId: this.#taskForThread(agentId, threadId), since });
+    for (const [threadId, { agentId, since }] of this.#waitingThreads) {
+      if (!agentIds.has(agentId)) continue;
+      const taskId = this.#taskForThread(agentId, threadId);
+      // Work in a channel, a routine run or another thread of the agent waits in no chat that a client shows.
+      const ownChat =
+        !this.#conversation.isRoutineSession(threadId) &&
+        this.#conversation.publicThreadId(agentId, threadId) === this.#store.get(agentId)?.threadId;
+      if (taskId !== null || ownChat) work.push({ agentId, taskId, since });
+    }
     return work.slice(-INPUT_LIMITS.agents);
   }
 

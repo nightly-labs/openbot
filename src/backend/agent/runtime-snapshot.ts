@@ -177,6 +177,7 @@ export function buildRuntimeSnapshot({
     avatarHue: agent.avatarHue,
     avatarUrl: agent.avatarUrl,
   }));
+  const agentIds = new Set(agents.map((agent) => agent.id));
   const activeTurns: AgentRuntimeSnapshot["activeTurns"] = [];
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
@@ -226,8 +227,8 @@ export function buildRuntimeSnapshot({
     usageLimits: usageLimits.limitedAgents(),
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),
-    subagentTurns: turn.subagentTurns(new Set(agents.map((agent) => agent.id))),
-    backgroundWork: turn.backgroundWork(new Set(agents.map((agent) => agent.id))),
+    subagentTurns: turn.subagentTurns(agentIds),
+    backgroundWork: turn.backgroundWork(agentIds),
     ...(contextStates ? { contextStates } : {}),
     ...(threadContextStates ? { threadContextStates } : {}),
   });
