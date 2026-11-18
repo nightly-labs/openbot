@@ -17,6 +17,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { agentAccessLockLabel } from "../agents/agent-access";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
+import { SidebarAgentThreads } from "./SidebarAgentThreads";
 import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
@@ -68,6 +69,9 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   // The state label already reads the question, so the label does not say it twice.
   const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [rowElement, setRowElement] = createSignal<HTMLElement>();
+  /** The side threads show in the full sidebar, and not for an agent that the host stops while hidden. */
+  const threads = () => (props.compact || paused() ? undefined : props.agentThreads);
   const limit = () => {
     const current = state();
     return current?.kind === "limited" ? current : undefined;
@@ -84,6 +88,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
       <ContextMenu.Trigger
+        ref={setRowElement}
         as="button"
         type="button"
         class={[
@@ -207,6 +212,17 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
           >
             {row()}
           </SidebarWaitTooltip>
+        )}
+      </Show>
+      <Show when={threads()}>
+        {(model) => (
+          <SidebarAgentThreads
+            model={model()}
+            agentId={rowProps.agent.id}
+            agentName={rowProps.agent.name}
+            row={rowElement()}
+            menuOpen={menuOpen()}
+          />
         )}
       </Show>
     </div>

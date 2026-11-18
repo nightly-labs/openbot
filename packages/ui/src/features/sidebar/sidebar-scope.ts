@@ -33,6 +33,15 @@ export function createSidebarScope(props: SidebarProps) {
    * after a tap.
    */
   const [pointerInList, setPointerInList] = createSignal(false);
+  /** The agents whose side threads show under their rows. Only this window keeps them. */
+  const [threadsOpenIds, setThreadsOpenIds] = createSignal<ReadonlySet<string>>(new Set());
+  const agentThreadsOpen = (agentId: string) => threadsOpenIds().has(agentId);
+  const toggleAgentThreads = (agentId: string) =>
+    setThreadsOpenIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(agentId)) next.add(agentId);
+      return next;
+    });
   const {
     assignedSectionId,
     chatIsUnread,
@@ -205,6 +214,7 @@ export function createSidebarScope(props: SidebarProps) {
    * store's writers are deliberately absent: only the engine may move a drag along.
    */
   return {
+    agentThreadsOpen,
     assignChatSection,
     cancelSectionEditor,
     closeDelete,
@@ -269,6 +279,7 @@ export function createSidebarScope(props: SidebarProps) {
     startRenameSection,
     startSectionDragging,
     stopSidebarDragging,
+    toggleAgentThreads,
     unreadChats,
     updateSectionEditorName,
     updateSidebarNativeDrag,
