@@ -10,6 +10,9 @@
 // has the chats without the channel messages. The import goes into the second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
 // messages in order with the file's bytes, the side thread, and that the first turn of an imported
 // agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
+// Last, it copies two agents to a fourth profile as Copy to another server does, on desktop (the file
+// on disk) and on mobile (the file as Base64): the routines, workflows and routine canvas places of
+// those agents arrive, and the other server settings and the shared skills stay behind.
 // `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -35,6 +38,7 @@ import {
   type SkillLearningMode,
   type UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
+import { copiedTransferUpload } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -417,9 +421,14 @@ try {
   const target = profile("target");
   // A server that a released client imports into: "Import server settings" without the new flag.
   const released = profile("released");
+  // The destinations of Copy to another server, from desktop and from mobile.
+  const copied = profile("copied");
+  const copiedOnPhone = profile("copied-on-phone");
   await runCauseEffect(source.agents.initialize());
   await runCauseEffect(target.agents.initialize());
   await runCauseEffect(released.agents.initialize());
+  await runCauseEffect(copied.agents.initialize());
+  await runCauseEffect(copiedOnPhone.agents.initialize());
 
   // --- The source setup.
   const create = (name: string) =>
@@ -619,6 +628,16 @@ try {
         { id: "e1", from: "hook", to: "write", type: "text" },
         { id: "e2", from: "write", to: "post", type: "text" },
       ],
+      strokes: [],
+    },
+  });
+
+  // A workflow of an agent that the copy leaves out.
+  source.workflows.create({
+    title: "Archive sweep",
+    graph: {
+      nodes: [{ id: "sweep", kind: "agent", at, fields: { agentId: archivist.id, task: "Sweep the archive." } }],
+      edges: [],
       strokes: [],
     },
   });
@@ -1083,6 +1102,83 @@ try {
     "the first turn of the imported agent gets the imported history",
     started.some((params) => params.includes(HISTORY_MARK)),
   );
+
+  // --- Copy to another server: two agents with their settings, from desktop and from mobile.
+  const copyFile = join(root, "copy.zip");
+  await runCauseEffect(
+    source.transfer.exportTo(copyFile, { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true }),
+  );
+  const exportedCopy = new Uint8Array(await readFile(copyFile));
+  const phoneUpload = copiedTransferUpload({
+    name: "copy.zip",
+    mimeType: "application/zip",
+    base64: Buffer.from(exportedCopy).toString("base64"),
+  });
+  assert.ok(phoneUpload, "The mobile copy could not read the file.");
+  const phoneFile = join(root, "copy-on-phone.zip");
+  await writeFile(phoneFile, Buffer.from(phoneUpload.base64, "base64"));
+  await runCauseEffect(source.transfer.keepCopiedSettings(copyFile));
+  const copiedBytes = new Uint8Array(await readFile(copyFile));
+  pass("desktop and mobile make the same copy", sha(copiedBytes) === sha(new Uint8Array(await readFile(phoneFile))));
+  pass("the copy does not copy the files again", copiedBytes.length < exportedCopy.length + 64 * 1024);
+  const copyEntries = unzipSync(copiedBytes);
+  const copyManifest: {
+    settings: {
+      mcpServers: unknown[];
+      customProviders: unknown[];
+      customAgents: unknown[];
+      sidebarSections: unknown[];
+      workflows?: { title: string }[];
+      routineFlowPositions?: unknown[];
+    } | null;
+    sharedSkills?: unknown;
+  } = JSON.parse(new TextDecoder().decode(copyEntries[INSTANCE_TRANSFER_MANIFEST]));
+  pass(
+    "the copy keeps only the workflows and routine canvas of the copied agents",
+    JSON.stringify(copyManifest.settings?.workflows?.map((workflow) => workflow.title)) ===
+      JSON.stringify(["Paper pipeline"]) &&
+      (copyManifest.settings?.routineFlowPositions?.length ?? 0) > 0 &&
+      copyManifest.settings?.mcpServers.length === 0 &&
+      copyManifest.settings.customProviders.length === 0 &&
+      copyManifest.settings.customAgents.length === 0 &&
+      copyManifest.settings.sidebarSections.length === 0,
+    JSON.stringify(copyManifest.settings),
+  );
+  pass(
+    "the copy leaves the shared skills out",
+    copyManifest.sharedSkills === undefined && !Object.keys(copyEntries).some((name) => name.startsWith("library/")),
+  );
+  for (const [label, destination, path] of [
+    ["desktop", copied, copyFile],
+    ["mobile", copiedOnPhone, phoneFile],
+  ] as const) {
+    const copyPreview = await runCauseEffect(destination.transfer.stage(path));
+    await runCauseEffect(
+      destination.transfer.apply({
+        token: copyPreview.token,
+        keys: copyPreview.agents.map((agent) => agent.key),
+        includeSettings: true,
+      }),
+    );
+    const copiedWriter = destination.agents.listAgents().find((agent) => agent.name === "Writer");
+    assert.ok(copiedWriter, `The ${label} copy has no Writer.`);
+    pass(
+      `${label} copy: the routines arrive`,
+      destination.agents.listRoutines(copiedWriter.id).some((item) => item.name === "Morning notes"),
+    );
+    const copiedWorkflows = destination.workflows.listWithGraphs();
+    pass(
+      `${label} copy: the workflow of the copied agents arrives`,
+      JSON.stringify(copiedWorkflows.map((item) => item.summary.title)) === JSON.stringify(["Paper pipeline"]) &&
+        copiedWorkflows[0]?.graph.nodes.find((item) => item.id === "write")?.fields.agentId === copiedWriter.id,
+      JSON.stringify(copiedWorkflows.map((item) => item.summary.title)),
+    );
+    pass(
+      `${label} copy: the places on the routine canvas arrive`,
+      (destination.positions.get(copiedWriter.id)?.length ?? 0) > 0,
+    );
+    pass(`${label} copy: no shared skill is added`, (await runCauseEffect(destination.library.list())).length === 0);
+  }
 
   report.passed = true;
 } catch (error) {

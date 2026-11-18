@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/contracts/instance-transfer-copy";
 import {
   AGENT_IMPORT_LIMITS,
   type AgentImportPreviewAgent,
@@ -102,6 +103,7 @@ import {
   isUnsafeEntry,
   MANIFEST_MAX_BYTES,
   readArchiveEffect,
+  readAtEffect,
   readEntriesEffect,
   readSkillEffect,
   withArchive,
@@ -795,6 +797,49 @@ export class InstanceTransferService {
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
     return yield* this.#stageFile(path, owner, false, ARCHIVE);
   }).bind(this);
+
+  /**
+   * Copy to another server: keeps only the settings of the copied agents in the file at `path`
+   * (`@openbot/contracts/instance-transfer-copy`). The file can be up to 2 GB, so only its end is
+   * read and written again.
+   */
+  readonly keepCopiedSettings = Effect.fn("InstanceTransfer.keepCopiedSettings")(function* (
+    path: string,
+  ): Effect.fn.Return<void, ArchiveOperationError> {
+    const invalid = sourceText("error.import.transferNotFile");
+    const archive = yield* readArchiveEffect(path, ARCHIVE);
+    const bytes = (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST], MANIFEST_MAX_BYTES))[
+      INSTANCE_TRANSFER_MANIFEST
+    ];
+    const copied = bytes && copyManifestBytes(bytes);
+    if (!copied) return yield* archiveFailure(new Error(invalid));
+    yield* Effect.acquireUseRelease(
+      archiveCall(() => open(path, "r+")),
+      (handle) =>
+        Effect.gen(function* () {
+          const { size } = yield* archiveCall(() => handle.stat());
+          const tailStart = Math.max(0, size - ZIP_TAIL_BYTES);
+          const location = zipDirectory(yield* readAtEffect(handle, tailStart, size - tailStart, invalid), tailStart);
+          if (!location) return yield* archiveFailure(new Error(invalid));
+          const directory = yield* readAtEffect(handle, location.offset, location.bytes, invalid);
+          const replacement = copyTail(directory, location.offset, copied);
+          if (!replacement) return yield* archiveFailure(new Error(invalid));
+          yield* archiveCall(async () => {
+            for (let written = 0; written < replacement.length; ) {
+              const { bytesWritten } = await handle.write(
+                replacement,
+                written,
+                replacement.length - written,
+                location.offset + written,
+              );
+              written += bytesWritten;
+            }
+            await handle.truncate(location.offset + replacement.length);
+          });
+        }),
+      (handle) => archiveCall(() => handle.close()).pipe(Effect.ignore),
+    );
+  });
 
   /** A file that a member of a joined client sends: the service keeps it until the token ends. */
   readonly stageUpload = Effect.fn("InstanceTransfer.stageUpload")(function* (
