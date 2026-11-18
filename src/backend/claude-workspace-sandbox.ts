@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { accessSync, constants } from "node:fs";
 import { lstat, mkdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import type { HookCallbackMatcher, Options, SdkPluginConfig, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
@@ -42,6 +44,50 @@ export function claudeWorkspaceSandbox(
     allowUnsandboxedCommands: false,
     filesystem: { allowWrite: writableRoots(roots), ...(excluded.length ? { denyWrite: [...excluded] } : {}) },
   };
+}
+
+let claudeSandboxConfirmed = false;
+
+/**
+ * Why Claude cannot make its Workspace only sandbox on this computer, or null when it can. OpenBot
+ * refuses Workspace only for Claude when the user or an agent selects it (#9746), not at the next
+ * turn: then the agent stops until the user gives it Full access.
+ *
+ * - Windows: Claude Code 2.1.326 keeps its Windows sandbox behind a feature gate (#4094, #9925), and
+ *   OpenBot cannot read that gate. Remove this rule when Claude Code turns the sandbox on.
+ * - Linux: Claude Code needs `bwrap` and `socat` on its PATH (its own start check). A container that
+ *   cannot make a mount namespace, such as Docker with its default seccomp profile, has both, but
+ *   `bwrap` stops with "Failed to make / slave". One short `bwrap` run finds that too.
+ *
+ * A host that passes keeps the result. A host that fails is checked again at the next request, so
+ * the tools that a user installs count with no restart.
+ */
+export function claudeSandboxMissing(platform: NodeJS.Platform = process.platform): string | null {
+  if (platform === "win32") return "Claude Code keeps its Windows sandbox off";
+  if (platform !== "linux" || claudeSandboxConfirmed) return null;
+  const bwrap = executableOnPath("bwrap");
+  if (bwrap === null) return "bwrap not installed";
+  if (executableOnPath("socat") === null) return "socat not installed";
+  try {
+    execFileSync(bwrap, ["--ro-bind", "/", "/", "--", "true"], { stdio: ["ignore", "ignore", "pipe"], timeout: 5000 });
+  } catch (error) {
+    const stderr = isDynamicRecord(error) && Buffer.isBuffer(error.stderr) ? error.stderr.toString().trim() : "";
+    return `bwrap cannot make a sandbox${stderr ? `: ${stderr.split("\n")[0]}` : ""}`;
+  }
+  claudeSandboxConfirmed = true;
+  return null;
+}
+
+function executableOnPath(name: string): string | null {
+  for (const folder of (process.env.PATH ?? "").split(delimiter)) {
+    if (!folder) continue;
+    const candidate = join(folder, name);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {}
+  }
+  return null;
 }
 
 /**
