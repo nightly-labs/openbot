@@ -3224,16 +3224,22 @@ export class TurnLifecycle {
   }
 
   /**
-   * The running turns of the Codex subagents that the turn `turnId` shows, each with the client that
-   * runs it. A Stop of the turn after it ended sends them `turn/interrupt` (#11871).
+   * The running turns of the Codex subagents that work on after the agent's ended turns, each with
+   * the client that runs it, when the ended turn `turnId` has one of them. A Stop of that turn sends
+   * them `turn/interrupt` (#11871). Stop shows for the newest such turn, so it stops them all.
    */
   workingCodexChildren(
     agentId: string,
     turnId: string,
   ): Array<{ threadId: string; turnId: string; client: AgentClient }> {
-    return this.#workingCodexChildren(turnId).filter(
-      ({ threadId }) => this.#codexChildren.get(threadId)?.agentId === agentId,
+    const turnIds = new Set(
+      [...this.#codexChildren.values()]
+        .filter((parent) => parent.agentId === agentId && !this.#runningTurns.has(parent.turnId))
+        .map((parent) => parent.turnId),
     );
+    if (!turnIds.has(turnId)) return [];
+    const children = [...turnIds].flatMap((ended) => this.#workingCodexChildren(ended));
+    return children.some((child) => this.#codexChildren.get(child.threadId)?.turnId === turnId) ? children : [];
   }
 
   #workingCodexChildren(turnId: string): Array<{ threadId: string; turnId: string; client: AgentClient }> {

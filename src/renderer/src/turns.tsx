@@ -623,6 +623,8 @@ const Turns = createSimpleContext({
     /**
      * The ended turn whose Codex subagents still work, which Stop stops. Main can stop only Codex
      * subagents after their turn; a background subagent of another provider has no Stop (#11871).
+     * Only the local host's runtime snapshot carries `subagentTurns`, so a joined server shows no
+     * such Stop until the Team API sends it.
      */
     function stoppableSubagentTurn(agent: { id: string; provider: string } | undefined): string | null {
       return agent?.provider === "codex" ? (subagentTurns()[agent.id] ?? null) : null;

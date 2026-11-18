@@ -7412,18 +7412,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // its own turn (#11871). The client then also stops the subagents of that subagent.
     const children = executionThreadId || mayStop ? [] : this.#turn.workingCodexChildren(agentId, turnId);
     if (children.length > 0 && this.#turn.turnStartedAt(turnId) === null) {
-      yield* Effect.forEach(
+      // Each subagent stops on its own: one that ended meanwhile does not keep the others working.
+      const exits = yield* Effect.forEach(
         children,
         (child) =>
-          child.client
-            .request("turn/interrupt", { threadId: child.threadId, turnId: child.turnId }, decodeRecordResponse)
-            .pipe(
-              Effect.mapError(
-                (failure) => new AgentLifecycleFailed({ operation: "interrupt subagent turn", cause: failure.cause }),
-              ),
+          Effect.exit(
+            child.client.request(
+              "turn/interrupt",
+              { threadId: child.threadId, turnId: child.turnId },
+              decodeRecordResponse,
             ),
-        { concurrency: "unbounded", discard: true },
+          ),
+        { concurrency: "unbounded" },
       );
+      const failure = exits.every(Exit.isFailure) ? exits.find(Exit.isFailure) : undefined;
+      if (failure) {
+        return yield* new AgentLifecycleFailed({
+          operation: "interrupt subagent turn",
+          cause: Cause.squash(failure.cause),
+        });
+      }
       return true;
     }
     // No provider runs a turn whose end failed part way or whose provider exited, so it has nothing to
