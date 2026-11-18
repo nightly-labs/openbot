@@ -26,6 +26,8 @@ import type { AgentRoutinesApi, RoutineResultsCalls } from "./routines-port";
 import type { CodexLivePort } from "./stores/codex-live-conversation-store";
 
 export interface ConversationRuntime {
+  /** Reports skill changes for any channel member, including on a read-only web client. */
+  onSkillsChanged?: (listener: (agentId: string) => void) => () => void;
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "discardDraftAttachment"

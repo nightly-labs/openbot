@@ -104,6 +104,8 @@ export const messages = {
   "channel.picture.icon.card": "카드",
   "channel.error.load": "채널을 불러올 수 없어요.",
   "channel.error.action": "채널 작업에 실패했어요.",
+  "channel.error.skillAddress": "이 스킬 메시지는 채널의 에이전트 한 명에게 보내세요.",
+  "channel.error.skillUnavailable": "선택한 스킬은 해당 에이전트가 더 이상 사용할 수 없습니다.",
   "channel.error.update": "채널을 업데이트할 수 없어요.",
   "channel.error.loadOlder": "이전 메시지를 불러올 수 없어요.",
   "channel.error.delete": "이 채널을 삭제할 수 없어요.",

@@ -113,6 +113,8 @@ export const messages = {
   "channel.picture.icon.card": "Tarjeta",
   "channel.error.load": "No se pudieron cargar los canales.",
   "channel.error.action": "La acción del canal falló.",
+  "channel.error.skillAddress": "Dirige este mensaje con una habilidad a un solo agente del canal.",
+  "channel.error.skillUnavailable": "La habilidad seleccionada ya no está disponible para ese agente.",
   "channel.error.update": "No se pudo actualizar el canal.",
   "channel.error.loadOlder": "No se pudieron cargar los mensajes anteriores.",
   "channel.error.delete": "No se pudo eliminar este canal.",

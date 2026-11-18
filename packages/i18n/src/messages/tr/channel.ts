@@ -105,6 +105,8 @@ export const messages = {
   "channel.picture.icon.card": "Kart",
   "channel.error.load": "Kanallar yüklenemedi.",
   "channel.error.action": "Kanal eylemi başarısız oldu.",
+  "channel.error.skillAddress": "Bu beceri mesajını kanaldaki tek bir ajana yöneltin.",
+  "channel.error.skillUnavailable": "Seçilen beceri artık bu ajan için kullanılamıyor.",
   "channel.error.update": "Kanal güncellenemedi.",
   "channel.error.loadOlder": "Önceki mesajlar yüklenemedi.",
   "channel.error.delete": "Bu kanal silinemedi.",

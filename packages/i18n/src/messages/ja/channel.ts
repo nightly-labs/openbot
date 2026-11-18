@@ -103,6 +103,8 @@ export const messages = {
   "channel.picture.icon.card": "カード",
   "channel.error.load": "チャンネルを読み込めませんでした。",
   "channel.error.action": "チャンネルの操作に失敗しました。",
+  "channel.error.skillAddress": "このスキルメッセージはチャンネル内の1人のエージェントに宛ててください。",
+  "channel.error.skillUnavailable": "選択したスキルは、そのエージェントでは利用できなくなりました。",
   "channel.error.update": "チャンネルを更新できませんでした。",
   "channel.error.loadOlder": "以前のメッセージを読み込めませんでした。",
   "channel.error.delete": "このチャンネルを削除できませんでした。",

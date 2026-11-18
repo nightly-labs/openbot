@@ -80,6 +80,8 @@ export const messages = {
     "Im Kanal gibt es einen unbestätigten Auftragsstart. Prüfe das Ergebnis, bevor du den Kanal löschst.",
   "error.backend.channelNotFound": "Kanal nicht gefunden.",
   "error.backend.channelMemberUnavailable": "Ein Kanalmitglied ist nicht verfügbar.",
+  "error.backend.channelSkillAddress": "Richte diese Skill-Nachricht an einen Agenten im Kanal.",
+  "error.backend.channelSkillUnavailable": "Der gewählte Skill ist für diesen Agenten nicht mehr verfügbar.",
   "error.backend.channelInstructionsTooLong":
     "Kürze die Anweisungen auf 2.000 Zeichen. Längere Anweisungen werden nicht gespeichert.",
   "error.backend.channelWaitBeforeNewConversation":

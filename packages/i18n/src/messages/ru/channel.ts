@@ -115,6 +115,8 @@ export const messages = {
   "channel.picture.icon.card": "Карта",
   "channel.error.load": "Не удалось загрузить каналы.",
   "channel.error.action": "Не удалось выполнить действие с каналом.",
+  "channel.error.skillAddress": "Адресуйте это сообщение с навыком одному агенту в канале.",
+  "channel.error.skillUnavailable": "Выбранный навык больше недоступен этому агенту.",
   "channel.error.update": "Не удалось обновить канал.",
   "channel.error.loadOlder": "Не удалось загрузить прежние сообщения.",
   "channel.error.delete": "Не удалось удалить этот канал.",

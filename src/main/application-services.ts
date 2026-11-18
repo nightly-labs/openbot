@@ -2490,6 +2490,7 @@ export async function createApplicationServices({
     linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
+    channelSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     browserProfiles: () => agentBrowserProfiles,
     crm: () => crmHandle,
     // `host` is built later, after the agent service; a CRM tool reads it when it runs.

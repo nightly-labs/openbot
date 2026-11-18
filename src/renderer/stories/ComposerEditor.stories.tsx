@@ -159,6 +159,7 @@ const threads: ComposerThread[] = [
  */
 function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options: { width: string; compact?: boolean }) {
   const [value, setValue] = createSignal(storyArgs.value);
+  const [channelSkillAgentId, setChannelSkillAgentId] = createSignal<string>();
   // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
   return (
     <div
@@ -167,7 +168,17 @@ function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options:
     >
       <div class="composer" data-compact={options.compact ? "" : undefined}>
         <div class="composer-input-label">
-          <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />
+          <ComposerEditor
+            {...storyArgs}
+            value={value()}
+            onValueChange={setValue}
+            onSubmit={storyArgs.onSubmit}
+            channelSkillAgent={
+              storyArgs.channelSkillAgents?.find((agent) => agent.id === channelSkillAgentId()) ??
+              storyArgs.channelSkillAgent
+            }
+            onChooseChannelSkillAgent={setChannelSkillAgentId}
+          />
         </div>
       </div>
     </div>
@@ -226,6 +237,34 @@ export const MentionPicker: Story = {
 export const SkillPicker: Story = {
   args: {
     skills: installedSkills,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const ChannelSkillPicker: Story = {
+  args: {
+    channelSkillAgents: STORY_AGENTS.slice(0, 2),
+    skills: installedSkills,
+    mcpServers: STORY_MCP_SERVERS,
+    skillPickerRequest: 1,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const ChannelSkillTyping: Story = {
+  args: {
+    channelSkillAgents: STORY_AGENTS.slice(0, 2),
+    skills: installedSkills,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const SingleMemberChannelSkillPicker: Story = {
+  args: {
+    channelSkillAgents: STORY_AGENTS.slice(0, 1),
+    channelSkillAgent: STORY_AGENTS[0],
+    skills: installedSkills,
+    skillPickerRequest: 1,
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
 };

@@ -71,6 +71,7 @@ import type {
   GenerateAgentProfileInput,
   HiddenAgentsSnapshot,
   HostAnalyticsInput,
+  InstalledSkill,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   LocalBrowserSecretResponse,
@@ -466,6 +467,8 @@ export interface AgentServiceOptions {
   installedCliProviders?: readonly AgentProvider[];
   saveInstalledCliChoice?: (provider: AgentProvider, installed: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: (() => LocalSkillTools) | undefined;
+  /** Current chat skills. Without a skill source, skill sends fail closed. */
+  channelSkills?: (agentId: string) => Effect.Effect<InstalledSkill[], { readonly cause: unknown }>;
   /**
    * The skills that an agent has, read from this computer only. A memory review reads them to suggest
    * a new skill or a change to one. Omitted, a review does not suggest skills.
@@ -1489,6 +1492,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.channels = new ChannelService(store.database, mailbox, new ChannelImages(store.channelImagesRoot), {
       agents: () => this.listAgents(),
+      skills: (agentId) => (options.channelSkills?.(agentId) ?? Effect.succeed([])).pipe(toChannelOperationError),
       generate: (lead, prompt, fallbacks = [], background = false) =>
         Effect.gen({ self: this }, function* () {
           const modelOf = (agent: AgentSummary) =>

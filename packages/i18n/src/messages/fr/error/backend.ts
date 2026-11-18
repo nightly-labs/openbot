@@ -80,6 +80,8 @@ export const messages = {
     "Le canal a un démarrage de tâche non confirmé. Vérifiez son résultat avant de le supprimer.",
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
+  "error.backend.channelSkillAddress": "Adressez ce message avec une compétence à un seul agent du canal.",
+  "error.backend.channelSkillUnavailable": "La compétence sélectionnée n’est plus disponible pour cet agent.",
   "error.backend.channelInstructionsTooLong":
     "Raccourcissez les instructions à 2 000 caractères. Les instructions plus longues ne sont pas enregistrées.",
   "error.backend.channelWaitBeforeNewConversation":

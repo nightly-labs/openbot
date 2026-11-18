@@ -80,6 +80,8 @@ export const messages = {
     "El canal tiene un inicio de tarea sin confirmar. Comprueba el resultado antes de eliminarlo.",
   "error.backend.channelNotFound": "No se encontró el canal.",
   "error.backend.channelMemberUnavailable": "Un miembro del canal no está disponible.",
+  "error.backend.channelSkillAddress": "Dirige este mensaje con una habilidad a un solo agente del canal.",
+  "error.backend.channelSkillUnavailable": "La habilidad seleccionada ya no está disponible para ese agente.",
   "error.backend.channelInstructionsTooLong":
     "Acorta las instrucciones a 2000 caracteres. Las instrucciones más largas no se guardan.",
   "error.backend.channelWaitBeforeNewConversation":

@@ -4,12 +4,13 @@
  * host from its own contexts.
  */
 
-import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, leadingAddress } from "@openbot/contracts/chat-tag-references";
 import {
   type AgentApproval,
   type AgentEvent,
   type BrowserTakeoverRequest,
   channelBrowserAgent,
+  type InstalledSkill,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -44,6 +45,7 @@ import {
   sentChannelMessageId,
   waitingChannelPrompt,
 } from "./channel-conversation-rows";
+import { channelSkillRecipient } from "./channel-skill-recipient";
 import { useChannels } from "./channels-context";
 
 export interface ChannelConversationEnvironment {
@@ -57,6 +59,7 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
+  listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
   /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
   prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
   /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
@@ -202,7 +205,30 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     // mention later in the text is a reference that the owner of the work can see. The host reads
     // every opening mention from the text; the field names the first one for a host that reads one.
     const mention = leadingAddress(body).mentions[0];
+    const skillRecipient = channelSkillRecipient(body);
+    const skillIds = chatTagReferences(body)
+      .filter((reference) => reference.kind === "skill")
+      .map((reference) => reference.id);
     try {
+      if (
+        skillRecipient === null ||
+        (skillRecipient &&
+          (!page()?.channel.members.some((member) => member.agentId === skillRecipient) ||
+            env.pausedAgentIds().has(skillRecipient)))
+      )
+        return { error: t("channel.error.skillAddress") };
+      if (skillRecipient) {
+        const skills = await env.listInstalledSkills(skillRecipient);
+        if (
+          skillIds.some(
+            (id) =>
+              !skills.some(
+                (skill) => skill.skillId === id && skill.enabled !== false && skill.state !== "needs-repair",
+              ),
+          )
+        )
+          return { error: t("channel.error.skillUnavailable") };
+      }
       const after = await channels.send({
         type: "send",
         operationId: clientMessageId ?? crypto.randomUUID(),
@@ -333,10 +359,11 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     firstUnreadMessageId: () => firstUnreadChannelMessageId(entries(), unreadCount(), env.isOwnSender),
     hasOlder: () => Boolean(page()?.olderCursor),
     unloadedHistory: () => unloadedHistory(page()),
-    /** The agents that a mention can name: the members. A hidden agent gets no work here either. */
+    /** The agents that a mention can name: the members. A paused agent gets no work here. */
     mentionAgents: () => {
       const members = new Set(page()?.channel.members.map((member) => member.agentId));
-      return channels.agents().filter((agent) => members.has(agent.id));
+      const paused = env.pausedAgentIds();
+      return channels.agents().filter((agent) => members.has(agent.id) && !paused.has(agent.id));
     },
     activeTurnId: () => activeRuns()[0] ?? null,
     prompt,

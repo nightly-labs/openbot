@@ -78,6 +78,8 @@ export const messages = {
     "Kanalda onaylanmamış bir görev başlangıcı var. Silmeden önce sonucunu kontrol edin.",
   "error.backend.channelNotFound": "Kanal bulunamadı.",
   "error.backend.channelMemberUnavailable": "Bir kanal üyesi kullanılamıyor.",
+  "error.backend.channelSkillAddress": "Bu beceri mesajını kanaldaki tek bir ajana yöneltin.",
+  "error.backend.channelSkillUnavailable": "Seçilen beceri artık bu ajan için kullanılamıyor.",
   "error.backend.channelInstructionsTooLong": "Talimatları 2.000 karaktere kısaltın. Daha uzun talimatlar kaydedilmez.",
   "error.backend.channelWaitBeforeNewConversation":
     "Bu kanaldaki iş bitene kadar bekleyin, sonra yeni bir konuşma başlatın.",

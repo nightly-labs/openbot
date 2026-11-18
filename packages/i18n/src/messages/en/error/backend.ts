@@ -76,6 +76,8 @@ export const messages = defineMessages("error.backend", {
     "The channel has an unconfirmed assignment start. Check its outcome before deleting it.",
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
+  "error.backend.channelSkillAddress": "Address this skill message to one agent in the channel.",
+  "error.backend.channelSkillUnavailable": "The selected skill is no longer available to that agent.",
   "error.backend.channelInstructionsTooLong":
     "Shorten the instructions to 2,000 characters. Longer instructions are not saved.",
   "error.backend.channelWaitBeforeNewConversation":

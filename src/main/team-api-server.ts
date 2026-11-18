@@ -284,6 +284,7 @@ import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
+import { ChannelSkillValidationError } from "../backend/channel-effects";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
 import { canConfineProcesses } from "../backend/process-confinement";
@@ -1444,6 +1445,7 @@ export class TeamApiServer {
       // logger below and answer 400 where the failure was a 500 nobody would then ever see.
       const expected =
         error instanceof HttpError ||
+        error instanceof ChannelSkillValidationError ||
         error instanceof RemoteScreenError ||
         error instanceof TeamStoreError ||
         error instanceof McpServerError ||

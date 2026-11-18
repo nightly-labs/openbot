@@ -78,6 +78,8 @@ export const messages = {
     "チャンネルに開始が未確認の割り当てがあります。削除する前に結果を確認してください。",
   "error.backend.channelNotFound": "チャンネルが見つかりません。",
   "error.backend.channelMemberUnavailable": "チャンネルのメンバーを使用できません。",
+  "error.backend.channelSkillAddress": "このスキルメッセージはチャンネル内の1人のエージェントに宛ててください。",
+  "error.backend.channelSkillUnavailable": "選択したスキルは、そのエージェントでは利用できなくなりました。",
   "error.backend.channelInstructionsTooLong":
     "指示を2,000文字以内に短くしてください。これより長い指示は保存されません。",
   "error.backend.channelWaitBeforeNewConversation":

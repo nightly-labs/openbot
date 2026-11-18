@@ -77,6 +77,8 @@ export const messages = {
     "Il canale ha un avvio di assegnazione non confermato. Controlla il risultato prima di eliminarlo.",
   "error.backend.channelNotFound": "Canale non trovato.",
   "error.backend.channelMemberUnavailable": "Un membro del canale non è disponibile.",
+  "error.backend.channelSkillAddress": "Indirizza questo messaggio con una competenza a un solo agente del canale.",
+  "error.backend.channelSkillUnavailable": "La competenza selezionata non è più disponibile per questo agente.",
   "error.backend.channelInstructionsTooLong":
     "Riduci le istruzioni a 2.000 caratteri. Le istruzioni più lunghe non vengono salvate.",
   "error.backend.channelWaitBeforeNewConversation":

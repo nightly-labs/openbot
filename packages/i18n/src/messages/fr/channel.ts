@@ -107,6 +107,8 @@ export const messages = {
   "channel.picture.icon.card": "Carte",
   "channel.error.load": "Impossible de charger les canaux.",
   "channel.error.action": "L’action sur le canal a échoué.",
+  "channel.error.skillAddress": "Adressez ce message avec une compétence à un seul agent du canal.",
+  "channel.error.skillUnavailable": "La compétence sélectionnée n’est plus disponible pour cet agent.",
   "channel.error.update": "Impossible de mettre à jour le canal.",
   "channel.error.loadOlder": "Impossible de charger les messages précédents.",
   "channel.error.delete": "Impossible de supprimer ce canal.",

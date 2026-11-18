@@ -107,6 +107,8 @@ export const messages = {
   "channel.picture.icon.card": "Kaart",
   "channel.error.load": "Kan kanalen niet laden.",
   "channel.error.action": "De kanaalactie is mislukt.",
+  "channel.error.skillAddress": "Richt dit vaardigheidsbericht aan één agent in het kanaal.",
+  "channel.error.skillUnavailable": "De gekozen vaardigheid is niet meer beschikbaar voor die agent.",
   "channel.error.update": "Kan het kanaal niet bijwerken.",
   "channel.error.loadOlder": "Kan eerdere berichten niet laden.",
   "channel.error.delete": "Kan dit kanaal niet verwijderen.",

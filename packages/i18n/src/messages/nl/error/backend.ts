@@ -80,6 +80,8 @@ export const messages = {
     "Het kanaal heeft een start van een opdracht die niet is bevestigd. Controleer het resultaat voordat je het verwijdert.",
   "error.backend.channelNotFound": "Kanaal niet gevonden.",
   "error.backend.channelMemberUnavailable": "Een lid van het kanaal is niet beschikbaar.",
+  "error.backend.channelSkillAddress": "Richt dit vaardigheidsbericht aan één agent in het kanaal.",
+  "error.backend.channelSkillUnavailable": "De gekozen vaardigheid is niet meer beschikbaar voor die agent.",
   "error.backend.channelInstructionsTooLong":
     "Kort de instructies in tot 2.000 tekens. Langere instructies worden niet opgeslagen.",
   "error.backend.channelWaitBeforeNewConversation":

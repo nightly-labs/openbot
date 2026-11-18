@@ -83,6 +83,8 @@ export const messages = {
     "O canal tem uma tarefa atribuída cujo início não foi confirmado. Verifique o resultado antes de excluí-lo.",
   "error.backend.channelNotFound": "Canal não encontrado.",
   "error.backend.channelMemberUnavailable": "Um membro do canal está indisponível.",
+  "error.backend.channelSkillAddress": "Direcione esta mensagem com uma habilidade a um único agente do canal.",
+  "error.backend.channelSkillUnavailable": "A habilidade selecionada não está mais disponível para esse agente.",
   "error.backend.channelInstructionsTooLong":
     "Encurte as instruções para 2.000 caracteres. Instruções mais longas não são salvas.",
   "error.backend.channelWaitBeforeNewConversation":

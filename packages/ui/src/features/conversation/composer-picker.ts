@@ -18,6 +18,7 @@ export interface PickerFrame {
 
 export type PickerOption =
   | { type: "agent"; agent: ComposerAgent }
+  | { type: "skill-agent"; agent: ComposerAgent }
   /** Addresses every member of a channel. It inserts the text `@everyone`. */
   | { type: "everyone" }
   /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
@@ -44,6 +45,7 @@ export interface PickerSection {
 
 export function pickerOptionKey(option: PickerOption): string {
   if (option.type === "agent") return `agent:${option.agent.id}`;
+  if (option.type === "skill-agent") return `skill-agent:${option.agent.id}`;
   if (option.type === "everyone") return "everyone";
   if (option.type === "skill") return `skill:${option.skill.skillId}`;
   if (option.type === "tab") return `tab:${option.tab.id}`;
@@ -52,7 +54,8 @@ export function pickerOptionKey(option: PickerOption): string {
 }
 
 export function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
-  if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
+  if (option.type === "agent" || option.type === "skill-agent")
+    return t("composer.picker.option.agent", { name: option.agent.name });
   if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") {
     const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
@@ -66,7 +69,7 @@ export function pickerOptionText(option: PickerOption, t: TextValue["t"]): strin
 }
 
 export function pickerOptionName(option: PickerOption, t: TextValue["t"]): string {
-  if (option.type === "agent") return option.agent.name;
+  if (option.type === "agent" || option.type === "skill-agent") return option.agent.name;
   if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") return option.skill.name;
   if (option.type === "tab") return tabTitle(option.tab);
@@ -150,7 +153,8 @@ export function pickerOptionBadge(
   // The section title says that a row is a tab, so a tab row needs no badge.
   if (option.type === "tab") return null;
   if (option.type === "thread") return { label: t(THREAD_STATE_LABELS[threadStateLabel(option.thread)]) };
-  if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
+  if (option.type === "agent" || option.type === "skill-agent")
+    return { label: t("composer.picker.badge.agent"), icon: Bot };
   if (option.type === "everyone") return { label: t("composer.picker.badge.channel"), icon: UsersRound };
   if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
   if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };

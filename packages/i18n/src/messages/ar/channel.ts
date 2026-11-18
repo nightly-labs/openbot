@@ -117,6 +117,8 @@ export const messages = {
   "channel.picture.icon.card": "بطاقة",
   "channel.error.load": "تعذّر تحميل القنوات.",
   "channel.error.action": "فشل إجراء القناة.",
+  "channel.error.skillAddress": "وجّه رسالة المهارة هذه إلى وكيل واحد في القناة.",
+  "channel.error.skillUnavailable": "لم تعد المهارة المحددة متاحة لذلك الوكيل.",
   "channel.error.update": "تعذّر تحديث القناة.",
   "channel.error.loadOlder": "تعذّر تحميل الرسائل السابقة.",
   "channel.error.delete": "تعذّر حذف هذه القناة.",

@@ -1,5 +1,6 @@
 import { type AgentProviderId, agentSteersTurns, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import {
   type AccountUsageLimit,
   type AgentWait,
@@ -11,6 +12,7 @@ import {
   composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  type InstalledSkill,
   type QueueSnapshot,
   routineRunsTurn,
 } from "@openbot/contracts/ipc";
@@ -51,6 +53,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { skillsPort } from "../../skills-port";
 import { customProviderRestartMessage } from "../custom-providers/custom-provider-restart";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
@@ -58,6 +61,7 @@ import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { createComposerResize } from "./composer-resize";
 import { useConversationController } from "./conversation-controller-context";
 import { composerDraftKey } from "./conversation-keys";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { currentConversationTarget } from "./stores/composer-store";
 
@@ -158,8 +162,82 @@ export function ConversationComposer() {
         ? t("composer.placeholder.message", { name: props.agent.name })
         : t("composer.placeholder.messageAgent");
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  const [chosenChannelSkillAgentId, setChosenChannelSkillAgentId] = createSignal<string>();
+  const [channelSkillsRevision, setChannelSkillsRevision] = createSignal(0);
+  const [channelSkillLoad, setChannelSkillLoad] = createStore<{
+    skills: InstalledSkill[];
+    loading: boolean;
+    failed: boolean;
+  }>({
+    skills: [],
+    loading: false,
+    failed: false,
+  });
+  const channelSkillAgents = () => (channel ? (props.mentionAgents ?? []) : undefined);
+  const channelAddress = () => leadingAddress(currentDraft().text);
+  const channelSkillBlocked = () =>
+    Boolean(channel && (channelAddress().everyone || channelAddress().mentions.length > 1));
+  const channelSkillAgent = () => {
+    const agents = channelSkillAgents();
+    if (!agents || channelSkillBlocked()) return undefined;
+    const addressedId = channelAddress().mentions[0]?.id;
+    return (
+      agents.find((agent) => agent.id === (addressedId ?? chosenChannelSkillAgentId())) ??
+      (addressedId ? undefined : agents.length === 1 ? agents[0] : undefined)
+    );
+  };
+  let channelSkillsRequest = 0;
+  createEffect(
+    () => ({ agentId: channelSkillAgent()?.id, runtime: props.runtime }),
+    ({ agentId, runtime }) => {
+      if (!channel || !agentId) return;
+      const changed = (changedId: string) => {
+        if (changedId === agentId) setChannelSkillsRevision((revision) => revision + 1);
+      };
+      if (runtime) return runtime.onSkillsChanged?.(changed) ?? runtime.admin?.skills.onChanged?.(changed);
+      return skillsPort().agent.onEvent((event) => {
+        if (event.type === "skills-changed") changed(event.agentId);
+      });
+    },
+  );
+  createEffect(
+    () => ({
+      agentId: channelSkillAgent()?.id,
+      runtime: conversationRuntime(props),
+      supported:
+        props.server?.kind !== "remote" || props.server.compatibility?.capabilities.includes("installed-skills"),
+      visible: props.skillsMarketplaceOpen !== true,
+      connectionSequence: props.server?.connectionSequence ?? 0,
+      revision: channelSkillsRevision(),
+    }),
+    ({ agentId, runtime, supported, visible }) => {
+      const request = ++channelSkillsRequest;
+      setChannelSkillLoad((state) => {
+        state.skills = [];
+        state.failed = false;
+        state.loading = Boolean(agentId && supported && visible);
+      });
+      if (!channel || !agentId || !supported || !visible) return;
+      void runtime.agent
+        .listInstalledSkills(agentId)
+        .then((skills) => {
+          if (request !== channelSkillsRequest) return;
+          setChannelSkillLoad((state) => {
+            state.skills = skills;
+            state.loading = false;
+          });
+        })
+        .catch(() => {
+          if (request !== channelSkillsRequest) return;
+          setChannelSkillLoad((state) => {
+            state.failed = true;
+            state.loading = false;
+          });
+        });
+    },
+  );
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
-  const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
+  const pickSkill = () => () => setSkillPickerRequest((current) => current + 1);
   /** As for a skill: the task is for one agent. Hidden while the host cannot record the steps. */
   const teachTask = () => (channel || !canTeachBrowserTask() ? undefined : () => void openBrowserTeach());
   /**
@@ -836,8 +914,13 @@ export function ConversationComposer() {
               agentId={props.agent?.id}
               agents={props.mentionAgents ?? props.agents}
               everyoneMention={Boolean(channel) && (props.mentionAgents ?? props.agents).length > 1}
-              skills={installedSkills()}
-              skillsLoadFailed={installedSkillsLoadFailed()}
+              skills={channel ? channelSkillLoad.skills : installedSkills()}
+              skillsLoadFailed={channel ? channelSkillLoad.failed : installedSkillsLoadFailed()}
+              skillsLoading={channel ? channelSkillLoad.loading : false}
+              channelSkillAgents={channelSkillAgents()}
+              channelSkillAgent={channelSkillAgent()}
+              channelSkillBlocked={channelSkillBlocked()}
+              onChooseChannelSkillAgent={setChosenChannelSkillAgentId}
               mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
@@ -877,6 +960,9 @@ export function ConversationComposer() {
               onSubmit={submitComposer}
               onSteer={steerOnTab()}
               sendShortcut={deviceSendShortcut(props.platform)}
+              onPickerOpenChange={(open) => {
+                if (!open) setChosenChannelSkillAgentId(undefined);
+              }}
               dictation={{ text: voiceLiveText(), final: voicePhase() === "transcribing" }}
               onPasteFiles={(files, selection, text) => pasteFiles(files, selection, undefined, text)}
               onCopyAttachments={(clipboard, text, attachments, remaining) => {

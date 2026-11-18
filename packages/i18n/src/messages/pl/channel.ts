@@ -117,6 +117,8 @@ export const messages = {
   "channel.picture.icon.card": "Karta",
   "channel.error.load": "Nie udało się wczytać kanałów.",
   "channel.error.action": "Akcja kanału nie powiodła się.",
+  "channel.error.skillAddress": "Zaadresuj tę wiadomość z umiejętnością do jednego agenta na kanale.",
+  "channel.error.skillUnavailable": "Wybrana umiejętność nie jest już dostępna dla tego agenta.",
   "channel.error.update": "Nie udało się zaktualizować kanału.",
   "channel.error.loadOlder": "Nie udało się wczytać wcześniejszych wiadomości.",
   "channel.error.delete": "Nie udało się usunąć tego kanału.",

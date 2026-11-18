@@ -77,6 +77,8 @@ export const messages = {
     "채널에 시작을 확인하지 못한 배정이 있어요. 삭제하기 전에 결과를 확인하세요.",
   "error.backend.channelNotFound": "채널을 찾을 수 없어요.",
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
+  "error.backend.channelSkillAddress": "이 스킬 메시지는 채널의 에이전트 한 명에게 보내세요.",
+  "error.backend.channelSkillUnavailable": "선택한 스킬은 해당 에이전트가 더 이상 사용할 수 없습니다.",
   "error.backend.channelInstructionsTooLong": "지침을 2,000자 이내로 줄이세요. 더 긴 지침은 저장되지 않아요.",
   "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
   "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",

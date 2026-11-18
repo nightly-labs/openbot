@@ -2,6 +2,12 @@ import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
 import { StoredStateFailure } from "./stored-state-effects";
 
+/** A skill send that the sender can correct before retrying. */
+export class ChannelSkillValidationError extends Schema.TaggedError<ChannelSkillValidationError>()(
+  "ChannelSkillValidationError",
+  { message: Schema.String },
+) {}
+
 /** Preserves channel errors at the existing command and provider boundaries. */
 export class ChannelOperationError extends Schema.TaggedError<ChannelOperationError>()("ChannelOperationError", {
   cause: Schema.Defect(),

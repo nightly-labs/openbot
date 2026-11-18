@@ -107,6 +107,8 @@ export const messages = {
   "channel.picture.icon.card": "כרטיס",
   "channel.error.load": "לא ניתן לטעון את הערוצים.",
   "channel.error.action": "פעולת הערוץ נכשלה.",
+  "channel.error.skillAddress": "יש להפנות את הודעת המיומנות הזו לסוכן אחד בערוץ.",
+  "channel.error.skillUnavailable": "המיומנות שנבחרה כבר אינה זמינה לסוכן הזה.",
   "channel.error.update": "לא ניתן לעדכן את הערוץ.",
   "channel.error.loadOlder": "לא ניתן לטעון הודעות קודמות.",
   "channel.error.delete": "לא ניתן למחוק את הערוץ.",

@@ -78,6 +78,8 @@ export const messages = {
     "Kanał ma niepotwierdzone rozpoczęcie przydziału. Sprawdź jego wynik przed usunięciem.",
   "error.backend.channelNotFound": "Nie znaleziono kanału.",
   "error.backend.channelMemberUnavailable": "Członek kanału jest niedostępny.",
+  "error.backend.channelSkillAddress": "Zaadresuj tę wiadomość z umiejętnością do jednego agenta na kanale.",
+  "error.backend.channelSkillUnavailable": "Wybrana umiejętność nie jest już dostępna dla tego agenta.",
   "error.backend.channelInstructionsTooLong":
     "Skróć instrukcje do 2000 znaków. Dłuższe instrukcje nie zostaną zapisane.",
   "error.backend.channelWaitBeforeNewConversation":

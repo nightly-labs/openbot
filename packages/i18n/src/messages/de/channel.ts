@@ -113,6 +113,8 @@ export const messages = {
   "channel.picture.icon.card": "Karte",
   "channel.error.load": "Die Kanäle konnten nicht geladen werden.",
   "channel.error.action": "Die Kanalaktion ist fehlgeschlagen.",
+  "channel.error.skillAddress": "Richte diese Skill-Nachricht an einen Agenten im Kanal.",
+  "channel.error.skillUnavailable": "Der gewählte Skill ist für diesen Agenten nicht mehr verfügbar.",
   "channel.error.update": "Der Kanal konnte nicht aktualisiert werden.",
   "channel.error.loadOlder": "Frühere Nachrichten konnten nicht geladen werden.",
   "channel.error.delete": "Dieser Kanal konnte nicht gelöscht werden.",
