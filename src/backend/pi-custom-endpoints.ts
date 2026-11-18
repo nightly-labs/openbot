@@ -20,6 +20,30 @@ interface EndpointPayload {
   readonly apiKey: string | null;
   readonly headers: Readonly<Record<string, string>>;
   readonly models: readonly PiModelPayload[];
+  /** Absent: Pi detects the compat flags from the base URL, as for OpenAI and Azure. */
+  readonly compat?: PiCompat;
+}
+
+/** Pi's `openai-completions` compat flags that OpenBot sets (Pi 1.1.0 `models-configuration.md`). */
+interface PiCompat {
+  readonly supportsStore: false;
+  readonly supportsDeveloperRole: false;
+}
+
+/**
+ * Pi sends `store` and, for a reasoning model, the `developer` role to each base URL that is not on
+ * its own list of other services (`detectCompat`, Pi 1.5.2). Strict endpoints refuse the request:
+ * Mistral answers 422 for `store` (#11850), and EXAONE and DeepSeek hosts refuse `developer` (#7434,
+ * #11328). Only OpenAI and Azure OpenAI define both, so other hosts get neither, as in OpenCode.
+ */
+function isOpenAiHost(baseUrl: string): boolean {
+  const host = URL.parse(baseUrl)?.hostname.toLowerCase() ?? "";
+  return (
+    host === "api.openai.com" ||
+    host.endsWith(".openai.azure.com") ||
+    host.endsWith(".cognitiveservices.azure.com") ||
+    host.endsWith(".services.ai.azure.com")
+  );
 }
 
 interface PiModelPayload {
@@ -83,6 +107,7 @@ const SOURCE = `export default function (pi) {
         reasoning: model.thinkingLevelMap !== undefined,
         ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
         input: model.input,
+        ...(endpoint.compat ? { compat: endpoint.compat } : {}),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
@@ -99,6 +124,7 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
     baseUrl: endpoint.baseUrl,
     apiKey: endpoint.apiKey,
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
+    ...(isOpenAiHost(endpoint.baseUrl) ? {} : { compat: { supportsStore: false, supportsDeveloperRole: false } }),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
       // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
