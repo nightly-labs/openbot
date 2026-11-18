@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Fonte do código",
   "settings.codeFont.description": "A fonte do código, dos terminais e dos caminhos de arquivo.",
   "settings.codeFont.default": "Padrão",
+  "settings.motion.title": "Movimento",
+  "settings.backgroundBlur.title": "Desfoque do fundo",
+  "settings.backgroundBlur.description":
+    "Desfoque atrás de menus e caixas de diálogo. Começa desligado em um computador sem GPU.",
+  "settings.movingFaces.title": "Rostos de agentes em movimento",
+  "settings.movingFaces.description":
+    "Os rostos dos agentes piscam e se movem. Começam parados em um computador sem GPU.",
   "settings.logoColor.title": "Cor do logotipo",
   "settings.logoColor.description": "Aparece no Dock, na barra de tarefas e na Dynamic Island.",
   "settings.logoColor.buildNote":

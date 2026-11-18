@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Code-Schrift",
   "settings.codeFont.description": "Die Schrift von Code, Terminals und Dateipfaden.",
   "settings.codeFont.default": "Standard",
+  "settings.motion.title": "Bewegung",
+  "settings.backgroundBlur.title": "Hintergrundunschärfe",
+  "settings.backgroundBlur.description":
+    "Unschärfe hinter Menüs und Dialogen. Auf einem Computer ohne GPU ist sie anfangs aus.",
+  "settings.movingFaces.title": "Bewegte Agentengesichter",
+  "settings.movingFaces.description":
+    "Agentengesichter blinzeln und bewegen sich. Auf einem Computer ohne GPU sind sie anfangs still.",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
