@@ -24,10 +24,14 @@ export type MarketplaceView =
   | { kind: "agentGroup"; category: SkillCategory }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
   | { kind: "app"; id: string }
+  /** The apps of one category, on their own page. */
+  | { kind: "appGroup"; category: SkillCategory }
   /** "Your skills" or one catalog category, on its own page. */
   | { kind: "skillGroup"; group: SkillGroup }
   /** A skill made on this computer. It has no catalog listing. */
-  | { kind: "localSkill"; skillId: string };
+  | { kind: "localSkill"; skillId: string }
+  /** The form of a custom MCP server: a new one when `id` is null, else the server with this id. */
+  | { kind: "server"; id: string | null };
 
 /** "Your skills", or a catalog category. */
 export type SkillGroup = "yours" | SkillCategory;
@@ -61,6 +65,11 @@ export interface MarketplaceNavigationState {
   missingApp: string | null;
   /** A link named an agent or a skill that the Marketplace does not have. */
   missingListing: MarketplaceListingKind | null;
+  /**
+   * The category whose page the user opened last. Its title and first rows move between the Apps tab
+   * and the category page (`moveView`).
+   */
+  appGroup: SkillCategory | null;
 }
 
 /** The `verified` value of a catalog query for a source. */
@@ -92,6 +101,7 @@ function initialState(): MarketplaceNavigationState {
     skillSource: null,
     missingApp: null,
     missingListing: null,
+    appGroup: null,
   };
 }
 

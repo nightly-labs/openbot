@@ -4,17 +4,74 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
-import { memo, useEffect, useRef, useState } from "react";
-import { type ColorValue, View } from "react-native";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { type ColorValue, Text, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
+import type { BubbleTone } from "../model/bubble-tone";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
+/**
+ * Each highlight reads the whole block again, so a long block waits longer for the next one: the time
+ * that the highlight takes stays a small part of the time between two of them.
+ */
+const STREAMING_HIGHLIGHT_CHARACTERS_PER_MS = 40;
+
+function streamingHighlightInterval(length: number): number {
+  return Math.max(STREAMING_HIGHLIGHT_INTERVAL_MS, Math.round(length / STREAMING_HIGHLIGHT_CHARACTERS_PER_MS));
+}
+
+/**
+ * Android makes a set of spans for each coloured run of a text, and each new span is sorted against
+ * the spans before it. A block with thousands of runs then blocks the main thread when its text is
+ * made, laid out, drawn or read by accessibility services, and Android shows "App isn't responding".
+ * Above this many coloured runs, Android draws the code in the colour of the block. iOS keeps all runs.
+ */
+const ANDROID_MAX_COLORED_RUNS = 300;
+
+/** A run of code in one colour. `color` is unset for code in the colour of the block. */
+export interface CodeRun {
+  offset: number;
+  text: string;
+  color: ColorValue | undefined;
+}
+
+/**
+ * The tokens as runs of one colour. Many token types share a colour, and most tokens have the colour
+ * of the block, so a block has far fewer runs than tokens. The list draws a block again each time
+ * its row scrolls into view, and each run that has a colour is a text span to make.
+ */
+export function codeRuns(
+  tokens: readonly CodeToken[],
+  colors: Partial<Record<ShjToken, ColorValue>>,
+  foreground: ColorValue,
+): CodeRun[] {
+  const runs: CodeRun[] = [];
+  let last: CodeRun | undefined;
+  let colored = 0;
+  for (const token of tokens) {
+    const tokenColor = token.type ? colors[token.type] : undefined;
+    const color = tokenColor === undefined || tokenColor === foreground ? undefined : tokenColor;
+    if (last && last.color === color) {
+      last.text += token.text;
+      continue;
+    }
+    if (color !== undefined) colored += 1;
+    last = { offset: token.offset, text: token.text, color };
+    runs.push(last);
+  }
+  if (isAndroid && colored > ANDROID_MAX_COLORED_RUNS) {
+    return [{ offset: 0, text: tokens.map((token) => token.text).join(""), color: undefined }];
+  }
+  return runs;
+}
 
 interface ChatCodeBlockProps {
   text: string;
@@ -22,6 +79,11 @@ interface ChatCodeBlockProps {
   selectable?: boolean;
   /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
+  /**
+   * The colors of a bubble with a message color. The code is in the bubble's text color: the theme
+   * colors of highlighted code do not read on every message color.
+   */
+  tone?: BubbleTone;
 }
 
 export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
@@ -35,10 +97,20 @@ const CodeBlockBody = memo(function CodeBlockBody({
   language,
   selectable = true,
   finished = false,
+  tone,
   highlight: highlightAllowed,
 }: ChatCodeBlockProps & { highlight: boolean }) {
   const { t } = useText();
-  const { foreground, muted, colors } = useCodeTokenColors();
+  const theme = useCodeTokenColors();
+  const muted = tone?.muted ?? theme.muted;
+  // The block is drawn as a table: the language and the copy button on a card, and the code on an
+  // inset panel of the canvas. The card is a clear layer of the text color, so it shows on every
+  // surface: the screen, an agent's bubble or a card. A message color gives its own surfaces.
+  const [textColor, canvas] = useCSSVariable(["--openbot-text-primary", "--openbot-bg-native-canvas"]).map(String);
+  const card = tone?.panel ?? `${textColor}0f`;
+  const panel = tone?.deep ?? canvas;
+  const foreground = tone?.foreground ?? theme.foreground;
+  const colors: Partial<Record<ShjToken, ColorValue>> = tone ? { cmnt: tone.muted } : theme.colors;
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
     const tokens = cachedHighlight(text, language);
     return tokens ? { text, language, tokens } : null;
@@ -66,7 +138,9 @@ const CodeBlockBody = memo(function CodeBlockBody({
         });
     };
     const last = lastHighlight.current;
-    const delay = last === null ? 0 : Math.max(0, STREAMING_HIGHLIGHT_INTERVAL_MS - (Date.now() - last));
+    // The text of a finished block does not change again: it gets its colours at once.
+    const interval = finished ? STREAMING_HIGHLIGHT_INTERVAL_MS : streamingHighlightInterval(text.length);
+    const delay = last === null ? 0 : Math.max(0, interval - (Date.now() - last));
     const timer = delay === 0 ? null : setTimeout(run, delay);
     if (timer === null) run();
     return () => {
@@ -80,6 +154,7 @@ const CodeBlockBody = memo(function CodeBlockBody({
       : highlight.text === text
         ? highlight.tokens
         : [...highlight.tokens, { text: text.slice(highlight.text.length), offset: highlight.text.length }];
+  const runs = useMemo(() => codeRuns(tokens, colors, foreground), [tokens, colors, foreground]);
   const copied = copiedText === text;
   async function copy() {
     try {
@@ -92,9 +167,15 @@ const CodeBlockBody = memo(function CodeBlockBody({
     }
   }
   return (
-    <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
-      <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
-        <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
+    <View className="overflow-hidden" style={{ borderRadius: 16, borderCurve: "continuous", backgroundColor: card }}>
+      {/* The label lines up with the code on the inset panel, as a table header does with its rows. */}
+      <View className="flex-row items-center justify-between gap-3" style={{ paddingStart: 15, paddingEnd: 4 }}>
+        <Typography.Paragraph
+          type="body-xs"
+          className="shrink text-muted"
+          numberOfLines={1}
+          style={tone ? { color: tone.muted } : undefined}
+        >
           {codeLanguageLabel(language, t)}
         </Typography.Paragraph>
         <Button
@@ -107,25 +188,36 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>
+      <View
+        style={[
+          CODE_LAYOUT_STYLE,
+          {
+            marginHorizontal: 3,
+            marginBottom: 3,
+            borderRadius: 13,
+            borderCurve: "continuous",
+            backgroundColor: panel,
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+          },
+        ]}
+      >
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
-          style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+          style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
         >
-          {tokens.map((token) => (
-            <Typography.Code
-              key={token.offset}
-              className="bg-transparent p-0"
-              style={{
-                color: token.type ? (colors[token.type] ?? foreground) : foreground,
-                fontSize: 14,
-                lineHeight: 20,
-              }}
-            >
-              {token.text}
-            </Typography.Code>
-          ))}
+          {runs.map((run) =>
+            run.color === undefined ? (
+              run.text
+            ) : (
+              // A plain native span in the font of the block around it, not a `Typography`: a long
+              // block has hundreds of runs, and each `Typography` adds four components to the row.
+              <Text key={run.offset} style={{ color: run.color }}>
+                {run.text}
+              </Text>
+            ),
+          )}
         </Typography.Code>
       </View>
     </View>

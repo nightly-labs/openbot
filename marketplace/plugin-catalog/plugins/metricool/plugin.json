@@ -1,0 +1,36 @@
+{
+  "slug": "metricool",
+  "name": "Metricool",
+  "tagline": "Social media analytics and planning",
+  "description": "Metricool lets agents read social media and ads analytics for connected brands and plan posts in the content calendar. Each user signs in to their own Metricool account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Metricool",
+  "iconUrl": "https://metricool.com/wp-content/uploads/cropped-web-app-manifest-512x512-1-192x192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-best-posts", "text": "Which of my Instagram posts had the most engagement last month?" },
+    { "id": "prompt-best-time", "text": "What are the best times to post on LinkedIn for my brand?" },
+    {
+      "id": "prompt-draft-post",
+      "text": "Draft a post for next Tuesday about our product update, but do not schedule it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-metricool-mcp",
+      "name": "Metricool",
+      "description": "Social analytics and post planning, over Metricool's MCP server with browser sign-in.",
+      "iconUrl": "https://metricool.com/wp-content/uploads/cropped-web-app-manifest-512x512-1-192x192.png",
+      "server": {
+        "name": "metricool",
+        "transport": "http",
+        "url": "https://ai.metricool.com/mcp",
+        "auth": [{ "id": "metricool-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://metricool.com",
+  "privacyPolicyUrl": "https://metricool.com/privacy-policy/",
+  "termsUrl": "https://metricool.com/legal-terms/"
+}

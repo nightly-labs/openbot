@@ -29,6 +29,8 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+# The update signing certificate is public: each binary has it. Its private key is never in the repository.
+!/certs/certificate.pem
 
 # local env files
 .env*.local

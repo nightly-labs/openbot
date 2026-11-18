@@ -15,7 +15,8 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { MailboxSync } from "./mailbox-sync";
 
 export interface ConversationReaderHooks {
-  emit(event: AgentEvent): void;
+  /** With `memberId`, the event is only for the connections of that member. */
+  emit(event: AgentEvent, memberId?: string): void;
   listAgents(): AgentSummary[];
 }
 
@@ -88,6 +89,7 @@ export class ConversationReader {
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
       const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
+      this.#mailboxSync.refreshQueuePositions(page.messages);
       return {
         ...page,
         readState: this.#reads.readStateForThread(memberId, agent.threadId, options),
@@ -146,11 +148,15 @@ export class ConversationReader {
       if (state.throughMessageId !== previous) {
         // Read cursors are shared by a member's devices, not by every team member.
         // Invalidate without broadcasting a reader's cursor; each client reloads its own state.
-        this.#hooks.emit({
-          type: "conversation-invalidated",
-          agentId,
-          revision: this.#store.database.readConversationRevision(agentId, agent.threadId),
-        });
+        // Only this member's connections get it: the messages did not change for the others.
+        this.#hooks.emit(
+          {
+            type: "conversation-invalidated",
+            agentId,
+            revision: this.#store.database.readConversationRevision(agentId, agent.threadId),
+          },
+          memberId,
+        );
       }
       return state;
     });
@@ -161,15 +167,19 @@ export class ConversationReader {
     agentId: string,
     memberId: string,
     fromMessageId: string | null = null,
+    options: ConversationMarkerExclusions = {},
   ) {
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
-      const state = this.#reads.markUnreadForThread(memberId, agent.threadId, fromMessageId);
-      this.#hooks.emit({
-        type: "conversation-invalidated",
-        agentId,
-        revision: this.#store.database.readConversationRevision(agentId, agent.threadId),
-      });
+      const state = this.#reads.markUnreadForThread(memberId, agent.threadId, fromMessageId, options);
+      this.#hooks.emit(
+        {
+          type: "conversation-invalidated",
+          agentId,
+          revision: this.#store.database.readConversationRevision(agentId, agent.threadId),
+        },
+        memberId,
+      );
       return state;
     });
   }, Effect.uninterruptible);

@@ -1,0 +1,31 @@
+{
+  "slug": "excalidraw",
+  "name": "Excalidraw",
+  "tagline": "Hand-drawn diagrams",
+  "description": "Excalidraw lets agents draw hand-drawn style diagrams in the chat and export them to excalidraw.com as a shareable link. It needs no account and no key.",
+  "category": "design",
+  "creatorName": "Excalidraw",
+  "iconUrl": "https://excalidraw.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-architecture",
+      "text": "Draw a diagram of a web app with a load balancer, two API servers, and a database."
+    },
+    { "id": "prompt-flow", "text": "Sketch the sign-up flow from landing page to first login." },
+    { "id": "prompt-export", "text": "Export this diagram to Excalidraw and give me the link." }
+  ],
+  "apps": [
+    {
+      "id": "app-excalidraw-mcp",
+      "name": "Excalidraw",
+      "description": "Diagram drawing and export, over the Excalidraw MCP server with no sign-in.",
+      "iconUrl": "https://excalidraw.com/apple-touch-icon.png",
+      "server": { "name": "excalidraw", "transport": "http", "url": "https://mcp.excalidraw.com/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://excalidraw.com",
+  "privacyPolicyUrl": "https://plus.excalidraw.com/privacy-policy",
+  "termsUrl": "https://plus.excalidraw.com/terms-of-service"
+}

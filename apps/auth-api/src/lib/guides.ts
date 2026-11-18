@@ -15,11 +15,39 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   indexTitle: "OpenBot Guides: How to Run a Team of AI Agents",
   indexDescription:
     "How OpenBot works and how to run a team of AI agents. Start with how to set up your first agent, then explore practical guides to models, agents, and the Marketplace.",
+  indexSocialImage: {
+    path: "/social/guides.jpg",
+    alt: "From idea to done. OpenBot agents on a folded paper path",
+  },
   feedTitle: "OpenBot guides",
   backLabel: "All guides",
   moreTitle: "More guides",
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
+    {
+      slug: "ai-agent-workflow",
+      title: "AI Agent Workflow: From Task to Finished Result",
+      description:
+        "Follow a practical AI agent workflow in OpenBot. Write a clear brief, check official sources, save a result and review it before you share it.",
+      publishedAt: "2026-11-12",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-teammates-vs-ai-chatbots",
+      title: "AI Teammates vs AI Chatbots: When You Need More Than One Conversation",
+      description:
+        "See when a quick AI chat is enough and how to divide research, writing and review between OpenBot agents that can pass files to each other.",
+      publishedAt: "2026-11-10",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-workspace-vs-chat",
+      title: "AI Agent Workspace vs Chat History: What Changes in Practice?",
+      description:
+        "Compare an AI agent workspace with chat history in OpenBot. See how saved files, shared work and model changes affect an ongoing research task.",
+      publishedAt: "2026-11-03",
+      author: NEWS_AUTHOR,
+    },
     {
       slug: "install-openbot-vps",
       title: "How to Install OpenBot on a VPS: Ubuntu and Docker Guide",

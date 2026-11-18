@@ -15,7 +15,10 @@ import {
   type HostStatus,
   type InvitePreview,
   type InviteSummary,
+  isAvatarColor,
+  isRemoteControlAccess,
   REMOTE_DESKTOP_ERROR_CODES,
+  type RemoteControlPolicy,
   type RemoteDesktopConnectResult,
   type RemoteDesktopDisplay,
   type RemoteDesktopSession,
@@ -44,6 +47,7 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 const HOST_PHASES = ["unconfigured", "idle", "starting", "online", "stopping", "error"] as const;
 const TEAM_ROLES = ["owner", "admin", "member"] as const;
@@ -102,6 +106,7 @@ export function decodeHostStatus(value: unknown): HostStatus {
     serverName: nullableString(status, "serverName"),
     apiUrl: nullableString(status, "apiUrl"),
     logoUrl: nullableString(status, "logoUrl"),
+    appearance: serverAppearance(status.appearance),
     apiOnline: requiredBoolean(status, "apiOnline"),
     remoteDesktopReady: requiredBoolean(status, "remoteDesktopReady"),
     remoteDesktopScreenRecordingDenied: requiredBoolean(status, "remoteDesktopScreenRecordingDenied"),
@@ -110,6 +115,12 @@ export function decodeHostStatus(value: unknown): HostStatus {
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),
     message: nullableString(status, "message"),
   };
+}
+
+export function decodeRemoteControlPolicy(value: unknown): RemoteControlPolicy {
+  const policy = decodeRecord(value, "remote control policy");
+  if (!isRemoteControlAccess(policy.access)) throw new Error("Invalid remote control access.");
+  return { access: policy.access, askOnHost: requiredBoolean(policy, "askOnHost") };
 }
 
 export function decodeTeamMember(value: unknown): TeamMemberSummary {
@@ -267,14 +278,18 @@ function server(summary: DynamicRecord): ServerSummary {
     compatibility,
     issue,
     connectionSequence,
+    capabilitiesPending,
     hostRestart,
     hostedSleep,
     hostedIssue,
     hostedStart,
     memberLimit,
     hosted,
+    restartAvailable,
+    storageGb,
     keyChangedAt,
     thisComputer,
+    appearance,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
@@ -284,6 +299,10 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid memberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
+  if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
+  if (storageGb !== undefined && !(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1)) {
+    throw new Error("Invalid storageGb.");
+  }
   if (
     keyChangedAt !== undefined &&
     !(isNumber(keyChangedAt) && Number.isSafeInteger(keyChangedAt) && keyChangedAt >= 0)
@@ -291,6 +310,9 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
+    throw new Error("Invalid capabilitiesPending.");
+  }
   return {
     notificationsMuted: requiredBoolean(summary, "notificationsMuted"),
     notificationsMutedUntil: nullableNumber(summary, "notificationsMutedUntil"),
@@ -302,6 +324,7 @@ function server(summary: DynamicRecord): ServerSummary {
     apiUrl: nullableString(summary, "apiUrl"),
     remoteDesktopAvailable: requiredBoolean(summary, "remoteDesktopAvailable"),
     logoUrl: nullableString(summary, "logoUrl"),
+    ...(appearance === undefined ? {} : { appearance: serverAppearance(appearance) }),
     role: role === null ? null : teamRole(role),
     active: requiredBoolean(summary, "active"),
     ...(compatibility === undefined
@@ -309,6 +332,7 @@ function server(summary: DynamicRecord): ServerSummary {
       : { compatibility: compatibility === null ? null : serverCompatibility(compatibility) }),
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
+    ...(capabilitiesPending === undefined ? {} : { capabilitiesPending }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
     // Only the indicator reads it, so a value from a newer main process shows no indicator.
     ...(hostedSleep === undefined
@@ -318,9 +342,19 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    ...(restartAvailable === undefined ? {} : { restartAvailable }),
+    ...(storageGb === undefined ? {} : { storageGb }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };
+}
+
+/** Null for the automatic look. Main sends only a checked value, so another value fails closed. */
+function serverAppearance(value: unknown): ServerAppearance | null {
+  if (value === null) return null;
+  const appearance = serverAppearanceOrNull(value);
+  if (!appearance) throw new Error("Invalid appearance.");
+  return appearance;
 }
 
 function serverHostRestart(value: unknown): NonNullable<ServerSummary["hostRestart"]> {
@@ -379,10 +413,11 @@ function optionalReadState(conversation: DynamicRecord): { readState?: DirectCon
 }
 
 function teamMember(member: DynamicRecord): TeamMemberSummary {
-  const { avatarUrl } = member;
+  const { avatarUrl, chatColor } = member;
   if (avatarUrl !== undefined && avatarUrl !== null && !isString(avatarUrl)) {
     throw new Error("Invalid avatarUrl.");
   }
+  if (chatColor !== undefined && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
   return {
     id: requiredString(member, "id"),
     username: requiredString(member, "username"),
@@ -392,6 +427,7 @@ function teamMember(member: DynamicRecord): TeamMemberSummary {
     role: teamRole(member.role),
     createdAt: requiredString(member, "createdAt"),
     disabled: requiredBoolean(member, "disabled"),
+    ...(chatColor === undefined ? {} : { chatColor }),
   };
 }
 

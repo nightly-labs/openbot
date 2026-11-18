@@ -51,7 +51,10 @@ export interface HermesImportViewProps {
   updated?: ReadonlySet<string>;
   error?: string | null;
   onBack: () => void;
-  onChooseFolder: () => void;
+  /** The folder is on a joined server, not on this computer. */
+  server?: boolean;
+  /** Reads a folder that the user chooses. Not set: the user cannot choose another folder. */
+  onChooseFolder?: (() => void) | undefined;
   onImport: (selection: HermesImportSelection[]) => void;
   onDone: () => void;
   onOpenAgent: (agentId: string) => void;
@@ -106,16 +109,24 @@ export function HermesImportView(props: HermesImportViewProps) {
         <div class="storage-message">
           <TriangleAlert class="storage-message-icon" aria-hidden="true" />
           <div>
-            <p class="storage-message-title">{t("import.hermes.notFound")}</p>
-            <p class="storage-message-description">{t("import.hermes.notFoundNote")}</p>
+            <p class="storage-message-title">
+              {props.server ? t("import.hermes.notFoundServer") : t("import.hermes.notFound")}
+            </p>
+            <p class="storage-message-description">
+              {props.server ? t("import.hermes.notFoundServerNote") : t("import.hermes.notFoundNote")}
+            </p>
           </div>
         </div>
-        <Button type="button" variant="ghost" class="agent-import-picker" onClick={() => props.onChooseFolder()}>
-          <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
-          <span class="agent-import-picker-copy">
-            <span class="agent-import-picker-title">{t("import.hermes.chooseFolder")}</span>
-          </span>
-        </Button>
+        <Show when={props.onChooseFolder}>
+          {(chooseFolder) => (
+            <Button type="button" variant="ghost" class="agent-import-picker" onClick={() => chooseFolder()()}>
+              <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
+              <span class="agent-import-picker-copy">
+                <span class="agent-import-picker-title">{t("import.hermes.chooseFolder")}</span>
+              </span>
+            </Button>
+          )}
+        </Show>
       </Show>
       {/* Keyed, so a newly read folder starts with every profile selected again. */}
       <Show when={(props.phase === "review" || props.phase === "importing") && props.preview} keyed>
@@ -140,7 +151,7 @@ function HermesReview(props: {
   preview: HermesImportPreview;
   importing: boolean;
   error?: string | null | undefined;
-  onChooseFolder: () => void;
+  onChooseFolder?: (() => void) | undefined;
   onImport: (selection: HermesImportSelection[]) => void;
   onCancel: () => void;
 }) {
@@ -184,16 +195,20 @@ function HermesReview(props: {
             <p class="storage-summary-total">{t("import.hermes.profiles", { count: props.preview.profiles.length })}</p>
             <p class="storage-summary-caption">{t("import.hermes.caption", { path: props.preview.home })}</p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={props.importing}
-            onClick={() => props.onChooseFolder()}
-          >
-            <FolderOpen class="files-button-icon" aria-hidden="true" />
-            {t("import.hermes.chooseAnother")}
-          </Button>
+          <Show when={props.onChooseFolder}>
+            {(chooseFolder) => (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={props.importing}
+                onClick={() => chooseFolder()()}
+              >
+                <FolderOpen class="files-button-icon" aria-hidden="true" />
+                {t("import.hermes.chooseAnother")}
+              </Button>
+            )}
+          </Show>
         </div>
       </section>
 

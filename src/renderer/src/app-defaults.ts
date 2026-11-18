@@ -54,6 +54,8 @@ export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
     pi: NO_PROVIDER_RUNTIME,
     muse: NO_PROVIDER_RUNTIME,
     devin: NO_PROVIDER_RUNTIME,
+    copilot: NO_PROVIDER_RUNTIME,
+    mistral: NO_PROVIDER_RUNTIME,
   },
   toolRuntimes: { bun: NO_PROVIDER_RUNTIME },
 };
@@ -65,6 +67,7 @@ export const FALLBACK_HOST_STATUS: HostStatus = {
   serverId: null,
   serverName: null,
   logoUrl: null,
+  appearance: null,
   apiUrl: null,
   apiOnline: false,
   remoteDesktopReady: false,

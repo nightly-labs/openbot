@@ -45,9 +45,11 @@ const LOOP_SECONDS = 6;
 const LOOP_FRAMES = LOOP_SECONDS * PLUSH_FPS;
 /**
  * The eyes play the engine on a smooth periodic clock that goes forward and back, so a loop closes
- * without a jump of the gaze or the lids. The decor keeps a linear clock.
+ * without a jump of the gaze or the lids. The decor keeps a linear clock. The swing is short, so an
+ * idle face looks round a little and slowly; it still reaches the blink at 5.3 s. The loop starts at
+ * `SETTLED`, so the still picture does not change with the swing.
  */
-const LIFE_SWING = 1.5;
+const LIFE_SWING = 0.8;
 /**
  * The engine time where loops start. The entry of a state, such as the felt dot of `notify`, is
  * over, and the engine blinks once at 5.3 s, inside the swing: the loop blinks on the way forward

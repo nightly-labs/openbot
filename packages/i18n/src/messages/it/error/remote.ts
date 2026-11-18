@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Il test del desktop remoto non è disponibile.",
   "error.remote.controlUnavailable": "Il controllo remoto non è disponibile.",
   "error.remote.controlSessionNotFound": "Sessione di controllo remoto non trovata.",
+  "error.remote.controlNotAllowed": "Il proprietario di questo computer non consente al tuo ruolo di controllarlo.",
+  "error.remote.controlDeclined": "La persona a questo computer non ha consentito il controllo remoto.",
   "error.remote.testRuntimeUpdate": "Aggiorna il runtime del desktop remoto per macOS per eseguire questo test.",
   "error.remote.testOtherSessions": "Termina le altre sessioni di desktop remoto prima di avviare un test.",
   "error.remote.testPermissions": "Controlla i permessi e la sessione grafica sull'host prima di avviare il test.",
@@ -19,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "Un test del desktop remoto è in corso. Riprova quando finisce.",
   "error.remote.screenRecordingDenied":
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
+  "error.remote.windowsSessionDisconnected":
+    "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
   "error.remote.teamSessionExpired": "La sessione del team è scaduta.",
   "error.remote.finishTestBeforeSwitch": "Termina il test del desktop remoto prima di cambiare schermo.",
   "error.remote.displayNotFound": "Schermo remoto non trovato.",
@@ -146,6 +150,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L'host ha rifiutato l'allegato.",
   "error.remote.attachmentTooLarge": "Gli allegati devono essere di 10 MB o meno.",
   "error.remote.attachmentBusy": "Attendi che l'allegato attuale finisca.",
+  "error.remote.attachmentChanged": "Il file è cambiato o non è disponibile. Selezionalo di nuovo.",
   "error.remote.uploadTimeout": "Il caricamento dell'allegato è scaduto.",
   "error.remote.hostSessionActive": "L'host ha già una sessione remota attiva.",
   "error.remote.tooManyConnections": "Troppe connessioni remote attive.",
@@ -187,12 +192,15 @@ export const messages = {
     "Questo host ha raggiunto il limite di membri. Chiedi al proprietario di fare spazio.",
   "error.remote.hostNotRegistered": "Questo host non è più registrato presso il servizio OpenBot.",
   "error.remote.membershipEnded": "Non sei più membro di questo host. Chiedi un nuovo invito al proprietario.",
+  "error.remote.membershipChanged":
+    "Qualcun altro ha modificato questo membro nello stesso momento. Ricarica i membri e riprova.",
   "error.remote.accountSessionInactive": "Il tuo accesso non è più attivo. Accedi di nuovo.",
   "error.remote.hostOtherAccount": "Questo host appartiene a un altro account.",
   "error.remote.remoteNotConfigured": "Le connessioni remote non sono configurate su questo servizio OpenBot.",
   "error.remote.hostRefused": "L'host ha rifiutato la richiesta ({status}).",
   "error.remote.formUnavailable": "Questo modulo non è più disponibile.",
   "error.remote.hostedServerRemoval": "Usa Fatturazione per eliminare un server ospitato.",
+  "error.remote.hostRemoved": "Il proprietario ha rimosso questo server dall'account.",
   "error.remote.channelsUnsupported": "Aggiorna questo server desktop per usare i canali.",
   "error.remote.channelDeleteUnsupported": "Aggiorna questo server desktop per eliminare i canali.",
   "error.remote.historyRefreshFailed":

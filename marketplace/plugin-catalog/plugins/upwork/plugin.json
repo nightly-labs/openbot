@@ -1,0 +1,36 @@
+{
+  "slug": "upwork",
+  "name": "Upwork",
+  "tagline": "Freelance jobs and talent",
+  "description": "Upwork lets agents search jobs and freelancers, draft job posts, and review proposals and contracts in the signed-in Upwork account. Each user signs in to their own Upwork account through the browser.",
+  "category": "other",
+  "creatorName": "Upwork",
+  "iconUrl": "https://avatars.githubusercontent.com/u/11737042?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-find-talent",
+      "text": "Find freelance React developers with strong reviews and a rate under $80 per hour."
+    },
+    { "id": "prompt-draft-job", "text": "Draft a job post for a two-week logo design project." },
+    { "id": "prompt-proposals", "text": "Summarize the proposals on my data entry job and rank them." }
+  ],
+  "apps": [
+    {
+      "id": "app-upwork-mcp",
+      "name": "Upwork",
+      "description": "Job and talent search, job post drafts, and proposal review, over Upwork's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/11737042?s=256&v=4",
+      "server": {
+        "name": "upwork",
+        "transport": "http",
+        "url": "https://mcp.upwork.com/mcp",
+        "auth": [{ "id": "upwork-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.upwork.com",
+  "privacyPolicyUrl": "https://www.upwork.com/legal#privacy",
+  "termsUrl": "https://www.upwork.com/legal#terms"
+}

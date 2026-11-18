@@ -1,0 +1,33 @@
+{
+  "slug": "miro",
+  "name": "Miro",
+  "tagline": "Boards, diagrams and docs",
+  "description": "Miro lets agents read board content and create diagrams, documents, and tables on boards the user can access. Each user signs in to their own Miro account through the browser.",
+  "category": "design",
+  "creatorName": "Miro",
+  "iconUrl": "https://framerusercontent.com/images/6FBG66PBxjV2QFaDfIdUi5mi9A.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-summarize-board", "text": "Summarize the sticky notes on my retrospective board." },
+    { "id": "prompt-flowchart", "text": "Create a flowchart of the user sign-up process on a new board." },
+    { "id": "prompt-board-to-spec", "text": "Turn the ideas on this board into a short product spec." }
+  ],
+  "apps": [
+    {
+      "id": "app-miro-mcp",
+      "name": "Miro",
+      "description": "Board reading and diagram creation, over Miro's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/6FBG66PBxjV2QFaDfIdUi5mi9A.png",
+      "server": {
+        "name": "miro",
+        "transport": "http",
+        "url": "https://mcp.miro.com/",
+        "auth": [{ "id": "miro-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://miro.com",
+  "privacyPolicyUrl": "https://miro.com/legal/privacy-policy/",
+  "termsUrl": "https://miro.com/legal/terms-of-service/"
+}

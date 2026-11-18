@@ -2,13 +2,13 @@ import type {
   CheckCustomAgentInput,
   CustomAgentCheckResult,
   CustomAgentSummary,
-  CustomAgentsDesktopApi,
   CustomAgentUsage,
   CustomProviderRestart,
   SaveCustomAgentInput,
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
+import type { CustomAgentsEndpointApi } from "../custom-agents-port";
 
 interface CustomAgentsState {
   agents: CustomAgentSummary[];
@@ -32,10 +32,13 @@ export interface CustomAgentUsageRow {
  * list empty, and the mutations write the list main returned and re-throw for the button that
  * started them.
  */
-export function createCustomAgentsStore(api: () => CustomAgentsDesktopApi | undefined) {
+export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | undefined) {
   const [state, setState] = createStore<CustomAgentsState>({ agents: [], loaded: false, usage: [] });
+  /** Changes on each `reset`, so an answer of the previous API does not replace the new list. */
+  let generation = 0;
 
-  function apply(agents: CustomAgentSummary[]): void {
+  function apply(agents: CustomAgentSummary[], from: number): void {
+    if (from !== generation) return;
     setState((current) => {
       current.agents = agents;
       current.loaded = true;
@@ -53,7 +56,18 @@ export function createCustomAgentsStore(api: () => CustomAgentsDesktopApi | unde
   async function refreshCustomAgents(): Promise<void> {
     const group = api();
     if (!group) return;
-    apply(await group.list());
+    const from = generation;
+    apply(await group.list(), from);
+  }
+
+  /** Empties the list for a new API, such as another server, and drops the answers still in flight. */
+  function resetCustomAgents(): void {
+    generation += 1;
+    setState((current) => {
+      current.agents = [];
+      current.loaded = false;
+      current.usage = [];
+    });
   }
 
   /** The agents that the user gave a usage prompt and that answered, in the order of the list. */
@@ -66,9 +80,9 @@ export function createCustomAgentsStore(api: () => CustomAgentsDesktopApi | unde
 
   /** Each agent answers in a model-list process, so this can take as long as the slowest agent. */
   async function refreshCustomAgentUsage(): Promise<void> {
-    const group = api();
-    if (!group) return;
-    const usage = await group.usage();
+    const from = generation;
+    const usage = await api()?.usage?.();
+    if (!usage || from !== generation) return;
     setState((current) => {
       current.usage = usage;
     });
@@ -77,30 +91,33 @@ export function createCustomAgentsStore(api: () => CustomAgentsDesktopApi | unde
   async function saveCustomAgent(input: SaveCustomAgentInput): Promise<CustomProviderRestart> {
     const group = api();
     if (!group) throw new Error(currentText().t("customProvider.saveUnavailable"));
+    const from = generation;
     const result = await group.save(input);
-    apply(result.agents);
+    apply(result.agents, from);
     return result.restart;
   }
 
   async function deleteCustomAgent(id: string): Promise<CustomProviderRestart> {
     const group = api();
     if (!group) throw new Error(currentText().t("customProvider.removeUnavailable"));
+    const from = generation;
     const result = await group.delete({ id });
-    apply(result.agents);
+    apply(result.agents, from);
     return result.restart;
   }
 
   /** One trial start. Writes nothing, so the list does not change. */
   async function checkCustomAgent(input: CheckCustomAgentInput): Promise<CustomAgentCheckResult> {
-    const group = api();
-    if (!group) throw new Error(currentText().t("customProvider.saveUnavailable"));
-    return group.check(input);
+    const check = api()?.check;
+    if (!check) throw new Error(currentText().t("customProvider.saveUnavailable"));
+    return check(input);
   }
 
   return {
     customAgents,
     customAgentsLoaded,
     refreshCustomAgents,
+    resetCustomAgents,
     customAgentUsage,
     refreshCustomAgentUsage,
     saveCustomAgent,

@@ -1,0 +1,33 @@
+{
+  "slug": "crustdata",
+  "name": "Crustdata",
+  "tagline": "Company and people data",
+  "description": "Crustdata lets agents search and enrich companies and people, search job listings, and track social posts. Each user signs in to their own Crustdata account through the browser, and each request uses credits of that account.",
+  "category": "research",
+  "creatorName": "Crustdata",
+  "iconUrl": "https://framerusercontent.com/images/E8mnzGlBd4YPo1cPiZk7sGel9Y.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-companies", "text": "Find Series A fintech companies in Berlin with 50 to 200 employees." },
+    { "id": "prompt-profile", "text": "Give me a profile of this company: headcount, funding, and recent hires." },
+    { "id": "prompt-jobs", "text": "Which engineering roles is this company hiring for now?" }
+  ],
+  "apps": [
+    {
+      "id": "app-crustdata-mcp",
+      "name": "Crustdata",
+      "description": "Company and people search, enrichment, jobs, and posts, over Crustdata's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/E8mnzGlBd4YPo1cPiZk7sGel9Y.png",
+      "server": {
+        "name": "crustdata",
+        "transport": "http",
+        "url": "https://mcp.crustdata.com/mcp",
+        "auth": [{ "id": "crustdata-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://crustdata.com",
+  "privacyPolicyUrl": "https://crustdata.com/privacy",
+  "termsUrl": "https://crustdata.com/terms",
+  "skills": []
+}

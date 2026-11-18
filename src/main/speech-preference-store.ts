@@ -1,4 +1,14 @@
-import { DEFAULT_SPEECH_SETTINGS, isSpeechSpeed, isSpeechVoice, type SpeechSettings } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_SPEECH_SETTINGS,
+  isCodexLiveVoice,
+  isElevenLabsSpeechVoice,
+  isSpeechModelId,
+  isSpeechSpeed,
+  isSpeechVoice,
+  isVoiceTurnPause,
+  isXaiSpeechVoice,
+  type SpeechSettings,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -10,7 +20,10 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  *
  * A file that is missing, unreadable as JSON or names an unknown voice reads as the default: replies
  * are not read aloud. A file with no known speed, such as one from an earlier version, reads at normal
- * speed. The speed is an extra field of version 1, so an earlier version still reads the file.
+ * speed. The speed is an extra field of version 1, so an earlier version still reads the file. Codex
+ * live voice is one more extra field, and a file without it reads as off. The model and the cloud
+ * voices are extra fields too: a file without a known model reads as Supertonic 3. The pause that ends a
+ * turn of a voice conversation is one more: a file without a known pause reads as the default.
  */
 export class SpeechPreferenceStore {
   readonly #path: string;
@@ -31,8 +44,18 @@ export class SpeechPreferenceStore {
           isSpeechVoice(parsed.voice)
             ? {
                 readReplies: parsed.readReplies,
+                modelId: isSpeechModelId(parsed.modelId) ? parsed.modelId : DEFAULT_SPEECH_SETTINGS.modelId,
                 voice: parsed.voice,
+                elevenLabsVoice: isElevenLabsSpeechVoice(parsed.elevenLabsVoice)
+                  ? parsed.elevenLabsVoice
+                  : DEFAULT_SPEECH_SETTINGS.elevenLabsVoice,
+                xaiVoice: isXaiSpeechVoice(parsed.xaiVoice) ? parsed.xaiVoice : DEFAULT_SPEECH_SETTINGS.xaiVoice,
                 speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
+                codexLive: parsed.codexLive === true,
+                codexLiveVoice: isCodexLiveVoice(parsed.codexLiveVoice) ? parsed.codexLiveVoice : null,
+                turnPauseMs: isVoiceTurnPause(parsed.turnPauseMs)
+                  ? parsed.turnPauseMs
+                  : DEFAULT_SPEECH_SETTINGS.turnPauseMs,
               }
             : null,
         ),
@@ -48,16 +71,24 @@ export class SpeechPreferenceStore {
     return { ...this.#settings };
   }
 
-  readonly set = Effect.fn("SpeechPreference.set")(function* (
-    this: SpeechPreferenceStore,
-    { readReplies, voice, speed }: SpeechSettings,
-  ) {
+  readonly set = Effect.fn("SpeechPreference.set")(function* (this: SpeechPreferenceStore, input: SpeechSettings) {
+    const settings: SpeechSettings = {
+      readReplies: input.readReplies,
+      modelId: input.modelId,
+      voice: input.voice,
+      elevenLabsVoice: input.elevenLabsVoice,
+      xaiVoice: input.xaiVoice,
+      speed: input.speed,
+      codexLive: input.codexLive,
+      codexLiveVoice: input.codexLiveVoice,
+      turnPauseMs: input.turnPauseMs,
+    };
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, readReplies, voice, speed }).pipe(
+        writePreferenceFile(this.#path, { version: 1, ...settings }).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
-              this.#settings = { readReplies, voice, speed };
+              this.#settings = settings;
             }),
           ),
         ),

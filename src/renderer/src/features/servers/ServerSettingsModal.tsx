@@ -3,11 +3,13 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import {
@@ -19,18 +21,23 @@ import {
   AlertTitle,
   AppWindow,
   ArrowLeftRight,
-  Blocks,
+  Bot,
+  Brain,
   Button,
   CalendarClock,
   Download,
+  FlaskConical,
   Globe2,
   HardDrive,
   History,
+  ItemGroup,
   KeyRound,
   Monitor,
   RefreshCw,
   Settings,
+  SettingsSection,
   ShieldCheck,
+  Smile,
   Sparkles,
   Tabs,
   Text,
@@ -41,6 +48,7 @@ import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/Provi
 import {
   SaveBarDock,
   SettingsDialogShell,
+  SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
@@ -49,28 +57,47 @@ import {
   type HostedSiteDeleteResult,
 } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
+import type { CrmHost } from "../crm/crm-port";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
+import { hostedPlanStorageGb } from "../files/storage-usage";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type {
+  HostClaudeCompactWindowOptions,
+  ProviderClaudeCompactWindowSource,
+} from "../settings/provider-claude-compact-window";
+import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
+import type { HostProviderEnvironmentOptions, ProviderEnvironmentSource } from "../settings/provider-environment";
+import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
-import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { createServerAgentsSection, type ServerAgentDefaultsOptions } from "./ServerAgentsSection";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
+import { ServerCrmSetting } from "./ServerCrmSetting";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
-import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
-import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
+import {
+  type HermesFolderPlace,
+  type ServerImportDetail,
+  type ServerImportOptions,
+  ServerImportPanel,
+} from "./ServerImportPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
+import { createServerMemorySection } from "./ServerMemorySection";
+import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
+import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -89,6 +116,11 @@ export interface ServerSettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
+  /**
+   * Saves the plush look that the server shows with no logo; null gives the automatic look. The
+   * picker shows only where a caller supplies this.
+   */
+  onSaveAppearance?: ((appearance: ServerAppearance | null) => Promise<void>) | undefined;
   onSetPublished: (published: boolean) => Promise<void>;
   /**
    * Changes the key of the server on this computer, and paired devices follow it. The Server key
@@ -103,6 +135,11 @@ export interface ServerSettingsModalProps {
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
   companySignIn?: CompanySignInCalls | undefined;
+  /**
+   * Opens the desktop app download where `companySignIn` is absent. The owner then sees that setup
+   * needs the desktop app, instead of no section.
+   */
+  onDownloadDesktopApp?: (() => void) | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -122,37 +159,6 @@ export interface ServerSettingsModalProps {
   onOpenScreenRecordingSettings: () => Promise<void>;
   /** Asks the host to read the grant again, so the owner who gave it sees the warning go. */
   onRecheckScreenRecording: () => Promise<void>;
-  /**
-   * The MCP section appears only when a caller supplies these. A caller that cannot manage MCP
-   * servers - a remote host without the capability, or a `member` account - passes nothing, and
-   * then neither the tab nor the panel exists.
-   */
-  mcpServers?: McpServerConfig[] | undefined;
-  /** Why the MCP list is empty, when the read failed rather than found nothing. */
-  mcpLoadError?: string | null;
-  /**
-   * What the managed runtime under a STDIO server is doing, when there is anything to say. The
-   * caller decides: it describes this computer, and this dialog also opens for a remote server.
-   */
-  mcpToolRuntimeNote?: string | null;
-  onRetryMcpServers?: () => void;
-  onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
-  onRemoveMcpServer?: (id: string) => Promise<void>;
-  onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
-  onTestMcpServer?: (config: McpServerConfig) => Promise<McpTestResult>;
-  /** Browser sign-in for http MCP servers. Only the server on this computer gets it. */
-  mcpSignIn?: McpPanelSignIn | undefined;
-  /** An MCP row to sign in to when the list holds it: the user pressed Sign in on an agent's card. */
-  mcpSignInRequest?: string | null | undefined;
-  onMcpSignInRequestHandled?: (() => void) | undefined;
-  /** Opens the MCP form for a new server once the section shows. */
-  mcpAddRequest?: boolean | undefined;
-  onMcpAddRequestHandled?: (() => void) | undefined;
-  /**
-   * Fired when the MCP section becomes visible. The list is read then, not when the dialog opens,
-   * because most visits to this dialog never reach that section.
-   */
-  onMcpSectionShown?: () => void;
   /**
    * The Storage section appears only when a caller supplies this: a remote host without
    * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
@@ -189,10 +195,20 @@ export interface ServerSettingsModalProps {
    */
   hostUpdate?: ServerUpdateOptions | undefined;
   /**
-   * General shows the server timezone only when a caller supplies this, and only for the local
+   * Agent defaults shows the server timezone only when a caller supplies this, and only for the local
    * server or a remote host with `host-timezone-v1` that this member administers.
    */
   hostTimezone?: ServerTimezoneOptions | undefined;
+  /**
+   * Agent defaults shows the thread limits only when a caller supplies this, and only for the local
+   * server or a remote host with `host-turn-limits-v1` that this member administers.
+   */
+  hostTurnLimits?: ServerTurnLimitsOptions | undefined;
+  /**
+   * The Personality section shows only when a caller supplies this, and only for the local server or
+   * a remote host with `host-personality-v1` that this member administers.
+   */
+  hostPersonality?: ServerPersonalityOptions | undefined;
   /**
    * General shows how many memories each agent keeps only when a caller supplies this, and only for
    * the local server or a remote host with `agent-memory-limit-v1` that this member administers.
@@ -204,16 +220,51 @@ export interface ServerSettingsModalProps {
    */
   memoryReview?: ServerMemoryReviewOptions | undefined;
   /**
+   * General shows whether the memory review saves the skills it learns only when a caller supplies
+   * this, and only for the local server or a remote host with `skill-learning-v1` that this member
+   * administers.
+   */
+  skillLearning?: ServerSkillLearningOptions | undefined;
+  /**
+   * General shows whether the agents learn from what people do in agent tabs they hold only when a
+   * caller supplies this, and only for the local server or a remote host with `browsing-memory-v1`
+   * that this member administers.
+   */
+  browsingMemory?: ServerBrowsingMemoryOptions | undefined;
+  /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member
    * administers.
    */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
   /**
+   * The Claude provider page shows "Use my Claude Code setup" only when a caller supplies this, and
+   * only for the local server or a remote host with `claude-user-setup-v1` that this member
+   * administers.
+   */
+  claudeUserSetup?: HostClaudeUserSetupOptions | undefined;
+  /**
+   * The Claude provider page shows the size at which Claude Code compacts chats only when a caller
+   * supplies this, and only for the local server or a remote host with `claude-compact-window-v1`
+   * that this member administers.
+   */
+  claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
+  /**
+   * The provider pages show their Environment section only when a caller supplies this, and only for
+   * the local server or a remote host with `provider-environment-v1` that this member administers.
+   */
+  providerEnvironment?: HostProviderEnvironmentOptions | undefined;
+  /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
    */
   hostModelVisibility?: HostModelVisibilityOptions | undefined;
+  /**
+   * The Providers section of a remote host with `provider-default-v1` that this member administers
+   * shows the host's Default provider only when a caller supplies this. This computer's comes with
+   * `providers`.
+   */
+  hostDefaultProvider?: HostDefaultProviderOptions | undefined;
   /**
    * The Roles section appears only when a caller supplies this, and only for the local server or a
    * remote host with `agent-access-v1` that this member administers.
@@ -224,6 +275,11 @@ export interface ServerSettingsModalProps {
    * a remote host with `server-audit-v1` that this member administers.
    */
   serverAudit?: ServerAuditOptions | undefined;
+  /**
+   * The Agents section appears only when a caller supplies this: for this computer, and for an online
+   * remote host with `agent-defaults-v1` that this member administers.
+   */
+  agentDefaults?: ServerAgentDefaultsOptions | undefined;
   /**
    * The Routines section appears only when a caller supplies this: the feed listens on this
    * computer, so a remote server passes nothing.
@@ -236,10 +292,25 @@ export interface ServerSettingsModalProps {
   browserProfiles?: ServerBrowserProfilesOptions | undefined;
   /** The Vault section: this computer, or a joined server that serves `vault-v1` to an owner or admin. */
   vault?: ServerVaultOptions | undefined;
+  /**
+   * The CRM of this server, for the CRM switch of the Experimental section. The section shows to an
+   * owner or admin of a server with `crm-v1`.
+   */
+  crm?: CrmHost | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
+  /** Counts the open requests, so a new request moves to its section also when the section did not change. */
+  initialSectionRequest?: number | undefined;
+  /** Gets the section on screen, so the rail can mark the page that it opened. */
+  onSectionChange?: ((section: ServerSettingsSection) => void) | undefined;
   /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
+  /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
+  sectionQuery?: string | undefined;
+  /** A new number opens the first section that the search finds. */
+  openFirstSectionRequest?: number | undefined;
+  /** Called when a request opened a section. The page then clears its search. */
+  onFirstSectionOpened?: (() => void) | undefined;
 }
 
 export interface ServerHostedSitesOptions {
@@ -254,12 +325,14 @@ export interface ServerHostedSitesOptions {
 
 export type ServerSettingsSection =
   | "general"
+  | "personality"
+  | "agents"
+  | "memory"
   | "vault"
   | "members"
   | "roles"
   | "audit"
   | "desktop"
-  | "mcp"
   | "storage"
   | "sites"
   | "providers"
@@ -267,17 +340,20 @@ export type ServerSettingsSection =
   | "import"
   | "transfer"
   | "routines"
-  | "browser-profiles";
+  | "browser-profiles"
+  | "experimental";
 type Section = ServerSettingsSection;
 
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
+  personality: { title: "server.settings.personalityTitle", description: "server.settings.personalityDescription" },
+  agents: { title: "server.settings.agentDefaultsTitle", description: "server.settings.agentsDescription" },
+  memory: { title: "server.settings.memoryTitle", description: "server.settings.memoryDescription" },
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
   audit: { title: "server.settings.auditTitle", description: "server.settings.auditDescription" },
   desktop: { title: "server.settings.desktopTitle", description: "server.settings.desktopDescription" },
-  mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
   storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
   sites: { title: "server.settings.hostedSitesTitle", description: "server.settings.hostedSitesDescription" },
   providers: { title: "server.settings.providersTitle", description: "server.settings.providersDescription" },
@@ -286,21 +362,89 @@ const sections = {
   transfer: { title: "server.settings.transferTitle", description: "server.settings.transferDescription" },
   routines: { title: "server.settings.routinesTitle", description: "server.settings.routinesDescription" },
   "browser-profiles": { title: "browser.profiles.title", description: "browser.profiles.subtitle" },
+  experimental: {
+    title: "server.settings.experimentalTitle",
+    description: "server.settings.experimentalDescription",
+  },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
+
+/** The row names of a section, so that the section search also finds a section by one of its rows. */
+const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
+  general: [
+    "server.settings.name",
+    "server.settings.logo",
+    "server.settings.hostKeyTitle",
+    "server.settings.leaveTitle",
+    "server.settings.removeTitle",
+  ],
+  agents: [
+    "server.settings.timezone",
+    "server.settings.turnLimit",
+    "server.settings.agentTaskLimit",
+    "agentSettings.automation.title",
+    "agentSettings.agentNewChat.title",
+    "agentSettings.quickAcknowledgement.title",
+    "settings.busyMessage.title",
+    "settings.commitCoAuthor.sectionTitle",
+  ],
+  memory: [
+    "server.settings.memoryLimit",
+    "server.settings.memoryReview",
+    "server.settings.skillLearning",
+    "server.settings.browsingMemory",
+  ],
+  members: [
+    "server.settings.publish",
+    "server.companySignIn.title",
+    "server.companySignIn.sso",
+    "server.companySignIn.scim",
+  ],
+  storage: ["settings.backgroundProcesses.title"],
+  experimental: ["server.settings.experimentalCrm"],
+};
+
+/**
+ * The section list, in its order. The sections that most users need come first, and each group after
+ * them starts with its label. A section shows only when the server and the caller support it.
+ */
+const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group?: AppTextKey }> = [
+  { value: "general", icon: Settings },
+  { value: "providers", icon: Sparkles },
+  { value: "personality", icon: Smile },
+  { value: "agents", icon: Bot, group: "server.settings.group.agents" },
+  { value: "memory", icon: Brain, group: "server.settings.group.agents" },
+  { value: "vault", icon: KeyRound, group: "server.settings.group.agents" },
+  { value: "browser-profiles", icon: AppWindow, group: "server.settings.group.agents" },
+  { value: "routines", icon: CalendarClock, group: "server.settings.group.agents" },
+  { value: "sites", icon: Globe2, group: "server.settings.group.agents" },
+  { value: "members", icon: UsersRound, group: "server.settings.group.people" },
+  { value: "roles", icon: ShieldCheck, group: "server.settings.group.people" },
+  { value: "audit", icon: History, group: "server.settings.group.people" },
+  { value: "storage", icon: HardDrive, group: "server.settings.group.server" },
+  { value: "updates", icon: RefreshCw, group: "server.settings.group.server" },
+  { value: "desktop", icon: Monitor, group: "server.settings.group.server" },
+  { value: "import", icon: Download, group: "server.settings.group.server" },
+  { value: "transfer", icon: ArrowLeftRight, group: "server.settings.group.server" },
+  { value: "experimental", icon: FlaskConical, group: "server.settings.group.server" },
+];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const { t, errorMessage } = useText();
   const [section, setSection] = createSignal<Section>("general");
-  /** Set while the MCP panel shows a form, so the header reads `MCP › Connect to a custom MCP`. */
-  const [mcpDetail, setMcpDetail] = createSignal<McpPanelDetail | null>(null);
+  createEffect(
+    () => ({ shown: section(), notify: props.onSectionChange }),
+    ({ shown, notify }) => {
+      notify?.(shown);
+    },
+  );
   /** Set while a provider page is open, so the header reads `Providers › Codex`. */
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   /** Set while an import source is open, so the header reads `Import › Hermes Agent`. */
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
   const crumbDetail = () => {
-    if (section() === "mcp") return mcpDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
+    if (section() === "agents") return agents.crumb();
     return section() === "providers" ? providerDetail() : null;
   };
   /** The key of the one action in flight, gating every panel at once rather than belonging to any. */
@@ -315,23 +459,62 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
-  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && props.platform === "darwin";
+  // A named function, not a ternary in the prop: a ternary makes a memo on each read, and a read
+  // from an effect callback (a select that reports a change) then halts the renderer.
+  const hostName = () => (local() ? undefined : props.server.name);
+  // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
+  // because its owner chooses there who can control the computer.
+  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
-  /**
-   * The role check without `configured()`. MCP servers belong to this machine and are spawned
-   * by the agents on it, so they are manageable before the user publishes a Team API host at all.
-   */
-  const canManageMcp = () => serverRoleCanAdminister(props.server);
   const actionsAvailable = () => local() || props.server.state === "online";
+  // A joined server reads its own Hermes folder for an owner or admin. Only this computer's server lets
+  // the user choose another folder: the folder dialog shows this computer's files.
+  const hermesFolderPlace = (): HermesFolderPlace | undefined => {
+    if (local()) return "computer";
+    return serverCanAdminister(props.server, "hermes-import-v1") ? "server" : undefined;
+  };
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function claudeUserSetupSource(): ProviderClaudeUserSetupSource | undefined {
+    const options = props.claudeUserSetup;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-user-setup-v1")) return undefined;
+    return { ...options, serverId: props.server.id, remote: !local() };
+  }
+  function claudeCompactWindowSource(): ProviderClaudeCompactWindowSource | undefined {
+    const options = props.claudeCompactWindow;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-compact-window-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function providerEnvironmentSource(): ProviderEnvironmentSource | undefined {
+    const options = props.providerEnvironment;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "provider-environment-v1"))
+      return undefined;
     return { ...options, serverId: props.server.id };
   }
   function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
     const options = props.hostModelVisibility;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "model-visibility-v1")) return undefined;
     return { ...options, serverId: props.server.id };
+  }
+  function hostDefaultProviderSource(): HostDefaultProviderSource | undefined {
+    const options = props.hostDefaultProvider;
+    if (!options || local() || !actionsAvailable() || !serverCanAdminister(props.server, "provider-default-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function personalityOptions(): ServerPersonalityOptions | undefined {
+    const options = props.hostPersonality;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "host-personality-v1")) return undefined;
+    return options;
+  }
+  /** The CRM switch needs an owner or admin, a host with `crm-v1`, and a host that answers. */
+  function crmHost(): CrmHost | undefined {
+    if (!props.crm || !actionsAvailable() || !serverCanAdminister(props.server, CRM_CAPABILITY)) return undefined;
+    return props.crm;
   }
   const availableInitialSection = (): Section | null =>
     props.initialSection === "updates" && !props.hostUpdate ? null : (props.initialSection ?? null);
@@ -375,6 +558,90 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const general = createServerGeneralSection(host);
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
   const audit = createServerAuditSection(host, () => section() === "audit");
+  const agents = createServerAgentsSection(host, () => section() === "agents");
+  const memory = createServerMemorySection(host);
+
+  /** Whether this server and the caller support the section. */
+  const sectionSupported = (value: Section): boolean => {
+    switch (value) {
+      case "general":
+      case "members":
+        return true;
+      case "personality":
+        return Boolean(personalityOptions());
+      case "agents":
+        return agents.available();
+      case "memory":
+        return memory.available();
+      case "vault":
+        return Boolean(props.vault);
+      case "roles":
+        return roles.available();
+      case "audit":
+        return audit.available();
+      case "desktop":
+        return remoteDesktopSection();
+      case "storage":
+        return Boolean(props.storage);
+      case "sites":
+        return Boolean(props.hostedSites);
+      case "providers":
+        return Boolean(props.providers || props.onSwitchToManageProviders);
+      case "updates":
+        return Boolean(props.hostUpdate);
+      case "import":
+        return Boolean(props.agentImport);
+      case "transfer":
+        return Boolean(props.instanceTransfer);
+      case "routines":
+        return Boolean(props.routineFeed);
+      case "browser-profiles":
+        return Boolean(props.browserProfiles);
+      case "experimental":
+        return Boolean(crmHost());
+    }
+  };
+  /** Whether the title or the description of the section holds the search of the page. */
+  const sectionMatches = (value: Section): boolean => {
+    const needle = props.sectionQuery?.trim().toLocaleLowerCase();
+    if (!needle) return true;
+    const { title, description } = sections[value];
+    return [title, description, ...(SECTION_ROWS[value] ?? [])].some((key) =>
+      t(key).toLocaleLowerCase().includes(needle),
+    );
+  };
+  /** The sections that the search finds. Without a search, each section that this server supports. */
+  const matchingSections = createMemo(() =>
+    NAV_SECTIONS.filter((item) => sectionSupported(item.value) && sectionMatches(item.value)),
+  );
+  /**
+   * The section list. The open section stays in it, so the search does not open a different section
+   * while the user types.
+   */
+  const navSections = createMemo(() =>
+    NAV_SECTIONS.filter(
+      (item) => matchingSections().includes(item) || (item.value === section() && sectionSupported(item.value)),
+    ),
+  );
+  /** Each new request of the page opens the first section that the search finds, and the page clears its search. */
+  let handledOpenFirstRequest = untrack(() => props.openFirstSectionRequest ?? 0);
+  createEffect(
+    () => props.openFirstSectionRequest ?? 0,
+    (request) => {
+      if (request === handledOpenFirstRequest) return;
+      handledOpenFirstRequest = request;
+      const first = untrack(matchingSections)[0];
+      if (!first) return;
+      setSection(first.value);
+      untrack(() => props.onFirstSectionOpened?.());
+    },
+  );
+  /** What a screen reader hears while the user types a search. */
+  const searchStatus = () => {
+    if (!props.sectionQuery?.trim()) return "";
+    const count = matchingSections().length;
+    return count > 0 ? t("app.settingsPage.resultCount", { count }) : t("app.settingsPage.noResults");
+  };
   const members = createServerMembersSection(
     host,
     {
@@ -386,6 +653,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const companySignIn = createServerCompanySignInSection(
     host,
     () => props.companySignIn,
+    () => props.onDownloadDesktopApp,
     () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(
@@ -423,10 +691,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       setToastHeight(0);
     });
   }
-  // Both save bars dock in the same place, so the toast has to lift for either one. It is
-  // `position: absolute` over the footer: without this it covers the bar and swallows its clicks.
-  const saveBarDocked = () =>
-    (section() === "general" && general.identityDirty()) || (section() === "mcp" && Boolean(mcpDetail()?.saveBar()));
+  // The save bar docks over the footer, so the toast has to lift for it. It is `position: absolute`
+  // over the footer: without this it covers the bar and swallows its clicks.
+  const saveBarDocked = () => section() === "general" && general.identityDirty();
 
   createEffect(
     () => ({
@@ -446,6 +713,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
+        agents.resetForServer();
       }
       if (!editing) general.syncFromServer(name, logoUrl);
     },
@@ -467,6 +735,22 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
+  /** The agent defaults leave with the access that gives them, as Roles does. */
+  createEffect(
+    () => section() === "agents" && !agents.available(),
+    (gone) => {
+      if (gone) setSection("general");
+    },
+  );
+
+  /** The memory settings leave with the access that gives them, as the agent defaults do. */
+  createEffect(
+    () => section() === "memory" && !memory.available(),
+    (gone) => {
+      if (gone) setSection("general");
+    },
+  );
+
   /** A server with no Vault for this account has no Vault section. */
   createEffect(
     () => section() === "vault" && !props.vault,
@@ -476,28 +760,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
 
   /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
+  const requestedSection = createMemo(() => (props.open ? availableInitialSection() : null));
   createEffect(
-    () => (props.open ? availableInitialSection() : null),
-    (requested) => {
+    () => ({ requested: requestedSection(), request: props.initialSectionRequest }),
+    ({ requested }) => {
       if (requested) setSection(requested);
     },
   );
 
+  // A joined host can offer its scan after the section opens, when its capabilities arrive.
   createEffect(
-    () => props.open && section() === "providers" && props.providers !== undefined,
+    () => props.open && section() === "providers" && props.providers?.onShown !== undefined,
     (visible) => {
       if (visible) untrack(() => props.providers?.onShown?.());
-    },
-  );
-
-  /** The latch keeps a section the user is already in from being reported again on every change. */
-  let mcpSectionVisible = false;
-  createEffect(
-    () => props.open && section() === "mcp" && Boolean(props.mcpServers),
-    (visible) => {
-      if (visible === mcpSectionVisible) return;
-      mcpSectionVisible = visible;
-      if (visible) untrack(() => props.onMcpSectionShown?.());
     },
   );
 
@@ -510,12 +785,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        value === "personality" ||
+        value === "agents" ||
+        value === "memory" ||
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
         value === "audit" ||
         value === "desktop" ||
-        value === "mcp" ||
         value === "storage" ||
         value === "sites" ||
         value === "providers" ||
@@ -523,7 +800,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "import" ||
         value === "transfer" ||
         value === "routines" ||
-        value === "browser-profiles"
+        value === "browser-profiles" ||
+        value === "experimental"
       )
         setSection(value);
     },
@@ -574,53 +852,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         }
         footer={
           <>
-            {/* The MCP form's save bar belongs to the dialog, not to the panel: the footer sits
-                outside the scroll area, so the bar stays on screen and spans the whole panel. It
-                appears only once the form holds a change, the way the General tab's bar does. */}
-            <Show when={section() === "mcp" ? mcpDetail() : null}>
-              {(detail) => (
-                <SaveBarDock value={detail().saveBar()}>
-                  {(bar) => (
-                    <section class="settings-modal-save-bar" aria-label={t("server.settings.unsavedMcpChanges")}>
-                      <Show
-                        when={bar().failed}
-                        fallback={
-                          <Text variant="caption" tone="muted">
-                            {bar().message}
-                          </Text>
-                        }
-                      >
-                        <Text variant="caption" tone="danger" role="alert">
-                          {bar().message}
-                        </Text>
-                      </Show>
-                      <div class="settings-modal-save-actions">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={bar().resetDisabled}
-                          onClick={detail().reset}
-                        >
-                          {t("server.settings.reset")}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="default"
-                          loading={bar().saving}
-                          loadingLabel={t("common.saving")}
-                          disabled={bar().saveDisabled}
-                          onClick={detail().save}
-                        >
-                          {t("common.save")}
-                        </Button>
-                      </div>
-                    </section>
-                  )}
-                </SaveBarDock>
-              )}
-            </Show>
             {/* `true` while the identity form is dirty: the dock only needs to know that there is
                 something to show, so the bar's own markup stays as it was. */}
             <SaveBarDock value={section() === "general" && general.identityDirty() ? true : null}>
@@ -657,99 +888,68 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </>
         }
         sidebar={
-          <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
-            <Tabs.Trigger class="settings-modal-nav-item" value="general">
-              <Settings aria-hidden="true" />
-              <span>{t(sections.general.title)}</span>
-            </Tabs.Trigger>
-            <Show when={props.vault}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="vault">
-                <KeyRound aria-hidden="true" />
-                <span>{t(sections.vault.title)}</span>
-              </Tabs.Trigger>
+          <>
+            <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
+              <For each={navSections()}>
+                {(item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <>
+                      <Show when={item.group !== navSections()[index() - 1]?.group && item.group}>
+                        {(group) => <SettingsNavGroupLabel label={t(group())} />}
+                      </Show>
+                      <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
+                        <Icon aria-hidden="true" />
+                        <span>{t(sections[item.value].title)}</span>
+                      </Tabs.Trigger>
+                    </>
+                  );
+                }}
+              </For>
+            </Tabs.List>
+            <Show when={matchingSections().length === 0}>
+              <p class="settings-page-empty">{t("app.settingsPage.noResults")}</p>
             </Show>
-            <Tabs.Trigger class="settings-modal-nav-item" value="members">
-              <UsersRound aria-hidden="true" />
-              <span>{t(sections.members.title)}</span>
-            </Tabs.Trigger>
-            <Show when={roles.available()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="roles">
-                <ShieldCheck aria-hidden="true" />
-                <span>{t(sections.roles.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={audit.available()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="audit">
-                <History aria-hidden="true" />
-                <span>{t(sections.audit.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={remoteDesktopSection()}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="desktop">
-                <Monitor aria-hidden="true" />
-                <span>{t(sections.desktop.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.mcpServers}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="mcp">
-                <Blocks aria-hidden="true" />
-                <span>{t(sections.mcp.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.storage}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="storage">
-                <HardDrive aria-hidden="true" />
-                <span>{t(sections.storage.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.hostedSites}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="sites">
-                <Globe2 aria-hidden="true" />
-                <span>{t(sections.sites.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.providers || props.onSwitchToManageProviders}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="providers">
-                <Sparkles aria-hidden="true" />
-                <span>{t(sections.providers.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.hostUpdate}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="updates">
-                <RefreshCw aria-hidden="true" />
-                <span>{t(sections.updates.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.agentImport}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="import">
-                <Download aria-hidden="true" />
-                <span>{t(sections.import.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.instanceTransfer}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="transfer">
-                <ArrowLeftRight aria-hidden="true" />
-                <span>{t(sections.transfer.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.routineFeed}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="routines">
-                <CalendarClock aria-hidden="true" />
-                <span>{t(sections.routines.title)}</span>
-              </Tabs.Trigger>
-            </Show>
-            <Show when={props.browserProfiles}>
-              <Tabs.Trigger class="settings-modal-nav-item" value="browser-profiles">
-                <AppWindow aria-hidden="true" />
-                <span>{t(sections["browser-profiles"].title)}</span>
-              </Tabs.Trigger>
-            </Show>
-          </Tabs.List>
+            <span class="sr-only" role="status">
+              {searchStatus()}
+            </span>
+          </>
         }
       >
         <Tabs.Content value="general" class="settings-modal-tab-panel server-settings-panel" data-tab="general">
           <general.Panel />
         </Tabs.Content>
+        <Show when={memory.available()}>
+          <Tabs.Content value="memory" class="settings-modal-tab-panel server-settings-panel" data-tab="memory">
+            <memory.Panel />
+          </Tabs.Content>
+        </Show>
+        <Show when={personalityOptions()}>
+          {(options) => (
+            <Tabs.Content
+              value="personality"
+              class="settings-modal-tab-panel server-settings-panel"
+              data-tab="personality"
+            >
+              <SettingsSection title={t("server.settings.agents")}>
+                <ItemGroup class="settings-modal-card">
+                  <ServerPersonalitySetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={modalElement()}
+                    run={run}
+                  />
+                </ItemGroup>
+              </SettingsSection>
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={agents.available()}>
+          <Tabs.Content value="agents" class="settings-modal-tab-panel server-settings-panel" data-tab="agents">
+            <agents.Panel />
+          </Tabs.Content>
+        </Show>
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
@@ -773,41 +973,24 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Show when={remoteDesktopSection()}>
           <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
-            <ServerDesktopPanel server={props.server} platform={props.platform} hostStatus={props.hostStatus} />
+            <ServerDesktopPanel
+              server={props.server}
+              platform={props.platform}
+              hostStatus={props.hostStatus}
+              menuMount={modalElement()}
+            />
           </Tabs.Content>
-        </Show>
-        <Show when={props.mcpServers}>
-          {(servers) => (
-            <Tabs.Content value="mcp" class="settings-modal-tab-panel server-settings-panel" data-tab="mcp">
-              <ServerMcpPanel
-                servers={servers()}
-                canManage={canManageMcp()}
-                menuMount={modalElement()}
-                loadError={props.mcpLoadError}
-                toolRuntimeNote={props.mcpToolRuntimeNote}
-                onRetryLoad={props.onRetryMcpServers}
-                onDetailChange={setMcpDetail}
-                onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
-                onRemove={(id) => props.onRemoveMcpServer?.(id) ?? Promise.resolve()}
-                onSetEnabled={(id, enabled) => props.onSetMcpServerEnabled?.(id, enabled) ?? Promise.resolve()}
-                onTest={(config) =>
-                  props.onTestMcpServer?.(config) ??
-                  Promise.resolve({ toolCount: 0, error: t("mcp.panel.testUnavailable") })
-                }
-                signIn={props.mcpSignIn}
-                signInRequest={props.mcpSignInRequest}
-                onSignInRequestHandled={props.onMcpSignInRequestHandled}
-                addRequest={props.mcpAddRequest}
-                onAddRequestHandled={props.onMcpAddRequestHandled}
-              />
-            </Tabs.Content>
-          )}
         </Show>
         {/* Mounted only while selected, so the host is measured when the section opens. */}
         <Show when={props.storage}>
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
-              <ServerStoragePanel serverId={props.server.id} members={props.members} {...storage()} />
+              <ServerStoragePanel
+                serverId={props.server.id}
+                storageGb={hostedPlanStorageGb(props.server)}
+                members={props.members}
+                {...storage()}
+              />
             </Tabs.Content>
           )}
         </Show>
@@ -849,11 +1032,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(providers) => (
                 <HostProviderSettingsPanel
                   {...providers()}
-                  hostName={local() ? undefined : props.server.name}
+                  hostName={hostName()}
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
+                  claudeUserSetup={claudeUserSetupSource()}
+                  claudeCompactWindow={claudeCompactWindowSource()}
+                  providerEnvironment={providerEnvironmentSource()}
                   modelVisibility={modelVisibilitySource()}
+                  hostDefaultProvider={hostDefaultProviderSource()}
                 />
               )}
             </Show>
@@ -880,7 +1067,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   <ServerImportPanel
                     serverId={serverId}
                     {...agentImport()}
-                    hermes={local()}
+                    hermes={hermesFolderPlace()}
+                    onServer={!local()}
                     onOpenTransfer={props.instanceTransfer ? () => setSection("transfer") : undefined}
                     onDetailChange={setImportDetail}
                   />
@@ -920,6 +1108,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               data-tab="browser-profiles"
             >
               <ServerBrowserProfilesPanel {...browserProfiles()} menuMount={modalElement()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={crmHost()}>
+          {(crm) => (
+            <Tabs.Content
+              value="experimental"
+              class="settings-modal-tab-panel server-settings-panel"
+              data-tab="experimental"
+            >
+              <SettingsSection title={t("server.settings.experimentalFeatures")}>
+                <ItemGroup class="settings-modal-card">
+                  <ServerCrmSetting host={crm()} disabled={Boolean(busy())} run={run} />
+                </ItemGroup>
+              </SettingsSection>
             </Tabs.Content>
           )}
         </Show>

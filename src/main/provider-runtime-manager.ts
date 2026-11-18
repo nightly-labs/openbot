@@ -25,6 +25,7 @@ import {
   type AgentProviderRef,
   agentProviderDescriptor,
   type CustomProviderHarness,
+  type InstallerProviderId,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -32,6 +33,7 @@ import {
   MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
   type ManagedRuntimeId,
+  type McpServerConfig,
   type ProviderRuntimeDownload,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
@@ -43,6 +45,7 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { PROCESSOR_FEATURE_MISSING } from "../backend/agent-client";
 import {
   type BundledProviderExecutables,
   compareReleases,
@@ -56,6 +59,7 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { measureTree } from "../backend/storage-usage";
+import type { HermesInstaller } from "./hermes-installer";
 import { isSafeLinkTarget } from "./provider-runtime-archive";
 import {
   type ArchiveDigest,
@@ -83,6 +87,8 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
+/** What tar and the system write for ENOSPC, when the failure has no error code. */
+const DISK_FULL_OUTPUT = /no space left on device|not enough space on the disk/iu;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -187,6 +193,11 @@ export interface ProviderRuntimeManagerOptions {
   availableDiskBytes?: () => Promise<number>;
   /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
   heldStageWaitMs?: number;
+  /**
+   * Installs Hermes, which has no release archive, with its own installer. Its status joins the
+   * snapshot, and `download` and `cancel` of `hermes` go to it. Without it, Hermes has no status.
+   */
+  hermesInstaller?: HermesInstaller;
   /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
   heldSourceWaitsMs?: readonly number[];
   /**
@@ -225,17 +236,26 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #root: string;
   readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
+  #isCatalogNpxApp: (config: McpServerConfig) => boolean = () => false;
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
   readonly #heldStageWaitMs: number;
   readonly #heldSourceWaitsMs: readonly number[];
+  readonly #hermesInstaller: HermesInstaller | null;
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Fiber.Fiber<void, ProviderRuntimeFailure>>();
   readonly #cancelled = new Set<ManagedRuntimeId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the update target. */
   readonly #systemVersions = new Map<ManagedProviderId, string>();
+  /** Providers whose installed CLI lacks a part that some models need (#9139). */
+  readonly #incompleteSystemClis = new Set<ManagedProviderId>();
+  /**
+   * Runtimes whose newest copy in the store failed its check at start, so no checked copy runs. The
+   * next update check downloads each one again, once, so it is not left "not installed" (#10909).
+   */
+  readonly #rejected = new Set<ManagedRuntimeId>();
   /** The latest upstream release of each provider CLI, as the last check found it. */
   readonly #latest = new Map<ManagedProviderId, RuntimeSpec>();
   /** What each running download installs, so a cancel removes the right partial file. */
@@ -289,6 +309,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       });
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
     this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
+    this.#hermesInstaller = options.hermesInstaller ?? null;
+    this.#hermesInstaller?.on("status", () => {
+      this.#revision += 1;
+      this.emit("status", this.getStatus());
+    });
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -302,6 +327,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
       devin: emptyStatus(unsupportedMessage),
+      copilot: emptyStatus(unsupportedMessage),
+      mistral: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -309,11 +336,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
       yield* runtimeIO(async () => await mkdir(this.#root, { recursive: true }));
       yield* this.#removeAbandonedStagingEffect();
-      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime), {
+      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime, true), {
         concurrency: "unbounded",
         discard: true,
       });
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, VERSION_RETENTION_MS);
+      if (this.#target) {
+        const stale = Date.now() - VERSION_RETENTION_MS;
+        const paths = yield* this.#oldVersionPathsEffect(this.#target, stale, true);
+        // Forked, as in the update check: the removal can take gigabytes off a slow disk, and the
+        // window waits for this start. The stamps above are done, so a sibling keeps these versions.
+        yield* Effect.forkIn(this.#removeOldVersionPathsEffect(paths, stale), this.#scope);
+      }
       return this.getStatus();
     });
   }
@@ -325,9 +358,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (this.#target) {
       for (const provider of PROVIDERS) {
         const version = this.#targetSpec(provider, this.#target).version;
-        // Agent status names a system fallback until the managed candidate is activated.
-        const installed = this.#systemVersions.get(provider) ?? providers[provider].version;
-        const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
+        // Agent status names a system fallback until the managed candidate is activated. A user who
+        // chose their own CLI runs it also when the copy is newer, and the copy then has no update
+        // to offer until a release is newer than it (#6327).
+        const system = this.#systemVersions.get(provider);
+        const copy = providers[provider].phase === "ready" ? providers[provider].version : null;
+        const installed = system && copy && olderVersion(system, copy) ? copy : (system ?? providers[provider].version);
+        // An incomplete CLI of the user's gives way to the copy, so a missing copy is offered (#9139).
+        const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
+        const offer =
+          missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
         // After an app upgrade the first check updates an installed CLI itself, so it is not offered
         // until that check has started its download.
         const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
@@ -336,7 +376,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           offer && !configuredCliPath(provider) && !automatic && this.#isProviderOn(provider) ? version : null;
       }
     }
-    return { revision: this.#revision, providers, toolRuntimes: { bun } };
+    const hermes = this.#hermesInstaller?.status();
+    return {
+      revision: this.#revision,
+      providers: hermes ? { ...providers, hermes } : providers,
+      toolRuntimes: { bun },
+    };
   }
   checkForUpdates(): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
@@ -560,6 +605,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         );
         this.#updateInstalled = false;
       }
+      // A copy that failed its check at start is downloaded again, once, unless the provider runs
+      // nothing from the store here. The changed copy itself never runs (#10909).
+      const repairs = PROVIDERS.filter(
+        (provider) =>
+          this.#rejected.has(provider) &&
+          this.#statuses[provider].phase === "not-downloaded" &&
+          this.#cliInUse(provider) &&
+          !configuredCliPath(provider),
+      );
+      this.#rejected.clear();
+      yield* Effect.forEach(
+        this.#stopping ? [] : repairs,
+        (provider) => Effect.ignore(this.#startDownload(provider, target)),
+        { discard: true },
+      );
       this.#revision += 1;
       this.emit("status", this.getStatus());
       const now = Date.now();
@@ -623,10 +683,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    *
    * True when the provider runs its copy in the store again. The caller then runs
    * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
+   *
+   * `incomplete`: that CLI lacks a part that some models need. A copy that is not downloaded is then
+   * offered, as the copy runs in its place once downloaded (#9139).
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+  setSystemVersion(provider: ManagedProviderId, version: string | null, incomplete = false): boolean {
     const previous = this.#systemVersions.get(provider) ?? null;
-    if (previous === version) return false;
+    const flagged = Boolean(version) && incomplete;
+    if (previous === version && flagged === this.#incompleteSystemClis.has(provider)) return false;
+    if (flagged) this.#incompleteSystemClis.add(provider);
+    else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
@@ -702,13 +768,40 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * nothing rewrites a stored command, the catalog, or the wire.
    */
   mcpToolRuntimes(): McpToolRuntimes {
-    const executable = this.#target && this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
-    if (!(executable && this.#target)) return NO_MCP_TOOL_RUNTIMES;
-    const bin = dirname(executable);
-    return { binDirectories: [bin], commandAliases: { npx: join(bin, bunxExecutableName(this.#target)) } };
+    const target = this.#target;
+    // No managed Bun exists for this machine, so a Marketplace app starts as the machine can start it.
+    if (!target) return NO_MCP_TOOL_RUNTIMES;
+    const executable = this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
+    const bunx = executable ? join(dirname(executable), bunxExecutableName(target)) : null;
+    const isCatalogNpxApp = this.#isCatalogNpxApp;
+    const catalogCommand: McpToolRuntimes["catalogCommand"] = (config) => {
+      if (!isCatalogNpxApp(config)) return null;
+      // `--bun`, because `bunx` alone starts the package with a `node` it finds on the `PATH`.
+      return bunx ? { command: bunx, args: ["--bun"] } : "pending";
+    };
+    if (!(executable && bunx)) return { ...NO_MCP_TOOL_RUNTIMES, catalogCommand };
+    return { binDirectories: [dirname(executable)], commandAliases: { npx: bunx }, catalogCommand };
   }
-  download(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+
+  /**
+   * Names the Marketplace apps that `npx` starts. The catalog is read after this manager is made,
+   * so it arrives here. Until then no server is a Marketplace app.
+   */
+  setCatalogNpxApps(isCatalogNpxApp: (config: McpServerConfig) => boolean): void {
+    this.#isCatalogNpxApp = isCatalogNpxApp;
+  }
+  download(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (!this.#hermesInstaller)
+          return yield* new ProviderRuntimeFailure({
+            cause: new Error(sourceText("error.provider.runtimesUnsupported")),
+          });
+        yield* this.#hermesInstaller.install();
+        return this.getStatus();
+      }
       if (!this.#target)
         return yield* new ProviderRuntimeFailure({
           cause: new Error(sourceText("error.provider.runtimesUnsupported")),
@@ -873,8 +966,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       ),
     );
   }
-  cancel(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+  cancel(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (this.#hermesInstaller) yield* this.#hermesInstaller.cancel();
+        return this.getStatus();
+      }
       if (this.#statuses[runtime].phase !== "downloading") return this.getStatus();
       const task = this.#tasks.get(runtime);
       const spec = this.#transfers.get(runtime);
@@ -893,17 +992,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#checkTimer) clearInterval(this.#checkTimer);
       this.#checkTimer = null;
       for (const controller of this.#controllers.values()) controller.abort();
+      if (this.#hermesInstaller) yield* this.#hermesInstaller.stop();
       yield* Effect.forEach(this.#tasks.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Effect.forEach(this.#removals.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Scope.close(this.#scope, Exit.void);
     });
   }
 
-  #inspectEffect(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+  /** `atStart`: a copy that fails its check is downloaded again by the first update check. */
+  #inspectEffect(
+    runtime: ManagedRuntimeId,
+    atStart = false,
+  ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       if (!this.#target) return this.#statuses[runtime];
       const pinned = runtimeSpec(runtime, this.#target, this.#lock);
-      const installed = yield* this.#newestInstalledEffect(pinned);
+      const { installed, rejected } = yield* this.#newestInstalledEffect(pinned);
+      if (atStart && !installed && rejected) this.#rejected.add(runtime);
       this.#statuses[runtime] = installed
         ? readyStatus(installed)
         : { ...emptyStatus(), version: yield* this.#previousVersionEffect(pinned) };
@@ -917,10 +1022,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * That is the pinned version, checked against the lock, or a newer upstream release, checked
    * against the record its install wrote. A directory with neither is an older pin this build has no
    * hashes for; `#previousVersion` still lends it out until an update replaces it.
+   *
+   * `rejected`: the pinned version, or a newer one with its install record, is in the store but
+   * failed its check, for example after a file in it changed. It does not run, and the log keeps
+   * the reason.
    */
 
-  #newestInstalledEffect(pinned: RuntimeSpec): Effect.Effect<string | null, ProviderRuntimeFailure> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string | null, ProviderRuntimeFailure> {
+  #newestInstalledEffect(
+    pinned: RuntimeSpec,
+  ): Effect.Effect<{ installed: string | null; rejected: boolean }, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<
+      { installed: string | null; rejected: boolean },
+      ProviderRuntimeFailure
+    > {
       const targetRoot = dirname(this.#installRoot(pinned));
       const entries = yield* runtimeIO(async () => await readdir(targetRoot, { withFileTypes: true }).catch(() => []));
       const versions = entries
@@ -928,14 +1042,34 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .map((entry) => entry.name)
         // Of two builds that the release does not order, the pinned one comes first.
         .sort((a, b) => compareReleases(b, a) || Number(b === pinned.version) - Number(a === pinned.version));
+      let rejected = false;
       for (const version of versions) {
         const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
         const installRoot = join(targetRoot, version);
-        if (!(yield* this.#verifiesUnlessUnchangedEffect(installRoot, spec))) continue;
+        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+          Effect.as(null),
+          Effect.catch((error) => Effect.succeed(error)),
+        );
+        if (failure) {
+          // Only a copy that this build can check counts: the pinned version, or a newer one with the
+          // record of its install. An older pin, or the pin of a newer build, has no hashes here.
+          const checkable =
+            version === pinned.version ||
+            (!olderVersion(version, pinned.version) && (yield* pathExists(join(installRoot, INSTALL_RECORD))));
+          if (checkable) {
+            rejected = true;
+            logger.warn("Provider runtime check failed.", {
+              runtime: pinned.runtime,
+              version,
+              cause: logCause(failure.cause),
+            });
+          }
+          continue;
+        }
         yield* this.#stampInUseEffect(pinned.runtime, installRoot);
-        return version;
+        return { installed: version, rejected };
       }
-      return null;
+      return { installed: null, rejected };
     });
   }
 
@@ -985,7 +1119,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  /** The newest version older than `version` whose executable is still there. */
+  /**
+   * The newest version older than `version` whose executable is still there. An install with a
+   * legacy executable name counts, so the update after an app upgrade replaces it, but it cannot run:
+   * `executablePath` names the current program in it, which is missing.
+   */
 
   #workingBackupEffect(
     targetRoot: string,
@@ -998,11 +1136,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .filter((entry) => entry.isDirectory() && olderVersion(entry.name, version))
         .map((entry) => entry.name)
         .sort((a, b) => compareReleases(b, a));
+      const names = [spec.executableName, ...(providerRuntimeDescriptor(spec.runtime).legacyExecutableNames ?? [])];
       for (const candidate of versions) {
-        const executable = yield* runtimeIO(
-          async () => await stat(join(targetRoot, candidate, "bin", spec.executableName)).catch(() => null),
-        );
-        if (executable?.isFile()) return candidate;
+        for (const name of names) {
+          const executable = yield* runtimeIO(
+            async () => await stat(join(targetRoot, candidate, "bin", name)).catch(() => null),
+          );
+          if (executable?.isFile()) return candidate;
+        }
       }
       return null;
     });
@@ -1158,7 +1299,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
 
       return yield* this.#installEffect(spec, partialPath);
-    }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.mapError(diskFullFailure));
   }
 
   /** Answers whether this instance committed the install, or adopted the one it found. */
@@ -1352,13 +1493,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
   }
 
-  #verifiesUnlessUnchangedEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean> {
-    return verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
-      Effect.as(true),
-      Effect.catch(() => Effect.succeed(false)),
-    );
-  }
-
   #downloadSmallFileEffect(
     url: string,
     expectedSha256: string | null,
@@ -1527,23 +1661,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #collectVersionsEffect(target: RuntimeTarget, retentionMs: number): Effect.Effect<void> {
     const stale = Date.now() - retentionMs;
     return this.#oldVersionPathsEffect(target, stale, true).pipe(
-      Effect.flatMap((paths) =>
-        Effect.forEach(
-          paths,
-          (path) =>
-            removeStaleRuntimeDirectory(path, stale).pipe(
-              Effect.andThen(pathExists(path)),
-              Effect.flatMap((kept) =>
-                kept
-                  ? Effect.void
-                  : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
-              ),
-            ),
-          { concurrency: "unbounded", discard: true },
-        ),
-      ),
-      Effect.catch(() => Effect.void),
+      Effect.flatMap((paths) => this.#removeOldVersionPathsEffect(paths, stale)),
     );
+  }
+
+  /** Removes each of `paths` that is still not stamped after `stale`, with its verification record. */
+
+  #removeOldVersionPathsEffect(paths: readonly string[], stale: number): Effect.Effect<void> {
+    return Effect.forEach(
+      paths,
+      (path) =>
+        removeStaleRuntimeDirectory(path, stale).pipe(
+          Effect.andThen(pathExists(path)),
+          Effect.flatMap((kept) =>
+            kept ? Effect.void : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    ).pipe(Effect.catch(() => Effect.void));
   }
 
   /**
@@ -1733,12 +1868,61 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })))
-        .stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
 });
+
+/**
+ * A CLI built for a processor feature that this computer does not have names the feature and stops
+ * with SIGILL before it answers, such as Antigravity on a processor without AES or PCLMUL (#7111).
+ * Another try of the same copy stops in the same way, so the row names the cause instead of "Try
+ * again". Only provider runtimes get this text, because it names a provider. The log keeps the
+ * original failure.
+ */
+function unsupportedProcessorFailure(
+  runtime: ManagedRuntimeId,
+  failure: ProviderRuntimeFailure,
+): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    !("signal" in cause) ||
+    cause.signal !== "SIGILL" ||
+    !("stderr" in cause) ||
+    typeof cause.stderr !== "string" ||
+    !PROCESSOR_FEATURE_MISSING.test(cause.stderr)
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * A disk that fills during the download or the install. The space check runs before both, but it
+ * cannot see every write, so the failure itself also names the cause: a Retry on the same disk fails
+ * in the same way, and "Try again" does not tell the user to free space (#10191). tar reports a full
+ * disk in its output, not as an error code. The log keeps the original failure.
+ */
+function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  const diskFull = (error: unknown, depth: number): boolean =>
+    error instanceof Error &&
+    (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
+      DISK_FULL_OUTPUT.test(error.message) ||
+      ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
+      (depth < 3 && diskFull(error.cause, depth + 1)));
+  if (!diskFull(cause, 0)) return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.diskSpace"), { cause }) });
+}
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */
 const VERIFICATION_RECORD_LAYOUT = 1;

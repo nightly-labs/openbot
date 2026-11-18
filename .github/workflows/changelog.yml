@@ -57,7 +57,13 @@ jobs:
             ! -path changelog.d/README.md ! -path apps/mobile/changelog.d/README.md -print0 |
             xargs -0 -r bun scripts/check-release-notes.ts --fragments
 
-      # A merge that gives a mobile version its second store date posts on Discord
+      # An over-the-air update of the mobile app has its own section, such as `## [1.4.8.1]`, and no
+      # version change. `/changelog` and the app show the section as it is.
+      - name: Check the mobile OTA sections
+        shell: bash
+        run: bun scripts/check-release-notes.ts --ota
+
+      # A merge that gives a mobile version a store date posts on Discord after the deploy
       # (mobile-release-announcement.yml), so its highlights must be ready before the merge.
       - name: Check the mobile Discord announcement
         shell: bash

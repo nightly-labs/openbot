@@ -1,3 +1,4 @@
+import { Button } from "@openbot/ui";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
@@ -73,6 +74,27 @@ export const AuthenticationFailed: Story = {
   render: (args) => (
     <ComposerStack>
       <ComposerErrorBanner {...args} />
+    </ComposerStack>
+  ),
+};
+
+/** Google asks the user to verify the account before Gemini answers (#2419). The button opens Google's page. */
+export const GeminiVerificationRequired: Story = {
+  args: {
+    message:
+      "Google must verify your account before Gemini can answer. Verify your Google account in a browser, then send your message again.",
+    title: "Gemini · Gemini 3 Flash",
+  },
+  render: (args) => (
+    <ComposerStack>
+      <ComposerErrorBanner
+        {...args}
+        action={
+          <Button variant="outline" size="sm" type="button">
+            Verify account
+          </Button>
+        }
+      />
     </ComposerStack>
   ),
 };

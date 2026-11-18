@@ -10,8 +10,8 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export interface WhatsAppSenderRules {
   /** The owner's personal number: only their own chat and the allowed senders count. */
   ownNumber: boolean;
-  /** Phone numbers in digits. */
-  contacts: ReadonlySet<string>;
+  /** Phone numbers in digits, each with the name that the user saved for it (empty when none). */
+  contacts: ReadonlyMap<string, string>;
   /** Group JIDs. */
   groups: ReadonlySet<string>;
 }
@@ -21,6 +21,8 @@ export type SenderDecision =
   | { type: "allow" }
   /** A dedicated number answers an unknown person once, with a code for the owner. */
   | { type: "pair" }
+  /** The message is saved for the chat's history, and nothing answers it. */
+  | { type: "save" }
   | { type: "ignore" };
 
 export interface SenderFacts {
@@ -42,12 +44,31 @@ export interface SenderFacts {
  */
 export function senderDecision(rules: WhatsAppSenderRules, facts: SenderFacts): SenderDecision {
   if (facts.isSelfChat) return { type: "allow" };
-  // The owner's own messages in other chats are their personal conversations.
-  if (facts.fromMe) return { type: "ignore" };
-  if (facts.isGroup) return rules.groups.has(facts.chatJid) ? { type: "allow" } : { type: "ignore" };
-  if (facts.authorNumber && rules.contacts.has(facts.authorNumber)) return { type: "allow" };
+  const allowedGroup = facts.isGroup && rules.groups.has(facts.chatJid);
+  // The owner's own messages in other chats are their personal conversations. In an allowed group they
+  // are part of the conversation that agents read, so they are saved.
+  if (facts.fromMe) return allowedGroup ? { type: "save" } : { type: "ignore" };
+  if (facts.isGroup) return allowedGroup ? { type: "allow" } : { type: "ignore" };
+  if (facts.authorNumber && allowsContact(rules, facts.authorNumber)) return { type: "allow" };
   if (rules.ownNumber || !facts.authorNumber) return { type: "ignore" };
   return { type: "pair" };
+}
+
+/**
+ * The forms of one phone number that WhatsApp can use for the same person. Brazil put a 9 before each
+ * mobile number, but an account made before that keeps its WhatsApp number without the 9, so the number
+ * that people type and the number that WhatsApp sends can differ. Only mobile numbers get the other form.
+ */
+export function whatsAppNumberForms(number: string): string[] {
+  const brazil = /^55([1-9]{2})(9?)([6-9][0-9]{7})$/u.exec(number);
+  if (!brazil) return [number];
+  const [, area, nine, local] = brazil;
+  return [number, nine ? `55${area}${local}` : `55${area}9${local}`];
+}
+
+/** True when the number is an allowed contact, in any of its forms. */
+export function allowsContact(rules: WhatsAppSenderRules, number: string): boolean {
+  return whatsAppNumberForms(number).some((form) => rules.contacts.has(form));
 }
 
 /**

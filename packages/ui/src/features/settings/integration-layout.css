@@ -21,6 +21,7 @@
 .integration-logo-tile > svg {
   width: 55%;
   height: 55%;
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 /* An app icon fills its tile. */
@@ -28,6 +29,13 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: inherit;
+}
+
+/* A connector's icon is a brand tile, so it fills its tile as an app icon does. */
+.integration-logo-tile > .connector-brand-tile {
+  width: 100%;
+  height: 100%;
   border-radius: inherit;
 }
 
@@ -500,6 +508,11 @@
 
 .integrations-agent-face[data-size="sm"] {
   --integrations-agent-face-size: 24px;
+}
+
+/* In a list that also has agent faces, an icon stays in the middle of the same column, so the titles align. */
+.ui-item-group:has(.integrations-agent-face:not([data-size="sm"])) .ui-item-media > svg {
+  margin-inline: calc((32px - var(--openbot-icon-lg)) / 2);
 }
 
 /* An agent avatar stands low in its box. Lift it to the middle, as the marketplace avatar does. */

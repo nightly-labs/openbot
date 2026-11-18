@@ -1,0 +1,36 @@
+{
+  "slug": "typeform",
+  "name": "Typeform",
+  "tagline": "Forms and responses",
+  "description": "Typeform lets agents create and edit forms, and read and analyze form responses in the signed-in account. Each user signs in to their own Typeform account through the browser.",
+  "category": "productivity",
+  "creatorName": "Typeform",
+  "iconUrl": "https://cdn.prod.website-files.com/66ffe2174aa8e8d5661c2708/68b6f00951eb33cd19b77288_Frame%201867174.png",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-summarize-responses",
+      "text": "Summarize the responses to the customer feedback form from this month."
+    },
+    { "id": "prompt-draft-form", "text": "Draft a five-question event registration form." },
+    { "id": "prompt-low-scores", "text": "Which respondents gave a score below 6, and what did they say?" }
+  ],
+  "apps": [
+    {
+      "id": "app-typeform-mcp",
+      "name": "Typeform",
+      "description": "Form creation and response analysis, over Typeform's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/66ffe2174aa8e8d5661c2708/68b6f00951eb33cd19b77288_Frame%201867174.png",
+      "server": {
+        "name": "typeform",
+        "transport": "http",
+        "url": "https://api.typeform.com/mcp",
+        "auth": [{ "id": "typeform-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.typeform.com",
+  "privacyPolicyUrl": "https://www.typeform.com/legal/privacy-policy/",
+  "termsUrl": "https://www.typeform.com/legal/service-terms-and-conditions/"
+}

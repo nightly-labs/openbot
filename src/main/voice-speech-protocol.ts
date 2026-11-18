@@ -15,6 +15,10 @@ export interface VoiceSpeechRequest {
   speakerId: number;
   /** Only load the model, and answer with no audio. */
   loadOnly: boolean;
+  /** ONNX Runtime threads. */
+  numThreads: number;
+  /** A file of ONNX Runtime session settings in the runtime directory, or empty for the defaults. */
+  sessionConfig: string;
 }
 
 /**

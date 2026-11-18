@@ -365,7 +365,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .initial-setup-eyebrow {
@@ -450,7 +450,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .setup-route-icon i {
@@ -723,7 +723,7 @@
   height: 18px;
   grid-column: 2;
   color: var(--openbot-text-secondary);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .provider-picker-option-unavailable .provider-picker-logo,
@@ -1297,21 +1297,16 @@ textarea:not(.ui-textarea):focus-visible {
   background: var(--openbot-accent-strong);
 }
 
-/* No vertical scroll bar: the wheel, the trackpad and the keyboard still scroll. Horizontal bars
- * stay, because a mouse wheel cannot scroll a code block or a table sideways. */
+/* No scroll bar on either axis: the wheel, the trackpad and the keyboard still scroll. Content
+ * that a mouse wheel cannot scroll sideways, such as a table or a code block, uses ScrollEdges,
+ * which shows arrows on the edge with more content. */
+* {
+  scrollbar-width: none;
+}
+
 ::-webkit-scrollbar {
   width: 0;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-border-strong);
-  background-clip: padding-box;
+  height: 0;
 }
 
 .scroll-fade-top:not(.scroll-fade-bottom) {
@@ -1359,18 +1354,6 @@ textarea:not(.ui-textarea):focus-visible {
     var(--openbot-text-primary) calc(100% - 18px),
     transparent 100%
   );
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 body,

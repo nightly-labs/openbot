@@ -25,12 +25,15 @@ const chiefMemories: AgentMemory[] = [
     "manual",
     "2026-10-29T08:10:00.000Z",
   ),
-  memory(
-    "x-workflow",
-    'X workflow: read mentions only through the "Mentions Monitor" deck. Go by time: skip everything before last_pass in replied.log (Warsaw time). Reply only to items addressed to the user; skip quote posts, giveaways and replies to other accounts.',
-    "automatic",
-    "2026-10-28T19:42:00.000Z",
-  ),
+  {
+    ...memory(
+      "x-workflow",
+      'X workflow: read mentions only through the "Mentions Monitor" deck. Go by time: skip everything before last_pass in replied.log (Warsaw time). Reply only to items addressed to the user; skip quote posts, giveaways and replies to other accounts.',
+      "automatic",
+      "2026-10-28T19:42:00.000Z",
+    ),
+    site: "x.com",
+  },
   memory(
     "updates",
     "The user prefers short progress updates with the result first.",

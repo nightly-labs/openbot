@@ -10,6 +10,8 @@ export type AgentProvider = AgentProviderId;
 /** Where a diagnostic came from. See `AgentClient.on("diagnostic")`. */
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
+  /** Set when the text is a record of the agent process's stderr, not a report that OpenBot wrote. */
+  readonly stderr?: boolean;
 }
 
 export interface AgentClient {
@@ -21,10 +23,34 @@ export interface AgentClient {
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   /**
-   * True when a streaming `final_answer` item can still become a step: the provider names no phase,
-   * and the client classifies the text only at the next tool call or at the end of the turn.
+   * True when the provider compacts its own context, although OpenBot cannot ask it to. The context
+   * meter shows that the provider manages compaction, as for `native`.
+   */
+  readonly compactsItself?: boolean;
+  /**
+   * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
+   * become a step: the provider names no phase, and the client classifies the text only at the next
+   * tool call or at the end of the turn.
    */
   readonly provisionalAnswers?: boolean;
+  /**
+   * True when the client sends the essential memories and the section-mates with the user turns
+   * (`TurnContext`), so they stay out of the developer instructions. A memory change then keeps the
+   * instructions, and the provider's cached prefix with them.
+   */
+  readonly turnContext?: boolean;
+  /**
+   * True when the client gives the model the `note` of an `item/tool/requestUserInput` result, such
+   * as the note that the user wrote a new message instead of answering. Optional, because Codex sends
+   * the result on as it is, and its `request_user_input` response has no field for a note.
+   */
+  readonly userInputNote?: boolean;
+  /**
+   * The provider variable that sends the model requests to an address that the user set, such as
+   * Codex's `OPENAI_BASE_URL`. A wrong address can fail as a lost connection: Codex reads a web page
+   * from it as a stream that ends early (#10165). Absent when the provider uses its own address.
+   */
+  readonly modelAddressVariable?: string;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**
@@ -33,8 +59,24 @@ export interface AgentClient {
    * because the other providers declare the MCP tools or load them on their own.
    */
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
+  /**
+   * True when the provider keeps the MCP tools of this session's first turn (`AcpFlavor`
+   * `mcpToolsFixedAtStart`). A changed MCP set then needs a new session, not a resume. Optional,
+   * because the other providers take the current servers on resume.
+   */
+  readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
+  /**
+   * True when the agent of `model` gets each OpenBot catalog tool as an MCP tool of its own (`AcpFlavor`
+   * `catalogAsMcpTools`). Optional, because the other providers do not hide OpenBot's tools.
+   */
+  readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
+  /**
+   * True when the process must be replaced before the next turn, and nothing that uses it is lost:
+   * it still runs a stopped turn that OpenBot ended. `threadIds` are the threads loaded on it.
+   */
+  readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
   /**
@@ -44,20 +86,40 @@ export interface AgentClient {
    * this call the previous session stays open inside the client, and the MCP servers it spawned stay
    * alive with it, so each further change adds another set of processes - including the servers the
    * user turned off. Optional, because a client that keeps no per-thread state has nothing to close.
+   *
+   * `resumes`: the next turn resumes this same provider session, which still holds the context that
+   * its turns were sent. A client keeps what it knows of that context, so the turn does not send it
+   * again. Otherwise the session ends, and the client forgets it.
    */
-  releaseThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
   /**
-   * Hides a thread that a replacement session took over from the provider's own thread list, and
-   * keeps its history readable. Optional, because only a provider that shows its threads to the user
-   * in another app has a list to keep clean.
+   * Whether the session runs work that its release would end, such as a background terminal.
+   * Optional, because a client without this check must keep its idle sessions loaded.
+   */
+  holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  /**
+   * Hides a thread that a replacement session took over, or that a deleted agent leaves, from the
+   * provider's own thread list, and keeps its history readable. Optional, because only a provider
+   * that shows its threads to the user in another app has a list to keep clean.
    */
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Sets the title of a thread in the provider's own thread list. Optional, for the same reason as
+   * `archiveThread`.
+   */
+  nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
   /**
    * Closes each thread that has no turn and can open again from its session, to free its processes
    * and MCP servers when the machine is low on memory. Optional, because a client that runs all its
    * threads in one process frees nothing this way.
    */
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Closes each thread that has no turn and stays open only for background work that sent nothing
+   * for a long time. The memory guard calls it at each sample while the machine is low on memory.
+   * Optional, because only a client whose background work holds a thread's process has one.
+   */
+  releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   /** Effective provider options. Saved overrides belong to the agent store. */
   readSessionSettings?(
     externalThreadId: string,
@@ -120,6 +182,17 @@ export class ProviderTurnActiveError extends Error {
 }
 
 /**
+ * The provider refused to open the session because a prompt that OpenBot stopped still runs in it.
+ * Nothing ran. No event tells when that prompt ends, so the caller tries the message again later.
+ */
+export class ProviderSessionBusyError extends ProviderTurnActiveError {
+  constructor(providerName: string) {
+    super(providerName);
+    this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
+  }
+}
+
+/**
  * Claude cannot resume this session ID, because another provider made it. Nothing ran, so
  * `isMissingProviderSessionError` reads it as a missing session and the caller opens a new one.
  */
@@ -140,6 +213,15 @@ export class MissingPiSessionError extends Error {
     this.name = "MissingPiSessionError";
   }
 }
+
+/**
+ * The line that the Go runtime of a CLI writes before it stops with SIGILL on a processor without a
+ * feature that the CLI was built for, such as "This binary was compiled with aes enabled, but this
+ * feature is not available on this processor" (#7111). A SIGILL without it can have another cause,
+ * such as a crash bug or the CPU list of a container (`docs/docker.md`), that a different provider
+ * does not fix.
+ */
+export const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
 
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;

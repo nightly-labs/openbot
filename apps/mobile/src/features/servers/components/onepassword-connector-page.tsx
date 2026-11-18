@@ -25,7 +25,7 @@ const STATUS_KEYS = {
 } as const;
 
 /**
- * Server settings › Connectors › 1Password of a joined server. The host connects with a service
+ * Marketplace › Apps › 1Password of a joined server. The host connects with a service
  * account token that the user pastes here. The token goes to the host once; this phone keeps no copy.
  */
 export function OnePasswordConnectorPage({

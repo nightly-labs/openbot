@@ -28,4 +28,6 @@ export const messages = {
   "status.remote.attemptFailed": { other: "연결 시도에 실패했어요. {count}초 후 다시 시도해요." },
   "status.remote.reconnectingDetail": { other: "다시 연결 중 {attempt}/{count}\n{detail}" },
   "status.remote.reconnecting": { other: "다시 연결 중 {attempt}/{count}" },
+  "status.remote.messageCut":
+    "[이 메시지의 {size}MB는 이 기기에 표시되지 않습니다. 전체를 읽으려면 서버를 실행하는 컴퓨터에서 여세요.]",
 } as const satisfies PartialTranslation<typeof source>;

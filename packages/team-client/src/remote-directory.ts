@@ -12,6 +12,10 @@ import {
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
@@ -28,6 +32,11 @@ export interface RemoteTeamHost {
   hostId: string;
   name: string;
   logoKey: string | null;
+  /**
+   * The shape and colour that the server shows with no logo; null for the automatic look. An older
+   * account server sends none, and a bad value is dropped.
+   */
+  appearance?: ServerAppearance | null;
   devicePublicKey: string;
   membershipId: string;
   role: "owner" | "admin" | "member";
@@ -37,6 +46,10 @@ export interface RemoteTeamHost {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
+  restartAvailable?: boolean;
+  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
+  storageGb?: number;
   /**
    * When the host last changed its key, from a handover that both keys signed. Absent when the host
    * kept its first key or the account service sends no handovers.
@@ -121,6 +134,7 @@ const DIRECTORY_ERROR_TEXT = new Map<string, string>([
   ["license_users_full", sourceText("error.remote.licenseUsersFull")],
   ["host_not_found", sourceText("error.remote.hostNotRegistered")],
   ["membership_not_found", sourceText("error.remote.membershipEnded")],
+  ["membership_changed", sourceText("error.remote.membershipChanged")],
   ["session_inactive", sourceText("error.remote.accountSessionInactive")],
   ["host_owner_mismatch", sourceText("error.remote.hostOtherAccount")],
   ["remote_not_configured", sourceText("error.remote.remoteNotConfigured")],
@@ -191,6 +205,8 @@ export class RemoteTeamDirectoryClient {
               return [];
             const memberLimit = candidate.memberLimit;
             const hosted = candidate.hosted;
+            const restartAvailable = candidate.restartAvailable;
+            const storageGb = candidate.storageGb;
             if (
               (memberLimit !== undefined &&
                 (!isNumber(memberLimit) || !Number.isSafeInteger(memberLimit) || memberLimit < 1)) ||
@@ -219,12 +235,16 @@ export class RemoteTeamDirectoryClient {
                 hostId: candidate.hostId,
                 name: candidate.name,
                 logoKey: candidate.logoKey,
+                ...optionalServerAppearanceField(candidate.appearance),
                 devicePublicKey,
                 membershipId: candidate.membershipId,
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
                 // A bad value drops only the flag, so the server stays in the list.
                 ...(isBoolean(hosted) ? { hosted } : {}),
+                ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
+                // A bad value drops only the storage, as for the flag.
+                ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
               },
             ];

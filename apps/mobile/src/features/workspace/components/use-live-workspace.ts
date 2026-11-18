@@ -6,9 +6,11 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
+import type { MobileThreadWait } from "@/features/workspace/model/thread-waits";
 
 const NO_REQUESTS: BrowserTakeoverRequest[] = [];
 const NO_APPROVALS: readonly PendingApproval[] = [];
+const NO_WAITS: readonly MobileThreadWait[] = [];
 
 /** The store does not change, so reading it does not render the component again. */
 export function selectLiveState(workspace: MobileWorkspaceContextValue) {
@@ -19,6 +21,13 @@ export function selectLiveState(workspace: MobileWorkspaceContextValue) {
 export function useAgentUnread(agentId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().unreadAgentIds.includes(agentId), [liveState, agentId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+/** The host's unread message count of this agent's own chat. Re-renders only when it changes. */
+export function useAgentUnreadCount(agentId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().unreadCounts[agentId] ?? 0, [liveState, agentId]);
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
@@ -33,6 +42,13 @@ export function useUnreadAgentIds() {
 export function useUnreadCounts() {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().unreadCounts, [liveState]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+/** The first unread message of this agent's chat, from the host. Re-renders only when it changes. */
+export function useAgentFirstUnreadMessageId(agentId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().firstUnreadMessageIds[agentId] ?? null, [liveState, agentId]);
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
@@ -81,5 +97,11 @@ export function useBrowserTabsLoaded(serverId: string) {
 export function useApprovalRequests(serverId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().approvalRequests[serverId] ?? NO_APPROVALS, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+/** The questions, approvals and takeovers that this server waits on. Re-renders only when that list changes. */
+export function useThreadWaits(serverId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().threadWaitsByServer[serverId] ?? NO_WAITS, [liveState, serverId]);
   return useSyncExternalStore(liveState.subscribe, select);
 }

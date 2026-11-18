@@ -11,11 +11,14 @@ export interface AppPort {
   getAppInterfaceSizePreference: OpenBotDesktopApi["getAppInterfaceSizePreference"];
   getAppLanguagePreference: OpenBotDesktopApi["getAppLanguagePreference"];
   getAppLogoColorPreference: OpenBotDesktopApi["getAppLogoColorPreference"];
+  listInstalledFonts: OpenBotDesktopApi["listInstalledFonts"];
   onAppAppearancePreference: OpenBotDesktopApi["onAppAppearancePreference"];
   onAppInterfaceSizePreference: OpenBotDesktopApi["onAppInterfaceSizePreference"];
   onAppLanguagePreference: OpenBotDesktopApi["onAppLanguagePreference"];
   onAppLogoColorPreference: OpenBotDesktopApi["onAppLogoColorPreference"];
   openExternal: OpenBotDesktopApi["openExternal"];
+  getSentMessageStats: OpenBotDesktopApi["getSentMessageStats"];
+  reportRendererTiming: OpenBotDesktopApi["reportRendererTiming"];
   openUrl: OpenBotDesktopApi["openUrl"];
   openChatWindow: OpenBotDesktopApi["openChatWindow"];
   getChatWindows: OpenBotDesktopApi["getChatWindows"];

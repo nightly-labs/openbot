@@ -6,8 +6,8 @@ import {
   type UiFormField,
   type UiFormBlock as UiFormSpec,
 } from "@openbot/contracts/ui-blocks";
-import { Button, Field, Input, KeyRound, Lock, NativeSelect, Spinner, Textarea } from "@openbot/ui";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { Button, Field, Input, KeyRound, Lock, NativeSelect, Textarea } from "@openbot/ui";
+import { createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
 import { UiBlockCard } from "./UiBlockCard";
@@ -58,7 +58,7 @@ function FormAnswerRows(props: { rows: AnswerRow[] }) {
   );
 }
 
-/** The key before the title of an answered form that asked for a secret. */
+/** The key before the title of a form that asks for a secret, as the Vault request card has its kind. */
 function SecretFormIcon(props: { shown: boolean }) {
   return (
     <Show when={props.shown}>
@@ -71,6 +71,7 @@ function SecretFormIcon(props: { shown: boolean }) {
 
 export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   const { t } = useText();
+  const formId = createUniqueId();
   const state = () => uiBlockState(props);
   const frozen = () => state().status !== "pending";
   const locked = () => frozen() || props.disabled === true || props.busy === true;
@@ -89,6 +90,12 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   };
   // An answered form that asked for a secret shows its answer as rows, not as disabled inputs.
   const summarized = () => state().status === "answered" && props.spec.fields.some(isSecretFormField);
+  // One that closed or expired without an answer leaves out its secret fields: an empty, disabled key
+  // field looks like a field that does not work (#7678). The other fields still show what was asked.
+  const shownFields = () =>
+    frozen() && state().status !== "answered"
+      ? props.spec.fields.filter((field) => !isSecretFormField(field))
+      : props.spec.fields;
   const answerRows = (): AnswerRow[] =>
     props.spec.fields.flatMap((field): AnswerRow[] => {
       if (isSecretFormField(field)) return [{ field }];
@@ -98,6 +105,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   // The rows already show each answer, so the line under them would repeat it.
   const outcome = () => (summarized() ? undefined : state().outcome);
   const errorOf = (field: UiFormField) => (failed().has(field.id) ? t("uiBlock.form.required") : undefined);
+  const cardError = (): string | undefined => (rejected() ? t("uiBlock.form.invalid") : props.error);
 
   function setValue(field: UiFormField, value: string): void {
     setDraft((current) => ({ ...current, [field.id]: value }));
@@ -124,16 +132,27 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
     <UiBlockCard
       class={cx("ui-block-form", props.class)}
       title={props.spec.title}
-      icon={<SecretFormIcon shown={summarized()} />}
+      icon={<SecretFormIcon shown={props.spec.fields.some(isSecretFormField)} />}
       status={state().status}
       outcome={outcome()}
       busy={props.busy}
-      error={rejected() ? t("uiBlock.form.invalid") : props.error}
+      waiting={props.disabled !== true}
+      error={cardError()}
       onSkip={props.disabled ? undefined : props.onSkip}
+      actions={
+        // The button is outside the form, in the footer of the card, so it names the form it sends.
+        <Button type="submit" size="sm" form={formId} disabled={locked()}>
+          {props.spec.submit ?? t("uiBlock.form.submit")}
+        </Button>
+      }
       elementRef={props.elementRef}
     >
-      <Show when={!summarized()} fallback={<FormAnswerRows rows={answerRows()} />}>
+      <Show
+        when={!summarized() && shownFields().length > 0}
+        fallback={summarized() ? <FormAnswerRows rows={answerRows()} /> : undefined}
+      >
         <form
+          id={formId}
           class="ui-block-form-fields"
           novalidate
           onSubmit={(event) => {
@@ -141,7 +160,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
             submit();
           }}
         >
-          <For each={props.spec.fields}>
+          <For each={shownFields()}>
             {(field) => (
               <Switch>
                 <Match when={field.kind === "segmented" ? field : undefined}>
@@ -235,19 +254,6 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
               </Switch>
             )}
           </For>
-          <Show when={!frozen()}>
-            <div class="ui-block-actions">
-              <Button type="submit" disabled={locked()}>
-                {props.spec.submit ?? t("uiBlock.form.submit")}
-              </Button>
-              <Show when={props.busy}>
-                <span class="ui-block-sending" role="status">
-                  <Spinner size="sm" />
-                  {t("common.sending")}
-                </span>
-              </Show>
-            </div>
-          </Show>
         </form>
       </Show>
     </UiBlockCard>

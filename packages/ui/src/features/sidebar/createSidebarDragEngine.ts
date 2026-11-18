@@ -65,6 +65,9 @@ export interface SidebarDragEngineDeps {
 /** A drag that rests this long on a closed folder opens it. */
 const SPRING_OPEN_MS = 700;
 
+/** After the empty pin area opens, a drag aims at nothing until the pointer moves this far from its start. */
+const DRAG_AIM_DISTANCE_PX = 6;
+
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
     assignedSectionId,
@@ -97,6 +100,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   let dragPoint: SidebarDragPoint | null = null;
 
+  /** Where a drag that opened the empty pin area started, until the pointer moves away from it. */
+  let dragOrigin: SidebarDragPoint | null = null;
+
   let dragTarget: SidebarDropTarget | null = null;
 
   let dragTargetFrame: number | null = null;
@@ -121,6 +127,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     stopSpringOpen();
     dragSession = null;
     dragPoint = null;
+    dragOrigin = null;
     dragTarget = null;
     dragTargetFrame = null;
     dragScrollFrame = null;
@@ -281,9 +288,15 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
+  function pointerIsAtDragOrigin(point: SidebarDragPoint): boolean {
+    if (!dragOrigin) return false;
+    return Math.hypot(point.clientX - dragOrigin.clientX, point.clientY - dragOrigin.clientY) < DRAG_AIM_DISTANCE_PX;
+  }
+
   function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
     const session = dragSession;
-    return session ? sidebarDropTargetAt(sidebarDragWorld(session), point) : null;
+    if (!session || pointerIsAtDragOrigin(point)) return null;
+    return sidebarDropTargetAt(sidebarDragWorld(session), point);
   }
 
   /**
@@ -395,6 +408,8 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       dragScrollSpeed = 0;
       return;
     }
+    // The list moved under the pointer, so the pointer now aims at another row.
+    dragOrigin = null;
     applySidebarDropTarget(resolveSidebarDropTarget(dragPoint));
     scrollFades.measure();
     dragScrollFrame = requestAnimationFrame(runSidebarDragAutoScroll);
@@ -426,6 +441,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       chatKind(dragSession.source.id) !== null
     ) {
       const activeSession = dragSession;
+      // The area pushes every row down under a still pointer. Until the pointer moves, the drag aims at
+      // nothing, so a drop in place keeps the order. `dragPoint` is still the drag start here.
+      dragOrigin = dragPoint;
       dragState.setEmptyPinnedDropVisible(true);
       queueMicrotask(() => {
         if (dragSession !== activeSession) return;
@@ -434,6 +452,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       });
     }
     const point = { clientX: event.clientX, clientY: event.clientY };
+    if (!pointerIsAtDragOrigin(point)) dragOrigin = null;
     if (pointInRect(point, dragGeometry.list)) {
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";

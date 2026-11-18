@@ -9,9 +9,6 @@ import {
   parseAgentImportSkillSource,
   type RemoteAgentImportResult,
 } from "@openbot/contracts/ipc";
-import { AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
-import { sourceText } from "@openbot/i18n/source";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
@@ -25,7 +22,7 @@ import {
   NotesSection,
   toggledKeys,
 } from "@/features/servers/components/import-parts";
-import { pickZipUpload } from "@/features/servers/model/transfer-file";
+import { type PickedZip, pickZipFile } from "@/features/servers/model/transfer-file";
 import { IMPORT_SOURCE_NAMES } from "@/features/servers/screens/server-import-screen";
 import {
   SettingsContent,
@@ -51,7 +48,7 @@ export function ServerImportGuideScreen() {
   const serverId = params.serverId;
   const source = parseSource(params.source);
   const { canImportAgents } = useMobileWorkspace();
-  const { stageAgentImport, applyAgentImport, discardAgentImport } = useMobileWorkspaceActions();
+  const { checkAgentExport, stageAgentImport, applyAgentImport, discardAgentImport } = useMobileWorkspaceActions();
   const [phase, setPhase] = useState<Phase>("guide");
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,23 +92,30 @@ export function ServerImportGuideScreen() {
     setPhase("reading");
     setError(null);
     setProgress(null);
-    let upload: RemoteFileUpload | null;
+    let file: PickedZip | null = null;
     try {
-      upload = await pickZipUpload(AGENT_IMPORT_UPLOAD_BYTES, sourceText("error.import.remoteZipTooLarge"));
+      file = await pickZipFile();
+      if (file) checkAgentExport(file.size, serverId);
     } catch (caught) {
       // Nothing went to the host, so the open export stays open.
+      file?.release();
       setPhase(open ? "review" : "guide");
       setError(errorMessage(caught, t("mobile.server.import.readFailed")));
       void haptics.notification("error");
       return;
     }
-    if (!upload) {
+    if (!file) {
       setPhase(open ? "review" : "guide");
       return;
     }
     try {
-      // A new export releases the earlier one on the host.
-      const next = await stageAgentImport(upload, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
+      // A new export releases the earlier one on the host. A closed screen stops at the next part.
+      const picked = file;
+      const readPart = (offset: number, length: number) =>
+        closed.current ? Promise.reject(new Error()) : picked.readPart(offset, length);
+      const next = await stageAgentImport({ ...picked, readPart }, serverId, (fraction) =>
+        setProgress(Math.floor(fraction * 100)),
+      );
       if (closed.current) {
         void discardAgentImport(next.token, serverId).catch(() => undefined);
         return;
@@ -121,11 +125,13 @@ export function ServerImportGuideScreen() {
     } catch (caught) {
       // The host may still hold the export that was open, so it is released.
       if (open) void discardAgentImport(open.token, serverId).catch(() => undefined);
+      if (closed.current) return;
       setPreview(null);
       setPhase("guide");
       setError(errorMessage(caught, t("mobile.server.import.readFailed")));
       void haptics.notification("error");
     } finally {
+      file.release();
       setProgress(null);
     }
   }

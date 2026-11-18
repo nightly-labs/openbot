@@ -112,6 +112,13 @@ export interface LiveActivityViewInput {
   /** Signs the button links. */
   actionKey: Uint8Array;
   /**
+   * The thread of what the presentation shows, or null: the thread of its request
+   * (`DynamicIslandCoordinator.requestThreadId`), or the side thread that does the work that it shows
+   * (`DynamicIslandCoordinator.workingTurn`). The links carry it, so the app opens that thread: a side
+   * thread of the agent, the channel of a channel thread, or the agent's own chat.
+   */
+  threadId?: string | null;
+  /**
    * Hides the secrets in the agent text, because the Lock Screen and a paired watch show it. The
    * caller supplies the shared log redaction: this package runs in React Native too.
    */
@@ -125,6 +132,8 @@ export interface LiveActivityViewInput {
 export const LIVE_ACTIVITY_URL = "openbot://live-activity";
 /** Opens the chat list. It starts no action, so it needs no signature. */
 export const LIVE_ACTIVITY_LIST_URL = `${LIVE_ACTIVITY_URL}?list=1`;
+/** The link parameter that names the thread to open. An app from before it opens the agent's own chat. */
+const THREAD_PARAM = "thread";
 
 const TITLE_LIMIT = 80;
 const DETAIL_LIMIT = 180;
@@ -160,16 +169,18 @@ export function liveActivityView(
     presentation.mode === "message" ? sortUnreadAgents(input.unreadAgents, presentation.message.agent.id) : [];
   const unread = allUnread.slice(0, UNREAD_AGENT_ROWS);
   const command = presentation.mode === "approval" ? (presentation.item.approval.command ?? undefined) : undefined;
+  const threadId = input.threadId ?? null;
   return liveActivityProps(
     presentation,
     {
       avatar: shown ? input.avatar(presentation.serverId, shown, liveActivityMood(presentation)) : "",
       // Several chats have replies, so a tap opens the agent list and the user chooses one.
-      tapUrl: allUnread.length > 1 || !shown ? LIVE_ACTIVITY_LIST_URL : openUrl(presentation.serverId, shown.id),
+      tapUrl:
+        allUnread.length > 1 || !shown ? LIVE_ACTIVITY_LIST_URL : openUrl(presentation.serverId, shown.id, threadId),
       buttons: buttons.map((button) => ({
         label: button.label,
         prominent: button.prominent,
-        url: liveActivityActionUrl(button.action, input.actionKey, command),
+        url: liveActivityActionUrl(button.action, input.actionKey, command, threadId),
       })),
       agents: unread.map((agent) => ({
         name: agent.name,
@@ -510,16 +521,29 @@ export function liveActivityFileName(parts: readonly string[]): string {
     .join("-");
 }
 
-/** The link of a button. `command` is the command an Approve button runs, which the app shows again. */
-export function liveActivityActionUrl(action: LiveActivityAction, key: Uint8Array, command?: string): string {
+/**
+ * The link of a button. `command` is the command an Approve button runs, which the app shows again.
+ * `threadId` is the thread of the request. It only says which conversation the app opens after the
+ * action, as the tap link does, so it is outside the signed payload: an app from before it reads the
+ * same signed action.
+ */
+export function liveActivityActionUrl(
+  action: LiveActivityAction,
+  key: Uint8Array,
+  command?: string,
+  threadId: string | null = null,
+): string {
   const payload = JSON.stringify(command === undefined ? { action } : { action, command });
-  return `${LIVE_ACTIVITY_URL}?${new URLSearchParams({ action: payload, sig: signLiveActivityLink(payload, key) })}`;
+  const params = new URLSearchParams({ action: payload, sig: signLiveActivityLink(payload, key) });
+  if (threadId) params.set(THREAD_PARAM, threadId);
+  return `${LIVE_ACTIVITY_URL}?${params}`;
 }
 
+/** `threadId` is the thread to open, or null for the agent's own chat. A link from an earlier host has none. */
 export type LiveActivityLink =
   | { type: "list" }
-  | { type: "open"; serverId: string; agentId: string }
-  | { type: "action"; action: LiveActivityAction; command: string | null };
+  | { type: "open"; serverId: string; agentId: string; threadId: string | null }
+  | { type: "action"; action: LiveActivityAction; command: string | null; threadId: string | null };
 
 /**
  * Reads a Live Activity link. Any app can open an `openbot://` link, so a link that changes host
@@ -531,24 +555,30 @@ export function readLiveActivityLink(url: string, keyFor: (serverId: string) => 
   const params = new URL(url).searchParams;
   const serverId = params.get("server");
   const agentId = params.get("agent");
-  if (serverId && agentId) return { type: "open", serverId, agentId };
+  const threadId = params.get(THREAD_PARAM) || null;
+  if (serverId && agentId) return { type: "open", serverId, agentId, threadId };
   const payload = params.get("action");
   const signature = params.get("sig");
   if (payload === null || signature === null) return { type: "list" };
-  const link = signedPayload(payload);
+  const link = signedPayload(payload, threadId);
   const key = link.type === "action" ? keyFor(link.action.serverId) : null;
   return key && verifyLiveActivityLink(payload, signature, key) ? link : { type: "list" };
 }
 
 /** The host or this app signed the link, so its action has the shape that one of them built. */
-function signedLink(value: unknown): LiveActivityLink {
+function signedLink(value: unknown, threadId: string | null): LiveActivityLink {
   if (!isDynamicRecord(value) || !isLiveActivityAction(value.action)) return { type: "list" };
-  return { type: "action", action: value.action, command: isString(value.command) ? value.command : null };
+  return {
+    type: "action",
+    action: value.action,
+    command: isString(value.command) ? value.command : null,
+    threadId,
+  };
 }
 
-function signedPayload(payload: string): LiveActivityLink {
+function signedPayload(payload: string, threadId: string | null): LiveActivityLink {
   try {
-    return signedLink(JSON.parse(payload));
+    return signedLink(JSON.parse(payload), threadId);
   } catch {
     return { type: "list" };
   }
@@ -564,8 +594,10 @@ function isLiveActivityAction(value: unknown): value is LiveActivityAction {
   );
 }
 
-function openUrl(serverId: string, agentId: string): string {
-  return `${LIVE_ACTIVITY_URL}?${new URLSearchParams({ server: serverId, agent: agentId })}`;
+function openUrl(serverId: string, agentId: string, threadId: string | null = null): string {
+  const params = new URLSearchParams({ server: serverId, agent: agentId });
+  if (threadId) params.set(THREAD_PARAM, threadId);
+  return `${LIVE_ACTIVITY_URL}?${params}`;
 }
 
 /** The agent the island shows first, then the most unread. */

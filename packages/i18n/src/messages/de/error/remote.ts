@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Remote-Desktop-Tests sind nicht verfügbar.",
   "error.remote.controlUnavailable": "Die Fernsteuerung ist nicht verfügbar.",
   "error.remote.controlSessionNotFound": "Fernsteuerungssitzung nicht gefunden.",
+  "error.remote.controlNotAllowed": "Der Eigentümer dieses Computers erlaubt deiner Rolle keine Fernsteuerung.",
+  "error.remote.controlDeclined": "Die Person an diesem Computer hat die Fernsteuerung nicht erlaubt.",
   "error.remote.testRuntimeUpdate": "Aktualisiere die macOS-Remote-Desktop-Laufzeit, um diesen Test auszuführen.",
   "error.remote.testOtherSessions": "Beende andere Remote-Desktop-Sitzungen, bevor du einen Test startest.",
   "error.remote.testPermissions":
@@ -20,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Ein Remote-Desktop-Test ist aktiv. Versuche es nach seinem Abschluss erneut.",
   "error.remote.screenRecordingDenied":
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
+  "error.remote.windowsSessionDisconnected":
+    "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -149,6 +153,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Der Host hat den Anhang abgelehnt.",
   "error.remote.attachmentTooLarge": "Anhänge dürfen höchstens 10 MB groß sein.",
   "error.remote.attachmentBusy": "Warte, bis der aktuelle Anhang abgeschlossen ist.",
+  "error.remote.attachmentChanged": "Die Datei hat sich geändert oder ist nicht verfügbar. Wähle sie erneut aus.",
   "error.remote.uploadTimeout": "Die Zeit für den Anhangsupload ist abgelaufen.",
   "error.remote.hostSessionActive": "Der Host hat bereits eine aktive entfernte Sitzung.",
   "error.remote.tooManyConnections": "Zu viele aktive entfernte Verbindungen.",
@@ -191,12 +196,15 @@ export const messages = {
   "error.remote.hostNotRegistered": "Dieser Host ist nicht mehr beim OpenBot-Dienst registriert.",
   "error.remote.membershipEnded":
     "Du bist kein Mitglied dieses Hosts mehr. Bitte den Eigentümer um eine neue Einladung.",
+  "error.remote.membershipChanged":
+    "Jemand hat dieses Mitglied gleichzeitig geändert. Lade die Mitglieder neu und versuche es erneut.",
   "error.remote.accountSessionInactive": "Deine Anmeldung ist nicht mehr aktiv. Melde dich erneut an.",
   "error.remote.hostOtherAccount": "Dieser Host gehört zu einem anderen Konto.",
   "error.remote.remoteNotConfigured": "Remote-Verbindungen sind für diesen OpenBot-Dienst nicht eingerichtet.",
   "error.remote.hostRefused": "Der Host hat die Anfrage abgelehnt ({status}).",
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
+  "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":

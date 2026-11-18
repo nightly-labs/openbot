@@ -1,0 +1,33 @@
+{
+  "slug": "gitbook",
+  "name": "GitBook",
+  "tagline": "Documentation spaces",
+  "description": "GitBook lets agents search and read pages in the documentation spaces of the signed-in GitBook organization. Each user signs in to their own GitBook account through the browser.",
+  "category": "documents",
+  "creatorName": "GitBook",
+  "iconUrl": "https://avatars.githubusercontent.com/u/7111340?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-search-docs", "text": "Search our GitBook docs for how API keys are rotated." },
+    { "id": "prompt-outdated", "text": "Which pages in the API reference space mention the old v1 endpoints?" },
+    { "id": "prompt-draft-page", "text": "Draft a getting started page from the existing installation docs." }
+  ],
+  "apps": [
+    {
+      "id": "app-gitbook-mcp",
+      "name": "GitBook",
+      "description": "Documentation search and page access, over GitBook's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/7111340?s=256&v=4",
+      "server": {
+        "name": "gitbook",
+        "transport": "http",
+        "url": "https://mcp.gitbook.com/mcp",
+        "auth": [{ "id": "gitbook-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.gitbook.com",
+  "privacyPolicyUrl": "https://gitbook.com/docs/policies/privacy-and-security/statement",
+  "termsUrl": "https://gitbook.com/docs/policies/terms",
+  "skills": []
+}

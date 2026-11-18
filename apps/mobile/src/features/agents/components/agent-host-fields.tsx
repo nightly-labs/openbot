@@ -1,25 +1,29 @@
 import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
-  type AgentFastModeSettings,
   type AgentHostSettings,
+  type AgentModelOption,
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
+  type AgentSpeed,
+  type AgentSpeedSettings,
   type AgentTaskLimitSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
   canAdministerServer,
-  type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
+  type UpdateAgentSpeedInput,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
+import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import {
   type MobileAgent,
@@ -145,6 +149,15 @@ function SaveError({ error }: { error: string | null }) {
   ) : null;
 }
 
+/** A save error under a row of a group. */
+function RowSaveError({ error }: { error: string | null }) {
+  return error ? (
+    <View className="px-4 pb-3">
+      <SaveError error={error} />
+    </View>
+  ) : null;
+}
+
 /** Agent info > Permissions: Computer Use and local scripts, which act on the host computer. */
 export function AgentHostPermissionFields(props: AgentHostFieldsProps) {
   const { t } = useText();
@@ -185,44 +198,43 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
   const { current, enabled, error, save } = useAgentHostSettings(props);
+  const steering = useAgentSteers(props.agent);
   if (!current) return null;
   const { agent } = props;
   const choice: BusyMessageChoice = current.busyMessageMode ?? "default";
   const mode = current.busyMessageMode ?? current.defaultBusyMessageMode;
-  const steerUnsupported =
-    mode === "steer" && agent.provider !== undefined && agentProviderDescriptor(agent.provider).steer !== "native";
+  // As on desktop: a custom agent that reports steering steers. While the phone cannot tell (an older
+  // host or models that did not load), the note does not show.
+  const steerUnsupported = mode === "steer" && steering.known && !steering.steers;
   return (
-    <>
-      <SettingsSection
-        footer={
+    <SettingsGroupRow>
+      <SettingsRow
+        description={
           steerUnsupported && agent.provider
             ? t("mobile.agent.busyMessage.steerUnsupported", { provider: agentProviderName(agent.provider) })
             : t("mobile.agent.busyMessage.footer")
         }
+        trailing={
+          <SettingsPicker<BusyMessageChoice>
+            value={choice}
+            options={[
+              { value: "default", label: t(HOST_DEFAULT_LABEL[current.defaultBusyMessageMode]) },
+              { value: "queue", label: t(BUSY_MESSAGE_LABEL.queue) },
+              { value: "steer", label: t(BUSY_MESSAGE_LABEL.steer) },
+            ]}
+            enabled={enabled}
+            dark={theme === "dark"}
+            label={t("mobile.agent.busyMessage.label")}
+            onChange={(next) => {
+              if (next !== choice) void save(current, { busyMessageMode: next === "default" ? null : next });
+            }}
+          />
+        }
       >
-        <SettingsRow
-          trailing={
-            <SettingsPicker<BusyMessageChoice>
-              value={choice}
-              options={[
-                { value: "default", label: t(HOST_DEFAULT_LABEL[current.defaultBusyMessageMode]) },
-                { value: "queue", label: t(BUSY_MESSAGE_LABEL.queue) },
-                { value: "steer", label: t(BUSY_MESSAGE_LABEL.steer) },
-              ]}
-              enabled={enabled}
-              dark={theme === "dark"}
-              label={t("mobile.agent.busyMessage.label")}
-              onChange={(next) => {
-                if (next !== choice) void save(current, { busyMessageMode: next === "default" ? null : next });
-              }}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+        <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -247,39 +259,36 @@ export function AgentTaskLimitField(props: AgentHostFieldsProps) {
   const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
   const choice: TaskLimitChoice = oneTurnAtATime ? 1 : (current.taskLimit ?? "default");
   return (
-    <>
-      <SettingsSection
-        footer={
+    <SettingsGroupRow>
+      <SettingsRow
+        description={
           oneTurnAtATime && agent.provider
             ? t("mobile.agent.taskLimit.oneTurn", { provider: agentProviderName(agent.provider) })
             : t("mobile.agent.taskLimit.footer")
         }
+        trailing={
+          <SettingsPicker<TaskLimitChoice>
+            value={choice}
+            options={TASK_LIMIT_CHOICES.map((value) => ({
+              value,
+              label:
+                value === "default"
+                  ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
+                  : format.number(value),
+            }))}
+            enabled={enabled && !oneTurnAtATime}
+            dark={theme === "dark"}
+            label={t("mobile.agent.taskLimit.footer")}
+            onChange={(next) => {
+              if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
+            }}
+          />
+        }
       >
-        <SettingsRow
-          trailing={
-            <SettingsPicker<TaskLimitChoice>
-              value={choice}
-              options={TASK_LIMIT_CHOICES.map((value) => ({
-                value,
-                label:
-                  value === "default"
-                    ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
-                    : format.number(value),
-              }))}
-              enabled={enabled && !oneTurnAtATime}
-              dark={theme === "dark"}
-              label={t("mobile.agent.taskLimit.footer")}
-              onChange={(next) => {
-                if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
-              }}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+        <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -300,20 +309,18 @@ export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
   );
   if (!current) return null;
   return (
-    <>
-      <SettingsSection footer={t("mobile.agent.agentNewChat.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.allowNewChat}
-            disabled={!enabled}
-            label={t("mobile.agent.agentNewChat.title")}
-            dark={theme === "dark"}
-            onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
-          />
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+    <SettingsGroupRow>
+      <SettingsRow description={t("mobile.agent.agentNewChat.footer")}>
+        <SettingsSwitch
+          value={current.allowNewChat}
+          disabled={!enabled}
+          label={t("mobile.agent.agentNewChat.title")}
+          dark={theme === "dark"}
+          onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
+        />
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -330,49 +337,80 @@ export function AgentPlanCardField(props: AgentHostFieldsProps) {
   );
   if (!current) return null;
   return (
-    <>
-      <SettingsSection footer={t("mobile.agent.planCard.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.quickAcknowledgement}
-            disabled={!enabled}
-            label={t("mobile.agent.planCard.label")}
-            dark={theme === "dark"}
-            onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
-          />
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+    <SettingsGroupRow>
+      <SettingsRow description={t("mobile.agent.planCard.footer")}>
+        <SettingsSwitch
+          value={current.quickAcknowledgement}
+          disabled={!enabled}
+          label={t("mobile.agent.planCard.label")}
+          dark={theme === "dark"}
+          onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
+        />
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
+const SPEED_LABEL = {
+  standard: "mobile.agent.fastMode.standard",
+  fast: "mobile.agent.fastMode.fast",
+  ultrafast: "mobile.agent.fastMode.ultrafast",
+} as const satisfies Record<AgentSpeed, MobileTextKey>;
+
 /**
- * Agent info > Model: whether the agent asks its provider for the fast service tier, from
- * `agent-fast-mode-v1`. It shows only for a model with a fast tier, as on desktop. A member with
- * view access reads it; the host saves a change only for a member with manage access. A change
- * applies from the next turn.
+ * Agent info > Model: the speed of the agent (Standard, Fast or Ultrafast), from `agent-speed-v1`, or
+ * from `agent-fast-mode-v1` on an older host. It shows only for a model with a fast tier, as on
+ * desktop, and offers Ultrafast only for a model with that tier. A member with view access reads it;
+ * the host saves a change only for a member with manage access. A change applies from the next turn.
+ * Claude fast mode costs more per token and a Claude subscription pays for it from usage credits, so
+ * a faster speed on a Claude agent asks first, as the desktop picker does.
  */
-export function AgentFastModeField(props: AgentHostFieldsProps) {
+export function AgentSpeedField(props: AgentHostFieldsProps & { model: AgentModelOption }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const workspace = useMobileWorkspaceActions();
   const { current, enabled, error, save } = useAgentHostRecord<
-    AgentFastModeSettings,
-    Omit<UpdateAgentFastModeInput, "agentId">
-  >(props, "fast-mode", workspace.loadAgentFastMode, workspace.updateAgentFastMode, true);
+    AgentSpeedSettings,
+    Omit<UpdateAgentSpeedInput, "agentId">
+  >(props, "fast-mode", workspace.loadAgentSpeed, workspace.updateAgentSpeed, true);
   if (!current) return null;
+  const settings = current;
+  const value = settings.speed ?? "standard";
+  const speeds: AgentSpeed[] =
+    props.model.ultrafastServiceTier || value === "ultrafast"
+      ? ["standard", "fast", "ultrafast"]
+      : ["standard", "fast"];
+  const claude = props.agent.provider === "claude" || props.model.provider === "claude";
+
+  function change(speed: AgentSpeed): void {
+    if (speed === value) return;
+    if (speed === "standard" || !claude) {
+      void save(settings, { speed });
+      return;
+    }
+    Alert.alert(t("mobile.agent.fastMode.confirmTitle"), t("mobile.agent.fastMode.confirmBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("mobile.agent.fastMode.confirm"), onPress: () => void save(settings, { speed }) },
+    ]);
+  }
+
   return (
     <>
       <SettingsSection footer={t("mobile.agent.fastMode.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.fastMode === true}
-            disabled={!enabled}
-            label={t("mobile.agent.fastMode.label")}
-            dark={theme === "dark"}
-            onValueChange={(fastMode) => void save(current, { fastMode })}
-          />
+        <SettingsRow
+          trailing={
+            <SettingsPicker<AgentSpeed>
+              value={value}
+              options={speeds.map((speed) => ({ value: speed, label: t(SPEED_LABEL[speed]) }))}
+              enabled={enabled}
+              dark={theme === "dark"}
+              label={t("mobile.agent.fastMode.speed")}
+              onChange={change}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.agent.fastMode.speed")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

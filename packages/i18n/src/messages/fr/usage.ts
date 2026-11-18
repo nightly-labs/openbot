@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Jetons",
   "usage.column.date": "Date",
   "usage.column.costUsd": "Coût · USD",
+  "usage.column.loads": "Chargements",
+  "usage.column.agents": "Agents",
   "usage.empty": "Aucune utilisation enregistrée sur cette période.",
   "usage.partial":
     "Données partielles · {turns} tours sans utilisation signalée ; {unpriced} enregistrements sans estimation de coût ; {incomplete} enregistrements avec des données de jetons incomplètes.",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "Modèle",
   "usage.breakdown.agent": "Agent",
   "usage.breakdown.day": "Jour",
+  "usage.breakdown.skill": "Compétence",
   "usage.breakdown.byModel": "Utilisation par modèle",
   "usage.breakdown.byAgent": "Utilisation par agent",
   "usage.breakdown.byDay": "Utilisation et coût quotidiens",
+  "usage.breakdown.bySkill": "Utilisation par compétence",
+  "usage.breakdown.skillEmpty": "Aucune compétence chargée sur cette période.",
   "usage.unknownModel": "Modèle inconnu",
   "usage.footer": "Collecte commencée le {started} · Mise à jour {updated}",
   "usage.updatedNever": "jamais",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Cet hôte ne prend pas en charge les analyses des agents. Mettez l’hôte à jour pour utiliser cette vue.",
   "usage.panel.loadFailed": "Impossible de charger l’utilisation. Vérifiez la connexion et la période.",
+  "usage.machine.label": "Utilisation de la machine. CPU : {cpu}, mémoire : {memory}",
+  "usage.machine.openStorage": "Ouvrir Stockage. Disque : {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

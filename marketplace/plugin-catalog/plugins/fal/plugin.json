@@ -1,0 +1,36 @@
+{
+  "slug": "fal",
+  "name": "fal",
+  "tagline": "Generative media models",
+  "description": "fal lets agents find image, video, and audio generation models and run them with the signed-in fal account. Each user signs in to their own fal account through the browser.",
+  "category": "design",
+  "creatorName": "fal",
+  "iconUrl": "https://cdn.prod.website-files.com/6a72ef21c470312422dea9b3/6adae13a70a66b6d479f659e_fal-icon-favicon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-model", "text": "Which fal models can turn a product photo into a short video?" },
+    {
+      "id": "prompt-generate-image",
+      "text": "Generate a square image of a lighthouse at dawn in a flat illustration style."
+    },
+    { "id": "prompt-model-inputs", "text": "What inputs and options does the FLUX image model take on fal?" }
+  ],
+  "apps": [
+    {
+      "id": "app-fal-mcp",
+      "name": "fal",
+      "description": "Model search and image, video, and audio generation, over fal's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6a72ef21c470312422dea9b3/6adae13a70a66b6d479f659e_fal-icon-favicon.png",
+      "server": {
+        "name": "fal",
+        "transport": "http",
+        "url": "https://mcp.fal.ai/mcp-relay",
+        "auth": [{ "id": "fal-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://fal.ai",
+  "privacyPolicyUrl": "https://fal.ai/legal/privacy-policy",
+  "termsUrl": "https://fal.ai/legal/terms-of-service"
+}

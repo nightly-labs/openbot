@@ -3,6 +3,7 @@
 // these versions. Versions 1-3 retain their own codec.
 import { PROVIDER_ID_PATTERN } from "../agent-providers";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "./capability-limits";
 
 /**
  * What a released provider-aware protocol accepts. Each list is frozen with its protocol version: a value
@@ -1083,7 +1084,7 @@ export interface TeamProtocolSupportProviderAware {
 
 export function decodeTeamProtocolSupportProviderAware(
   value: unknown,
-  maximumCapabilities = 64,
+  maximumCapabilities: number = TEAM_PROTOCOL_CAPABILITY_LIMITS[4],
 ): TeamProtocolSupportProviderAware {
   if (!isDynamicRecord(value) || !isString(value.appVersion) || value.appVersion.length > 64) {
     throw new Error("Invalid Team API compatibility response.");
@@ -1965,7 +1966,8 @@ function projectProviderAwareRemoteDisplay(value: unknown): TeamProtocolProvider
   return projectProviderAwareObject(value, ["id", "label", "width", "height", "primary"]);
 }
 
-function projectProviderAwareConversationSearch(value: unknown): TeamProtocolProviderAwareJsonObject {
+/** The released message-search projection. `thread-message-search-v1` reuses it. */
+export function projectProviderAwareConversationSearch(value: unknown): TeamProtocolProviderAwareJsonObject {
   const projected = projectProviderAwareObject(
     value,
     TEAM_PROTOCOL_ProviderAware_HTTP_RESPONSE_KEYS["GET message-search"],
@@ -2829,7 +2831,8 @@ function isProviderAwareRoutineRun(value: unknown): boolean {
   );
 }
 
-function isProviderAwareConversationSearch(value: unknown): boolean {
+/** The released message-search validator. `thread-message-search-v1` reuses it. */
+export function isProviderAwareConversationSearch(value: unknown): boolean {
   return (
     isDynamicRecord(value) &&
     Array.isArray(value.results) &&

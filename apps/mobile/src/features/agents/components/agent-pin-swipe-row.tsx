@@ -11,6 +11,7 @@ import { ChatDragArea, type useChatDrag } from "@/features/agents/components/cha
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 
 import { PIN_COMMIT_DISTANCE, PIN_REVEAL_DISTANCE, useAgentPinSwipe } from "./use-agent-pin-swipe";
 
@@ -39,13 +40,17 @@ function PinAction({
   const reducedMotion = useReducedMotion();
   const circleStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: reducedMotion ? 1 : 0.65 + Math.min(1, Math.max(0, -translation.get() / PIN_COMMIT_DISTANCE)) * 0.55 },
+      {
+        scale: reducedMotion
+          ? 1
+          : 0.65 + Math.min(1, Math.max(0, (-translation.get() * END_X) / PIN_COMMIT_DISTANCE)) * 0.55,
+      },
     ],
   }));
 
   const { t } = useText();
   const actionStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: Math.min(0, (translation.get() + PIN_REVEAL_DISTANCE) / 2) }],
+    transform: [{ translateX: END_X * Math.min(0, (translation.get() * END_X + PIN_REVEAL_DISTANCE) / 2) }],
   }));
 
   return (
@@ -102,6 +107,16 @@ export function AgentPinSwipeRow({
   const { openingGesture } = useAppDrawer();
   const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked, drag?.gesture);
   const { t } = useText();
+  const renderPin = (_progress: SharedValue<number>, translation: SharedValue<number>) => (
+    <PinAction
+      revealed={swipe.revealed}
+      agentName={agentName}
+      pinned={pinned}
+      pinBlocked={pinBlocked}
+      translation={translation}
+      onPress={() => swipe.pin()}
+    />
+  );
 
   return (
     <GestureDetector gesture={swipe.detectorGesture}>
@@ -111,25 +126,20 @@ export function AgentPinSwipeRow({
         containerStyle={{ backgroundColor: background, overflow: "hidden" }}
         childrenContainerStyle={{ backgroundColor: background }}
         friction={1}
-        overshootRight
+        // The action is at the end of the row. Swipeable places its actions on the screen's sides.
+        overshootRight={END_X === 1}
+        overshootLeft={END_X === -1}
         overshootFriction={1}
         rightThreshold={PIN_REVEAL_DISTANCE / 2}
+        leftThreshold={PIN_REVEAL_DISTANCE / 2}
         enableTrackpadTwoFingerGesture
         simultaneousWith={swipe.gesture}
         requireToFail={swipe.swipeRequires}
         onSwipeableWillOpen={swipe.onWillOpen}
         onSwipeableWillClose={swipe.onWillClose}
         onSwipeableClose={swipe.onClose}
-        renderRightActions={(_progress, translation) => (
-          <PinAction
-            revealed={swipe.revealed}
-            agentName={agentName}
-            pinned={pinned}
-            pinBlocked={pinBlocked}
-            translation={translation}
-            onPress={() => swipe.pin()}
-          />
-        )}
+        renderRightActions={END_X === 1 ? renderPin : undefined}
+        renderLeftActions={END_X === -1 ? renderPin : undefined}
       >
         <View
           pointerEvents={swipe.revealed ? "none" : "auto"}

@@ -8,7 +8,7 @@
 // graph would make the build depend on the UI it is only illustrating. Article
 // bodies live in src/content and are wired up separately.
 
-import { OPENBOT_SITE_URL } from "./site-metadata";
+import { OPENBOT_SITE_URL, type PageSocialImage } from "./site-metadata";
 
 export type CollectionId = "news" | "guides" | "compare" | "providers";
 /** The collections whose articles are prose, drawn by the article page. */
@@ -41,6 +41,8 @@ export interface ContentCollection<Id extends CollectionId = CollectionId> {
   /** The `<title>` of the index page. */
   indexTitle: string;
   indexDescription: string;
+  /** The index page's own social card. Without it, the index shows the site's card. */
+  indexSocialImage?: PageSocialImage;
   /** Names the RSS feed, in the feed itself and in `<link rel="alternate">`. */
   feedTitle: string;
   /** The link back to the index from inside an article. */

@@ -44,6 +44,8 @@ export const messages = {
   "onboarding.provider.clineAccount": "Modelos gratuitos con una cuenta de Cline",
   "onboarding.provider.kimiAccount": "Modelos de Kimi con una cuenta de Kimi Code",
   "onboarding.provider.devinAccount": "Muchos modelos con una cuenta de Devin",
+  "onboarding.provider.copilotAccount": "Muchos modelos con un plan de Copilot",
+  "onboarding.provider.mistralAccount": "Modelos de Mistral con una cuenta de Mistral",
   "onboarding.provider.hermesNous": "Plan de Nous Portal o tu configuración de Hermes",
   "onboarding.provider.inceptionKey": "Modelos Mercury con una clave de API de Inception",
   "onboarding.provider.deepseekKey": "Modelos de DeepSeek con una clave de API de DeepSeek",
@@ -100,7 +102,7 @@ export const messages = {
   "onboarding.action.connect": "Conectar",
   "onboarding.action.open": "Abrir OpenBot",
   "onboarding.action.next": "Siguiente",
-  "onboarding.server.title": "Configurar {server}",
+  "onboarding.server.title": "Te damos la bienvenida a {server}",
   "onboarding.server.description":
     "OpenBot no incluye una suscripción de IA. Conecta tu propio proveedor a este servidor antes de crear un agente.",
   "onboarding.server.label": "Elige el proveedor de IA de este servidor",

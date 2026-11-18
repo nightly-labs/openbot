@@ -16,6 +16,7 @@ export interface OnboardingPrimaryButtonProps extends GlassTiming {
 
 /** A round button with an icon only. */
 export interface OnboardingIconButtonProps extends GlassTiming {
+  /** An arrow that points in the reading direction. It turns in a right-to-left layout. */
   icon: LucideIcon;
   label: string;
   onPress: () => void;

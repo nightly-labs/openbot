@@ -1,14 +1,22 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
-import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AttachmentSummary,
+  type ConversationMessage,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
 import { flush, onSettled } from "solid-js";
+import { showNewAgentBackdrop } from "../../agent-backdrops";
 import { withoutAgent } from "../../app-message-projection";
-import { playCompletionSoundForAgentEvent } from "../../completion-sound";
+import { playCompletionSoundForAgentEvent, prepareCompletionSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
@@ -22,11 +30,22 @@ import { useConversation } from "../conversation/conversation-context";
 import { useConversationController } from "../conversation/conversation-controller-context";
 import { agentConversationKey, composerDraftKey, promptRequestKey } from "../conversation/conversation-keys";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
+import { noteSocialFollowReplyCompleted } from "../conversation/social-follow-prompt";
 import { appendTurnStepLine } from "../conversation/turn-step-lines";
+import { serverCanManageMcp } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
-import { claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import { isReaderAuthor } from "../team/reader-identity";
+import { usePresence } from "../team/team-context";
+import {
+  agentErrorDetails,
+  claimErrorToast,
+  createRetryNotices,
+  providerErrorTitle,
+  readableAgentError,
+} from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -53,14 +72,47 @@ import { agentsPort } from "./agents-port";
  *
  * Conversation invalidations also cover read cursors changed on another device.
  */
+/**
+ * The page of a backdrop message in a chat event. The desktop reads it from its file address, on this
+ * computer and on a joined server, so a chat that is not open can change the backdrop too.
+ */
+const agentBackdropPage = {
+  title: (message: ConversationMessage) => message.text,
+  bytes: async (attachment: AttachmentSummary) => {
+    if (!attachment.previewUrl) throw new Error("The page has no address.");
+    const response = await fetch(attachment.previewUrl);
+    if (!response.ok) throw new Error("The page cannot be read.");
+    return new Uint8Array(await response.arrayBuffer());
+  },
+};
+
 export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
-  const { applyAccountUsage } = useAuth();
+  const { setSkillsMarketplaceOpen } = useSettings();
+  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage, centralAuth } = useAuth();
+  const { readerMemberId } = usePresence();
+  /** Whether a sender id is the reader, so a backdrop that another member asked for stays off. */
+  const isReader = (senderId: string) => {
+    const state = centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: readerMemberId(),
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+  const backdropPage = { ...agentBackdropPage, isReader };
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
-    useAgents();
+  const {
+    agentList,
+    setModelOptions,
+    explicitlyOpenedAgentChatId,
+    applyStoredAgents,
+    applyUserHiddenAgents,
+    ownAgentLevels,
+    applyOwnAgentLevels,
+  } = useAgents();
   const { setConversationErrors, setConversationErrorRuns } = useConversationController();
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
@@ -71,8 +123,10 @@ export function AgentEventBridge() {
     agentChatsToRetryRead,
     scheduleConversation,
     isAgentChatReadable,
+    isAgentChatOpen,
     autoMarkAgentMessageRead,
     applyConversationDelta,
+    flushConversationDeltas,
     applyConversationPage,
     markReplyCompleted,
     clearRecentReply,
@@ -83,7 +137,9 @@ export function AgentEventBridge() {
     setTurnStepLines,
     setFailedTurns,
     setUsageLimits,
+    setSubagentTurns,
     setUsageLimitedModels,
+    setFailedModels,
     setWaitedUsageLimits,
     setContextStates,
     setThreadContextStates,
@@ -102,20 +158,36 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout, receiveServerPins } = useSidebar();
-  // As on web, mute and the notification level of the server decide the sounds too. Before the
-  // server list arrives, the sounds play as they did.
-  const soundLevel = () => {
+  // As on web, mute and the notification level of the server decide the sounds too, and the user's
+  // own level of the agent replaces the server level, as for the notifications. Before the server
+  // list arrives, the sounds play as they did.
+  const soundLevel = (agentId: string | null) => {
     const server = activeServer();
     if (!server) return "all";
-    return server.notificationsMuted ? "nothing" : server.notificationLevel;
+    if (server.notificationsMuted) return "nothing";
+    if (agentId === null) return server.notificationLevel;
+    return agentNotificationLevel(server.notificationLevel, ownAgentLevels(), agentId);
   };
   const playAgentEventSound = createAgentEventSounds(
-    (agentId) => soundLevel() !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
+    (agentId) =>
+      soundLevel(agentId) !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
+  const retryNotices = createRetryNotices();
   let readRefresh = 0;
+  /** Whether main sent a runtime snapshot to this page, which it does only after the page loaded. */
+  let snapshotReceived = false;
   let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
+    // Streamed text waits for the next frame. Other events apply it first, so each one sees the text
+    // that came before it. Progress and side-thread text do not read the conversations.
+    if (
+      event.type !== "conversation-delta" &&
+      event.type !== "turn-progress" &&
+      event.type !== "agent-task-conversation-delta"
+    ) {
+      flushConversationDeltas();
+    }
     switch (event.type) {
       case "status":
         applyAgentStatus(event.status);
@@ -132,6 +204,12 @@ export function AgentEventBridge() {
       case "usage-changed":
         applyAccountUsage(event.usage);
         return;
+      case "usage-credits-changed": {
+        // A joined server's usage event does not say whether an account works on credits: read it again.
+        const target = accountUsageTargetKey();
+        if (target) void refreshAccountUsage(target).catch(() => undefined);
+        return;
+      }
       case "agents-changed":
         applyStoredAgents(event.agents);
         return;
@@ -144,7 +222,15 @@ export function AgentEventBridge() {
       case "hidden-agents-changed":
         applyUserHiddenAgents(event.agents);
         return;
+      case "agent-notification-levels-changed":
+        applyOwnAgentLevels(event);
+        return;
       case "conversation":
+        showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
+          event.snapshot.agentId,
+          event.snapshot.messages,
+          backdropPage,
+        );
         scheduleConversation(event.snapshot);
         return;
       case "conversation-page":
@@ -157,6 +243,11 @@ export function AgentEventBridge() {
             (existingUnreadCount === 0 ||
               explicitlyOpenedAgentChatId() === event.page.agentId ||
               agentChatsToRetryRead.has(trackingKey));
+          showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
+            event.page.agentId,
+            event.page.messages,
+            backdropPage,
+          );
           const pageApplied = applyConversationPage(event.page, "latest", "latest");
           const latestIncomingMessage = markNewMessagesRead
             ? latestIncomingConversationMessage(event.page.messages)
@@ -184,9 +275,16 @@ export function AgentEventBridge() {
       case "turn-progress":
         setTurnProgress((current) => ({
           ...current,
-          [event.agentId]: { turnId: event.turnId, detail: cleanAgentMessageText(event.detail) },
+          [event.agentId]: {
+            turnId: event.turnId,
+            detail: cleanAgentMessageText(event.detail),
+            ...(event.running ? { running: true } : {}),
+            ...(event.activity ? { activity: event.activity } : {}),
+          },
         }));
-        setTurnStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));
+        setTurnStepLines((current) =>
+          appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail), event.error),
+        );
         return;
       case "queue-changed":
         queueSnapshotRequests.set(event.snapshot.agentId, (queueSnapshotRequests.get(event.snapshot.agentId) ?? 0) + 1);
@@ -224,9 +322,12 @@ export function AgentEventBridge() {
           ...current,
           [event.agentId]: event.turnId,
         }));
+        if (soundLevel(event.agentId) === "all" && !platform.chatWindow) prepareCompletionSound();
         return;
-      case "turn-completed":
+      case "turn-completed": {
         completedTurnByAgent.set(event.agentId, event.turnId);
+        const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
+        retryNotices.clearAtTurnEnd(bannerKey, setConversationErrors, setConversationErrorRuns);
         setTurnProgress((current) =>
           current[event.agentId]?.turnId === event.turnId ? withoutAgent(current, event.agentId) : current,
         );
@@ -251,13 +352,14 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
+        // A detached question outlives its turn: the host keeps it until the user answers.
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
             pending?.type === "prompt" &&
-            promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey
+            (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)
           ) {
             return current;
           }
@@ -269,12 +371,18 @@ export function AgentEventBridge() {
         );
         if (event.status === "completed") {
           markReplyCompleted(event.agentId);
-          if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event, agentList());
+          if (soundLevel(event.agentId) === "all" && !platform.chatWindow)
+            playCompletionSoundForAgentEvent(event, agentList());
+          // A finished reply is a good moment to ask for a post. A chat window has no toasts.
+          if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
         return;
-      case "routine-thread-turn-completed":
-        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
-        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+      }
+      case "thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
+        // routine thread plays the sound, as before: a routine run played it in the agent's chat.
+        if (event.routine && soundLevel(event.turn.agentId) === "all" && !platform.chatWindow)
+          playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
@@ -315,8 +423,27 @@ export function AgentEventBridge() {
           event.approval,
         ]);
         return;
+      case "subagent-failed": {
+        // The chat shows the failure in the subagent card. The toast tells the user who looks at
+        // another chat; the desktop notification tells the user who is not in the app. A failure does
+        // not need the user, so it shows only at the "all" level, as the completion sound does.
+        const agent = agentList().find((candidate) => candidate.id === event.agentId);
+        if (!agent?.notifications || soundLevel(event.agentId) !== "all" || platform.chatWindow) return;
+        if (!platform.appFocused() || isAgentChatOpen(event.agentId)) return;
+        const { t } = currentText();
+        toast.error(agent.name, {
+          description: event.title
+            ? t("notification.subagentFailedFor", { task: event.title })
+            : t("notification.subagentFailed"),
+        });
+        return;
+      }
       case "runtime-snapshot":
-        void channels.refresh();
+        // A joined server sends a snapshot after a reconnect, when channel events can be lost. This
+        // computer loses events only while the page loads: the start read and the first sent snapshot
+        // cover that. It sends a snapshot at each token count change of a working agent, and a full
+        // channel read each time stalls typing (#11103).
+        if (activeServerId() !== LOCAL_SERVER_ID || !snapshotReceived) void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -353,13 +480,22 @@ export function AgentEventBridge() {
           // reader one line whatever its length, and dismissing it clears the whole run.
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
           const message = readableAgentError(event.message);
+          retryNotices.noteError(key, event.message, message);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           // The provider and model above the error let the user report which run failed (#2858).
           const provider = event.provider ? providerDisplayName(event.provider) : null;
           const run =
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
+          // Google asks the user to verify the account in a browser before Gemini answers (#2419).
+          const link = event.link;
+          // The general sentence hides the cause, so the user can copy it into a report (#6410).
+          const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
-            if (run) return { ...current, [key]: { message, run } };
+            if (run || link || details)
+              return {
+                ...current,
+                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+              };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;
@@ -370,13 +506,22 @@ export function AgentEventBridge() {
         // one stays global. The message is already redacted in the main process.
         const toastKey = readableAgentError(event.message);
         if (claimErrorToast(toastKey)) {
-          // An MCP server left out at hand-off is not the provider failing, and calling it a
-          // provider error sends the user to the wrong settings page.
+          // An MCP server that a provider was not given or could not use is not the provider failing,
+          // and calling it a provider error sends the user to the wrong settings page. The button
+          // opens the Marketplace, which holds the MCP servers, and shows only to a user who can
+          // manage them.
           const { t } = currentText();
-          const title =
-            event.code === "mcp_server_not_started" ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code);
-          toast.error(title, {
+          const mcp = event.code === "mcp_server_not_started";
+          toast.error(mcp ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code), {
             ...{ description: toastKey },
+            ...(mcp && serverCanManageMcp(activeServer())
+              ? {
+                  action: {
+                    label: t("agent.error.openMarketplace"),
+                    onClick: () => setSkillsMarketplaceOpen(true),
+                  },
+                }
+              : {}),
             report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
           });
         }
@@ -406,6 +551,8 @@ export function AgentEventBridge() {
       Object.fromEntries(Object.entries(current).filter(([agentId]) => agentId in usageLimits)),
     );
     setUsageLimitedModels(snapshot.usageLimitedModels ?? []);
+    setFailedModels(snapshot.failedModels ?? []);
+    setSubagentTurns(Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
     setApprovals((current) => reconcileAttentionApprovals(current, snapshot));
@@ -413,12 +560,14 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
+    if (soundLevel(null) === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
-        void channels.refresh();
+        void channels.changed(event.channelId);
         return;
       }
       flush(() => handleAgentEvent(event));
+      if (event.type === "runtime-snapshot") snapshotReceived = true;
       // The main window also gets each event, so a chat window does not play or read it a second time.
       if (platform.chatWindow) return;
       playAgentEventSound(event);

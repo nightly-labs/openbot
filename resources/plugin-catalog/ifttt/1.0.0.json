@@ -1,0 +1,33 @@
+{
+  "slug": "ifttt",
+  "name": "IFTTT",
+  "tagline": "Connect apps and devices",
+  "description": "IFTTT lets agents run actions in the services and devices connected to the signed-in IFTTT account, such as a Slack message or smart lights, and create applets. Each user signs in to their own IFTTT account through the browser.",
+  "category": "automation",
+  "creatorName": "IFTTT",
+  "iconUrl": "https://ifttt.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-services", "text": "Which of my connected services can you use through IFTTT?" },
+    { "id": "prompt-ideas", "text": "Suggest applets that save new email attachments to cloud storage." },
+    { "id": "prompt-draft-applet", "text": "Set up an applet that turns on my porch light at sunset." }
+  ],
+  "apps": [
+    {
+      "id": "app-ifttt-mcp",
+      "name": "IFTTT",
+      "description": "Actions in connected services and applet creation, over IFTTT's MCP server with browser sign-in.",
+      "iconUrl": "https://ifttt.com/favicon.ico",
+      "server": {
+        "name": "ifttt",
+        "transport": "http",
+        "url": "https://ifttt.com/mcp",
+        "auth": [{ "id": "ifttt-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://ifttt.com",
+  "privacyPolicyUrl": "https://ifttt.com/privacy",
+  "termsUrl": "https://ifttt.com/terms",
+  "skills": []
+}

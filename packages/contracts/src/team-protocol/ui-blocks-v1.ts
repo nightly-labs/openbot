@@ -51,8 +51,8 @@ export function withConversationUiBlocks(
     if (!isDynamicRecord(message) || message.uiBlock === undefined) continue;
     const normalized = normalizeConversationUiBlock(message.uiBlock);
     if (!normalized) throw new Error("Invalid conversation UI block.");
-    // `vault` came later, so it stays off this wire: a remote client shows the form of the block.
-    const { vault: _vault, ...v1Block } = normalized;
+    // `vault` and `apiKey` came later, so they stay off this wire: a remote client shows the form of the block.
+    const { vault: _vault, apiKey: _apiKey, ...v1Block } = normalized;
     const json = JSON.stringify({ ...v1Block, state: v1State(v1Block.state) });
     if (isString(message.id)) candidates.push({ id: message.id, block: JSON.parse(json), size: json.length });
   }

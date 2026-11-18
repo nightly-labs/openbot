@@ -1,0 +1,33 @@
+{
+  "slug": "sonarqube",
+  "name": "SonarQube Cloud",
+  "tagline": "Code quality and security issues",
+  "description": "SonarQube Cloud lets agents read issues, security hotspots, quality gate status, and metrics for projects in the organizations of the signed-in user. This address is for the EU region of SonarQube Cloud.",
+  "category": "coding",
+  "creatorName": "SonarSource",
+  "iconUrl": "https://www.sonarsource.com/app-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-quality-gate", "text": "Did the quality gate pass on the main branch of my project?" },
+    { "id": "prompt-critical-issues", "text": "List the critical issues in my project that are still open." },
+    { "id": "prompt-hotspot", "text": "Explain the newest security hotspot in my project and suggest a fix." }
+  ],
+  "apps": [
+    {
+      "id": "app-sonarqube-mcp",
+      "name": "SonarQube Cloud",
+      "description": "Issues, security hotspots, and quality gates, over SonarQube Cloud's MCP server with browser sign-in.",
+      "iconUrl": "https://www.sonarsource.com/app-icon.png",
+      "server": {
+        "name": "sonarqube",
+        "transport": "http",
+        "url": "https://api.sonarcloud.io/mcp",
+        "auth": [{ "id": "sonarqube-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.sonarsource.com/products/sonarqube/cloud/",
+  "privacyPolicyUrl": "https://www.sonarsource.com/company/privacy/",
+  "termsUrl": "https://www.sonarsource.com/legal/sonarcloud/terms-of-service/"
+}

@@ -16,6 +16,14 @@ export const messages = {
   "mobile.marketplace.kind.agent": "Agent",
   "mobile.marketplace.kind.app": "App",
   "mobile.marketplace.kind.skill": "Compétence",
+  "mobile.marketplace.app.slackTagline": "Mentions et messages directs dans Slack",
+  "mobile.marketplace.app.discordTagline": "Mentions et messages directs dans Discord",
+  "mobile.marketplace.app.telegramTagline": "Groupes et discussions privées dans Telegram",
+  "mobile.marketplace.app.whatsappTagline": "Votre propre discussion et les personnes que vous autorisez dans WhatsApp",
+  "mobile.marketplace.app.githubTagline": "Dépôts, tickets et pull requests",
+  "mobile.marketplace.app.onePasswordTagline": "Connectez-vous aux sites avec les identifiants que vous partagez",
+  "mobile.marketplace.app.bitwardenTagline": "Connectez-vous aux sites avec les identifiants d’un dossier partagé",
+  "mobile.marketplace.app.protonPassTagline": "Connectez-vous aux sites avec les identifiants d’un coffre partagé",
   "mobile.marketplace.search.placeholder": "Rechercher dans la Marketplace",
   "mobile.marketplace.search.clear": "Effacer la recherche",
   "mobile.marketplace.search.close": "Fermer la recherche",
@@ -40,6 +48,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, installé",
   "mobile.marketplace.empty": "Aucun résultat. Effacez le filtre ou modifiez la recherche.",
   "mobile.marketplace.loadFailed": "Impossible de charger la Marketplace.",
+  "mobile.marketplace.loadMore": "Charger plus",
   "mobile.marketplace.installFailed": "L’installation n’a pas abouti.",
   "mobile.marketplace.listing.notFound": "Cet élément n’est plus dans la Marketplace.",
   "mobile.marketplace.listing.creator": "Par {name}",
@@ -53,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Connexion",
   "mobile.marketplace.facts.accessLocal": "Cet ordinateur",
   "mobile.marketplace.facts.accessNone": "Sans connexion",
+  "mobile.marketplace.facts.accessMac": "Mac uniquement",
   "mobile.marketplace.permission.admin":
     "Seuls les propriétaires et les administrateurs peuvent installer depuis la Marketplace.",
   "mobile.marketplace.permission.unavailable":
@@ -88,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Aidez-moi à utiliser cette compétence.",
   "mobile.marketplace.app.add": "Ajouter l’app",
+  "mobile.marketplace.app.addCustom": "Ajout personnalisé",
   "mobile.marketplace.app.connect": "Connecter",
   "mobile.marketplace.app.connectTitle": "Connecter {name}",
   "mobile.marketplace.app.keyIntro": "Collez la clé de votre compte. Le serveur la teste avant d’enregistrer l’app.",
@@ -107,6 +118,8 @@ export const messages = {
   "mobile.marketplace.app.docs": "Obtenir une clé",
   "mobile.marketplace.app.local":
     "Cette app s’exécute sur l’ordinateur avec OpenBot. Configurez-la sur cet ordinateur.",
+  "mobile.marketplace.app.needsMac":
+    "Cette app fonctionne uniquement sur un Mac qui exécute OpenBot, et ce serveur n’est pas un Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Cette app demande une connexion dans le navigateur. Mettez à jour OpenBot sur le serveur ou connectez l’app sur l’ordinateur.",
   "mobile.marketplace.app.waiting": "En attente de la page de connexion…",

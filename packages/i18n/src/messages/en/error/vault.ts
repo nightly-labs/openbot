@@ -9,6 +9,8 @@ export const messages = defineMessages("error.vault", {
   "error.vault.valueTooLong": "A value is too long.",
   "error.vault.websiteInvalid": "Enter an HTTPS website address.",
   "error.vault.passwordRequired": "Enter a password.",
+  "error.vault.twoStepKeyInvalid":
+    "This is not a two-step key. Enter the setup key or the otpauth:// link of the site.",
   "error.vault.cardNumberInvalid": "Enter a valid card number.",
   "error.vault.securityCodeInvalid": "Enter a security code of 3 or 4 digits.",
   "error.vault.expiryInvalid": "Enter a valid expiry month and year.",
@@ -18,6 +20,8 @@ export const messages = defineMessages("error.vault", {
   "error.vault.apiKeyNameInvalid":
     "Enter a variable name with capital letters A–Z, digits and _, which starts with a letter, such as OPENAI_API_KEY.",
   "error.vault.apiKeyNameTaken": "The Vault has an API key with this variable name already.",
+  "error.vault.apiKeyAgentTaken": "An agent that you chose has an API key with this variable name already.",
+  "error.vault.agentsRequired": "Choose at least one agent.",
   "error.vault.csvInvalid": "This file is not a password export in CSV format.",
   "error.vault.csvTooLarge": "The CSV file is too large.",
 });

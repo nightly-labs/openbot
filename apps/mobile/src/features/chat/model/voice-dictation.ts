@@ -23,8 +23,40 @@ export function applyDictationResult(
   return { committed: text ? [...transcript.committed, text] : transcript.committed, interim: "" };
 }
 
+/**
+ * On iOS 18 and later, `expo-speech-recognition` reports a result with a speech duration as final, and
+ * Apple's own final result that follows can hold the same text again. A final with no partial result
+ * after the last segment, and the text of that segment or of all segments, is that repeat. New speech
+ * always sends partial results first, so a sentence that the user says twice stays. Only for iOS:
+ * Android can commit a short segment with no partial result.
+ */
+export function isRepeatedFinal(transcript: DictationTranscript, result: { isFinal: boolean; text: string }): boolean {
+  const text = result.text.trim();
+  if (!result.isFinal || !text || transcript.interim || transcript.committed.length === 0) return false;
+  return text === transcript.committed.at(-1) || text === joinSegments(transcript.committed);
+}
+
+/** The scripts that write no space between words, and their full-width punctuation, such as "。". */
+const NO_SPACE_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\u3000-\u303f\uff01-\uff60]/u;
+
+/**
+ * Joins segments with a space, except between two characters of a script that writes none. The
+ * phone's recognizer, Qwen3-ASR and ElevenLabs can each end a Chinese segment at a pause.
+ */
+export function joinSegments(segments: readonly string[]): string {
+  let text = "";
+  for (const segment of segments) {
+    const next = segment.trim();
+    if (!next) continue;
+    const joint = text && !(NO_SPACE_SCRIPT.test(text.at(-1) ?? "") && NO_SPACE_SCRIPT.test(next[0] ?? ""));
+    text = joint ? `${text} ${next}` : `${text}${next}`;
+  }
+  return text;
+}
+
 export function spokenText(transcript: DictationTranscript): string {
-  return [...transcript.committed, transcript.interim].filter(Boolean).join(" ");
+  return joinSegments([...transcript.committed, transcript.interim]);
 }
 
 /** The draft the user sees: what was there before the mic, then the speech. */

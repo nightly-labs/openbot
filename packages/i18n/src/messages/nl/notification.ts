@@ -10,6 +10,8 @@ export const messages = {
   "notification.workflowApproval": "Een stap wacht op je goedkeuring.",
   "notification.workflowOutput": "Een workflow heeft een nieuw resultaat.",
   "notification.failed": "Gestopt met een fout.",
+  "notification.subagentFailed": "Een subagent is gestopt met een fout.",
+  "notification.subagentFailedFor": "Een subagent is gestopt met een fout: {task}",
   "notification.channelTitle": "{agent} in {channel}",
   "notification.channelMessage": "Heeft een bericht gestuurd.",
   "notification.usageLimit.title": "Account van {provider} heeft de limiet bereikt",

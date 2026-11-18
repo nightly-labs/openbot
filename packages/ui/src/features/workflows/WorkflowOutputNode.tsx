@@ -18,12 +18,13 @@ import {
   useStepRun,
   useTextField,
 } from "./workflow-node-parts";
-import { InputRow, PlaceRow, SettingRow, SettingRows } from "./workflow-setting-rows";
+import { InputRow, OutputChannelRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
 import { SLACK_OUTPUT_DEFAULTS, SlackIcon, SlackOutputRows } from "./workflow-slack-parts";
 import { TELEGRAM_OUTPUT_DEFAULTS, TelegramIcon, TelegramOutputRows } from "./workflow-telegram-parts";
 
-type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram" | "slack";
+type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram" | "slack" | "chat-channel";
 
+/** One "Channel" target for both channel targets: its row then chooses an OpenBot channel or a messaging place. */
 const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "channel", label: t("workflow.node.place.channel"), icon: () => <Hash aria-hidden="true" /> },
   { value: "file", label: t("workflow.output.target.file"), icon: () => <FileText aria-hidden="true" /> },
@@ -34,7 +35,16 @@ const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "slack", label: t("workflow.output.target.slack"), icon: () => <SlackIcon /> },
 ];
 
-const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord", "telegram", "slack"];
+const TARGET_TYPES: readonly OutputTarget[] = [
+  "channel",
+  "file",
+  "notify",
+  "github",
+  "discord",
+  "telegram",
+  "slack",
+  "chat-channel",
+];
 
 /** Targets that only an admin's host offers: they act as the host's GitHub App or messaging bot. */
 const HOST_TARGETS: readonly OutputTarget[] = ["github", "discord", "telegram", "slack"];
@@ -71,11 +81,20 @@ export function OutputNode(props: {
     untrack(() => props.target ?? "channel"),
     oneOf(TARGET_TYPES),
   );
+  /** An OpenBot channel or a messaging place: the card shows both as Channel. */
+  const isChannel = () => target() === "channel" || target() === "chat-channel";
   /**
    * A new GitHub, Discord, Telegram or Slack output stores the fields that its rows show, so the host reads the
    * same. Each keeps an `action`, so a change from one to another writes the defaults again.
    */
   const chooseTarget = (value: OutputTarget) => {
+    if (value === "channel" && isChannel()) return;
+    // With no messaging place, Channel goes back to the OpenBot channel of the card, or starts on the first one.
+    const channels = board.catalogs().channels ?? [];
+    const stored = board.field(props.id, "channelId");
+    const channel = channels.some((entry) => entry.id === stored) ? stored : channels[0]?.id;
+    if (value === "channel" && board.catalogs().places.length === 0 && channel !== undefined)
+      return board.setFields(props.id, { target: "chat-channel", channelId: channel });
     const defaults = TARGET_DEFAULTS[value];
     const fromOther = target() !== value && HOST_TARGETS.includes(target());
     if (!defaults || (board.field(props.id, "action") !== undefined && !fromOther)) return setTarget(value);
@@ -85,6 +104,8 @@ export function OutputNode(props: {
   const offered = (value: OutputTarget) => {
     const outputs = board.features()?.outputs;
     if (value === target()) return true;
+    // Channel shows for messaging places and for OpenBot channels.
+    if (value === "channel" && (isChannel() || outputs?.includes("chat-channel"))) return true;
     return HOST_TARGETS.includes(value) ? outputs?.includes(value) === true : (outputs?.includes(value) ?? true);
   };
   const [path, setPath] = useTextField(
@@ -133,20 +154,28 @@ export function OutputNode(props: {
         head={
           <SettingRow
             name={t("workflow.output.sendTo")}
-            value={target()}
+            value={isChannel() ? "channel" : target()}
             choices={TARGETS(t).filter((choice) => offered(choice.value))}
             disabled={locked()}
             onChange={chooseTarget}
           />
         }
       >
-        <Show when={target() === "channel"}>
-          <PlaceRow
+        <Show when={isChannel()}>
+          <OutputChannelRow
             id={props.id}
+            openbot={target() === "chat-channel"}
             connectionId={untrack(() => props.connectionId)}
             placeId={untrack(() => props.placeId)}
             disabled={locked()}
           />
+        </Show>
+        <Show when={target() === "chat-channel"}>
+          <SettingsFoot>
+            <StaticRow name={t("workflow.output.postsAs")}>
+              <span class="wfn-row-text">{t("workflow.output.postsAsNote")}</span>
+            </StaticRow>
+          </SettingsFoot>
         </Show>
         <Show when={target() === "file"}>
           <InputRow name={t("workflow.output.path")} value={path()} disabled={locked()} onChange={setPath} />

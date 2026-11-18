@@ -53,10 +53,12 @@ export interface WhatsNewEntry {
 }
 
 /**
- * A sentence ends at `.`, `!` or `?`, and an optional closing quote, before a space and a capital
- * letter or a quote. The notes use no abbreviations such as "e.g.", so a period ends a sentence.
+ * A sentence ends at `.`, `!`, `?` or `؟`, and an optional closing quote, before a space and a
+ * capital letter, a letter of a script with no capitals (Arabic, Hebrew, Korean), a quote, or the
+ * Spanish `¿` or `¡`. In Chinese and Japanese it ends at `。`, `！` or `？`, with no space after it.
+ * The notes use no abbreviations such as "e.g.", so a period ends a sentence.
  */
-const FIRST_SENTENCE = /^(.+?[.!?]["”]?)\s+(?=[A-Z"“])(.+)$/su;
+const FIRST_SENTENCE = /^(.+?(?:[.!?؟]["“”»]?(?=\s+["“„«¿¡]?[\p{Lu}\p{Lo}])|[。！？][”」』]?(?=\s*\S)))\s*(.+)$/su;
 
 /**
  * The changelog writes what changed in the first sentence and why or how in the next ones. The

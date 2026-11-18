@@ -80,6 +80,7 @@ export type ChatEditAction = "undo" | "redo" | "cut" | "copy" | "paste" | "paste
 
 export type ChatContextMenuItem =
   | { kind: "copy-link" }
+  | { kind: "copy-image" }
   | { kind: "separator" }
   | { kind: "spelling"; suggestion: string }
   | { kind: "edit"; action: ChatEditAction; enabled: boolean };
@@ -88,6 +89,9 @@ export interface ChatContextMenuParams {
   selectionText: string;
   isEditable: boolean;
   linkURL: string;
+  mediaType: string;
+  /** False while the image under the pointer has not loaded, or when it failed. */
+  hasImageContents: boolean;
   misspelledWord: string;
   dictionarySuggestions: string[];
   editFlags: {
@@ -106,8 +110,8 @@ export interface ChatContextMenuParams {
 /**
  * The native items a right-click offers in chat. An editable field gets spelling suggestions and
  * the full edit menu, each entry enabled from the field's edit state. Selected text elsewhere gets
- * copy and select-all, and a link gets a copy-link entry first. Anywhere else keeps no menu, so the
- * window does not pop a menu with nothing useful in it.
+ * copy and select-all, a link gets a copy-link entry first, and a loaded image gets a copy-image
+ * entry. Anywhere else keeps no menu, so the window does not pop a menu with nothing useful in it.
  */
 export function chatContextMenuItems(params: ChatContextMenuParams): ChatContextMenuItem[] {
   const items: ChatContextMenuItem[] = [];
@@ -116,6 +120,7 @@ export function chatContextMenuItems(params: ChatContextMenuParams): ChatContext
   };
   const edit = (action: ChatEditAction, enabled: boolean) => items.push({ kind: "edit", action, enabled });
   if (params.linkURL) items.push({ kind: "copy-link" });
+  if (params.mediaType === "image" && params.hasImageContents) items.push({ kind: "copy-image" });
   const flags = params.editFlags;
   if (params.isEditable) {
     if (params.misspelledWord && params.dictionarySuggestions.length > 0) {

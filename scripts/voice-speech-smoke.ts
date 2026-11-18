@@ -14,15 +14,23 @@ import { fork } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { SpeechAudio, SpeechLanguage, SpeechVoice } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_SPEECH_SETTINGS,
+  type SpeechAudio,
+  type SpeechLanguage,
+  type SpeechVoice,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { SpeechPreferenceStore } from "../src/main/speech-preference-store";
+import { VoiceApiKeyStore } from "../src/main/voice-api-key-store";
 import { SUPERTONIC_MODEL_DIRECTORY } from "../src/main/voice-model-service";
 import type { VoiceSpeechHostProcess, VoiceSpeechResponse } from "../src/main/voice-speech-protocol";
 import { VoiceSpeechService } from "../src/main/voice-speech-service";
 
 const RESOURCES_ROOT = resolve(".openbot-build/voice");
+/** The smoke saves no key. */
+const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
 const OUTPUT = resolve(".openbot-build/voice-speech-smoke");
 const HOST = resolve("src/main/voice-speech-host.ts");
 const ELECTRON = resolve("node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
@@ -125,6 +133,11 @@ async function main(): Promise<void> {
     modelDirectory: join(RESOURCES_ROOT, SUPERTONIC_MODEL_DIRECTORY),
     preferences,
     spawnHost,
+    // The smoke reads with Supertonic only, so no key is saved.
+    apiKeys: {
+      elevenlabs: new VoiceApiKeyStore({ path: join(preferencesDirectory, "elevenlabs-key.json"), cipher: NO_CIPHER }),
+      xai: new VoiceApiKeyStore({ path: join(preferencesDirectory, "xai-key.json"), cipher: NO_CIPHER }),
+    },
   });
   const results: unknown[] = [];
   try {
@@ -133,7 +146,16 @@ async function main(): Promise<void> {
     if (status.phase !== "ready") throw new Error(`The model is not ready: ${status.phase} ${status.message ?? ""}`);
     const downloadMs = Date.now() - downloadStartedAt;
     for (const sample of SAMPLES) {
-      await Effect.runPromise(speech.setSettings({ readReplies: true, voice: sample.voice, speed: 1 }));
+      await Effect.runPromise(
+        speech.setSettings({
+          ...DEFAULT_SPEECH_SETTINGS,
+          readReplies: true,
+          voice: sample.voice,
+          speed: 1,
+          codexLive: false,
+          codexLiveVoice: null,
+        }),
+      );
       const startedAt = Date.now();
       const audio = await Effect.runPromise(speech.speak({ text: sample.text, language: sample.language }));
       const synthesisMs = Date.now() - startedAt;

@@ -1,0 +1,36 @@
+{
+  "slug": "heyreach",
+  "name": "HeyReach",
+  "tagline": "LinkedIn outreach campaigns",
+  "description": "HeyReach lets agents read LinkedIn outreach campaigns, lead lists, and conversations in the signed-in HeyReach workspace. Each user signs in to their own HeyReach account through the browser.",
+  "category": "automation",
+  "creatorName": "HeyReach",
+  "iconUrl": "https://cdn.prod.website-files.com/6a295ff72cf042cd2bb5d03a/6a2961149bef90a92f912aea_HQ-Favicon-1000x1000.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaign-stats", "text": "How are my active campaigns doing on acceptance and reply rates?" },
+    { "id": "prompt-replies", "text": "List the leads who replied this week and what they said." },
+    {
+      "id": "prompt-draft-message",
+      "text": "Draft a short LinkedIn follow-up for a lead who accepted but did not reply."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-heyreach-mcp",
+      "name": "HeyReach",
+      "description": "Campaign, lead list, and conversation access, over HeyReach's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6a295ff72cf042cd2bb5d03a/6a2961149bef90a92f912aea_HQ-Favicon-1000x1000.png",
+      "server": {
+        "name": "heyreach",
+        "transport": "http",
+        "url": "https://mcp.heyreach.io/mcp",
+        "auth": [{ "id": "heyreach-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.heyreach.io",
+  "privacyPolicyUrl": "https://www.heyreach.io/privacy-policy",
+  "termsUrl": "https://www.heyreach.io/terms-of-service",
+  "skills": []
+}

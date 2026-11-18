@@ -1,0 +1,33 @@
+{
+  "slug": "browserless",
+  "name": "Browserless",
+  "tagline": "Cloud browsers for agents",
+  "description": "Browserless lets agents open pages in a hosted browser, read their content, take screenshots, and make PDFs, also on sites that need JavaScript. Each user signs in to their own Browserless account through the browser.",
+  "category": "automation",
+  "creatorName": "Browserless",
+  "iconUrl": "https://avatars.githubusercontent.com/u/51244358?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-read-page", "text": "Open this page in a browser and give me its main text." },
+    { "id": "prompt-screenshot", "text": "Take a full-page screenshot of our pricing page." },
+    { "id": "prompt-pdf", "text": "Make a PDF of this article." }
+  ],
+  "apps": [
+    {
+      "id": "app-browserless-mcp",
+      "name": "Browserless",
+      "description": "Hosted browser sessions, page content, screenshots, and PDFs, over Browserless' MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/51244358?s=256&v=4",
+      "server": {
+        "name": "browserless",
+        "transport": "http",
+        "url": "https://mcp.browserless.io/mcp",
+        "auth": [{ "id": "browserless-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.browserless.io",
+  "privacyPolicyUrl": "https://www.browserless.io/privacy-policy",
+  "termsUrl": "https://www.browserless.io/terms-of-service",
+  "skills": []
+}

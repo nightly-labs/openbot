@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Tokens",
   "usage.column.date": "Fecha",
   "usage.column.costUsd": "Coste · USD",
+  "usage.column.loads": "Cargas",
+  "usage.column.agents": "Agentes",
   "usage.empty": "No se registró uso en este período.",
   "usage.partial":
     "Datos parciales · {turns} turnos sin datos de uso; {unpriced} registros sin estimación de coste; {incomplete} registros con datos de tokens incompletos.",
@@ -52,9 +54,12 @@ export const messages = {
   "usage.breakdown.model": "Modelo",
   "usage.breakdown.agent": "Agente",
   "usage.breakdown.day": "Día",
+  "usage.breakdown.skill": "Habilidad",
   "usage.breakdown.byModel": "Uso por modelo",
   "usage.breakdown.byAgent": "Uso por agente",
   "usage.breakdown.byDay": "Uso y coste diarios",
+  "usage.breakdown.bySkill": "Uso por habilidad",
+  "usage.breakdown.skillEmpty": "No se cargó ninguna habilidad en este periodo.",
   "usage.unknownModel": "Modelo desconocido",
   "usage.footer": "Recopilación iniciada {started} · Actualizado {updated}",
   "usage.updatedNever": "nunca",
@@ -74,4 +79,6 @@ export const messages = {
   "usage.panel.loading": "Cargando datos de uso…",
   "usage.panel.unsupported": "Este host no admite estadísticas de agentes. Actualiza el host para usar esta vista.",
   "usage.panel.loadFailed": "No se pudieron cargar los datos de uso. Comprueba la conexión y el intervalo de fechas.",
+  "usage.machine.label": "Uso de la máquina. CPU: {cpu}, memoria: {memory}",
+  "usage.machine.openStorage": "Abrir Almacenamiento. Disco: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

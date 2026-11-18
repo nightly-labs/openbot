@@ -1,9 +1,14 @@
 // @vitest-environment node
 
-import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "@openbot/contracts/ipc";
+import {
+  BROWSER_DOCK_OVERLAY_WIDTH,
+  type BrowserDockAction,
+  type BrowserDockFrame,
+  type BrowserDockPresentation,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BROWSER_DOCK_OVERLAY_WIDTH, browserDockLayout } from "../browser-dock-overlay";
+import { browserDockLayout } from "../browser-dock-overlay";
 import { browserDockIpcHandlers } from "./browser-dock-handlers";
 
 // Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
@@ -137,6 +142,16 @@ describe("browser dock handlers", () => {
     expect(frames).toEqual([]);
   });
 
+  it("takes the width of the dock, and refuses a missing, negative or too large width", () => {
+    const { frames, call } = register();
+    const anchored = { ...FRAME, anchor: { width: 180 } };
+    expect(() => call("setFrame", OVERLAY_ID, { ...FRAME, anchor: {} })).toThrow("frame is invalid");
+    expect(() => call("setFrame", OVERLAY_ID, { ...FRAME, anchor: { width: -1 } })).toThrow("frame is invalid");
+    expect(() => call("setFrame", OVERLAY_ID, { ...FRAME, anchor: { width: 16_385 } })).toThrow("frame is invalid");
+    call("setFrame", OVERLAY_ID, anchored);
+    expect(frames).toEqual([anchored]);
+  });
+
   it("rejects a renderer outside the app", () => {
     const { published } = register();
     const listener = registrations.get("browserDock:publishPresentation");
@@ -148,13 +163,34 @@ describe("browser dock handlers", () => {
 describe("browser dock layout", () => {
   const page = { tabId: "tab-1", bounds: { x: 100, y: 50, width: 1000, height: 800 }, zoomFactor: 1 };
 
-  it("puts the overlay at the bottom centre of the page", () => {
+  it("puts the overlay at the bottom centre of the page until the dock reports its width", () => {
     expect(browserDockLayout(page, 200, []).overlay).toEqual({
       x: 100 + (1000 - BROWSER_DOCK_OVERLAY_WIDTH) / 2,
       y: 650,
       width: BROWSER_DOCK_OVERLAY_WIDTH,
       height: 200,
     });
+  });
+
+  it("puts the overlay at the bottom centre, with the width that the dock reports", () => {
+    expect(browserDockLayout(page, 200, [], { width: 300 }).overlay).toEqual({
+      x: 450,
+      y: 650,
+      width: 300,
+      height: 200,
+    });
+  });
+
+  it("keeps the glass of the dock at its distance from the centre in a narrower page", () => {
+    const narrow = { ...page, bounds: { x: 0, y: 0, width: 400, height: 300 } };
+    const layout = browserDockLayout(
+      narrow,
+      100,
+      [{ left: 270, bottom: 0, width: 60, height: 40, radius: 8, blur: 16 }],
+      { width: 600 },
+    );
+    expect(layout.overlay).toEqual({ x: 0, y: 200, width: 400, height: 100 });
+    expect(layout.glass).toEqual([{ bounds: { x: 170, y: 260, width: 60, height: 40 }, radius: 8, blur: 16 }]);
   });
 
   it("keeps the overlay inside a small page", () => {

@@ -12,6 +12,7 @@ export {
   resolveLocale,
   TRANSLATED_LOCALES,
   type TranslatedLocale,
+  withHourCycle,
 } from "./locale";
 export { loadLocale, localeLoaded } from "./locale-loading";
 export {

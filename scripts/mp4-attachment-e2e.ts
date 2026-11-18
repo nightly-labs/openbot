@@ -96,7 +96,7 @@ async function run() {
     assert.equal(isOpenableAttachmentName("render.mp4"), true);
     assert.doesNotThrow(() => assertSupportedAttachmentName("render.mp4"));
     // A remote host with media-attachments but without mp4-attachments does not get MP4 files.
-    const oldHost = { eml: true, media: true, zip: true, mp4: false, svg: true };
+    const oldHost = { eml: true, media: true, zip: true, mp4: false, svg: true, anyFile: false };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("mp4"), false);
     assert.equal(supportedAttachmentExtensions(oldHost).includes("mov"), true);
     assert.equal(isSupportedAttachmentNameFor("clip.mp4", oldHost), false);

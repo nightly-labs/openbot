@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Oluşturuluyor…",
   "mobile.onboarding.task.withoutTask": "Görev olmadan oluştur",
   "mobile.onboarding.task.failed": "Ajan oluşturulamadı. Tekrar deneyin.",
+  "mobile.onboarding.task.sendFailed": "İlk göreviniz gönderilmedi. Sohbette gönderin.",
   "mobile.onboarding.idea.builder1": "Küçük bir yapılacaklar listesi web uygulaması yapın.",
   "mobile.onboarding.idea.builder2": "Git dallarının nasıl çalıştığını örneklerle açıklayın.",
   "mobile.onboarding.idea.builder3": "Fotoğraflarımı tarihe göre sıralayan bir betik yazın.",

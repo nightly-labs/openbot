@@ -1,14 +1,19 @@
 import { type MobilePlatformLogoVariant, PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
+import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
+import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
+import { useLandingText } from "./LandingText";
 
 interface DownloadCardContentProps {
   action?: string;
+  /** Links of the card's own, in place of `action`, for a card that is not one link. */
+  actions?: JSX.Element;
   description: string;
   platform: PlatformLogoVariant | MobilePlatformLogoVariant;
   status: string;
@@ -25,11 +30,18 @@ function DownloadCardContent(props: DownloadCardContentProps) {
       <div class="landing-download-card-copy">
         <h3>{props.title}</h3>
         <p>{props.description}</p>
-        <Show when={props.action}>
-          <span class="landing-download-action">
-            {props.action}
-            <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
-          </span>
+        <Show
+          when={props.actions}
+          fallback={
+            <Show when={props.action}>
+              <span class="landing-download-action">
+                {props.action}
+                <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+              </span>
+            </Show>
+          }
+        >
+          {(actions) => <div class="landing-download-actions">{actions()}</div>}
         </Show>
       </div>
     </>
@@ -40,6 +52,8 @@ export function DownloadSection() {
   let sectionRef: HTMLElement | undefined;
   const revealed = createLandingReveal(() => sectionRef);
   const revealState = () => (revealed() ? "true" : "false");
+  const landing = useLandingText();
+  const text = () => landing().download;
   const macos = DOWNLOAD_PLATFORMS.macos;
   const windows = DOWNLOAD_PLATFORMS.windows;
   const linux = DOWNLOAD_PLATFORMS.linux;
@@ -48,29 +62,41 @@ export function DownloadSection() {
     <section ref={sectionRef} id="download" class="landing-download" aria-labelledby="download-title">
       <div class="landing-download-inner">
         <header class="landing-download-heading" data-revealed={revealState()}>
-          <h2 id="download-title">Download OpenBot</h2>
-          <p>
-            Choose your platform. Run Codex, Claude, Gemini, Grok, OpenCode, Muse Code, Pi or your own model from one
-            desktop app, and talk to your agents from your phone.
-          </p>
+          <h2 id="download-title">{text().title}</h2>
+          <p>{text().description}</p>
         </header>
 
         <div class="landing-download-grid">
-          <a
+          {/* The Apple silicon installer does not open on an Intel Mac, and a browser cannot reliably
+              tell the two apart. So the card also has the Intel installer, as the Android card has the APK. */}
+          <div
             class="landing-download-card"
-            href={macos.href}
             data-download-platform="macos"
             data-state="available"
             data-revealed={revealState()}
           >
             <DownloadCardContent
               platform="macos"
-              status={macos.status}
+              status={text().available}
               title={macos.label}
               description={macos.description}
-              action={macos.action}
+              actions={
+                <>
+                  <a class="landing-download-action landing-download-card-link" href={macos.href}>
+                    {text().desktop.macos}
+                    <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+                  </a>
+                  <a
+                    class="landing-download-action landing-download-action-alternate"
+                    href={OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos}
+                  >
+                    {text().intelMac}
+                    <LandingIcon name="download" class="landing-download-action-icon" />
+                  </a>
+                </>
+              }
             />
-          </a>
+          </div>
 
           <a
             class="landing-download-card"
@@ -81,10 +107,10 @@ export function DownloadSection() {
           >
             <DownloadCardContent
               platform="windows"
-              status={windows.status}
+              status={text().available}
               title={windows.label}
               description={windows.description}
-              action={windows.action}
+              action={text().desktop.windows}
             />
           </a>
 
@@ -99,10 +125,10 @@ export function DownloadSection() {
           >
             <DownloadCardContent
               platform="linux"
-              status={linux.status}
+              status={text().available}
               title={linux.label}
               description={linux.description}
-              action={linux.action}
+              action={text().desktop.linux}
             />
           </a>
         </div>
@@ -111,6 +137,44 @@ export function DownloadSection() {
           <For each={MOBILE_APP_ORDER}>
             {(platform) => {
               const app = MOBILE_APPS[platform];
+              // Android has two downloads while a version has an APK. A link cannot contain a link,
+              // so the card is a box: the Google Play link covers it, and the APK link is on top.
+              if (platform === "android" && ANDROID_APK_AVAILABLE)
+                return (
+                  <div
+                    class="landing-download-card"
+                    data-download-platform={platform}
+                    data-state="available"
+                    data-revealed={revealState()}
+                  >
+                    <DownloadCardContent
+                      platform={platform}
+                      status={text().available}
+                      title={app.label}
+                      description={text().phone[platform].description}
+                      actions={
+                        <>
+                          <a
+                            class="landing-download-action landing-download-card-link"
+                            href={app.href}
+                            target="_blank"
+                            rel={EXTERNAL_LINK_REL}
+                          >
+                            {text().phone[platform].action}
+                            <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+                          </a>
+                          <a
+                            class="landing-download-action landing-download-action-alternate"
+                            href={OPENBOT_ANDROID_APK_LINK}
+                          >
+                            {text().apk}
+                            <LandingIcon name="download" class="landing-download-action-icon" />
+                          </a>
+                        </>
+                      }
+                    />
+                  </div>
+                );
               return (
                 <a
                   class="landing-download-card"
@@ -123,10 +187,10 @@ export function DownloadSection() {
                 >
                   <DownloadCardContent
                     platform={platform}
-                    status={app.status}
+                    status={text().available}
                     title={app.label}
-                    description={app.description}
-                    action={app.action}
+                    description={text().phone[platform].description}
+                    action={text().phone[platform].action}
                   />
                 </a>
               );
@@ -138,7 +202,7 @@ export function DownloadSection() {
             links. They are also how a crawler finds those pages from the home page. The phone apps
             are a separate group after a rule, as their cards are a separate row. */}
         <p class="landing-download-pages">
-          System requirements and install steps:
+          {text().pages}
           <For each={DOWNLOAD_PLATFORM_ORDER}>
             {(platform) => (
               <Link to="/download/$platform" params={{ platform }}>

@@ -1,5 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   ConversationLoadNotice,
   ServerConnectionNotice,
@@ -9,6 +10,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
+import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useChannels } from "./features/channels/channels-context";
@@ -19,12 +21,14 @@ import { useDirectMessages } from "./features/conversation/direct-messages-conte
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agent-usage-polling";
+import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
+import { serverCanAdminister } from "./features/servers/server-capabilities";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
@@ -33,8 +37,9 @@ import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
-import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
+import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -96,6 +101,9 @@ export function WorkspaceShell(props: {
     refreshServers,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
+  const agentDockPlacement = useAgentDockPlacement();
+  /* The dock in the window keeps a column at the right edge, so it does not cover the panes. */
+  const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
   const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
@@ -142,14 +150,32 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
-  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
-  const tasksAgentsHidden = () =>
-    middlePane() === "tasks" &&
-    !windowPage.tasksAgentsOpen() &&
-    scope.loaded() &&
-    !scope.connection.panelsFailed &&
-    !blockedRemoteServer();
-
+  /** The Library follows a server switch too. An older joined server has no storage routes and no Library button. */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "library") return false;
+      return !!server?.compatibility?.hostAppVersion && !serverHasStorage(server);
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
+  /**
+   * The CRM follows a server switch too. A member, or an older joined server, has no CRM button, and
+   * the page closes when an owner or admin turns the CRM off on any device.
+   */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "crm") return false;
+      if (usage.crmEnabled() === false) return true;
+      return !!server?.compatibility?.hostAppVersion && !serverCanAdminister(server, CRM_CAPABILITY);
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
@@ -182,6 +208,16 @@ export function WorkspaceShell(props: {
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };
+  // A remote connection can read online while the host does not answer it. Each read then failed after
+  // the same wait (#5912). The check replaces the connection only when the host does not answer.
+  const checkRemoteConnection = () => {
+    const server = activeServer();
+    if (server?.kind === "remote" && server.state === "online") void retryServerConnection(server.id);
+  };
+  const retryConversationLoad = () => {
+    checkRemoteConnection();
+    retryConversation();
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -189,8 +225,10 @@ export function WorkspaceShell(props: {
       return;
     }
     if (!server) return;
-    if (server.state === "online") scope.retry();
-    else void retryServerConnection(server.id);
+    if (server.state === "online") {
+      checkRemoteConnection();
+      scope.retry();
+    } else void retryServerConnection(server.id);
   };
   // The main window shows the toasts and prompts of the servers once.
   if (!chatWindow)
@@ -236,7 +274,8 @@ export function WorkspaceShell(props: {
   // not stutter, and mounts while the screen fades.
   const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());
   createEffect(
-    () => fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
+    // The landing demo loads its mock data at once, so it shows no loading screen.
+    () => !platform.landingPreview && fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
     (show) => {
       if (!show) return;
       setCoverOpen(false);
@@ -279,6 +318,19 @@ export function WorkspaceShell(props: {
     />
   );
 
+  // A server that this window saw with no agents stays in its first run after the owner leaves it.
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.kind === "remote" && agentListSettled()
+        ? { id: server.id, empty: agentList().length === 0 }
+        : null;
+    },
+    (seen) => {
+      if (seen) noteServerAgents(seen.id, seen.empty);
+    },
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -289,6 +341,10 @@ export function WorkspaceShell(props: {
               online: server.id === activeServer()?.id ? scope.loaded() : server.state === "online",
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
+              // Until the agents load, the open server could be new; a notice that waits shows after them.
+              ...(server.id === activeServer()?.id
+                ? { firstRun: !agentListSettled() || agentList().length === 0 }
+                : {}),
             },
           ]
         : [],
@@ -302,11 +358,12 @@ export function WorkspaceShell(props: {
   return (
     // The overlays and the chat cards show the same connectors.
     <ConnectorsProvider>
+      <WindowBackdrop />
       {/* The page rail sits at the left of the frame. The frame is the card of the page that the rail selects. */}
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame
-          class={chatWindow ? "app-frame-chat-window" : undefined}
+          class={chatWindow ? "app-frame-chat-window" : windowAgentDock() ? "app-frame-agent-dock" : undefined}
           compact={layout.leftPanelCompact()}
           initialLoading={!serversLoaded() || !scope.connection.synced}
           connection={
@@ -317,11 +374,17 @@ export function WorkspaceShell(props: {
                   name={activeAgent()?.name ?? ""}
                   loading={!activeConversation()?.loaded && activeConversation()?.loading === true}
                   error={activeConversation()?.loadError ?? null}
-                  onRetry={retryConversation}
+                  onRetry={retryConversationLoad}
                 />
               </Show>
               <Show when={scope.loaded() && scope.connection.panelsFailed}>
-                <ServerPanelLoadNotice busy={scope.connection.panelsLoading} onRetry={() => void scope.retryPanels()} />
+                <ServerPanelLoadNotice
+                  busy={scope.connection.panelsLoading}
+                  onRetry={() => {
+                    checkRemoteConnection();
+                    void scope.retryPanels();
+                  }}
+                />
               </Show>
             </>
           }
@@ -329,7 +392,6 @@ export function WorkspaceShell(props: {
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
           windowPage={windowPage.page()}
-          sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
@@ -342,6 +404,7 @@ export function WorkspaceShell(props: {
               <WorkspaceOverlays account={props.account} />
               <Show when={!chatWindow}>
                 <ServerUpdateDialogHost hosts={remoteHosts()} />
+                <AgentDockHost />
               </Show>
             </>
           }
@@ -352,8 +415,6 @@ export function WorkspaceShell(props: {
                 serverId={serverId()}
                 hostName={servers().find((server) => server.id === serverId())?.name ?? t("app.page.serverFallback")}
                 onBack={usage.closeUsage}
-                agentsOpen={!tasksAgentsHidden()}
-                onToggleAgents={() => windowPage.setTasksAgentsOpen(tasksAgentsHidden())}
               />
             )}
           </Show>

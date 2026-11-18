@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { AvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { SettingsRow } from "@/features/settings/components/settings-content";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -22,6 +23,8 @@ export function ListingIcon({ listing, size = 44 }: { listing: MarketplaceListin
   const [failed, setFailed] = useState(false);
   const [surface, muted] = useThemeColor(["surface-secondary", "muted"]);
   const radius = listing.kind === "agent" ? size / 2 : Math.round(size * 0.23);
+  if (listing.kind === "app" && listing.source === "connector")
+    return <ConnectorLogo id={listing.connector} size={size} />;
   if (listing.imageUrl && !failed)
     return (
       <Image

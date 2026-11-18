@@ -301,7 +301,15 @@ const sunshineTestSchema = Schema.Struct({
   code: Schema.String.check(Schema.isPattern(/^(?:[0-9]{4})?$/u)),
 });
 const sunshineDisplaysSchema = Schema.Struct({
-  displays: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString, name: Schema.NonEmptyString })),
+  displays: Schema.Array(
+    Schema.Struct({
+      id: Schema.NonEmptyString,
+      name: Schema.NonEmptyString,
+      // A Windows host also reports where the display starts, in physical pixels.
+      x: Schema.optionalKey(Schema.Int),
+      y: Schema.optionalKey(Schema.Int),
+    }),
+  ),
 });
 const sunshinePairingsSchema = Schema.Struct({
   pairings: Schema.Array(
@@ -338,6 +346,8 @@ interface SunshineMoonlightRuntimeOptions {
   platform: "darwin" | "win32" | "linux";
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
+  /** Where a display from `getDisplays` starts, in physical pixels. Only a Windows host supplies it. */
+  getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError>;
   spawnProcess?: RemoteRuntimeSpawn;
   onDiagnostic?: ((source: "sunshine" | "moonlight", message: string) => void) | undefined;
@@ -738,9 +748,12 @@ export class SunshineMoonlightRuntime {
       this.#options.stateDirectory,
       this.#options.platform === "win32" ? "openbot-ice-helper.cmd" : "openbot-ice-helper.sh",
     );
+    // Moonlight reads a JSON list of ICE servers from the helper's output. Both helpers copy the
+    // endpoint's body unchanged: Windows PowerShell 5.1 `ConvertTo-Json` writes a list again as an
+    // object, and Moonlight then has no ICE servers.
     const contents =
       this.#options.platform === "win32"
-        ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
+        ? "@powershell.exe -NoProfile -NonInteractive -Command \"(Invoke-WebRequest -UseBasicParsing -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL).Content\"\r\n"
         : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
     yield* desktopCall(() => writeFile(path, contents, { mode: 0o700 }));
     if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o700));
@@ -939,8 +952,16 @@ export class SunshineMoonlightRuntime {
     // Sunshine also lists outputs that have no monitor: an X server with a dummy driver has 16, and
     // only one is connected. Electron lists only connected monitors, so an output with no match is
     // not a screen to show, and its size is unknown.
+    // Windows ids are device ids that Electron does not know, and the two lists can have a different
+    // order, so a Windows display is found by where it starts.
     const displays = native.displays.flatMap((display, index) => {
-      const metadata = local.find((candidate) => candidate.id === display.id) ?? local[index];
+      const metadata =
+        local.find((candidate) => candidate.id === display.id) ??
+        local.find((candidate) => {
+          const origin = this.#options.getDisplayScreenOrigin?.(candidate.id);
+          return origin !== undefined && origin.x === display.x && origin.y === display.y;
+        }) ??
+        local[index];
       if (!metadata) return [];
       return [
         {
@@ -1119,6 +1140,11 @@ export class SunshineMoonlightRuntime {
   // After a start, nothing waits on these processes. One that exits on its own would leave a runtime
   // that still reports itself started, and every new session would wait for a stream that never comes.
   #watchExit(child: ChildProcess, source: "sunshine" | "moonlight"): void {
+    // A file that is not there gives `error` and no `exit`. With no listener, Node throws it as an
+    // uncaught exception. The child then counts as ended, so the readiness wait of the start fails.
+    child.on("error", (error) => {
+      this.#options.onDiagnostic?.(source, `OpenBot: ${source} had a process error (${error.message}).\n`);
+    });
     child.once("exit", (code, signal) => {
       // A stop clears the field before it waits. A start in progress fails its own readiness wait.
       if ((source === "sunshine" ? this.#sunshine : this.#moonlight) !== child || !this.#state) return;

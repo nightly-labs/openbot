@@ -13,6 +13,7 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import type { MarketplaceListing } from "../model/marketplace-listings";
 import { ListingGradient } from "./listing-gradient";
@@ -194,7 +195,7 @@ export function HeroRequest({
               className="h-10 w-10 items-center justify-center rounded-full"
               style={{ backgroundColor: "rgba(255, 255, 255, 0.14)" }}
             >
-              <ArrowRight color="#ffffff" size={20} strokeWidth={2.2} />
+              <ArrowRight color="#ffffff" size={20} strokeWidth={2.2} style={MIRROR_IN_RTL} />
             </View>
           </TryPressable>
         ) : null}

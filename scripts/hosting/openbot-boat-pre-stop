@@ -5,8 +5,9 @@
 # most 60 seconds), and then saves the disk. boat supports this hook, but its documentation does not
 # show it yet. The save copies files while they change, and a file that changed during the copy is
 # restored torn. A database that OpenBot wrote during the save was restored damaged. When OpenBot is
-# stopped first, the save sees no writes. A stop that boat does not complete leaves OpenBot stopped
-# until the next boot.
+# stopped first, the save sees no writes. boat can cancel the stop after this hook, for example when
+# it cannot pause a Docker container that restarts. The machine then runs on with OpenBot stopped, so a
+# timer starts OpenBot again (below).
 set -u
 
 # The flag stops the starts until boat saves the disk: the Restart= of the unit, and the start at the
@@ -14,6 +15,15 @@ set -u
 # stopped machine in memory and continue it with no boot; then the account server removes the flag
 # and starts OpenBot (HELD_RESUME_START_COMMAND in apps/auth-api).
 sudo -n touch /run/openbot-pre-stop || exit 1
+# The timer starts OpenBot 15 minutes after the last hook when the flag is still there. boat runs this
+# hook again before each new try of the stop, which touches the flag and sets a new timer. The start
+# skips a flag that is 5 minutes old or less, so it does not start OpenBot while boat saves the disk. A
+# machine that stopped runs no timer. A held machine that the account server started has no flag, so the
+# timer does nothing. The command has no `$`: systemd would replace it.
+sudo -n systemctl stop openbot-pre-stop-restart.timer 2>/dev/null
+sudo -n systemd-run --quiet --collect --unit=openbot-pre-stop-restart --on-active=15min /bin/sh -c \
+  'if find /run/openbot-pre-stop -mmin +5 2>/dev/null | grep -q .; then rm -f /run/openbot-pre-stop && systemctl start --no-block openbot.service; fi' ||
+  echo "The start after a cancelled stop is not set." >&2
 # The unit stops OpenBot with SIGTERM, and OpenBot closes its database last. OpenBot exits after 30
 # seconds by itself. The 60 seconds of TimeoutStopSec are too long for the limit of boat. A killed
 # OpenBot leaves a database that SQLite recovers, because no copy runs while it ends.

@@ -1,10 +1,26 @@
-import type { BrowserPreview, BrowserTakeoverRequest, LocalBrowserSecretResponse } from "@openbot/contracts/ipc";
+import type {
+  BrowserPreview,
+  BrowserTakeoverRequest,
+  BrowserVaultSkipReason,
+  LocalBrowserSecretResponse,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, Checkbox, ErrorReference, Input, Lock, Maximize2, Monitor, ShieldCheck, X } from "@openbot/ui";
 import { OtpInput } from "@openbot/ui/features/account/OtpInput";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
+
+/** Why a saved login that fits the site was not filled, as the user reads it. */
+const VAULT_SKIP_TEXT = {
+  "agent-script": "browser.secret.vaultSkip.agentScript",
+  "field-kind": "browser.secret.vaultSkip.fieldKind",
+  "login-choice": "browser.secret.vaultSkip.loginChoice",
+  "no-secret": "browser.secret.vaultSkip.noPassword",
+  "vault-unreadable": "browser.secret.vaultSkip.vaultUnreadable",
+} as const satisfies Record<BrowserVaultSkipReason, AppTextKey>;
 
 /**
  * The Vault that a typed password can go to. `server` is null for this computer, or the name of the
@@ -18,11 +34,13 @@ export interface BrowserSecretVault {
 
 /**
  * The code or the password that the agent asks for: the site at the top, the value in the middle and Submit
- * at the end. Cancel is the X. The `card` variant is the timeline card and shows the sign-in page under the
- * value; the `island` variant is the glass card over the browser page. The value goes only to the agent, and
+ * at the end. The `card` variant is a block in the timeline, with Cancel in its footer, and shows the
+ * sign-in page under the value; the `island` variant is the glass card over the browser page, where
+ * Cancel is the X. The value goes only to the agent, and
  * the card clears it after each answer. With `vault`, a password can also go to the Vault of the server
  * that runs the agent. The box starts checked for this computer and unchecked for a joined server; a
- * server that cannot save shows the box off, with the reason.
+ * server that cannot save shows the box off, with the reason. When a saved login fits the site but was
+ * not filled, a line above the value says why.
  */
 export function BrowserSecretCard(props: {
   request: BrowserTakeoverRequest;
@@ -35,6 +53,7 @@ export function BrowserSecretCard(props: {
 }) {
   const { t } = useText();
   const saveId = `browser-secret-save-${createUniqueId()}`;
+  const formId = createUniqueId();
   const [saveChoice, setSaveChoice] = createSignal<boolean | null>(null);
   const saveBlocked = () => Boolean(props.vault?.blocked);
   const saveToVault = () => !saveBlocked() && (saveChoice() ?? props.vault?.server === null);
@@ -77,6 +96,15 @@ export function BrowserSecretCard(props: {
     if (vault.blocked === "version") return t("browser.secret.saveBlockedVersion", { server: vault.server });
     return t("browser.secret.saveHintRemote", { server: vault.server });
   };
+  const vaultSkipText = () => {
+    const reason = props.request.vaultSkip;
+    if (!reason) return null;
+    if (reason === "no-secret" && !password()) return t("browser.secret.vaultSkip.noAuthenticatorKey");
+    return t(VAULT_SKIP_TEXT[reason]);
+  };
+  const vaultSkipNote = () => (
+    <Show when={vaultSkipText()}>{(text) => <p class="browser-secret-vault-skip">{text()}</p>}</Show>
+  );
   const valid = () => (password() ? value().length > 0 : value().length === digits());
   onCleanup(() => setValue(""));
   createEffect(
@@ -130,162 +158,229 @@ export function BrowserSecretCard(props: {
     }
   };
   const previewPage = () => ({ title: t("browser.secret.signInPage"), host: props.request.secret?.origin ?? "" });
-  return (
-    <form
-      class={["browser-secret-card", { "conversation-interaction-card": variant() === "card" }]}
-      data-variant={variant()}
-      aria-label={t("browser.secret.label")}
-      aria-busy={pending() ? "true" : "false"}
-      onSubmit={(event) => {
-        event.preventDefault();
-        void respond("submit");
-      }}
-    >
-      <header class="browser-secret-header">
-        <span class="browser-secret-icon" aria-hidden="true">
-          <Lock class="browser-secret-glyph" />
-        </span>
-        <div class="browser-secret-heading">
-          <h2>{title()}</h2>
-          <p>
-            {submitOnce().before}
-            <strong class="browser-secret-origin">{props.request.secret?.origin}</strong>
-            {submitOnce().after}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          type="button"
-          class="browser-secret-close"
-          aria-label={t("common.cancel")}
-          disabled={pending()}
-          onClick={() => void respond("cancel")}
-        >
-          <X aria-hidden="true" />
-        </Button>
-      </header>
-      <Show
-        when={password()}
-        fallback={
-          <div class="browser-secret-code">
-            <OtpInput
-              value={value()}
-              length={digits()}
-              numeric
-              masked
-              size="compact"
-              label={t("browser.secret.codeLength", { digits: digits() })}
-              status={error() ? "error" : pending() ? "verifying" : "idle"}
-              errorMessage={error()}
-              onChange={(next) => {
-                setValue(next);
-                setError("");
-              }}
-            />
-            <ErrorReference reference={shownCode()} />
-          </div>
-        }
-      >
-        <div class="browser-secret-password">
-          <Input
-            aria-label={t("browser.secret.password")}
-            placeholder={t("browser.secret.password")}
-            type="password"
-            autocomplete="off"
-            maxlength={4096}
+  const submitOnceText = () => (
+    <>
+      {submitOnce().before}
+      <strong class="browser-secret-origin">{props.request.secret?.origin}</strong>
+      {submitOnce().after}
+    </>
+  );
+  const valueField = () => (
+    <Show
+      when={password()}
+      fallback={
+        <div class="browser-secret-code">
+          <OtpInput
             value={value()}
-            disabled={pending()}
-            invalid={Boolean(error())}
-            onInput={(event) => {
-              setValue(event.currentTarget.value);
+            length={digits()}
+            numeric
+            masked
+            size="compact"
+            label={t("browser.secret.codeLength", { digits: digits() })}
+            status={error() ? "error" : pending() ? "verifying" : "idle"}
+            errorMessage={error()}
+            onChange={(next) => {
+              setValue(next);
               setError("");
             }}
           />
-          <Show when={error()}>
-            <p class="browser-secret-error" role="alert">
-              {error()}
-              <ErrorReference reference={shownCode()} />
-            </p>
-          </Show>
-          <Show when={props.vault}>
-            {(vault) => (
-              <div class="browser-secret-save-option">
-                <label class="browser-secret-save" for={saveId}>
-                  <Checkbox
-                    id={saveId}
-                    checked={saveToVault()}
-                    disabled={pending() || saveBlocked()}
-                    aria-describedby={`${saveId}-hint`}
-                    onChange={(event) => setSaveChoice(event.currentTarget.checked)}
-                  />
-                  <Show when={remoteSaveLabel()} fallback={<span>{t("browser.secret.saveToVaultLocal")}</span>}>
-                    {(label) => (
-                      <span>
-                        {label().before}
-                        <strong class="browser-secret-save-server">{label().server}</strong>
-                        {label().after}
-                      </span>
-                    )}
-                  </Show>
-                </label>
-                <p class="browser-secret-save-hint" id={`${saveId}-hint`}>
-                  {saveHint(vault())}
-                </p>
-              </div>
-            )}
-          </Show>
+          <ErrorReference reference={shownCode()} />
         </div>
-      </Show>
-      <Show when={variant() === "card" && !previewHidden()}>
-        <figure class="browser-takeover-preview">
-          <figcaption class="browser-takeover-preview-bar">
-            <Monitor aria-hidden="true" />
-            <span>{t("browser.secret.signInPage")}</span>
-            <small>{props.request.secret?.origin}</small>
-          </figcaption>
-          <Show
-            when={props.onOpen}
-            fallback={
-              <div class="browser-takeover-preview-viewport">
-                <BrowserTakeoverPreview preview={preview()} previewStatus={previewStatus()} page={previewPage()} />
-              </div>
-            }
-          >
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-takeover-preview-viewport browser-takeover-preview-open"
-              aria-label={t("browser.secret.openSignInPage")}
-              onClick={() => props.onOpen?.()}
-            >
-              <BrowserTakeoverPreview preview={preview()} previewStatus={previewStatus()} page={previewPage()} />
-              <span class="browser-takeover-preview-open-label" aria-hidden="true">
-                <Maximize2 />
-                {t("browser.secret.openInBrowser")}
-              </span>
-            </Button>
-          </Show>
-        </figure>
-      </Show>
-      <footer class="browser-secret-footer">
-        <span class="browser-secret-private">
-          <ShieldCheck class="browser-secret-glyph-sm" aria-hidden="true" />
-          {t("browser.secret.notAddedToChat")}
-        </span>
-        <Button variant="ghost" size="sm" type="button" disabled={pending()} onClick={() => void respond("takeover")}>
-          {t("browser.secret.takeOver")}
-        </Button>
-        <Button
-          size="sm"
-          type="submit"
-          disabled={!valid()}
-          loading={pending()}
-          loadingLabel={t("browser.secret.submitting")}
-        >
-          {t("browser.secret.submit")}
-        </Button>
-      </footer>
-    </form>
+      }
+    >
+      <div class="browser-secret-password">
+        <Input
+          aria-label={t("browser.secret.password")}
+          placeholder={t("browser.secret.password")}
+          type="password"
+          autocomplete="off"
+          maxlength={4096}
+          value={value()}
+          disabled={pending()}
+          invalid={Boolean(error())}
+          onInput={(event) => {
+            setValue(event.currentTarget.value);
+            setError("");
+          }}
+        />
+        <Show when={error()}>
+          <p class="browser-secret-error" role="alert">
+            {error()}
+            <ErrorReference reference={shownCode()} />
+          </p>
+        </Show>
+        <Show when={props.vault}>
+          {(vault) => (
+            <div class="browser-secret-save-option">
+              <label class="browser-secret-save" for={saveId}>
+                <Checkbox
+                  id={saveId}
+                  checked={saveToVault()}
+                  disabled={pending() || saveBlocked()}
+                  aria-describedby={`${saveId}-hint`}
+                  onChange={(event) => setSaveChoice(event.currentTarget.checked)}
+                />
+                <Show when={remoteSaveLabel()} fallback={<span>{t("browser.secret.saveToVaultLocal")}</span>}>
+                  {(label) => (
+                    <span>
+                      {label().before}
+                      <strong class="browser-secret-save-server">{label().server}</strong>
+                      {label().after}
+                    </span>
+                  )}
+                </Show>
+              </label>
+              <p class="browser-secret-save-hint" id={`${saveId}-hint`}>
+                {saveHint(vault())}
+              </p>
+            </div>
+          )}
+        </Show>
+      </div>
+    </Show>
   );
+  const privateNote = () => (
+    <span class="browser-secret-private">
+      <ShieldCheck class="browser-secret-glyph-sm" aria-hidden="true" />
+      {t("browser.secret.notAddedToChat")}
+    </span>
+  );
+  /** While the value is on its way, "Sending…" takes the place of the note. */
+  const noteUnlessSending = () => (pending() ? undefined : privateNote());
+  const takeOverButton = () => (
+    <Button
+      variant={takeOverVariant()}
+      size="sm"
+      type="button"
+      disabled={pending()}
+      onClick={() => void respond("takeover")}
+    >
+      {t("browser.secret.takeOver")}
+    </Button>
+  );
+  const takeOverVariant = () => (variant() === "card" ? "secondary" : "ghost");
+  const onSubmit = (event: SubmitEvent) => {
+    event.preventDefault();
+    void respond("submit");
+  };
+  return (
+    <Show when={variant() === "card"} fallback={<IslandFrame />}>
+      <UiBlockCard
+        class="browser-secret-card"
+        status="pending"
+        title={title()}
+        subtitle={submitOnceText()}
+        icon={
+          <span class="ui-block-icon integration-logo-tile" aria-hidden="true">
+            <Lock />
+          </span>
+        }
+        busy={pending()}
+        waiting
+        footerStart={noteUnlessSending()}
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              disabled={pending()}
+              onClick={() => void respond("cancel")}
+            >
+              {t("common.cancel")}
+            </Button>
+            {takeOverButton()}
+            <Button size="sm" type="submit" form={formId} disabled={!valid() || pending()}>
+              {t("browser.secret.submit")}
+            </Button>
+          </>
+        }
+      >
+        <form id={formId} class="browser-secret-fields" aria-label={t("browser.secret.label")} onSubmit={onSubmit}>
+          {vaultSkipNote()}
+          {valueField()}
+        </form>
+        <Show when={!previewHidden()}>
+          <figure class="browser-takeover-preview">
+            <figcaption class="browser-takeover-preview-bar">
+              <Monitor aria-hidden="true" />
+              <span>{t("browser.secret.signInPage")}</span>
+              <small>{props.request.secret?.origin}</small>
+            </figcaption>
+            <Show
+              when={props.onOpen}
+              fallback={
+                <div class="browser-takeover-preview-viewport">
+                  <BrowserTakeoverPreview preview={preview()} previewStatus={previewStatus()} page={previewPage()} />
+                </div>
+              }
+            >
+              <Button
+                variant="ghost"
+                type="button"
+                class="browser-takeover-preview-viewport browser-takeover-preview-open"
+                aria-label={t("browser.secret.openSignInPage")}
+                onClick={() => props.onOpen?.()}
+              >
+                <BrowserTakeoverPreview preview={preview()} previewStatus={previewStatus()} page={previewPage()} />
+                <span class="browser-takeover-preview-open-label" aria-hidden="true">
+                  <Maximize2 />
+                  {t("browser.secret.openInBrowser")}
+                </span>
+              </Button>
+            </Show>
+          </figure>
+        </Show>
+      </UiBlockCard>
+    </Show>
+  );
+
+  /** The glass card over the browser page. */
+  function IslandFrame() {
+    return (
+      <form
+        class="browser-secret-card"
+        data-variant="island"
+        aria-label={t("browser.secret.label")}
+        aria-busy={pending() ? "true" : "false"}
+        onSubmit={onSubmit}
+      >
+        <header class="browser-secret-header">
+          <span class="browser-secret-icon" aria-hidden="true">
+            <Lock class="browser-secret-glyph" />
+          </span>
+          <div class="browser-secret-heading">
+            <h2>{title()}</h2>
+            <p>{submitOnceText()}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            type="button"
+            class="browser-secret-close"
+            aria-label={t("common.cancel")}
+            disabled={pending()}
+            onClick={() => void respond("cancel")}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </header>
+        {vaultSkipNote()}
+        {valueField()}
+        <footer class="browser-secret-footer">
+          {privateNote()}
+          {takeOverButton()}
+          <Button
+            size="sm"
+            type="submit"
+            disabled={!valid()}
+            loading={pending()}
+            loadingLabel={t("browser.secret.submitting")}
+          >
+            {t("browser.secret.submit")}
+          </Button>
+        </footer>
+      </form>
+    );
+  }
 }

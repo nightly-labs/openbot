@@ -108,13 +108,43 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "session-settings",
     });
   }
+  if (event.type === "library-folders-changed") {
+    // A folder change on the desktop, on another phone, or by an agent that saved a file into a folder.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
+  }
+  if (event.type === "usage-credits-changed") {
+    // The usage event does not say whether an account works on credits, so the plan limits read again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "browser-profiles-changed") {
-    // A change on the desktop or another phone: the profile list and each agent's choice read again.
+    // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProxies(scope, serverId) });
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId),
       predicate: (query) => query.queryKey.at(-1) === "browser-profile",
     });
+  }
+  if (event.type === "status") {
+    // The host sends a status event after a change to its providers, the models that its picker
+    // shows, the prompt cache time, the Claude compaction size or a provider's variables, such as one
+    // on the desktop app.
+    // Open provider pages read again.
+    for (const queryKey of [
+      queryKeys.providerStatus(scope, serverId),
+      queryKeys.providerModels(scope, serverId),
+      queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCompactWindow(scope, serverId),
+      queryKeys.agentModels(scope, serverId),
+    ])
+      void queryClient.invalidateQueries({ queryKey });
+    // Each provider has its own variables; the prefix reads every open one again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.providerEnvironment(scope, serverId, "").slice(0, -1) });
+  }
+  if (event.type === "message-pins-changed") {
+    // A pin of the agent changed on another device, by the agent, or by a deleted message: read the list again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.messagePins(scope, serverId, event.agentId) });
   }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });

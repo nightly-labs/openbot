@@ -67,6 +67,8 @@ export interface StoredQueueEdit {
   deliveryId: string;
   editId: string;
   originalAttachmentIds: string[];
+  /** The text of the message when the edit began. An edit stored by an older version has none. */
+  originalText?: string;
   draft: ComposerDraft;
   backup: ComposerDraft;
   pendingSave?: StoredQueueSave;
@@ -104,6 +106,7 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     !isString(value.editId) ||
     !Array.isArray(value.originalAttachmentIds) ||
     !value.originalAttachmentIds.every(isString) ||
+    (value.originalText !== undefined && !isString(value.originalText)) ||
     !isComposerDraft(value.draft) ||
     !isComposerDraft(value.backup)
   )
@@ -125,10 +128,93 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     deliveryId: value.deliveryId,
     editId: value.editId,
     originalAttachmentIds: value.originalAttachmentIds,
+    ...(isString(value.originalText) ? { originalText: value.originalText } : {}),
     draft: value.draft,
     backup: value.backup,
     ...(pendingSave ? { pendingSave } : {}),
   };
+}
+
+/**
+ * The message box after a queue edit ended before its Save: the message started, or somebody deleted
+ * it. A changed edit keeps its text and the files that it added, after the draft from before the
+ * edit, so no typed text is lost. An unchanged edit gives back the draft from before the edit, as
+ * Cancel does. `dropped` are the added files that the box does not keep, for the caller to discard.
+ */
+export function draftAfterEndedEdit(
+  draft: ComposerDraft,
+  backup: ComposerDraft,
+  originalAttachmentIds: readonly string[],
+  changed: boolean,
+): { next: ComposerDraft; dropped: DraftAttachment[] } {
+  const original = new Set(originalAttachmentIds);
+  // The files of the message belong to it. Only files added during the edit can go in a new message.
+  const added = draft.attachments.filter((attachment) => !original.has(attachment.id));
+  if (!changed) return { next: backup, dropped: added };
+  const attachments = [...backup.attachments, ...added];
+  const before = backup.text.trim();
+  return {
+    next: {
+      text: before ? `${backup.text}\n\n${draft.text}` : draft.text,
+      attachments: attachments.slice(0, INPUT_LIMITS.attachments),
+      replyToMessageId: before ? backup.replyToMessageId : draft.replyToMessageId,
+    },
+    dropped: attachments.slice(INPUT_LIMITS.attachments),
+  };
+}
+
+/** Whether a queue edit changed its message: the text, or the files that it keeps or adds. */
+export function queueEditChanged(
+  draft: ComposerDraft,
+  originalText: string | undefined,
+  originalAttachmentIds: readonly string[],
+): boolean {
+  const original = new Set(originalAttachmentIds);
+  return (
+    originalText === undefined ||
+    draft.text !== originalText ||
+    draft.attachments.length !== originalAttachmentIds.length ||
+    draft.attachments.some((attachment) => !original.has(attachment.id))
+  );
+}
+
+export const THREAD_QUEUE_EDIT_STORAGE_KEY = "openbot:thread-queue-edit";
+/**
+ * A queue edit in the message box of a side thread. It has its own record, so it does not take the
+ * place of an edit in the agent's own chat. `draftKey` is the thread's `threadDraftKey`.
+ */
+export interface StoredThreadQueueEdit extends StoredQueueEdit {
+  taskId: string;
+  draftKey: string;
+}
+
+export function readStoredThreadQueueEdit(): StoredThreadQueueEdit | null {
+  try {
+    return decodeStoredThreadQueueEdit(
+      JSON.parse(window.localStorage.getItem(THREAD_QUEUE_EDIT_STORAGE_KEY) ?? "null"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function decodeStoredThreadQueueEdit(value: unknown): StoredThreadQueueEdit | null {
+  const edit = decodeStoredQueueEdit(value);
+  if (!edit || !isDynamicRecord(value) || !isString(value.taskId) || !isString(value.draftKey)) return null;
+  return { ...edit, taskId: value.taskId, draftKey: value.draftKey };
+}
+
+/** Throws when storage is full or unavailable: an edit that cannot be stored must not start. */
+export function storeThreadQueueEdit(edit: StoredThreadQueueEdit): void {
+  window.localStorage.setItem(THREAD_QUEUE_EDIT_STORAGE_KEY, JSON.stringify(edit));
+}
+
+export function clearStoredThreadQueueEdit(): void {
+  try {
+    window.localStorage.removeItem(THREAD_QUEUE_EDIT_STORAGE_KEY);
+  } catch {
+    // Storage is unavailable, so nothing was stored.
+  }
 }
 
 /** The thumbnail row of a message box: each image, also one that the text names, and each other file that the text does not name. */

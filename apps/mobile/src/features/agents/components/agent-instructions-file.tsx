@@ -124,6 +124,7 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
         appearance="soft"
         placeholder={t("mobile.agent.instructionsFile.placeholder")}
         multiline
+        tall
         autoCapitalize="sentences"
         value={text}
         editable={available && !saving}

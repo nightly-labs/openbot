@@ -1,7 +1,7 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Blocks, Button, Puzzle, TextQuote } from "@openbot/ui";
+import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -30,10 +30,16 @@ export interface RichMessageTextProps {
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
-  onOpenSharedFile?: ((path: string) => void) | undefined;
-  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
+  /**
+   * Opens a file chip. `asWritten` is the code span text when the chip joined it to the folder that the
+   * message names; it opens in the workspace when the joined path does not.
+   */
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  /** Shows the browser tab or opens the thread that a tag names. Without it, the chip does nothing. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   showCitationFooter?: boolean;
   /** The characters of a streaming body after this text. It fades the words revealed last. */
   streamingTailAfter?: number | undefined;
@@ -50,8 +56,12 @@ const UNAVAILABLE_TAG_LABELS = {
   mcp: "chat.tag.unavailableMcp",
 } as const satisfies Record<UnavailableTagKind, AppTextKey>;
 
-/* A quote carries its own text, so it never depends on something that can go away. */
-type UnavailableTagKind = Exclude<ChatTagKind, "quote">;
+/*
+ * A quote carries its own text, so it never depends on something that can go away. A tab or a thread
+ * keeps the name it had when the message was sent, as an MCP server does: the message records what
+ * the user asked.
+ */
+type UnavailableTagKind = Exclude<ChatTagKind, "quote" | "tab" | "thread">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
@@ -194,6 +204,19 @@ export function RichMessageText(props: RichMessageTextProps) {
                 class="message-reference-chip message-quote-tag"
                 icon={<TextQuote />}
                 onClick={onOpenQuote ? () => onOpenQuote(quote.messageId, quote.text) : undefined}
+              />
+            );
+          }
+          if (part.reference) {
+            const reference = part.reference;
+            const onOpenTag = props.onOpenTag;
+            return (
+              <ReferenceChip
+                kind={reference.kind}
+                name={part.text}
+                class="message-reference-chip"
+                icon={reference.kind === "tab" ? <AppWindow /> : <Split />}
+                onClick={onOpenTag ? () => onOpenTag(reference.kind, reference.id) : undefined}
               />
             );
           }
@@ -360,6 +383,7 @@ function plainTextPart(part: RichMessagePart): boolean {
     part.skill ||
     part.mcpName ||
     part.quote ||
+    part.reference ||
     part.unavailableKind ||
     part.citation ||
     part.attachment ||
@@ -378,6 +402,8 @@ interface RichMessagePart {
   mcpName?: string;
   /** Text the user quoted from a message of this chat. */
   quote?: { messageId: string; text: string };
+  /** A browser tab, by tab id, or a side thread, by task id. */
+  reference?: { kind: "tab" | "thread"; id: string };
   unavailableKind?: UnavailableTagKind;
   citation?: MessageCitation;
   attachment?: AttachmentSummary;
@@ -407,6 +433,7 @@ function richMessageParts(
       taggedReference.skill ||
       taggedReference.mcpName ||
       taggedReference.quote ||
+      taggedReference.reference ||
       taggedReference.unavailableKind
     ) {
       parts.push(taggedReference);
@@ -448,6 +475,8 @@ function semanticTagParts(body: string, agents: ComposerAgent[], skills: Compose
       parts.push({ text: reference.name, mcpName: reference.name });
     } else if (reference.kind === "quote") {
       parts.push({ text: reference.name, quote: { messageId: reference.id, text: reference.name } });
+    } else if (reference.kind === "tab" || reference.kind === "thread") {
+      parts.push({ text: reference.name, reference: { kind: reference.kind, id: reference.id } });
     } else {
       const skill = skills.find(
         (candidate) => candidate.skillId === reference.id && candidate.state !== "needs-repair",

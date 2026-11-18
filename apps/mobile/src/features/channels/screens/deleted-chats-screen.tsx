@@ -93,7 +93,13 @@ export function DeletedChatsScreen() {
                     className="min-w-0 flex-1 flex-row items-center gap-3 rounded-2xl px-1 py-1"
                     style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
                   >
-                    <ChannelAvatar channel={channel} agents={members} size={46} disconnected={!online} />
+                    <ChannelAvatar
+                      channel={channel}
+                      agents={members}
+                      size={46}
+                      serverId={serverId}
+                      disconnected={!online}
+                    />
                     <View className="min-w-0 flex-1 gap-1">
                       <Typography.Paragraph weight="semibold" numberOfLines={1}>
                         {channel.name}

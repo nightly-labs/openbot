@@ -1,0 +1,456 @@
+/* The chat color setting: the color dot, the popup and the picker (a port of the beUI motion color picker,
+ * ChatColorPicker.tsx). The popup has a 1px ring and no shadow. */
+
+/* ---------------------------------------------------------------------------------------------
+ * The color dot of the row
+ * ------------------------------------------------------------------------------------------- */
+
+.chat-color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--chat-color-value);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 18%, transparent);
+}
+
+/* While the popup is open, a ring marks the dot that it came from. */
+.chat-color-dot.chat-color-dot-open {
+  outline: 1px solid color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+  outline-offset: 2px;
+}
+
+/* The own row: the dot sits where a select shows its value text, before the name. */
+.chat-color-own-trigger .chat-color-dot {
+  margin-inline: 0 var(--openbot-space-2);
+}
+
+.chat-color-own-trigger .ui-select-value {
+  flex: 1 1 auto;
+  text-align: start;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * The popup. It opens as the select menus of the app do: a short scale and fade toward the row,
+ * from the color dot. The script sets the origin and the 6px shift.
+ * ------------------------------------------------------------------------------------------- */
+
+.chat-color-popover {
+  --chat-color-shift: -6px;
+  position: fixed;
+  z-index: var(--openbot-layer-popover);
+  padding: var(--openbot-space-3);
+  border-radius: var(--ui-menu-radius);
+  background: var(--ui-menu-bg);
+  box-shadow: 0 0 0 1px var(--ui-menu-edge);
+  color: var(--openbot-text-primary);
+  animation: chat-color-popover-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+@keyframes chat-color-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--chat-color-shift)) scale(0.96);
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * The picker. Sizes follow beUI: a 264px column, 36px fields with an 8px radius, a 160px area with
+ * a 12px radius, an 18px thumb with a 3px light rim and 24px presets. Where beUI has a drop
+ * shadow, the port keeps only its 1px ring.
+ * ------------------------------------------------------------------------------------------- */
+
+.chat-color-picker,
+.chat-color-picker-presets {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.chat-color-picker {
+  --chat-color-edge: color-mix(in srgb, var(--openbot-text-primary) 11%, transparent);
+  --chat-color-edge-hover: color-mix(in srgb, var(--openbot-text-primary) 20%, transparent);
+  --chat-color-inset: inset 0 0 0 1px color-mix(in srgb, var(--openbot-color-picker-dark) 10%, transparent);
+  position: relative;
+  display: grid;
+  width: 264px;
+  gap: var(--openbot-space-3);
+}
+
+.chat-color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* The area, the hue and the fields are left to right in each language, as the color models are. */
+.chat-color-picker-area,
+.chat-color-picker-hue,
+.chat-color-picker-row.chat-color-picker-fields {
+  direction: ltr;
+}
+
+.chat-color-picker-row.chat-color-picker-fields {
+  gap: var(--openbot-space-1-5);
+}
+
+/* Saturation and brightness */
+
+.chat-color-picker-area {
+  position: relative;
+  height: 160px;
+  border-radius: var(--openbot-radius-lg);
+  background:
+    linear-gradient(to top, var(--openbot-color-picker-dark), transparent),
+    linear-gradient(to right, var(--openbot-color-picker-light), var(--chat-color-pure));
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.chat-color-picker-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--chat-color-inset);
+  pointer-events: none;
+}
+
+.chat-color-picker-track {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chat-color-picker-thumb {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  top: calc(var(--chat-color-y) * 1%);
+  left: calc(var(--chat-color-x) * 1%);
+  width: 18px;
+  height: 18px;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  outline: 0;
+  pointer-events: auto;
+  translate: -50% -50%;
+  transition:
+    top var(--chat-color-layout-duration) var(--chat-color-layout-ease),
+    left var(--chat-color-layout-duration) var(--chat-color-layout-ease);
+}
+
+.chat-color-picker-hue .chat-color-picker-thumb {
+  top: 50%;
+}
+
+.chat-color-picker-dragging .chat-color-picker-thumb {
+  transition: none;
+}
+
+.chat-color-picker-thumb:focus-visible {
+  outline: 2px solid var(--openbot-text-primary);
+  outline-offset: 2px;
+}
+
+/* The rim and the color shrink together while the thumb is held, as in beUI. */
+.chat-color-picker-thumb-dot {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--openbot-color-picker-light);
+  border-radius: inherit;
+  background: var(--chat-color-value);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-color-picker-dark) 12%, transparent);
+  transition: scale var(--chat-color-press-duration) var(--chat-color-press-ease);
+}
+
+.chat-color-picker-dragging .chat-color-picker-thumb-dot {
+  scale: 0.78;
+}
+
+/* The loupe above the thumb shows the color under it, and swings against the drag. */
+.chat-color-picker-loupe {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  transform: rotate(var(--chat-color-tilt));
+  transform-origin: 50% 130%;
+  transition: transform 220ms var(--openbot-ease-out);
+  animation: chat-color-loupe-lift var(--chat-color-lift-duration) var(--chat-color-lift-ease) both;
+}
+
+.chat-color-picker-loupe-drop {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--openbot-color-picker-light);
+  border-radius: var(--openbot-radius-pill) var(--openbot-radius-pill) var(--openbot-radius-pill) 0;
+  background: var(--chat-color-value);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-color-picker-dark) 10%, transparent);
+  rotate: -45deg;
+}
+
+@keyframes chat-color-loupe-lift {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+    scale: 0.3;
+  }
+}
+
+/* Hue */
+
+.chat-color-picker-hue {
+  position: relative;
+  height: 14px;
+  flex: 1 1 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-color-picker-spectrum);
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Inset by half a thumb, so the thumb never leaves the rounded track. */
+.chat-color-picker-hue-rail {
+  position: absolute;
+  inset: 0 9px;
+}
+
+/* The eye dropper, the format switch, the fields and the swatch: 36px boxes with a 1px edge. */
+
+.chat-color-picker-icon-button,
+.chat-color-picker-format {
+  display: inline-grid;
+  height: var(--openbot-control-lg);
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--chat-color-edge);
+  border-radius: var(--openbot-radius-md);
+  outline: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  transition:
+    color var(--openbot-duration-hover) var(--openbot-ease-out),
+    border-color var(--openbot-duration-hover) var(--openbot-ease-out),
+    scale var(--chat-color-press-duration) var(--chat-color-press-ease);
+}
+
+.chat-color-picker-icon-button {
+  width: var(--openbot-control-lg);
+}
+
+.chat-color-picker-format {
+  width: 48px;
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.chat-color-picker-icon-button:hover,
+.chat-color-picker-format:hover {
+  color: var(--openbot-text-primary);
+}
+
+.chat-color-picker-icon-button:active {
+  scale: 0.92;
+}
+
+.chat-color-picker-icon-button:focus-visible,
+.chat-color-picker-format:focus-visible {
+  border-color: var(--chat-color-edge-hover);
+  color: var(--openbot-text-primary);
+}
+
+.chat-color-picker-icon-button > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chat-color-picker-format-label {
+  grid-area: 1 / 1;
+  animation: chat-color-format-in var(--chat-color-press-duration) var(--chat-color-press-ease) both;
+}
+
+@keyframes chat-color-format-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+.chat-color-picker-hex {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chat-color-picker-hex-hash {
+  position: absolute;
+  top: 50%;
+  left: var(--openbot-space-3);
+  translate: 0 -50%;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  pointer-events: none;
+}
+
+.chat-color-picker-field {
+  width: 100%;
+  height: var(--openbot-control-lg);
+  min-width: 0;
+  border: 1px solid var(--chat-color-edge);
+  border-radius: var(--openbot-radius-md);
+  outline: 0;
+  background: transparent;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.chat-color-picker-field:focus-visible {
+  border-color: var(--chat-color-edge-hover);
+}
+
+.chat-color-picker-field.chat-color-picker-hex-input {
+  padding: 0 var(--openbot-space-3) 0 var(--openbot-space-6);
+  font-family: var(--openbot-font-mono);
+  text-transform: uppercase;
+}
+
+.chat-color-picker-field.chat-color-picker-hex-input::placeholder {
+  color: var(--openbot-text-placeholder);
+  text-transform: none;
+}
+
+.chat-color-picker-channels {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: var(--openbot-space-1-5);
+}
+
+/* The channel letter sits in the field, as the # of the hex field, so the row keeps its height. */
+.chat-color-picker-channel {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.chat-color-picker-field.chat-color-picker-channel-input {
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-6);
+}
+
+.chat-color-picker-channel-label {
+  position: absolute;
+  top: 50%;
+  left: var(--openbot-space-3);
+  translate: 0 -50%;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  pointer-events: none;
+}
+
+.chat-color-picker-swatch {
+  width: var(--openbot-control-lg);
+  height: var(--openbot-control-lg);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-md);
+  background: var(--chat-color-value);
+  box-shadow: var(--chat-color-inset);
+  transition: background-color 150ms var(--openbot-ease-out);
+}
+
+/* Presets. The ring hops between them (see Presets in the picker). */
+
+/* The empty choice and the 11 chat colors fill two rows of 6. */
+.chat-color-picker-presets {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  justify-content: space-between;
+  row-gap: var(--openbot-space-2);
+  padding: var(--openbot-space-1) var(--openbot-space-0-5) 0;
+}
+
+.chat-color-picker-preset {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  outline: 0;
+  background: var(--chat-color-value);
+  box-shadow: var(--chat-color-inset);
+  padding: 0;
+  cursor: pointer;
+  transition: scale var(--chat-color-press-duration) var(--chat-color-press-ease);
+}
+
+.chat-color-picker-preset:active {
+  scale: 0.88;
+}
+
+.chat-color-picker-preset:focus-visible {
+  outline: 2px solid var(--openbot-text-primary);
+  outline-offset: 3px;
+}
+
+.chat-color-picker-preset-ring {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 30px;
+  height: 30px;
+  border: 2px solid color-mix(in srgb, var(--openbot-text-primary) 70%, transparent);
+  border-radius: var(--openbot-radius-pill);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.chat-color-picker-preset-ring[data-visible="true"] {
+  opacity: 1;
+}
+
+/* No color: a slash, as the beUI "none" swatch. */
+.chat-color-dot.chat-color-none,
+.chat-color-picker-swatch.chat-color-none,
+.chat-color-picker-preset.chat-color-none {
+  background:
+    linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--openbot-text-muted) calc(50% - 1px) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
+    var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--chat-color-edge, var(--ui-menu-edge));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-color-picker .chat-color-picker-loupe,
+  .chat-color-picker .chat-color-picker-format-label {
+    animation: none;
+  }
+
+  .chat-color-popover {
+    animation-name: ui-select-content-fade-in;
+  }
+
+  .chat-color-picker .chat-color-picker-thumb,
+  .chat-color-picker .chat-color-picker-thumb-dot,
+  .chat-color-picker .chat-color-picker-preset,
+  .chat-color-picker .chat-color-picker-preset-ring,
+  .chat-color-picker .chat-color-picker-icon-button,
+  .chat-color-picker .chat-color-picker-format {
+    transition: none;
+  }
+}

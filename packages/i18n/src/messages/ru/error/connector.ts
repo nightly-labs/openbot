@@ -18,15 +18,27 @@ export const messages = {
     "OpenBot не смог установить CLI 1Password. Проверьте подключение к интернету и повторите попытку.",
   "error.connector.onePasswordCliSignedOut":
     "В CLI 1Password не выполнен вход. Включите его интеграцию в приложении 1Password и подключитесь снова.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot не может связаться с приложением 1Password. Откройте 1Password и разблокируйте его. В разделе «Настройки» > «Разработчик» проверьте, что параметр «Integrate with 1Password CLI» включён. Затем повторите попытку.",
   "error.connector.onePasswordCliFailed": "CLI 1Password завершился с ошибкой: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Ваш аккаунт 1Password не позволяет вам создать общее хранилище или сервисный аккаунт. Попросите владельца или администратора аккаунта дать это разрешение или выдать токен сервисного аккаунта, затем нажмите «Использовать токен».",
   "error.connector.onePasswordUnexpected": "1Password прислал неожиданный ответ: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password не принял токен сервисного аккаунта.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot не смог подключиться к 1Password. Проверьте подключение к интернету и повторите попытку.",
+  "error.connector.onePasswordRateLimited":
+    "1Password получил слишком много запросов. Подождите несколько минут и повторите попытку.",
   "error.connector.onePasswordNoVault":
     "Сервисный аккаунт не может читать ни одно хранилище. Дайте ему доступ к хранилищу и повторите попытку.",
   "error.connector.onePasswordFileUnreadable": "Файл подключения 1Password не читается.",
   "error.connector.onePasswordFileTooLarge": "Файл подключения 1Password слишком большой.",
   "error.connector.bitwardenFailed":
     "Не удалось прочитать Bitwarden. Установите CLI bw, войдите, разблокируйте его и создайте одну папку с именем Shared with OpenBot. Подключитесь с новым ключом сессии.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot не находит Bitwarden CLI. Установите bw, проверьте, что он работает в новом терминале, и подключитесь снова.",
+  "error.connector.bitwardenFolderMissing":
+    "В Bitwarden должна быть ровно одна папка с именем Shared with OpenBot. Создайте её или удалите лишнюю, затем подключитесь снова.",
   "error.connector.bitwardenHostInput":
     "Введите адрес сервера HTTPS, client_id и client_secret ключа API и мастер-пароль.",
   "error.connector.bitwardenHostFailed":
@@ -34,4 +46,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Не удалось установить Bitwarden CLI на этом сервере. Проверьте его сетевое подключение и подключитесь снова.",
   "error.connector.bitwardenFileUnreadable": "Файл подключения Bitwarden не читается.",
+  "error.connector.passwordManagerUnknown": "OpenBot не знает этот менеджер паролей.",
+  "error.connector.passwordManagerMethod": "Этот менеджер паролей нельзя подключить таким способом.",
+  "error.connector.passwordManagerNoSignIn": "Страница входа не открыта. Подключитесь снова.",
+  "error.connector.protonPassFailed": "Не удалось подключить Proton Pass. Подключитесь снова.",
+  "error.connector.protonPassCliInstallFailed":
+    "Не удалось установить Proton Pass CLI. Проверьте сетевое подключение и подключитесь снова.",
+  "error.connector.protonPassPlan":
+    "Ваш тариф Proton не разрешает Proton Pass CLI. Смените тариф и подключитесь снова.",
+  "error.connector.protonPassExpired": "Доступ к Proton Pass закончился. Подключитесь снова.",
+  "error.connector.protonPassKeyInvalid": "Введите ключ доступа Proton Pass, который начинается с pst_.",
+  "error.connector.protonPassExtraPassword": "Дополнительный пароль неверен. Введите его снова.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass не запрашивал дополнительный пароль.",
+  "error.connector.protonPassFileUnreadable": "Не удалось прочитать файл подключения Proton Pass.",
+  "error.connector.protonPassSignInTimeout": "Вход в Proton занял слишком много времени. Подключитесь снова.",
+  "error.connector.protonPassSetupFailed":
+    "Не удалось создать в Proton Pass хранилище Shared with OpenBot или его ключ доступа. Подключитесь снова.",
 } as const satisfies PartialTranslation<typeof source>;

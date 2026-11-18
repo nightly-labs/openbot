@@ -67,6 +67,9 @@ const { TeamApiServer } = await import("../src/main/team-api-server");
 const unused = () => Effect.die(new Error("Unexpected provider or browser call."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  shareTab: () => {},
+  unshareThread: () => {},
+  agentTab: () => null,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -92,6 +95,8 @@ const teamBrowser: TeamApiBrowser = {
   takeUserControl: unused,
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  startTeach: unused,
+  stopTeach: () => [],
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -315,9 +320,15 @@ try {
   for (const remote of [false, true]) {
     const label = remote ? "Team API" : "service";
     store.setHidden(first.id, new Date().toISOString());
-    await check(`${label}: hidden member`, () =>
-      rejected(command(`${markAgent(first)} ${markSkill()}`), addressError, remote),
-    );
+    await check(`${label}: hidden member can still receive skills`, async () => {
+      const before = channels.store.tasks(channelId).length;
+      const input = command(`${markAgent(first)} ${markSkill()}`, first.id);
+      if (remote) assert.equal((await wire(CHANNEL_ROUTES.command, input)).status, 200);
+      else await runCauseEffect(channels.command(input, actor));
+      const tasks = channels.store.tasks(channelId).slice(before);
+      assert.equal(tasks.length, 1);
+      assert.equal(tasks[0]?.ownerAgentId, first.id);
+    });
     store.setHidden(first.id, null);
     await seedSkills(first, false);
     await check(`${label}: disabled skill`, () =>

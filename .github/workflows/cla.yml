@@ -1,34 +1,29 @@
 name: CLA
 
 # Checks that each author of a pull request signed CLA.md. The rules are in `scripts/cla.ts`. The
-# signatures are recorded in `signatures.json` on the `cla-signatures` branch.
+# signatures are recorded in `signatures.json` on the `cla-signatures` branch. An author signs by
+# email; a maintainer then records the signature with `bun scripts/cla.ts record`, which also sets
+# the status. This workflow only reads the record.
 #
-# `pull_request_target` and `issue_comment` give a fork's pull request a token that can comment, set a
-# status and write the record. It is safe here because no step checks out or runs the pull request's
-# code: the job checks out the default branch and reads the pull request only through the API.
+# `pull_request_target` gives a fork's pull request a token that can comment and set a status. It is
+# safe here because no step checks out or runs the pull request's code: the job checks out the
+# default branch and reads the pull request only through the API.
 on:
   pull_request_target:
-    # `edited`: the author ticks the agreement box in the description.
-    types: [opened, reopened, synchronize, edited]
-  issue_comment:
-    types: [created, edited]
+    types: [opened, reopened, synchronize]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
-  pull-requests: write
+  pull-requests: read
   statuses: write
 
 jobs:
   cla:
     # Not "CLA": that is the name of the commit status that the script sets.
     name: Check CLA signatures
-    # A comment starts a run only on a pull request, and only when it can contain a signature.
-    if: >-
-      github.event_name == 'pull_request_target' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, 'Contributor Assignment Agreement'))
     concurrency:
-      group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+      group: cla-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -48,5 +43,5 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bun scripts/cla.ts pr "$PR_NUMBER"

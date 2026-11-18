@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Tokens",
   "usage.column.date": "Datum",
   "usage.column.costUsd": "Kosten · USD",
+  "usage.column.loads": "Aufrufe",
+  "usage.column.agents": "Agenten",
   "usage.empty": "Für diesen Zeitraum wurde keine Nutzung erfasst.",
   "usage.partial":
     "Unvollständige Daten · {turns} Durchläufe ohne gemeldete Nutzung; {unpriced} Einträge ohne Kostenschätzung; {incomplete} Einträge mit unvollständigen Token-Daten.",
@@ -52,9 +54,12 @@ export const messages = {
   "usage.breakdown.model": "Modell",
   "usage.breakdown.agent": "Agent",
   "usage.breakdown.day": "Tag",
+  "usage.breakdown.skill": "Fähigkeit",
   "usage.breakdown.byModel": "Nutzung nach Modell",
   "usage.breakdown.byAgent": "Nutzung nach Agent",
   "usage.breakdown.byDay": "Tägliche Nutzung und Kosten",
+  "usage.breakdown.bySkill": "Nutzung nach Fähigkeit",
+  "usage.breakdown.skillEmpty": "In diesem Zeitraum wurde keine Fähigkeit geladen.",
   "usage.unknownModel": "Unbekanntes Modell",
   "usage.footer": "Erfasst seit {started} · Aktualisiert {updated}",
   "usage.updatedNever": "nie",
@@ -76,4 +81,6 @@ export const messages = {
     "Dieser Host unterstützt keine Agentenstatistiken. Aktualisiere den Host, um diese Ansicht zu nutzen.",
   "usage.panel.loadFailed":
     "Die Nutzungsdaten konnten nicht geladen werden. Prüfe die Verbindung und den Datumsbereich.",
+  "usage.machine.label": "Maschinenauslastung. CPU: {cpu}, Arbeitsspeicher: {memory}",
+  "usage.machine.openStorage": "Speicher öffnen. Datenträger: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,6 +10,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const NO_READS: ReadonlyMap<string, AgentTaskReadState> = new Map();
 
+/** True when `serverId` is online and keeps the read marks of side threads. */
 function useThreadReadsEnabled(serverId: string): boolean {
   return useMobileWorkspaceSelector(
     (current) =>
@@ -109,4 +110,85 @@ export function useServerThreadReads(
       failed: enabled && results.some((result) => result.isError),
     }),
   });
+}
+
+/** The read marks of the open threads of one agent: one shape for each place that reads them. */
+function threadReadsQuery(
+  queryScope: ReturnType<typeof useQueryScope>,
+  workspace: ReturnType<typeof useMobileWorkspaceReader>,
+  serverId: string,
+  agentId: string,
+  enabled: boolean,
+) {
+  return {
+    queryKey: queryKeys.agentThreadReads(queryScope, serverId, agentId),
+    enabled,
+    retry: false,
+    queryFn: () => workspace().loadAgentThreadReads(agentId, serverId),
+  };
+}
+
+/**
+ * Reads the marks of the open threads of each agent in `agentIds`, for the home list, and gives the
+ * unread messages of each agent's threads. Agents without any are left out. The task events and
+ * `useMarkThreadRead` keep the counts current.
+ */
+export function useAgentThreadUnreadCounts(serverId: string, agentIds: readonly string[]): ReadonlyMap<string, number> {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId);
+  // The counts become a string first, so a read that changes no count does not change the map.
+  const key = useQueries({
+    queries: agentIds.map((agentId) => threadReadsQuery(queryScope, workspace, serverId, agentId, enabled)),
+    combine: (results) =>
+      JSON.stringify(
+        results.flatMap((result, index) => {
+          const count = (result.data ?? []).reduce((sum, read) => sum + read.unreadCount, 0);
+          return enabled && count > 0 ? [[agentIds[index], count]] : [];
+        }),
+      ),
+  });
+  return useMemo(() => new Map<string, number>(JSON.parse(key)), [key]);
+}
+
+/**
+ * The unread messages of the open threads of one agent, from the marks that the home list reads. It
+ * starts no read of its own. Opening the agent's own chat does not change it.
+ */
+export function useAgentThreadUnread(serverId: string, agentId: string): number {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId);
+  // A real query function, not `skipToken`: each observer writes its options into the shared query,
+  // and a later invalidation of the key fetches with them.
+  const unread = useQuery({
+    ...threadReadsQuery(queryScope, workspace, serverId, agentId, false),
+    select: (reads) => reads.reduce((sum, read) => sum + read.unreadCount, 0),
+  }).data;
+  return enabled ? (unread ?? 0) : 0;
+}
+
+/**
+ * The first unread message of one thread when its screen opens, where the NEW line stands, as in the
+ * agent's chat. `firstUnread` is `undefined` while the host sends the marks for this visit: a mark
+ * that the phone kept can be old. It is `null` when the person has read the thread, on a host without
+ * `agent-thread-reads-v1`, offline, for a draft (`taskId` null), or when the read failed or cannot
+ * start. `keptUnread` is false when the marks that the phone kept show the thread as read.
+ */
+export function useThreadOpeningUnread(
+  serverId: string,
+  agentId: string,
+  taskId: string | null,
+): { firstUnread: string | null | undefined; keptUnread: boolean } {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId) && taskId !== null;
+  // A fresh read on each visit: the host sends no event when a mark moves.
+  const reads = useQuery({ ...threadReadsQuery(queryScope, workspace, serverId, agentId, enabled), staleTime: 0 });
+  const read = reads.data?.find((entry) => entry.taskId === taskId);
+  const keptUnread = !reads.data || (read?.unreadCount ?? 0) > 0;
+  if (!enabled || reads.isError) return { firstUnread: null, keptUnread: false };
+  // A paused read, such as while the phone is offline, gives no marks for this visit.
+  if (reads.fetchStatus === "fetching") return { firstUnread: undefined, keptUnread };
+  return { firstUnread: read?.firstUnreadMessageId ?? null, keptUnread };
 }

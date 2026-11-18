@@ -2,7 +2,7 @@ import { Button, Plus, TriangleAlert } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { AppLogo, Done } from "./MarketplaceParts";
-import type { MarketplaceApp } from "./marketplace-model";
+import { customServerStatus, type MarketplaceApp, pluginNeedsMac } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
 /** "1,204 installs", in the reader's number format. */
@@ -34,6 +34,8 @@ export function AppAction(props: {
   const model = () => props.scope.model;
   const attention = () => props.app.status === "attention";
   const list = () => props.size !== undefined && props.variant === undefined;
+  /** The app has not read yet whether this account can connect apps on the joined server. */
+  const checking = () => props.app.kind === "plugin" && model().appsBlocked?.()?.reason === "checking";
   /** The app of a plugin whose server refused its saved sign-in. The button then signs in to it again. */
   const refused = () => {
     const app = props.app;
@@ -81,20 +83,28 @@ export function AppAction(props: {
       when={props.app.status !== "connected"}
       fallback={
         <Show when={list()}>
-          <Done>{t("marketplace.app.connected")}</Done>
+          <Done>{t(props.app.kind === "custom" ? customServerStatus(props.app) : "marketplace.app.connected")}</Done>
         </Show>
       }
     >
-      {/* A custom server is turned on in Server settings › MCP, not here. The Apps tab lists only the
-          connectors that this account can connect. */}
-      <Show when={props.app.kind === "connector" || (props.app.kind === "plugin" && model().canConnectApps())}>
+      {/* A custom server is turned on on its own page, not here. The Apps tab lists only the
+          connectors that this account can connect. While the app reads what a joined server serves,
+          the app page shows Connect as busy; a list leaves it out. */}
+      <Show
+        when={
+          props.app.kind === "connector" ||
+          (props.app.kind === "plugin" &&
+            !pluginNeedsMac(model(), props.app.plugin) &&
+            (model().canConnectApps() || (!list() && checking())))
+        }
+      >
         <Button
           type="button"
           variant={variant()}
           size={props.size}
           class={list() ? "marketplace-app-action" : undefined}
           data-status={props.app.status}
-          loading={model().appBusy(props.app.id) || props.app.status === "connecting"}
+          loading={model().appBusy(props.app.id) || props.app.status === "connecting" || checking()}
           aria-label={label()}
           onClick={connect}
         >

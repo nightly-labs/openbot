@@ -1,6 +1,6 @@
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import type { Rectangle } from "electron";
-import type { ObservedAction } from "./cua-driver-action-tap";
+import type { Point, Rectangle } from "electron";
+import type { ObservedAction, ObservedPointer } from "./cua-driver-action-tap";
 import { HIGHLIGHT_OWNER_SHORT_ID } from "./cua-driver-daemon-client";
 
 /** Below this a "window" is a tool palette or a shadow helper, not something an agent works in. */
@@ -125,11 +125,29 @@ export interface TargetChoice {
 }
 
 /**
+ * The desktop point an agent aimed at, in the driver's units, or `null` when nothing places it.
+ *
+ * A point in a window is a pixel of that window's last screenshot. The driver acts on it as the
+ * window's top-left corner plus the point scaled from the screenshot to the window's size: the
+ * screenshot can be smaller than the window, and on macOS it is in pixels while the window is in
+ * points. The tap keeps that screenshot's width with the point; without the window there is no cursor.
+ */
+export function pointerOnDesktop(pointer: ObservedPointer, windows: unknown): Point | null {
+  if (pointer.windowId === null || pointer.screenshotWidth === null) return { x: pointer.x, y: pointer.y };
+  const window = readWindows(windows).find((entry) => entry.windowId === pointer.windowId);
+  if (!window) return null;
+  const scale = window.bounds.width / pointer.screenshotWidth;
+  return { x: window.bounds.x + pointer.x * scale, y: window.bounds.y + pointer.y * scale };
+}
+
+/**
  * The window the rim marks.
  *
  * The agent's own last request is the answer whenever it named a window or an application: it says
  * where the agent works even while the driver acts in the background and leaves the window behind
- * everything else.
+ * everything else. When the rim cannot mark that place - an OpenBot window, a window on another
+ * Space, one that is minimized or gone - the rim goes down. Any other window would be one the agent
+ * does not touch, and often the one the user works in.
  *
  * Without such a request - a browser tool names a tab, not a window - the front window is the only
  * evidence left. Front order also moves each time the user clicks, so the rim holds the window it
@@ -150,6 +168,7 @@ export function chooseTarget({
   const candidates = workableWindows(visible, ownPid);
   const acted = actedWindow(candidates, action);
   if (acted) return asTarget(acted, visible);
+  if (action) return null;
   const held = previous ? candidates.find((window) => window.windowId === previous.windowId) : undefined;
   if (held && session.idleSeconds > AGENT_ACTION_SECONDS) return asTarget(held, visible);
   const front = frontWindow(candidates);

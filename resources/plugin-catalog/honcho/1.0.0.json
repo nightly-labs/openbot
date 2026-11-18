@@ -1,0 +1,52 @@
+{
+  "slug": "honcho",
+  "name": "Honcho",
+  "tagline": "Your memory across AI tools",
+  "description": "Honcho by Plastic Labs gives agents a long-term memory of you that other AI tools you connect can share. Agents save what they learn, and Honcho reasons over it to build a model of your preferences, goals and ways of working. Agents ask it questions before they start. OpenBot agents keep their own memory too; Honcho is the memory that follows you to other tools. Messages that agents save go to your Honcho account.",
+  "category": "productivity",
+  "creatorName": "Plastic Labs",
+  "iconUrl": "https://honcho.dev/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recall", "text": "Ask Honcho what it knows about how I like to work before we start." },
+    { "id": "prompt-save", "text": "Save the decisions from this thread to Honcho." },
+    { "id": "prompt-preferences", "text": "What does Honcho say about my writing style? Use it for this draft." }
+  ],
+  "apps": [
+    {
+      "id": "app-honcho-mcp",
+      "name": "Honcho",
+      "description": "Save and query long-term memory in your Honcho workspaces over one MCP server.",
+      "iconUrl": "https://honcho.dev/favicon.ico",
+      "server": {
+        "name": "honcho",
+        "transport": "http",
+        "url": "https://mcp.honcho.dev",
+        "auth": [
+          { "id": "honcho-oauth", "kind": "link", "label": "Sign in" },
+          {
+            "id": "honcho-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "api-key",
+                "label": "API key",
+                "header": "Authorization",
+                "prefix": "Bearer ",
+                "placeholder": "hch-…",
+                "hint": "Create a key at app.honcho.dev."
+              }
+            ],
+            "docsUrl": "https://honcho.dev/docs/v3/guides/integrations/mcp",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "websiteUrl": "https://honcho.dev",
+  "privacyPolicyUrl": "https://app.honcho.dev/privacy",
+  "termsUrl": "https://app.honcho.dev/tos",
+  "skills": []
+}

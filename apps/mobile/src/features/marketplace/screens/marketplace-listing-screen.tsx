@@ -25,6 +25,7 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { loadMarketplaceAgent, loadMarketplaceSkill } from "../api/marketplace-catalog";
 import {
   HeroChips,
@@ -87,7 +88,7 @@ export function MarketplaceListingScreen() {
   let body: ReactNode;
   if (kind === "app")
     body =
-      app?.kind === "app" ? (
+      app?.kind === "app" && app.source === "plugin" ? (
         <AppPage serverId={serverId} listing={app} plugin={app.plugin} onBusy={setBusy} />
       ) : (
         <SettingsNote>{t("mobile.marketplace.listing.notFound")}</SettingsNote>
@@ -423,12 +424,16 @@ function AppPage({
   const { t } = useText();
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
-  const block = useInstallBlock(serverId, canManage);
+  const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   const installed = useMarketplaceInstalled(serverId);
   const app = plugin.apps[0] ?? null;
+  // An app that drives Apple apps does not run on a host that is not a Mac, so it is not offered there.
+  const needsMac = macUnavailable && plugin.apps.some((entry) => entry.needsMac);
+  const block = useInstallBlock(serverId, canManage) ?? (needsMac ? t("mobile.marketplace.app.needsMac") : null);
   const method = app ? pluginConnectMethod(app, canRelay) : null;
   const connect = usePluginConnect(serverId, app, method);
   const connected = connect.state.phase === "done" || installed.installed(listing);
+  const connectedServerId = connected ? pluginServerId(plugin, installed.mcpServers ?? []) : null;
   const working = connect.state.phase === "working";
   useEffect(() => onBusy(working), [onBusy, working]);
   const installable =
@@ -448,8 +453,9 @@ function AppPage({
     plugin.privacyPolicyUrl ? { label: t("mobile.marketplace.app.privacy"), url: plugin.privacyPolicyUrl } : null,
     plugin.termsUrl ? { label: t("mobile.marketplace.app.terms"), url: plugin.termsUrl } : null,
   ].filter((link) => link !== null);
-  const access =
-    method?.kind === "key"
+  const access = needsMac
+    ? t("mobile.marketplace.facts.accessMac")
+    : method?.kind === "key"
       ? t("mobile.marketplace.facts.accessKey")
       : method?.kind === "link" || method?.kind === "relayUnsupported"
         ? t("mobile.marketplace.facts.accessSignIn")
@@ -498,13 +504,16 @@ function AppPage({
       {connected ? (
         <SettingsSection footer={t("mobile.marketplace.app.connectedHint")}>
           <SettingsRow
-            onPress={() => {
-              // The app's own MCP page; the list when the row is not known yet, such as right after a connect.
-              const mcpServerId = pluginServerId(plugin, installed.mcpServers ?? []);
-              if (mcpServerId)
-                router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId } });
-              else router.push({ pathname: "/server-settings/mcp", params: { serverId } });
-            }}
+            // The app's own MCP page. Right after a connect, the row waits until the server list has the app.
+            onPress={
+              connectedServerId
+                ? () =>
+                    router.push({
+                      pathname: "/server-settings/mcp-server",
+                      params: { serverId, mcpServerId: connectedServerId },
+                    })
+                : undefined
+            }
           >
             <Typography.Paragraph>{t("mobile.marketplace.app.connected")}</Typography.Paragraph>
           </SettingsRow>
@@ -527,7 +536,9 @@ function AppPage({
                   style={{ borderCurve: "continuous" }}
                 >
                   <Typography.Paragraph className="min-w-0 flex-1">{prompt.text}</Typography.Paragraph>
-                  {connected ? <ArrowRight color={String(muted)} size={18} strokeWidth={2} /> : null}
+                  {connected ? (
+                    <ArrowRight color={String(muted)} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+                  ) : null}
                 </View>
               </TryPressable>
             ))}

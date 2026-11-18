@@ -1,0 +1,33 @@
+{
+  "slug": "airwallex",
+  "name": "Airwallex",
+  "tagline": "Business accounts and cards",
+  "description": "Airwallex lets agents read balances and transactions, build cashflow reports, create beneficiaries, and issue cards in the production account of the signed-in user. Each user signs in to their own Airwallex account through the browser.",
+  "category": "other",
+  "creatorName": "Airwallex",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/90/b5/18/90b5186a-c2cc-d29d-9511-832e2292175a/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-balances", "text": "What are my balances in each currency today?" },
+    { "id": "prompt-cashflow", "text": "Build a cashflow report for last month." },
+    { "id": "prompt-card-spend", "text": "Which cards had the most spend this quarter?" }
+  ],
+  "apps": [
+    {
+      "id": "app-airwallex-mcp",
+      "name": "Airwallex",
+      "description": "Balances, transactions, reports, beneficiaries, and cards, over Airwallex's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/90/b5/18/90b5186a-c2cc-d29d-9511-832e2292175a/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "airwallex",
+        "transport": "http",
+        "url": "https://mcp.airwallex.com/mcp",
+        "auth": [{ "id": "airwallex-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.airwallex.com",
+  "privacyPolicyUrl": "https://www.airwallex.com/global/terms/privacy-policy",
+  "termsUrl": "https://www.airwallex.com/global/terms"
+}

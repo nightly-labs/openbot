@@ -1,5 +1,6 @@
 // Runs workflow model steps end to end on the real Antigravity driver, ACP client, warm client and
-// SQLite usage tables, with a fake server process that answers each prompt with text and token usage.
+// SQLite usage tables, with a fake Antigravity CLI 1.5.4 that answers each prompt with text and token
+// usage.
 // Checks that each step starts its own session on a process of its own that ends after the step
 // (#3925), that the warm process starts once, that a new main client and a failed step each start a
 // new warm process, that shutdown stops the warm process, and that the host usage report shows the
@@ -29,6 +30,10 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-model-steps
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4" + NL);
+  process.exit(0);
+}
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 let sessions = 0;
 function handle(message) {
@@ -101,6 +106,8 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-model-steps-e2e-"));
 const log = join(root, "agy.jsonl");
 process.env.FAKE_AGY_LOG = log;
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 const database = new OpenBotDatabase(join(root, "profile"));
 const clients: AgentClient[] = [];
 
@@ -141,11 +148,11 @@ async function ended(pid: number): Promise<boolean> {
 
 try {
   await Effect.runPromise(database.initialize());
-  const executable = join(root, "agy", "bin", "agy_acp_server");
-  await mkdir(join(root, "agy", "bin"), { recursive: true });
+  const executable = join(root, "agy", "1.5.4", "bin", "antigravity");
+  await mkdir(join(root, "agy", "1.5.4", "bin"), { recursive: true });
   await writeFile(executable, FAKE_AGY);
   await chmod(executable, 0o755);
-  const cli: AgentCliInfo = { executable, version: "1.4.1", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
   const driver = requireProviderDriver("antigravity");
   const modelId = "gemini-fake";
   assert.ok(isAgentModel(modelId));

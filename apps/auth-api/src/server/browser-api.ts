@@ -1,5 +1,6 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { parseBillingPortalRequest } from "@openbot/contracts/billing";
+import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
+import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import {
@@ -13,9 +14,10 @@ import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/cont
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
 import { type AccountAttribution, requestFirstTouch } from "./account-attribution";
-import { type AuthService, AuthServiceError, readAnalyticsAnswer } from "./auth-service";
+import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
+import { withSuggestedCountry } from "./billing-tax";
 import { companySignInApiOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
@@ -47,10 +49,12 @@ export interface BrowserApiServices {
     | "authenticate"
     | "enforceTeamInviteRateLimit"
     | "updateAnalytics"
+    | "updateChatColor"
     | "updateName"
     | "updateAvatar"
     | "listAccountSessions"
     | "revokeAccountSession"
+    | "createServerClaimForUser"
   >;
   remote: Pick<
     RemoteControlPlane,
@@ -81,7 +85,10 @@ export interface BrowserApiServices {
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
   /** The billing service, or null when this deployment has no Stripe key. */
-  billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
+  billing: () => Pick<
+    BillingService,
+    "getState" | "createPortal" | "buyStorage" | "getBillingDetails" | "setBillingDetails" | "license"
+  > | null;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   sourceIp: (request: Request) => string;
@@ -400,6 +407,12 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
       return yield* new AuthServiceError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
     return json(yield* services.auth.updateAnalytics(token, answer));
   }
+  if (path === "v1/me/chat-color" && request.method === "PUT") {
+    const chatColor = readChatColor(yield* readJsonObject(request));
+    if (chatColor === undefined)
+      return yield* new AuthServiceError(400, "invalid_chat_color", "The chat color is not valid.");
+    return json(yield* services.auth.updateChatColor(token, chatColor));
+  }
   if (path === AVATAR_PATH && request.method === "PUT") {
     return yield* Effect.gen(function* () {
       const upload = yield* readAvatarUpload(request);
@@ -410,6 +423,9 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: yield* services.auth.listAccountSessions(token) });
+  // The install command of a self-hosted server. Never log the claim.
+  if (path === "v2/server-claims" && request.method === "POST")
+    return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
     return yield* handleBilling(request, path, user, services);
   // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
@@ -435,11 +451,24 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   const billing = services.billing();
   if (path === "v1/me/billing" && request.method === "GET")
     return json(billing ? yield* billing.getState(user.id) : BILLING_UNAVAILABLE_STATE);
+  if (path === "v1/me/billing/details" && (request.method === "GET" || request.method === "PUT")) {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    if (request.method === "GET") return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
+    const input = parseBillingDetailsRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_details", sourceText("error.billing.detailsInvalid"));
+    return json(yield* billing.setBillingDetails(user, input));
+  }
   if (path === "v1/me/billing/portal" && request.method === "POST") {
     if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
     const input = parseBillingPortalRequest(yield* readJsonObject(request));
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json({ url: yield* billing.createPortal(user.id, input, "web", origin) });
+  }
+  if (path === "v1/me/billing/storage" && request.method === "POST") {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    const input = parseBillingStorageRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.buyStorage(user.id, input));
   }
   if (path === "v1/me/license" && request.method === "GET")
     return json(billing ? yield* billing.license.getState(user.id) : LICENSE_UNAVAILABLE_STATE);

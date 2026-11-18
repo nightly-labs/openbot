@@ -48,8 +48,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "Le lien de l’agent n’est pas valide.",
   "error.marketplace.changedSinceOpened":
     "Cet agent a changé depuis que vous l’avez ouvert. Ouvrez de nouveau le lien pour voir la nouvelle version.",
-  "error.marketplace.skillNameConflict":
-    "Vous avez déjà une autre compétence locale nommée « {name} ». Renommez-la ou supprimez-la, puis ajoutez de nouveau cet agent.",
   "error.marketplace.avatarInvalid": "L’avatar de l’agent n’est pas valide.",
   "error.marketplace.secretInName": "Retirez le secret ou l’adresse e-mail du nom avant la publication.",
   "error.marketplace.secretInTitle": "Retirez le secret ou l’adresse e-mail du titre avant la publication.",

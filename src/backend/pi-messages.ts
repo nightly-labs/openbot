@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { withoutTurnContext } from "./agent/developer-instructions";
 import { getArray, getString, isRecord, type ThreadItem } from "./protocol";
 import { providerCall, providerFailure } from "./provider-client-effects";
 
@@ -21,7 +22,7 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
       {
         id,
         type: "userMessage",
-        content: [{ type: "text", text: piText(isRecord(message) ? message.content : null) }],
+        content: [{ type: "text", text: withoutTurnContext(piText(isRecord(message) ? message.content : null)) }],
       },
     ];
   if (role === "toolResult")
@@ -51,7 +52,8 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
         id: `${id}:thinking:${index}`,
         type: "reasoning",
         text: block.thinking,
-        summary: [{ type: "summary_text", text: block.thinking }],
+        // `reasoningText` reads a list of strings, as Codex sends it. An object here made the text empty (#9669).
+        summary: [block.thinking],
       });
     if (block.type === "toolCall")
       items.push({

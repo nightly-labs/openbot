@@ -10,17 +10,16 @@
 // under a heading, and inline `**bold**`, `code` and [links](url).
 
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import {
-  OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_X_HANDLE,
-} from "./site-metadata";
+import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 
 export const CHANGELOG_ROUTE = "/changelog";
 const CHANGELOG_TITLE = "OpenBot Changelog: Release Notes for Every Version";
 export const CHANGELOG_DESCRIPTION =
   "Every OpenBot release, newest first: new features, improvements and fixes, with what to do after you upgrade.";
+const CHANGELOG_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/changelog.jpg",
+  alt: "Good things in the making. OpenBot agents around a paper sun",
+};
 
 /** The app a changelog covers. The web client ships with the desktop app, so it has no own list. */
 export type ChangelogPlatform = "desktop" | "mobile";
@@ -57,6 +56,8 @@ export interface StoreAvailability {
   store: MobileStore;
   /** `YYYY-MM-DD`, the day the store made the version available. Empty while it reviews it. */
   date: string;
+  /** The store will never ship the version, because a newer one replaced it. `date` is empty. */
+  skipped: boolean;
 }
 
 export interface ChangelogRelease {
@@ -85,6 +86,10 @@ const IN_REVIEW_HEADING = /^## \[[^\]]+\]\s+-\s+In review\s*$/;
 const SHARED_DATE_HEADING = /^## \[[^\]]+\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$/;
 /** `2026-10-14 (Android)`: one store's date in a mobile heading, as `scripts/release-notes.ts` writes it. */
 const STORE_DATE = /(\d{4}-\d{2}-\d{2}) \((iOS|Android)\)/g;
+/** `Skipped (Android)`: a store that will never ship the version, as `scripts/release-notes.ts` writes it. */
+const STORE_SKIPPED = /Skipped \((iOS|Android)\)/g;
+/** `1.4.8.1`: an over-the-air update of the store version `1.4.8`, as `scripts/release-notes.ts` writes it. */
+const OTA_VERSION = /^\d+\.\d+\.\d+\.\d+$/;
 const STORE_NAMES: Record<string, MobileStore> = { iOS: "ios", Android: "android" };
 const MOBILE_STORES: readonly MobileStore[] = ["ios", "android"];
 const GROUP_HEADING = /^### (.+)$/;
@@ -118,7 +123,12 @@ function storeAvailability(line: string, date: string): StoreAvailability[] {
     const store = STORE_NAMES[name];
     if (store && isRealDate(day)) dates.set(store, day);
   }
-  return MOBILE_STORES.map((store) => ({ store, date: dates.get(store) ?? "" })).sort(
+  const skipped = new Set<MobileStore>();
+  for (const [, name = ""] of line.matchAll(STORE_SKIPPED)) {
+    const store = STORE_NAMES[name];
+    if (store && !dates.has(store)) skipped.add(store);
+  }
+  return MOBILE_STORES.map((store) => ({ store, date: dates.get(store) ?? "", skipped: skipped.has(store) })).sort(
     (a, b) => (a.date === "" ? 1 : 0) - (b.date === "" ? 1 : 0) || a.date.localeCompare(b.date),
   );
 }
@@ -166,10 +176,15 @@ export function parseChangelog(
       const [, version = "", written = ""] = heading;
       // A date the page cannot format would stop the whole page from rendering.
       const firstDate = isRealDate(written) ? written : "";
-      const availability = stores ? storeAvailability(line, firstDate) : [];
+      // No store reviews an over-the-air update, so a store that its heading does not name never gets it.
+      const availability = (stores ? storeAvailability(line, firstDate) : []).filter(
+        (entry) => entry.date !== "" || !OTA_VERSION.test(version),
+      );
       group = undefined;
+      // A mobile version that no store made available, because each one reviews or skipped it.
+      const unavailable = stores && availability.every((entry) => entry.date === "");
       release =
-        version.toLowerCase() === "unreleased" || IN_REVIEW_HEADING.test(line)
+        version.toLowerCase() === "unreleased" || IN_REVIEW_HEADING.test(line) || unavailable
           ? undefined
           : {
               version,
@@ -250,6 +265,7 @@ export function changelogUrl(siteUrl: string = OPENBOT_SITE_URL, platform: Chang
 
 export function changelogHead(siteUrl: string, platform: ChangelogPlatform = "desktop") {
   const url = changelogUrl(siteUrl, platform);
+  const image = pageSocialImageMeta(CHANGELOG_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -261,14 +277,12 @@ export function changelogHead(siteUrl: string, platform: ChangelogPlatform = "de
       { property: "og:url", content: url },
       { property: "og:title", content: CHANGELOG_TITLE },
       { property: "og:description", content: CHANGELOG_DESCRIPTION },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: CHANGELOG_TITLE },
       { name: "twitter:description", content: CHANGELOG_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [{ rel: "canonical", href: url }],
   };

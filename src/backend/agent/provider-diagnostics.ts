@@ -8,9 +8,9 @@
  * list. That belongs in the log, not in an error the user is asked to read.
  *
  * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app. So does a server this app configured - the user asked for it here, and the reason it
- * does not start is something only they can fix. `configuredNames` is what separates the two: a
- * server the user configured in their own provider files is still nobody's failure but theirs.
+ * this app. A server this app configured is an MCP line too. The caller finds that server and
+ * reports it as the server's failure, not the provider's: the user asked for it here, and only they
+ * can fix it.
  *
  * Grok's CLI also loads the servers in `~/.claude.json`, `~/.cursor/mcp.json` and `.mcp.json`. One
  * there that asks for OAuth ends its transport with the `rmcp` worker's own sentence,
@@ -19,10 +19,33 @@
  * error" toast (#1199). The worker's sentence is matched as it stands, because no other part of a
  * provider writes it.
  */
-export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
+export function isMcpSubsystemDiagnostic(message: string): boolean {
   if (/openbot/i.test(message)) return false;
-  if (configuredNames.some((name) => name && message.includes(name))) return false;
   return /\b(mcp|rmcp)\b|\bworker quit with (?:fatal|join error|reason):/i.test(message);
+}
+
+/**
+ * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
+ *
+ * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. Codex CLI 0.169.0
+ * writes `The <name> MCP server is not logged in.` in its failed startup status (#9360). A bare
+ * `401` is not enough: a port, an id or a line number can be 401.
+ */
+export function isMcpSignInDiagnostic(message: string): boolean {
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot (?:authenticated|logged in)\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+    message,
+  );
+}
+
+/**
+ * Whether an MCP diagnostic says that the server did not answer in time. A provider can wait less
+ * than OpenBot's connection test, so a server that downloads packages at its start can pass the
+ * test and still time out in the provider. `deadline has elapsed` is the Rust `tokio` timeout text.
+ * A bare `timeout` does not count: a server name or a quoted option such as `--timeout` can hold it.
+ */
+export function isMcpTimeoutDiagnostic(message: string): boolean {
+  return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
 }
 
 /**
@@ -220,6 +243,25 @@ export function isGlogBelowErrorDiagnostic(message: string): boolean {
 }
 
 /**
+ * A Rust log record whose own level is below error, as in
+ * `2026-11-04T23:00:00.123456Z  INFO devin::acp: request failed, will retry` (`tracing`) or
+ * `[2026-11-04T23:00:00Z INFO  devin::acp] …` (`env_logger`).
+ *
+ * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
+ * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
+ * through as a provider error (#5064). The level of the record decides instead.
+ *
+ * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
+ * or text without a level - a Rust panic included - stays visible.
+ */
+const RUST_LOG_RECORD =
+  /^\[?(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?(?:TRACE|DEBUG|INFO|WARN)\s/u;
+
+export function isRustLogBelowErrorDiagnostic(message: string): boolean {
+  return RUST_LOG_RECORD.test(message);
+}
+
+/**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
  * something to act on, and it makes every repeat of one failure a new message.
@@ -249,12 +291,16 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 
 /**
  * Whether a provider says that a plan window is spent, a limit that resets by itself: "You've hit
- * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM.",
+ * your session limit · resets 8:40pm", "You've hit your 5-hour limit · resets 8:40pm" (#6906),
+ * "You've hit your usage limit. Try again at 10:34 AM.",
  * "You've reached your weekly usage limit for your plan. Your limit resets at …". The OpenCode Go
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
  * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
- * limit will reset at …" (#4469). Its reset names no zone, so it is not read. A spent credit
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
+ * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
+ * Usage resets over a rolling 24-hour window" (#4869). Cline names its plan between the window and
+ * "limit": "You have reached your weekly Clinepass limit. The limit resets in 8h 30m" (#10674). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -262,11 +308,15 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit\b/iu.test(
+      message,
+    ) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
-    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message) ||
+    /\bsubscription:free-usage-exhausted\b/u.test(message)
   );
 }
 
@@ -296,4 +346,126 @@ export function providerResetDelayMs(message: string): number | null {
 /** Whether a provider's text names money or a quota, which no wait gives back. */
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+}
+
+/**
+ * Whether a model endpoint refused an image in the request because a side is too short. The image
+ * stays in the provider session, which sends it on each turn, so each turn fails the same way until
+ * a new session (#6188). xAI writes "Image dimensions 6x8 are too small. Both width and height must
+ * be at least 8 pixels.", vLLM's Qwen vision models "height:22 or width:1568 must be larger than
+ * factor:28", and DashScope "The image length and width do not meet the model restrictions".
+ */
+export function isImageTooSmallDiagnostic(message: string): boolean {
+  return (
+    /\bimage\b[^.\n]{0,80}\btoo small\b/iu.test(message) ||
+    (/\bimage\b/iu.test(message) &&
+      /\b(?:height|width)\b[^.\n]{0,60}\bmust be at least \d+ ?(?:px|pixels?)\b/iu.test(message)) ||
+    /\bmust be larger than factor\b/iu.test(message) ||
+    /\bimage length and width do not meet the model restrictions\b/iu.test(message)
+  );
+}
+
+/**
+ * Whether a model endpoint refused an image in the request because it is too large. As for a too
+ * small image, the provider session keeps the image and sends it on each turn, so each turn fails
+ * the same way until a new session (#6429). A model behind OpenCode writes "Inline image exceeds
+ * maximum dimensions of 1024px on its longest side.", and Anthropic "At least one of the image
+ * dimensions exceed max allowed size for many-image requests: 2000 pixels".
+ */
+export function isImageTooLargeDiagnostic(message: string): boolean {
+  return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
+}
+
+/**
+ * Whether Google's Gemini API refused an image in the request because it cannot read it:
+ * INVALID_ARGUMENT "Unable to process input image. Please retry or report in ...". The Antigravity
+ * CLI 1.5.9 keeps the image in the session and sends it on each turn, so each later message failed
+ * with the same 400 until a new chat (#9593). For each provider. Google's generic text
+ * (`GEMINI_INVALID_ARGUMENT`) is matched for Antigravity only: a refused tool schema also gives it.
+ */
+export function isImageUnreadableDiagnostic(message: string): boolean {
+  return /\bUnable to process input image\b/iu.test(message);
+}
+
+/**
+ * Google's text for a 400 INVALID_ARGUMENT that names no field. Not the status name: a refused API
+ * key is also INVALID_ARGUMENT.
+ */
+export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
+
+/**
+ * Google's text for a request with an access token that is not valid: "UNAUTHENTICATED (code 401):
+ * Request had invalid authentication credentials. Expected OAuth 2 access token, ...". The Antigravity
+ * CLI 1.5.9 refreshes the token itself, and sent a request with the old token when it expired during
+ * a turn. The new token was ready less than a second later (#10367).
+ */
+export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
+
+/**
+ * A count of images in one clause, such as "at most 8 images", or Azure's "Exceeded maximum number of
+ * images (50) allowed in the request" (#11628).
+ */
+const IMAGE_COUNT_LIMIT =
+  /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])|\bmaximum number of images\b/iu;
+
+/** A limit over time, such as "at most 50 images per day", which a new session does not change. */
+const IMAGE_QUOTA_PERIOD =
+  /\b(?:per|a|each|every) (?:second|minute|hour|day|week|month)\b|\b(?:hourly|daily|weekly|monthly|quota)\b/iu;
+
+/**
+ * Whether a model endpoint refused the request because it holds more images than the endpoint
+ * accepts in one request. The provider session sends each image of the chat again on each turn, so
+ * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
+ * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
+ * 30", other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
+ * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
+ * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
+ * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
+ * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not
+ * a count in one request, so a clause that names a period does not match. A period in a different
+ * clause, such as "try again in a minute", does not stop the match.
+ */
+export function isImageCountDiagnostic(message: string): boolean {
+  return (
+    /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
+      message,
+    ) ||
+    // Split first: a pattern that also reads the clause around the count takes quadratic time on a long
+    // error text with no full stop.
+    message.split(/[.;\n]/u).some((clause) => IMAGE_COUNT_LIMIT.test(clause) && !IMAGE_QUOTA_PERIOD.test(clause))
+  );
+}
+
+/**
+ * Whether the model endpoint refused the request because its body is larger than the endpoint
+ * accepts. The ChatGPT backend that Codex uses writes "request body exceeds 67108864 bytes", or
+ * "decompressed request body exceeds 67108864 bytes" for a compressed request. Codex counts each
+ * image of the session at a small fixed token cost, so a session with many images grows past this
+ * byte limit before its token-based compaction starts, and each later turn fails the same way until
+ * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ * Google's Gemini API writes FAILED_PRECONDITION "The message size exceeds 30.000MB limit". The
+ * Antigravity CLI compacts a session by tokens and keeps each image that the agent opened, so a
+ * session with many images grows past it in the same way, and `/compact` fails too (#10517).
+ */
+export function isRequestBodyLimitDiagnostic(message: string): boolean {
+  return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
+}
+
+/**
+ * Whether a model endpoint refused a file, image or audio part in the request. OpenCode 2.1.1 sends
+ * a part when the model catalog lists its kind, or when the part has a kind it does not know, such as
+ * an MCP resource; OpenCode itself refuses a kind that the protocol cannot carry. The part stays in
+ * the provider session, so each turn fails the same way until a new session. A custom endpoint gets
+ * images by default, and its refusal names no OpenBot setting: "the selected model route accepts text
+ * only" (#6033), OpenAI's "image_url is only supported by certain models", and OpenRouter's "No
+ * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
+ * at position 124 with role 'user' contains an invalid part type: file" (#8654). Z.ai's text-only
+ * GLM models refuse an image with error 1210: "messages.content.type is invalid, allowed values:
+ * ['text']" (#10012). A local server refuses a screenshot that a tool returned to a text-only model:
+ * "MiniMax-M2.7-AWQ-4bit is not a multimodal model" (#11679).
+ */
+export function isUnreadableContentDiagnostic(message: string): boolean {
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+    message,
+  );
 }

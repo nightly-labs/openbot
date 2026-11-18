@@ -3,13 +3,18 @@ import type { ChannelService } from "../../backend/channel-service";
 import type { AcpRegistry } from "../acp-registry";
 import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentDefaultsSettingsService } from "../agent-defaults-settings";
 import type { AgentFolders } from "../agent-folders";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentInstructionsFiles } from "../agent-instructions-files";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
+import type { listBackgroundProcesses, stopBackgroundProcess } from "../background-processes";
 import type { BrowserProfileService } from "../browser-profile-service";
+import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
+import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { WorkflowGitHubDirectory } from "../github-rest";
@@ -17,17 +22,23 @@ import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
+import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
+import type { ProviderDetection } from "../provider-detection";
+import type { ProviderDetectionSettingsStore } from "../provider-detection-settings-store";
+import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
 import type { ServerAuditStore } from "../server-audit-store";
+import type { ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import type { ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
+import type { SkillLearningPreferenceStore } from "../skill-learning-preference-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
@@ -45,6 +56,8 @@ import type {
   CentralAuthUser,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
+  McpAccessLevel,
+  RemoteControlAccess,
   RoutineResultConnectionOption,
   RoutineResultDestination,
   RoutineResultRoutineInput,
@@ -57,10 +70,12 @@ import type {
   SidebarPinsSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
+  VoiceLiveEvent,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
+import type { CrmPeopleOperations } from "../../backend/crm/crm-handle";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import type { RoutineFlowsHandle } from "../../backend/routine-flows/routine-flows";
@@ -72,12 +87,17 @@ import type { AgentImportService } from "../agent-import-service";
 import type { BitwardenConnectorService } from "../bitwarden-connector-service";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { GitHubConnectorService } from "../github-connector-service";
+import type { HermesImportService } from "../hermes-import-service";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
+import type { LibraryFoldersService } from "../library-folders-service";
 import type { LiveActivityPushService } from "../live-activity-push";
+import type { McpAccessControl } from "../mcp-access-store";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
+import type { McpServerOwnersStore } from "../mcp-server-owners-store";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
+import type { PasswordManagersService } from "../password-managers/password-managers-service";
 import type { ProviderAccountsHost } from "../provider-accounts-host";
 import type { ProviderHostSignIns } from "../provider-host-sign-ins";
 import type { PushNotificationService } from "../push-notifications";
@@ -101,6 +121,8 @@ type TeamApiAgentMethods = Pick<
   | "listConversationReads"
   | "generateProfile"
   | "askSideQuestion"
+  | "saveSkillSuggestion"
+  | "withdrawFeedback"
   | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"
@@ -145,22 +167,33 @@ type TeamApiAgentMethods = Pick<
   | "discardDraftAttachment"
   | "resolveSharedFile"
   | "resolveWorkspaceFile"
+  | "resolveLocalWorkspaceFile"
   | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
+  | "listActiveQueues"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"
+  | "listPinnedMessages"
+  | "setMessagePinned"
   | "cancelQueuedMessage"
+  | "listWaits"
+  | "cancelWait"
   | "steerQueuedMessage"
   | "updateQueuedMessage"
   | "editQueuedMessage"
   | "reorderQueue"
   | "interrupt"
   | "clearAgentContext"
+  | "deleteAgentHistory"
+  | "clearChannelContext"
+  | "compactChannelContext"
+  | "deleteChannelHistory"
   | "compactAgentContext"
   | "compactTaskContext"
   | "agentIdForRequest"
+  | "pendingApproval"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"
@@ -168,8 +201,9 @@ type TeamApiAgentMethods = Pick<
 >;
 
 export type TeamApiAgents = TeamApiAgentMethods & {
-  on: (event: "event", listener: (event: AgentEvent) => void) => void;
-  off: (event: "event", listener: (event: AgentEvent) => void) => void;
+  /** With `memberId`, the event is only for the connections of that member. */
+  on: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
+  off: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
 };
 
 /**
@@ -180,6 +214,24 @@ export type TeamApiMcpServers = Pick<
   AgentService,
   "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
+
+/**
+ * Who added each MCP server. Its presence, beside `mcpServers`, is what `#protocolSupport` advertises
+ * `mcp-member-access-v1` on.
+ */
+export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove"> & {
+  /**
+   * The level of a member for an MCP server (`mcp-access-v1`). Absent on a host without the access
+   * entries: a member then manages a server that the member added, and uses each other one.
+   */
+  level?(mcpServerId: string, memberId: string): McpAccessLevel;
+};
+
+/**
+ * Which agents get each MCP server, and the level of each role for it. Its presence, beside
+ * `mcpServers`, is what `#protocolSupport` advertises `mcp-access-v1` on.
+ */
+export type TeamApiMcpAccess = McpAccessControl;
 
 /** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
 export type TeamApiMcpSignIns = Pick<
@@ -224,6 +276,8 @@ export interface TeamApiConnectors {
     | "removeWhatsAppSender"
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
+    | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
   >;
 }
 
@@ -245,7 +299,22 @@ export type TeamApiProviderHostSignIns = Pick<ProviderHostSignIns, "start" | "st
 /** Its presence is what `#protocolSupport` advertises `provider-accounts-v1` on. The routes are admin-only. */
 export type TeamApiProviderAccounts = Pick<
   ProviderAccountsHost,
-  "list" | "usage" | "startSignIn" | "signInStatus" | "cancelSignIn" | "rename" | "remove" | "setAgentAccount"
+  | "list"
+  | "models"
+  | "pools"
+  | "setPool"
+  | "usage"
+  | "startSignIn"
+  | "signInStatus"
+  | "cancelSignIn"
+  | "connectKey"
+  | "startCodeSignIn"
+  | "submitCodeSignIn"
+  | "codeSignInStatus"
+  | "cancelCodeSignIn"
+  | "rename"
+  | "remove"
+  | "setAgentAccount"
 >;
 
 /** Its presence is what `#protocolSupport` advertises `provider-usage-reset-v1` on. The routes are admin-only. */
@@ -254,18 +323,34 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 /** Its presence is what `#protocolSupport` advertises `provider-sign-out-v1` on. The route is admin-only. */
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
-/** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
-export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+/** Its presence is what `#protocolSupport` advertises `storage-v1`, `storage-disk-v1` and `storage-user-files-v1` on. */
+export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
+/** Its presence is what `#protocolSupport` advertises `library-folders-v1` on. Each member reads and changes the folders. */
+export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,
   "metrics" | "alerts" | "setAlerts" | "canBeResponsible" | "pending" | "subscribe"
 >;
+/**
+ * `background-processes-v1`: the programs that the host's agents left running. The routes are
+ * admin-only. The list redacts each command line, as Server Settings > Storage on this computer does.
+ */
+export interface TeamApiBackgroundProcesses {
+  list(): ReturnType<typeof listBackgroundProcesses>;
+  stop(id: string): ReturnType<typeof stopBackgroundProcess>;
+}
 /** `hosted-sites-v1`: the openbot.site sites of this server. Members list; only admins delete. */
 export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites" | "deleteServerSite">;
 
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
+
+/**
+ * `routine-run-place-v1` and `routine-pause-reasons-v1`: the routine records of each agent, of every
+ * trigger kind.
+ */
+export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
 
 /**
  * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
@@ -302,13 +387,16 @@ export interface TeamApiSidebarPins {
 
 /**
  * Its presence is what `#protocolSupport` advertises `agent-tasks-v1` and `agent-threads-v1` on. A member
- * who can send a message to the agent can use it. Moving a queued message into a task stays local.
+ * who can send a message to the agent can use it. It also moves a queued message into a task, under
+ * `agent-queue-task-v1`.
  */
 export type TeamApiAgentTasks = Pick<
   AgentService,
   | "listAgents"
   | "listTasks"
   | "readTask"
+  | "readTaskPage"
+  | "readTaskAround"
   | "startTask"
   | "sendMessage"
   | "stopTask"
@@ -319,6 +407,7 @@ export type TeamApiAgentTasks = Pick<
   | "listTaskReads"
   | "markTaskRead"
   | "branchTask"
+  | "runQueuedMessageAsTask"
 >;
 
 /**
@@ -328,12 +417,26 @@ export type TeamApiAgentTasks = Pick<
 export type TeamApiBrowserProfiles = BrowserProfileService;
 
 /** Its presence is what `#protocolSupport` advertises `agent-import-v1` on. Any member can use it. */
-export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;
+export type TeamApiAgentImport = Pick<
+  AgentImportService,
+  "stageUpload" | "openUpload" | "writeUpload" | "stageParts" | "apply" | "discard"
+>;
 
-/** Its presence is what `#protocolSupport` advertises `instance-transfer-v1` on. Only admins use it. */
+/**
+ * Its presence is what `#protocolSupport` advertises `hermes-import-v1` on. Only owners and admins use
+ * it. `read` reads the Hermes folder of the host; the client cannot name a folder.
+ */
+export interface TeamApiHermesImport extends Pick<HermesImportService, "apply" | "discard"> {
+  read: () => ReturnType<HermesImportService["stage"]>;
+}
+
+/**
+ * Its presence is what `#protocolSupport` advertises `instance-transfer-v1` and
+ * `instance-transfer-chunks-v1` on. Only admins use it.
+ */
 export type TeamApiInstanceTransfer = Pick<
   InstanceTransferService,
-  "summary" | "exportForMember" | "stageUpload" | "apply" | "discard"
+  "summary" | "exportForMember" | "stageUpload" | "apply" | "discard" | "chunks"
 >;
 
 /**
@@ -342,7 +445,7 @@ export type TeamApiInstanceTransfer = Pick<
  */
 export type TeamApiRoutineFlows = Pick<
   RoutineFlowsHandle,
-  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf"
+  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf" | "stopRun"
 >;
 
 /**
@@ -372,6 +475,11 @@ export type TeamApiWorkflows = Pick<
   | "workflowOf"
   | "githubHistory"
   | "githubLastEvent"
+  | "keepPicture"
+  | "mediaProviders"
+  | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**
@@ -380,6 +488,12 @@ export type TeamApiWorkflows = Pick<
      */
     github?: WorkflowGitHubDirectory;
   };
+
+/**
+ * Its presence is what `#protocolSupport` advertises `crm-v1` on. Only owners and admins use it; see
+ * `crm-v1.ts` for the grant.
+ */
+export type TeamApiCrm = CrmPeopleOperations;
 
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {
@@ -429,6 +543,8 @@ export interface TeamApiAdmin {
    * `agent-plan-card-v1`: whether it shows its plan card before a long task.
    */
   agentHost?: AgentHostSettingsService;
+  /** `agent-defaults-v1`: the agent defaults of this computer, and which agents follow them. */
+  agentDefaults?: AgentDefaultsSettingsService;
   /** `agent-folders-v1`: the folders that one agent can change besides its workspace. */
   folders?: Omit<AgentFolders, "requireAgent">;
   /** `agent-instructions-v1`: read and save the instruction file of one agent. */
@@ -437,8 +553,11 @@ export interface TeamApiAdmin {
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
   >;
-  /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
-  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
+  /**
+   * `skills-admin-v1`: list, install, remove and enable the skills of one agent. `github-skills-v1`:
+   * read the skills under a GitHub link.
+   */
+  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */
   sharedTables?: Pick<AgentService, "listTables" | "deleteTable">;
   /**
@@ -454,8 +573,17 @@ export interface TeamApiAdmin {
   identity?: TeamApiHostIdentity;
   /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
+  /**
+   * `host-restart-v1`: restart this host now. Only a self-hosted server has it: its service manager
+   * starts the app again after it quits. The host answers before it closes.
+   */
+  restart?: { request(memberId: string): void };
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  /** `host-turn-limits-v1`: the total turn limit and the default task limit of each agent. */
+  turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
+  /** `host-personality-v1`: how the server's agents talk while they work. Any member reads it. */
+  personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
   /**
@@ -472,14 +600,31 @@ export interface TeamApiAdmin {
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */
   memoryReview?: MemoryReviewPreferenceStore;
+  /** `skill-learning-v1`: what this computer's memory reviews do when a chat teaches an agent a skill. */
+  skillLearning?: SkillLearningPreferenceStore;
+  /** `browsing-memory-v1`: whether this computer learns from what people do in agent tabs they hold. */
+  browsingMemory?: BrowsingMemoryPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  /** `claude-user-setup-v1`: whether this computer's Claude agents load the Claude Code setup of its user. */
+  claudeUserSetup?: ClaudeUserSetupControl;
+  /** `claude-compact-window-v1`: the size at which Claude Code compacts the chats of this computer's agents. */
+  claudeCompactWindow?: ClaudeCompactWindowControl;
+  /** `provider-environment-v1`: the variables that each process of a provider of this computer starts with. */
+  providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
+  /** `provider-detection-v1`: the local model servers and ACP agent commands that this computer finds. */
+  providerDetection?: {
+    detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
+    settings: Pick<ProviderDetectionSettingsStore, "get" | "set">;
+  };
   /** `model-visibility-v1`: which models the model picker of this computer shows, for each provider. */
   modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
   /** `provider-default-v1`: the provider and model that a new agent of this computer starts on. */
   defaultProvider?: TeamApiDefaultProvider;
   /** `routine-results-v1`: the place where an agent routine sends its answers. */
   routineResults?: TeamApiRoutineResults;
+  /** `routine-run-command-v1`: the command that runs one routine from a script on this computer. */
+  routineRunCommand?: Pick<AgentService, "listAgents" | "automationRunCommand">;
 }
 
 /** A failure keeps its cause; a `RoutineResultError` cause is a refusal that the reader sees. */
@@ -505,6 +650,9 @@ interface TeamApiProviders {
     | "cancelProviderCodeLogin"
     | "changeProviderCredential"
     | "clearProviderCredential"
+    | "signInCodexWithApiKey"
+    | "getStatus"
+    | "setProviderOn"
   >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<
@@ -545,9 +693,12 @@ export type TeamApiBrowser = Pick<
   | "takeUserControl"
   | "releaseUserControl"
   | "releaseUserControlHeldBy"
+  // A task that a person shows, behind `browser-teach-v1`.
+  | "startTeach"
+  | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
-  // Behind `browser-sign-in`.
+  // Behind `browser-sign-in` and `browser-sign-in-storage-v1`.
   | "importSignIn"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.
@@ -584,8 +735,22 @@ export type TeamApiOnePasswordConnector = Pick<
 /** `bitwarden-connector-v1`: the Bitwarden connection of this host, by an API key and the master password. */
 export type TeamApiBitwardenConnector = Pick<BitwardenConnectorService, "status" | "connectWithApiKey" | "disconnect">;
 
+/** `password-managers-v1`: the password managers of this host, such as Proton Pass. */
+export type TeamApiPasswordManagers = Pick<
+  PasswordManagersService,
+  "list" | "refusal" | "connect" | "cancel" | "disconnect"
+>;
+
 /** `vault-v1`: the Vault of this host, for an owner or admin. The route uses no CSV import. */
 export type TeamApiVault = VaultService;
+
+/**
+ * `live-voice-v1`: Codex live voice for a member. The host starts the Codex process; the audio goes
+ * between the member's client and OpenAI. `subscribe` gives each transcript and end with its owner.
+ */
+export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVoice"> & {
+  subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
+};
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
@@ -595,11 +760,14 @@ export interface TeamApiOptions {
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;
+  mcpServerOwners?: TeamApiMcpServerOwners | undefined;
+  mcpAccess?: TeamApiMcpAccess | undefined;
   mcpSignIns?: TeamApiMcpSignIns | undefined;
   signInRelay?: TeamApiSignInRelay | undefined;
   connectors?: TeamApiConnectors | undefined;
   onePasswordConnector?: TeamApiOnePasswordConnector | undefined;
   bitwardenConnector?: TeamApiBitwardenConnector | undefined;
+  passwordManagers?: TeamApiPasswordManagers | undefined;
   vault?: TeamApiVault | undefined;
   providerHostSignIns?: TeamApiProviderHostSignIns | undefined;
   providerAccounts?: TeamApiProviderAccounts | undefined;
@@ -608,13 +776,19 @@ export interface TeamApiOptions {
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
+  libraryFolders?: TeamApiLibraryFolders;
   machine?: TeamApiMachine;
+  backgroundProcesses?: TeamApiBackgroundProcesses;
+  liveVoice?: TeamApiLiveVoice;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
+  hermesImport?: TeamApiHermesImport;
   instanceTransfer?: TeamApiInstanceTransfer;
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
+  crm?: TeamApiCrm;
   hiddenAgents?: TeamApiHiddenAgents;
+  routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
   sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
@@ -639,6 +813,8 @@ export interface TeamApiOptions {
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView | undefined;
   remoteScreen?: TeamApiRemoteScreen | undefined;
+  /** The roles that may control this computer through remote desktop. Every member when not set. */
+  remoteControlAccess?: (() => RemoteControlAccess) | undefined;
   redeemCentralTicket?: (
     ticket: string,
     serverId: string,

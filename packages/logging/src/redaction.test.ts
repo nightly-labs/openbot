@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenBotLogger,
   type LogValue,
+  redactSecrets,
   redactText,
   redactValue,
   registerSecretValue,
@@ -40,7 +41,10 @@ describe("redactText", () => {
       `gsk_${run(52)}`,
       `ASIA${"A1".repeat(8)}`,
       `rk_live_${run(24)}`,
+      `rk_test_${run(24)}`,
       `whsec_${run(32)}`,
+      // A Standard Webhooks secret in base64 has `+`, `/` and `=`.
+      `whsec_${run(10)}+${run(10)}/${run(10)}=`,
     ]) {
       expect(redactText(`key ${key} leaked`)).toBe("key [redacted] leaked");
     }
@@ -143,6 +147,18 @@ describe("redactText", () => {
     expect(redactText("note {not json} and more")).toBe("note {not json} and more");
   });
 
+  // An agent's reply goes through these rules before it is stored. Doubled brackets with no quoted
+  // key are a template or a link, not a record (#6437).
+  it("keeps template placeholders and links that are not records", () => {
+    expect(redactText("Dear {{name}}, see {{ a.b }} and [[Page]]")).toBe("Dear {{name}}, see {{ a.b }} and [[Page]]");
+    expect(redactText("m = [[a, b], [c, d]]")).toBe("m = [[a, b], [c, d]]");
+    expect(redactText("a chunk that ends {{na")).toBe("a chunk that ends {{na");
+    // Each placeholder is one read against the scan bound, so a template with many of them is kept.
+    const template = Array.from({ length: 16 }, (_, index) => `{{p${index}}}`).join(" ");
+    expect(redactText(template)).toBe(template);
+    expect(redactText('ERROR [{"headers":{"X-Tenant":"tenant-secret"}},]')).toBe("ERROR [redacted-unscanned]");
+  });
+
   it("redacts a serialized payload no matter how long it is", () => {
     const padding = "x".repeat(200_000);
     expect(redactText(JSON.stringify({ key: "pk_live_abcdefgh1234", padding }))).toBe(
@@ -156,6 +172,17 @@ describe("redactText", () => {
     // assignment is the only thing a rule can match, and it has to match under the provider prefix.
     expect(redactText("OPENCODE_API_KEY=abc123def")).not.toContain("abc123def");
     expect(redactText("contact jan@example.com please")).toBe("contact [redacted-email] please");
+  });
+
+  // The agent's own memories and history keep an address the user gave it, but never a secret (#5820).
+  it("keeps emails and redacts secrets for the agent", () => {
+    expect(redactSecrets("account jan@example.com, password=hunter2")).toBe(
+      "account jan@example.com, password=[redacted]",
+    );
+    expect(redactSecrets('note {"email":"jan@example.com","apiKey":"pk_live_9f2b3c4d5e"}')).toBe(
+      'note {"email":"jan@example.com","apiKey":"[redacted]"}',
+    );
+    expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {
@@ -238,8 +265,6 @@ describe("redactText", () => {
     expect(redactText('{"apiKey":"abcdef123456')).toBe("[redacted-unscanned]");
   });
 
-  // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
-  // around it is untouched: only the run itself is read as data.
   // A line can hold more payloads than the bound allows, and the regex rules match no header name,
   // so what was not read must not be shown.
   it("drops the rest of a line whose payloads pass the scan bound", () => {
@@ -248,19 +273,57 @@ describe("redactText", () => {
     expect(redacted).toContain("[redacted-unscanned]");
   });
 
+  // The agent reads its own replies back. Code has far more bracket runs than the bound, and a cut
+  // reply made the agent send broken code again (#10122).
+  it("keeps the rest of the agent's own text past the scan bound", () => {
+    const code = Array.from({ length: 40 }, (_, index) => `v${index} = close[${index}] > open[${index}]`).join("\n");
+    expect(redactSecrets(code)).toBe(code);
+    expect(redactSecrets(`${code}\ntoken = Bearer abcdef123456`)).toBe(`${code}\ntoken = [redacted]`);
+    expect(redactSecrets(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(`${code}\n{"apiKey":"[redacted]"}`);
+  });
+
   // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
   // full pass per brace. Every attempt counts against the bound, not only the ones that parse.
   it("bounds the work a line of open braces can cause", () => {
     const braces = "{".repeat(65_536);
     const started = performance.now();
-    // A brace followed by a brace opens what looks like a record, and the run never closes, so the
-    // whole line is dropped on the first read instead of once per brace.
-    expect(redactText(braces)).toBe("[redacted-unscanned]");
+    // No brace opens a record, because no quoted key follows, so the whole run is passed in one read
+    // instead of once per brace.
+    expect(redactText(braces)).toBe(braces);
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 
   it("keeps the text around an embedded payload", () => {
-    expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
+    expect(redactText("read [1, 2, 3] items")).toBe("read [1, 2, 3] items");
+  });
+
+  // A skill example reached the agent with other digits, because the payload was parsed and written
+  // again with nothing to redact in it (#7760).
+  it("keeps a payload that no rule changes as it was written", () => {
+    const example = 'Use:\n```json\n{"channelId": 1234567890123456789, "ids": [9876543210987654321]}\n```';
+    expect(redactText(example)).toBe(example);
+    expect(redactText('{"channelId": 1234567890123456789}')).toBe('{"channelId": 1234567890123456789}');
+    const result = JSON.stringify({ instructions: example });
+    expect(JSON.parse(redactText(result)).instructions).toBe(example);
+  });
+
+  it("writes a payload again when it has a secret or a key written twice", () => {
+    expect(redactText('note {"apiKey": "pk_live_9f2b3c4d5e", "n": 1}')).toBe('note {"apiKey":"[redacted]","n":1}');
+    // The parse keeps only the last `headers`, so the first one is never read and must not stay.
+    expect(redactText('ERROR {"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('ERROR {"headers":{}}');
+    expect(redactText('{"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('{"headers":{}}');
+  });
+
+  // Past the conversion depth bound the payload is cut, not kept, and a nesting too deep for the
+  // serializer must not turn the line into an unread one.
+  it("cuts a payload nested past the depth bound", () => {
+    const depth = 100_000;
+    const payload = `${'{"a":'.repeat(depth)}{"headers":{"X":"tenant-secret"}}${"}".repeat(depth)}`;
+    for (const line of [payload, `ERR ${payload}`]) {
+      const redacted = redactText(line);
+      expect(redacted).not.toContain("tenant-secret");
+      expect(redacted).toContain("[too deep]");
+    }
   });
 });
 
@@ -313,6 +376,20 @@ describe("registerSecretValue", () => {
     registerSecretValue("Basic c2VjcmV0");
 
     expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
+  });
+
+  // A saved password such as a company name made every link to the company's site `https:[redacted]`.
+  it("keeps the host of a web address, and masks its user part and path", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+    registerSecretValue("feedtoken42x");
+
+    expect(redactText("see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl")).toBe(
+      "see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl",
+    );
+    expect(redactText("https://example.com/feed/feedtoken42x")).toBe("https://example.com[redacted]");
+    expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
+    expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
+    expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

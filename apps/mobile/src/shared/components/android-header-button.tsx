@@ -5,11 +5,11 @@ import type { LucideIcon } from "lucide-react-native";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** The 40 dp round state layer of a Material icon button. */
 const ICON_RIPPLE = { borderless: true, radius: 20 } as const;
@@ -42,7 +42,7 @@ export function AndroidHeaderButton({
   onPress: () => void;
 } & ({ icon: LucideIcon; text?: undefined } | { icon?: undefined; text: string })) {
   const foreground = String(useThemeColor("foreground"));
-  const glass = useChromeGlass();
+  const glass = useChromeGlass({ shadow: false });
   const press = useRef(onPress);
   useLayoutEffect(() => {
     press.current = onPress;
@@ -79,10 +79,10 @@ export function AndroidHeaderButton({
 }
 
 /** The round back button that `androidBackOptions` puts in the header. */
-function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; onPress: () => void }) {
+export function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; onPress: () => void }) {
   const { t } = useText();
   const foreground = useThemeColor("foreground");
-  const glass = useChromeGlass();
+  const glass = useChromeGlass({ shadow: false });
   return (
     <Pressable
       accessibilityRole="button"
@@ -95,7 +95,7 @@ function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; 
       }}
     >
       <GlassCircle glass={hasGlass ? glass : undefined}>
-        <ArrowLeft color={String(foreground)} size={22} strokeWidth={2} />
+        <ArrowLeft color={String(foreground)} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
       </GlassCircle>
     </Pressable>
   );
@@ -126,7 +126,6 @@ export function androidBackOptions(
 function GlassCircle({ glass, children }: { glass?: ViewStyle; children: ReactNode }) {
   return (
     <View className="size-10 items-center justify-center overflow-hidden rounded-full" style={glass}>
-      {glass ? <ChromeGlassSheen /> : null}
       {children}
     </View>
   );

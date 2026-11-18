@@ -3,6 +3,7 @@ import { ACP_AGENT_PRESETS, CUSTOM_AGENT_LIMITS, type CustomAgentSummary } from 
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
@@ -27,6 +28,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -302,6 +304,7 @@ function CustomAgentForm({
           <SettingsRow
             disclosure={false}
             disabled={busy}
+            leading={<RowIcon icon={Trash2} tone="danger" />}
             onPress={() =>
               Alert.alert(
                 t("mobile.server.customAgents.removeTitle", { name: saved.name }),

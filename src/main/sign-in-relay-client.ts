@@ -6,6 +6,7 @@ import {
   loopbackCallback,
   type McpSignInRelayPage,
   relayCallbackQuery,
+  relayPageUrl,
   type SignInRelayStatus,
 } from "@openbot/contracts/ipc";
 import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -49,13 +50,18 @@ export function signInRelayRemote<E>(
 export interface SignInRelayClientDependencies {
   openExternal: (url: string) => Promise<void>;
   language: Pick<LanguageService, "locale" | "translate">;
-  /** The MCP grant listener of this computer, which takes the callbacks on its port by `state`. */
-  ownListener: () => { port: number; path: string } | null;
+  /** The MCP grant listener of this computer, which takes the callbacks on its port and paths by `state`. */
+  ownListener: () => { port: number; paths: readonly string[] } | null;
+  /**
+   * `openbot://mcp-auth` while the operating system opens it in this app, or `undefined`. Its
+   * callbacks reach `deliver` by `state` (`sign-in-relay-deep-link-v1`).
+   */
+  deepLinkRedirectUrl: () => string | undefined;
 }
 
 interface Waiting {
   page: McpSignInRelayPage;
-  /** The address the browser opens. It goes nowhere until the user, who sees its host name, asks. */
+  /** The address the browser opens. */
   url: string;
   /** `null` for a page that returns nowhere: no callback is its own. */
   state: string | null;
@@ -80,11 +86,10 @@ export interface ChosenSignInPage {
  * user pastes the address the browser shows. The query of the callback holds a grant: it goes only to
  * the host, and it is never logged.
  *
- * The host chooses the page, so a host that is not honest could ask for a grant of another account in
- * this browser. The page therefore opens only when the user, who sees its host name, asks; the port is
- * read from the page and not from the host's answer; and a page with no `state` is refused, so the
- * listener hands on only the callback of this sign-in. A page with no `state` that returns nowhere has
- * no callback to take, so the user can only open it.
+ * The page opens in the browser as soon as the sign-in waits, and the dialog shows its host name. The
+ * host chooses the page, so the port is read from the page and not from the host's answer, and a page
+ * with no `state` is refused, so the listener hands on only the callback of this sign-in. A page with
+ * no `state` that returns nowhere has no callback to take, so it only opens.
  */
 export class SignInRelayClient {
   readonly #dependencies: SignInRelayClientDependencies;
@@ -113,7 +118,12 @@ export class SignInRelayClient {
     return false;
   }
 
-  /** Opens the page of the sign-in of `key` in the user's browser, after they checked its host name. */
+  /** Whether a host's sign-in can return to this computer through `openbot://mcp-auth`. */
+  receivesDeepLink(): boolean {
+    return this.#dependencies.deepLinkRedirectUrl() !== undefined;
+  }
+
+  /** Opens the page of the sign-in of `key` in the user's browser again. */
   open(key: string): Promise<void> {
     const waiting = this.#waiting.get(key);
     if (!waiting) return Promise.reject(new Error(sourceText("error.mcp.relayEnded")));
@@ -133,9 +143,9 @@ export class SignInRelayClient {
   }
 
   /**
-   * Runs one relayed sign-in to its end. An interrupt or a failure cancels the flow on the host. With
-   * `chosen`, the page that the user already chose opens as soon as the callback can come back. The
-   * host names the page, so any other page ends the sign-in unopened.
+   * Runs one relayed sign-in to its end. An interrupt or a failure cancels the flow on the host. The
+   * page opens as soon as the callback can come back. With `chosen`, the host names the page, so any
+   * other page ends the sign-in unopened.
    */
   run<E>(key: string, remote: SignInRelayRemote<E>, chosen: ChosenSignInPage | null = null) {
     return this.#run(key, remote, chosen);
@@ -173,13 +183,13 @@ export class SignInRelayClient {
       // user only opens it, and the host's sign-in finishes by itself.
       if (!state && !callback) {
         wait({
-          page: { authorizeHost: page.host, listening: false, pasteable: false },
+          page: { authorizeHost: page.host, url: relayPageUrl(page), listening: false, pasteable: false },
           url: page.toString(),
           state: null,
           receive: () => undefined,
           accepted: () => false,
         });
-        yield* self.#openChosen(key, chosen);
+        yield* self.#openPage(key, chosen);
         return yield* awaitResult(remote, flowId);
       }
       if (!state) return { toolCount: 0, error: sourceText("error.mcp.relayNoState") };
@@ -192,16 +202,21 @@ export class SignInRelayClient {
         (server) => Effect.promise(() => server?.close() ?? Promise.resolve()),
       );
       const own = self.#dependencies.ownListener();
+      // A page that returns to `openbot://mcp-auth` comes back through `deliver` by itself.
+      const deepLink =
+        callback === null && page.searchParams.get("redirect_uri") === self.#dependencies.deepLinkRedirectUrl();
       const routed =
-        callback !== null && (listener !== null || (own?.port === callback.port && own.path === callback.path));
+        deepLink ||
+        (callback !== null &&
+          (listener !== null || (own?.port === callback.port && own.paths.includes(callback.path))));
       wait({
-        page: { authorizeHost: page.host, listening: routed, pasteable: true },
+        page: { authorizeHost: page.host, url: relayPageUrl(page), listening: routed, pasteable: true },
         url: page.toString(),
         state,
         receive: (value) => Deferred.doneUnsafe(query, Effect.succeed(value)),
         accepted: () => Deferred.isDoneUnsafe(query),
       });
-      yield* self.#openChosen(key, chosen);
+      yield* self.#openPage(key, chosen);
 
       // The host can end the sign-in first: its deadline passed, or another start replaced it.
       const ended = yield* Effect.raceFirst(
@@ -218,12 +233,24 @@ export class SignInRelayClient {
     );
   });
 
-  /** Opens the chosen page of the sign-in of `key`, which now waits, and tells the caller what it shows. */
-  #openChosen(key: string, chosen: ChosenSignInPage | null) {
+  /** Opens the page of the sign-in of `key`, which now waits. With `chosen`, tells the caller what it shows. */
+  #openPage(key: string, chosen: ChosenSignInPage | null) {
     const waiting = this.#waiting.get(key);
-    if (chosen === null || !waiting) return Effect.void;
-    chosen.onWaiting(waiting.page);
-    return Effect.promise(() => this.#dependencies.openExternal(waiting.url));
+    if (!waiting) return Effect.void;
+    // The dialog shows the page, so the user can open it again when the browser did not open. A chat
+    // shows the page only while this computer does not take the callback, so it also shows it then.
+    return Effect.tryPromise(() => this.#dependencies.openExternal(waiting.url)).pipe(
+      Effect.as(true),
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          logger.warn("OpenBot could not open a relayed sign-in page:", toLogValue(error.cause));
+          return false;
+        }),
+      ),
+      Effect.flatMap((opened) =>
+        Effect.sync(() => chosen?.onWaiting({ ...waiting.page, listening: waiting.page.listening && opened })),
+      ),
+    );
   }
 
   /**
@@ -236,9 +263,9 @@ export class SignInRelayClient {
     receive: (query: string) => void,
   ): Promise<LoopbackCallbackServer | null> {
     const own = this.#dependencies.ownListener();
-    if (!callback || (own?.port === callback.port && own.path === callback.path)) return null;
+    if (!callback || (own?.port === callback.port && own.paths.includes(callback.path))) return null;
     return startLoopbackCallbackServer({
-      path: callback.path,
+      paths: [callback.path],
       port: { exact: callback.port },
       language: this.#dependencies.language,
       noPort: () => new Error("The sign-in relay listener was given no port."),

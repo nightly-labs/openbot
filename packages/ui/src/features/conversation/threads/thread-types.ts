@@ -7,6 +7,8 @@ export type ThreadStatus =
   /** A message waits for a free turn. */
   | { kind: "queued" }
   | { kind: "waiting"; reason: SidebarWaitReason }
+  /** No turn runs, and the thread waits for the answers to its requests to other agents. */
+  | { kind: "awaiting" }
   | { kind: "failed" };
 
 /**
@@ -19,6 +21,8 @@ export interface ThreadItem {
   title: string;
   updatedAt: string;
   status: ThreadStatus;
+  /** The agent messages in the thread that the user has not read. Absent when the host keeps no read mark. */
+  unread?: number | undefined;
   /**
    * The tree lines before the title in the thread menu, for a branch under its source thread. Absent
    * at the top level and in the tabs.

@@ -1,7 +1,8 @@
 import { isAppLanguage } from "@openbot/contracts/app-language";
 import type { TranslatedLocale } from "@openbot/i18n";
 import { createIsomorphicFn } from "@tanstack/solid-start";
-import { getRequestHeader } from "@tanstack/solid-start/server";
+import { getCookie, getRequestHeader } from "@tanstack/solid-start/server";
+import { chosenSiteLocale, SITE_LOCALE_COOKIE } from "./site-paths";
 
 /** One language range of an `Accept-Language` header, with its quality. */
 interface LanguageRange {
@@ -36,15 +37,34 @@ function firstTranslated(tags: readonly string[]): TranslatedLocale {
   return "en";
 }
 
+/** The value of the cookie `name` in a `document.cookie` string. */
+function cookieValue(cookies: string, name: string): string | undefined {
+  for (const part of cookies.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return value.join("=");
+  }
+  return undefined;
+}
+
 /**
  * The language of the public pages that show catalog text. The root route reads it in
- * `beforeLoad`, and each page takes it from `match.context`. The server reads the request's
+ * `beforeLoad`, and each page takes it from `match.context`. The language that the visitor chose in
+ * the header (`SITE_LOCALE_COOKIE`) comes first. Without it, the server reads the request's
  * `Accept-Language` header. Hydration does not run `beforeLoad` again: the browser keeps the
  * server's value from the dehydrated context, so the first render matches the server HTML. On a
- * later navigation the browser reads `navigator.languages`, the list that it sends as that header.
+ * later navigation the browser reads the cookie and `navigator.languages`, the list that it sends as
+ * that header.
  *
  * Only the root route imports this, for the same reason as `servingSiteUrl`.
  */
 export const requestLocale = createIsomorphicFn()
-  .server(() => firstTranslated(acceptedLanguages(getRequestHeader("accept-language"))))
-  .client(() => firstTranslated(globalThis.navigator?.languages ?? []));
+  .server(
+    (): TranslatedLocale =>
+      chosenSiteLocale(getCookie(SITE_LOCALE_COOKIE)) ??
+      firstTranslated(acceptedLanguages(getRequestHeader("accept-language"))),
+  )
+  .client(
+    (): TranslatedLocale =>
+      chosenSiteLocale(cookieValue(globalThis.document?.cookie ?? "", SITE_LOCALE_COOKIE)) ??
+      firstTranslated(globalThis.navigator?.languages ?? []),
+  );

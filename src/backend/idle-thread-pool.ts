@@ -130,6 +130,16 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     this.#disarm(thread);
   }
 
+  /**
+   * Holds a thread with no turn whose provider starts a turn of its own soon. The idle limit and the
+   * release of idle threads at low memory do not close it, because they would end that turn before
+   * it starts; its timeout still does. Its turn holds it, and the end of that turn marks it idle.
+   */
+  awaitOwnTurn(thread: Thread): void {
+    thread.idleSince = 0;
+    this.#arm(thread);
+  }
+
   /** Marks a thread with no turn as idle, and closes the longest idle threads over the limit. */
   readonly markIdle = Effect.fn("IdleThreadPool.markIdle")(function* (
     this: IdleThreadPool<Thread, Released>,
@@ -208,6 +218,28 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
   releaseIdle(): Effect.Effect<void, ProviderClientOperationError> {
     return this.#releaseIdleOver(0);
   }
+
+  /**
+   * Closes each thread with no turn that `stale` names, also one that `canRelease` keeps from the
+   * timer. The caller owns that choice. Its next turn opens it again from its session. Returns the
+   * closed threads.
+   */
+  readonly releaseWhere = Effect.fn("IdleThreadPool.releaseWhere")(function* (
+    this: IdleThreadPool<Thread, Released>,
+    stale: (thread: Thread) => boolean,
+  ) {
+    const closed = [...this.#threads.values()].filter((thread) => this.#isIdle(thread) && stale(thread));
+    for (const thread of closed) yield* this.#release(thread);
+    return closed;
+  });
+
+  /** Closes the thread now, also during a turn, and keeps its snapshot so that its next turn opens it again. */
+  readonly releaseNow = Effect.fn("IdleThreadPool.releaseNow")(function* (
+    this: IdleThreadPool<Thread, Released>,
+    thread: Thread,
+  ) {
+    if (this.#threads.get(thread.id) === thread) yield* this.#release(thread);
+  });
 
   /** An armed release timer marks a thread that is idle and can be opened again. */
   readonly #releaseIdleOver = Effect.fn("IdleThreadPool.releaseIdleOver")(function* (

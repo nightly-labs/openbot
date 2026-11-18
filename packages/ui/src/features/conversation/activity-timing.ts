@@ -13,7 +13,7 @@ export function agentActivityExitDuration(): number {
 }
 
 export function agentActivityShowDelay(): number {
-  return rendererDuration("--openbot-duration-fast", 120);
+  return rendererDuration("--openbot-agent-activity-show-delay", 750);
 }
 
 export function agentActivityExitDelay(): number {

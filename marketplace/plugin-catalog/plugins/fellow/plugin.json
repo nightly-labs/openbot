@@ -1,0 +1,33 @@
+{
+  "slug": "fellow",
+  "name": "Fellow",
+  "tagline": "Meeting notes and actions",
+  "description": "Fellow lets agents search meetings and read their summaries, transcripts, and action items in the signed-in Fellow workspace. A workspace admin must turn on the MCP server, and each user signs in through the browser.",
+  "category": "productivity",
+  "creatorName": "Fellow",
+  "iconUrl": "https://framerusercontent.com/images/W3zP48ABQ5JvFZqDFzSM0WCWKg.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-open-actions", "text": "Which action items from my meetings this week are still open?" },
+    { "id": "prompt-meeting-summary", "text": "Summarize the last product review meeting." },
+    { "id": "prompt-prep", "text": "Prepare talking points for my next one-on-one from our past meetings." }
+  ],
+  "apps": [
+    {
+      "id": "app-fellow-mcp",
+      "name": "Fellow",
+      "description": "Meeting summaries, transcripts, and action items, over Fellow's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/W3zP48ABQ5JvFZqDFzSM0WCWKg.png",
+      "server": {
+        "name": "fellow",
+        "transport": "http",
+        "url": "https://fellow.app/mcp",
+        "auth": [{ "id": "fellow-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://fellow.ai",
+  "privacyPolicyUrl": "https://fellow.ai/privacy-policy",
+  "termsUrl": "https://fellow.ai/terms-of-use"
+}

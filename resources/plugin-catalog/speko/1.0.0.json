@@ -1,0 +1,33 @@
+{
+  "slug": "speko",
+  "name": "Speko",
+  "tagline": "Voice AI agents",
+  "description": "Speko lets agents build and manage voice AI agents, and read their calls, sessions, knowledge bases, and evaluations, in the Speko account of the signed-in user.",
+  "category": "automation",
+  "creatorName": "Speko",
+  "iconUrl": "https://speko.ai/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-list-agents", "text": "List my voice agents and their phone numbers." },
+    { "id": "prompt-today-calls", "text": "Summarize the calls my support agent handled today." },
+    { "id": "prompt-draft-prompt", "text": "Draft a system prompt for a voice agent that books dental appointments." }
+  ],
+  "apps": [
+    {
+      "id": "app-speko-mcp",
+      "name": "Speko",
+      "description": "Voice agents, calls, and knowledge bases, over Speko's MCP server with browser sign-in.",
+      "iconUrl": "https://speko.ai/apple-icon.png",
+      "server": {
+        "name": "speko",
+        "transport": "http",
+        "url": "https://mcp.speko.ai/mcp",
+        "auth": [{ "id": "speko-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://speko.ai",
+  "privacyPolicyUrl": "https://speko.ai/privacy-policy",
+  "termsUrl": "https://speko.ai/terms-of-service",
+  "skills": []
+}

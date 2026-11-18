@@ -2,7 +2,7 @@
 // Instructions page. The folders and the Instructions page also work for a joined server's agent,
 // through `agent-folders-v1` and `agent-instructions-v1`.
 
-import { agentFolderParent } from "@openbot/contracts/ipc";
+import { agentFolderParent, type OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
 import type {
   AgentInstructionsCalls,
@@ -32,12 +32,31 @@ export type HostFolderPickFn = (
   start: string | null,
 ) => Promise<string | null>;
 
+/** The host calls behind a joined server's folders. The desktop sends them through preload. */
+export type AgentFoldersApi = Pick<
+  OpenBotDesktopApi["agent"],
+  | "listAgentFolders"
+  | "addAgentFolder"
+  | "removeAgentFolder"
+  | "addAgentExclusion"
+  | "removeAgentExclusion"
+  | "browseAgentFolders"
+>;
+
+/** The host calls behind a joined server's Instructions page. The desktop sends them through preload. */
+export type AgentInstructionsApi = Pick<OpenBotDesktopApi["agent"], "readAgentInstructions" | "saveAgentInstructions">;
+
 /**
  * The folders of an agent on a joined server. The native picker shows only this computer, so `pick`
  * lists the folders of the host. A folder dropped from this computer is not on the host: no `drop`.
+ * The web client gives its own `api`, which calls the connected host.
  */
-export function remoteAgentFolderCalls(serverId: string, pick: HostFolderPickFn): AgentFolderCalls {
-  const agent = () => window.openbot.agent;
+export function remoteAgentFolderCalls(
+  serverId: string,
+  pick: HostFolderPickFn,
+  api?: AgentFoldersApi,
+): AgentFolderCalls {
+  const agent = () => api ?? window.openbot.agent;
   const list = (agentId: string) => agent().listAgentFolders(agentId, serverId);
   return {
     list,
@@ -68,8 +87,8 @@ export function remoteAgentFolderCalls(serverId: string, pick: HostFolderPickFn)
 }
 
 /** The folders in one folder of a joined server's computer, for the host folder browser. */
-export function browseHostFolders(serverId: string, agentId: string, path: string | null) {
-  return window.openbot.agent.browseAgentFolders({ agentId, path }, serverId);
+export function browseHostFolders(serverId: string, agentId: string, path: string | null, api?: AgentFoldersApi) {
+  return (api ?? window.openbot.agent).browseAgentFolders({ agentId, path }, serverId);
 }
 
 type InstructionsWatcher = Parameters<AgentInstructionsFileCalls["watch"]>[0];
@@ -94,12 +113,16 @@ function watchersOf(serverKey: string): Set<InstructionsWatcher> {
  * joined server's file comes through `agent-instructions-v1`, and this computer cannot show it in the
  * file manager.
  */
-export function agentInstructionsCalls(serverId?: string): Omit<AgentInstructionsCalls, "openLink"> {
+export function agentInstructionsCalls(
+  serverId?: string,
+  api?: AgentInstructionsApi,
+): Omit<AgentInstructionsCalls, "openLink"> {
   const watchers = watchersOf(serverId ?? "");
+  const agent = () => api ?? window.openbot.agent;
   return {
-    read: (agentId) => window.openbot.agent.readAgentInstructions(agentId, serverId),
+    read: (agentId) => agent().readAgentInstructions(agentId, serverId),
     save: async (agentId, text, expected) => {
-      const file = await window.openbot.agent.saveAgentInstructions({ agentId, text, expected }, serverId);
+      const file = await agent().saveAgentInstructions({ agentId, text, expected }, serverId);
       for (const watcher of watchers) watcher(agentId, file);
       return file;
     },

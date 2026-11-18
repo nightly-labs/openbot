@@ -2,13 +2,33 @@
   "fill-specializations": [
     {
       "value": {
-        "solid": "display-p3:0.81396,0.68457,0.93115,1.00000"
+        "linear-gradient": ["display-p3:0.86726,0.73451,1.00000,1.00000", "display-p3:0.66522,0.56340,0.76704,1.00000"],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 0.7
+          }
+        }
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "solid": "srgb:0.00000,0.00000,0.00000,1.00000"
+        "linear-gradient": ["display-p3:0.11699,0.11737,0.11850,1.00000", "display-p3:0.07498,0.07395,0.07647,1.00000"],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 0.7
+          }
+        }
       }
     }
   ],
@@ -16,17 +36,25 @@
     {
       "layers": [
         {
+          "blend-mode": "normal",
           "fill-specializations": [
+            {
+              "value": "automatic"
+            },
             {
               "appearance": "dark",
               "value": {
-                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+                "solid": "extended-gray:1.00000,1.00000"
               }
             }
           ],
           "glass-specializations": [
             {
-              "value": false
+              "value": true
+            },
+            {
+              "appearance": "dark",
+              "value": true
             },
             {
               "appearance": "tinted",
@@ -38,11 +66,8 @@
           "name": "eyes",
           "opacity": 1,
           "position": {
-            "scale": 0.206,
-            "translation-in-points": [
-              0,
-              -14
-            ]
+            "scale": 0.21,
+            "translation-in-points": [0, 0]
           }
         }
       ],

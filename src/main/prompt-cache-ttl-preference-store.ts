@@ -20,6 +20,7 @@ export class PromptCacheTtlPreferenceStore {
   readonly #path: string;
   #ttl: PromptCacheTtl = DEFAULT_PROMPT_CACHE_TTL.ttl;
   #writes = Semaphore.makeUnsafe(1);
+  #changed: () => void = () => undefined;
 
   constructor(path: string) {
     this.#path = path;
@@ -39,22 +40,36 @@ export class PromptCacheTtlPreferenceStore {
     });
   }
 
+  /** Runs after a save that changes the time, from this computer or a joined server, so every client reads it again. */
+  onChange(listener: () => void): void {
+    this.#changed = listener;
+  }
+
   get(): PromptCacheTtlSetting {
     return { ttl: this.#ttl };
   }
 
   readonly set = Effect.fn("PromptCacheTtlPreference.set")((ttl: PromptCacheTtl) =>
-    this.#writes.withPermit(
-      Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, ttl }).pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
+    this.#writes
+      .withPermit(
+        Effect.uninterruptible(
+          writePreferenceFile(this.#path, { version: 1, ttl }).pipe(
+            Effect.map(() => {
+              const changed = this.#ttl !== ttl;
               this.#ttl = ttl;
+              return changed;
             }),
           ),
-          Effect.map(() => this.get()),
         ),
+      )
+      .pipe(
+        // After the permit, and only for a new time: the clients read it again.
+        Effect.tap((changed) =>
+          Effect.sync(() => {
+            if (changed) this.#changed();
+          }),
+        ),
+        Effect.map(() => this.get()),
       ),
-    ),
   );
 }

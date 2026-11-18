@@ -3,6 +3,7 @@ import { createSignal, createUniqueId, For, flush, Match, onSettled, Switch } fr
 import { SITE_NAVIGATION_LINKS, SITE_NAVIGATION_SECTIONS, type SiteNavigationSection } from "../../lib/site-navigation";
 import { LandingIcon } from "./LandingIcon";
 import { SiteNavigationPanel } from "./SiteNavigationPanel";
+import { useSiteChrome, useSitePath } from "./SiteText";
 
 // The header menu on a wide screen. A Solid port of the Kobra navigation menu
 // (https://kobra.systems/components/navigation-menu), which is React on Base UI.
@@ -38,6 +39,9 @@ const CLOSE_DELAY_MS = 180;
 const VIEWPORT_GUTTER_PX = 16;
 
 export function SiteNavigationMenu() {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text;
+  const path = useSitePath();
   const baseId = createUniqueId();
   const [active, setActive] = createSignal<SectionId | null>(null);
   const [motion, setMotion] = createSignal<MenuMotion>({ opened: "enter" });
@@ -280,7 +284,7 @@ export function SiteNavigationMenu() {
     <nav
       ref={root}
       class="site-nav"
-      aria-label="Primary navigation"
+      aria-label={text().primaryNavigation}
       data-state={active() ? "open" : "closed"}
       onPointerEnter={() => clearTimeout(closeTimer)}
       onPointerLeave={(event) => {
@@ -309,7 +313,7 @@ export function SiteNavigationMenu() {
                         onPointerEnter={(event) => handleTriggerPointerEnter(event, section.id)}
                         onPointerLeave={() => clearTimeout(openTimer)}
                       >
-                        {section.label}
+                        {text().sections[section.id].label}
                         <LandingIcon name="chevron-down" class="site-nav-chevron" />
                       </Link>
                     )}
@@ -326,7 +330,7 @@ export function SiteNavigationMenu() {
                       onPointerDown={(event) => (pressPointer = event.pointerType)}
                       onClick={(event) => handleButtonTriggerClick(event, section.id)}
                     >
-                      {section.label}
+                      {text().sections[section.id].label}
                       <LandingIcon name="chevron-down" class="site-nav-chevron" />
                     </button>
                   </Match>
@@ -350,12 +354,12 @@ export function SiteNavigationMenu() {
               <li class="site-nav-item">
                 <Link
                   class="site-nav-trigger site-nav-link"
-                  to={link.to}
+                  to={path(link.to)}
                   onPointerEnter={(event) => {
                     if (event.pointerType === "mouse") reachLink(event.currentTarget);
                   }}
                 >
-                  {link.label}
+                  {text().links[link.id]}
                 </Link>
               </li>
             )}

@@ -1,0 +1,132 @@
+name: Release health
+
+# Every two hours in the first 72 hours after a desktop release, compares how the new release starts
+# and keeps running with the release before it (scripts/release-health.ts). When a metric is clearly
+# worse, it posts the rows to the private release regression Discord channel: keep the staged rollout
+# where it is. This repository is public, so the log must show no data: the script runs with --quiet,
+# the report is not uploaded, and errors go only to Discord. The secrets and the tunnel are the same as
+# for release-regression.yml, in the `analytics` environment, which only `main` can use.
+on:
+  schedule:
+    - cron: "41 */2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the newest release
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: analytics
+    permissions:
+      contents: read
+    steps:
+      # Most runs come after the first 72 hours of a release. They stop here, before the tunnel, so an
+      # analytics outage posts nothing when no release needs the check.
+      - name: Check the age of the newest release
+        id: age
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          published="$(gh release view --repo "$REPOSITORY" --json publishedAt --jq .publishedAt)"
+          age=$(( $(date -u +%s) - $(date -u -d "$published" +%s) ))
+          if [ "$age" -le $((72 * 3600)) ]; then echo "fresh=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Check out repository
+        if: steps.age.outputs.fresh == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        if: steps.age.outputs.fresh == 'true'
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      # The state is an HMAC of the last posted rows, keyed by the webhook URL, so the cache shows no
+      # data. The same worse rows of a release are posted once.
+      - name: Restore the last posted rows
+        if: steps.age.outputs.fresh == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/release-health-state
+          key: release-health-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: release-health-state-
+
+      - name: Open the tunnel to the analytics server
+        if: steps.age.outputs.fresh == 'true'
+        env:
+          SSH_KEY: ${{ secrets.RELEASE_REGRESSION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_REGRESSION_SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.RELEASE_REGRESSION_SSH_HOST }}
+        run: |
+          dir="$RUNNER_TEMP/release-health-ssh"
+          install -d -m 0700 "$dir"
+          printf '%s\n' "$SSH_KEY" > "$dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          chmod 0600 "$dir/key" "$dir/known_hosts"
+          # -q keeps the host name out of the log.
+          ssh -q -F /dev/null -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
+            -M -S "$dir/control" \
+            -f -N -L 127.0.0.1:18123:127.0.0.1:18123 "openpanel-ci@$SSH_HOST" \
+            || { echo "The tunnel did not open."; exit 1; }
+
+      - name: Check the release
+        if: steps.age.outputs.fresh == 'true'
+        # Shorter than the job limit, so the failure step below still has time to run.
+        timeout-minutes: 7
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENPANEL_CLICKHOUSE_URL: http://127.0.0.1:18123/
+          OPENPANEL_CLICKHOUSE_USER: ${{ secrets.OPENPANEL_CLICKHOUSE_USER }}
+          OPENPANEL_CLICKHOUSE_PASSWORD: ${{ secrets.OPENPANEL_CLICKHOUSE_PASSWORD }}
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+          STATE_FILE: ${{ runner.temp }}/release-health-state/sent
+        run: |
+          set +e
+          bun scripts/release-health.ts latest --max-age 72 --quiet --discord --state "$STATE_FILE"
+          code=$?
+          # 3: not enough data yet, which is normal in the first hours.
+          if [ "$code" -eq 3 ]; then exit 0; fi
+          # 1 (worse) and 2 (error): the script posted to Discord itself.
+          if [ "$code" -ne 0 ]; then : > "$RUNNER_TEMP/release-health-notified"; fi
+          exit "$code"
+
+      # A failure that the script did not handle (the tunnel, a timeout, a cancel): post a notice here.
+      - name: Post a notice after a failure
+        if: failure() || cancelled()
+        env:
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+        run: |
+          if [ -f "$RUNNER_TEMP/release-health-notified" ]; then exit 0; fi
+          # curl output can contain the webhook URL, so it goes nowhere.
+          curl -sS --fail --max-time 30 -o /dev/null -H 'Content-Type: application/json' \
+            -d '{"allowed_mentions":{"parse":[]},"embeds":[{"title":"🔴 Release health check failed","description":"The check did not finish: the tunnel did not open, or the run timed out or was cancelled.","color":15548997}]}' \
+            "$RELEASE_REGRESSION_WEBHOOK_URL?wait=true" 2>/dev/null \
+            || echo "The failure could not be sent to Discord."
+
+      - name: Save the posted rows
+        if: always() && steps.age.outputs.fresh == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/release-health-state
+          key: release-health-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Remove the key and the report
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/release-health-ssh"
+          if [ -S "$dir/control" ]; then
+            ssh -q -F /dev/null -S "$dir/control" -O exit tunnel || true
+          fi
+          rm -rf "$RUNNER_TEMP/release-health-ssh" .openbot-build/release-health

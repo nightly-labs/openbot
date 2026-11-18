@@ -1,0 +1,33 @@
+{
+  "slug": "era",
+  "name": "Era",
+  "tagline": "Personal finance",
+  "description": "Era lets agents read the accounts, transactions and insights of the bank accounts that the user connects to Era. Each user signs in to their own Era account through the browser.",
+  "category": "productivity",
+  "creatorName": "Era",
+  "iconUrl": "https://era.app/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-spending", "text": "How much did I spend on restaurants last month?" },
+    { "id": "prompt-subscriptions", "text": "Which recurring subscriptions am I paying for?" },
+    { "id": "prompt-balances", "text": "Summarize my account balances." }
+  ],
+  "apps": [
+    {
+      "id": "app-era-mcp",
+      "name": "Era",
+      "description": "Accounts, transactions, and insights, over Era's MCP server with browser sign-in.",
+      "iconUrl": "https://era.app/favicon.ico",
+      "server": {
+        "name": "era",
+        "transport": "http",
+        "url": "https://context.era.app/mcp",
+        "auth": [{ "id": "era-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://era.app",
+  "privacyPolicyUrl": "https://era.app/privacy",
+  "termsUrl": "https://era.app/terms",
+  "skills": []
+}

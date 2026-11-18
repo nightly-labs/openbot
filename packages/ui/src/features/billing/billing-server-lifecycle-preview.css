@@ -32,6 +32,7 @@
 .billing-lifecycle-dialog-icon svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .billing-lifecycle-server-copy {
@@ -65,6 +66,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   color: var(--openbot-warning-text);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .billing-lifecycle-receipt {

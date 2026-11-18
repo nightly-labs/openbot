@@ -45,7 +45,6 @@ export const messages = {
   "error.marketplace.templateTooLarge": "该助手体积过大无法发布，请精简其指令、技能或自动化任务。",
   "error.marketplace.linkInvalid": "助手链接无效。",
   "error.marketplace.changedSinceOpened": "该助手在你打开之后发生了变化，请重新打开链接查看新版本。",
-  "error.marketplace.skillNameConflict": "你已有一个不同的同名本地技能“{name}”，请重命名或移除它后再添加该助手。",
   "error.marketplace.avatarInvalid": "助手头像无效。",
   "error.marketplace.secretInName": "发布前请从名称中移除密钥或邮箱地址。",
   "error.marketplace.secretInTitle": "发布前请从称号中移除密钥或邮箱地址。",

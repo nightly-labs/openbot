@@ -23,7 +23,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { AppDrawerShownContext, AppDrawerShownOnUIContext } from "@/features/servers/components/app-drawer-activity";
+import { AppDrawerShownOnUIContext } from "@/features/servers/components/app-drawer-activity";
 import { ServerDrawerContent } from "@/features/servers/components/server-drawer-content";
 import {
   useMobileWorkspaceActions,
@@ -32,6 +32,7 @@ import {
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 
 interface AppDrawerContextValue {
   openDrawer: () => void;
@@ -86,8 +87,12 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const drawerShownOnUI = useSharedValue(false);
   const drawerProgress = useSharedValue(0);
   // The surface stays in view at the right, clear of a right inset (the iPhone Duo rail).
-  const drawerWidth = Math.min(360, Math.max(280, width - insets.right - 52));
-  const drawerSideInset = Math.max(insets.left, 18);
+  // The drawer is at the start edge: the left, or the right in a right-to-left layout. The insets
+  // are sides of the screen, so they are picked for that edge.
+  const startInset = END_X === 1 ? insets.left : insets.right;
+  const endInset = END_X === 1 ? insets.right : insets.left;
+  const drawerWidth = Math.min(360, Math.max(280, width - endInset - 52));
+  const drawerSideInset = Math.max(startInset, 18);
   const surfaceCornerRadius = Math.max(DRAWER_SURFACE_MIN_RADIUS, insets.top, insets.right, insets.bottom, insets.left);
 
   const drawerOpenOnUI = useSharedValue(false);
@@ -163,16 +168,17 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
         "worklet";
         if (!openingEnabled.get() || drawerOpenOnUI.get()) GestureStateManager.fail(event.handlerTag);
       },
-      activeOffsetX: 12,
-      failOffsetX: -10,
+      activeOffsetX: 12 * END_X,
+      failOffsetX: -10 * END_X,
       failOffsetY: [-10, 10],
       onUpdate: (event) => {
         "worklet";
-        drawerProgress.set(Math.min(1, Math.max(0, event.translationX / drawerWidth)));
+        drawerProgress.set(Math.min(1, Math.max(0, (event.translationX * END_X) / drawerWidth)));
       },
       onDeactivate: (event) => {
         "worklet";
-        const projected = drawerProgress.get() + event.velocityX / drawerWidth / 6;
+        const velocity = (event.velocityX * END_X) / drawerWidth;
+        const projected = drawerProgress.get() + velocity / 6;
         const shouldOpen = projected > 0.45;
         if (shouldOpen) {
           drawerOpenOnUI.set(true);
@@ -180,11 +186,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
           scheduleOnRN(commitDrawerState, true);
         }
         drawerProgress.set(
-          withSpring(
-            shouldOpen ? 1 : 0,
-            { ...DRAWER_SPRING, velocity: event.velocityX / drawerWidth },
-            shouldOpen ? finishOpening : undefined,
-          ),
+          withSpring(shouldOpen ? 1 : 0, { ...DRAWER_SPRING, velocity }, shouldOpen ? finishOpening : undefined),
         );
       },
     }),
@@ -198,20 +200,21 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
         .onTouchesDown((_event, manager) => {
           if (!drawerOpenOnUI.get()) manager.fail();
         })
-        .activeOffsetX(-8)
-        .failOffsetX(12)
+        .activeOffsetX(-8 * END_X)
+        .failOffsetX(12 * END_X)
         .failOffsetY([-12, 12])
         .onUpdate((event) => {
-          drawerProgress.set(Math.min(1, Math.max(0, 1 + event.translationX / drawerWidth)));
+          drawerProgress.set(Math.min(1, Math.max(0, 1 + (event.translationX * END_X) / drawerWidth)));
         })
         .onEnd((event) => {
-          const projected = drawerProgress.get() + event.velocityX / drawerWidth / 6;
+          const velocity = (event.velocityX * END_X) / drawerWidth;
+          const projected = drawerProgress.get() + velocity / 6;
           const shouldOpen = projected > 0.55;
           if (!shouldOpen) scheduleOnRN(triggerDrawerHaptic);
           drawerProgress.set(
             withSpring(
               shouldOpen ? 1 : 0,
-              { ...DRAWER_SPRING, velocity: event.velocityX / drawerWidth },
+              { ...DRAWER_SPRING, velocity },
               // A drag that started before the opening motion ended stopped that motion and its callback.
               shouldOpen ? finishOpening : finishClosing,
             ),
@@ -222,7 +225,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   const surfaceStyle = useAnimatedStyle(() =>
     isAndroid
-      ? { transform: [{ translateX: drawerProgress.get() * drawerWidth }] }
+      ? { transform: [{ translateX: drawerProgress.get() * drawerWidth * END_X }] }
       : {
           borderRadius: interpolate(
             drawerProgress.get(),
@@ -230,7 +233,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
             [0, surfaceCornerRadius],
             Extrapolation.CLAMP,
           ),
-          transform: [{ translateX: drawerProgress.get() * drawerWidth }],
+          transform: [{ translateX: drawerProgress.get() * drawerWidth * END_X }],
         },
   );
   // Android: the radius and the shadow change only when the drawer leaves or reaches its closed place.
@@ -243,7 +246,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const drawerStyle = useAnimatedStyle(() => ({
     // Android: a closed drawer lies fully under the surface. At opacity 0, Android does not draw it.
     opacity: isAndroid && drawerProgress.get() <= 0 ? 0 : interpolate(drawerProgress.get(), [0, 1], [0.55, 1]),
-    transform: [{ translateX: interpolate(drawerProgress.get(), [0, 1], [-24, 0]) }],
+    transform: [{ translateX: interpolate(drawerProgress.get(), [0, 1], [-24 * END_X, 0]) }],
   }));
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(drawerProgress.get(), [0, 1], [0, 0.5]),
@@ -285,90 +288,85 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   return (
     <AppDrawerContext.Provider value={contextValue}>
-      <AppDrawerShownContext.Provider value={drawerPhase !== "closed"}>
-        <AppDrawerShownOnUIContext.Provider value={drawerShownOnUI}>
-          <GestureDetector gesture={closingGesture}>
-            <View className="flex-1 bg-sidebar">
-              <Animated.View
-                style={[
-                  {
-                    bottom: 0,
-                    left: 0,
-                    paddingBottom: Math.max(insets.bottom, 12),
-                    paddingLeft: drawerSideInset,
-                    position: "absolute",
-                    top: 0,
-                    width: drawerWidth,
-                  },
-                  drawerStyle,
-                ]}
-                accessibilityElementsHidden={!drawerOpen}
-                importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
-                // Android: while the drawer moves, its fading content draws from one cached layer.
-                renderToHardwareTextureAndroid={isAndroid && drawerPhase === "moving"}
-              >
-                <ServerDrawerContent
-                  activeServerId={activeServerId}
-                  muted={muted}
-                  open={drawerSettled}
-                  servers={servers}
-                  session={session}
-                  sideInset={drawerSideInset}
-                  topInset={insets.top}
-                  onNavigate={navigateAfterClosing}
-                  onLeave={leaveServer}
-                  onRemove={removeServer}
-                  onDelete={deleteLocalServer}
-                  localServerKind={localServerKind}
-                  onReorder={reorderServers}
-                  onSelectServer={selectServerAndClose}
-                />
-              </Animated.View>
+      <AppDrawerShownOnUIContext.Provider value={drawerShownOnUI}>
+        <GestureDetector gesture={closingGesture}>
+          <View className="flex-1 bg-sidebar">
+            <Animated.View
+              style={[
+                {
+                  bottom: 0,
+                  left: 0,
+                  paddingBottom: Math.max(insets.bottom, 12),
+                  paddingLeft: drawerSideInset,
+                  position: "absolute",
+                  top: 0,
+                  width: drawerWidth,
+                },
+                drawerStyle,
+              ]}
+              accessibilityElementsHidden={!drawerOpen}
+              importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
+              // Android: while the drawer moves, its fading content draws from one cached layer.
+              renderToHardwareTextureAndroid={isAndroid && drawerPhase === "moving"}
+            >
+              <ServerDrawerContent
+                activeServerId={activeServerId}
+                muted={muted}
+                open={drawerSettled}
+                servers={servers}
+                session={session}
+                sideInset={drawerSideInset}
+                topInset={insets.top}
+                onNavigate={navigateAfterClosing}
+                onLeave={leaveServer}
+                onRemove={removeServer}
+                onDelete={deleteLocalServer}
+                localServerKind={localServerKind}
+                onReorder={reorderServers}
+                onSelectServer={selectServerAndClose}
+              />
+            </Animated.View>
 
-              <GestureDetector gesture={openingGesture}>
-                <Animated.View
-                  className="flex-1 overflow-hidden bg-background"
-                  style={
-                    isAndroid
-                      ? [{ borderCurve: "continuous" }, androidSurfaceEdgeStyle, surfaceStyle]
-                      : [
-                          {
-                            borderCurve: "continuous",
-                            boxShadow: "-12px 0 32px rgba(0, 0, 0, 0.28)",
-                          },
-                          surfaceStyle,
-                        ]
-                  }
-                >
-                  <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
-                    {children}
-                  </Animated.View>
-                  <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
-                    {/* Android: without a blur method this view is only a tint, one more full-screen layer to
-                    draw on each frame. The scrim keeps the dimming. */}
-                    {isAndroid ? null : (
-                      <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
-                        <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />
-                      </Animated.View>
-                    )}
-                    <Animated.View
-                      className="absolute inset-0 bg-drawer-scrim"
-                      pointerEvents="none"
-                      style={scrimStyle}
-                    />
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("mobile.server.drawer.close")}
-                      className="flex-1"
-                      onPress={closeDrawer}
-                    />
-                  </Animated.View>
+            <GestureDetector gesture={openingGesture}>
+              <Animated.View
+                className="flex-1 overflow-hidden bg-background"
+                style={
+                  isAndroid
+                    ? [{ borderCurve: "continuous" }, androidSurfaceEdgeStyle, surfaceStyle]
+                    : [
+                        {
+                          borderCurve: "continuous",
+                          // The shadow falls on the drawer, at the start edge of the surface.
+                          boxShadow: `${-12 * END_X}px 0 32px rgba(0, 0, 0, 0.28)`,
+                        },
+                        surfaceStyle,
+                      ]
+                }
+              >
+                <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
+                  {children}
                 </Animated.View>
-              </GestureDetector>
-            </View>
-          </GestureDetector>
-        </AppDrawerShownOnUIContext.Provider>
-      </AppDrawerShownContext.Provider>
+                <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
+                  {/* Android: without a blur method this view is only a tint, one more full-screen layer to
+                    draw on each frame. The scrim keeps the dimming. */}
+                  {isAndroid ? null : (
+                    <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
+                      <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />
+                    </Animated.View>
+                  )}
+                  <Animated.View className="absolute inset-0 bg-drawer-scrim" pointerEvents="none" style={scrimStyle} />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.server.drawer.close")}
+                    className="flex-1"
+                    onPress={closeDrawer}
+                  />
+                </Animated.View>
+              </Animated.View>
+            </GestureDetector>
+          </View>
+        </GestureDetector>
+      </AppDrawerShownOnUIContext.Provider>
     </AppDrawerContext.Provider>
   );
 }

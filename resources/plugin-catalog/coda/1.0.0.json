@@ -1,0 +1,33 @@
+{
+  "slug": "coda",
+  "name": "Coda",
+  "tagline": "Docs, pages and tables",
+  "description": "Coda lets agents read and write docs, pages and tables in the workspace of the signed-in account. Each user signs in to their own Coda account through the browser.",
+  "category": "documents",
+  "creatorName": "Superhuman",
+  "iconUrl": "https://avatars.githubusercontent.com/u/7737862?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-summary", "text": "Summarize the project plan doc in Coda." },
+    { "id": "prompt-table", "text": "Which rows in the launch tracker table are still open?" },
+    { "id": "prompt-page", "text": "Draft a new page in this doc with the notes from today's meeting." }
+  ],
+  "apps": [
+    {
+      "id": "app-coda-mcp",
+      "name": "Coda",
+      "description": "Docs, pages, and tables, over Coda's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/7737862?s=256&v=4",
+      "server": {
+        "name": "coda",
+        "transport": "http",
+        "url": "https://coda.io/apis/mcp",
+        "auth": [{ "id": "coda-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://coda.io",
+  "privacyPolicyUrl": "https://superhuman.com/legal/privacy-policy",
+  "termsUrl": "https://superhuman.com/legal/terms",
+  "skills": []
+}

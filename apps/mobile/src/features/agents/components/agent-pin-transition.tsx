@@ -31,7 +31,13 @@ export interface AgentPinTransitionState {
   chatId: string;
   avatar:
     | { kind: "agent"; hue: AvatarHue | null; color: AvatarColor | null; seed: string }
-    | { kind: "channel"; channel: ChannelSummary; agents: ReadonlyMap<string, MobileAgent>; disconnected: boolean };
+    | {
+        kind: "channel";
+        channel: ChannelSummary;
+        serverId: string;
+        agents: ReadonlyMap<string, MobileAgent>;
+        disconnected: boolean;
+      };
   from: AvatarRect;
   source: AgentAvatarLocation;
   target: AgentAvatarLocation;
@@ -223,6 +229,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
         {
           kind: "channel",
           channel,
+          serverId,
           agents: new Map(agents.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent])),
           disconnected: !servers.some((server) => server.id === serverId && showsOnline(server)),
         },

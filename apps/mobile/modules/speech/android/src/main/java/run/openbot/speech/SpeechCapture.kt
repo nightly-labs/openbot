@@ -7,6 +7,7 @@ import android.media.MediaRecorder
 import android.util.Base64
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineQwen3AsrModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
@@ -35,30 +36,52 @@ private const val LEADING_SILENCE_SAMPLES = 4_800
 /** How often the words of the current segment are recognized again while the user speaks. */
 private const val INTERIM_FRAMES = 10
 
+/** The speech models of the phone in sherpa-onnx. */
+internal enum class RecognizerModel { PARAKEET, QWEN3_ASR }
+
 /**
- * Parakeet TDT 0.6B v3 in sherpa-onnx: the speech recognizer of desktop. It finds the spoken
- * language itself. Only the recognition executor uses it.
+ * A speech model of the phone in sherpa-onnx. Parakeet TDT 0.6B v3 is the speech recognizer of
+ * desktop; Qwen3-ASR 0.6B also hears Chinese mixed with English. Both find the spoken language
+ * themselves. Only the recognition executor uses it.
  */
-internal class ParakeetRecognizer(val directory: String, threads: Int) {
+internal class OfflineSpeechRecognizer(val directory: String, val model: RecognizerModel, threads: Int) {
   private val recognizer: OfflineRecognizer
 
   init {
     val file = { name: String -> File(directory, name).absolutePath }
+    val modelConfig = when (model) {
+      RecognizerModel.PARAKEET -> OfflineModelConfig(
+        transducer = OfflineTransducerModelConfig(
+          encoder = file("encoder.int8.onnx"),
+          decoder = file("decoder.int8.onnx"),
+          joiner = file("joiner.int8.onnx"),
+        ),
+        tokens = file("tokens.txt"),
+        numThreads = threads,
+        debug = false,
+        provider = "cpu",
+        modelType = "nemo_transducer",
+      )
+      // The tokenizer files are in the model directory itself. The export holds 512 positions: a
+      // segment of 25 s takes about 330 of them, and its words fit in the rest.
+      RecognizerModel.QWEN3_ASR -> OfflineModelConfig(
+        qwen3Asr = OfflineQwen3AsrModelConfig(
+          convFrontend = file("conv_frontend.onnx"),
+          encoder = file("encoder.int8.onnx"),
+          decoder = file("decoder.int8.onnx"),
+          tokenizer = File(directory).absolutePath,
+          maxTotalLen = 512,
+          maxNewTokens = 256,
+        ),
+        numThreads = threads,
+        debug = false,
+        provider = "cpu",
+      )
+    }
     recognizer = OfflineRecognizer(
       config = OfflineRecognizerConfig(
         featConfig = FeatureConfig(sampleRate = CAPTURE_SAMPLE_RATE, featureDim = 80),
-        modelConfig = OfflineModelConfig(
-          transducer = OfflineTransducerModelConfig(
-            encoder = file("encoder.int8.onnx"),
-            decoder = file("decoder.int8.onnx"),
-            joiner = file("joiner.int8.onnx"),
-          ),
-          tokens = file("tokens.txt"),
-          numThreads = threads,
-          debug = false,
-          provider = "cpu",
-          modelType = "nemo_transducer",
-        ),
+        modelConfig = modelConfig,
         decodingMethod = "greedy_search",
       ),
     )
@@ -126,13 +149,13 @@ private class LoudnessMeter {
 
 /**
  * The microphone at 16 kHz mono. In `transcribe` mode it cuts the speech into segments at the user's
- * pauses and recognizes each one with Parakeet; in `stream` mode it sends the audio. All state
+ * pauses and recognizes each one with the loaded recognizer; in `stream` mode it sends the audio. All state
  * belongs to `executor`; a reader thread hands it the frames.
  */
 internal class SpeechCapture(
   private val executor: ExecutorService,
   private val recognition: ExecutorService,
-  private val recognizer: () -> ParakeetRecognizer?,
+  private val recognizer: () -> OfflineSpeechRecognizer?,
   private val send: (String, Map<String, Any?>) -> Unit,
 ) {
   private var record: AudioRecord? = null

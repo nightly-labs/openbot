@@ -54,6 +54,7 @@ export function UiHoldButton(props: UiHoldButtonProps) {
     <Button
       type="button"
       variant={props.variant ?? "default"}
+      size="sm"
       class="ui-block-hold"
       data-holding={holding() ? "" : undefined}
       disabled={props.disabled}

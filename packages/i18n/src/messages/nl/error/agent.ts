@@ -4,8 +4,26 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "De geschiedenis is niet beschikbaar voor dit verzoek. Lees de recente geschiedenis opnieuw, of gebruik channel_history voor werk in een kanaal.",
+  "error.agent.historyArgumentsInvalid":
+    "Onjuiste geschiedenisargumenten: {detail} Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.toolRequestInvalid":
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
+  "error.agent.toolCallArgumentsNotObject":
+    "De tool is niet uitgevoerd. In tool_call moet arguments een JSON-object zijn, geen tekst. Stuur de aanroep opnieuw met arguments als object.",
+  "error.agent.toolCallDiscoveryTool":
+    "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
+  "error.agent.toolCallEnvelopeKeys":
+    "De tool is niet uitgevoerd. tool_call accepteert alleen name en arguments. Zet de argumenten van de tool in arguments, als object, en stuur de aanroep opnieuw.",
+  "error.agent.toolCallUnknownTool":
+    "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. De gekwalificeerde naam is mogelijk {name}. Als dat zo is, stuur de aanroep dan opnieuw met die naam.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe heeft geen OpenBot-tool met de naam {names} gevonden. Het beschrijft alleen de OpenBot- en browsertools die openbot.tool_search toont, geen MCP-tools.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Roep {names} rechtstreeks aan. tool_describe beschrijft de zoektools niet.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "De planning van de routine is ongeldig: {detail} Corrigeer de planning en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
   "error.agent.accessLocalOnly": "Toegang van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.duplicateCleanupFailed":
@@ -49,8 +67,12 @@ export const messages = {
   "error.agent.modelNotListed": "Model “{model}” is niet beschikbaar. Beschikbare modellen: {models}.",
   "error.agent.providerNotListed":
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
+  "error.agent.creatorModelNotListed":
+    "Je model ‘{model}’ staat nu niet in de modellijst, dus de nieuwe agent kan er niet mee starten. Probeer het over een paar seconden opnieuw, of zet provider en model op een model dat list_models toont.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model “{model}” heeft geen instelling voor het redeneerniveau, dus je kunt het niveau niet wijzigen.",
   "error.agent.noStartingModelInSettings":
     "{provider} heeft geen model beschikbaar, en geen andere aanbieder waarbij je bent ingelogd heeft er een. Log in bij een aanbieder, of wijzig de standaardaanbieder in Serverinstellingen → Aanbieders.",
   "error.agent.noStartingModel":
@@ -63,6 +85,8 @@ export const messages = {
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je een nieuwe chat start.",
   "error.agent.waitBeforeCompactContext":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de context comprimeert.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de geschiedenis wist.",
   "error.agent.compactContextUnavailable": "Deze agent kan de context nu niet comprimeren.",
   "error.agent.unknown": "Onbekende agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -82,6 +106,18 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.promptCancelled":
+    "{provider} heeft dit bericht geannuleerd voordat het begon. Stuur het bericht opnieuw.",
+  "error.agent.toolLoopStopped":
+    "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
+  "error.agent.answerCutOff":
+    "De agent stopte voordat het antwoord klaar was, dus het antwoord is niet volledig. Stuur het bericht opnieuw.",
+  "error.agent.compactionConnectionLost":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
+  "error.agent.compactionConnectionLostAddress":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding. Controleer ook of {variable} onder Variabelen in de instellingen van {provider} het API-adres van je modeldienst is (vaak eindigend op /v1). Stuur daarna een bericht.",
+  "error.agent.compactionLoopStopped":
+    "{provider} heeft de context steeds opnieuw gecomprimeerd, en elke keer bleef die te vol om door te gaan. Daarom heeft OpenBot deze beurt gestopt. Zet de MCP-servers of het computergebruik uit die deze agent niet nodig heeft, en stuur dan een bericht. Als jij of de agent hebt gewijzigd wanneer {provider} comprimeert, maak die wijziging dan ongedaan.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
   "error.agent.profileEndpointsChanged":
     "De aangepaste endpoints zijn gewijzigd tijdens het maken. Probeer het opnieuw.",
@@ -114,6 +150,9 @@ export const messages = {
     "Alleen de computer waarop de agent draait, kan deze instelling wijzigen.",
   "error.agent.sideQuestionBusy": "Er lopen te veel zijvragen. Probeer het zo opnieuw.",
   "error.agent.sideQuestionFailed": "De agent kon de zijvraag niet beantwoorden. Probeer het opnieuw.",
+  "error.agent.webSearchSignIn": "Zoeken op het web vereist een Codex-aanmelding met een ChatGPT-account.",
+  "error.agent.webSearchBusy": "Er lopen te veel zoekopdrachten en zijvragen. Probeer het zo opnieuw.",
+  "error.agent.webSearchFailed": "De webzoekopdracht is niet voltooid. Probeer het opnieuw.",
   "error.agent.busyMessageModeLocalOnly":
     "Wat berichten doen terwijl de agent werkt, kun je alleen instellen op de computer waarop de agent draait.",
   "error.agent.backupModelsLocalOnly": "Reservemodellen kun je alleen instellen op de computer waarop de agent draait.",
@@ -133,8 +172,14 @@ export const messages = {
     "Deze server heeft weinig geheugen. Je bericht wacht in de wachtrij en start zodra er geheugen vrij is.",
   "error.agent.workspaceOnlyToolMissing":
     "Alleen werkruimte heeft {tool} nodig, maar OpenBot heeft dit niet gevonden. Installeer het, of kies Volledige toegang in de instellingen van de agent.",
+  "error.agent.codexSandboxUnavailable":
+    "Alleen werkruimte heeft de Codex-sandbox nodig, maar Codex kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Eerst vragen of Volledige toegang in de instellingen van de agent.",
   "error.agent.claudeSandboxUnavailable":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
+  "error.agent.claudeNoSandbox":
+    "Claude kan op deze computer geen sandbox gebruiken, dus Alleen werkruimte werkt er niet mee. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
+  "error.agent.claudeSandboxBlocked":
+    "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":
     "Schermopname staat uit voor deze agent. De gebruiker kan Computerbesturing aanzetten in de instellingen van de agent.",
   "error.agent.screenCaptureUnavailable": "Schermopname is niet beschikbaar op deze computer.",
@@ -143,9 +188,12 @@ export const messages = {
   "error.agent.screenCaptureDeclined": "De gebruiker heeft deze schermopname niet toegestaan. Er is niets opgenomen.",
   "error.agent.mcpServerDeclined":
     "De gebruiker heeft deze wijziging van de MCP-server niet toegestaan. Er is niets gewijzigd.",
+  "error.agent.mcpToolDeclined": "De gebruiker heeft deze MCP-toolaanroep niet toegestaan. De tool is niet uitgevoerd.",
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
-    "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Serverinstellingen, MCP.",
+    "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Marktplaats, Apps, {name}.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",
   "error.agent.screenCaptureWindowMissing":
     "Dat venster is nu niet open. Roep list_capture_sources aan voor de huidige venster-id’s.",

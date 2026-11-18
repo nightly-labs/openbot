@@ -1,0 +1,36 @@
+{
+  "slug": "transcriptapi",
+  "name": "TranscriptAPI",
+  "tagline": "YouTube transcripts",
+  "description": "TranscriptAPI lets agents get the transcripts of YouTube videos and search YouTube videos and channels. Each user signs in to their own TranscriptAPI account through the browser, and requests use that account's credits.",
+  "category": "research",
+  "creatorName": "TranscriptAPI",
+  "iconUrl": "https://transcriptapi.com/brand/logo-180.png",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-summarize-video",
+      "text": "Get the transcript of this YouTube video and summarize the main points."
+    },
+    { "id": "prompt-quotes", "text": "Find what the speaker says about pricing in this talk, with timestamps." },
+    { "id": "prompt-channel-videos", "text": "List the latest videos from this channel and their topics." }
+  ],
+  "apps": [
+    {
+      "id": "app-transcriptapi-mcp",
+      "name": "TranscriptAPI",
+      "description": "YouTube transcripts and video search, over TranscriptAPI's MCP server with browser sign-in.",
+      "iconUrl": "https://transcriptapi.com/brand/logo-180.png",
+      "server": {
+        "name": "transcriptapi",
+        "transport": "http",
+        "url": "https://transcriptapi.com/mcp",
+        "auth": [{ "id": "transcriptapi-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://transcriptapi.com",
+  "privacyPolicyUrl": "https://transcriptapi.com/privacy",
+  "termsUrl": "https://transcriptapi.com/terms"
+}

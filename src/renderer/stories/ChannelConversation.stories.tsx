@@ -1,3 +1,4 @@
+import { CHANNEL_ASSIGNMENT_LIMIT_ERROR } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { createSignal, onCleanup } from "solid-js";
@@ -116,9 +117,22 @@ const waitingSubtasks: AwaitingReplyItem[] = [
 const stoppedTask = (agentId: string, long = false) => ({
   id: `stopped-${agentId}`,
   ownerAgentId: agentId,
-  error: long
-    ? "The automatic assignment limit was reached. Continue or reassign this task. The source report still needs review before the team can complete the work."
-    : "The agent could not complete this task.",
+  instruction:
+    agentId === sales.id
+      ? "Check the sources in the notes and mark each claim that has no source"
+      : agentId === research.id
+        ? "Compare the three pricing pages and list what each one leaves out"
+        : "Draft the pricing section for the launch post",
+  // The limit names the members of the run, so each card has its own reason.
+  ...(long
+    ? {
+        error: CHANNEL_ASSIGNMENT_LIMIT_ERROR,
+        runAgentIds: [
+          agentId,
+          ...[chief.id, sales.id, research.id].filter((id) => id !== agentId).slice(0, agentId === chief.id ? 1 : 2),
+        ],
+      }
+    : { error: "The agent could not complete this task." }),
 });
 
 const longHistory = (length: number): AgentMessage[] =>

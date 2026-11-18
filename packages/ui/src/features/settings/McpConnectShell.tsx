@@ -22,7 +22,7 @@
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle, Button, OctagonX, Puzzle } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, createStore, Show } from "solid-js";
+import { createSignal, createStore, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
 import { WizardDialog } from "./IntegrationLayout";
 
@@ -45,6 +45,8 @@ export interface McpConnectBaseProps {
   onCancel: () => void;
   /** Starts the attempt when the dialog opens: the click that opened it already asked to connect. */
   connectOnOpen?: boolean | undefined;
+  /** The other way into the same server, such as a key in place of a sign-in. */
+  alternative?: JSX.Element;
 }
 
 /**
@@ -66,13 +68,17 @@ export interface ConnectState {
  * `authorize` is the part that differs - today the typed values written into the configuration, or
  * the configuration as the listing states it. Every write is guarded by the attempt count, so an
  * answer that arrives after the user changed the credential is dropped: it describes what was sent,
- * not what is on screen.
+ * not what is on screen. A dialog that leaves the screen, such as a sign-in the user left for a key,
+ * drops the answer in the same way.
  */
 export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "onConnected">) {
   const { t, errorMessage, sourceText } = useText();
   const [state, setState] = createStore<ConnectState>({ phase: "idle", error: "" });
   let run = 0;
   const busy = () => state.phase === "connecting";
+  onCleanup(() => {
+    run += 1;
+  });
 
   function forget() {
     // The credential changed, so the previous refusal describes one that is no longer being offered.
@@ -114,7 +120,8 @@ export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "on
   return { state, busy, forget, attempt };
 }
 
-export interface McpConnectShellProps extends Pick<McpConnectBaseProps, "open" | "subject" | "onCancel"> {
+export interface McpConnectShellProps
+  extends Pick<McpConnectBaseProps, "open" | "subject" | "onCancel" | "alternative"> {
   state: ConnectState;
   busy: () => boolean;
   /** The line under the name: what this way in is about to do. One sentence. */
@@ -175,6 +182,7 @@ export function McpConnectShell(props: McpConnectShellProps) {
       }
     >
       {props.children}
+      {props.alternative}
       {/* Only what the user can act on: the connection that worked has closed the dialog. */}
       <Show when={props.state.phase === "failed"}>
         <Alert tone="danger" role="alert">

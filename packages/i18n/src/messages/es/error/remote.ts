@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Las pruebas del escritorio remoto no están disponibles.",
   "error.remote.controlUnavailable": "El control remoto no está disponible.",
   "error.remote.controlSessionNotFound": "No se encontró la sesión de control remoto.",
+  "error.remote.controlNotAllowed": "El propietario de este equipo no permite que tu rol lo controle.",
+  "error.remote.controlDeclined": "La persona en este equipo no permitió el control remoto.",
   "error.remote.testRuntimeUpdate":
     "Actualiza el entorno de ejecución del escritorio remoto de macOS para ejecutar esta prueba.",
   "error.remote.testOtherSessions": "Finaliza las otras sesiones de escritorio remoto antes de iniciar una prueba.",
@@ -20,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Hay una prueba de escritorio remoto activa. Inténtalo de nuevo cuando termine.",
   "error.remote.screenRecordingDenied":
     "El host no ha permitido que OpenBot grabe su pantalla. Concede permiso de grabación de pantalla en el host e inténtalo de nuevo.",
+  "error.remote.windowsSessionDisconnected":
+    "La sesión de Windows del host está desconectada, así que no hay pantalla para compartir. Inicia sesión en Windows en la pantalla del host e inténtalo de nuevo.",
   "error.remote.teamSessionExpired": "La sesión del equipo caducó.",
   "error.remote.finishTestBeforeSwitch": "Termina la prueba de escritorio remoto antes de cambiar de pantalla.",
   "error.remote.displayNotFound": "No se encontró la pantalla remota.",
@@ -148,6 +152,7 @@ export const messages = {
   "error.remote.attachmentRejected": "El host rechazó el archivo adjunto.",
   "error.remote.attachmentTooLarge": "Los archivos adjuntos deben tener 10 MB o menos.",
   "error.remote.attachmentBusy": "Espera a que termine el archivo adjunto actual.",
+  "error.remote.attachmentChanged": "El archivo cambió o no está disponible. Selecciónalo de nuevo.",
   "error.remote.uploadTimeout": "Se agotó el tiempo de carga del archivo adjunto.",
   "error.remote.hostSessionActive": "El host ya tiene una sesión remota activa.",
   "error.remote.tooManyConnections": "Hay demasiadas conexiones remotas activas.",
@@ -188,12 +193,15 @@ export const messages = {
   "error.remote.memberLimitReached": "Este host alcanzó su límite de miembros. Pide al propietario que libere espacio.",
   "error.remote.hostNotRegistered": "Este host ya no está registrado en el servicio de OpenBot.",
   "error.remote.membershipEnded": "Ya no eres miembro de este host. Pide al propietario una nueva invitación.",
+  "error.remote.membershipChanged":
+    "Otra persona cambió este miembro al mismo tiempo. Vuelve a cargar los miembros e inténtalo de nuevo.",
   "error.remote.accountSessionInactive": "Tu sesión ya no está activa. Inicia sesión de nuevo.",
   "error.remote.hostOtherAccount": "Este host pertenece a otra cuenta.",
   "error.remote.remoteNotConfigured": "Las conexiones remotas no están configuradas en este servicio de OpenBot.",
   "error.remote.hostRefused": "El host rechazó la solicitud ({status}).",
   "error.remote.formUnavailable": "Este formulario ya no está disponible.",
   "error.remote.hostedServerRemoval": "Usa Facturación para eliminar un servidor alojado.",
+  "error.remote.hostRemoved": "El propietario quitó este servidor de la cuenta.",
   "error.remote.channelsUnsupported": "Actualiza este servidor de escritorio para usar canales.",
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",

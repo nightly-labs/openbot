@@ -17,6 +17,10 @@ export const messages = {
   "update.provider.checking": "Recherche de mises à jour pour {name}",
   "update.provider.available": "Mise à jour de {name} disponible",
   "update.provider.updating": "Mise à jour de {name}",
+  "update.provider.downloading": "Téléchargement de {name}",
+  "update.provider.downloaded": "{name} est téléchargé",
+  "update.provider.downloadFailed": "Échec du téléchargement de {name}",
+  "update.provider.downloadFailedRetry": "Le téléchargement a échoué. Réessayez.",
   "update.provider.waiting": "Mise à jour de {name} en attente",
   "update.provider.failed": "Échec de la mise à jour de {name}",
   "update.provider.settingUp": "Configuration",
@@ -66,4 +70,10 @@ export const messages = {
   "update.whatsNew.changelog": "Journal complet",
   "update.whatsNew.changelogFailed": "OpenBot n’a pas pu ouvrir le journal des modifications.",
   "update.whatsNew.done": "Compris",
+  "update.required.title": "Mise à jour requise",
+  "update.required.description":
+    "OpenBot {version} n’est plus pris en charge. Passez à la version {minimum} ou plus récente pour continuer.",
+  "update.required.download": "Télécharger OpenBot",
+  "update.required.continue": "Continuer sans mettre à jour",
+  "update.required.failed": "La mise à jour ne s’est pas terminée.",
 } as const satisfies PartialTranslation<typeof source>;

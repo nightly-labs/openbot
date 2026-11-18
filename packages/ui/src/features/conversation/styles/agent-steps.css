@@ -206,6 +206,49 @@
   color: var(--openbot-text-muted);
 }
 
+/* A failed tool step: its line, a toggle as quiet as the steps header, and the error it opens. */
+.agent-step-failed {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-items: start;
+}
+
+.agent-step .agent-step-error-toggle {
+  display: inline-flex;
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin-inline-start: calc(-1 * var(--openbot-space-1));
+  border-radius: var(--openbot-radius-xs);
+  padding: 0 var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: inherit;
+  font-weight: var(--openbot-weight-regular);
+  line-height: inherit;
+}
+
+.agent-step-error-toggle[aria-expanded="true"] .agent-steps-chevron {
+  rotate: 90deg;
+}
+
+.agent-step-error {
+  max-height: 160px;
+  justify-self: stretch;
+  margin: var(--openbot-space-1) 0 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .agent-steps-chevron,
   .agent-steps-panel,
@@ -223,6 +266,7 @@
   transform: scaleX(-1);
 }
 
-:dir(rtl) .agent-steps-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
+:dir(rtl) .agent-steps-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron,
+:dir(rtl) .agent-step-error-toggle[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
   rotate: -90deg;
 }

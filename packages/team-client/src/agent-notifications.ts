@@ -86,7 +86,8 @@ const START_FAILED_CODE = "delivery_start_failed";
 
 /**
  * The agent events that `notificationForAgentEvent` can show. Desktop, web and phone pass only these,
- * so each surface notifies about the same kinds.
+ * so each surface notifies about the same kinds. A `subagent-failed` event is local, so only the
+ * desktop of the host passes it, in addition to these.
  */
 export function agentEventCanNotify(event: AgentEvent | TeamRealtimeEvent): boolean {
   switch (event.type) {
@@ -124,6 +125,20 @@ export function notificationRequestKey(serverId: string, event: AgentEvent): str
   }
 }
 
+/**
+ * Whether a teammate's message started the turn that ended: a request from another agent, or its
+ * answer. Such a turn is work between agents, so its answer stays in the chat and shows no
+ * notification and plays no sound. A prompt, an approval, a browser step and a failed turn still
+ * notify, because the user must act or the work stopped.
+ *
+ * Pass the event as it arrived. A task that an agent starts with `start_task` also has the origin
+ * "agent", because the agent sends its brief to itself. Its turn arrives in a `thread-turn-completed`
+ * event, which this does not match, so the result of a task still notifies.
+ */
+export function teammateTurnCompleted(event: AgentEvent): boolean {
+  return event.type === "turn-completed" && event.status === "completed" && event.origin === "agent";
+}
+
 /** Whether the event waits for the user, so that the "needs-me" level keeps it. */
 export function agentEventNeedsUser(event: AgentEvent): boolean {
   return event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested";
@@ -142,6 +157,7 @@ export function agentEventAgentId(event: AgentEvent): string | null {
   switch (event.type) {
     case "prompt":
     case "turn-completed":
+    case "subagent-failed":
       return event.agentId;
     case "approval":
       return event.approval.agentId;
@@ -158,14 +174,20 @@ export function agentEventAgentId(event: AgentEvent): string | null {
  * The level for the events of one agent. The level that the user chose for the agent replaces the
  * server level, in both directions. A server set to "nothing" stays quiet for every agent: on a phone
  * it then has no registration that the host could send to, so the desktop and the web do the same.
+ *
+ * `hidden` is for an agent that the user hid. The user took it out of the list, so with no level of
+ * its own it notifies only when it waits for the user: the server level "all" becomes "needs-me".
  */
 export function agentNotificationLevel(
   serverLevel: ServerNotificationLevel,
   agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
   agentId: string | null,
+  hidden = false,
 ): ServerNotificationLevel {
   if (serverLevel === "nothing" || agentId === null) return serverLevel;
-  return agentLevels?.get(agentId) ?? serverLevel;
+  const own = agentLevels?.get(agentId);
+  if (own !== undefined) return own;
+  return hidden && serverLevel === "all" ? "needs-me" : serverLevel;
 }
 
 /**
@@ -225,6 +247,13 @@ function notificationSubject(
     return { body: translate("notification.needsBrowserStep"), agentId, threadId };
   }
   if (level !== "all") return null;
+  if (event.type === "subagent-failed") {
+    const task = preview && plainPreview(preview.redact(event.title));
+    const body = task
+      ? translate("notification.subagentFailedFor", { task })
+      : translate("notification.subagentFailed");
+    return { body, agentId: event.agentId, threadId: event.threadId };
+  }
   if (event.type === "error" && event.agentId && agentEventCanNotify(event))
     return { body: translate("notification.failed"), agentId: event.agentId, threadId: null };
   // A quiet routine run posted nothing, so there is nothing to look at. A turn that continues its

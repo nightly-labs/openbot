@@ -56,14 +56,19 @@ const DEFAULT_CPU_INTERVAL_MS = 5_000;
 // there to measure, and the counters it reads are cumulative, so nothing is
 // lost by asking rarely.
 const MIN_CPU_INTERVAL_MS = 1_000;
+// GitHub refuses PR video attachments over 10 MB on the free plan. The app
+// window records at about 0.8 Mbit/s, so 90 s stays under that limit.
+const DEFAULT_RECORD_DURATION_MS = 60_000;
+const MAX_RECORD_DURATION_MS = 90_000;
 
 const USAGE = [
-  "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu|memory> [flags]",
+  "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|record|cpu|memory> [flags]",
   "",
   "Target:     --instance=<id> | --port=<port>, --service=<app|test-client>, --page=<target-id|url-substring>",
   "click/type: --role=<role> --name=<name> [--text=<text>] [--submit] [--exact] --allow-mutations",
   "Waiting:    --wait-for=<role>,<name>, --timeout=<ms>",
   "screenshot: --out=<path>",
+  "record:     --out=<path>.webm --duration=<ms>; SIGINT or SIGTERM stops it early",
   "cpu:        --duration=<ms> --interval=<ms> --label=<name> --compare=<report.json> --out=<path>",
   "memory:     --label=<name> --heap-snapshot=<target-id|url-substring> --out=<path>",
 ].join("\n");
@@ -325,6 +330,61 @@ async function measureMemory(flags: Flags, target: AutomationTarget): Promise<vo
   process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
 }
 
+// Resolves on the deadline or on the first SIGINT/SIGTERM, so an agent that
+// recorded in the background can stop when its demo ends. The handlers stay
+// installed: a second signal while the encoder flushes must not kill the
+// process and truncate the file.
+function waitForStop(durationMs: number): Promise<void> {
+  return new Promise((resolveStop) => {
+    const finish = (): void => {
+      clearTimeout(timer);
+      resolveStop();
+    };
+    const timer = setTimeout(finish, durationMs);
+    process.on("SIGINT", finish);
+    process.on("SIGTERM", finish);
+  });
+}
+
+// Read-only: a CDP screencast of one page. The clicks of the demo come from
+// other `click` and `type` runs, so this command changes nothing in the app.
+async function recordVideo(flags: Flags, target: AutomationTarget): Promise<void> {
+  const durationMs = readMilliseconds(flags, "duration", DEFAULT_RECORD_DURATION_MS, 1_000, MAX_RECORD_DURATION_MS);
+  const outPath = resolveWritablePath(
+    SCREENSHOT_ROOT,
+    flagValue(flags, "out") ?? `recording-${Date.now()}.webm`,
+    ".webm",
+    "Recordings",
+  );
+  const reportable = reportableScreenshotPath(outPath, process.cwd());
+  const waitTarget = readWaitTarget(flags);
+  const session = await connectToDevApp(target.port, logger, {
+    expectedRendererPort: target.expectedRendererPort,
+    pageSelector: readPageSelector(flags),
+    ownerPid: target.pid,
+  });
+  let startedAt = 0;
+  try {
+    if (waitTarget) await waitForRole(session.page, waitTarget, readTimeout(flags), logger, flags.exact ?? false);
+    // The VP8 encoder needs even dimensions. CSS pixels keep the file small.
+    const size = await session.page.evaluate(() => ({
+      width: Math.floor(window.innerWidth / 2) * 2,
+      height: Math.floor(window.innerHeight / 2) * 2,
+    }));
+    mkdirSync(dirname(outPath), { recursive: true });
+    await session.page.screencast.start({ path: outPath, size });
+    startedAt = Date.now();
+    logger.info(
+      `recording ${size.width}x${size.height} for up to ${durationMs} ms; stop with kill -INT ${process.pid}`,
+    );
+    await waitForStop(durationMs);
+    await session.page.screencast.stop();
+  } finally {
+    await session.close();
+  }
+  process.stdout.write(`${JSON.stringify({ recording: reportable, durationMs: Date.now() - startedAt })}\n`);
+}
+
 async function main(): Promise<void> {
   const parsed = readScriptArguments({ usage: USAGE, options: OPTIONS, maxPositionals: 1 });
   if (parsed === null) return;
@@ -350,6 +410,7 @@ async function main(): Promise<void> {
     command !== "click" &&
     command !== "type" &&
     command !== "screenshot" &&
+    command !== "record" &&
     command !== "cpu" &&
     command !== "memory"
   ) {
@@ -376,6 +437,10 @@ async function main(): Promise<void> {
   }
   if (command === "memory") {
     await measureMemory(flags, target);
+    return;
+  }
+  if (command === "record") {
+    await recordVideo(flags, target);
     return;
   }
   if (command === "click" || command === "type") {

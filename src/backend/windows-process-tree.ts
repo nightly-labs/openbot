@@ -1,4 +1,5 @@
-import { type ChildProcess, execFile } from "node:child_process";
+import { type ChildProcess, type ExecFileException, execFile } from "node:child_process";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Fiber, Schema } from "effect";
 
 /**
@@ -9,6 +10,18 @@ import { Effect, Fiber, Schema } from "effect";
 class ProcessTreeFailed extends Schema.TaggedError<ProcessTreeFailed>()("ProcessTreeFailed", {
   cause: Schema.Defect(),
 }) {}
+
+const logger = createOpenBotLogger("windows-process-tree");
+
+/** Runs `taskkill /T /F` on a tree. Its error, or null when it stopped each process of the tree. */
+const taskkillTree = (pid: number) =>
+  Effect.tryPromise({
+    try: () =>
+      new Promise<ExecFileException | null>((resolve) =>
+        execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, (error) => resolve(error)),
+      ),
+    catch: (cause) => new ProcessTreeFailed({ cause }),
+  });
 
 export const stopWindowsProcessTree = Effect.fn("WindowsProcessTree.stop")(function* (child: ChildProcess) {
   const pid = child.pid;
@@ -24,13 +37,15 @@ export const stopWindowsProcessTree = Effect.fn("WindowsProcessTree.stop")(funct
     }),
     { startImmediately: true },
   );
-  yield* Effect.tryPromise({
-    try: () =>
-      new Promise<void>((resolve) =>
-        execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, () => resolve()),
-      ),
-    catch: (cause) => new ProcessTreeFailed({ cause }),
-  });
+  // A child that exits while `taskkill` walks the tree, or a refused child, makes it fail part-way.
+  // A kill of the wrapper alone then leaves the rest of the tree with no parent, where no later
+  // `taskkill` finds it (#6470). So it runs once more while the wrapper still holds the tree.
+  const failure = yield* taskkillTree(pid);
+  if (failure && child.exitCode === null && child.signalCode === null) {
+    const again = yield* taskkillTree(pid);
+    if (again && child.exitCode === null && child.signalCode === null)
+      logger.warn("taskkill did not stop a process tree.", { pid, code: again.code ?? null });
+  }
   yield* Effect.try({
     try: () => {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");

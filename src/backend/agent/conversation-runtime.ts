@@ -12,6 +12,8 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-writer";
+import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -48,15 +50,13 @@ const logger = createOpenBotLogger("conversation-runtime");
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
 /**
- * Runs `work` inside a SQLite transaction, opening one only when the caller is not already inside
- * another. Nesting is load-bearing: `deleteRoutine` drives a routine mutation whose `beforeMutate`
- * hook appends a run transition in the same transaction, and an approval response can append a
- * hosted-site event inside an outer one. This is the only `BEGIN IMMEDIATE` under `src/backend/agent`.
+ * Runs `work` in `withTransaction`. Nesting is load-bearing: `deleteRoutine` drives a routine
+ * mutation whose `beforeMutate` hook appends a run transition in the same transaction, and an
+ * approval response can append a hosted-site event inside an outer one.
  *
- * `onCommit` exists because a nested caller must not publish in-memory state the owner can still
- * discard: there is no partial rollback here, so effects that make rows visible to the rest of the
- * app are queued on the owner and run once, after `COMMIT`. `onRollback` is queued the same way, so
- * an owner that fails *after* a nested call succeeded still undoes that call's in-memory slice.
+ * A nested call queues `onCommit` and `onRollback` on the owner, so in-memory state shows only
+ * committed rows. When a level fails, its savepoint is rolled back, so the effects queued inside it
+ * are removed: its rollbacks run at once, newest first, and its commits never run.
  */
 export function withDatabaseTransaction<T>(
   database: OpenBotDatabase,
@@ -64,65 +64,53 @@ export function withDatabaseTransaction<T>(
   onRollback?: () => void,
   onCommit?: () => void,
 ): T {
-  // `isTransaction`, not the map, decides who opens one: a transaction started anywhere else would
-  // otherwise make this call BEGIN IMMEDIATE inside it, which SQLite rejects.
-  if (database.connection.isTransaction) {
-    const owner = openTransactions.get(database);
-    let result: T;
-    try {
-      result = work();
-    } catch (error) {
-      // Our own work failed, so undo our in-memory slice now rather than queueing it: the owner's
-      // ROLLBACK will undo the rows, and a queued restorer would run a second time.
-      onRollback?.();
-      throw error;
-    }
-    if (owner) {
-      if (onRollback) owner.rollback.push(onRollback);
-      if (onCommit) owner.commit.push(onCommit);
-    } else {
-      // An ambient transaction this helper did not open has no queue to defer onto, so the
-      // effects run as they always did.
-      onCommit?.();
-    }
-    return result;
-  }
-  database.connection.exec("BEGIN IMMEDIATE");
-  const scope: TransactionScope = { rollback: [], commit: [] };
-  openTransactions.set(database, scope);
+  const connection = database.connection;
+  // `isTransaction`, not the map, decides who owns one: a transaction opened elsewhere has no
+  // scope in the map, and this call must still join it.
+  const nested = connection.isTransaction;
+  const owner = nested ? openTransactions.get(database) : undefined;
+  const scope: TransactionScope = owner ?? { rollback: [], commit: [] };
+  const rollbackMark = scope.rollback.length;
+  const commitMark = scope.commit.length;
+  let ran = false;
   let result: T;
   try {
-    result = work();
-    database.connection.exec("COMMIT");
+    result = withTransaction(connection, () => {
+      ran = true;
+      if (!nested) openTransactions.set(database, scope);
+      return work();
+    });
   } catch (error) {
-    if (database.connection.isTransaction) database.connection.exec("ROLLBACK");
-    openTransactions.delete(database);
-    // Innermost first, so each restorer sees the state the one after it has already put back.
-    for (const restore of [...scope.rollback].reverse()) restore();
+    if (!nested) openTransactions.delete(database);
+    // A failed `BEGIN` or `SAVEPOINT` ran no work.
+    if (!ran) throw error;
+    scope.commit.splice(commitMark);
+    for (const restore of scope.rollback.splice(rollbackMark).reverse()) restore();
     onRollback?.();
     throw error;
   }
-  // Past COMMIT the rows are durable, so the effects run outside the block above: a listener that
-  // throws while a conversation is published must not reach the restorers, which would put the
-  // in-memory projection back to a state SQLite no longer holds. Only `work` and `COMMIT` roll back.
-  //
-  // The scope is cleared first because publishing can re-enter this function, which must then open
-  // its own transaction instead of joining one that is already committed.
+  if (owner) {
+    if (onRollback) owner.rollback.push(onRollback);
+    if (onCommit) owner.commit.push(onCommit);
+    return result;
+  }
+  // A transaction opened elsewhere has no queue, so the effect runs now.
+  if (nested) {
+    onCommit?.();
+    return result;
+  }
+  // Past COMMIT the rows are durable, so a throwing effect must not reach the restorers. The scope
+  // is cleared first: an effect can re-enter this function and must open its own transaction.
   openTransactions.delete(database);
-  // Every effect runs, so a throw from one does not skip the rest. The rows are already durable,
-  // and an effect that keeps memory in step with them is the only thing left to put it back.
+  // Every effect runs, so a throw from one does not skip the rest.
   const failures: unknown[] = [];
-  const runEffect = (effect: (() => void) | undefined): void => {
+  for (const effect of [...scope.commit, onCommit]) {
     try {
       effect?.();
     } catch (error) {
       failures.push(error);
     }
-  };
-  for (const effect of scope.commit) runEffect(effect);
-  runEffect(onCommit);
-  // One failure keeps its own message, because a single failing listener already names the cause.
-  // Several report together, so no cause is lost.
+  }
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, sourceText("error.agent.commitEffectsFailed"));
   return result;
@@ -209,6 +197,11 @@ export class ConversationRuntime {
   readonly #forgottenExecutionThreads = new Set<string>();
   /** The execution threads that are tasks: they run beside the agent's own chat, not after it. */
   readonly #taskThreads = new Set<string>();
+  /**
+   * The execution threads of channels, with their channel. A channel turn runs beside the agent's
+   * own chat and its tasks, as a task does, unless the provider runs one turn at a time.
+   */
+  readonly #channelThreads = new Map<string, string>();
   /**
    * The open provider sessions of routine runs, with their agent. A routine run has its own session,
    * which closes when the run ends, so the agent's long chat session does not grow with it.
@@ -366,27 +359,29 @@ export class ConversationRuntime {
         if (other !== cached && other.snapshot.messages === cached.snapshot.messages) committed.delete(other);
       }
     };
+    // The least recently used first. The sort is stable, so of two chats used at the same time, an
+    // agent chat goes before a thread, and each in map order, as before.
+    let byAge: Array<{ kind: "agent" | "execution"; id: string; cached: CachedSnapshot }> | undefined;
     while (this.#cachedSnapshotBytes > CONVERSATION_CACHE_TOTAL_BYTES_LIMIT) {
-      let oldest:
-        | { kind: "agent"; id: string; usedAt: number }
-        | { kind: "execution"; id: string; usedAt: number }
-        | undefined;
-      for (const [id, cached] of this.#cachedSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
+      byAge ??= [
+        ...[...this.#cachedSnapshots].map(([id, cached]) => ({ kind: "agent" as const, id, cached })),
+        ...[...this.#cachedExecutionSnapshots].map(([id, cached]) => ({ kind: "execution" as const, id, cached })),
+      ].sort((left, right) => left.cached.usedAt - right.cached.usedAt);
+      // A full signature is computed only for a chat that is the oldest one left, not for each
+      // cached chat. Each call on a full cache otherwise serialized the whole budget again (#7250).
+      const oldest = byAge.find(({ kind, id, cached }) => {
+        const current = kind === "agent" ? this.#cachedSnapshots.get(id) : this.#cachedExecutionSnapshots.get(id);
+        if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "agent", id, usedAt: cached.usedAt };
-      }
-      for (const [id, cached] of this.#cachedExecutionSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
-        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "execution", id, usedAt: cached.usedAt };
-      }
+          return false;
+        return isCommitted(cached);
+      });
       if (!oldest) return;
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
         if (cached?.snapshot.activeTurnId) trim(cached);
+        // SQLite cannot rebuild a request that waits for a teammate, as the idle sweep says.
+        else if (cached?.snapshot.messages.some(hasActiveDelivery)) untrimmable.add(cached);
         else {
           // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
           // while the process budget evicts it; dropping the map entry without a marker would make
@@ -457,7 +452,7 @@ export class ConversationRuntime {
 
   /**
    * Removes from memory each agent snapshot that is idle and that SQLite can rebuild with the same
-   * content. A snapshot stays when it has no thread, has a turn that runs, or is different from
+   * content. A snapshot stays when it has no thread, has a turn that runs, waits for a delivery, or is different from
    * SQLite: streamed text before its flush, and mailbox messages that a read merged, are in memory
    * only. `revision` is not compared: a rebuilt snapshot takes the thread's last event sequence from
    * SQLite, as after a restart.
@@ -470,6 +465,9 @@ export class ConversationRuntime {
       // A snapshot that must stay is read again only after one more idle period.
       this.#snapshotUsedAt.set(agentId, now);
       if (!snapshot.threadId || snapshot.activeTurnId) continue;
+      // A rebuild reads only the latest messages. An older request that a teammate still works on is
+      // in memory only, and when the teammate finishes, the chat must show that the request ended (#9885).
+      if (snapshot.messages.some(hasActiveDelivery)) continue;
       const cached = this.#cachedSnapshots.get(agentId);
       if (cached && cached.signature !== conversationContentSignature(snapshot)) continue;
       this.#dropCachedSnapshot(agentId);
@@ -506,12 +504,17 @@ export class ConversationRuntime {
   }
 
   /**
-   * The running turn of the agent's own chat, or of a channel or messaging thread it serves. A task
-   * runs beside these, so its turns are not here: see `anyWorkingSnapshot` and `workingTaskSnapshots`.
+   * The running turn of the agent's own chat, or of a messaging thread it serves. A task and a
+   * channel run beside these, so their turns are not here: see `anyWorkingSnapshot`,
+   * `workingTaskSnapshots` and `workingChannelSnapshots`.
    */
   workingSnapshot(agentId: string): ConversationSnapshot | undefined {
     return [...this.activeSnapshots()].find(
-      ([id, snapshot]) => id === agentId && snapshot.activeTurnId && !this.isTaskThread(snapshot.threadId),
+      ([id, snapshot]) =>
+        id === agentId &&
+        snapshot.activeTurnId &&
+        !this.isTaskThread(snapshot.threadId) &&
+        this.channelForThread(snapshot.threadId) === null,
     )?.[1];
   }
 
@@ -532,6 +535,31 @@ export class ConversationRuntime {
     return [...this.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];
+  }
+
+  /** The channel threads of this agent that run a turn now. */
+  workingChannelSnapshots(agentId: string): ConversationSnapshot[] {
+    return [...this.#executionSnapshots.values()].filter(
+      (snapshot) =>
+        snapshot.agentId === agentId && snapshot.activeTurnId && this.channelForThread(snapshot.threadId) !== null,
+    );
+  }
+
+  /** Records the execution thread of one channel, so its turns run in the channel's own lane. */
+  registerChannelThread(agentId: string, threadId: string, channelId: string): void {
+    if (this.#forgottenExecutionThreads.has(threadId) || this.#store.ownsThread(threadId)) return;
+    this.#channelThreads.set(threadId, channelId);
+    this.registerExecutionThread(agentId, threadId);
+  }
+
+  /** The channel whose execution thread this is, or null. */
+  channelForThread(threadId: string | null): string | null {
+    return threadId === null ? null : (this.#channelThreads.get(threadId) ?? null);
+  }
+
+  /** Whether this thread runs beside the agent's own chat: a task or a channel thread. */
+  isSideThread(threadId: string | null): boolean {
+    return this.isTaskThread(threadId) || this.channelForThread(threadId) !== null;
   }
 
   registerTaskThread(agentId: string, threadId: string): void {
@@ -656,13 +684,17 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
+    const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
+    // A turn end is stored also when an earlier write already saved this chat, such as the failure
+    // note to an agent that asked: only the turn-end write closes the stored turn (#10698).
+    const turnEnd = isTurnEndEvent(eventType);
+    if (unchanged && !turnEnd) {
       this.#retainPublishedSnapshot(snapshot);
       return;
     }
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
-      const changedMessages = this.#changedMessages(snapshot);
+      const changedMessages = this.#changedMessages(snapshot, snapshot.threadId);
       const removedMessageIds = this.#removedMessageIds(snapshot);
       if (
         cached &&
@@ -683,7 +715,8 @@ export class ConversationRuntime {
         !cached ||
         changedMessages.length > 0 ||
         removedMessageIds.length > 0 ||
-        cached.activeTurnId !== snapshot.activeTurnId
+        cached.activeTurnId !== snapshot.activeTurnId ||
+        turnEnd
       ) {
         snapshot.revision = this.#store.database.persistConversationChanges({
           agentId: snapshot.agentId,
@@ -716,9 +749,12 @@ export class ConversationRuntime {
     return undefined;
   }
 
-  #changedMessages(snapshot: ConversationSnapshot): ConversationMessage[] {
+  #changedMessages(snapshot: ConversationSnapshot, threadId: string): ConversationMessage[] {
     const cached = this.#cachedSnapshot(snapshot);
-    if (!cached) return structuredClone(snapshot.messages);
+    // A caller can keep a snapshot while a provider read, an eviction or another thread replaces the
+    // cached one. Write only what stores differently: writing it whole put every unchanged message in
+    // the event log again (#8166).
+    if (!cached) return this.#store.database.changedConversationMessages(threadId, snapshot.messages);
     const changed = new Set<ConversationMessage>();
     const untracked: ConversationMessage[] = [];
     for (const message of snapshot.messages) {
@@ -729,10 +765,7 @@ export class ConversationRuntime {
     if (untracked.length === 0) return [...changed];
     // A message the cache does not hold can be a stored row that a limit dropped and a sync added
     // back. Write it only when it stores differently, so the same row is never written again.
-    for (const message of snapshot.threadId
-      ? this.#store.database.changedConversationMessages(snapshot.threadId, untracked)
-      : untracked)
-      changed.add(message);
+    for (const message of this.#store.database.changedConversationMessages(threadId, untracked)) changed.add(message);
     return snapshot.messages.filter((message) => changed.has(message));
   }
 
@@ -779,11 +812,15 @@ export class ConversationRuntime {
     return this.#threadToAgent.get(externalThreadId);
   }
 
-  /** Model retrieval must never fall back to the agent's personal conversation. */
+  /**
+   * Model retrieval must never fall back to the agent's personal conversation. The scope lasts as long
+   * as the client runs the session: `unloadAgentThreads` only reloads the instructions before the next
+   * turn, and the running turn must keep its history tools (#6584).
+   */
   historyScope(externalThreadId: string, client: AgentClient) {
     const agentId = this.#threadToAgent.get(externalThreadId);
     const threadId = this.#publicThreads.get(externalThreadId);
-    return agentId && threadId && this.#loadedThreads.get(externalThreadId) === client ? { agentId, threadId } : null;
+    return agentId && threadId && this.openClientFor(externalThreadId) === client ? { agentId, threadId } : null;
   }
 
   bindThread(externalThreadId: string, agentId: string, publicThreadId?: string): void {
@@ -813,6 +850,13 @@ export class ConversationRuntime {
   unloadThread(externalThreadId: string): void {
     this.#loadedThreads.delete(externalThreadId);
     this.#unloadedThreads.delete(externalThreadId);
+  }
+
+  /** The provider threads that this client holds, loaded or not yet unloaded. */
+  clientThreads(client: AgentClient): string[] {
+    return [...this.#loadedThreads, ...this.#unloadedThreads]
+      .filter(([, owner]) => owner === client)
+      .map(([externalThreadId]) => externalThreadId);
   }
 
   /** Forgets the sessions one stopped process held, and leaves those of every other provider loaded. */
@@ -888,6 +932,7 @@ export class ConversationRuntime {
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#taskThreads.delete(threadId);
+    this.#channelThreads.delete(threadId);
     this.#executionSnapshots.delete(threadId);
     this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
@@ -949,6 +994,14 @@ export class ConversationRuntime {
     return this.#snapshots.get(agentId);
   }
 
+  /**
+   * After "Delete history" of the agent's own chat: the next read of the deleted ids comes from the
+   * database, which now holds every message of the thread. The caller replaces the snapshot.
+   */
+  forgetDeletedHistory(threadId: string): void {
+    this.#deletedMessageIds.delete(threadId);
+  }
+
   clearLoadedThreads(): void {
     this.#loadedThreads.clear();
     this.#unloadedThreads.clear();
@@ -958,6 +1011,7 @@ export class ConversationRuntime {
     for (const [id, snapshot] of this.#executionSnapshots) {
       if (snapshot.agentId !== agentId) continue;
       this.#taskThreads.delete(id);
+      this.#channelThreads.delete(id);
       this.#executionSnapshots.delete(id);
       this.#dropCachedExecutionSnapshot(id);
       this.#conversationSignatures.delete(id);
@@ -1229,6 +1283,9 @@ function oldestMessagesToRemove(
   return removed;
 }
 
+/** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
 function messageSignature(message: ConversationMessage): string {
-  return createHash("sha256").update(JSON.stringify(message)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(withoutQueuePositions(message)))
+    .digest("hex");
 }

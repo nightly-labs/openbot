@@ -20,7 +20,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { DiscordMark, SlackMark } from "./brand-marks";
+import { DiscordTile, SlackTile } from "./brand-marks";
 import {
   type ChannelAgent,
   type ChannelAvatar,
@@ -35,6 +35,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import {
   type IntegrationPageSlots,
@@ -106,11 +107,13 @@ const STATE_HELP: Record<WorkspacePlatform, Partial<Record<MessagingConnection["
     invalid_token: "messaging.help.invalid_token",
     secret_storage_unavailable: "messaging.help.secret_storage_unavailable",
     relay_unavailable: "messaging.help.relay_unavailable",
+    not_linked: "messaging.help.not_linked",
   },
   discord: {
     invalid_token: "messaging.discordHelp.invalid_token",
     secret_storage_unavailable: "messaging.discordHelp.secret_storage_unavailable",
     relay_unavailable: "messaging.discordHelp.relay_unavailable",
+    not_linked: "messaging.discordHelp.not_linked",
   },
 };
 
@@ -246,11 +249,11 @@ const ORCHESTRATOR_AVATAR = {
   discord: DISCORD_ORCHESTRATOR_AVATAR,
 } as const satisfies Record<WorkspacePlatform, ChannelAvatar>;
 
-/** The logo of a platform. */
+/** The app icon of a platform, for its tile. */
 export function MessagingMark(props: { platform?: WorkspacePlatform | undefined }) {
   return (
-    <Show when={props.platform === "discord"} fallback={<SlackMark />}>
-      <DiscordMark />
+    <Show when={props.platform === "discord"} fallback={<SlackTile />}>
+      <DiscordTile />
     </Show>
   );
 }
@@ -288,7 +291,7 @@ export function slackIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: text.statusAttention, attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: text.statusConnected, attention };
+  return pausedChannelState(connections) ?? { status: "connected", label: text.statusConnected, attention };
 }
 
 /**
@@ -646,7 +649,7 @@ function RolesDialog(props: {
       open={props.connection !== null}
       closeLabel={t("connector.discord.close")}
       onClose={props.onClose}
-      logo={<DiscordMark />}
+      logo={<DiscordTile />}
       link="connected"
       title={t("connector.discord.accessDialogTitle", { workspace: props.connection?.workspaceName ?? "" })}
       description={t("connector.discord.accessDialogDescription")}

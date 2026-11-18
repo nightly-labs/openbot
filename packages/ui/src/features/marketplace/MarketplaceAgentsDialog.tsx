@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { assignedSkillCount } from "@openbot/contracts/ipc";
-import { Button, Checkbox, Dialog, IconButton, Input, Plus, Search, Text, X } from "@openbot/ui";
+import { Badge, Button, Checkbox, Dialog, IconButton, Input, Plus, Search, Text, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
@@ -142,14 +142,23 @@ function createDragCheck(props: {
   };
 }
 
-/** One agent in a picker row: avatar, name, and a short note at the end. */
+/** One agent in a picker row: avatar, name, title as in the sidebar, and a short note at the end. */
 function PickerAgent(props: { agent: MarketplaceAgent; note: string | undefined }) {
   return (
     <>
       <span class="marketplace-avatar" data-size="xs">
         <AgentAvatar agent={props.agent} motion="idle" />
       </span>
-      <span class="marketplace-skill-picker-name">{props.agent.name}</span>
+      <span class="marketplace-skill-picker-agent">
+        <span class="marketplace-skill-picker-name">{props.agent.name}</span>
+        <Show when={props.agent.title.trim()}>
+          {(title) => (
+            <Badge class="agent-role-badge" title={title()}>
+              <span dir="auto">{title()}</span>
+            </Badge>
+          )}
+        </Show>
+      </span>
       <Show when={props.note}>
         {(note) => (
           <Text as="span" variant="caption" tone="muted">
@@ -165,7 +174,7 @@ function PickerAgent(props: { agent: MarketplaceAgent; note: string | undefined 
  * The agents with a search field and a check box each: a long list must not be a long menu. "All"
  * checks each agent that the search shows. A row that cannot change has its check box off.
  */
-function AgentSearchList(props: {
+export function AgentSearchList(props: {
   agents: readonly MarketplaceAgent[];
   label: string;
   checked: (agentId: string) => boolean;
@@ -417,7 +426,7 @@ function DialogButton(props: {
 }
 
 /** Small avatars of the first agents, one over the next. The text beside it gives the count. */
-function AgentStack(props: { agents: readonly MarketplaceAgent[] }) {
+export function AgentStack(props: { agents: readonly MarketplaceAgent[] }) {
   return (
     <span class="marketplace-skill-stack" aria-hidden="true">
       <For each={props.agents.slice(0, 3)} keyed={(agent) => agent.id}>

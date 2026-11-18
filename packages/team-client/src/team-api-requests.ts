@@ -1,18 +1,24 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
+import { bytesToBase64 } from "./base64";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
 // whose path, body and decoding are the same in both are here. A request that differs in one of them
 // stays at its call site.
 
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import {
+  type AgentApproval,
   type AgentImportPreview,
   type AgentMemory,
   type AgentMemorySelectionState,
   type AgentTask,
   type AgentTaskInput,
+  type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
+  type AgentTaskWindow,
   type ApplyAgentImportInput,
   type ApplyInstanceTransferInput,
   type AttachmentSummary,
@@ -36,33 +42,43 @@ import {
   decodeRemoteInstanceTransferResult,
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
+  INSTANCE_TRANSFER_LIMITS,
   type InstalledSkill,
   type InstanceTransferPreview,
   type InstanceTransferSummary,
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAttachmentSummary,
   isConversationSnapshot,
   isQueuedMessageReceipt,
   isRoutine,
   isRoutineFlowCanvas,
   isRoutineFlowLink,
+  isRoutinePausedByRun,
   isRoutineRun,
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
+  type ReadAgentTaskAroundInput,
+  type ReadAgentTaskPageInput,
   type RemoteAgentImportResult,
   type RemoteInstanceTransferResult,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
+  type Routine,
+  type RoutineRunPlace,
   remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
+  type SetMessagePinnedInput,
   type StartAgentTaskInput,
   type SteerQueuedMessageInput,
   type UpdateQueuedMessageInput,
@@ -72,11 +88,17 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
+import {
   AGENT_MEMORIES_PAGE_ROUTE,
   AGENT_MEMORIES_PAGE_SIZE,
   AGENT_MEMORY_INCLUSION_ROUTE,
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { AGENT_QUEUE_TASK_ROUTES } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_BRANCHES_ROUTES,
@@ -84,6 +106,7 @@ import {
   isAgentThreadBranchLinks,
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -91,12 +114,52 @@ import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/br
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
+  INSTANCE_TRANSFER_CHUNK_BYTES,
+  INSTANCE_TRANSFER_CHUNKS_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
+  decodeLiveVoiceSessionResponse,
+  LIVE_VOICE_ROUTES,
+  type LiveVoiceSessionResponse,
+  type LiveVoiceStartRequest,
+} from "@openbot/contracts/team-protocol/live-voice-v1";
+import { decodeMessagePinsResponse, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+  type RoutinePauseReasonEntry,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
+  decodeRoutineRunPlace,
+  decodeRoutineRunPlaces,
+  ROUTINE_RUN_PLACE_ROUTES,
+  type RoutineRunPlaceEntry,
+} from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
+import {
+  createOnceAgentRoutine,
+  createOnceChannelRoutine,
+  isOnceSchedule,
+  listOnceAgentRoutines,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
+  updateChannelRoutineOnce,
+} from "./routines-once";
 
 export class TeamRequestError extends Schema.TaggedError<TeamRequestError>()("TeamRequestError", {
   cause: Schema.Defect(),
@@ -192,9 +255,30 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
   return yield* teamCall(() => request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId }));
 });
 
+/**
+ * Starts GPT live voice in the chat of `agentId` with the WebRTC offer of the client's peer, and
+ * answers the session id and the answer of OpenAI. Send it only to a host that serves `live-voice-v1`.
+ */
+export const startLiveVoice = Effect.fn("TeamClient.startLiveVoice")(function* (
+  request: TeamApiRequest,
+  input: LiveVoiceStartRequest,
+): Effect.fn.Return<LiveVoiceSessionResponse, TeamRequestError> {
+  return yield* teamCall(() => request("POST", LIVE_VOICE_ROUTES.start, decodeLiveVoiceSessionResponse, { ...input }));
+});
+
+/** Ends a GPT live voice session. The host then sends its `live-voice` end event. */
+export const stopLiveVoice = Effect.fn("TeamClient.stopLiveVoice")(function* (
+  request: TeamApiRequest,
+  sessionId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", LIVE_VOICE_ROUTES.stop, ignoreResponse, { sessionId }));
+});
+
 const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");
 const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
 const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
+const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
+const decodeTaskWindow = guardedDecoder(isAgentTaskWindow, "thread part response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
 
 /**
@@ -213,6 +297,52 @@ export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
   { agentId, taskId }: AgentTaskInput,
 ): Effect.fn.Return<ConversationSnapshot, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
+});
+
+/** Older messages of a task, before a message that the client holds. Send it only to a host with `agent-thread-pages-v1`. */
+export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, beforeMessageId, limit }: ReadAgentTaskPageInput,
+): Effect.fn.Return<AgentTaskPage, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, decodeTaskPage, { agentId, taskId, beforeMessageId, limit }),
+  );
+});
+
+/** The messages of a task around one of its messages. Send it only to a host with `message-pins-v1`. */
+export const readAgentThreadAround = Effect.fn("TeamClient.readAgentThreadAround")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, limit }: ReadAgentTaskAroundInput,
+): Effect.fn.Return<AgentTaskWindow, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", MESSAGE_PINS_ROUTES.readThread, decodeTaskWindow, { agentId, taskId, messageId, limit }),
+  );
+});
+
+/** The pinned messages of all chats of an agent, the newest pin first. Send it only to a host with `message-pins-v1`. */
+export const listMessagePins = Effect.fn("TeamClient.listMessagePins")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", MESSAGE_PINS_ROUTES.list, decodeMessagePinsResponse, { agentId }));
+});
+
+/**
+ * Pins or unpins one message of the agent's own chat or, with `taskId`, of one of its side threads.
+ * Answers the new list. Send it only to a host with `message-pins-v1`.
+ */
+export const setMessagePinned = Effect.fn("TeamClient.setMessagePinned")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, pinned }: SetMessagePinnedInput,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", MESSAGE_PINS_ROUTES.set, decodeMessagePinsResponse, {
+      agentId,
+      taskId: taskId ?? null,
+      messageId,
+      pinned,
+    }),
+  );
 });
 
 /**
@@ -237,6 +367,14 @@ export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
           ...(clientMessageId === undefined ? {} : { clientMessageId }),
         }),
   );
+});
+
+/** Moves a queued message of the agent's own chat into a new task. Send it only to a host with `agent-queue-task-v1`. */
+export const runQueuedMessageAsAgentTask = Effect.fn("TeamClient.runQueuedMessageAsAgentTask")(function* (
+  request: TeamApiRequest,
+  { agentId, deliveryId }: { agentId: string; deliveryId: string },
+): Effect.fn.Return<AgentTask, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_QUEUE_TASK_ROUTES.run, decodeAgentTask, { agentId, deliveryId }));
 });
 
 /**
@@ -378,6 +516,42 @@ export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(functio
   );
 });
 
+function decodeUploadId(value: unknown): string {
+  if (!isDynamicRecord(value) || !isString(value.uploadId)) throw new Error("The host returned an invalid upload.");
+  return value.uploadId;
+}
+
+/** An export that is read one part at a time. */
+export interface AgentExportParts {
+  name: string;
+  size: number;
+  /** Up to `length` bytes from `offset`, as Base64. */
+  readPart: (offset: number, length: number) => Promise<string>;
+}
+
+/**
+ * Sends a Grok Bot export of any size to the host in parts, and answers its preview. Send it only to
+ * a host that serves `agent-import-v2`; `apply` and `discard` stay the v1 calls.
+ */
+export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInParts")(function* (
+  request: TeamApiRequest,
+  file: AgentExportParts,
+): Effect.fn.Return<AgentImportPreview, TeamRequestError> {
+  const uploadId = yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.open, decodeUploadId, { size: file.size }),
+  );
+  for (let offset = 0; offset < file.size; ) {
+    const length = Math.min(AGENT_IMPORT_V2_CHUNK_BYTES, file.size - offset);
+    const base64 = yield* teamCall(() => file.readPart(offset, length));
+    const upload = { name: file.name, mimeType: "application/zip", base64, maxBytes: AGENT_IMPORT_V2_CHUNK_BYTES };
+    yield* teamCall(() => request("POST", agentImportV2ChunkPath(uploadId, offset), ignoreResponse, undefined, upload));
+    offset += length;
+  }
+  return yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.stage, decodeRemoteAgentImportPreview, { uploadId }),
+  );
+});
+
 export const applyAgentImport = Effect.fn("TeamClient.applyAgentImport")(function* (
   request: TeamApiRequest,
   input: ApplyAgentImportInput,
@@ -427,6 +601,174 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
   );
 });
 
+/** The host's export in parts: the whole file's size and SHA-256, and the SHA-256 of each part. */
+export interface InstanceTransferExportState {
+  exportId: string;
+  size: number;
+  sha256: string;
+  chunkBytes: number;
+  chunks: string[];
+  warnings: string[];
+}
+
+const SHA256 = /^[0-9a-f]{64}$/u;
+
+const isPartBytes = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
+
+/**
+ * The `export/begin` body of `instance-transfer-full-copy-v1`: every part as a field. The channel
+ * messages follow the chat history when the input does not name them, as they did before.
+ */
+export function fullCopyExportBody(input: ExportInstanceInput) {
+  const includeHistory = input.includeHistory === true;
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    includeHistory,
+    includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+    includeServerPreferences: input.includeServerPreferences === true,
+  };
+}
+
+/** The `export/begin` answer of `instance-transfer-chunks-v1`, checked against the file limits. */
+export function decodeInstanceTransferExportState(value: unknown): InstanceTransferExportState {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.exportId) ||
+    typeof value.size !== "number" ||
+    !Number.isSafeInteger(value.size) ||
+    value.size <= 0 ||
+    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
+    !isString(value.sha256) ||
+    !SHA256.test(value.sha256) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.chunks) ||
+    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
+    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every(isString)
+  )
+    throw new Error("The host returned an invalid transfer export.");
+  return {
+    exportId: value.exportId,
+    size: value.size,
+    sha256: value.sha256,
+    chunkBytes: value.chunkBytes,
+    chunks: value.chunks,
+    warnings: value.warnings,
+  };
+}
+
+/**
+ * Starts an export in parts with each part of the file chosen. Send it only to a host that serves
+ * `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`.
+ */
+export const beginInstanceTransferFullCopy = Effect.fn("TeamClient.beginInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ExportInstanceInput,
+): Effect.fn.Return<InstanceTransferExportState, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeInstanceTransferExportState, {
+      ...fullCopyExportBody(input),
+    }),
+  );
+});
+
+/** One part of the host's export, as Base64. The transport must let one part answer this request. */
+export const readInstanceTransferExportPart = Effect.fn("TeamClient.readInstanceTransferExportPart")(function* (
+  request: TeamApiRequest,
+  part: { exportId: string; index: number },
+): Effect.fn.Return<RemoteFileUpload, TeamRequestError> {
+  return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, decodeTransferFile, part));
+});
+
+/** Ends the host's export, which removes its file. */
+export const finishInstanceTransferExport = Effect.fn("TeamClient.finishInstanceTransferExport")(function* (
+  request: TeamApiRequest,
+  exportId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, ignoreResponse, { exportId }));
+});
+
+/** A transfer file that the client reads in parts, so it never holds the whole file at once. */
+export interface TransferFileParts {
+  name: string;
+  size: number;
+  readBytes(offset: number, length: number): Promise<Uint8Array>;
+}
+
+const decodeUploadState = (value: unknown): { uploadId: string; chunkBytes: number; received: number[] } => {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.uploadId) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.received) ||
+    !value.received.every((index) => typeof index === "number" && Number.isSafeInteger(index) && index >= 0)
+  )
+    throw new Error("The host returned an invalid transfer upload.");
+  return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
+};
+
+const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** The SHA-256 of `bytes` as the transfer routes write it: 64 lower-case hexadecimal digits. */
+export function sha256Hex(bytes: Uint8Array): string {
+  return hex(sha256(bytes));
+}
+
+/**
+ * Sends a transfer file to the host in parts and answers the preview of `instance-transfer-v1` stage.
+ * The whole file's SHA-256 is read first, in parts. A part that the host already has from an earlier
+ * try is not sent again. Send it only to a host that serves `instance-transfer-chunks-v1`.
+ */
+export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceTransferInParts")(function* (
+  request: TeamApiRequest,
+  file: TransferFileParts,
+  /** The bytes that the host has, after the start and after each part. Then the host reads the file. */
+  onProgress?: (sent: number, total: number) => void,
+): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
+  const whole = sha256.create();
+  for (let offset = 0; offset < file.size; offset += INSTANCE_TRANSFER_CHUNK_BYTES)
+    whole.update(
+      yield* teamCall(() => file.readBytes(offset, Math.min(INSTANCE_TRANSFER_CHUNK_BYTES, file.size - offset))),
+    );
+  const upload = yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, decodeUploadState, {
+      size: file.size,
+      sha256: hex(whole.digest()),
+    }),
+  );
+  const received = new Set(upload.received);
+  const partLength = (index: number) => Math.min(upload.chunkBytes, file.size - index * upload.chunkBytes);
+  // The parts that a failed upload left on the host count at once.
+  let sent = 0;
+  for (const index of received) if (index * upload.chunkBytes < file.size) sent += partLength(index);
+  onProgress?.(sent, file.size);
+  for (let index = 0; index * upload.chunkBytes < file.size; index++) {
+    if (received.has(index)) continue;
+    const offset = index * upload.chunkBytes;
+    const bytes = yield* teamCall(() => file.readBytes(offset, partLength(index)));
+    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: sha256Hex(bytes) });
+    yield* teamCall(() =>
+      request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
+        name: file.name,
+        mimeType: "application/octet-stream",
+        base64: bytesToBase64(bytes),
+        maxBytes: upload.chunkBytes,
+      }),
+    );
+    sent += bytes.length;
+    onProgress?.(sent, file.size);
+  }
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, decodeRemoteInstanceTransferPreview, {
+      uploadId: upload.uploadId,
+    }),
+  );
+});
+
 /** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */
 export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer")(function* (
   request: TeamApiRequest,
@@ -436,6 +778,26 @@ export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer
     request("POST", INSTANCE_TRANSFER_ROUTES.stage, decodeRemoteInstanceTransferPreview, undefined, {
       ...upload,
       maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
+    }),
+  );
+});
+
+/**
+ * Imports a staged file and also replaces the server preferences when the input asks. Send it only to
+ * a host that serves `instance-transfer-full-copy-v1`.
+ */
+export const applyInstanceTransferFullCopy = Effect.fn("TeamClient.applyInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ApplyInstanceTransferInput,
+  timezone: string,
+): Effect.fn.Return<RemoteInstanceTransferResult, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, decodeRemoteInstanceTransferResult, {
+      token: input.token,
+      keys: input.keys,
+      includeSettings: input.includeSettings,
+      includeServerPreferences: input.includeServerPreferences === true,
+      timezone,
     }),
   );
 });
@@ -484,6 +846,36 @@ export const respondToApproval = Effect.fn("TeamClient.respondToApproval")(funct
   return yield* teamCall(() => request("POST", TEAM_API_ROUTES.respond.approval, ignoreResponse, { ...input }));
 });
 
+/**
+ * The whole copy of one approval that an agent waits on, with `pending-approval-v1`. A runtime snapshot
+ * cuts the texts of an approval, so a client reads this before it offers Allow for a cut copy.
+ */
+export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(function* (
+  request: TeamApiRequest,
+  input: { agentId: string; requestId: string | number },
+): Effect.fn.Return<AgentApproval, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, { ...input }),
+  );
+});
+
+/**
+ * Sends a bug report about the phone app that an agent waits on, with the phone's version, system
+ * and support log (`phone-feedback-v1`). It answers the approval: the host takes no plain "accept"
+ * of such a report.
+ */
+export const sendPhoneFeedback = Effect.fn("TeamClient.sendPhoneFeedback")(function* (
+  request: TeamApiRequest,
+  input: { requestId: string | number; phone: FeedbackPhone },
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PHONE_FEEDBACK_ROUTES.send, ignoreResponse, {
+      requestId: input.requestId,
+      phone: { ...input.phone },
+    }),
+  );
+});
+
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
   request: TeamApiRequest,
   input: RespondToBrowserTakeoverInput,
@@ -523,22 +915,60 @@ export type TeamChannelsApi = Pick<
   | "listChannelRoutineRuns"
 >;
 
-/** Every channel route is a POST with the channel in the body, except the list. */
-export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
+/**
+ * A host with channel-picture-v1 names a channel image by its `openbot-avatar:` URL, which a browser
+ * cannot open. Without it, the channel shows its icon or its member faces.
+ */
+function withoutHostImage<T extends { imageUrl?: string | null }>(channel: T): T {
+  return channel.imageUrl ? { ...channel, imageUrl: null } : channel;
+}
+
+/**
+ * Every channel route is a POST with the channel in the body, except the list. With `once`, for a host
+ * with `routines-once-v1`, the routine list adds the `once` routines and every routine update goes to
+ * its routes. With `keepHostImage`, a channel keeps the host's image URL, for a caller that reads the
+ * image through the `channel-picture-v1` image route.
+ */
+export function teamChannelsApi(
+  request: TeamApiRequest,
+  once: () => boolean = () => false,
+  keepHostImage = false,
+): TeamChannelsApi {
+  const image = <T extends { imageUrl?: string | null }>(channel: T): T =>
+    keepHostImage ? channel : withoutHostImage(channel);
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
+  const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
   return {
-    listChannels: () => request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries),
-    readChannel: (input) => post(CHANNEL_ROUTES.read, decodeChannelPage, input),
-    channelCommand: (command) => post(CHANNEL_ROUTES.command, decodeChannel, command),
+    listChannels: async () => (await request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries)).map(image),
+    readChannel: async (input) => {
+      const page = await post(CHANNEL_ROUTES.read, decodeChannelPage, input);
+      return { ...page, channel: image(page.channel) };
+    },
+    channelCommand: async (command) => image(await post(CHANNEL_ROUTES.command, decodeChannel, command)),
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),
     deleteChannelMemory: (input) => post(CHANNEL_ROUTES.memoryDelete, ignoreResponse, input),
     clearChannelMemories: (channelId) => post(CHANNEL_ROUTES.memoryClear, ignoreResponse, { channelId }),
-    listChannelRoutines: (channelId) => post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }),
-    createChannelRoutine: (input) => post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input),
-    updateChannelRoutine: (input) => post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input),
+    listChannelRoutines: async (channelId) => {
+      const routines = post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId });
+      if (!once()) return routines;
+      const [released, onceRoutines] = await Promise.all([routines, listOnceChannelRoutines(send, channelId)]);
+      return [...released, ...onceRoutines];
+    },
+    createChannelRoutine: (input) => {
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, once());
+        return createOnceChannelRoutine(send, input);
+      }
+      return post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input);
+    },
+    updateChannelRoutine: (input) => {
+      if (once()) return updateChannelRoutineOnce(send, input);
+      requireReleasedScheduleOn(input.schedule, false);
+      return post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input);
+    },
     deleteChannelRoutine: (input) => post(CHANNEL_ROUTES.routineDelete, ignoreResponse, input),
     testChannelRoutine: (input) => post(CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, input),
     listChannelRoutineRuns: (input) => post(CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, input),
@@ -556,19 +986,112 @@ export type TeamAgentRoutinesApi = Pick<
   "listRoutines" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "listRoutineRuns"
 >;
 
-/** The frozen v1 agent routine routes. Every host serves them. */
-export function teamAgentRoutinesApi(request: TeamApiRequest): TeamAgentRoutinesApi {
+/** Gives each routine the place where the host runs it, from the `routine-run-place-v1` list. */
+export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunPlace }>(
+  routines: readonly R[],
+  places: readonly RoutineRunPlaceEntry[],
+): R[] {
+  const placeOf = new Map(places.map((place) => [place.routineId, place.runIn]));
+  return routines.map((routine) => {
+    const runIn = placeOf.get(routine.id);
+    return runIn ? { ...routine, runIn } : routine;
+  });
+}
+
+/**
+ * Gives each paused routine the scheduled run of its own that paused it, from the
+ * `routine-pause-reasons-v1` list (#10048).
+ */
+export function withRoutinePauseReasons<R extends { id: string; active: boolean }>(
+  routines: readonly R[],
+  reasons: readonly RoutinePauseReasonEntry[],
+): R[] {
+  if (reasons.length === 0) return [...routines];
+  const reasonOf = new Map(reasons.map((reason) => [reason.routineId, reason.scheduledFor]));
+  return routines.map((routine) => {
+    const pausedByRun = routine.active ? undefined : { scheduledFor: reasonOf.get(routine.id) };
+    // The preload refuses the whole list for one time that does not parse, so a bad one is dropped here.
+    return isRoutinePausedByRun(pausedByRun) ? { ...routine, pausedByRun } : routine;
+  });
+}
+
+/** The `routine-pause-reasons-v1` list of an agent. */
+export function listRoutinePauseReasons(request: TeamApiRequest, agentId: string): Promise<RoutinePauseReasonEntry[]> {
+  return request("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, { agentId });
+}
+
+/**
+ * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
+ * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes. They
+ * also leave out the `once` routines, so with `once`, for a host with `routines-once-v1`, the list
+ * adds them and every routine update goes to their routes, which save the place too. They leave out
+ * why a routine is paused, so with `pauseReasons`, for a host with `routine-pause-reasons-v1`, the
+ * list reads it on that route.
+ */
+export function teamAgentRoutinesApi(
+  request: TeamApiRequest,
+  runPlaces: () => boolean = () => false,
+  once: () => boolean = () => false,
+  pauseReasons: () => boolean = () => false,
+): TeamAgentRoutinesApi {
+  const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
+  // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
+  // and a second save does not make a second routine.
+  const withRunPlace = async (
+    routine: Routine,
+    runIn: RoutineRunPlace | undefined,
+    created = false,
+  ): Promise<Routine> => {
+    if (!runIn || !runPlaces()) return routine;
+    const placed = request("POST", ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+      agentId: routine.agentId,
+      routineId: routine.id,
+      runIn,
+    });
+    const place = created ? await placed.catch(() => ({ runIn: "chat" as const })) : await placed;
+    return { ...routine, runIn: place.runIn };
+  };
   return {
-    listRoutines: (agentId) => request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
-    createRoutine: (input) =>
-      request("POST", TEAM_API_ROUTES.agent.routines(input.agentId), decodeRoutine, decodeTeamProtocolV2Json(input)),
-    updateRoutine: (input) =>
-      request(
-        "PATCH",
-        TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-        decodeRoutine,
-        decodeTeamProtocolV2Json(input),
-      ),
+    listRoutines: async (agentId) => {
+      const [list, places, reasons, extra] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+        runPlaces()
+          ? request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId })
+          : Promise.resolve([]),
+        pauseReasons() ? listRoutinePauseReasons(request, agentId) : Promise.resolve([]),
+        once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]),
+      ]);
+      return [...withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons), ...extra];
+    },
+    createRoutine: async ({ runIn, ...input }) => {
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, once());
+        return createOnceAgentRoutine(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+      }
+      return withRunPlace(
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.routines(input.agentId),
+          decodeRoutine,
+          decodeTeamProtocolV2Json(input),
+        ),
+        runIn,
+        true,
+      );
+    },
+    updateRoutine: async ({ runIn, ...input }) => {
+      if (once()) return updateAgentRoutineOnce(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+      requireReleasedScheduleOn(input.schedule, false);
+      return withRunPlace(
+        await request(
+          "PATCH",
+          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+          decodeRoutine,
+          decodeTeamProtocolV2Json(input),
+        ),
+        runIn,
+      );
+    },
     deleteRoutine: ({ agentId, routineId }) =>
       request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse),
     testRoutine: ({ agentId, routineId }) =>
@@ -578,7 +1101,10 @@ export function teamAgentRoutinesApi(request: TeamApiRequest): TeamAgentRoutines
   };
 }
 
-/** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
+/**
+ * The routine canvas calls of the desktop IPC surface. Send them only to a host that serves
+ * `routine-flows-v1`, and `stopRun` only to one that also serves `routine-flow-stop-v1`.
+ */
 export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
 
 const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
@@ -595,6 +1121,7 @@ export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsAp
     connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
     disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
     updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
+    stopRun: (input) => post(ROUTINE_FLOW_STOP_ROUTES.stopRun, ignoreResponse, input),
   };
 }
 /** An Effect request lets the desktop reuse its managed request lifetime. */

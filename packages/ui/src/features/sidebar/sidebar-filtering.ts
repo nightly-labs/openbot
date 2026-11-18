@@ -38,6 +38,7 @@ export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate
   if (state.kind === "working") return t("sidebar.state.working");
   if (state.kind === "responded") return t("sidebar.state.responded");
   if (state.kind === "routine") return routineStateLabel(state.phase, state.count, t);
+  if (state.count === 0) return t("sidebar.state.unreadThreads");
   return t("sidebar.state.unread", { count: state.count });
 }
 

@@ -4,6 +4,9 @@
 
 import {
   DISCORD_CUSTOM_ID_PREFIX,
+  DISCORD_EMBED_LIMITS,
+  DISCORD_EMBED_TEXT_LIMIT,
+  DISCORD_EMBEDS_LIMIT,
   DISCORD_LIST_CHANNELS_LIMIT,
   DISCORD_LIST_MESSAGES_LIMIT,
   DISCORD_MESSAGE_TEXT_LIMIT,
@@ -11,9 +14,11 @@ import {
   type DiscordApiErrorCode,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordChannelList,
   type DiscordChannelSummary,
   type DiscordHistoryMessage,
   type DiscordRoleSummary,
+  discordEmbedTextLength,
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { Effect, Schema } from "effect";
 import { z } from "zod";
@@ -27,16 +32,69 @@ const buttonSchema = z.strictObject({
   style: z.enum(["primary", "secondary", "success", "danger"]),
 });
 const buttonsSchema = z.array(buttonSchema).max(5);
+const embedUrlSchema = z.url({ protocol: /^https?$/u }).max(DISCORD_EMBED_LIMITS.url);
+const embedTextSchema = (max: number) => z.string().trim().min(1).max(max);
+const embedSchema = z
+  .strictObject({
+    title: embedTextSchema(DISCORD_EMBED_LIMITS.title).optional(),
+    description: embedTextSchema(DISCORD_EMBED_LIMITS.description).optional(),
+    url: embedUrlSchema.optional(),
+    color: z.int().min(0).max(0xffffff).optional(),
+    timestamp: z.iso.datetime({ offset: true }).optional(),
+    author: z
+      .strictObject({
+        name: embedTextSchema(DISCORD_EMBED_LIMITS.authorName),
+        url: embedUrlSchema.optional(),
+        icon_url: embedUrlSchema.optional(),
+      })
+      .optional(),
+    footer: z
+      .strictObject({ text: embedTextSchema(DISCORD_EMBED_LIMITS.footerText), icon_url: embedUrlSchema.optional() })
+      .optional(),
+    thumbnail: z.strictObject({ url: embedUrlSchema }).optional(),
+    image: z.strictObject({ url: embedUrlSchema }).optional(),
+    fields: z
+      .array(
+        z.strictObject({
+          name: embedTextSchema(DISCORD_EMBED_LIMITS.fieldName),
+          value: embedTextSchema(DISCORD_EMBED_LIMITS.fieldValue),
+          inline: z.boolean().optional(),
+        }),
+      )
+      .max(DISCORD_EMBED_LIMITS.fields)
+      .optional(),
+  })
+  // Discord refuses an embed that shows nothing.
+  .refine((embed) =>
+    Boolean(
+      embed.title ||
+        embed.description ||
+        embed.author ||
+        embed.footer ||
+        embed.image ||
+        embed.thumbnail ||
+        embed.fields?.length,
+    ),
+  );
+const embedsSchema = z
+  .array(embedSchema)
+  .min(1)
+  .max(DISCORD_EMBEDS_LIMIT)
+  .refine((embeds) => discordEmbedTextLength(embeds) <= DISCORD_EMBED_TEXT_LIMIT);
 
 const discordApiRequestSchema = z.discriminatedUnion("op", [
-  z.strictObject({
-    op: z.literal("createMessage"),
-    guildId: snowflakeSchema,
-    channelId: snowflakeSchema,
-    content: contentSchema,
-    replyTo: snowflakeSchema.nullable(),
-    buttons: buttonsSchema,
-  }),
+  z
+    .strictObject({
+      op: z.literal("createMessage"),
+      guildId: snowflakeSchema,
+      channelId: snowflakeSchema,
+      content: z.string().max(DISCORD_MESSAGE_TEXT_LIMIT),
+      replyTo: snowflakeSchema.nullable(),
+      buttons: buttonsSchema,
+      embeds: embedsSchema.optional(),
+    })
+    // Discord refuses a post without text, files or embeds.
+    .refine((request) => request.content.length > 0 || request.embeds !== undefined),
   z.strictObject({
     op: z.literal("editMessage"),
     guildId: snowflakeSchema,
@@ -139,7 +197,7 @@ type DiscordApiResult =
   | { messageId: string }
   | { name: string }
   | { messages: DiscordHistoryMessage[] }
-  | { channels: DiscordChannelSummary[] }
+  | DiscordChannelList
   | { roles: DiscordRoleSummary[] }
   | Record<string, never>;
 
@@ -263,7 +321,9 @@ const historySchema = z
   .max(DISCORD_LIST_MESSAGES_LIMIT);
 
 const BUTTON_STYLES = { primary: 1, secondary: 2, success: 3, danger: 4 } as const;
-// No post can ping anyone: not a user, a role, `@everyone`, or the author of the replied message.
+// A new post can ping a user that it mentions, but not a role, `@everyone`, or the author of the
+// replied message. Discord sends no ping for an edit.
+const USER_MENTIONS = { parse: ["users"], replied_user: false };
 const NO_MENTIONS = { parse: [], replied_user: false };
 
 function failure(status: number, code: DiscordApiErrorCode, retryAfterMs?: number): DiscordApiFailure {
@@ -336,10 +396,11 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
           method: "POST",
           route: `/channels/${request.channelId}/messages`,
           body: {
-            content: request.content,
-            allowed_mentions: NO_MENTIONS,
+            ...(request.content ? { content: request.content } : {}),
+            allowed_mentions: USER_MENTIONS,
             ...messageReference(request.replyTo),
             components: components(request.buttons),
+            ...(request.embeds ? { embeds: request.embeds } : {}),
           },
         }).pipe(Effect.flatMap((value) => decode(createdMessageSchema, value)));
         return { messageId: created.id };
@@ -431,7 +492,8 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const can = (channelId: string | null | undefined, needed: bigint) =>
           channelId != null && ((permissions.get(channelId) ?? 0n) & needed) === needed;
         const joined = new Set((active.members ?? []).flatMap((member) => (member.id ? [member.id] : [])));
-        const channels: DiscordChannelSummary[] = [
+        // The newest threads first: a Discord id grows with time, and the limit drops the oldest ones.
+        const places: DiscordChannelSummary[] = [
           ...guildChannels
             .filter(
               (channel) => POSTABLE_CHANNEL_TYPES.has(channel.type) && can(channel.id, VIEW_CHANNEL | SEND_MESSAGES),
@@ -443,10 +505,12 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
                 can(thread.parent_id, VIEW_CHANNEL | SEND_MESSAGES_IN_THREADS) &&
                 (thread.type !== PRIVATE_THREAD_TYPE || joined.has(thread.id)),
             )
+            .sort((left, right) => (BigInt(right.id) > BigInt(left.id) ? 1 : -1))
             .map((thread) => ({ id: thread.id, name: thread.name ?? "", kind: "thread" as const })),
-        ].slice(0, DISCORD_LIST_CHANNELS_LIMIT);
+        ];
+        const channels = places.slice(0, DISCORD_LIST_CHANNELS_LIMIT);
         for (const channel of channels) state.rememberChannel(channel.id, request.guildId, channel.name);
-        return { channels };
+        return { channels, omitted: places.length - channels.length };
       }
       // The roles a person can have: not `@everyone`, whose id is the guild's, and not a role that a
       // bot or integration manages.

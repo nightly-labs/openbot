@@ -39,7 +39,7 @@ const SETUP_STORAGE_KEYS = {
   "hermes-agent": "openbot.agent-import.hermes-setup",
 } as const satisfies Record<AgentImportSkillSource, string>;
 
-/** The setups each app offers. Reading the Hermes folder needs this computer. */
+/** The setups each app offers. Reading the Hermes folder needs a server that can read its own. */
 function setupsFor(source: AgentImportSkillSource, folder: boolean): readonly AgentImportSetup[] {
   if (source === "grok-bot") return ["agent", "skill"];
   return folder ? ["folder", "command", "skill"] : ["command", "skill"];
@@ -61,9 +61,19 @@ type HermesCall = "readHermes" | "chooseHermes" | "applyHermes" | "discardHermes
 export type AgentImportCalls = Omit<OpenBotDesktopApi["agentImport"], HermesCall> & {
   /** Opens the ready export agent's Grok Bot page. */
   openExportAgent(): void;
-  /** The Hermes folder calls, on desktop only: main reads the Hermes folder of this computer. */
-  hermes?: Pick<OpenBotDesktopApi["agentImport"], HermesCall>;
+  /**
+   * The Hermes folder calls: the server reads its own Hermes folder. `chooseHermes` opens the folder
+   * dialog of this computer, so only the desktop has it.
+   */
+  hermes?: Pick<OpenBotDesktopApi["agentImport"], Exclude<HermesCall, "chooseHermes">> &
+    Partial<Pick<OpenBotDesktopApi["agentImport"], "chooseHermes">>;
 };
+
+/**
+ * Where the Hermes folder is read. `computer`: this computer's server, where the user can also choose
+ * another folder. `server`: a joined server that reads its own Hermes folder with `hermes-import-v1`.
+ */
+export type HermesFolderPlace = "computer" | "server";
 
 export interface ServerImportOptions {
   onOpenAgent: (agentId: string) => void;
@@ -103,8 +113,10 @@ interface HermesState {
 export function ServerImportPanel(
   props: ServerImportOptions & {
     serverId: string;
-    /** This computer's server: the Hermes folder here can be read with no export. */
-    hermes?: boolean;
+    /** Where the server can read the Hermes folder with no export. Not set: Hermes offers the export only. */
+    hermes?: HermesFolderPlace | undefined;
+    /** The panel imports to a joined server, not to this computer. */
+    onServer?: boolean | undefined;
     /** Opens the Transfer section, when the settings have one. */
     onOpenTransfer?: (() => void) | undefined;
     onDetailChange?: ((detail: ServerImportDetail | null) => void) | undefined;
@@ -115,6 +127,8 @@ export function ServerImportPanel(
   // The server the preview's token belongs to, fixed for the life of the panel.
   const serverId = props.serverId;
   const hermesCalls = props.hermes ? calls.hermes : undefined;
+  // The folder dialog shows the files of this computer, and a joined server cannot read them.
+  const chooseHermes = props.hermes === "computer" ? hermesCalls?.chooseHermes : undefined;
 
   const [source, setSource] = createSignal<AgentImportSkillSource | null>(null);
   const [state, setState] = createStore<ImportState>({ phase: "idle", error: null, preview: null, result: null });
@@ -220,7 +234,7 @@ export function ServerImportPanel(
     });
   const releaseHermes = () => {
     const token = hermes.preview?.token;
-    if (token) void hermesCalls?.discardHermes(token).catch(() => undefined);
+    if (token) void hermesCalls?.discardHermes(token, serverId).catch(() => undefined);
   };
   onSettled(() => releaseHermes);
 
@@ -259,7 +273,7 @@ export function ServerImportPanel(
       draft.error = null;
     });
     try {
-      const result = await hermesCalls.applyHermes({ token: preview.token, profiles: selection });
+      const result = await hermesCalls.applyHermes({ token: preview.token, profiles: selection }, serverId);
       showHermes({ phase: "done", error: null, preview: null, result });
     } catch (error) {
       // Main keeps the profiles open when a check fails before anything changes, so the same
@@ -273,10 +287,14 @@ export function ServerImportPanel(
     }
   };
 
+  const chooseFolder = () => {
+    const choose = chooseHermes;
+    return choose ? () => void readHermes(() => choose(), true) : undefined;
+  };
   const openFolder = () => {
     if (!hermesCalls) return;
     setFolder(true);
-    void readHermes(() => hermesCalls.readHermes(), false);
+    void readHermes(() => hermesCalls.readHermes(serverId), false);
   };
   const closeFolder = () => {
     releaseHermes();
@@ -303,6 +321,8 @@ export function ServerImportPanel(
       <Match when={source() === null}>
         <AgentImportSources
           transfer={Boolean(props.onOpenTransfer)}
+          hermesFolder={props.hermes}
+          onServer={props.onServer}
           onHermes={() => setSource("hermes-agent")}
           onGrok={() => setSource("grok-bot")}
           onTransfer={() => props.onOpenTransfer?.()}
@@ -316,9 +336,8 @@ export function ServerImportPanel(
           updated={updated()}
           error={hermes.error}
           onBack={closeFolder}
-          onChooseFolder={() => {
-            if (hermesCalls) void readHermes(() => hermesCalls.chooseHermes(), true);
-          }}
+          server={props.hermes === "server"}
+          onChooseFolder={chooseFolder()}
           onImport={(selection) => void applyHermes(selection)}
           onDone={() => {
             backToSources();
@@ -343,6 +362,7 @@ export function ServerImportPanel(
               onOpenExportAgent={() => calls.openExportAgent()}
               onSaveExportSkill={() => void saveSkill(current())}
               onReadFolder={current() === "hermes-agent" && hermesCalls ? openFolder : undefined}
+              folderOnServer={props.hermes === "server"}
               onChoose={() => void choose()}
               onImport={(keys, channelKeys) => void apply(keys, channelKeys)}
               onCancel={reset}

@@ -2,35 +2,25 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { isAgentTaskOpen, taskNeedsYou } from "@openbot/team-client/agent-tasks";
 import * as Crypto from "expo-crypto";
 import { type Href, router, useFocusEffect } from "expo-router";
-import type { NativeStackNavigationProp } from "expo-router/native-stack";
-import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
+import { useNavigation } from "expo-router/react-navigation";
 import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CircleX from "lucide-react-native/icons/circle-x";
 import EyeOff from "lucide-react-native/icons/eye-off";
+import ListChecks from "lucide-react-native/icons/list-checks";
 import ListRestart from "lucide-react-native/icons/list-restart";
 import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 import Settings from "lucide-react-native/icons/settings";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
-import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
-import {
-  type ComponentProps,
-  type PropsWithChildren,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type PropsWithChildren, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   BackHandler,
@@ -40,7 +30,6 @@ import {
   TextInput,
   type TextInputInstance,
   View,
-  type ViewInstance,
 } from "react-native";
 import { KeyboardAwareScrollView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
@@ -63,7 +52,6 @@ import { openChatFromPane, useChatListPane } from "@/features/agents/components/
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
-import { useAppDrawerShown } from "@/features/servers/components/app-drawer-activity";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { TaskListRow } from "@/features/servers/components/task-list-row";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
@@ -74,12 +62,13 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { BlurSwap } from "@/shared/components/blur-swap";
 import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
-import { ANDROID_BLUR, GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
+import { GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { currentText, useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
@@ -612,14 +601,7 @@ function TaskTargetRow({ agent, onPress }: { agent: MobileAgent; onPress: () => 
 }
 
 /** The field at the bottom of home. It rides on the keyboard, and a close button comes in beside it. */
-export function HomeSearchBar({
-  search,
-  blurTarget,
-}: {
-  search: HomeSearch;
-  /** Android: the home content that the field blurs. */
-  blurTarget?: RefObject<ViewInstance | null>;
-}) {
+export function HomeSearchBar({ search }: { search: HomeSearch }) {
   const { t } = useText();
   const { input } = search;
   // Touch down mounts the hidden results, and focus opens them: a drag that starts on the field
@@ -628,14 +610,35 @@ export function HomeSearchBar({
   // clears it first.
   const touched = useRef(false);
   // A quick action of the app icon opens the search with the keyboard. The field registers it, so a
-  // request that comes while the list loads waits until the field and its input are mounted.
+  // request that comes while the list loads waits until the field and its input are mounted. A request
+  // that closes the screens over home comes before home shows again, and a hidden field takes no
+  // focus, so the field waits for home to have focus.
+  const navigation = useNavigation();
   useEffect(() => {
-    setHomeSearchOpener(() => {
+    let removeFocusListener: (() => void) | null = null;
+    const focusField = () => {
       touched.current = false;
       input.current?.focus();
+    };
+    setHomeSearchOpener(() => {
+      removeFocusListener?.();
+      removeFocusListener = null;
+      if (navigation.isFocused()) {
+        focusField();
+        return;
+      }
+      const remove = navigation.addListener("focus", () => {
+        remove();
+        removeFocusListener = null;
+        focusField();
+      });
+      removeFocusListener = remove;
     });
-    return () => setHomeSearchOpener(null);
-  }, [input]);
+    return () => {
+      removeFocusListener?.();
+      setHomeSearchOpener(null);
+    };
+  }, [input, navigation]);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reduced = useReducedMotion();
@@ -665,7 +668,6 @@ export function HomeSearchBar({
   const layout = reduced ? undefined : FIELD_LAYOUT;
   const enter = reduced ? undefined : closeButtonEnter;
   const exit = reduced ? undefined : closeButtonExit;
-  const homeAtRest = useHomeAtRest();
   const { target } = search;
   const prepareFromTouch = () => {
     if (search.open) return;
@@ -746,15 +748,12 @@ export function HomeSearchBar({
         </Animated.View>
       ) : null}
       <Animated.View className="min-w-0 flex-1" layout={layout}>
-        <HomeFieldCapsule
+        <GlassCapsule
           height={fieldHeight}
           liquidGlass={liquidGlass}
           fallbackBackground={fieldBackground}
           tint={resultTint}
           tintShown={showsResult}
-          blurTarget={blurTarget}
-          // The open results lie over the list and are not in the target, so the field is solid then.
-          blurPaused={search.open || !homeAtRest}
         >
           {/* The field stays mounted under the result, so "Try again" can focus it at once. The field
               fades out first; the result then fades in from 97% as the tint comes in. */}
@@ -802,6 +801,7 @@ export function HomeSearchBar({
                   paddingBottom: 0,
                   paddingTop: 0,
                   textAlignVertical: "center",
+                  ...fieldDirectionStyle(search.query),
                 }}
                 value={search.query}
                 onChangeText={search.setQuery}
@@ -884,7 +884,7 @@ export function HomeSearchBar({
               />
             ) : null}
           </Animated.View>
-        </HomeFieldCapsule>
+        </GlassCapsule>
       </Animated.View>
     </Animated.View>
   );
@@ -988,51 +988,6 @@ function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => voi
   );
 }
 
-/**
- * Android: whether home shows with no screen over it and no push or pop in progress. The field's
- * blur blurs the whole home list again on each frame that the list changes, so it stops from the
- * moment home loses focus. It starts again when home has focus and its return animation has ended.
- * A sheet over home does not hide home, so its close gives focus with no animation to wait for.
- */
-function useHomeAtRest(): boolean {
-  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
-  const [atRest, setAtRest] = useState(true);
-  useEffect(() => {
-    if (!ANDROID_BLUR) return;
-    // A screen that slid over home hid it; home then comes back with its own animation.
-    let hidden = false;
-    const listeners = [
-      navigation.addListener("blur", () => setAtRest(false)),
-      navigation.addListener("focus", () => {
-        if (!hidden) setAtRest(true);
-      }),
-      navigation.addListener("transitionStart", () => setAtRest(false)),
-      navigation.addListener("transitionEnd", (event) => {
-        if (event.data.closing) {
-          hidden = !navigation.isFocused();
-          return;
-        }
-        hidden = false;
-        if (navigation.isFocused()) setAtRest(true);
-      }),
-    ];
-    return () => {
-      for (const remove of listeners) remove();
-    };
-  }, [navigation]);
-  return atRest;
-}
-
-/**
- * The capsule of the home field. It shows the solid glass while the drawer is open or moves: the
- * scrim covers home then, and the Android blur would blur the whole home list again on each frame of
- * the motion. Only the capsule reads the drawer state, so the field itself does not render again.
- */
-function HomeFieldCapsule({ blurPaused = false, ...props }: ComponentProps<typeof GlassCapsule>) {
-  const drawerShown = useAppDrawerShown();
-  return <GlassCapsule {...props} blurPaused={blurPaused || drawerShown} />;
-}
-
 interface Shortcut {
   id: string;
   label: string;
@@ -1057,7 +1012,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
             {
               id: "tasks",
               label: t("mobile.app.route.threads"),
-              icon: SquareCheck,
+              icon: ListChecks,
               href: { pathname: "/server-tasks", params: { serverId } } as const,
             },
           ]
@@ -1066,14 +1021,14 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
         ? [
             {
               id: "routines",
-              label: t("mobile.app.route.routines"),
+              label: t("mobile.app.route.schedule"),
               icon: CalendarClock,
               href: { pathname: "/server-routines", params: { serverId } } as const,
             },
             {
               id: "usage",
               label: t("mobile.app.route.usage"),
-              icon: ChartColumn,
+              icon: ChartArea,
               href: { pathname: "/server-usage", params: { serverId } } as const,
             },
             {
@@ -1192,7 +1147,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
         </View>
         <View className="flex-row items-start gap-2">
           <View className="pt-0.5">
-            <SquareCheck color={muted} size={16} strokeWidth={1.8} />
+            <ListChecks color={muted} size={16} strokeWidth={1.8} />
           </View>
           <Typography.Paragraph className="min-w-0 flex-1 text-muted" style={typeScale.caption}>
             {t("mobile.search.thread.how", { name: agent.name })}{" "}

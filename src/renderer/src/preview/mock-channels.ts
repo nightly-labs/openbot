@@ -22,7 +22,12 @@ import type {
   UpdateChannelMemoryInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
-import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
+import {
+  CONTEXT_RESET_ITEM_TYPE,
+  channelRoutingConversationEventItemType,
+  isContextResetMarker,
+  withBrowserMember,
+} from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText } from "@openbot/i18n/source";
 import { avatarImageDataUrl } from "@openbot/ui/avatar-image";
@@ -33,6 +38,11 @@ function storedPicture(channel: Channel | undefined): Pick<Channel, "icon" | "im
     ...(channel?.icon === undefined ? {} : { icon: channel.icon }),
     ...(channel?.imageUrl === undefined ? {} : { imageUrl: channel.imageUrl }),
   };
+}
+
+/** A draft without `browser` keeps the stored setting, as the service does. */
+function storedBrowser(channel: Channel | undefined): Pick<Channel, "browser"> {
+  return channel?.browser === undefined ? {} : { browser: channel.browser };
 }
 
 /** A channel that exists when the preview starts, with its history. */
@@ -94,6 +104,7 @@ export function createMockChannels(
               ...storedPicture(channels.get(input.channelId)),
               // A draft without `isolated` keeps the stored value, as the service does.
               ...(channels.get(input.channelId)?.isolated ? { isolated: true } : {}),
+              ...storedBrowser(channels.get(input.channelId)),
               ...input.draft,
               id: input.channelId,
               revision: channels.get(input.channelId)?.revision ?? 0,
@@ -101,7 +112,11 @@ export function createMockChannels(
               createdAt: channels.get(input.channelId)?.createdAt ?? new Date().toISOString(),
             }
           : requireChannel(input.channelId);
-      channel = { ...channel, revision: channel.revision + 1 };
+      // The service refuses to delete a channel while a task runs there.
+      if (input.type === "archive" && (tasks.get(input.channelId) ?? []).some((task) => task.state === "running"))
+        throw new Error(sourceText("error.backend.channelArchiveRunning"));
+      // A browser member that left the channel turns the setting to no member, as the service does.
+      channel = withBrowserMember({ ...channel, revision: channel.revision + 1 });
       if (input.type === "archive" || input.type === "restore") channel.archived = input.type === "archive";
       const work = tasks.get(channel.id) ?? [];
       if (input.type === "archive")
@@ -238,6 +253,44 @@ export function createMockChannels(
       channels.set(channel.id, structuredClone(channel));
       changed(channel.id, channel.revision);
       return structuredClone(channel);
+    },
+    clearChannelContext: async (channelId: string): Promise<void> => {
+      const channel = requireChannel(channelId);
+      if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))
+        throw new Error(sourceText("error.backend.channelWaitBeforeNewConversation"));
+      const list = messages.get(channelId) ?? [];
+      const last = list.at(-1);
+      if (!last || isContextResetMarker(last.message)) return;
+      const id = `context-reset-${crypto.randomUUID()}`;
+      list.push({
+        id,
+        channelId,
+        sequence: (last.sequence ?? list.length) + 1,
+        author: { kind: "member", id: "preview", name: "You" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id,
+          author: "system",
+          source: "system",
+          text: sourceText("status.agent.contextCleared"),
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          itemType: CONTEXT_RESET_ITEM_TYPE,
+        },
+      });
+      messages.set(channelId, list);
+      changed(channel.id, channel.revision);
+    },
+    compactChannelContext: async (channelId: string): Promise<void> => {
+      requireChannel(channelId);
+    },
+    deleteChannelHistory: async (channelId: string): Promise<void> => {
+      const channel = requireChannel(channelId);
+      if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))
+        throw new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory"));
+      messages.set(channelId, []);
+      changed(channel.id, channel.revision);
     },
     deleteChannelMessage: async (input: { channelId: string; messageId: string }): Promise<void> => {
       const channel = requireChannel(input.channelId);

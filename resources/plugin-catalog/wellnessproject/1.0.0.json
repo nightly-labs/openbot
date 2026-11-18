@@ -1,0 +1,33 @@
+{
+  "slug": "wellnessproject",
+  "name": "Wellness Project",
+  "tagline": "Fitness and health data",
+  "description": "Wellness Project lets agents read and log workouts, nutrition, sleep, body metrics, and wearable data in the signed-in account. Each user signs in to their own Wellness Project account through the browser.",
+  "category": "other",
+  "creatorName": "Wellness Project",
+  "iconUrl": "https://wellnessproject.ai/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-training-week", "text": "Summarize my training volume this week compared with last week." },
+    { "id": "prompt-sleep-trend", "text": "How has my sleep changed over the last month?" },
+    { "id": "prompt-log-workout", "text": "Log today's workout: 5 sets of 5 squats at 100 kg." }
+  ],
+  "apps": [
+    {
+      "id": "app-wellnessproject-mcp",
+      "name": "Wellness Project",
+      "description": "Workout, nutrition, sleep, and wearable data, over Wellness Project's MCP server with browser sign-in.",
+      "iconUrl": "https://wellnessproject.ai/apple-icon.png",
+      "server": {
+        "name": "wellnessproject",
+        "transport": "http",
+        "url": "https://wellnessproject.ai/api/mcp",
+        "auth": [{ "id": "wellnessproject-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://wellnessproject.ai",
+  "privacyPolicyUrl": "https://wellnessproject.ai/privacy",
+  "termsUrl": "https://wellnessproject.ai/terms",
+  "skills": []
+}

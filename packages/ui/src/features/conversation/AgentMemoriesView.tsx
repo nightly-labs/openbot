@@ -83,12 +83,12 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   const [query, setQuery] = createSignal("");
   const searching = () => query().trim() !== "";
 
-  /** The memories that have each word of the search in their text, in any case. */
+  /** The memories that have each word of the search in their text or site, in any case. */
   const matches = createMemo(() => {
     const words = query().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     if (words.length === 0) return props.memories;
     return props.memories.filter((memory) => {
-      const text = memory.text.toLocaleLowerCase();
+      const text = `${memory.text} ${memory.site ?? ""}`.toLocaleLowerCase();
       return words.every((word) => text.includes(word));
     });
   });
@@ -256,6 +256,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                                 rows.set(untrack(memory).id, element);
                               }}
                               label={splitMemory(memory().text).title}
+                              value={memory().site}
                               onClick={() => openMemory(memory())}
                             />
                           )}
@@ -294,6 +295,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                       <p class="agent-memories-text">{memory().text}</p>
                       <p class="agent-memories-meta">
                         {memory().origin === "automatic" ? t("memory.learned") : t("memory.manual")}
+                        <Show when={memory().site}>{(site) => ` · ${site()}`}</Show>
                         {" · "}
                         {memoryDate(memory().updatedAt)}
                       </p>

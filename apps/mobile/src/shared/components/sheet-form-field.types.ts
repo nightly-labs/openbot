@@ -7,12 +7,16 @@ export interface SheetFormFieldProps {
   autoFocus?: boolean;
   editable?: boolean;
   hint?: string;
+  /** A problem with the value. It shows under the field, and the field has the danger border. */
+  error?: string;
   trailing?: ReactNode;
   inputMode?: TextInputProps["inputMode"];
   isRequired?: boolean;
   label: string;
   maxLength?: number;
   multiline?: boolean;
+  /** A multiline field of about 14 lines instead of 4, for a long text such as an instructions file. */
+  tall?: boolean;
   appearance?: "default" | "soft";
   hideLabel?: boolean;
   /** React Native 0.88 adds `start` and `end`, which the iOS field does not take. */

@@ -16,7 +16,7 @@
   height: var(--openbot-icon-lg);
   margin-bottom: var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .side-question-empty > strong {

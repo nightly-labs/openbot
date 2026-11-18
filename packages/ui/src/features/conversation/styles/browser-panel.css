@@ -115,7 +115,7 @@
 
 .browser-profile-status {
   min-width: 0;
-  max-width: 160px;
+  max-width: 240px;
   flex-shrink: 1;
   background: var(--openbot-bg-control);
   color: var(--openbot-text-secondary);

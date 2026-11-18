@@ -17,9 +17,12 @@ import {
   isAgentApproval,
   isBrowserTakeoverRequest,
 } from "./ipc-approvals";
-import { isIdentifier } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { BrowserControlState, BrowserTab } from "./ipc-browser";
+import { type AgentChatColorEntry, isChatColors, type MemberChatColorEntry } from "./ipc-chat-colors";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
+import { CONVERSATION_SUBAGENT_TITLE_LIMIT } from "./ipc-conversation-subagents";
+import { CONVERSATION_TRACE_TEXT_LIMIT } from "./ipc-conversation-trace";
 import {
   type ConversationPage,
   type ConversationSnapshot,
@@ -34,6 +37,29 @@ import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
+
+/**
+ * What a tool step of a turn does, on its `turn-progress` event: `reviewing` when the step ended and
+ * the model reads its result. A client shows it on the agent's avatar. A host before this field
+ * leaves it out, and so does a step that is not a tool step. The event keeps it as text, so that a
+ * client still takes the progress of a later host that sends an activity it does not know.
+ */
+export const AGENT_STEP_ACTIVITIES = [
+  "searching",
+  "browsing",
+  "reading",
+  "running",
+  "editing",
+  "delegating",
+  "working",
+  "reviewing",
+] as const;
+export type AgentStepActivity = (typeof AGENT_STEP_ACTIVITIES)[number];
+
+/** The activity of a `turn-progress` event, or null when it has none or one that this client does not know. */
+export function agentStepActivity(value: string | undefined): AgentStepActivity | null {
+  return AGENT_STEP_ACTIVITIES.find((activity) => activity === value) ?? null;
+}
 
 function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
   return value === "user" || value === "routine" || value === "agent" || value === "unknown";
@@ -71,13 +97,25 @@ export type AgentEvent =
   | { type: "skills-changed"; agentId: string }
   /** The routine canvas of this agent changed, so the views showing it read it again. */
   | { type: "routine-flows-changed"; agentId: string }
-  /** A workflow of this server changed: its graph, its title, a run or a step. Views showing it read it again. */
-  | { type: "workflows-changed"; workflowId: string }
+  /**
+   * A workflow of this server changed: its graph, its title, a run or a step. Views showing it read it
+   * again. `agentId`: the agent whose tool call made or saved it, so an open canvas shows its build.
+   * Only this computer's event has it: `workflows-v1` sends the workflow id only.
+   */
+  | { type: "workflows-changed"; workflowId: string; agentId?: string }
+  /** The CRM of this server changed. The CRM page reads it again. */
+  | { type: "crm-changed" }
   /** The Vault of this server changed. Server settings of a joined server read it again. */
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
+  /** A Library folder of this server, or the folder of one of its files, changed. Views read the folders again. */
+  | { type: "library-folders-changed" }
+  /** Whether a provider account of this server works on credits changed. Views read the usage again. */
+  | { type: "usage-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
+  /** A pin of a chat of the agent changed. Views read the list of pins again. */
+  | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
@@ -85,6 +123,8 @@ export type AgentEvent =
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
   /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
   | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
+  /** The whole list of agent and member chat colours, in the `chat-colors-v1` wire shape. */
+  | { type: "chat-colors-changed"; agents: AgentChatColorEntry[]; members: MemberChatColorEntry[] }
   /**
    * The user's own notification levels on this server changed on one of their devices. Only the
    * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
@@ -133,16 +173,35 @@ export type AgentEvent =
       createdAt: string;
       revision: number;
     }
-  | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
+  | {
+      type: "turn-progress";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      detail: string;
+      /**
+       * True while a tool step of the turn runs, such as a long command. The turn then works, it does not wait
+       * for its provider. A host before this field leaves it out, and the client counts silence as before.
+       */
+      running?: boolean;
+      /** An `AgentStepActivity`, read with `agentStepActivity`. */
+      activity?: string;
+      /**
+       * On the line of a failed tool step: its error text, with known secrets removed. A host before
+       * this field leaves it out, and the client shows the line with no error.
+       */
+      error?: string;
+    }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
   /**
-   * A non-quiet turn in a routine thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
-   * the state of the agent's chat does not change. The desktop notification, the phone notification and
-   * the completion sound read `turn` from this event, and a click opens the routine thread. Local only:
-   * the released Team API event adapters do not carry it.
+   * A non-quiet turn in a side thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
+   * the state of the agent's chat does not change. `routine` is true for the thread of a routine: the
+   * desktop notification, the phone notification and the completion sound read `turn` from this event,
+   * and a click opens the routine thread. For another side thread, only the phone notification reads
+   * it, and a tap opens the thread. Local only: the released Team API event adapters do not carry it.
    */
-  | { type: "routine-thread-turn-completed"; taskId: string; turn: AgentTurnCompletedEvent }
+  | { type: "thread-turn-completed"; taskId: string; routine: boolean; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
       requestId: string | number;
@@ -150,6 +209,13 @@ export type AgentEvent =
       threadId: string;
       turnId: string;
       questions: AgentPromptQuestion[];
+      /**
+       * The card stays after its turn ends. Either no turn waits for this question (the provider could
+       * not wait longer, and the answer starts a new turn), or a Codex subagent asked it and still
+       * waits after its parent's turn. A client sees it in the runtime snapshot's `pendingPrompts`.
+       * Local only: the released Team API adapters do not carry it.
+       */
+      detached?: true;
     }
   | {
       type: "agent-input-resolved";
@@ -171,10 +237,19 @@ export type AgentEvent =
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
   /**
-   * `provider` and `model` name the run that failed, for the banner. Local only: the Team API event
-   * projection drops them.
+   * `provider` and `model` name the run that failed, for the banner. `link` is the Google page where
+   * the user fixes the account that failed the turn, which the banner opens. Local only: the Team API
+   * event projection drops them.
    */
-  | { type: "error"; agentId?: string; code: string; message: string; provider?: AgentProviderId; model?: string }
+  | {
+      type: "error";
+      agentId?: string;
+      code: string;
+      message: string;
+      provider?: AgentProviderId;
+      model?: string;
+      link?: string;
+    }
   /**
    * A provider plan refused a turn, once per limit. The queues of its agents wait for the reset.
    * Local only: the released Team API event adapters do not carry it. `resetsAt` is in epoch seconds.
@@ -185,6 +260,19 @@ export type AgentEvent =
       provider: AgentProviderId;
       resetsAt: number | null;
       agentCount: number;
+    }
+  /**
+   * A subagent of a turn failed, once per subagent. `title` is the task the card shows. Local only:
+   * the released Team API event adapters do not carry it, and a remote client reads the failure in the
+   * subagent list of the conversation (`subagents-v1`).
+   */
+  | {
+      type: "subagent-failed";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      subagentId: string;
+      title: string;
     };
 
 export function isAgentEvent(value: unknown): value is AgentEvent {
@@ -212,13 +300,17 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "agent-session-settings-changed":
+    case "message-pins-changed":
     case "skills-changed":
     case "routine-flows-changed":
       return isIdentifier(value.agentId);
     case "workflows-changed":
-      return isIdentifier(value.workflowId);
+      return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
+    case "crm-changed":
     case "vault-changed":
     case "browser-profiles-changed":
+    case "library-folders-changed":
+    case "usage-credits-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":
@@ -229,6 +321,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isHiddenAgentsSnapshot({ agents: value.agents });
     case "agent-colors-changed":
       return isAgentColors({ agents: value.agents });
+    case "chat-colors-changed":
+      return isChatColors({ agents: value.agents, members: value.members });
     case "agent-notification-levels-changed":
       return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
     case "sidebar-pins-changed":
@@ -299,11 +393,15 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isIdentifier(value.turnId) &&
         isString(value.detail) &&
         value.detail.length > 0 &&
-        value.detail.length <= INPUT_LIMITS.promptQuestion
+        value.detail.length <= INPUT_LIMITS.promptQuestion &&
+        (value.running === undefined || typeof value.running === "boolean") &&
+        (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier)) &&
+        (value.error === undefined || isBoundedString(value.error, CONVERSATION_TRACE_TEXT_LIMIT))
       );
-    case "routine-thread-turn-completed":
+    case "thread-turn-completed":
       return (
         isIdentifier(value.taskId) &&
+        typeof value.routine === "boolean" &&
         isDynamicRecord(value.turn) &&
         value.turn.type === "turn-completed" &&
         isAgentEvent(value.turn)
@@ -326,7 +424,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.turnId) &&
         Array.isArray(value.questions) &&
         value.questions.length <= INPUT_LIMITS.promptQuestions &&
-        value.questions.every(isAgentPromptQuestion)
+        value.questions.every(isAgentPromptQuestion) &&
+        (value.detached === undefined || value.detached === true)
       );
     case "agent-input-resolved":
       return (
@@ -361,7 +460,16 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.code) &&
         isString(value.message) &&
         (value.provider === undefined || isAgentProvider(value.provider)) &&
-        (value.model === undefined || isString(value.model))
+        (value.model === undefined || isString(value.model)) &&
+        (value.link === undefined || isString(value.link))
+      );
+    case "subagent-failed":
+      return (
+        isIdentifier(value.agentId) &&
+        isIdentifier(value.threadId) &&
+        isIdentifier(value.turnId) &&
+        isIdentifier(value.subagentId) &&
+        isBoundedString(value.title, CONVERSATION_SUBAGENT_TITLE_LIMIT)
       );
     case "usage-limit-reached":
       return (

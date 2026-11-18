@@ -2,6 +2,10 @@
 // release that ships with an empty or malformed section ships with an empty or broken page entry.
 // No package imports: `release.yml` runs this before `bun install`.
 
+import { execFileSync } from "node:child_process";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+
 const RELEASE_GROUPS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"];
 const PLACEHOLDER = /\b(TODO|TBD|FIXME|XXX)\b/;
 
@@ -18,13 +22,28 @@ export const MOBILE_STORES = ["ios", "android"] as const;
 export type MobileStore = (typeof MOBILE_STORES)[number];
 export const MOBILE_STORE_NAMES: Record<MobileStore, string> = { ios: "iOS", android: "Android" };
 
-/** The day each store made the version available. A store that still reviews it has no entry. */
-export type StoreDates = Partial<Record<MobileStore, string>>;
+/**
+ * A store that will never ship the version, because a newer one replaced it before review ended:
+ * `Skipped (Android)` in a heading. `/changelog` shows it as skipped, and it gets no Discord post.
+ */
+export const SKIPPED = "Skipped";
+
+/** What a store did with a version: the day it made it available, or `SKIPPED`. */
+export type StoreState = string;
+
+/** The state of each store. A store that still reviews the version has no entry. */
+export type StoreDates = Partial<Record<MobileStore, StoreState>>;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const STORE_DATE = /^(\d{4}-\d{2}-\d{2}) \(([^)]+)\)$/;
+const STORE_STATE = /^(\d{4}-\d{2}-\d{2}|Skipped) \(([^)]+)\)$/;
 const isDay = (text: string) => DAY.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`));
 const storeNamed = (name: string) => MOBILE_STORES.find((store) => MOBILE_STORE_NAMES[store] === name);
+
+/** The day that `store` made the version available. Undefined while it reviews it, or when it skipped it. */
+export function storeDay(dates: StoreDates, store: MobileStore): string | undefined {
+  const state = dates[store];
+  return state === undefined || state === SKIPPED ? undefined : state;
+}
 
 /**
  * Reads what follows `## [x.y.z] - ` in a mobile heading. Undefined when it is not one of:
@@ -33,6 +52,8 @@ const storeNamed = (name: string) => MOBILE_STORES.find((store) => MOBILE_STORE_
  *   2026-10-14                               both stores since that day
  *   2026-10-14 (Android)                     only that store; the other one still reviews it
  *   2026-10-14 (Android), 2026-10-16 (iOS)   both stores, earlier day first
+ *   2026-11-01 (iOS), Skipped (Android)      a store skipped the version; days come first
+ *   Skipped (Android)                        Android skipped it; iOS still reviews it
  */
 export function parseStoreDates(text: string): StoreDates | undefined {
   if (text === IN_REVIEW) return {};
@@ -40,10 +61,10 @@ export function parseStoreDates(text: string): StoreDates | undefined {
   const dates: StoreDates = {};
   const parts = text.split(", ");
   for (const part of parts) {
-    const [, day = "", name = ""] = STORE_DATE.exec(part) ?? [];
+    const [, state = "", name = ""] = STORE_STATE.exec(part) ?? [];
     const store = storeNamed(name);
-    if (!isDay(day) || store === undefined || dates[store] !== undefined) return undefined;
-    dates[store] = day;
+    if ((state !== SKIPPED && !isDay(state)) || store === undefined || dates[store] !== undefined) return undefined;
+    dates[store] = state;
   }
   // One form for each state, so a heading that `formatStoreDates` would write differently is wrong.
   return parts.length <= 2 && formatStoreDates(dates) === text ? dates : undefined;
@@ -51,14 +72,70 @@ export function parseStoreDates(text: string): StoreDates | undefined {
 
 /** The heading text of `dates`. The inverse of `parseStoreDates`. */
 export function formatStoreDates(dates: StoreDates): string {
-  const entries = MOBILE_STORES.flatMap((store) => {
-    const day = dates[store];
+  const days = MOBILE_STORES.flatMap((store) => {
+    const day = storeDay(dates, store);
     return day === undefined ? [] : [{ store, day }];
   }).sort((a, b) => a.day.localeCompare(b.day));
-  const [first, second] = entries;
-  if (first === undefined) return IN_REVIEW;
-  if (second !== undefined && second.day === first.day) return first.day;
-  return entries.map(({ store, day }) => `${day} (${MOBILE_STORE_NAMES[store]})`).join(", ");
+  const skipped = MOBILE_STORES.filter((store) => dates[store] === SKIPPED);
+  const [first, second] = days;
+  if (first === undefined && skipped.length === 0) return IN_REVIEW;
+  if (first !== undefined && second !== undefined && second.day === first.day) return first.day;
+  return [
+    ...days.map(({ store, day }) => `${day} (${MOBILE_STORE_NAMES[store]})`),
+    ...skipped.map((store) => `${SKIPPED} (${MOBILE_STORE_NAMES[store]})`),
+  ].join(", ");
+}
+
+/**
+ * An over-the-air (OTA) update of a store version: `1.4.8.2` is the second one of `1.4.8`. It
+ * changes only the JavaScript of a build that the stores already have. Thus it is not a store
+ * version: no store reviews it, it does not change `app.json`, and it gets no Discord post.
+ * Undefined for a store version.
+ */
+export function otaVersion(version: string): { store: string; number: number } | undefined {
+  const [, store = "", number = ""] = /^(\d+\.\d+\.\d+)\.(\d+)$/.exec(version) ?? [];
+  return store === "" ? undefined : { store, number: Number(number) };
+}
+
+/**
+ * What is wrong with the OTA sections of the mobile changelog. Empty when each one is ready.
+ * An OTA section has the heading of a store version that is available, such as
+ * `## [1.4.8.1] - 2026-11-12 (Android)`, and it is directly above the section that it updates.
+ */
+export function otaSectionProblems(changelog: string): string[] {
+  const headings = changelog.split(/\r?\n/).flatMap((line) => {
+    const [, version = ""] = /^## \[([^\]]+)\]/.exec(line) ?? [];
+    return version === "" ? [] : [{ version, line }];
+  });
+  const datesOf = (version: string) => {
+    const prefix = `## [${version}] - `;
+    const line = headings.find((heading) => heading.line.startsWith(prefix))?.line;
+    return line === undefined ? undefined : parseStoreDates(line.slice(prefix.length));
+  };
+  return headings.flatMap(({ version, line }, index) => {
+    const ota = otaVersion(version);
+    if (ota === undefined) return [];
+    const problems = releaseNotesProblems(changelog, version, { storeReview: true });
+    const dates = datesOf(version) ?? {};
+    const stores = MOBILE_STORES.filter((store) => dates[store] !== undefined);
+    if (stores.length === 0 || stores.some((store) => dates[store] === SKIPPED)) {
+      problems.push(
+        `"${line}" is an OTA update, so it must have a date for each platform that gets it, and no "${IN_REVIEW}" or "${SKIPPED}".`,
+      );
+    }
+    // The first OTA update is above its store version, and each later one is above the one before it.
+    const below = ota.number > 1 ? `${ota.store}.${ota.number - 1}` : ota.store;
+    if (ota.number < 1 || headings[index + 1]?.version !== below) {
+      problems.push(`"${line}" must be directly above the "## [${below}]" section.`);
+    }
+    const storeDates = datesOf(ota.store) ?? {};
+    for (const store of stores.filter((candidate) => storeDay(storeDates, candidate) === undefined)) {
+      problems.push(
+        `${version} names ${MOBILE_STORE_NAMES[store]}, but ${ota.store} is not available on ${MOBILE_STORE_NAMES[store]}.`,
+      );
+    }
+    return problems;
+  });
 }
 
 interface ReleaseNotesOptions {
@@ -92,7 +169,7 @@ export function releaseNotesProblems(
       problems.push(
         `"${heading}" must be "${prefix}" and then "${IN_REVIEW}", a real YYYY-MM-DD date for both stores, ` +
           `"YYYY-MM-DD (Android)" or "YYYY-MM-DD (iOS)" for one store, or "YYYY-MM-DD (Android), YYYY-MM-DD (iOS)" ` +
-          "with the earlier date first.",
+          `with the earlier date first. A store that skipped the version is "${SKIPPED} (iOS)" or "${SKIPPED} (Android)", after the dates.`,
       );
     }
   } else if (version !== UNRELEASED && (date === undefined || !isDay(date))) {
@@ -151,6 +228,25 @@ export function unreleasedItems(changelog: string): string[] {
   if (start === -1) return [];
   const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
   return lines.slice(start + 1, end === -1 ? undefined : end).filter((line) => line.startsWith("- "));
+}
+
+/** The fragments in `directory`, oldest commit first. A fragment with no commit is last. */
+export async function releaseFragments(directory: string): Promise<string[]> {
+  // Recursive, as the hook and the workflow check a fragment in a subdirectory too.
+  const names = (await readdir(directory, { recursive: true })).filter(
+    (name) => name.endsWith(".md") && name !== "README.md",
+  );
+  const added = (path: string) => {
+    const time = execFileSync("git", ["log", "--diff-filter=A", "--format=%ct", "-1", "--", path], {
+      encoding: "utf8",
+    }).trim();
+    return time === "" ? Number.POSITIVE_INFINITY : Number(time);
+  };
+  return names
+    .map((name) => join(directory, name))
+    .map((path) => ({ path, time: added(path) }))
+    .sort((a, b) => a.time - b.time || a.path.localeCompare(b.path))
+    .map(({ path }) => path);
 }
 
 /** What stops one fragment in `changelog.d` from being released. Empty when it is ready. */

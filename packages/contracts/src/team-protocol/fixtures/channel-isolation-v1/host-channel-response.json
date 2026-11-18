@@ -1,0 +1,16 @@
+{
+  "name": "launch",
+  "title": "Launch",
+  "instructions": "",
+  "members": [
+    {
+      "agentId": "agent-1"
+    }
+  ],
+  "leadAgentId": "agent-1",
+  "id": "channel-1",
+  "archived": false,
+  "revision": 4,
+  "createdAt": "2026-11-06T09:00:00.000Z",
+  "isolated": true
+}

@@ -1,0 +1,33 @@
+{
+  "slug": "pandadoc",
+  "name": "PandaDoc",
+  "tagline": "Documents, proposals and e-signatures",
+  "description": "PandaDoc lets agents list documents and templates, check document status, and create documents from templates. Each user signs in to their own PandaDoc account through the browser.",
+  "category": "documents",
+  "creatorName": "PandaDoc",
+  "iconUrl": "https://developers.pandadoc.com/apple-touch-icon.png?v=b9ba294dfee0",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-status", "text": "Which of my documents are waiting for a signature?" },
+    { "id": "prompt-templates", "text": "List my proposal templates." },
+    { "id": "prompt-draft", "text": "Create a draft proposal for Acme Corp from my standard template." }
+  ],
+  "apps": [
+    {
+      "id": "app-pandadoc-mcp",
+      "name": "PandaDoc",
+      "description": "Document and template access and document creation, over PandaDoc's MCP server with browser sign-in.",
+      "iconUrl": "https://developers.pandadoc.com/apple-touch-icon.png?v=b9ba294dfee0",
+      "server": {
+        "name": "pandadoc",
+        "transport": "http",
+        "url": "https://mcp.pandadoc.com/v1/mcp",
+        "auth": [{ "id": "pandadoc-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.pandadoc.com",
+  "privacyPolicyUrl": "https://www.pandadoc.com/legal/privacy-notice/",
+  "termsUrl": "https://www.pandadoc.com/legal/master-services-agreement/",
+  "skills": []
+}

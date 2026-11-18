@@ -34,15 +34,20 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
     const limit = props.store.state.limit;
     return limit !== null && props.store.state.used >= limit ? props.onSeePlans : undefined;
   }
+  /** The limit as an object, so that a limit of 0 still shows the usage row. */
+  function usage() {
+    const limit = props.store.state.limit;
+    return limit === null ? undefined : { count: limit };
+  }
   return (
     <SettingsSection title={t("settings.hostedSites.title")}>
       <Show when={props.available} fallback={<Text tone="muted">{t("settings.hostedSites.unavailable")}</Text>}>
         <div class="hosted-sites-overview">
-          <Show when={props.store.state.limit}>
+          <Show when={usage()}>
             {(limit) => (
               <div class="hosted-sites-usage">
                 <span class="settings-modal-row-title">
-                  {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit() })}
+                  {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit().count })}
                 </span>
                 <Show when={plansOffer()}>
                   {(seePlans) => (

@@ -13,6 +13,11 @@
   min-width: 128px;
 }
 
+/* Wide enough for "Can manage · Everyone", so the levels of a role page line up. */
+.server-roles-agent-level {
+  min-width: 176px;
+}
+
 .server-roles-name-row {
   display: flex;
   align-items: center;
@@ -34,4 +39,20 @@
   flex-shrink: 0;
   width: 14px;
   height: 14px;
+}
+
+/* "· Everyone" after the level of a role row: Everyone gives the agent that level. */
+.server-roles-level-source {
+  color: var(--openbot-text-secondary);
+}
+
+.server-roles-level-menu {
+  min-width: 176px;
+}
+
+.server-roles-level-menu .server-roles-open-everyone {
+  margin-top: var(--openbot-space-1);
+  border-top: 1px solid var(--openbot-border);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }

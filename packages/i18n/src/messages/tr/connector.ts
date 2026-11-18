@@ -306,6 +306,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} üzerindeki OpenBot Telegram mesajlarını alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "connector.telegram.helpError": "OpenBot bu sohbete ulaşamıyor. Yeniden bağlanın veya sohbetin bağlantısını kesin.",
+  "connector.telegram.helpNotLinked": "Bu sohbet bu sunucuya bağlı değil. Bağlamak için Yeniden bağlan'ı seçin.",
   "connector.telegram.retryAt": "Telegram OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.telegram.pause": "Duraklat",
   "connector.telegram.resume": "Sürdür",
@@ -396,6 +397,8 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpError":
     "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot bu numaranın kayıtlı anahtarlarını okuyamıyor. Numarayı yeniden bağlayın.",
   "connector.whatsapp.retryAt": "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.whatsapp.pause": "Duraklat",
   "connector.whatsapp.resume": "Sürdür",
@@ -411,7 +414,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Kişisel numara",
   "connector.whatsapp.ownNumberDescription":
-    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
+  "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+  "connector.whatsapp.statusReactions": "Durum tepkileri",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "connector.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
@@ -431,10 +440,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Numara",
   "connector.whatsapp.kindPersonal": "Kişisel numaram",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar. Diğer kişiler yanıt almaz.",
   "connector.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
   "connector.whatsapp.kindDedicatedDescription":
-    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+    "OpenBot bu numaradan tanımadığınız her kişiye, size iletmesi için bir kodla yanıt verir. Onları burada onaylarsınız.",
   "connector.whatsapp.methodLabel": "Bağlama yöntemi",
   "connector.whatsapp.methodQr": "QR kodu",
   "connector.whatsapp.methodCode": "Eşleme kodu",
@@ -608,4 +617,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API anahtarı client_secret",
   "connector.bitwarden.masterPassword": "Ana parola",
   "connector.bitwarden.connecting": "Bağlanıyor",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Ajanlar, paylaşılan bir Proton Pass kasasındaki oturum bilgileriyle sitelerde oturum açar.",
+  "connector.protonPass.descriptionHost":
+    "{host} üzerindeki ajanlar, paylaşılan bir Proton Pass kasasındaki oturum bilgileriyle sitelerde oturum açar.",
+  "connector.protonPass.connect": "Bağla",
+  "connector.protonPass.moreWays": "Diğer bağlanma yolları",
+  "connector.protonPass.useKey": "Erişim anahtarı kullan",
+  "connector.protonPass.keyLabel": "Erişim anahtarı",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Kurulum",
+  "connector.protonPass.setupDescription":
+    "Bağla, Proton oturum açma sayfasını tarayıcınızda açar. Sonra OpenBot paylaşılan kasayı oluşturur ve yalnızca salt okunur bir anahtar saklar.",
+  "connector.protonPass.setupDescriptionHost":
+    "Bağla, Proton oturum açma sayfasını tarayıcınızda açar. Sonra {host} paylaşılan kasayı oluşturur ve yalnızca salt okunur bir anahtar saklar.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot bu kasayı bağlandığınızda oluşturur. Paylaşmak için oturum bilgilerini buraya taşıyın.",
+  "connector.protonPass.showSteps": "Adımları göster",
+  "connector.protonPass.stepsLabel": "Bağlantı adımları",
+  "connector.protonPass.stepSignIn": "Oturum aç",
+  "connector.protonPass.stepVault": "Paylaşılan kasayı oluştur",
+  "connector.protonPass.stepDone": "Bitti",
+  "connector.protonPass.signInTitle": "Proton’da oturum açın",
+  "connector.protonPass.signInStarting": "OpenBot oturum açmayı başlatıyor. Proton sayfası tarayıcınızda açılır.",
+  "connector.protonPass.signInDescription":
+    "Oturum açma tarayıcınızda açık. Proton parolanızı ve ikinci faktörünüzü ister.",
+  "connector.protonPass.signInDescriptionHost":
+    "{host} için oturum açma tarayıcınızda açık. Proton parolanızı ve ikinci faktörünüzü ister.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass ek parolanızı istiyor.",
+  "connector.protonPass.extraPasswordWrong": "Ek parola doğru değil. Yeniden girin.",
+  "connector.protonPass.extraPasswordLabel": "Ek parola",
+  "connector.protonPass.continue": "Devam",
+  "connector.protonPass.setupStepTitle": "Paylaşılan kasa oluşturuluyor",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot “{vault}” kasasını ve onun için salt okunur bir anahtar oluşturur. Sonra Proton oturumunuzu kapatır.",
+  "connector.protonPass.doneTitle": "Proton Pass bağlandı",
+  "connector.protonPass.doneDescription":
+    "Ajanların oturum açabilmesi için oturum bilgilerini “{vault}” kasasına taşıyın.",
+  "connector.protonPass.failedTitle": "Proton Pass bağlanmadı",
+  "connector.protonPass.copyLink": "Bağlantıyı kopyala",
+  "connector.protonPass.linkCopied": "Kopyalandı",
+  "connector.protonPass.openAgain": "Yeniden aç",
+  "connector.protonPass.done": "Bitti",
+  "connector.protonPass.close": "Kapat",
+  "connector.protonPass.statusConnecting": "Bağlanıyor",
+  "connector.protonPass.statusConnected": "Bağlı",
+  "connector.protonPass.statusExpired": "Anahtarın süresi doldu",
+  "connector.protonPass.expiredTitle": "Proton Pass anahtarının süresi doldu",
+  "connector.protonPass.expiredDescription":
+    "Siz yeniden oturum açana kadar ajanlar paylaşılan oturum bilgilerinizle oturum açamaz.",
+  "connector.protonPass.reconnect": "Yeniden bağla",
+  "connector.protonPass.planTitle": "Proton Pass ücretli bir plan gerektirir",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI yalnızca ücretli bir Proton planıyla çalışır. Planınızı değiştirin, sonra yeniden bağlanın.",
+  "connector.protonPass.vaultTitle": "Paylaşılan kasa",
+  "connector.protonPass.vaultDescription":
+    "Ajanlar bu kasadaki oturum bilgileriyle oturum açabilir. Paylaşmak için bir oturum bilgisini buraya taşıyın.",
+  "connector.protonPass.loginCount": { one: "{count} giriş", other: "{count} giriş" },
+  "connector.protonPass.loginsLoading": "Oturum bilgileri sayılıyor…",
+  "connector.protonPass.keyExpires": "Salt okunur. {date} tarihinde sona erer.",
+  "connector.protonPass.keyExpired": "Salt okunur. {date} tarihinde sona erdi.",
+  "connector.protonPass.keyNoExpiry": "Salt okunur. Süresi dolmaz.",
+  "connector.protonPass.disconnectTitle": "Proton Pass bağlantısını kes",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot bu bilgisayardaki erişim anahtarını siler. Kasa ve içindeki oturum bilgileri Proton hesabınızda kalır.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot {host} üzerindeki erişim anahtarını siler. Kasa ve içindeki oturum bilgileri Proton hesabınızda kalır.",
+  "connector.protonPass.disconnect": "Bağlantıyı kes",
+  "connector.protonPass.actionFailed": "OpenBot, Proton Pass bağlantısını değiştiremedi.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "جارٍ الإنشاء…",
   "mobile.onboarding.task.withoutTask": "إنشاء بدون مهمة",
   "mobile.onboarding.task.failed": "تعذّر إنشاء الوكيل. أعد المحاولة.",
+  "mobile.onboarding.task.sendFailed": "لم تُرسَل مهمتك الأولى. أرسلها في المحادثة.",
   "mobile.onboarding.idea.builder1": "اصنع تطبيق ويب صغيرًا لقائمة المهام.",
   "mobile.onboarding.idea.builder2": "اشرح كيف تعمل فروع Git، مع أمثلة.",
   "mobile.onboarding.idea.builder3": "اكتب برنامجًا نصيًا يرتّب صوري حسب التاريخ.",

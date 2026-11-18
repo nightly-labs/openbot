@@ -430,6 +430,32 @@
   color: var(--openbot-danger-text);
 }
 
+/* The error of a failed tool row, under the row. It covers the lines of the timeline behind it. */
+.trace-span-error-row {
+  position: relative;
+  z-index: 2;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  padding-inline-start: calc(var(--openbot-space-2) + (var(--trace-depth, 0) + 1) * var(--openbot-space-4));
+  border-bottom: 1px solid var(--openbot-border);
+  background: var(--trace-surface);
+}
+
+.trace-span-error {
+  max-height: 160px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* A light moves along the name of a running step. It repaints the text on each frame, so only the
  * few running rows have it. */
 .trace-row[data-running] .trace-span-name {
@@ -631,9 +657,12 @@
  * rows that draw parts of it do not give it their own colour. */
 .trace-handoff {
   --trace-elbow: var(--openbot-space-2);
-  top: calc((var(--trace-from) + 1.5) * var(--trace-row-height) + var(--trace-bar-height) / 2);
+  --trace-line-top: calc((var(--trace-from) + 1.5) * var(--trace-row-height) + var(--trace-bar-height) / 2);
+  --trace-line-rows: calc(var(--trace-to) - var(--trace-from) - 0.5);
+  /* An open error moves the rows under it, so the line moves and grows by the errors along it. */
+  top: calc(var(--trace-line-top) + var(--trace-from-shift, 0px));
   width: var(--trace-elbow);
-  height: calc((var(--trace-to) - var(--trace-from) - 0.5) * var(--trace-row-height) - var(--trace-bar-height) / 2);
+  height: calc(var(--trace-line-rows) * var(--trace-row-height) - var(--trace-bar-height) / 2 + var(--trace-grow, 0px));
   box-sizing: border-box;
   border-left: 2px dotted var(--trace-hue);
   translate: calc(-1 * var(--trace-elbow)) 0;

@@ -34,6 +34,9 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
+/** Words that the title of a pull request or issue contains. */
+const TITLE_PLACEHOLDER = "fix:";
+
 /** The longest text of a filter field that `workflows-v1` carries. */
 const FILTER_LIMIT = 200;
 
@@ -135,8 +138,17 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
     <>
       <SettingsSection title={t("mobile.workflow.trigger.github")}>
         <PickRow
-          label={t("mobile.workflow.github.repository")}
-          value={settings.repository || t("mobile.workflow.github.chooseRepository")}
+          label={t(
+            settings.repositories.length > 1
+              ? "mobile.workflow.github.repositories"
+              : "mobile.workflow.github.repository",
+          )}
+          value={
+            settings.repositories.length > 0
+              ? settings.repositories.join(", ")
+              : // A stored name that is not a valid repository still shows, as the summary shows it.
+                settings.repository || t("mobile.workflow.github.chooseRepository")
+          }
           disabled={!editable}
           onPress={() => openGitHubPick(node.id, "repository")}
         />
@@ -180,6 +192,7 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
       {settings.filters.includes("title") ? (
         <SheetFormField
           label={t("mobile.workflow.github.trigger.titleHas")}
+          placeholder={TITLE_PLACEHOLDER}
           value={settings.titleText}
           maxLength={FILTER_LIMIT}
           editable={editable}

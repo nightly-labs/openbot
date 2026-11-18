@@ -4,7 +4,7 @@
 // All times are seconds of the network, as in the scene, except the idle timers, which use
 // the page clock: the network clock stops when the section is off screen.
 
-import { LANDING_NETWORK_EGGS } from "../../lib/landing-content";
+import type { LandingPageText } from "../../lib/landing-page-text";
 import {
   type AgentNetwork,
   agentNetworkNodePoint,
@@ -56,6 +56,8 @@ export interface AgentNetworkEggsHost {
   unmasked: (x: number, y: number) => boolean;
   /** Starts a hub signal at second `at`. */
   signal: (style: HubSignalStyle, at: number) => void;
+  /** What the network says, in the language of the page. */
+  eggs: LandingPageText["network"]["eggs"];
 }
 
 export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
@@ -135,7 +137,7 @@ export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
   const chat = (count: number, delay: number) => {
     const t = now();
     const talkers = new Set(bubbles.filter((bubble) => bubble.until >= t).map((bubble) => bubble.node)).size;
-    chorus(spreadAgents(Math.min(count, MAX_TALKERS - talkers)), LANDING_NETWORK_EGGS.chats, delay, 0.45, 2.6);
+    chorus(spreadAgents(Math.min(count, MAX_TALKERS - talkers)), host.eggs.chats, delay, 0.45, 2.6);
   };
   const startShake = (length: number, size: number) => {
     shake = { at: now(), until: now() + length, size };
@@ -217,7 +219,7 @@ export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
       }
       if (hover.node >= 0 && !hover.spoken && !sleep.asleep && stamp - hover.since > HOVER_MS) {
         hover.spoken = true;
-        say(hover.node, pick(LANDING_NETWORK_EGGS.hover), 0, 3);
+        say(hover.node, pick(host.eggs.hover), 0, 3);
       }
     },
 
@@ -232,7 +234,7 @@ export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
       if (!sleep.asleep) return;
       sleep = { asleep: false, at: -1, sleepers: [] };
       randomSignal();
-      chorus(spreadAgents(3), LANDING_NETWORK_EGGS.wake, 0.3, 0.35, 2.4);
+      chorus(spreadAgents(3), host.eggs.wake, 0.3, 0.35, 2.4);
     },
 
     /**
@@ -243,20 +245,20 @@ export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
       const t = now();
       pokes = { count: t - pokes.last < POKE_STREAK_GAP ? pokes.count + 1 : 1, last: t };
       const hub = speaker();
-      if (pokes.count === 3) say(hub, pick(LANDING_NETWORK_EGGS.tickle));
+      if (pokes.count === 3) say(hub, pick(host.eggs.tickle));
       if (pokes.count === 5) {
-        say(hub, pick(LANDING_NETWORK_EGGS.awake));
-        chorus(spreadAgents(4), LANDING_NETWORK_EGGS.wonder, 0.25, 0.15, 1.8);
+        say(hub, pick(host.eggs.awake));
+        chorus(spreadAgents(4), host.eggs.wonder, 0.25, 0.15, 1.8);
       }
       if (pokes.count === 8) {
-        say(hub, pick(LANDING_NETWORK_EGGS.busy));
+        say(hub, pick(host.eggs.busy));
         startShake(0.6, 5);
       }
       if (pokes.count === 12) {
-        say(hub, pick(LANDING_NETWORK_EGGS.sneeze), 0, 1.6);
+        say(hub, pick(host.eggs.sneeze), 0, 1.6);
         startShake(0.9, 14);
         for (const style of HUB_SIGNAL_STYLES) signal(style, 0.05);
-        chorus(spreadAgents(5), LANDING_NETWORK_EGGS.blessings, 0.9, 0.2, 2);
+        chorus(spreadAgents(5), host.eggs.blessings, 0.9, 0.2, 2);
         pokes = { count: 0, last: -10 };
         return;
       }
@@ -278,19 +280,19 @@ export function createAgentNetworkEggs(host: AgentNetworkEggsHost) {
       if (KONAMI.every((key, index) => keys[keys.length - KONAMI.length + index] === key)) {
         keys = [];
         roll = { at: now(), until: now() + ROLL_SECONDS };
-        say(hub, pick(LANDING_NETWORK_EGGS.konami), ROLL_SECONDS, 2.4);
+        say(hub, pick(host.eggs.konami), ROLL_SECONDS, 2.4);
         randomSignal(ROLL_SECONDS);
       } else if (word.endsWith("hello")) {
         keys = [];
-        chorus(spreadAgents(6), LANDING_NETWORK_EGGS.greetings, 0, 0.18, 2.4);
+        chorus(spreadAgents(6), host.eggs.greetings, 0, 0.18, 2.4);
       } else if (word.endsWith("party")) {
         keys = [];
-        say(hub, pick(LANDING_NETWORK_EGGS.party), 0, 4);
+        say(hub, pick(host.eggs.party), 0, 4);
         for (let beat = 0; beat < 10; beat += 1) randomSignal(beat * 0.45);
         startShake(0.4, 3);
       } else if (word.endsWith("sudo")) {
         keys = [];
-        say(hub, pick(LANDING_NETWORK_EGGS.sudo), 0, 3);
+        say(hub, pick(host.eggs.sudo), 0, 3);
       }
     },
 

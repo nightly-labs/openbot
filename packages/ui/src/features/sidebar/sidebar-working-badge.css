@@ -1,0 +1,77 @@
+/* The badge of a sidebar agent that works: three felt balls hop in a wave inside a pill.
+   The thread tabs show the same dots in a smaller pill, so the ball rules apply to this badge only. */
+
+.agent-row-agent-status-working {
+  width: 30px;
+  height: 16px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  /* A shadow makes a halo on the dark sidebar. */
+  box-shadow: none;
+}
+
+/* The balls stand on a line as high as one ball, so a ball at rest is on the centre of the pill. */
+.agent-row-agent-status-working .agent-row-thinking-dots {
+  align-items: flex-end;
+  gap: 1px;
+  height: 7px;
+}
+
+.agent-row-agent-status-working .agent-row-thinking-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--openbot-radius-pill);
+  background: url("../../assets/plush/ball-lilac.webp") center / contain no-repeat;
+  transform-origin: 50% 100%;
+  animation: none;
+}
+
+.agent-row-agent-status-working .agent-row-thinking-dots i:nth-child(2) {
+  background-image: url("../../assets/plush/ball-mint.webp");
+}
+
+.agent-row-agent-status-working .agent-row-thinking-dots i:nth-child(3) {
+  background-image: url("../../assets/plush/ball-pink.webp");
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agent-row-agent-status-working .agent-row-thinking-dots i {
+    animation: agent-row-ball-hop 960ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  }
+
+  .agent-row-agent-status-working .agent-row-thinking-dots i:nth-child(2) {
+    animation-delay: 130ms;
+  }
+
+  .agent-row-agent-status-working .agent-row-thinking-dots i:nth-child(3) {
+    animation-delay: 260ms;
+  }
+}
+
+/* A low hop with a soft squash, so each ball stays inside the pill border. */
+@keyframes agent-row-ball-hop {
+  0%,
+  62%,
+  100% {
+    translate: 0 0;
+    scale: 1 1;
+  }
+
+  8% {
+    scale: 1.1 0.9;
+  }
+
+  26% {
+    translate: 0 -1.75px;
+    scale: 0.94 1.06;
+  }
+
+  44% {
+    translate: 0 0;
+    scale: 1.08 0.92;
+  }
+
+  54% {
+    scale: 0.98 1.02;
+  }
+}

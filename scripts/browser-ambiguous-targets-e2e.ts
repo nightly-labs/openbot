@@ -10,7 +10,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 class FixtureProcessTimeout extends Error {}
 
 /** The case count of `browser-ambiguous-targets-electron.ts`. A case that stops running fails the check. */
-const AMBIGUOUS_TARGET_CASES = 7;
+const AMBIGUOUS_TARGET_CASES = 11;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-ambiguous-targets-"));
@@ -19,13 +19,17 @@ const runId = randomUUID();
 let sourceSha: string | undefined;
 try {
   await mkdir(dirname(reportPath), { recursive: true });
-  const entry = join(buildRoot, "browser-ambiguous-targets.mjs");
+  // run_script loads the QuickJS WebAssembly from node_modules, so the entry sits in the project to
+  // resolve it.
+  const entry = join(dirname(reportPath), "browser-ambiguous-targets.mjs");
   await run(process.execPath, [
     "build",
     join(projectRoot, "scripts/browser-ambiguous-targets-electron.ts"),
     "--target=node",
     "--format=esm",
     "--external=electron",
+    "--external=quickjs-emscripten-core",
+    "--external=@jitl/quickjs-wasmfile-release-sync",
     `--outfile=${entry}`,
   ]);
   sourceSha = (await output("git", ["rev-parse", "HEAD"])).trim();

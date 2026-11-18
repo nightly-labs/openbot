@@ -21,6 +21,8 @@ export const messages = defineMessages("usage", {
   "usage.column.tokens": "Tokens",
   "usage.column.date": "Date",
   "usage.column.costUsd": "Cost · USD",
+  "usage.column.loads": "Loads",
+  "usage.column.agents": "Agents",
   "usage.empty": "No usage recorded in this range.",
   "usage.partial":
     "Partial data · {turns} turns have no reported usage; {unpriced} records have no cost estimate; {incomplete} records have incomplete token data.",
@@ -48,9 +50,12 @@ export const messages = defineMessages("usage", {
   "usage.breakdown.model": "Model",
   "usage.breakdown.agent": "Agent",
   "usage.breakdown.day": "Day",
+  "usage.breakdown.skill": "Skill",
   "usage.breakdown.byModel": "Usage by model",
   "usage.breakdown.byAgent": "Usage by agent",
   "usage.breakdown.byDay": "Daily usage and cost",
+  "usage.breakdown.bySkill": "Usage by skill",
+  "usage.breakdown.skillEmpty": "No skill loads in this period.",
   "usage.unknownModel": "Unknown model",
   "usage.footer": "Collection started {started} · Updated {updated}",
   "usage.updatedNever": "never",
@@ -70,4 +75,6 @@ export const messages = defineMessages("usage", {
   "usage.panel.loading": "Loading usage…",
   "usage.panel.unsupported": "This host does not support agent analytics. Update the host to use this view.",
   "usage.panel.loadFailed": "Could not load usage. Check the connection and date range.",
+  "usage.machine.label": "Machine use. CPU: {cpu}, memory: {memory}",
+  "usage.machine.openStorage": "Open Storage. Disk: {percent}, {detail}",
 });

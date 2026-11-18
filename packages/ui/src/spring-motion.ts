@@ -4,6 +4,17 @@ export interface Spring {
   dampingFraction: number;
 }
 
+/**
+ * The island springs, as the product island, the voice morph and the Library pill use them: the island
+ * opens with a small overshoot and closes with none. The content comes and goes on its own, shorter spring.
+ */
+export const ISLAND_OPEN: Spring = { response: 0.5, dampingFraction: 0.8 };
+export const ISLAND_CLOSE: Spring = { response: 0.45, dampingFraction: 1 };
+export const ISLAND_CONTENT: Spring = { response: 0.34, dampingFraction: 0.88 };
+
+/** The ease-out curve for content that leaves the island. */
+export const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
+
 /** The progress of a spring from 0 to 1 at `time` seconds. A damping fraction of 1 does not overshoot. */
 export function springProgress(time: number, spring: Spring): number {
   const angularFrequency = (2 * Math.PI) / spring.response;

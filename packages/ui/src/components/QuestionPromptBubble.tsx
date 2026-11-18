@@ -4,31 +4,10 @@ import {
   type AgentPromptResolution,
   MCP_ELICITATION_DECISION_QUESTION_ID,
 } from "@openbot/contracts/ipc";
-import {
-  Badge,
-  Bubble,
-  BubbleContent,
-  Button,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  CircleCheck,
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-  Kbd,
-  LoaderCircle,
-  PencilLine,
-  Questionnaire,
-  Spinner,
-  X,
-} from "@openbot/ui";
+import { Bubble, BubbleContent, Button, Kbd, Questionnaire, Spinner, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { MarkdownInlineText, markdownPlainText } from "../features/conversation/MarkdownMessageText";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
@@ -60,6 +39,26 @@ export interface QuestionPromptBubbleProps {
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }
 
+/** The time a single pick stays on screen before the next question moves in. */
+const PICK_HOLD_MS = 180;
+
+const queuedStageFits: Array<() => (() => void) | undefined> = [];
+
+/**
+ * Fits the stages of the bubbles that mount together. All read their page heights before any of
+ * them writes: a write before the next read lays out the page again, and a chat can open with many
+ * question cards.
+ */
+function queueStageFit(measure: () => (() => void) | undefined): void {
+  if (queuedStageFits.length === 0) {
+    queueMicrotask(() => {
+      const writes = queuedStageFits.splice(0).map((queued) => queued());
+      for (const write of writes) write?.();
+    });
+  }
+  queuedStageFits.push(measure);
+}
+
 /**
  * A private answer has its own masked field, never the composer. A plugin consent takes only one of
  * its options, so a typed answer would cancel it.
@@ -68,17 +67,13 @@ function acceptsComposerAnswer(question: AgentPromptQuestion): boolean {
   return !question.isSecret && question.id !== MCP_ELICITATION_DECISION_QUESTION_ID;
 }
 
-type QuestionAnswers = Record<string, string>;
-type QuestionPicks = Record<string, string[]>;
-type QuestionFlags = Record<string, boolean>;
-type PageContent = { kind: "question"; index: number } | { kind: "resolution"; resolution: AgentPromptResolution };
+const optionLetter = (index: number) => String.fromCharCode(65 + index);
 
-function questionPageContent(content: PageContent): Extract<PageContent, { kind: "question" }> | undefined {
-  return content.kind === "question" ? content : undefined;
-}
-
-function resolutionPageContent(content: PageContent): Extract<PageContent, { kind: "resolution" }> | undefined {
-  return content.kind === "resolution" ? content : undefined;
+/** The letter of an answer: the letter of its option, or the letter of the typed row. */
+function answerLetter(question: AgentPromptQuestion, answer: string): string {
+  const options = question.options ?? [];
+  const index = options.findIndex((option) => option.label === answer);
+  return optionLetter(index === -1 ? options.length : index);
 }
 
 function motionDuration(element: HTMLElement, property: string, fallback: number): number {
@@ -110,224 +105,114 @@ function QuestionText(props: { question: string; onOpenLink: (url: string) => vo
   );
 }
 
-function CompletedQuestionPrompt(props: {
-  questions: AgentPromptQuestion[];
-  resolution: AgentPromptResolution;
-  onOpenLink: (url: string) => void;
-}) {
-  const { t } = useText();
-  const title = () => {
-    if (props.resolution.status === "cancelled") return t("prompt.question.cancelled");
-    if (props.resolution.status === "expired") return t("prompt.question.expired");
-    return t("prompt.question.answersSent");
-  };
+type PagePosition = "prev" | "current" | "next";
 
-  function answerLabel(question: AgentPromptQuestion): string {
-    if (props.resolution.status !== "answered") return "";
-    const response = props.resolution.responses[question.id];
-    if (!response || response.status === "skipped") return t("prompt.question.skipped");
-    if (question.isSecret || !response.answers) return t("prompt.question.privateAnswer");
-    return response.answers.length > 0 ? response.answers.join(", ") : t("prompt.question.skipped");
-  }
-
-  return (
-    <section class="question-prompt-complete" aria-label={title()} data-state={props.resolution.status}>
-      <header class="question-prompt-complete-header">
-        <span class="question-prompt-complete-status" role="status">
-          {props.resolution.status === "answered" ? <CircleCheck aria-hidden="true" /> : <X aria-hidden="true" />}
-          <strong>{title()}</strong>
-        </span>
-      </header>
-
-      <Show when={props.resolution.status === "answered"}>
-        <ItemGroup class="question-prompt-complete-answers">
-          <For each={props.questions}>
-            {(question) => (
-              <Item size="compact">
-                <ItemContent>
-                  <ItemDescription>
-                    <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
-                  </ItemDescription>
-                  <ItemTitle>{answerLabel(question)}</ItemTitle>
-                </ItemContent>
-              </Item>
-            )}
-          </For>
-        </ItemGroup>
-      </Show>
-    </section>
-  );
+interface PromptState {
+  /** The open page. The page after the last question is the summary. */
+  step: number;
+  /** The ticked options of each question. A single-select question has one at most. */
+  picks: Record<string, string[]>;
+  /** The typed answer of each question. */
+  drafts: Record<string, string>;
+  submitting: boolean;
+  /** The question that a screen reader announces when the page changes with no focus in the bubble. */
+  announced: string;
+  /** The answers that this bubble sent, or the cancellation. */
+  sent: AgentPromptResolution | null;
 }
 
 export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   const { t } = useText();
-  const initialContent = (): PageContent | null => {
-    if (props.resolution) return { kind: "resolution", resolution: props.resolution };
-    return props.questions.length > 0 ? { kind: "question", index: 0 } : null;
-  };
-  const initialPage = untrack(initialContent);
-  const [step, setStep] = createSignal(0);
-  const [answers, setAnswers] = createSignal<QuestionPicks>({});
-  // The options ticked on a multi-select question. They become its answer on confirm.
-  const [picks, setPicks] = createSignal<QuestionPicks>({});
-  const [customAnswers, setCustomAnswers] = createSignal<QuestionFlags>({});
-  const [customDrafts, setCustomDrafts] = createSignal<QuestionAnswers>({});
-  const [skipped, setSkipped] = createSignal<QuestionFlags>({});
-  const [submitting, setSubmitting] = createSignal(false);
-  const [transitioning, setTransitioning] = createSignal(false);
-  const [activeSlot, setActiveSlot] = createSignal<0 | 1>(0);
-  const [visiblePage, setVisiblePage] = createSignal<1 | 2>(1);
-  const [slotPages, setSlotPages] = createSignal<[PageContent | null, PageContent | null]>([initialPage, null]);
-  const [slotPageIds, setSlotPageIds] = createSignal<[1 | 2, 1 | 2]>([1, 2]);
-  const customInputs = new Map<string, HTMLInputElement>();
-  const pageElements: Array<HTMLElement | undefined> = [];
+  const total = () => props.questions.length;
+  const [state, setState] = createStore<PromptState>({
+    step: untrack(() => (props.resolution ? props.questions.length : 0)),
+    picks: {},
+    drafts: {},
+    submitting: false,
+    announced: "",
+    sent: null,
+  });
+  const animateEntrance = untrack(() => !props.resolution);
   let stage: HTMLDivElement | undefined;
-  let transitionTimer: number | undefined;
-  let queuedInteraction: (() => void) | undefined;
+  let holdTimer: number | undefined;
+  let presentTimer: number | undefined;
   let resolutionPresentationPending = false;
 
-  const questionCount = () => props.questions.length;
-  const showingResolution = () => slotPages()[activeSlot()]?.kind === "resolution";
-  const interactionDisabled = () =>
-    Boolean(props.readOnly || props.pending || submitting() || props.resolution || showingResolution());
-  const busy = () => Boolean(interactionDisabled() || transitioning());
+  const resolution = () => props.resolution ?? state.sent;
+  const resolved = () => resolution() !== null;
+  const index = () => Math.min(state.step, Math.max(0, total() - 1));
+  const busy = () => Boolean(props.readOnly || props.pending || state.submitting || resolved());
+  const position = (page: number): PagePosition => {
+    const step = resolved() ? total() : state.step;
+    return page < step ? "prev" : page === step ? "current" : "next";
+  };
+
+  /** The answer of a question: the ticked options in the order the question lists them, then the typed one. */
+  function answerOf(question: AgentPromptQuestion): string[] {
+    const typed = state.drafts[question.id]?.trim() ?? "";
+    const picked = state.picks[question.id] ?? [];
+    if (!question.multiSelect) return typed ? [typed] : picked.slice(0, 1);
+    const labels = (question.options ?? []).map((option) => option.label).filter((label) => picked.includes(label));
+    return typed ? [...labels, typed] : labels;
+  }
+
+  const currentQuestion = () => props.questions[index()];
+  const canGoOn = () => {
+    const question = currentQuestion();
+    return Boolean(question && answerOf(question).length > 0);
+  };
 
   onCleanup(() => {
-    if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
-    queuedInteraction = undefined;
+    window.clearTimeout(holdTimer);
+    window.clearTimeout(presentTimer);
     if (resolutionPresentationPending) presentResolution();
     props.elementRef?.(undefined);
   });
 
-  createEffect(
-    () => ({ count: questionCount(), resolution: props.resolution, step: step() }),
-    ({ count, resolution, step: currentStep }) => {
-      if (count === 0 || resolution) return;
-      if (currentStep >= count) setStep(Math.max(0, count - 1));
-    },
-  );
+  /** Reads the height of the open page and returns the write that gives it to the stage. */
+  function measureStage(step = resolved() ? total() : state.step): (() => void) | undefined {
+    const target = stage;
+    const page = target?.children[step];
+    if (!target?.isConnected || !(page instanceof HTMLElement)) return undefined;
+    const height = `${page.offsetHeight}px`;
+    return () => {
+      target.style.height = height;
+    };
+  }
 
-  function transitionTo(content: PageContent, direction: "forward" | "back", after?: () => void): void {
-    if (transitioning() || !stage) return;
-    const fromHeight = stage.getBoundingClientRect().height;
-    stage.dataset.preparing = "";
-    stage.style.height = `${fromHeight}px`;
-    const fromSlot = activeSlot();
-    const toSlot: 0 | 1 = fromSlot === 0 ? 1 : 0;
-    const fromPageId = direction === "forward" ? 1 : 2;
-    const toPageId = direction === "forward" ? 2 : 1;
-    setTransitioning(true);
-    setSlotPages((current) => {
-      const next: [PageContent | null, PageContent | null] = [...current];
-      next[toSlot] = content;
-      return next;
-    });
-    setSlotPageIds((current) => {
-      const next: [1 | 2, 1 | 2] = [...current];
-      next[fromSlot] = fromPageId;
-      next[toSlot] = toPageId;
-      return next;
-    });
-    setVisiblePage(fromPageId);
+  /** The stage takes the height of the open page, so the bubble grows and shrinks with it. */
+  function fitStage(step?: number) {
+    measureStage(step)?.();
+  }
 
+  onSettled(() => {
+    if (!stage) return;
+    const observer = new ResizeObserver(() => fitStage());
+    for (const page of Array.from(stage.children)) observer.observe(page);
+    queueStageFit(() => measureStage());
+    return () => observer.disconnect();
+  });
+
+  function goTo(step: number): void {
+    window.clearTimeout(holdTimer);
+    const next = Math.max(0, Math.min(total(), step));
+    const keepFocus = stage?.closest(".question-prompt-bubble")?.contains(document.activeElement) ?? false;
+    const question = props.questions[next];
+    setState((draft) => {
+      draft.step = next;
+      // Focus moves into the new page and reads it; an answer from the composer leaves focus there.
+      draft.announced = keepFocus || !question ? "" : markdownPlainText(question.question);
+    });
+    fitStage(next);
+    if (!keepFocus) return;
     queueMicrotask(() => {
-      if (!stage) return;
-      const toElement = pageElements[toSlot];
-      void stage.offsetHeight;
-      delete stage.dataset.preparing;
-      if (toElement) stage.style.height = `${toElement.scrollHeight}px`;
-      setVisiblePage(toPageId);
-      const duration = motionDuration(stage, "--page-slide-dur", 250);
-      const finishTransition = () => {
-        setActiveSlot(toSlot);
-        setSlotPages((current) => {
-          const next: [PageContent | null, PageContent | null] = [...current];
-          next[fromSlot] = null;
-          return next;
-        });
-        setTransitioning(false);
-        transitionTimer = undefined;
-        stage?.style.removeProperty("height");
-        after?.();
-        const interaction = queuedInteraction;
-        queuedInteraction = undefined;
-        if (interaction) queueMicrotask(interaction);
-      };
-      if (duration === 0) finishTransition();
-      else transitionTimer = window.setTimeout(finishTransition, duration);
+      const page = stage?.children[next];
+      const target =
+        next < total()
+          ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
+          : null;
+      (target ?? stage)?.focus({ preventScroll: true });
     });
-  }
-
-  function performWhenReady(action: () => void): void {
-    if (interactionDisabled()) return;
-    if (transitioning()) {
-      queuedInteraction = () => performWhenReady(action);
-      return;
-    }
-    action();
-  }
-
-  function moveTo(target: number): void {
-    performWhenReady(() => {
-      const next = Math.max(0, Math.min(questionCount() - 1, target));
-      if (next === step()) return;
-      const direction = next > step() ? "forward" : "back";
-      setStep(next);
-      transitionTo({ kind: "question", index: next }, direction, () => {
-        const question = props.questions[next];
-        if (!question) return;
-        queueMicrotask(() => {
-          if (!question.options?.length || customAnswers()[question.id]) {
-            customInputs.get(question.id)?.focus();
-            return;
-          }
-          const page = pageElements[activeSlot()];
-          (
-            page?.querySelector<HTMLInputElement>(".ui-questionnaire-choice-input:checked") ??
-            page?.querySelector<HTMLInputElement>(".ui-questionnaire-choice-input:not(:disabled)")
-          )?.focus();
-        });
-      });
-    });
-  }
-
-  function isResolved(question: AgentPromptQuestion, nextAnswers = answers(), nextSkipped = skipped()): boolean {
-    return Boolean(nextSkipped[question.id] || nextAnswers[question.id]?.length);
-  }
-
-  function resultFor(nextAnswers: QuestionPicks, nextSkipped: QuestionFlags): Record<string, string[]> {
-    return Object.fromEntries(
-      props.questions.map((question) => [
-        question.id,
-        nextSkipped[question.id] ? [] : (nextAnswers[question.id] ?? []).map((value) => value.trim()),
-      ]),
-    );
-  }
-
-  function nextUnresolvedIndex(currentIndex: number, nextAnswers: QuestionPicks, nextSkipped: QuestionFlags): number {
-    for (let offset = 1; offset <= questionCount(); offset += 1) {
-      const candidate = (currentIndex + offset) % questionCount();
-      const question = props.questions[candidate];
-      if (question && !isResolved(question, nextAnswers, nextSkipped)) return candidate;
-    }
-    return -1;
-  }
-
-  async function submit(result: Record<string, string[]>): Promise<void> {
-    if (busy()) return;
-    setSubmitting(true);
-    let completed = false;
-    try {
-      completed = await props.onSubmit(result);
-    } catch {
-      completed = false;
-    }
-    setSubmitting(false);
-    if (!completed) return;
-    resolutionPresentationPending = true;
-    transitionTo({ kind: "resolution", resolution: summaryResolution(props.questions, result) }, "forward", () =>
-      presentResolution(),
-    );
   }
 
   function presentResolution(): void {
@@ -336,297 +221,314 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     props.onResolutionPresented?.();
   }
 
-  function finishQuestion(questionIndex: number, nextAnswers: QuestionPicks, nextSkipped: QuestionFlags): void {
-    setAnswers(nextAnswers);
-    setSkipped(nextSkipped);
-    const unresolvedIndex = nextUnresolvedIndex(questionIndex, nextAnswers, nextSkipped);
-    if (unresolvedIndex === -1) {
-      void submit(resultFor(nextAnswers, nextSkipped));
-      return;
+  async function submit(result: Record<string, string[]>): Promise<void> {
+    if (busy()) return;
+    window.clearTimeout(holdTimer);
+    setState((draft) => {
+      draft.submitting = true;
+    });
+    let completed = false;
+    try {
+      completed = await props.onSubmit(result);
+    } catch {
+      completed = false;
     }
-    moveTo(unresolvedIndex);
+    setState((draft) => {
+      draft.submitting = false;
+      if (completed) draft.sent = summaryResolution(props.questions, result);
+    });
+    if (!completed) return;
+    resolutionPresentationPending = true;
+    goTo(total());
+    const duration = stage ? motionDuration(stage, "--page-slide-dur", 250) : 0;
+    presentTimer = window.setTimeout(presentResolution, duration);
   }
 
-  function chooseOption(question: AgentPromptQuestion, questionIndex: number, value: string): void {
+  /** Goes to the next question, or sends the answers after the last one. `values` replaces the answer of `page`. */
+  function goOn(page: number, values?: string[]): void {
+    window.clearTimeout(holdTimer);
+    if (busy()) return;
+    if (page < total() - 1) {
+      goTo(page + 1);
+      return;
+    }
+    void submit(
+      Object.fromEntries(
+        props.questions.map((question, questionIndex) => [
+          question.id,
+          questionIndex === page && values ? values : answerOf(question),
+        ]),
+      ),
+    );
+  }
+
+  function choose(question: AgentPromptQuestion, page: number, label: string): void {
+    if (busy()) return;
     if (question.multiSelect) {
-      togglePick(question, value);
+      // The draft has the writes that the store does not show until the next flush.
+      setState((draft) => {
+        const picked = draft.picks[question.id];
+        if (!picked) {
+          draft.picks[question.id] = [label];
+          return;
+        }
+        const at = picked.indexOf(label);
+        if (at === -1) picked.push(label);
+        else picked.splice(at, 1);
+      });
       return;
     }
-    performWhenReady(() => {
-      const nextAnswers = { ...answers(), [question.id]: [value] };
-      const nextSkipped = { ...skipped(), [question.id]: false };
-      setCustomAnswers((current) => ({ ...current, [question.id]: false }));
-      finishQuestion(questionIndex, nextAnswers, nextSkipped);
+    setState((draft) => {
+      draft.picks[question.id] = [label];
+      draft.drafts[question.id] = "";
+    });
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => goOn(page, [label]), PICK_HOLD_MS);
+  }
+
+  function type(question: AgentPromptQuestion, value: string): void {
+    // A typed answer stops the move that a pick started.
+    window.clearTimeout(holdTimer);
+    setState((draft) => {
+      draft.drafts[question.id] = value;
+      // A typed answer replaces the pick of a single-select question.
+      if (!question.multiSelect && value.trim()) draft.picks[question.id] = [];
     });
   }
 
-  function togglePick(question: AgentPromptQuestion, value: string): void {
-    performWhenReady(() => {
-      const current = picks()[question.id] ?? [];
-      const next = current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
-      setPicks((all) => ({ ...all, [question.id]: next }));
-      // A confirmed answer that no longer matches the ticks must be confirmed again.
-      setAnswers(({ [question.id]: _changed, ...rest }) => rest);
+  function skip(page: number): void {
+    const question = props.questions[page];
+    if (!question || busy()) return;
+    setState((draft) => {
+      draft.picks[question.id] = [];
+      draft.drafts[question.id] = "";
     });
-  }
-
-  function isPicked(question: AgentPromptQuestion, label: string): boolean {
-    return picks()[question.id]?.includes(label) ?? false;
-  }
-
-  /** The ticked options, in the order the question lists them, then the typed answer. */
-  function multiSelectAnswer(question: AgentPromptQuestion, draft?: string): string[] {
-    const picked = picks()[question.id] ?? [];
-    const labels = (question.options ?? []).map((option) => option.label).filter((label) => picked.includes(label));
-    const custom = (draft ?? customDrafts()[question.id])?.trim();
-    return custom ? [...labels, custom] : labels;
-  }
-
-  function confirmMultiSelect(question: AgentPromptQuestion, questionIndex: number, draft?: string): void {
-    performWhenReady(() => {
-      const values = multiSelectAnswer(question, draft);
-      if (values.length === 0) return;
-      const nextAnswers = { ...answers(), [question.id]: values };
-      const nextSkipped = { ...skipped(), [question.id]: false };
-      const custom = (draft ?? customDrafts()[question.id])?.trim();
-      setCustomAnswers((current) => ({ ...current, [question.id]: Boolean(custom) }));
-      finishQuestion(questionIndex, nextAnswers, nextSkipped);
-    });
-  }
-
-  function commitCustomAnswer(question: AgentPromptQuestion, questionIndex: number, draft?: string): void {
-    if (question.multiSelect) {
-      confirmMultiSelect(question, questionIndex, draft);
-      return;
-    }
-    performWhenReady(() => {
-      const value = (draft ?? customDrafts()[question.id])?.trim() ?? "";
-      if (!value) return;
-      const nextAnswers = { ...answers(), [question.id]: [value] };
-      const nextSkipped = { ...skipped(), [question.id]: false };
-      setCustomAnswers((current) => ({ ...current, [question.id]: true }));
-      finishQuestion(questionIndex, nextAnswers, nextSkipped);
-    });
+    goOn(page, []);
   }
 
   function composerAnswerAvailable(): boolean {
-    const question = props.questions[step()];
-    return Boolean(question && acceptsComposerAnswer(question) && !interactionDisabled());
+    const question = currentQuestion();
+    return Boolean(question && state.step < total() && acceptsComposerAnswer(question) && !busy());
   }
 
   /**
-   * The text goes in the custom answer field, so it stays there when the send fails. The draft
-   * signal does not show the new value until the next flush, so the value goes to the commit too.
+   * The text goes in the custom answer field, so it stays there when the send fails. The store does
+   * not show the new value until the next flush, so the answer goes to `goOn` too.
    */
   function answerFromComposer(text: string): boolean {
-    const questionIndex = step();
-    const question = props.questions[questionIndex];
+    const page = index();
+    const question = props.questions[page];
     const value = text.trim();
     if (!question || !value || value.length > INPUT_LIMITS.promptAnswerText || !composerAnswerAvailable()) return false;
-    setCustomDrafts((drafts) => ({ ...drafts, [question.id]: value }));
-    commitCustomAnswer(question, questionIndex, value);
+    const picked = question.multiSelect
+      ? (question.options ?? []).map((option) => option.label).filter((label) => answerOf(question).includes(label))
+      : [];
+    type(question, value);
+    goOn(page, [...picked, value]);
     return true;
   }
 
   onSettled(() => props.registerComposerAnswer?.({ available: composerAnswerAvailable, answer: answerFromComposer }));
 
-  function skipQuestion(question: AgentPromptQuestion, questionIndex: number): void {
-    performWhenReady(() => finishQuestion(questionIndex, answers(), { ...skipped(), [question.id]: true }));
-  }
-
-  function handleShortcut(event: KeyboardEvent, question: AgentPromptQuestion, questionIndex: number): void {
+  function handleShortcut(event: KeyboardEvent, question: AgentPromptQuestion, page: number): void {
     if (busy() || event.metaKey || event.ctrlKey || event.altKey) return;
     const target = event.target;
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+    if (target instanceof HTMLTextAreaElement) return;
+    if (target instanceof HTMLInputElement && target.type !== "radio" && target.type !== "checkbox") return;
+    // A link in the question text keeps its own keys.
+    if (target instanceof Element && target.closest("a, button")) return;
+    const options = question.options ?? [];
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (answerOf(question).length > 0) goOn(page);
+      return;
+    }
+    if (event.key.length !== 1) return;
     const optionIndex = event.key.toUpperCase().charCodeAt(0) - 65;
-    const option = question.options?.[optionIndex];
-    if (!option || event.key.length !== 1) return;
-    event.preventDefault();
-    chooseOption(question, questionIndex, option.label);
+    const option = options[optionIndex];
+    if (option) {
+      event.preventDefault();
+      choose(question, page, option.label);
+    } else if (optionIndex === options.length) {
+      event.preventDefault();
+      event.currentTarget instanceof HTMLElement &&
+        event.currentTarget.querySelector<HTMLInputElement>(".question-prompt-custom-input")?.focus();
+    }
   }
 
-  function PromptNavigation() {
+  function handleCustomKey(event: KeyboardEvent, question: AgentPromptQuestion, page: number): void {
+    // The browser owns the key that commits an IME composition. Safari sends it after
+    // `compositionend` without `isComposing`; keyCode 229 marks it.
+    if (event.isComposing || event.keyCode === 229) return;
+    const sendShortcut = props.sendShortcut ?? "enter";
+    // Enter to send keeps the previous chord: every Enter sends.
+    if (sendShortcut === "enter") {
+      if (event.key !== "Enter") return;
+    } else if (!isSendShortcutKey(event, sendShortcut)) return;
+    event.preventDefault();
+    if (answerOf(question).length > 0) goOn(page);
+  }
+
+  function isPicked(question: AgentPromptQuestion, label: string): boolean {
+    if (!question.multiSelect && state.drafts[question.id]?.trim()) return false;
+    return state.picks[question.id]?.includes(label) ?? false;
+  }
+
+  const detail = (question: AgentPromptQuestion) =>
+    question.detail ?? (question.multiSelect ? t("prompt.question.chooseAll") : undefined);
+
+  function QuestionPage(pageProps: { question: AgentPromptQuestion; page: number }) {
+    const question = () => pageProps.question;
     return (
-      <Questionnaire.Root
-        current={step() + 1}
-        total={questionCount()}
-        disabled={busy()}
-        class="question-prompt-navigation-root"
-        aria-label={t("prompt.question.controls")}
-        onPrevious={() => moveTo(step() - 1)}
-        onNext={() => moveTo(step() + 1)}
-        onCancel={() => performWhenReady(() => void submit({}))}
-        onSubmit={(event) => event.preventDefault()}
+      <section
+        class="question-prompt-page"
+        data-pos={position(pageProps.page)}
+        inert={position(pageProps.page) !== "current"}
+        aria-hidden={position(pageProps.page) !== "current" ? "true" : undefined}
+        aria-label={markdownPlainText(question().question)}
+        onKeyDown={(event) => handleShortcut(event, question(), pageProps.page)}
       >
-        <nav class="question-prompt-navigation" aria-label={t("prompt.question.navigation")}>
-          <Questionnaire.Previous
-            size="icon-xs"
-            class="question-prompt-navigation-button"
-            aria-label={t("prompt.question.previous")}
-            title={t("prompt.question.previous")}
+        <header class="question-prompt-header">
+          <Questionnaire.Title class="question-prompt-title">
+            <QuestionText question={question().question} onOpenLink={props.onOpenLink} />
+          </Questionnaire.Title>
+          <Show when={detail(question())}>
+            {(text) => <Questionnaire.Description class="question-prompt-detail">{text()}</Questionnaire.Description>}
+          </Show>
+        </header>
+        <Questionnaire.Choices
+          class="question-prompt-options"
+          role={question().multiSelect ? "group" : "radiogroup"}
+          aria-label={markdownPlainText(question().question)}
+        >
+          <For each={question().options ?? []}>
+            {(option, optionIndex) => (
+              <Questionnaire.Choice
+                class="question-prompt-option"
+                name={question().id}
+                value={option.label}
+                multiple={question().multiSelect === true}
+                checked={isPicked(question(), option.label)}
+                disabled={busy()}
+                onChange={(value) => choose(question(), pageProps.page, value)}
+              >
+                <Kbd class="question-prompt-letter" aria-hidden="true">
+                  {optionLetter(optionIndex())}
+                </Kbd>
+                <span class="question-prompt-option-text">
+                  <span class="question-prompt-option-label">{option.label}</span>
+                  <Show when={option.description}>
+                    <span class="question-prompt-option-description">{option.description}</span>
+                  </Show>
+                </span>
+              </Questionnaire.Choice>
+            )}
+          </For>
+          <label
+            class="question-prompt-option question-prompt-custom"
+            data-checked={state.drafts[question().id]?.trim() ? "" : undefined}
           >
-            <ChevronLeft aria-hidden="true" />
-          </Questionnaire.Previous>
-          <Questionnaire.Progress>
-            {t("prompt.question.progress", { current: step() + 1, total: questionCount() })}
-          </Questionnaire.Progress>
-          <Questionnaire.Next
-            variant="ghost"
-            size="icon-xs"
-            class="question-prompt-navigation-button"
-            aria-label={t("prompt.question.next")}
-            title={t("prompt.question.next")}
-          >
-            <ChevronRight aria-hidden="true" />
-          </Questionnaire.Next>
-          <Questionnaire.Cancel
-            size="icon-xs"
-            class="question-prompt-navigation-button question-prompt-cancel"
-            aria-label={t("prompt.question.cancel")}
-            title={t("prompt.question.cancel")}
-          >
-            <X aria-hidden="true" />
-          </Questionnaire.Cancel>
-        </nav>
-      </Questionnaire.Root>
+            <Kbd class="question-prompt-letter" aria-hidden="true">
+              {optionLetter(question().options?.length ?? 0)}
+            </Kbd>
+            <Questionnaire.Input
+              class="question-prompt-custom-input"
+              type={question().isSecret ? "password" : "text"}
+              value={state.drafts[question().id] ?? ""}
+              placeholder={
+                question().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.question.somethingElse")
+              }
+              aria-label={t("prompt.question.customAnswerFor", { question: markdownPlainText(question().question) })}
+              aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
+              maxlength={INPUT_LIMITS.promptAnswerText}
+              disabled={busy()}
+              onValueChange={(value) => type(question(), value)}
+              onKeyDown={(event) => handleCustomKey(event, question(), pageProps.page)}
+            />
+          </label>
+        </Questionnaire.Choices>
+      </section>
     );
   }
 
-  function QuestionPage(pageProps: { index: number }) {
-    const question = () => props.questions[pageProps.index];
-    return (
-      <Show when={question()}>
-        {(current) => (
-          <Questionnaire.Root
-            current={pageProps.index + 1}
-            total={questionCount()}
-            disabled={busy()}
-            aria-label={t("prompt.question.label")}
-            onPrevious={() => moveTo(pageProps.index - 1)}
-            onNext={() => moveTo(pageProps.index + 1)}
-            onSkip={() => skipQuestion(current(), pageProps.index)}
-            onCancel={() => void submit({})}
-            onKeyDown={(event) => handleShortcut(event, current(), pageProps.index)}
-            onSubmit={(event) => event.preventDefault()}
-          >
-            <header class="question-prompt-header conversation-interaction-header">
-              <Questionnaire.Title>
-                <QuestionText question={current().question} onOpenLink={props.onOpenLink} />
-              </Questionnaire.Title>
-              <Badge variant="warning-light" class="conversation-interaction-status">
-                <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-                {t("prompt.inputRequired")}
-              </Badge>
-            </header>
-            <Questionnaire.Choices
-              role={current().multiSelect ? "group" : "radiogroup"}
-              aria-label={markdownPlainText(current().question)}
-            >
-              <ItemGroup class="question-prompt-options">
-                <For each={current().options ?? []}>
-                  {(option, optionIndex) => (
-                    <Questionnaire.Choice
-                      name={current().id}
-                      value={option.label}
-                      multiple={current().multiSelect === true}
-                      checked={
-                        current().multiSelect
-                          ? isPicked(current(), option.label)
-                          : answers()[current().id]?.[0] === option.label && !customAnswers()[current().id]
-                      }
-                      disabled={busy()}
-                      onChange={(value) => chooseOption(current(), pageProps.index, value)}
-                    >
-                      <Item size="compact">
-                        <ItemMedia>
-                          <Kbd aria-hidden="true">{String.fromCharCode(65 + optionIndex())}</Kbd>
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>{option.label}</ItemTitle>
-                          <Show when={option.description}>
-                            <ItemDescription>{option.description}</ItemDescription>
-                          </Show>
-                        </ItemContent>
-                        <span class="question-prompt-choice-arrow" aria-hidden="true">
-                          <Show when={current().multiSelect} fallback={<ChevronRight />}>
-                            <Show when={isPicked(current(), option.label)}>
-                              <Check />
-                            </Show>
-                          </Show>
-                        </span>
-                      </Item>
-                    </Questionnaire.Choice>
-                  )}
-                </For>
+  /** The answers of a question in the summary, or null for a skipped question. */
+  function summaryRows(question: AgentPromptQuestion): Array<{ letter: string; text: string }> | null {
+    const current = resolution();
+    if (current?.status !== "answered") return null;
+    const response = current.responses[question.id];
+    if (!response || response.status === "skipped") return null;
+    const custom = optionLetter(question.options?.length ?? 0);
+    if (question.isSecret || !response.answers) return [{ letter: custom, text: t("prompt.question.privateAnswer") }];
+    if (response.answers.length === 0) return null;
+    return response.answers.map((answer) => ({ letter: answerLetter(question, answer), text: answer }));
+  }
 
-                <div class="question-prompt-custom-row" data-selected={customAnswers()[current().id] ? "" : undefined}>
-                  <span class="question-prompt-pencil">
-                    <PencilLine aria-hidden="true" />
-                  </span>
-                  <Questionnaire.Input
-                    ref={(element) => customInputs.set(current().id, element)}
-                    type={current().isSecret ? "password" : "text"}
-                    value={customDrafts()[current().id] ?? ""}
-                    placeholder={
-                      current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
+  const statusTitle = () => {
+    const status = resolution()?.status;
+    if (status === "cancelled") return t("prompt.question.cancelled");
+    if (status === "expired") return t("prompt.question.expired");
+    return t("prompt.question.answersSent");
+  };
+
+  function Summary() {
+    return (
+      <section
+        class="question-prompt-page question-prompt-summary"
+        data-pos={position(total())}
+        inert={!resolved()}
+        aria-label={resolved() ? statusTitle() : undefined}
+      >
+        <Show when={resolved()}>
+          <Show
+            when={resolution()?.status === "answered"}
+            fallback={
+              <p class="question-prompt-closed" role="status">
+                <X aria-hidden="true" />
+                {statusTitle()}
+              </p>
+            }
+          >
+            <p class="sr-only" role="status">
+              {statusTitle()}
+            </p>
+            <For each={props.questions}>
+              {(question) => (
+                <section class="question-prompt-section" aria-label={markdownPlainText(question.question)}>
+                  <h2 class="question-prompt-title">
+                    <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
+                  </h2>
+                  <Show
+                    when={summaryRows(question)}
+                    fallback={
+                      <p class="question-prompt-answer question-prompt-answer-skipped">
+                        <Kbd class="question-prompt-letter" aria-hidden="true">
+                          –
+                        </Kbd>
+                        {t("prompt.question.skipped")}
+                      </p>
                     }
-                    aria-label={t("prompt.question.customAnswerFor", {
-                      question: markdownPlainText(current().question),
-                    })}
-                    aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
-                    maxlength={INPUT_LIMITS.promptAnswerText}
-                    disabled={busy()}
-                    onValueChange={(value) => setCustomDrafts((drafts) => ({ ...drafts, [current().id]: value }))}
-                    onKeyDown={(event) => {
-                      // The browser owns the key that commits an IME composition. Safari sends it
-                      // after `compositionend` without `isComposing`; keyCode 229 marks it.
-                      if (event.isComposing || event.keyCode === 229) return;
-                      const sendShortcut = props.sendShortcut ?? "enter";
-                      // Enter to send keeps the previous chord: every Enter sends.
-                      if (sendShortcut === "enter") {
-                        if (event.key !== "Enter") return;
-                      } else if (!isSendShortcutKey(event, sendShortcut)) return;
-                      event.preventDefault();
-                      commitCustomAnswer(current(), pageProps.index);
-                    }}
-                  />
-                  <div class="question-prompt-inline-actions">
-                    <Show when={submitting() || props.pending}>
-                      <span class="question-prompt-sending" role="status">
-                        <Spinner size="sm" />
-                        {t("common.sending")}
-                      </span>
-                    </Show>
-                    <Show when={current().multiSelect}>
-                      <Button
-                        type="button"
-                        size="xs"
-                        disabled={busy() || multiSelectAnswer(current()).length === 0}
-                        onClick={() => confirmMultiSelect(current(), pageProps.index)}
-                      >
-                        {t("prompt.question.submitAnswer")}
-                      </Button>
-                    </Show>
-                    {/* A software keyboard has no modifier chord, so the modifier mode needs a button. */}
-                    <Show when={!current().multiSelect && (props.sendShortcut ?? "enter") !== "enter"}>
-                      <Button
-                        type="button"
-                        size="xs"
-                        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
-                        disabled={busy() || !customDrafts()[current().id]?.trim()}
-                        onClick={() => commitCustomAnswer(current(), pageProps.index)}
-                      >
-                        {t("prompt.question.submitAnswer")}
-                      </Button>
-                    </Show>
-                    <Questionnaire.Skip size="xs">{t("prompt.question.skip")}</Questionnaire.Skip>
-                  </div>
-                </div>
-              </ItemGroup>
-            </Questionnaire.Choices>
-          </Questionnaire.Root>
-        )}
-      </Show>
+                  >
+                    {(rows) => (
+                      <ul class="question-prompt-answers">
+                        <For each={rows()}>
+                          {(row) => (
+                            <li class="question-prompt-answer">
+                              <Kbd class="question-prompt-letter" data-answered="" aria-hidden="true">
+                                {row.letter}
+                              </Kbd>
+                              {row.text}
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    )}
+                  </Show>
+                </section>
+              )}
+            </For>
+          </Show>
+        </Show>
+      </section>
     );
   }
 
@@ -635,11 +537,12 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       ref={(element) => props.elementRef?.(element)}
       variant="muted"
       class="question-prompt-bubble"
-      data-state={busy() ? "pending" : "idle"}
+      data-state={resolved() ? "done" : busy() ? "pending" : "idle"}
+      data-entrance={animateEntrance ? "" : undefined}
     >
-      <BubbleContent class="conversation-interaction-card">
+      <BubbleContent>
         <Show
-          when={initialContent()}
+          when={total() > 0}
           fallback={
             <section class="question-prompt-empty" aria-label={t("prompt.question.label")}>
               <strong>{t("prompt.question.emptyTitle")}</strong>
@@ -647,52 +550,83 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             </section>
           }
         >
-          <div class="question-prompt-layout">
-            <div
-              ref={stage}
-              class="question-prompt-stage t-page-slide"
-              data-page={visiblePage()}
-              data-transitioning={transitioning() ? "" : undefined}
-              aria-live="polite"
-            >
-              <For each={[0, 1] as const}>
-                {(slot) => (
-                  <section
-                    ref={(element) => {
-                      pageElements[slot] = element;
-                    }}
-                    class="question-prompt-page t-page"
-                    data-page-id={slotPageIds()[slot]}
-                    aria-hidden={visiblePage() === slotPageIds()[slot] ? undefined : "true"}
-                  >
-                    <Show when={slotPages()[slot]}>
-                      {(content) => (
-                        <Show
-                          when={questionPageContent(content())}
-                          fallback={
-                            <Show when={resolutionPageContent(content())}>
-                              {(resolutionPage) => (
-                                <CompletedQuestionPrompt
-                                  questions={props.questions}
-                                  resolution={resolutionPage().resolution}
-                                  onOpenLink={props.onOpenLink}
-                                />
-                              )}
-                            </Show>
-                          }
-                        >
-                          {(questionPage) => <QuestionPage index={questionPage().index} />}
-                        </Show>
-                      )}
-                    </Show>
-                  </section>
-                )}
-              </For>
-            </div>
-            <Show when={slotPages()[activeSlot()]?.kind === "question"}>
-              <PromptNavigation />
+          <Questionnaire.Root
+            class="question-prompt-form"
+            current={index() + 1}
+            total={total()}
+            disabled={busy()}
+            aria-label={t("prompt.question.label")}
+            onPrevious={() => goTo(index() - 1)}
+            onSkip={() => skip(index())}
+            onCancel={() => void submit({})}
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <Show when={!resolved()}>
+              <Questionnaire.Cancel
+                size="icon-xs"
+                class="question-prompt-cancel"
+                aria-label={t("prompt.question.cancel")}
+                title={t("prompt.question.cancel")}
+              >
+                <X aria-hidden="true" />
+              </Questionnaire.Cancel>
             </Show>
-          </div>
+            <p class="sr-only" aria-live="polite">
+              {resolved() ? "" : state.announced}
+            </p>
+            <div ref={stage} class="question-prompt-stage" tabindex="-1">
+              <For each={props.questions}>{(question, page) => <QuestionPage question={question} page={page()} />}</For>
+              <Summary />
+            </div>
+            <div
+              class="question-prompt-fold"
+              data-open={resolved() ? "false" : "true"}
+              inert={resolved()}
+              aria-hidden={resolved() ? "true" : undefined}
+            >
+              <div class="question-prompt-fold-inner">
+                <footer class="question-prompt-footer">
+                  <Show when={total() > 1}>
+                    <Questionnaire.Progress class="question-prompt-progress">
+                      <For each={props.questions}>
+                        {(_question, dot) => (
+                          <span
+                            class="question-prompt-dot"
+                            data-state={dot() < index() ? "done" : dot() === index() ? "current" : "next"}
+                          />
+                        )}
+                      </For>
+                    </Questionnaire.Progress>
+                  </Show>
+                  <span class="question-prompt-actions">
+                    <Show when={index() > 0}>
+                      <Questionnaire.Previous variant="secondary" size="sm" class="question-prompt-pill">
+                        {t("common.back")}
+                      </Questionnaire.Previous>
+                    </Show>
+                    <Questionnaire.Skip variant="secondary" size="sm" class="question-prompt-pill">
+                      {t("prompt.question.skip")}
+                    </Questionnaire.Skip>
+                    <Button
+                      type="button"
+                      size="sm"
+                      class="question-prompt-pill"
+                      disabled={busy() || !canGoOn()}
+                      onClick={() => goOn(index())}
+                    >
+                      <Show
+                        when={state.submitting || props.pending}
+                        fallback={index() === total() - 1 ? t("common.done") : t("prompt.question.next")}
+                      >
+                        <Spinner size="sm" />
+                        {t("common.sending")}
+                      </Show>
+                    </Button>
+                  </span>
+                </footer>
+              </div>
+            </div>
+          </Questionnaire.Root>
         </Show>
       </BubbleContent>
     </Bubble>

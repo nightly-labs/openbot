@@ -1,5 +1,13 @@
-// How the desktop app starts and stops: at login, when its main window closes, and when the
-// computer is idle.
+// How the desktop app starts and stops: at login, when its main window closes, when the
+// computer is idle, and on `Cmd + Q`.
+
+/**
+ * When `Cmd + Q` on a Mac quits only after the user holds it or presses it twice: while an agent
+ * works (the default), for every quit, or never.
+ */
+export const QUIT_GUARDS = ["working", "always", "never"] as const;
+export type QuitGuard = (typeof QUIT_GUARDS)[number];
+export const DEFAULT_QUIT_GUARD: QuitGuard = "working";
 
 /** As it crosses IPC. Null marks a choice that this run of the app does not offer. */
 export interface AppBehaviorPreference {
@@ -18,6 +26,8 @@ export interface AppBehaviorPreference {
   keepAwake: boolean | null;
   /** Keep the computer awake on battery power too. Null where `keepAwake` is null. */
   keepAwakeOnBattery: boolean | null;
+  /** When `Cmd + Q` needs a hold or a second press. Null on Windows, on Linux and on a server. */
+  quitGuard: QuitGuard | null;
 }
 
 /** The choices to change. A choice that is not given keeps its value. */
@@ -26,4 +36,5 @@ export interface AppBehaviorPreferenceChange {
   keepRunningInBackground?: boolean;
   keepAwake?: boolean;
   keepAwakeOnBattery?: boolean;
+  quitGuard?: QuitGuard;
 }

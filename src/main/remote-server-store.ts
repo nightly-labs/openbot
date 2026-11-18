@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
 import {
@@ -67,6 +68,7 @@ export interface RemoteServerPatch {
   role?: TeamRole;
   encryptedToken?: string;
   logoVersion?: string | null;
+  appearance?: ServerAppearance | null;
   remoteDesktopAvailable?: boolean;
 }
 
@@ -281,6 +283,8 @@ export class RemoteServerStore implements RemoteServerDirectory {
     // well -- leaving it would put the server back the next time a build that understands it runs.
     this.#forgetUnreadable(serverId);
     this.#state.servers = this.#state.servers.filter((server) => server.id !== serverId);
+    // A server that the user joins again does not get the connection of this computer back by itself.
+    this.#state.browserEgressServerIds = this.#state.browserEgressServerIds.filter((id) => id !== serverId);
     if (this.#state.activeServerId === serverId) this.setActiveServerId(LOCAL_SERVER_ID);
     yield* this.persist();
   });
@@ -410,6 +414,30 @@ export class RemoteServerStore implements RemoteServerDirectory {
     });
   });
 
+  /** Whether this computer shares its connection with a joined server. */
+  sharesBrowserEgress(serverId: string): boolean {
+    return this.#state.browserEgressServerIds.includes(serverId);
+  }
+
+  readonly setBrowserEgress = Effect.fn("RemoteStore.setBrowserEgress")(function* (
+    this: RemoteServerStore,
+    serverId: string,
+    sharing: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    yield* this.#writes.withPermit(
+      Effect.uninterruptible(
+        Effect.gen({ self: this }, function* () {
+          if (!this.has(serverId))
+            return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.serverNotFound")) });
+          const browserEgressServerIds = this.#state.browserEgressServerIds.filter((id) => id !== serverId);
+          if (sharing) browserEgressServerIds.push(serverId);
+          yield* this.#writeSnapshot({ ...structuredClone(this.#state), browserEgressServerIds });
+          this.#state.browserEgressServerIds = browserEgressServerIds;
+        }),
+      ),
+    );
+  });
+
   readonly #writeNotificationsEffect = Effect.fn("RemoteStore.writeNotifications")(function* (
     this: RemoteServerStore,
     serverId: string,
@@ -442,6 +470,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
             ...snapshot,
             mutedServerIds: [...this.#state.mutedServerIds],
             serverNotifications: structuredClone(this.#state.serverNotifications),
+            browserEgressServerIds: [...this.#state.browserEgressServerIds],
           }),
         ),
       ),

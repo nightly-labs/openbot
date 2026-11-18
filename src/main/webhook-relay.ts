@@ -16,6 +16,11 @@ export interface WebhookRelayOptions {
   account: WebhookRelayAccount;
   ingress: SignalIngress;
   hostId(): string | null;
+  /**
+   * Registers this host for the account when it has no ID or no machine token, without publishing
+   * it. A failure leaves the route without a URL for the next sync.
+   */
+  ensureHost(): Effect.Effect<void>;
 }
 
 /** The account service keeps a revoked route ID, and one that another host or account owns, for good. */
@@ -36,6 +41,10 @@ export class WebhookRelay implements HostWebhookRelay {
 
   connected(): boolean {
     return this.#options.ingress.webhookReady();
+  }
+
+  ensureHost(): Effect.Effect<void> {
+    return this.#options.ensureHost();
   }
 
   setEnabled(enabled: boolean): void {

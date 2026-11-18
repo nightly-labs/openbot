@@ -5,7 +5,7 @@
   "description": "Vercel lets agents list projects and recent deployments, read build and runtime logs, and find why a build failed. Each user signs in to their own Vercel account through the browser and chooses the teams that agents can use. In those teams, agents get the same rights as the user's account. They can also change environment variables, domains, DNS records and deployments, and buy domains.",
   "category": "coding",
   "creatorName": "Vercel",
-  "iconUrl": "https://vercel.com/favicon.ico",
+  "iconUrl": "https://assets.vercel.com/image/upload/q_auto/front/favicon/vercel/apple-touch-icon-256x256.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-failed-build", "text": "Why did the last production deployment fail?" },
@@ -17,7 +17,7 @@
       "id": "app-vercel-mcp",
       "name": "Vercel",
       "description": "Projects, deployments, build logs, and runtime logs, over Vercel's MCP server with browser sign-in.",
-      "iconUrl": "https://vercel.com/favicon.ico",
+      "iconUrl": "https://assets.vercel.com/image/upload/q_auto/front/favicon/vercel/apple-touch-icon-256x256.png",
       "server": {
         "name": "vercel",
         "transport": "http",

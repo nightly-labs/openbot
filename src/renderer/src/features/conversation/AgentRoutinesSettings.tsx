@@ -14,6 +14,7 @@ import {
   type RoutineResultDelivery,
   type RoutineResultDestination,
   type RoutineRunFields,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import type { RoutineWebhookTriggerInput, WebhookTestResult } from "@openbot/contracts/ipc-events";
@@ -67,10 +68,11 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
+import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import { HostedUpsellRoutinesNotice, hostedUpsellRoutineCreated } from "../servers/hosted-server-upsell-controller";
-import { isEventRoutine, routineListSummary, routineScheduleOf } from "./routine-summary";
+import { trackRoutineAction } from "./routine-analytics";
+import { isEventRoutine, routineListSummary, routinePausedByRunLabel, routineScheduleOf } from "./routine-summary";
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
@@ -85,7 +87,7 @@ type PendingRoutineExit =
   | "close"
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
-  | { kind: "conversation-message"; messageId: string }
+  | { kind: "conversation-message"; messageId: string; routineId: string | null }
   | { kind: "routine-thread"; routineId: string };
 
 interface RoutineDraft {
@@ -98,6 +100,7 @@ interface RoutineDraft {
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
   missedPolicy: RoutineMissedPolicy;
+  runIn: RoutineRunPlace;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -130,7 +133,8 @@ interface AgentRoutinesSettingsProps {
   onClose?: (() => void) | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  onOpenRun?: ((messageId: string) => void) | undefined;
+  /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
+  onOpenRun?: ((messageId: string, routineId?: string) => void) | undefined;
   /**
    * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
    * example on a host that runs routines in the agent's own chat.
@@ -220,7 +224,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const results = props.port.results;
     if (!results) return;
     try {
-      const [destination, items] = await Promise.all([results.destination(routineId), results.deliveries(routineId)]);
+      const [destination, items] = await Promise.all([
+        results.destination(routineId),
+        results.deliveries?.(routineId) ?? Promise.resolve([]),
+      ]);
       if (draft()?.id !== routineId) return;
       setSavedDestination(destination);
       setDeliveries(items);
@@ -342,6 +349,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           current.missedPolicy === (base.missedPolicy ?? "skip")
             ? (routine.missedPolicy ?? "skip")
             : current.missedPolicy,
+        runIn: current.runIn === (base.runIn ?? "chat") ? (routine.runIn ?? "chat") : current.runIn,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -360,6 +368,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       active: routine.active,
       limitPolicy: routine.limitPolicy ?? "wait",
       missedPolicy: routine.missedPolicy ?? "skip",
+      runIn: routine.runIn ?? "chat",
       ...triggerDraftOf(routine),
       destination: undefined,
     });
@@ -387,6 +396,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
       missedPolicy: "skip",
+      runIn: "chat",
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -447,7 +457,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   }
 
   function requestOpenRun(messageId: string): void {
-    requestExit({ kind: "conversation-message", messageId });
+    requestExit({ kind: "conversation-message", messageId, routineId: draft()?.id ?? null });
   }
 
   function performExit(target: PendingRoutineExit): void {
@@ -465,7 +475,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       return;
     }
     if (target.kind === "conversation-message") {
-      props.onOpenRun?.(target.messageId);
+      props.onOpenRun?.(target.messageId, target.routineId ?? undefined);
       return;
     }
     if (target.kind === "routine-thread") {
@@ -524,8 +534,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
+        // Only a changed place goes: a remote host sends it on a route of its own, after the save.
+        ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
+          ? { runIn: current.runIn }
+          : {}),
       });
-      const saved = result.routine;
+      // A remote answer leaves out the place that the host kept.
+      const saved =
+        props.port.runIn && result.routine.runIn === undefined
+          ? { ...result.routine, runIn: current.runIn }
+          : result.routine;
       setRoutines((items) => {
         const next = items.some((routine) => routine.id === saved.id)
           ? items.map((routine) => (routine.id === saved.id ? saved : routine))
@@ -536,7 +554,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       if (draft()?.id === current.id) draftBase = saved;
       const destinationSaved = await saveDestination(saved.id, current.destination);
-      if (draftRevision === savingRevision && destinationSaved) setDirty(false);
+      // A remote host can keep the new routine but not its place. The editor keeps the change, so Save
+      // tries again.
+      const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
+      if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
+      if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       if (result.secret && draft()?.id === saved.id) {
         const secret = result.secret;
@@ -549,7 +571,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         hostedUpsellRoutineCreated({ id: saved.id, name: saved.name, agentId: null });
       }
     } catch (caught) {
-      trackRoutineAction(analytics, action, current, startedAt, "failed");
+      trackRoutineAction(analytics, action, current, startedAt, "failed", caught);
       setError(errorMessage(caught, t("routine.settings.saveFailed")));
     } finally {
       setSaving(false);
@@ -581,11 +603,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
+  /** A joined server keeps the deliveries on its host, so its history has none. */
+  function deliveryHistory() {
+    return props.port.results?.deliveries ? { items: deliveries(), onResend: resendDelivery } : undefined;
+  }
+
   async function resendDelivery(runId: string): Promise<void> {
-    const results = props.port.results;
+    const resend = props.port.results?.resend;
     const routineId = draft()?.id;
-    if (!results || !routineId) return;
-    await results.resend(runId);
+    if (!resend || !routineId) return;
+    await resend(runId);
     await loadResults(routineId);
   }
 
@@ -610,7 +637,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       closeEditor();
       trackRoutineAction(analytics, "delete", current, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, "delete", current, startedAt, "failed");
+      trackRoutineAction(analytics, "delete", current, startedAt, "failed", caught);
       setError(errorMessage(caught, t("routine.settings.deleteFailed")));
     } finally {
       setDeleting(false);
@@ -643,7 +670,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       setRoutines((items) => items.map((item) => (item.id === saved.id ? saved : item)));
       trackRoutineAction(analytics, "update", tracked, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, "update", tracked, startedAt, "failed");
+      trackRoutineAction(analytics, "update", tracked, startedAt, "failed", caught);
       const fallback = active ? t("routine.settings.resumeFailed") : t("routine.settings.pauseFailed");
       actionToast.error(errorMessage(caught, fallback));
     } finally {
@@ -666,8 +693,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
-      // The test run runs in the routine's own thread, so the chat shows it there.
-      if (props.onOpenThread) requestExit({ kind: "routine-thread", routineId: current.id });
+      // A test run of a routine that runs in its own thread runs there, so the chat shows it there. The saved
+      // place applies, not a change that the user did not save.
+      if (props.onOpenThread && draftBase?.runIn === "thread")
+        requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
       trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
@@ -858,6 +887,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                                     ? t("routine.settings.completed", { schedule: routineListSummary(routine(), text) })
                                     : routineListSummary(routine(), text)}
                                 </small>
+                                <Show when={routinePausedByRunLabel(routine(), text)}>
+                                  {(reason) => <small>{reason()}</small>}
+                                </Show>
                               </span>
                             </Button>
                             {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}
@@ -1129,6 +1161,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </Show>
 
+              <Show when={props.port.runIn}>
+                <div class="settings-field agent-routine-run-in">
+                  <SwitchField
+                    label={t("routine.settings.runInThread")}
+                    checked={current().runIn === "thread"}
+                    onChange={(thread) => changeDraft((value) => ({ ...value, runIn: thread ? "thread" : "chat" }))}
+                  />
+                </div>
+              </Show>
+
               <Show when={props.port.results && (resultOptions().length > 0 || savedDestination())}>
                 <RoutineResultDestinationField
                   options={resultOptions()}
@@ -1142,7 +1184,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 runs={runs()}
                 onOpenRun={props.onOpenRun ? requestOpenRun : undefined}
                 activity={webhookActivity()}
-                deliveries={props.port.results ? { items: deliveries(), onResend: resendDelivery } : undefined}
+                deliveries={deliveryHistory()}
               />
             </div>
           )}
@@ -1242,20 +1284,4 @@ function validDraft(draft: RoutineDraft): boolean {
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
   return draft.id === null && draft.triggerKind === "schedule" && !draft.name.trim() && !draft.instruction.trim();
-}
-
-function trackRoutineAction(
-  analytics: DesktopAnalyticsScope,
-  action: "create" | "update" | "delete" | "test",
-  routine: Pick<RoutineDraft, "triggerKind" | "schedule">,
-  startedAt: number,
-  result: "succeeded" | "failed",
-): void {
-  analytics.track("routine_action", {
-    action,
-    trigger_type: routine.triggerKind === "webhook" ? "webhook" : routine.schedule.kind,
-    duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
-    result,
-    ...(result === "failed" ? { failure_code: `${action}_failed` } : {}),
-  });
 }

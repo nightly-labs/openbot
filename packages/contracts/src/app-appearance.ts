@@ -1,3 +1,4 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import { isDynamicRecord } from "./runtime-values";
 
 /**
@@ -42,6 +43,35 @@ export const APP_THEME_PALETTE_COLORS = [
 
 export type AppThemePaletteColor = (typeof APP_THEME_PALETTE_COLORS)[number];
 
+/**
+ * The background color of conversations that the user picks for one scheme, as `#rrggbb` in lowercase,
+ * or null for the color of the theme. Light and Dark keep their own color; System shows the one of the
+ * scheme that it resolves to, and so does a theme palette.
+ */
+export type ChatBackgroundColor = AvatarColor;
+
+/** The same rule as an agent color, because the same color picker gives both. */
+export const isChatBackgroundColor: (value: unknown) => value is ChatBackgroundColor = isAvatarColor;
+
+/**
+ * The family name of a font that is installed on this computer, such as "Noto Sans Arabic". Main
+ * lists them, and the renderer puts the chosen one before the default fonts in a CSS font list, in
+ * quotes. A name that the computer does not have shows the default fonts. The choice is per computer,
+ * because each computer has its own fonts: a joined server does not change it.
+ */
+export type AppFontFamily = string;
+
+/**
+ * 1 to 128 characters, with no control character and nothing that can end the quoted CSS string or
+ * the property: no quote, backslash, semicolon, brace or angle bracket. Font names do not use them.
+ */
+export const APP_FONT_FAMILY_PATTERN = /^[^\p{Cc}"\\;{}<>]{1,128}$/u;
+
+/** A font name that can go into a CSS font list. See `APP_FONT_FAMILY_PATTERN`. */
+export function isAppFontFamily(value: unknown): value is AppFontFamily {
+  return typeof value === "string" && value.trim() === value && APP_FONT_FAMILY_PATTERN.test(value);
+}
+
 /** The file name stem of a theme palette file, which is also its saved identifier. */
 export const APP_THEME_PALETTE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
@@ -78,6 +108,13 @@ export interface AppAppearancePreference {
    * appearance too.
    */
   transparentWindow: boolean;
+  /** See `ChatBackgroundColor`. Each scheme has its own field, so a change to one keeps the other. */
+  chatBackgroundLight: ChatBackgroundColor | null;
+  chatBackgroundDark: ChatBackgroundColor | null;
+  /** See `AppFontFamily`. The font of menus, chats and settings, or null for the default (Inter). */
+  interfaceFont: AppFontFamily | null;
+  /** See `AppFontFamily`. The font of code, terminals and file paths, or null for the default. */
+  codeFont: AppFontFamily | null;
 }
 
 /**
@@ -85,7 +122,16 @@ export interface AppAppearancePreference {
  * other. The theme control sends `palette: null` with a light, dark or system choice.
  */
 export type SetAppAppearancePreferenceInput = Partial<
-  Pick<AppAppearancePreference, "appearance" | "transparentWindow" | "palette">
+  Pick<
+    AppAppearancePreference,
+    | "appearance"
+    | "transparentWindow"
+    | "palette"
+    | "chatBackgroundLight"
+    | "chatBackgroundDark"
+    | "interfaceFont"
+    | "codeFont"
+  >
 >;
 
 export function isAppAppearance(value: unknown): value is AppAppearance {

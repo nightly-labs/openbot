@@ -4,6 +4,7 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import X from "lucide-react-native/icons/x";
 
 import { haptics } from "@/shared/lib/haptics";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export interface StageBackButtonProps {
   icon: "back" | "close";
@@ -33,7 +34,7 @@ export function StageBackButton({ icon, label, disabled = false, onPress }: Stag
         onPress();
       }}
     >
-      <Icon size={20} color={foreground} strokeWidth={2.4} />
+      <Icon size={20} color={foreground} strokeWidth={2.4} style={icon === "close" ? undefined : MIRROR_IN_RTL} />
     </Button>
   );
 }

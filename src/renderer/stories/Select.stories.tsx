@@ -1,4 +1,13 @@
-import { Heading, SearchSelect, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
+import {
+  Heading,
+  SearchSelect,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSection,
+  SelectTrigger,
+  SelectValue,
+} from "@openbot/ui";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
@@ -29,6 +38,37 @@ function ReasoningSelect(props: { size?: "sm" | "md" | undefined; disabled?: boo
   );
 }
 
+interface ModelGroup {
+  label: string;
+  models: string[];
+}
+
+const modelGroups: ModelGroup[] = [
+  { label: "On this computer", models: ["Supertonic 3"] },
+  { label: "ElevenLabs", models: ["Flash v2.5", "Multilingual v2", "Eleven v3"] },
+  { label: "xAI", models: ["Text to Speech"] },
+];
+
+/** Options in groups: `SelectSection` names each group. */
+function GroupedSelect() {
+  const [value, setValue] = createSignal("Supertonic 3");
+  return (
+    <Select<string, ModelGroup>
+      options={modelGroups}
+      optionGroupChildren="models"
+      value={value()}
+      onChange={(next) => next && setValue(next)}
+      sectionComponent={(section) => <SelectSection>{section.section.rawValue.label}</SelectSection>}
+      itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue}</SelectItem>}
+    >
+      <SelectTrigger size="sm" aria-label="Model">
+        <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
+      </SelectTrigger>
+      <SelectContent />
+    </Select>
+  );
+}
+
 export const Gallery: Story = {
   render: () => (
     <main class="foundation-story">
@@ -39,6 +79,7 @@ export const Gallery: Story = {
         <ReasoningSelect />
         <ReasoningSelect size="sm" />
         <ReasoningSelect disabled />
+        <GroupedSelect />
       </div>
     </main>
   ),

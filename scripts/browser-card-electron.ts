@@ -208,10 +208,11 @@ async function main(): Promise<void> {
     const open = async (url: string, frames = 1) => {
       const opened = await call("open", { url: `${url}${url.includes("?") ? "&" : "?"}n=${++sequence}` });
       assert(opened.success, "Fixture tab did not open.");
-      const tab = z.object({ tab: z.object({ id: z.string(), url: z.string() }) }).parse(JSON.parse(text(opened))).tab;
+      // open returns the first snapshot of the tab.
+      const tab = z.object({ tabId: z.string(), url: z.string() }).parse(JSON.parse(text(opened)));
       const contents = contentsOf(tab.url);
       await loaded(contents, frames);
-      return { tabId: tab.id, contents };
+      return { tabId: tab.tabId, contents };
     };
     const snapshot = async (tabId: string) => {
       const result = await call("snapshot", { tabId, image: "never" });

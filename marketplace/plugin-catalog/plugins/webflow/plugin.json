@@ -1,0 +1,33 @@
+{
+  "slug": "webflow",
+  "name": "Webflow",
+  "tagline": "Sites and CMS content",
+  "description": "Webflow lets agents read and update sites, pages, and CMS collections in the Webflow workspaces the signed-in user authorizes. Each user signs in to their own Webflow account through the browser.",
+  "category": "design",
+  "creatorName": "Webflow",
+  "iconUrl": "https://cdn.prod.website-files.com/686294e263eb7e215bd232f7/686d53d0446d4237b2f38c5f_webclip.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-cms-items", "text": "List the draft items in the blog collection and when they were last edited." },
+    { "id": "prompt-seo-check", "text": "Which pages on my site have no meta description?" },
+    { "id": "prompt-draft-post", "text": "Create a draft blog post in the CMS from these notes." }
+  ],
+  "apps": [
+    {
+      "id": "app-webflow-mcp",
+      "name": "Webflow",
+      "description": "Site, page, and CMS management, over Webflow's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/686294e263eb7e215bd232f7/686d53d0446d4237b2f38c5f_webclip.png",
+      "server": {
+        "name": "webflow",
+        "transport": "http",
+        "url": "https://mcp.webflow.com/mcp",
+        "auth": [{ "id": "webflow-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://webflow.com",
+  "privacyPolicyUrl": "https://webflow.com/legal/privacy",
+  "termsUrl": "https://webflow.com/legal/terms"
+}

@@ -1,6 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { Dynamic, type JSX } from "@solidjs/web";
-import { createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { createMemo, createSignal, createStore, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { Badge } from "../../badge";
 import { Button, IconButton } from "../../button";
 import { Dialog } from "../../complex";
@@ -57,6 +57,8 @@ export interface TraceSpan {
   /** The icon of the row. Without one, the row shows the icon of its kind. */
   icon?: TraceSpanIcon;
   failed?: boolean;
+  /** The output of a failed tool step, redacted by the host. A click on the row shows it under the row. */
+  error?: string | undefined;
   /** Epoch milliseconds. */
   start: number;
   /** Epoch milliseconds, or null while the span runs: its bar then grows to `now`. */
@@ -133,6 +135,8 @@ const SHORTCUT = { mac: "⌘F", pc: "Ctrl F" } as const satisfies Record<TraceKe
 interface TraceViewState {
   /** The parent rows that the user folded. */
   collapsed: Record<string, boolean>;
+  /** The failed rows whose error the user opened. */
+  errors: Record<string, boolean>;
   query: string;
   /** The time into the run that a replay shows, in ms. Null when the trace shows the whole run. */
   replay: number | null;
@@ -177,6 +181,9 @@ interface TraceHandoff {
   at: number;
   from: number;
   to: number;
+  /** The height in px of the open errors above the `from` row and above the `to` row. */
+  fromShift: number;
+  toShift: number;
   /** The colour of the agent that hands off. */
   hue: number | null;
 }
@@ -275,6 +282,7 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   const { t, format } = text;
   const [state, setState] = createStore<TraceViewState>({
     collapsed: {},
+    errors: {},
     query: untrack(() => props.defaultQuery) ?? "",
     replay: null,
     playing: false,
@@ -351,7 +359,7 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     const kept = new Set<string>();
     const parents = parentOf();
     for (const span of view().spans) {
-      const haystack = `${span.name} ${span.detail ?? ""}`.toLocaleLowerCase();
+      const haystack = `${span.name} ${span.detail ?? ""} ${span.error ?? ""}`.toLocaleLowerCase();
       if (!haystack.includes(query)) continue;
       for (let id: string | undefined = span.id; id !== undefined && !kept.has(id); id = parents.get(id)) kept.add(id);
     }
@@ -383,6 +391,20 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   });
 
   const rows = () => layout().rows;
+
+  /** The error of a row that can show one. A parent row folds on a click, so it shows no error. */
+  const errorOf = (row: TraceRow) => (row.parent || !row.span.failed ? undefined : row.span.error);
+  const errorOpen = (row: TraceRow) => errorOf(row) !== undefined && state.errors[row.span.id] === true;
+  const toggleError = (id: string) =>
+    setState((draft) => {
+      draft.errors[id] = !draft.errors[id];
+    });
+  /** The height in px of each open error. An error moves the rows under it, so the handoff lines move too. */
+  const [errorHeights, setErrorHeights] = createStore<Record<string, number>>({});
+  const setErrorHeight = (id: string, height: number) =>
+    setErrorHeights((draft) => {
+      draft[id] = height;
+    });
 
   /** The row under the pointer, or the row of the lane piece under it. The two light up together. */
   const [hovered, setHovered] = createSignal<string | null>(null);
@@ -525,6 +547,10 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   const handoffs = createMemo(() => {
     const shown = rows();
     const index = new Map(shown.map((row, at) => [row.span.id, at]));
+    /** `shifts[at]` is the height of the open errors above the row at `at`. */
+    const shifts = [0];
+    for (const row of shown)
+      shifts.push((shifts.at(-1) ?? 0) + (errorOpen(row) ? (errorHeights[row.span.id] ?? 0) : 0));
     const trunks = new Map<string, TraceHandoff>();
     const branches = new Map<string, TraceHandoff>();
     shown.forEach((row, at) => {
@@ -534,14 +560,18 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
       if (from === undefined) return;
       const start = position(row.span.start);
       const id = `${parentId}@${start}`;
+      const trunkFrom = handoffRow(shown, parentId, from, at, row.span.start);
       const trunk = trunks.get(id) ?? {
         id,
         at: start,
-        from: handoffRow(shown, parentId, from, at, row.span.start),
+        from: trunkFrom,
         to: at,
+        fromShift: shifts[trunkFrom] ?? 0,
+        toShift: 0,
         hue: hues().get(parentId) ?? null,
       };
       trunk.to = at;
+      trunk.toShift = shifts[at] ?? 0;
       trunks.set(id, trunk);
       branches.set(row.span.id, trunk);
     });
@@ -689,31 +719,53 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     "--trace-at": String(handoff.at),
     "--trace-from": String(handoff.from),
     "--trace-to": String(handoff.to),
+    "--trace-from-shift": `${handoff.fromShift}px`,
+    "--trace-grow": `${handoff.toShift - handoff.fromShift}px`,
   });
   const shownDuration = () => state.replay ?? range().duration;
   const formatShownDuration = (ms: number) => formatDuration(ms, format);
   const formatShownCost = (usd: number) => formatCost(usd, format);
 
-  /** One row of the list, with the values that it reads from the whole trace. */
-  const rowView = (row: () => TraceRow) => (
-    <TraceRowView
-      row={row()}
-      open={matches() !== null || !state.collapsed[row().span.id]}
-      slowest={slowestId() === row().span.id}
-      label={barLabel(row().span)}
-      start={position(row().span.start)}
-      end={position(spanEnd(row().span, view().now))}
-      segments={rowSegments(row())}
-      lines={handoffs().lines.get(row().span.id)}
-      hovered={hovered()}
-      focusable={activeId() === row().span.id}
-      selectable={canSelect(row().span.id)}
-      onToggle={() => toggle(row().span.id)}
-      onFocus={() => setActive(row().span.id)}
-      onKeyDown={(event) => onRowKeyDown(event, row())}
-      onSelect={() => props.onSelectSpan?.(row().span.id)}
-    />
-  );
+  /** One row of the list, with the values that it reads from the whole trace, and its open error. */
+  const rowView = (row: () => TraceRow) => {
+    const errorId = createUniqueId();
+    const shownError = () => (errorOpen(row()) ? errorOf(row()) : undefined);
+    return (
+      <>
+        <TraceRowView
+          row={row()}
+          open={matches() !== null || !state.collapsed[row().span.id]}
+          slowest={slowestId() === row().span.id}
+          label={barLabel(row().span)}
+          start={position(row().span.start)}
+          end={position(spanEnd(row().span, view().now))}
+          segments={rowSegments(row())}
+          lines={handoffs().lines.get(row().span.id)}
+          hovered={hovered()}
+          focusable={activeId() === row().span.id}
+          selectable={canSelect(row().span.id)}
+          onToggle={() => toggle(row().span.id)}
+          onFocus={() => setActive(row().span.id)}
+          onKeyDown={(event) => onRowKeyDown(event, row())}
+          onSelect={() => props.onSelectSpan?.(row().span.id)}
+          error={errorOf(row())}
+          errorOpen={errorOpen(row())}
+          errorId={errorId}
+          onToggleError={() => toggleError(row().span.id)}
+        />
+        <Show when={shownError()}>
+          {(error) => (
+            <TraceSpanError
+              id={errorId}
+              error={error()}
+              depth={row().depth}
+              onHeight={(height) => setErrorHeight(row().span.id, height)}
+            />
+          )}
+        </Show>
+      </>
+    );
+  };
   const rowSegments = (row: TraceRow) => (row.parent ? segments(row.span.id) : []);
 
   return (
@@ -988,6 +1040,11 @@ function TraceRowView(props: {
   onFocus: () => void;
   onKeyDown: (event: KeyboardEvent) => void;
   onSelect: () => void;
+  /** The error of a failed tool row. A click on the row shows it under the row, before a select. */
+  error: string | undefined;
+  errorOpen: boolean;
+  errorId: string;
+  onToggleError: () => void;
 }) {
   const { t } = useText();
   const span = () => props.row.span;
@@ -1005,14 +1062,27 @@ function TraceRowView(props: {
   const expanded = () => (props.open ? "true" : "false");
   const tabIndex = () => (props.focusable ? 0 : -1);
   const select = () => {
-    if (props.selectable) props.onSelect();
+    if (props.error !== undefined) props.onToggleError();
+    else if (props.selectable) props.onSelect();
+  };
+  /** A parent row tells if its rows show; a failed row tells if its error shows. */
+  const nameExpanded = () => {
+    if (props.row.parent) return expanded();
+    if (props.error === undefined) return undefined;
+    return props.errorOpen ? "true" : "false";
+  };
+  const nameControls = () => (props.errorOpen ? props.errorId : undefined);
+  const nameLabel = () => {
+    const name = `${span().name}, ${props.label}`;
+    if (props.error === undefined) return name;
+    return `${name}, ${t(props.errorOpen ? "chat.steps.hideError" : "chat.steps.showError")}`;
   };
   return (
     <div
       class="trace-row"
       data-span-id={span().id}
       data-hovered={props.hovered === span().id ? "" : undefined}
-      data-selectable={props.selectable ? "" : undefined}
+      data-selectable={props.selectable || props.error !== undefined ? "" : undefined}
       data-parent={props.row.parent ? "" : undefined}
       data-failed={span().failed ? "" : undefined}
       data-running={running() ? "" : undefined}
@@ -1041,8 +1111,9 @@ function TraceRowView(props: {
           size="xs"
           class="trace-name-button"
           tabindex={tabIndex()}
-          aria-expanded={props.row.parent ? expanded() : undefined}
-          aria-label={`${span().name}, ${props.label}`}
+          aria-expanded={nameExpanded()}
+          aria-controls={nameControls()}
+          aria-label={nameLabel()}
           onFocus={() => props.onFocus()}
           onKeyDown={(event: KeyboardEvent) => props.onKeyDown(event)}
           onClick={select}
@@ -1120,6 +1191,22 @@ function TraceRowView(props: {
           </Show>
         </span>
       </div>
+    </div>
+  );
+}
+
+/** The error of a failed tool row, under the row. It tells its height, which moves the handoff lines. */
+function TraceSpanError(props: { id: string; error: string; depth: number; onHeight: (height: number) => void }) {
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) if (entry.target instanceof HTMLElement) props.onHeight(entry.target.offsetHeight);
+  });
+  onCleanup(() => observer.disconnect());
+  const rowStyle = () => ({ "--trace-depth": String(props.depth) });
+  return (
+    <div class="trace-span-error-row" style={rowStyle()} ref={(element) => observer.observe(element)}>
+      <pre id={props.id} class="trace-span-error" dir="auto">
+        {props.error}
+      </pre>
     </div>
   );
 }

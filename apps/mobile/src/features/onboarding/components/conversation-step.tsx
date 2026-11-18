@@ -17,6 +17,7 @@ import {
 import { STEP_TOP_GAP } from "@/features/onboarding/components/onboarding-parts";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 
 const HEADER_HERO_SIZE = 56;
 // The replies come once the agent has finished "typing", one after another.
@@ -188,7 +189,7 @@ export function ConversationStep({
           {...selectionColorProps(color)}
           textAlignVertical="top"
           className="font-sans text-[17px]"
-          style={{ color: String(foreground), maxHeight: 132, paddingVertical: 12 }}
+          style={{ color: String(foreground), maxHeight: 132, paddingVertical: 12, ...fieldDirectionStyle(value) }}
         />
       </View>
     </View>

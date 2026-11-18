@@ -11,6 +11,12 @@
 #                             installed server, else the one in the build.
 #   --display-size <W>x<H>    The size of the virtual display that computer use reads, from 640x480
 #                             to 2576x2576. Default: the one of the installed server, else 1280x800.
+#   --name <name>             The server name, with a claim. Default: OpenBot.
+#
+# The command from the app (Add server, Other options, New server on another computer) puts a line
+# OPENBOT_CLAIM=<claim> before this script on standard input. The install then signs in with that
+# one-time claim, asks no questions, waits until the server is online, and ends with exit code 0
+# only when the server is connected. The claim is not an argument, because sudo logs its arguments.
 #
 # This file only downloads the latest release and checks it against the release manifest, the
 # manifest that the Linux desktop updater reads. The install steps come from that release
@@ -23,6 +29,10 @@ RELEASES=https://github.com/nightly-labs/openbot/releases
 service_user=""
 auth_api_url=""
 display_size=""
+# Set by the line before this script, which the command from the app sends. Child processes do not get it.
+claim=${OPENBOT_CLAIM:-}
+unset OPENBOT_CLAIM
+server_name=""
 
 fail() {
   echo "$*" >&2
@@ -50,13 +60,19 @@ while [ "$#" -gt 0 ]; do
       display_size=$2
       shift 2
       ;;
+    --name)
+      [ "$#" -ge 2 ] || fail "Add a server name after --name."
+      server_name=$2
+      shift 2
+      ;;
     -h | --help)
-      sed -n '2,18p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
+      sed -n '2,24p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) fail "Unknown option: $1" ;;
   esac
 done
+[ -z "$server_name" ] || [ -n "$claim" ] || fail "Give --name only with the command from the app, or run: sudo openbot login --name <name>"
 
 [ "$(uname -s)" = Linux ] || fail "This install is for Linux. Download the desktop app at https://openbot.run."
 [ "$(id -u)" -eq 0 ] || fail "Run this with sudo."
@@ -72,6 +88,17 @@ case $(uname -m) in
   aarch64) architecture=arm64 manifest=latest-linux-arm64.yml ;;
   *) fail "OpenBot has no release for this machine." ;;
 esac
+
+# A signed-in server keeps its account and does not use the claim, so it would not join this one.
+refuse_signed_in() {
+  local status
+  status=$(openbot status 2>/dev/null) || return 0
+  if grep -q '^Account: [^ ]*@' <<<"$status"; then
+    fail "This server is signed in to an account. To add it to another account, run \"sudo openbot logout\" and then this command again."
+  fi
+}
+# Before the download, so that a server with an account stops at once.
+if [ -n "$claim" ] && command -v openbot >/dev/null; then refuse_signed_in; fi
 
 missing=()
 for command in curl openssl; do command -v "$command" >/dev/null || missing+=("$command"); done
@@ -104,6 +131,20 @@ if [ -n "$display_size" ] && ! grep -q OPENBOT_DISPLAY_SIZE "$setup"; then
   fail "OpenBot $version has no --display-size. Install without it, or try again after the next release."
 fi
 bash "$setup" "$service_user" "$work/squashfs-root" "$auth_api_url" ${display_size:+"$display_size"}
+
+if [ -n "$claim" ]; then
+  refuse_signed_in
+  echo
+  # The claim goes on standard input: the openbot command takes no claim argument.
+  printf '%s\n' "$claim" | openbot login --claim ${server_name:+--name "$server_name"}
+  # The whole answer first: with pipefail, grep -q can end the pipe early and fail it.
+  status=$(openbot status)
+  grep -q '^Server: \(.* (\)\{0,1\}online)\{0,1\}$' <<<"$status" ||
+    fail "The server is not online. Run \"openbot status\" and \"openbot logs\" to see why."
+  echo
+  echo "OpenBot is connected to your account."
+  exit 0
+fi
 
 cat <<'EOF'
 

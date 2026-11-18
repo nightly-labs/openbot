@@ -1,11 +1,16 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
-import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
-import { EVERYONE_MENTION, leadingAddress, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { attachmentReferenceIds, expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import {
+  EVERYONE_MENTION,
+  expandChatTagReferences,
+  leadingAddress,
+  serializeChatTagReference,
+} from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
-import { Badge, Blocks, Listbox, Puzzle, UsersRound } from "@openbot/ui";
+import { AppWindow, Badge, Blocks, Listbox, Puzzle, Split, UsersRound } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
-import { Dynamic, Portal } from "@solidjs/web";
+import { Dynamic, type JSX, Portal } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -17,8 +22,15 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "../../data";
+import { normalizedSearchText, snippetAround } from "../../components/global-search-text";
+import type {
+  ComposerAgent,
+  ComposerBrowserTab,
+  ComposerMcpServer,
+  ComposerSkill,
+  ComposerThread,
+  ComposerThreadMessageMatch,
+} from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -46,11 +58,13 @@ import {
   measurePickerFrame,
   type PickerFrame,
   type PickerOption,
+  type PickerSection,
   pickerOptionBadge,
   pickerOptionDescription,
   pickerOptionKey,
   pickerOptionName,
   pickerOptionText,
+  referenceMatches,
   skillMatchRank,
 } from "./composer-picker";
 import {
@@ -60,13 +74,23 @@ import {
   createMentionToken,
   createQuoteToken,
   createSkillToken,
+  createTabToken,
+  createThreadToken,
+  type EditorTagSources,
   MENTION_PATTERN,
   renderEditorValue,
   syncAttachmentTokens,
   syncMcpTokens,
+  syncReferenceTokens,
   syncSkillTokens,
   truncateComposerValue,
 } from "./composer-tokens";
+import {
+  matchParts,
+  trackEnteringPickerRows,
+  trackPickerHighlight,
+  trackPickerScrollFades,
+} from "./mention-picker-motion";
 import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
@@ -77,11 +101,23 @@ interface ComposerEditorProps {
   channelSkillAgents?: ComposerAgent[] | undefined;
   channelSkillAgent?: ComposerAgent | undefined;
   onChooseChannelSkillAgent?: ((agentId: string) => void) | undefined;
+  onPickerOpenChange?: ((open: boolean) => void) | undefined;
   channelSkillBlocked?: boolean | undefined;
   skillsLoading?: boolean | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
   attachments?: DraftAttachment[] | undefined;
+  /** The agent's browser tabs that `@` offers. A tag gives the agent the tab to use. */
+  browserTabs?: ComposerBrowserTab[] | undefined;
+  /** The agent's side threads that `@` offers, newest first. A tag lets the agent read the thread. */
+  threads?: ComposerThread[] | undefined;
+  /**
+   * Finds the messages of the agent's side threads that contain the `@` query, newest first. Each
+   * listed thread with a match shows under "In messages". Absent when the host cannot search threads.
+   */
+  onSearchThreads?: ((query: string) => Promise<ComposerThreadMessageMatch[]>) | undefined;
+  /** Shows the browser tab, or opens the thread by its task id, that a chip in the draft names. */
+  onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   value: string;
   placeholder: string;
   ariaLabel: string;
@@ -136,8 +172,6 @@ interface ComposerEditorProps {
   ) => void;
   /** Offers `@everyone` in the mention picker, which a channel reads as a message to each member. */
   everyoneMention?: boolean | undefined;
-  /** Told when the mention picker opens or closes, so the queue panel can give up the same space. */
-  onPickerOpenChange?: (open: boolean) => void;
   /**
    * The words heard so far while the user dictates. `final` is set while the recording turns into
    * the final text. See `dictationWords` for how they show.
@@ -161,8 +195,59 @@ interface MentionContext {
 }
 
 const DICTATION_INTERIM_WORDS = 2;
+const EMPTY_TABS: ComposerBrowserTab[] = [];
+const EMPTY_THREADS: ComposerThread[] = [];
+/*
+ * The `@` search of thread messages. A shorter query matches almost every message, so it waits for
+ * three letters; it waits for a pause in the typing, and it shows a few threads. Search finds more.
+ */
+const THREAD_SEARCH_MIN_QUERY = 3;
+const THREAD_SEARCH_DELAY_MS = 150;
+const THREAD_SEARCH_ROWS = 5;
 /** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
+
+/** Longer than the exit of the list in `composer.css`, for a window that does not send its end. */
+const PICKER_EXIT_FALLBACK_MS = 300;
+
+/**
+ * Puts an inert copy of the closed `@` list in its place, so the list leaves with a movement. The
+ * list is out of the page when it closes, so the list itself cannot stay for its exit.
+ */
+function leavePicker(picker: HTMLElement, parent: HTMLElement): void {
+  if (!parent.isConnected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const copy = picker.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) return;
+  const scrollTop = picker.querySelector(".mention-picker-list")?.scrollTop ?? 0;
+  copy.dataset.leaving = "";
+  copy.inert = true;
+  copy.setAttribute("aria-hidden", "true");
+  // An SVG keeps its ids: an avatar draws its mask through `url(#id)`.
+  for (const element of copy.querySelectorAll("[id]"))
+    if (!(element instanceof SVGElement)) element.removeAttribute("id");
+  parent.append(copy);
+  const list = copy.querySelector(".mention-picker-list");
+  if (list) list.scrollTop = scrollTop;
+  const remove = () => copy.remove();
+  copy.addEventListener("animationend", (event) => {
+    if (event.target === copy) remove();
+  });
+  window.setTimeout(remove, PICKER_EXIT_FALLBACK_MS);
+}
+
+/** Closes with the content of the list, which is the moment to start the exit of the list. */
+function PickerExit(props: { picker: () => HTMLElement | undefined }): JSX.Element {
+  // Solid takes the list out of the page before this cleanup, so its place is read while it is open.
+  let parent: HTMLElement | null = null;
+  queueMicrotask(() => {
+    parent = props.picker()?.parentElement ?? null;
+  });
+  onCleanup(() => {
+    const picker = props.picker();
+    if (picker && parent) leavePicker(picker, parent);
+  });
+  return undefined;
+}
 
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
@@ -243,32 +328,135 @@ export function ComposerEditor(props: ComposerEditorProps) {
       context?.trigger === "$" && requestedMentionStart() !== context.start && /^\d/u.test(context.query.trimStart())
     );
   };
-  const matchingOptions = createMemo<PickerOption[]>(() => {
+  const browserTabs = () => props.browserTabs ?? EMPTY_TABS;
+  const threads = () => props.threads ?? EMPTY_THREADS;
+  const matchingTabs = createMemo(() => {
+    const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
+    return browserTabs().filter((tab) => referenceMatches({ tab }, query));
+  });
+  const matchingThreads = createMemo(() => {
+    const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
+    return threads().filter((thread) => referenceMatches({ thread }, query));
+  });
+  /** The `@` query that the thread message search answers, or an empty string when it does not run. */
+  const threadSearchQuery = createMemo(() => {
+    const context = mention();
+    const query = context?.trigger === "@" ? context.query.trim() : "";
+    return query.length >= THREAD_SEARCH_MIN_QUERY ? query : "";
+  });
+  /* The last answer. It stays while the user types on, so its rows do not blink for each letter. */
+  const [threadMessageMatches, setThreadMessageMatches] = createSignal<ComposerThreadMessageMatch[]>([]);
+  let threadSearchRequest = 0;
+  // A boolean, so that a new thread list (for example a task state change during a turn) does not
+  // start the search again.
+  const hasListedThreads = createMemo(() => threads().length > 0);
+  createEffect(
+    () => ({ query: threadSearchQuery(), search: props.onSearchThreads, listed: hasListedThreads() }),
+    ({ query, search, listed }) => {
+      const request = ++threadSearchRequest;
+      // A thread that is not listed cannot be tagged, so with no listed thread nothing can show.
+      if (!query || !search || !listed) {
+        setThreadMessageMatches([]);
+        return;
+      }
+      const timer = setTimeout(() => {
+        search(query).then(
+          (matches) => {
+            if (request === threadSearchRequest) setThreadMessageMatches(matches);
+          },
+          // The title matches still show; the rows of a failed search are only absent.
+          () => {
+            if (request === threadSearchRequest) setThreadMessageMatches([]);
+          },
+        );
+      }, THREAD_SEARCH_DELAY_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /**
+   * The listed threads that have the query in a message, but not in the title: one row for each
+   * thread, with its newest match. A match that no longer has the query, from an earlier answer, goes.
+   */
+  const matchingThreadMessages = createMemo(() => {
+    const query = threadSearchQuery();
+    const needle = normalizedSearchText(query);
+    if (!needle) return [];
+    const titled = new Set(matchingThreads().map((thread) => thread.id));
+    const listed = new Map(threads().map((thread) => [thread.id, thread]));
+    const rows: { thread: ComposerThread; snippet: string }[] = [];
+    for (const match of threadMessageMatches()) {
+      if (rows.length === THREAD_SEARCH_ROWS) break;
+      const thread = listed.get(match.threadId);
+      if (!thread || titled.has(thread.id) || rows.some((row) => row.thread.id === thread.id)) continue;
+      const text = threadMessagePreview(match.body);
+      if (!normalizedSearchText(text).includes(needle)) continue;
+      rows.push({ thread, snippet: snippetAround(text, query) });
+    }
+    return rows;
+  });
+  /*
+   * The `@` list has a group for each kind. A title over each group shows only when the list has
+   * more than one, so a list of agents alone looks as it did.
+   */
+  const pickerSections = createMemo<PickerSection[]>(() => {
     const trigger = mention()?.trigger;
     if (trigger === "$" && props.channelSkillAgents) {
       if (literalDollarAmount()) return [];
       const mcpOptions = matchingMcpServers().map((server) => ({ type: "mcp" as const, server }));
-      if (props.channelSkillBlocked) return mcpOptions;
-      if (!props.channelSkillAgent)
-        return [...props.channelSkillAgents.map((agent) => ({ type: "skill-agent" as const, agent })), ...mcpOptions];
-      return [...matchingSkills().map((match) => ({ type: "skill" as const, ...match })), ...mcpOptions];
+      const options: PickerOption[] = props.channelSkillBlocked
+        ? mcpOptions
+        : props.channelSkillAgent
+          ? [...matchingSkills().map((match) => ({ type: "skill" as const, ...match })), ...mcpOptions]
+          : [...props.channelSkillAgents.map((agent) => ({ type: "skill-agent" as const, agent })), ...mcpOptions];
+      return options.length ? [{ id: "skills", title: null, options }] : [];
     }
     /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
     if (trigger === "$")
       return [
-        ...matchingSkills().map((match) => ({ type: "skill" as const, ...match })),
-        ...matchingMcpServers().map((server) => ({ type: "mcp" as const, server })),
-      ];
+        {
+          id: "skills",
+          title: null,
+          options: [
+            ...matchingSkills().map((match) => ({ type: "skill" as const, ...match })),
+            ...matchingMcpServers().map((server) => ({ type: "mcp" as const, server })),
+          ],
+        },
+      ].filter((section) => section.options.length > 0);
     if (trigger !== "@") return [];
-    return [
-      ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
-      ...(matchesEveryone() ? [{ type: "everyone" as const }] : []),
-      ...matchingAttachments().map((attachment) => ({
-        type: "attachment" as const,
-        attachment,
-      })),
+    const sections: PickerSection[] = [
+      {
+        id: "agents",
+        title: "composer.picker.section.agents",
+        options: [
+          ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
+          ...(matchesEveryone() ? [{ type: "everyone" as const }] : []),
+        ],
+      },
+      {
+        id: "files",
+        title: "composer.picker.section.files",
+        options: matchingAttachments().map((attachment) => ({ type: "attachment" as const, attachment })),
+      },
+      {
+        id: "tabs",
+        title: "composer.picker.section.tabs",
+        options: matchingTabs().map((tab) => ({ type: "tab" as const, tab })),
+      },
+      {
+        id: "threads",
+        title: "composer.picker.section.threads",
+        options: matchingThreads().map((thread) => ({ type: "thread" as const, thread })),
+      },
+      {
+        id: "messages",
+        title: "composer.picker.section.messages",
+        options: matchingThreadMessages().map((row) => ({ type: "thread" as const, ...row })),
+      },
     ];
+    return sections.filter((section) => section.options.length > 0);
   });
+  const titledSections = () => (pickerSections().length > 1 ? pickerSections().length : 0);
+  const matchingOptions = createMemo(() => pickerSections().flatMap((section) => section.options));
   const activePickerValue = createMemo(() => {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
@@ -296,25 +484,46 @@ export function ComposerEditor(props: ComposerEditorProps) {
   });
   const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
   createEffect(
-    () => pickerOpen(),
-    (open) => {
+    () => ({ open: pickerOpen(), onOpenChange: props.onPickerOpenChange }),
+    ({ open, onOpenChange }) => {
       if (!open) setRequestedMentionStart(null);
-      props.onPickerOpenChange?.(open);
+      onOpenChange?.(open);
     },
   );
+  /** The `@` or `$` query, which the rows mark in their names. */
+  const pickerQuery = () => mention()?.query.trim() ?? "";
+  const descriptionMatchQuery = (option: PickerOption) =>
+    option.type === "tab" || (option.type === "thread" && option.snippet !== undefined) ? pickerQuery() : "";
   const pickerOptionElements = new Map<string, HTMLElement>();
-  const pickerFades = createScrollFades();
-  onCleanup(pickerFades.stop);
-  // The list has no scrollbar, so the fade is the only sign that more options wait below it.
-  createEffect(
-    () => matchingOptions().length,
-    () => pickerFades.remeasure(),
-  );
+  /* Set by an arrow key and read once by the highlight, so only a key press slides it. */
+  let keyMove = false;
+  const takeKeyMove = () => {
+    const moved = keyMove;
+    keyMove = false;
+    return moved;
+  };
+  /** The list calls its ref with no owner, so the editor stops the trackers of the last list. */
+  let releasePickerList: (() => void) | undefined;
+  const bindPickerList = (list: HTMLElement) => {
+    releasePickerList?.();
+    const stops = [
+      // The list has no scrollbar, so the fade is the only sign that more options wait below it.
+      trackPickerScrollFades(list),
+      trackEnteringPickerRows(list),
+      trackPickerHighlight(list, takeKeyMove),
+    ];
+    releasePickerList = () => {
+      for (const stop of stops) stop();
+    };
+  };
+  onCleanup(() => releasePickerList?.());
   let editor: HTMLDivElement | undefined;
+  let pickerElement: HTMLDivElement | undefined;
   let lastAgentId: string | undefined;
   let lastAttachmentKey = "";
   let lastSkillKey = "";
   let lastMcpKey = "";
+  let lastReferenceKey = "";
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
   let lastSkillPickerRequest = 0;
@@ -358,6 +567,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       skills: props.skills ?? [],
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
+      browserTabs: browserTabs(),
+      threads: threads(),
       focusRequest: props.focusRequest ?? 0,
       skillPickerRequest: props.skillPickerRequest ?? 0,
       quoteRequest: props.quoteRequest,
@@ -370,6 +581,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       skills,
       mcpServers,
       attachments,
+      browserTabs,
+      threads,
       focusRequest,
       skillPickerRequest,
       quoteRequest,
@@ -384,6 +597,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
         .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.enabled}:${skill.description ?? ""}`)
         .join("|");
       const mcpKey = mcpServers.map((server) => `${server.id}:${server.name}:${server.enabled}`).join("|");
+      // A title changes with each page the tab opens; the tags read only which tabs and threads exist.
+      const referenceKey = `${browserTabs.map((tab) => tab.id).join("|")}/${threads.map((thread) => thread.id).join("|")}`;
       const draftChanged = agentId !== lastAgentId;
       const attachmentsChanged = attachmentKey !== lastAttachmentKey;
       const renderedAttachments = new Set(
@@ -400,7 +615,14 @@ export function ComposerEditor(props: ComposerEditorProps) {
       const contentChanged = draftChanged || value !== lastEmittedValue || attachmentResolved;
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
-      const editorChanges = contentChanged || attachmentsChanged || skillsChanged || mcpChanged;
+      const referencesChanged = referenceKey !== lastReferenceKey;
+      // A list change redraws only its own tags in the draft. With none of them, the draft does not change.
+      const tagsChange =
+        (attachmentsChanged && renderedAttachments.size > 0) ||
+        (skillsChanged && editor.querySelector("[data-skill-id]") !== null) ||
+        (mcpChanged && editor.querySelector("[data-mcp-id]") !== null) ||
+        (referencesChanged && editor.querySelector("[data-tab-id], [data-thread-id]") !== null);
+      const editorChanges = contentChanged || tagsChange;
       // Only a change of the editor's content can move its caret or scroll position. A read of either
       // lays out the page, and this effect runs for each list that loads while a conversation opens.
       const selection =
@@ -414,12 +636,18 @@ export function ComposerEditor(props: ComposerEditorProps) {
         lastAgentId = agentId;
         lastEmittedValue = value;
         setAttachmentTooltip(null);
-        renderEditorValue(editor, value, agents, skills, mcpServers, attachments, attachmentTokenActions);
+        renderEditorValue(
+          editor,
+          value,
+          { agents, skills, mcpServers, attachments, browserTabs, threads },
+          attachmentTokenActions,
+        );
         setMention(null);
       } else {
         if (attachmentsChanged) syncAttachmentTokens(editor, attachments, attachmentTokenActions);
         if (skillsChanged) syncSkillTokens(editor, skills);
         if (mcpChanged) syncMcpTokens(editor, mcpServers);
+        if (referencesChanged) syncReferenceTokens(editor, browserTabs, threads);
       }
       if (selection) {
         restoreEditorSelection(editor, selection);
@@ -429,6 +657,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       lastAttachmentKey = attachmentKey;
       lastSkillKey = skillKey;
       lastMcpKey = mcpKey;
+      lastReferenceKey = referenceKey;
       if (focusRequested) {
         lastFocusRequest = focusRequest;
         // Text that the user selected in the draft stays selected, for example when they click Reply on a message.
@@ -466,10 +695,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
       skills: props.skills ?? [],
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
+      browserTabs: browserTabs(),
+      threads: threads(),
     }),
-    ({ shown, value, agents, skills, mcpServers, attachments }) => {
+    ({ shown, value, ...sources }) => {
       if (!shown || !dictationDraft) return;
-      renderEditorValue(dictationDraft, value, agents, skills, mcpServers, attachments, attachmentTokenActions);
+      renderEditorValue(dictationDraft, value, sources, attachmentTokenActions);
       // The editor needs a closing <br> to show an empty last line; inline, it would push the words a line down.
       if (value.endsWith("\n")) dictationDraft.lastChild?.remove();
     },
@@ -547,21 +778,24 @@ export function ComposerEditor(props: ComposerEditorProps) {
     };
   });
 
+  function tagSources(): EditorTagSources {
+    return {
+      agents: props.agents,
+      skills: props.skills ?? [],
+      mcpServers: props.mcpServers ?? [],
+      attachments: props.attachments ?? [],
+      browserTabs: browserTabs(),
+      threads: threads(),
+    };
+  }
+
   function emitValue() {
     if (!editor) return;
     let value = serializeEditor(editor);
     if (value.length > INPUT_LIMITS.messageText) {
       value = truncateComposerValue(value, INPUT_LIMITS.messageText);
       setAttachmentTooltip(null);
-      renderEditorValue(
-        editor,
-        value,
-        props.agents,
-        props.skills ?? [],
-        props.mcpServers ?? [],
-        props.attachments ?? [],
-        attachmentTokenActions,
-      );
+      renderEditorValue(editor, value, tagSources(), attachmentTokenActions);
       placeCaretAtEnd(editor);
     }
     lastEmittedValue = value;
@@ -655,7 +889,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
             ? createSkillToken(option.skill)
             : option.type === "mcp"
               ? createMcpToken(option.server)
-              : createAttachmentToken(option.attachment, attachmentTokenActions);
+              : option.type === "tab"
+                ? createTabToken(option.tab)
+                : option.type === "thread"
+                  ? createThreadToken(option.thread)
+                  : createAttachmentToken(option.attachment, attachmentTokenActions);
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
@@ -696,7 +934,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
   }
 
   function handleEditorClick(event: MouseEvent) {
-    const quote = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-quote-message-id]") : null;
+    const target = event.target instanceof Element ? event.target : null;
+    const reference = target?.closest<HTMLElement>(".reference-chip[data-tab-id], .reference-chip[data-thread-id]");
+    const tabId = reference?.dataset.tabId;
+    const threadId = reference?.dataset.threadId;
+    if (reference && props.onOpenTag && (tabId || threadId)) {
+      if (tabId) props.onOpenTag("tab", tabId);
+      else if (threadId) props.onOpenTag("thread", threadId);
+      return;
+    }
+    const quote = target?.closest<HTMLElement>("[data-quote-message-id]") ?? null;
     const messageId = quote?.dataset.quoteMessageId;
     if (messageId && props.onOpenQuote) {
       props.onOpenQuote(messageId, quote.dataset.quoteText ?? "");
@@ -711,6 +958,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   }
 
   function moveActiveOption(delta: number, optionCount: number) {
+    keyMove = true;
     setActiveOption((current) => {
       const next = (current + delta + optionCount) % optionCount;
       const option = matchingOptions()[next];
@@ -1048,12 +1296,17 @@ export function ComposerEditor(props: ComposerEditorProps) {
       <Show when={pickerOpen()}>
         <Portal mount={pickerFrame().mount ?? document.body}>
           <div
+            ref={(element) => {
+              pickerElement = element;
+            }}
             class="mention-picker"
             style={{
               "--mention-picker-bottom": `${pickerFrame().bottom}px`,
               "--mention-picker-rows": pickerStatus() === null ? matchingOptions().length : 1,
+              "--mention-picker-sections": pickerStatus() === null ? titledSections() : 0,
             }}
           >
+            <PickerExit picker={() => pickerElement} />
             <Show when={pickerStatus()}>
               {(status) => (
                 <p class="mention-picker-status" role="status">
@@ -1062,11 +1315,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
               )}
             </Show>
             <Show when={pickerStatus() === null}>
-              <Listbox.Root<PickerOption>
+              <Listbox.Root<PickerOption, PickerSection>
                 as="div"
-                ref={pickerFades.bind}
-                class={["mention-picker-list", pickerFades.classes()]}
-                onScroll={pickerFades.measure}
+                ref={bindPickerList}
+                class="mention-picker-list"
                 aria-label={t(
                   mention()?.trigger === "$"
                     ? matchingOptions().some((option) => option.type === "skill-agent")
@@ -1074,7 +1326,18 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       : "composer.picker.skillLabel"
                     : "composer.picker.mentionLabel",
                 )}
-                options={matchingOptions()}
+                options={pickerSections()}
+                optionGroupChildren="options"
+                renderSection={(section) => (
+                  <Show when={titledSections() > 0 ? section.rawValue.title : null}>
+                    {(title) => (
+                      <Listbox.Section class="mention-picker-section">
+                        <span>{t(title())}</span>
+                        <span class="mention-picker-section-count">{section.rawValue.options.length}</span>
+                      </Listbox.Section>
+                    )}
+                  </Show>
+                )}
                 optionValue={pickerOptionKey}
                 optionTextValue={(option) => pickerOptionText(option, t)}
                 selectionMode="single"
@@ -1098,6 +1361,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     <Listbox.Item
                       ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
                       item={item}
+                      data-option-key={pickerOptionKey(option)}
+                      data-filtering={pickerQuery() ? "" : undefined}
                       aria-label={pickerOptionText(option, t)}
                       class={[
                         "mention-picker-option",
@@ -1111,7 +1376,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
                         // The composer focuses its editor on any pointerdown that is not a control.
                         event.stopPropagation();
                       }}
-                      onMouseEnter={() => setActiveOption(optionIndex())}
+                      onMouseEnter={() => {
+                        keyMove = false;
+                        setActiveOption(optionIndex());
+                      }}
                     >
                       {option.type === "agent" || option.type === "skill-agent" ? (
                         <AgentAvatar agent={option.agent} />
@@ -1127,20 +1395,41 @@ export function ComposerEditor(props: ComposerEditorProps) {
                         <span class="mention-picker-skill-icon" aria-hidden="true">
                           <Blocks />
                         </span>
+                      ) : option.type === "tab" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <AppWindow />
+                        </span>
+                      ) : option.type === "thread" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <Split />
+                        </span>
                       ) : (
                         <AttachmentReferenceVisual name={option.attachment.name} />
                       )}
-                      <strong>{pickerOptionName(option, t)}</strong>
+                      <strong>
+                        <MatchedText text={pickerOptionName(option, t)} query={pickerQuery()} />
+                      </strong>
                       <Show when={option.type === "skill" && option.showSlug ? option.skill.slug : undefined}>
                         {(slug) => <span class="mention-picker-slug">{slug()}</span>}
                       </Show>
                       <Show when={pickerOptionDescription(option, t, format)}>
-                        {(description) => <span class="mention-picker-description">{description()}</span>}
+                        {(description) => (
+                          <span class="mention-picker-description">
+                            {/* A tab matches its address, and a thread its message, so they show the match. */}
+                            <MatchedText text={description()} query={descriptionMatchQuery(option)} />
+                          </span>
+                        )}
                       </Show>
-                      <Badge class="mention-picker-badge" variant="ghost">
-                        <Dynamic component={badge.icon} aria-hidden="true" />
-                        {badge.label}
-                      </Badge>
+                      <Show when={badge}>
+                        {(shown) => (
+                          <Badge class="mention-picker-badge" variant="ghost">
+                            <Show when={shown().icon}>
+                              {(icon) => <Dynamic component={icon()} aria-hidden="true" />}
+                            </Show>
+                            {shown().label}
+                          </Badge>
+                        )}
+                      </Show>
                     </Listbox.Item>
                   );
                 }}
@@ -1155,5 +1444,23 @@ export function ComposerEditor(props: ComposerEditorProps) {
         )}
       </Show>
     </div>
+  );
+}
+
+/** A thread message as one line of plain text, as the search dialog shows it. */
+function threadMessagePreview(body: string): string {
+  return expandAttachmentReferences(
+    expandChatTagReferences(body, (reference) => (reference.kind === "quote" ? `“${reference.name}”` : undefined)),
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/** Text with the part that matches the picker query marked, as the search dialog marks it. */
+function MatchedText(props: { text: string; query: string }) {
+  return (
+    <For each={matchParts(props.text, props.query)}>
+      {(part) => (part.match ? <mark class="mention-picker-match">{part.text}</mark> : part.text)}
+    </For>
   );
 }

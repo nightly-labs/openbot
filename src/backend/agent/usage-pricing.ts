@@ -141,7 +141,12 @@ const PRICES: Readonly<Record<string, Price>> = {
 
 function priceOf(provider: string, model: string): Price | undefined {
   // Claude Code names the 1M context window `[1m]`. It is priced at the model's standard rates.
-  return PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  const price = PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+  if (price || provider !== "antigravity") return price;
+  // An Antigravity agent can keep its effort in the model ID, such as `gemini-3.8-flash-high`. The
+  // effort changes the tokens, not the rates.
+  const effort = /-(minimal|low|medium|high)$/.exec(model);
+  return effort ? PRICES[`${provider}:${model.slice(0, effort.index)}`] : undefined;
 }
 
 /** The standard input rate per million tokens, or null for a model with no known price. */

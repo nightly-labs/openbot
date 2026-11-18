@@ -2,6 +2,7 @@ import { Button, ChevronRight, FieldContext } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { children, createUniqueId, onSettled, Show } from "solid-js";
 import { useText } from "../text";
+import { holdFlag } from "../utils";
 import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
 
@@ -26,13 +27,21 @@ export interface SettingsPanelProps {
   maxWidth: number | (() => number);
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
+  /** The width from the last drag. When the chat gets wider again, the panel goes back to it. */
+  preferredWidth?: (() => number) | undefined;
   children: JSX.Element;
 }
 
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
   const { t } = useText();
+  let panel!: HTMLElement;
+  // The chat beside the panel makes room for it (`panel-layout.css`).
+  onSettled(() => {
+    const conversation = panel.closest(".conversation-panel");
+    return conversation ? holdFlag(conversation, "settings-panel") : undefined;
+  });
   return (
-    <aside id={props.id} class="settings-panel" aria-label={props.label}>
+    <aside ref={panel} id={props.id} class="settings-panel" aria-label={props.label}>
       <PanelResizer
         class="right-panel-resizer"
         label={t("settings.panel.resize")}
@@ -44,6 +53,12 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
         max={props.maxWidth}
         onResize={props.onResize}
         onResizeEnd={props.onResizeEnd}
+        // A narrower chat makes the panel narrower only for now: the width from the last drag stays saved.
+        onParentResize={() => {
+          const max = typeof props.maxWidth === "function" ? props.maxWidth() : props.maxWidth;
+          const next = Math.round(Math.min(max, props.preferredWidth?.() ?? props.width));
+          if (next !== props.width) props.onResize(next);
+        }}
       />
       {props.children}
     </aside>

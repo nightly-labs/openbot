@@ -61,7 +61,17 @@ const tab = (title: string) =>
     .getByRole("tablist", { name: english("conversation.threads.open") })
     .getByRole("tab", { name: new RegExp(`^${literal(title)}`) })
     .first();
-const approvalCard = () => page.getByRole("region", { name: english("prompt.approval.label"), exact: true });
+// An approval card is an article named by its title, one for each kind of approval.
+const approvalName = new RegExp(
+  `^(${[
+    english("prompt.approval.title.command"),
+    english("prompt.approval.title.fileChange"),
+    english("prompt.approval.title.permissions"),
+  ]
+    .map(literal)
+    .join("|")})$`,
+);
+const approvalCard = () => page.getByRole("article", { name: approvalName });
 const needsYou = () => page.getByRole("region", { name: new RegExp(`^${literal(english("sidebar.waiting.title"))}`) });
 
 function writePrompt(): string {
@@ -179,7 +189,7 @@ try {
   const threadView = page.getByRole("region", {
     name: english("conversation.threads.view.label", { title: current.title }),
   });
-  const sideCard = threadView.getByRole("region", { name: english("prompt.approval.label"), exact: true });
+  const sideCard = threadView.getByRole("article", { name: approvalName });
   await sideCard.waitFor({ timeout: WAIT_MS });
   report.bothWaiting = { inNeedsYou: true, sideCardInThreadView: true };
   await page.screenshot({ path: resolve(OUT, "3-both-waiting.png") });

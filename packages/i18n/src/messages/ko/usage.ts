@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "토큰",
   "usage.column.date": "날짜",
   "usage.column.costUsd": "비용 · USD",
+  "usage.column.loads": "로드",
+  "usage.column.agents": "에이전트",
   "usage.empty": "이 기간에 기록된 사용량이 없어요.",
   "usage.partial":
     "일부 데이터 · 턴 {turns}건에 보고된 사용량이 없고, 기록 {unpriced}건에 비용 추정치가 없으며, 기록 {incomplete}건의 토큰 데이터가 불완전해요.",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "모델",
   "usage.breakdown.agent": "에이전트",
   "usage.breakdown.day": "일",
+  "usage.breakdown.skill": "스킬",
   "usage.breakdown.byModel": "모델별 사용량",
   "usage.breakdown.byAgent": "에이전트별 사용량",
   "usage.breakdown.byDay": "일별 사용량 및 비용",
+  "usage.breakdown.bySkill": "스킬별 사용량",
+  "usage.breakdown.skillEmpty": "이 기간에 로드된 스킬이 없습니다.",
   "usage.unknownModel": "알 수 없는 모델",
   "usage.footer": "수집 시작 {started} · 업데이트 {updated}",
   "usage.updatedNever": "없음",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "이 호스트는 에이전트 분석을 지원하지 않아요. 이 보기를 쓰려면 호스트를 업데이트해 주세요.",
   "usage.panel.loadFailed": "사용량을 불러올 수 없었어요. 연결과 날짜 범위를 확인해 주세요.",
+  "usage.machine.label": "머신 사용량. CPU: {cpu}, 메모리: {memory}",
+  "usage.machine.openStorage": "저장 공간 열기. 디스크: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

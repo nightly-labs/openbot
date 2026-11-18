@@ -1,0 +1,33 @@
+{
+  "slug": "mobbin",
+  "name": "Mobbin",
+  "tagline": "Real app UI references",
+  "description": "Mobbin lets agents search screens, flows, and UI elements from real mobile and web apps for design reference. Each user signs in to their own Mobbin account through the browser.",
+  "category": "design",
+  "creatorName": "Mobbin",
+  "iconUrl": "https://mobbin.com/mobbin-marketing-pages/images/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-onboarding", "text": "Show me onboarding flows from popular finance apps." },
+    { "id": "prompt-paywall", "text": "Find examples of paywall screens on iOS." },
+    { "id": "prompt-compare", "text": "Compare how three travel apps design their search screen." }
+  ],
+  "apps": [
+    {
+      "id": "app-mobbin-mcp",
+      "name": "Mobbin",
+      "description": "Screen, flow, and UI element search, over Mobbin's MCP server with browser sign-in.",
+      "iconUrl": "https://mobbin.com/mobbin-marketing-pages/images/apple-touch-icon.png",
+      "server": {
+        "name": "mobbin",
+        "transport": "http",
+        "url": "https://api.mobbin.com/mcp",
+        "auth": [{ "id": "mobbin-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://mobbin.com",
+  "privacyPolicyUrl": "https://mobbin.com/privacy",
+  "termsUrl": "https://mobbin.com/terms"
+}

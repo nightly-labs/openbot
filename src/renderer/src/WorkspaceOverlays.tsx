@@ -1,3 +1,4 @@
+import { INSTALL_SERVER_SCRIPT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type CentralAuthUser,
   LOCAL_SERVER_ID,
@@ -6,8 +7,11 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { classifyFailure } from "@openbot/telemetry";
 import { isAgentAccount } from "@openbot/ui/components/provider-accounts";
 import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
@@ -27,10 +31,15 @@ import { useAgents } from "./features/agents/agents-context";
 import { desktopBrowserProfileCalls } from "./features/browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "./features/browser/stores/browser-profiles-store";
 import { useConnectors } from "./features/connectors/connectors-context";
-import { conversationPort } from "./features/conversation/conversation-port";
+import { appendDraftText, EMPTY_DRAFT } from "./features/conversation/composer-draft";
+import { useConversationController } from "./features/conversation/conversation-controller-context";
+import { composerDraftKey } from "./features/conversation/conversation-keys";
+import { desktopCrmHost } from "./features/crm/crm-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import { desktopProviderDetectionCalls } from "./features/custom-providers/custom-providers-port";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
+import { createProviderDetectionStore } from "./features/custom-providers/stores/provider-detection-store";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
@@ -41,17 +50,25 @@ import {
   HostedServerUpsell,
   hostedUpsellRoutineCreated,
 } from "./features/servers/hosted-server-upsell-controller";
+import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
-import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
+import {
+  serverCanAdminister,
+  serverRotatesHostKey,
+  serverSupportsCapability,
+} from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
 import { useSidebar } from "./features/sidebar/sidebar-context";
+import { codexLiveAccess as codexLiveAccessOf } from "./features/speech/codex-live-access";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
@@ -109,6 +126,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <JoinServer account={props.account} />
       <AddServer />
       <CreateLocalServer />
+      <InstallServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -140,19 +158,36 @@ export function SkillsMarketplace() {
     setPendingPluginConnect,
     pendingMarketplaceListing,
     setPendingMarketplaceListing,
+    pendingMcpSignIn,
+    setPendingMcpSignIn,
+    setMcpSignIns,
   } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const { openMcpAdd } = useServerSettings();
   const connectors = useConnectors();
   const platform = usePlatform();
   const { remoteDesktopWorkspaceVisible, hideRemoteDesktopWorkspace } = useRemoteDesktop();
+  /**
+   * The tool runtime note, only when the providers context holds this server's runtimes: this
+   * computer's, or, over `providers-v1`, those of the host of the joined server on screen. Another
+   * host starts its servers with its own runtime, which this window has not read.
+   */
+  const mcpRuntimeNote = () => {
+    const server = activeServer();
+    if (!server) return null;
+    const held =
+      server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
+    return held ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null;
+  };
   // The remote desktop covers the window card, so a link or a search that opens the page hides it.
   // The remote desktop session stays.
+  // A sign-in that an agent's card asked for ends with the page, also when another page closes it.
   createEffect(skillsMarketplaceOpen, (open) => {
-    if (open && untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
+    if (!open) setPendingMcpSignIn(null);
+    else if (untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
   });
 
   return (
@@ -174,11 +209,11 @@ export function SkillsMarketplace() {
       marketplaceListing={pendingMarketplaceListing()}
       onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
-      macOS={platform.appInfo()?.platform === "darwin"}
-      onAddServer={(serverId) => {
-        setSkillsMarketplaceOpen(false);
-        openMcpAdd(serverId, null);
-      }}
+      macOS={platform.appInfo() ? platform.appInfo()?.platform === "darwin" : undefined}
+      mcpToolRuntimeNote={mcpRuntimeNote()}
+      mcpSignInRequest={pendingMcpSignIn()}
+      onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
+      onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
     />
   );
 }
@@ -243,16 +278,74 @@ function CreateLocalServer() {
   );
 }
 
+/** A server on another computer of the user, from one command that installs it and signs it in. */
+function InstallServer() {
+  const { servers, activeServer, installServerOpen, setInstallServerOpen } = useServers();
+  const { select } = useServerActions();
+  const { activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const { selectAgent } = useNavigation();
+  const controller = useConversationController();
+  /* The task goes to the agent of the open chat, when its composer can take another line. */
+  const agentTarget = createMemo(() => {
+    const server = activeServer();
+    const agent = activeAgent();
+    if (!server || !agent || agentStatus().phase !== "ready" || (agentSetupOpen() && creatingAgent())) return undefined;
+    // The host makes the command for its own account: on a server of another person it is not this user's.
+    if (!server.thisComputer && server.role !== "owner") return undefined;
+    if (controller.submitting() || controller.voicePhase() !== "idle" || controller.editingDeliveryId())
+      return undefined;
+    return { serverId: server.id, agentId: agent.id };
+  });
+  function setUpWithAgent(): (() => void) | undefined {
+    const target = agentTarget();
+    if (!target) return undefined;
+    return () => {
+      selectAgent(target.agentId);
+      const task = currentText().t("server.install.sshAgentPrompt");
+      const key = composerDraftKey(target);
+      controller.setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        /* An earlier press left the same task, or an old task with a command in it. The new task replaces it. */
+        const next =
+          draft.text.trim() === task.trim() || draft.text.includes(INSTALL_SERVER_SCRIPT_URL)
+            ? { ...draft, text: task }
+            : appendDraftText(draft, task);
+        return { ...current, [key]: next };
+      });
+      setInstallServerOpen(false);
+      controller.setComposerFocusRequest((value) => value + 1);
+    };
+  }
+  return (
+    <InstallServerOverlay
+      open={installServerOpen()}
+      servers={servers()}
+      createClaim={() => appPort().hostedServers.createServerClaim()}
+      retryConnection={(serverId) => serversPort().servers.retryConnection(serverId)}
+      onSetUpWithAgent={setUpWithAgent()}
+      onOpenServer={select}
+      onClose={() => setInstallServerOpen(false)}
+    />
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select, createLocal } = useServerActions();
-  const { openAppSettings } = useSettings();
+  const { select, createLocal, installServer } = useServerActions();
+  const { openAppSettings, setAppSettingsOpen } = useSettings();
+  const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
     (() => {
       setAddServerOpen(false);
       createLocal();
+    });
+  const onInstallServer =
+    installServer &&
+    (() => {
+      setAddServerOpen(false);
+      installServer();
     });
 
   return (
@@ -261,10 +354,16 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      billingDetails={appPort().billing}
+      thisComputer
+      pricingPage={windowPage.pricing}
+      onOpenUrl={(url) => void appPort().openUrl(url)}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
         setAddServerOpen(false);
+        // The server menu can open this dialog over Settings; the server opens in front of them.
+        setAppSettingsOpen(false);
         void select(serverId);
       }}
       onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -273,6 +372,7 @@ function AddServer() {
         setJoinServerOpen(true);
       }}
       onCreateLocal={onCreateLocal}
+      onInstallServer={onInstallServer}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -382,14 +482,21 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
+  const {
+    servers,
+    activeServer,
+    hostStatus,
+    hostedServerIds,
+    hostedServersAvailable,
+    hostedServersLoaded,
+    setAddServerOpen,
+  } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { agentList, agentStatus } = useAgents();
   const { setupState, saveSetup } = useSetup();
   const {
-    toolRuntimeStatuses,
     providerAdminServerId,
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -400,19 +507,52 @@ function ServerSettings() {
     cancelProviderSignIn,
     openProviderInstallGuide,
     setProviderOn,
+    providerUseServerId,
+    hostOffProviders,
+    refreshHostProviderUse,
     measureProviderDownload,
     removeProviderDownload,
     providerAccounts,
     restartProvider,
     cancelProviderRestart,
+    chooseInstalledCli,
     connection,
     providerKeys,
     hostCustomProviders,
+    customAgentsServerId,
+    hostCustomAgents,
   } = useProviders();
   const localEndpoints = useCustomProviders();
   const localAgents = useCustomAgents();
   const detection = useProviderDetection();
-  /** A custom agent is a command on this computer, so only the local server lists or runs one. */
+  /**
+   * What the host of the active joined server finds on its own computer, through
+   * `provider-detection-v1`, for an owner or admin. A detected row saves to the host's endpoints and
+   * custom agents, so the store needs both of them for the same server. A new store for each server
+   * keeps the settings and rows of one host from another.
+   */
+  // Keyed on the server id only: each servers event gives a new server object, and a new store would
+  // empty the found rows and the settings.
+  const hostDetectionServerId = createMemo(() => {
+    const serverId = customAgentsServerId();
+    const server = activeServer();
+    return serverId !== undefined &&
+      serverId === providerAdminServerId() &&
+      server?.id === serverId &&
+      serverCanAdminister(server, PROVIDER_DETECTION_CAPABILITY)
+      ? serverId
+      : undefined;
+  });
+  const hostDetection = createMemo(() => {
+    const serverId = hostDetectionServerId();
+    if (serverId === undefined) return undefined;
+    return createProviderDetectionStore({
+      api: () => desktopProviderDetectionCalls(serverId),
+      endpoints: hostCustomProviders,
+      agents: { customAgents: hostCustomAgents.customAgents, saveCustomAgent: hostCustomAgents.saveCustomAgent },
+    });
+  });
+  /** The custom agents of this computer. A joined server's host has its own, in `hostAgentSettings`. */
   const customAgents: CustomAgentSettingsApi = {
     get agents() {
       return localAgents.customAgents();
@@ -435,15 +575,34 @@ function ServerSettings() {
     cancelRestart: () => cancelProviderRestart("acp"),
   };
   /**
-   * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
-   * over `providers-v1`, those of the host of the joined server on screen.
+   * The custom agents of a joined server's host, for an owner or admin, through `custom-agents-v1`.
+   * The host runs each command on its own computer. The contract has no trial start, so the form has
+   * no Check, and a restart of the host's providers is not offered here, as for the other providers.
    */
-  const holdsToolRuntimes = (server: ServerSummary) =>
-    server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
+  const hostAgentSettings: CustomAgentSettingsApi = {
+    host: true,
+    get agents() {
+      return hostCustomAgents.customAgents();
+    },
+    save: hostCustomAgents.saveCustomAgent,
+    remove: hostCustomAgents.deleteCustomAgent,
+    // The settings of a joined server open on the active server, so this status is the host's.
+    get restartPending() {
+      return customAgents.restartPending;
+    },
+    get lastError() {
+      return customAgents.lastError;
+    },
+    get diagnostics() {
+      return customAgents.diagnostics;
+    },
+  };
   const {
     openServerSettings,
     serverSettingsTarget,
     serverSettingsSection,
+    setServerSettingsShownSection,
+    serverSettingsOpenRequest,
     serverSettingsOpen,
     setServerSettingsOpen,
     serverSettingsRestoreTarget,
@@ -453,6 +612,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    saveServerAppearance,
     recheckScreenRecording,
     rotateHostKey,
     setServerPublished,
@@ -461,28 +621,6 @@ function ServerSettings() {
     removeServerMember,
     leaveServer,
     revokeServerInvite,
-    serverSettingsMcp,
-    serverSettingsMcpError,
-    serverSettingsMcpSignIns,
-    serverSettingsMcpSignInRequest,
-    clearMcpSignInRequest,
-    serverSettingsMcpAddRequest,
-    clearMcpAddRequest,
-    serverSettingsMcpSignInPages,
-    serverSettingsMcpSignInRelays,
-    openMcpSignInRelay,
-    pasteMcpSignInRelay,
-    signInMcpServer,
-    cancelMcpSignIn,
-    signOutMcpServer,
-    mcpSignInApp,
-    saveMcpSignInApp,
-    removeMcpSignInApp,
-    refreshMcpServers,
-    saveMcpServer,
-    removeMcpServer,
-    setMcpServerEnabled,
-    testMcpServer,
   } = useServerSettings();
   /**
    * The named browser profiles of the selected server: this computer, or a joined server whose host
@@ -504,17 +642,36 @@ function ServerSettings() {
   });
   // A host that updates or rolls back keeps its id, so the API key kind follows this capability too.
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
+  const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
+  const vaultImport = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_IMPORT_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();
     if (serverId === undefined) return undefined;
     const local = untrack(serverSettingsTarget)?.kind === "local";
     return {
-      store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
+      store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId, vaultImport())),
       apiKeys: vaultApiKeys(),
+      twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
+  /**
+   * Copy to another server: each server that the user administers with `instance-transfer-v1`. Main
+   * holds the connections of all of them, so it reads from one and writes to another.
+   */
+  const copyOptions = (): ServerCopyOptions | undefined => {
+    const eligible = servers().filter((entry) => serverCanAdminister(entry, "instance-transfer-v1"));
+    if (eligible.length < 2) return undefined;
+    return {
+      servers: eligible,
+      onOpenServer: (serverId) => {
+        setServerSettingsOpen(false);
+        if (!eligible.find((entry) => entry.id === serverId)?.active) void selectServer(serverId);
+      },
+    };
+  };
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -540,6 +697,7 @@ function ServerSettings() {
       install: async (input) => {
         const result = await appPort().acpRegistry.install(input, server.id);
         if (server.kind === "local") await localAgents.refreshCustomAgents();
+        else if (server.id === customAgentsServerId()) await hostCustomAgents.refreshCustomAgents();
         return result;
       },
       cancel: (id) => appPort().acpRegistry.cancel(id, server.id),
@@ -556,6 +714,8 @@ function ServerSettings() {
      * `providerRuntimeDownloadsAvailable()`: a build without managed runtime downloads still has custom endpoints.
      */
     const endpoints = local ? localEndpoints : hostCustomProviders;
+    /** The detection of this computer, or of the host. Undefined while the host does not offer it. */
+    const detectionOf = () => (local ? detection : hostDetection());
     return {
       get defaultProvider() {
         const state = setupState();
@@ -584,8 +744,19 @@ function ServerSettings() {
       },
       onAddCustomProvider: endpoints.saveCustomProvider,
       onDeleteCustomProvider: endpoints.deleteCustomProvider,
-      // The Team API has no edit route, so only this computer's endpoints have Edit.
-      onUpdateCustomProvider: local ? localEndpoints.updateCustomProvider : undefined,
+      // A joined server's host edits an endpoint only with `custom-provider-edit-v1`. A list read
+      // before the host's capabilities arrived has no header names, and an edit from it would send no
+      // headers and delete the saved ones, so Edit waits for the list of that route.
+      get onUpdateCustomProvider() {
+        if (local) return endpoints.updateCustomProvider;
+        const editable =
+          serverSupportsCapability(server, "custom-provider-edit-v1") &&
+          endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
+        return editable ? endpoints.updateCustomProvider : undefined;
+      },
+      get customProviderHarnessChoice() {
+        return !local && serverSupportsCapability(server, "custom-provider-harness-choice-v1");
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
@@ -599,7 +770,13 @@ function ServerSettings() {
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
-      onSetProviderOn: local ? setProviderOn : undefined,
+      // A joined server's host turns its providers off and on only with `provider-use-v1`.
+      get onSetProviderOn() {
+        return local || server.id === providerUseServerId() ? setProviderOn : undefined;
+      },
+      get offProviders() {
+        return local ? undefined : hostOffProviders();
+      },
       onMeasureProviderDownload: local ? measureProviderDownload : undefined,
       onRemoveProviderDownload: local ? removeProviderDownload : undefined,
       get providerUsers() {
@@ -639,23 +816,41 @@ function ServerSettings() {
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
+      onChooseInstalledCli: local ? chooseInstalledCli : undefined,
       get providerDetection() {
-        return local ? detection.detection() : undefined;
+        return detectionOf()?.detection();
       },
-      detectedProviderApi: local ? detection.api : undefined,
+      get detectedProviderApi() {
+        return detectionOf()?.api;
+      },
       get takenAgentIds() {
-        return detection.takenAgentIds();
+        // The IDs of the same computer's agents, so a duplicate is a field error before a round trip.
+        return detectionOf()?.takenAgentIds() ?? hostCustomAgents.customAgents().map((agent) => agent.id);
       },
-      customAgents: local ? customAgents : undefined,
+      // The host's agents need its capabilities, which can arrive after the section opens.
+      get customAgents() {
+        if (local) return customAgents;
+        return server.id === customAgentsServerId() ? hostAgentSettings : undefined;
+      },
       acpRegistry: serverCanAdminister(server, "acp-registry-v1") ? registryFor(server) : undefined,
       get detectionSettings() {
-        return local ? (detection.settingsValue() ?? undefined) : undefined;
+        return detectionOf()?.settingsValue() ?? undefined;
       },
-      onDetectionSettingsChange: detection.setSettings,
+      get onDetectionSettingsChange() {
+        return detectionOf()?.setSettings;
+      },
       get detectionSettingsError() {
-        return detection.settingsError();
+        return detectionOf()?.settingsError() ?? null;
       },
-      onShown: local ? () => void detection.scan() : undefined,
+      get onShown() {
+        const store = detectionOf();
+        const readsUse = !local && server.id === providerUseServerId();
+        if (!store && !readsUse) return undefined;
+        return () => {
+          if (store) void store.scan();
+          if (readsUse) refreshHostProviderUse();
+        };
+      },
     };
   };
 
@@ -716,6 +911,9 @@ function ServerSettings() {
           // The settings show only as a page of the window, so they wait for the page.
           open={serverSettingsOpen() && windowPage.settingsPlacement("server") !== undefined}
           page={windowPage.settingsPlacement("server")}
+          sectionQuery={windowPage.serverSettingsQuery()}
+          openFirstSectionRequest={windowPage.openFirstServerSectionRequest()}
+          onFirstSectionOpened={() => windowPage.setServerSettingsQuery("")}
           restoreFocusTarget={serverSettingsRestoreTarget()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           server={server()}
@@ -726,8 +924,9 @@ function ServerSettings() {
           loadError={serverSettingsError()}
           onRetry={() => refreshServerSettings(server().id)}
           onSaveIdentity={saveServerIdentity}
+          onSaveAppearance={saveServerAppearance}
           onSetPublished={setServerPublished}
-          onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
+          onRotateHostKey={serverRotatesHostKey(server()) ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           companySignIn={appPort().auth}
@@ -740,52 +939,6 @@ function ServerSettings() {
           onRemoveServer={hostedServersLoaded() && !hostedServerIds().has(server().id) ? leaveServer : undefined}
           onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
           onRecheckScreenRecording={recheckScreenRecording}
-          mcpServers={serverSettingsMcp()}
-          // Only for the computer whose runtimes this window holds: another host starts its servers
-          // with its own runtime, which this window has not read.
-          mcpToolRuntimeNote={holdsToolRuntimes(server()) ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
-          mcpLoadError={serverSettingsMcpError()}
-          onMcpSectionShown={() => void refreshMcpServers()}
-          onRetryMcpServers={() => void refreshMcpServers()}
-          onSaveMcpServer={saveMcpServer}
-          onRemoveMcpServer={removeMcpServer}
-          onSetMcpServerEnabled={setMcpServerEnabled}
-          onTestMcpServer={testMcpServer}
-          mcpAddRequest={serverSettingsMcpAddRequest()}
-          onMcpAddRequestHandled={clearMcpAddRequest}
-          // A remote host with `sign-in-relay-v1` opens the page in this computer's browser. An older
-          // host's page shows here through the live view, which streams the active server only.
-          mcpSignInRequest={serverSettingsMcpSignInRequest()}
-          onMcpSignInRequestHandled={clearMcpSignInRequest}
-          mcpSignIn={
-            server().kind === "local" || remoteMcpSignIn(server())
-              ? {
-                  states: serverSettingsMcpSignIns(),
-                  remote:
-                    server().kind === "remote"
-                      ? {
-                          hostName: server().name,
-                          runtime: conversationPort().browser,
-                          clipboard: serverSupportsCapability(server(), "browser-view-clipboard"),
-                          pages: serverSettingsMcpSignInPages(),
-                          relay: serverSupportsCapability(server(), "sign-in-relay-v1")
-                            ? {
-                                pages: serverSettingsMcpSignInRelays(),
-                                open: openMcpSignInRelay,
-                                paste: pasteMcpSignInRelay,
-                              }
-                            : undefined,
-                        }
-                      : undefined,
-                  start: signInMcpServer,
-                  cancel: cancelMcpSignIn,
-                  signOut: signOutMcpServer,
-                  app: serverSupportsCapability(server(), "mcp-sign-in-app-v1")
-                    ? { load: mcpSignInApp, save: saveMcpSignInApp, remove: removeMcpSignInApp }
-                    : undefined,
-                }
-              : undefined
-          }
           storage={storageOptions(server())}
           providers={providerSettings(server())}
           onSwitchToManageProviders={
@@ -807,13 +960,24 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostTurnLimits={{}}
+          hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
+          skillLearning={{}}
+          browsingMemory={{}}
           hostPromptCacheTtl={{}}
+          claudeUserSetup={{}}
+          claudeCompactWindow={{}}
+          providerEnvironment={{}}
           hostModelVisibility={{}}
+          hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
+          initialSectionRequest={serverSettingsOpenRequest()}
+          onSectionChange={setServerSettingsShownSection}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
             serverSupportsCapability(server(), "agent-import-v1")
@@ -826,9 +990,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider) }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? {}
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.
@@ -843,6 +1019,7 @@ function ServerSettings() {
               : undefined
           }
           vault={vault()}
+          crm={desktopCrmHost(server().id)}
         />
       )}
     </Show>
@@ -871,7 +1048,26 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
+  const { servers, activeServer, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
+  const { agentStatus, agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
+  const { openServerSettings } = useServerSettings();
+  /** The agent dock tab lists the agents of the active server in sidebar order, without hidden agents. */
+  const agentDockSettings = createMemo(() => {
+    const server = activeServer();
+    return {
+      server: server ? { id: server.id, name: server.name } : null,
+      agents: sidebarAgentOrder(agentList(), {
+        layout: sidebarLayout(),
+        pinnedItems: pinnedSidebarItems(),
+        hiddenAgentIds: userHiddenAgentIds(),
+      }),
+      hiddenAgentIds: userHiddenAgentIds(),
+    };
+  });
+  /** Live voice runs on this computer's Codex, whose status shows only while this computer is active. */
+  const codexLiveAccess = () =>
+    activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
   const {
     appSettingsOpen,
     notificationFocusRequest,
@@ -901,6 +1097,7 @@ function AppSettings(props: AccountProps) {
         chatWindow={platform.chatWindow !== null}
         builtInDisplayGeometry={builtInDisplayGeometry()}
         servers={servers()}
+        agentDock={agentDockSettings()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onOpenWhatsNew={
@@ -917,6 +1114,7 @@ function AppSettings(props: AccountProps) {
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
+        onSetChatColor={auth.setChatColor}
         onCreateMobileConnect={auth.createMobileConnect}
         onCancelMobileConnect={auth.cancelMobileConnect}
         onGetMobileConnectLink={auth.getMobileConnectLink}
@@ -936,6 +1134,11 @@ function AppSettings(props: AccountProps) {
         onAddHostedServer={() => {
           setAppSettingsOpen(false);
           setAddServerOpen(true, "settings_billing");
+        }}
+        codexLiveAccess={codexLiveAccess()}
+        onConnectCodex={() => {
+          setAppSettingsOpen(false);
+          openServerSettings(LOCAL_SERVER_ID, null, "providers");
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}

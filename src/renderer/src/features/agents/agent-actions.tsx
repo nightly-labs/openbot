@@ -1,5 +1,5 @@
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -19,7 +19,6 @@ import { useTurns } from "../../turns";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { useConversation } from "../conversation/conversation-context";
 import { agentConversationKey } from "../conversation/conversation-keys";
-import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { type NewAgentDraft, newAgentInput } from "./agent-create-input";
@@ -52,7 +51,6 @@ const AgentActions = createSimpleContext({
       agentList,
       setAgentList,
       agentSetupOpen,
-      setAgentSetupOpen,
       agentSetupDraft,
       setAgentSetupError,
       creatingAgent,
@@ -69,21 +67,23 @@ const AgentActions = createSimpleContext({
       userHiddenAgents,
       userHiddenAgentIds,
       applyUserHiddenAgents,
+      ownAgentLevels,
+      applyOwnAgentLevels,
     } = useAgents();
     const { initializeConversation, removeConversation } = useConversation();
     const threads = useAgentThreads();
     const { setActiveTurns, setFailedTurns, setQueues, setPendingPrompts } = useTurns();
     const { sidebarLayout, setSidebarLayout, applySidebarLayoutAction, removePinnedSidebarItemEverywhere } =
       useSidebar();
-    const { clearDirectSelection } = useDirectMessages();
-    const { selectAgent } = useNavigation();
+    const { selectAgent, openCreatedAgent } = useNavigation();
     const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<Set<string>>(new Set());
 
     /** Asks the host for the agent. */
     function requestNewAgent(draft: NewAgentDraft) {
-      const createModelSupported =
-        activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
-      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported));
+      const local = activeServer()?.kind !== "remote";
+      const createModelSupported = local || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
+      const welcomeSupported = local || activeServerSupportsCapability(AGENT_WELCOME_CAPABILITY);
+      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported, welcomeSupported));
     }
 
     /** Synchronous, so a caller that also selects the agent does both in the same update. */
@@ -116,9 +116,8 @@ const AgentActions = createSimpleContext({
       setAgentSetupError(null);
       try {
         const newAgent = addNewAgent(await requestNewAgent(submitted));
-        setAgentSetupOpen(false);
-        clearDirectSelection();
-        setActiveAgentId(newAgent.id);
+        // As a sidebar click does: the form and an open channel close, and the new chat opens.
+        openCreatedAgent(newAgent.id);
         const properties = analyticsAgentProperties(newAgent.id);
         analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
       } catch (error) {
@@ -414,6 +413,36 @@ const AgentActions = createSimpleContext({
       }
     }
 
+    /**
+     * Mutes an agent for the user, or gives it the server level again. The menu shows the change at
+     * once, and the server's answer then replaces the levels. If the server refuses, the level of
+     * this agent goes back. The server keeps the level for all devices of the user.
+     */
+    async function setAgentMuted(agentId: string, muted: boolean): Promise<void> {
+      const previous = ownAgentLevels().get(agentId) ?? null;
+      const level = muted ? "nothing" : null;
+      if (previous === level) return;
+      const serverId = activeServerId();
+      const withLevel = (next: typeof previous) => ({
+        agents: [
+          ...[...ownAgentLevels()].flatMap(([id, own]) => (id === agentId ? [] : [{ agentId: id, level: own }])),
+          ...(next ? [{ agentId, level: next }] : []),
+        ],
+      });
+      applyOwnAgentLevels(withLevel(level));
+      try {
+        applyOwnAgentLevels(await agentsPort().agent.setAgentNotificationLevel({ agentId, level }, serverId));
+      } catch (error) {
+        if (!scopeIsCurrent()) return;
+        applyOwnAgentLevels(withLevel(previous));
+        const { t, errorMessage } = currentText();
+        actionToast.error(t("agent.error.muteFailed"), {
+          description: errorMessage(error, t("agent.error.hiddenFailed")),
+          report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+        });
+      }
+    }
+
     return {
       createAgent,
       createAgentInPlace,
@@ -423,6 +452,7 @@ const AgentActions = createSimpleContext({
       duplicatingSectionIds,
       deleteAgent,
       setAgentHiddenByUser,
+      setAgentMuted,
     };
   },
 });

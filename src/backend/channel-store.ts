@@ -10,16 +10,19 @@ import {
   type ChannelSummary,
   type ChannelTask,
   type ChannelThread,
+  CONTEXT_RESET_ITEM_TYPE,
   decodeChannel,
   isChannelMessage,
   isChannelTask,
+  MCP_SIGN_IN_ITEM_TYPE_PREFIX,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
+  withBrowserMember,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { changesModelContent } from "./channel-history";
-import { deleteAggregateHistory, deleteThreadAttachments } from "./database/database-core";
+import { deleteAggregateHistory, deleteReceiptsOf, deleteThreadAttachments } from "./database/database-core";
 import {
   databaseRow,
   databaseRows,
@@ -27,6 +30,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction } from "./database/sqlite-transaction";
 import type { OpenBotDatabase } from "./openbot-database";
 import { revokeRoutineWebhooks } from "./webhook-route-store";
 
@@ -191,7 +195,9 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
@@ -201,7 +207,13 @@ export class ChannelStore {
                 AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
-        .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
+        .all(
+          memberId,
+          memberId,
+          excludedId,
+          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+          `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+        ),
     );
     const threads = new Map<string, ChannelThread[]>();
     for (const row of databaseRows(
@@ -293,6 +305,19 @@ export class ChannelStore {
     return value;
   }
 
+  /** One task by id, read through the primary key rather than every task of the channel. */
+  task(channelId: string, taskId: string): ChannelTask | null {
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?")
+        .get(channelId, taskId),
+    );
+    if (!row) return null;
+    const value = JSON.parse(requiredStringColumn(row, "task_json"));
+    if (!isChannelTask(value)) throw new Error("Invalid stored channel task.");
+    return value;
+  }
+
   tasks(channelId: string): ChannelTask[] {
     return databaseRows(
       this.database.connection
@@ -354,6 +379,10 @@ export class ChannelStore {
    * reads has to name the cause as well. The same reason keeps this to one query: reaching a
    * channel through `list` parses every stored message of every channel. States are tried in the
    * order given, so a running assignment is reported before one that is only queued.
+   *
+   * A deleted (archived) channel is never the cause the user reads. Its stopped turn can hold the
+   * agent until the provider ends it, but that channel shows no work, so the scheduler alone counts
+   * that hold (#10472).
    */
   agentAssignment(
     agentId: string,
@@ -370,6 +399,7 @@ export class ChannelStore {
              JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
             WHERE json_extract(assignments.assignment_json, '$.agentId') = ?
               AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+              AND COALESCE(json_extract(channels.channel_json, '$.archived'), 0) = 0
             ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
                      assignments.rowid
             LIMIT 1`,
@@ -392,26 +422,65 @@ export class ChannelStore {
     return row ? decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))) : null;
   }
 
-  page(channelId: string, before?: number): ChannelPage {
-    const messages = this.messages(channelId, before, 101);
-    const hasOlder = messages.length > 100;
+  page(channelId: string, before?: number, limit = 100): ChannelPage {
+    const page = this.pageWithoutExtent(channelId, before, limit);
+    return page.olderCursor === null ? page : { ...page, ...this.olderExtent(channelId, page.olderCursor) };
+  }
+
+  /**
+   * `page` without `olderCount` and `oldestAt`. `olderExtent` reads the whole older history, so a
+   * caller that cuts the page smaller asks for it once, for the cursor of the page that it sends.
+   */
+  pageWithoutExtent(channelId: string, before?: number, limit = 100): ChannelPage {
+    const messages = this.messages(channelId, before, limit + 1);
+    const hasOlder = messages.length > limit;
     if (hasOlder) messages.shift();
-    const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
     return {
       channel: this.get(channelId),
       tasks: this.tasks(channelId),
       messages,
-      olderCursor,
-      throughSequence: this.messages(channelId, undefined, 1)[0]?.sequence ?? 0,
-      ...(olderCursor === null ? {} : this.olderExtent(channelId, olderCursor)),
+      olderCursor: hasOlder ? (messages[0]?.sequence ?? null) : null,
+      throughSequence: this.latestSequence(channelId),
     };
+  }
+
+  private latestSequence(channelId: string): number {
+    return this.messages(channelId, undefined, 1)[0]?.sequence ?? 0;
+  }
+
+  /**
+   * `tasks` with the dependencies that each waiting task already read: the `awaitedTaskIds` of its
+   * turns, whose results the turn had when it started. A lead that assigns work in rounds keeps every
+   * sub-task in `dependencies`, so the page shows only the round it waits for (#7505). Only the views
+   * of a person read it; the agent's channel history does not.
+   */
+  withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
+    if (!tasks.some((task) => task.state === "waiting")) return tasks;
+    // The rows are in the order the assignments started, because an update keeps its row.
+    const started = new Map<string, number>();
+    const readAt = new Map<string, Map<string, number>>();
+    this.assignments(channelId).forEach((assignment, order) => {
+      started.set(assignment.taskId, order);
+      const read = readAt.get(assignment.taskId) ?? new Map<string, number>();
+      for (const id of assignment.awaitedTaskIds) read.set(id, order);
+      readAt.set(assignment.taskId, read);
+    });
+    return tasks.map((task) => {
+      if (task.state !== "waiting") return task;
+      // A dependency that ran again after the turn that read it, as after Reassign, has a new result.
+      const seenDependencies = task.dependencies.filter((id) => {
+        const at = readAt.get(task.id)?.get(id);
+        return at !== undefined && (started.get(id) ?? -1) < at;
+      });
+      return seenDependencies.length ? { ...task, seenDependencies } : task;
+    });
   }
 
   /**
    * How many messages are older than a page, and when the first one was written: the day rail draws
    * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
    */
-  private olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
+  olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
     const row = databaseRow(
       this.database.connection
         .prepare(
@@ -426,12 +495,14 @@ export class ChannelStore {
     return { olderCount: row ? requiredNumberColumn(row, "older_count") : 0, ...(oldestAt ? { oldestAt } : {}) };
   }
 
-  commit(operationId: string, change: ChannelChange): Channel {
+  commit(operationId: string, change: ChannelChange, written?: (db: DatabaseSync, sequence: number) => void): Channel {
     const commandId = `channels:${operationId}`;
     const previous = this.database.commandResult(commandId);
     if (previous !== undefined) return decodeChannel(previous);
     if (!change.tasks.every(isChannelTask)) throw new Error("Invalid channel task.");
-    const channel = { ...change.channel, revision: change.channel.revision + 1 };
+    // A browser member that leaves the channel takes the browser with it: no member gets it in its
+    // place, as the setting limits access.
+    const channel = { ...withBrowserMember(change.channel), revision: change.channel.revision + 1 };
     // A late write of a deleted message must not keep its text in the event history either.
     const deleted = this.database.connection.prepare(
       "SELECT 1 FROM projection_channel_messages WHERE channel_id = ? AND message_id = ? AND json_extract(message_json, '$.deleted') = 1",
@@ -443,9 +514,42 @@ export class ChannelStore {
     return this.database.dispatch(
       commandId,
       [{ aggregateType: "channel", aggregateId: channel.id, eventType: "channel.changed", payload }],
-      (db) => {
+      (db, sequences) => {
         this.project(db, payload);
+        const sequence = sequences[0];
+        if (written && sequence !== undefined) written(db, sequence);
         return channel;
+      },
+    );
+  }
+
+  /**
+   * Writes one message that a member's turn changed. A streaming turn writes it on each delta, and
+   * each event holds the whole message, so the log grew with the square of its length (#5392). The
+   * first event of the message stays: a rebuild gives the message its place from it. The events
+   * between that one and the newest go, with their receipts.
+   */
+  captureMessage(channel: Channel, message: ChannelMessage): Channel {
+    // The id is JSON so that one message id is never the start of another: ids can hold ":".
+    const operationPrefix = `capture:${channel.id}:${JSON.stringify(message.id)}:`;
+    const commandPrefix = `channels:${operationPrefix}`;
+    return this.commit(
+      `${operationPrefix}${randomUUID()}`,
+      { channel, messages: [message], tasks: [], assignments: [] },
+      (db, sequence) => {
+        // The range reads the command index, not the payloads: they hold the long text.
+        const match = "command_id > ? AND command_id < ?";
+        const range = [commandPrefix, `${commandPrefix}\uffff`] as const;
+        const superseded = databaseRows(
+          db
+            .prepare(
+              `DELETE FROM orchestration_events WHERE ${match} AND sequence < ?
+                 AND sequence > (SELECT MIN(sequence) FROM orchestration_events WHERE ${match})
+               RETURNING command_id`,
+            )
+            .all(...range, sequence, ...range),
+        ).map((row) => requiredStringColumn(row, "command_id"));
+        deleteReceiptsOf(db, superseded);
       },
     );
   }
@@ -486,6 +590,88 @@ export class ChannelStore {
         return updated;
       },
     );
+  }
+
+  /**
+   * "Delete history": as `deleteMessage` for every shown message of the channel, in one commit. Each
+   * row and each earlier `channel.changed` event keeps the deleted row, so sequences and read cursors
+   * stay. The summary and the text of each earlier summary event go too, and a new empty summary
+   * covers the whole history, so no model reads a deleted message. Tasks, members, instructions,
+   * memories and routines stay. Returns false when the channel has no message.
+   */
+  deleteHistory(channel: Channel): boolean {
+    const db = this.database.connection;
+    const last = databaseRow(
+      db
+        .prepare("SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ?")
+        .get(channel.id),
+    );
+    const throughSequence = last && typeof last.sequence === "number" ? last.sequence : 0;
+    if (throughSequence === 0) return false;
+    const updated = { ...channel, revision: channel.revision + 1 };
+    const change: ChannelChange = { channel: updated, messages: [], tasks: [], assignments: [] };
+    const summary = { version: this.summary(channel.id).version + 1, throughSequence, text: "" };
+    this.database.dispatch(
+      `channels:history-deleted:${channel.id}:${randomUUID()}`,
+      [
+        { aggregateType: "channel", aggregateId: channel.id, eventType: "channel.changed", payload: change },
+        { aggregateType: "channel", aggregateId: channel.id, eventType: "channel.summarized", payload: summary },
+      ],
+      (tx, sequences) => {
+        this.project(tx, change);
+        // One row and one event at a time: a long channel holds too much text to read at once.
+        const ids = databaseRows(
+          tx
+            .prepare(`SELECT message_id FROM projection_channel_messages WHERE channel_id = ? AND ${SHOWN_MESSAGE_SQL}`)
+            .all(channel.id),
+        ).map((row) => requiredStringColumn(row, "message_id"));
+        const readMessage = tx.prepare(
+          "SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?",
+        );
+        const writeMessage = tx.prepare(
+          "UPDATE projection_channel_messages SET message_json = ? WHERE channel_id = ? AND message_id = ?",
+        );
+        for (const id of ids) {
+          const row = databaseRow(readMessage.get(channel.id, id));
+          const entry = row ? JSON.parse(requiredStringColumn(row, "message_json")) : null;
+          if (isChannelMessage(entry)) writeMessage.run(JSON.stringify(deletedChannelMessage(entry)), channel.id, id);
+        }
+        tx.prepare(
+          "INSERT INTO projection_channel_summaries VALUES (?, ?, ?, ?) ON CONFLICT(channel_id) DO UPDATE SET version = excluded.version, through_sequence = excluded.through_sequence, text = excluded.text",
+        ).run(channel.id, summary.version, summary.throughSequence, summary.text);
+        const own = new Set(sequences);
+        const events = databaseRows(
+          tx
+            .prepare(
+              "SELECT sequence FROM orchestration_events WHERE aggregate_type = 'channel' AND aggregate_id = ? AND event_type IN ('channel.changed', 'channel.summarized')",
+            )
+            .all(channel.id),
+        )
+          .map((row) => requiredNumberColumn(row, "sequence"))
+          .filter((sequence) => !own.has(sequence));
+        const readEvent = tx.prepare("SELECT event_type, payload_json FROM orchestration_events WHERE sequence = ?");
+        const writeEvent = tx.prepare("UPDATE orchestration_events SET payload_json = ? WHERE sequence = ?");
+        for (const sequence of events) {
+          const row = databaseRow(readEvent.get(sequence));
+          const value = row ? JSON.parse(requiredStringColumn(row, "payload_json")) : null;
+          if (!row || !isDynamicRecord(value)) continue;
+          if (row.event_type === "channel.summarized") {
+            if (isString(value.text) && value.text) writeEvent.run(JSON.stringify({ ...value, text: "" }), sequence);
+            continue;
+          }
+          if (!Array.isArray(value.messages)) continue;
+          let changed = false;
+          const messages = value.messages.map((item: unknown) => {
+            if (!isChannelMessage(item) || isDeletedChannelMessage(item)) return item;
+            changed = true;
+            return deletedChannelMessage(item);
+          });
+          if (changed) writeEvent.run(JSON.stringify({ ...value, messages }), sequence);
+        }
+        return updated;
+      },
+    );
+    return true;
   }
 
   private project(db: DatabaseSync, change: ChannelChange): void {
@@ -598,10 +784,14 @@ export class ChannelStore {
     );
   }
 
-  executionThreads(): Array<{ id: string; threadId: string }> {
+  executionThreads(): Array<{ id: string; threadId: string; channelId: string }> {
     return databaseRows(
-      this.database.connection.prepare("SELECT agent_id, thread_id FROM projection_channel_contexts").all(),
-    ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
+      this.database.connection.prepare("SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts").all(),
+    ).map((row) => ({
+      id: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+      channelId: requiredStringColumn(row, "channel_id"),
+    }));
   }
 
   contextThreads(channelId: string): string[] {
@@ -610,6 +800,39 @@ export class ChannelStore {
         .prepare("SELECT thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
         .all(channelId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** The agent and execution thread of each member context of one channel. */
+  contexts(channelId: string): Array<{ agentId: string; threadId: string }> {
+    return databaseRows(
+      this.database.connection
+        .prepare("SELECT agent_id, thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
+        .all(channelId),
+    ).map((row) => ({
+      agentId: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+    }));
+  }
+
+  /**
+   * The sequence of the newest "New conversation" marker of a channel, or 0. A model reads no
+   * message at or before it. The marker is an ordinary message row, so a deleted marker ends the
+   * boundary and no event type or migration is needed.
+   */
+  contextResetSequence(channelId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          // The id range reads the marker rows through the primary key, not every message of the channel.
+          `SELECT MAX(sequence) AS sequence FROM projection_channel_messages
+             WHERE channel_id = ? AND message_id >= 'context-reset-' AND message_id < 'context-reset.' AND ${SHOWN_MESSAGE_SQL}
+             AND json_extract(message_json, '$.message.itemType') = ?
+             AND json_extract(message_json, '$.message.author') = 'system'
+             AND json_extract(message_json, '$.message.source') = 'system'`,
+        )
+        .get(channelId, CONTEXT_RESET_ITEM_TYPE),
+    );
+    return row && typeof row.sequence === "number" ? row.sequence : 0;
   }
 
   /** The execution threads of one agent, one for each channel it works in. */
@@ -815,7 +1038,7 @@ export class ChannelStore {
   }
 
   markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
-    const maximum = this.page(channelId).throughSequence;
+    const maximum = this.latestSequence(channelId);
     if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
     return this.database.dispatch(
       `channel-read:${memberId}:${operationId}`,
@@ -839,8 +1062,7 @@ export class ChannelStore {
   /** Rebuilds channel projections from committed events without changing agent threads. */
   rebuild(channelId: string): void {
     const db = this.database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       const events = databaseRows(
         db
           .prepare(
@@ -927,11 +1149,7 @@ export class ChannelStore {
             throw new Error("Unknown channel event.");
         }
       }
-      db.exec("COMMIT");
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** A stored cursor of zero is a reader that read nothing, not a reader with no cursor at all. */

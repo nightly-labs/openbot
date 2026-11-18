@@ -1,0 +1,33 @@
+{
+  "slug": "salesloft",
+  "name": "Salesloft",
+  "tagline": "Sales pipeline and cadences",
+  "description": "Salesloft lets agents read people, accounts, cadences, calls, and deals in the Salesloft workspace of the signed-in user. Each user signs in to their own Salesloft account through the browser.",
+  "category": "productivity",
+  "creatorName": "Salesloft",
+  "iconUrl": "https://www.salesloft.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-stale-deals", "text": "Which of my deals have had no activity in two weeks?" },
+    { "id": "prompt-call-summary", "text": "Summarize my last call with the Acme account." },
+    { "id": "prompt-replies", "text": "Which people in my cadences replied this week?" }
+  ],
+  "apps": [
+    {
+      "id": "app-salesloft-mcp",
+      "name": "Salesloft",
+      "description": "People, accounts, cadences, calls, and deals, over Salesloft's MCP server with browser sign-in.",
+      "iconUrl": "https://www.salesloft.com/apple-touch-icon.png",
+      "server": {
+        "name": "salesloft",
+        "transport": "http",
+        "url": "https://mcp.salesloft.com/mcp",
+        "auth": [{ "id": "salesloft-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.salesloft.com",
+  "privacyPolicyUrl": "https://www.salesloft.com/legal/privacy-policies",
+  "termsUrl": "https://www.salesloft.com/legal/msa"
+}

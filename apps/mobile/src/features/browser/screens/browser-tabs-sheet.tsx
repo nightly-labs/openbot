@@ -22,6 +22,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { latestBrowserSheetControls, useBrowserSheetControls } from "../model/browser-sheet-bridge";
 import { browserAddressUrl, browserTabHost, browserTabTitle } from "../model/browser-tabs";
 
@@ -101,7 +102,7 @@ export function BrowserTabsSheet() {
               isDisabled={!canUseTab}
               onPress={() => run((screen) => screen.navigate("back"))}
             >
-              <ChevronLeft color={iconColor} size={20} strokeWidth={2} />
+              <ChevronLeft color={iconColor} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
             </Button>
             <Button
               isIconOnly
@@ -111,7 +112,7 @@ export function BrowserTabsSheet() {
               isDisabled={!canUseTab}
               onPress={() => run((screen) => screen.navigate("forward"))}
             >
-              <ChevronRight color={iconColor} size={20} strokeWidth={2} />
+              <ChevronRight color={iconColor} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
             </Button>
           </>
         )}

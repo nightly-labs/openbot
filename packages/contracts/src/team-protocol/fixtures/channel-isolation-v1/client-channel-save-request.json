@@ -1,0 +1,18 @@
+{
+  "type": "save",
+  "operationId": "operation-1",
+  "channelId": "channel-1",
+  "update": true,
+  "draft": {
+    "name": "launch",
+    "title": "Launch",
+    "instructions": "",
+    "members": [
+      {
+        "agentId": "agent-1"
+      }
+    ],
+    "leadAgentId": "agent-1",
+    "isolated": true
+  }
+}

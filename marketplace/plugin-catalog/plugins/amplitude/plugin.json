@@ -1,0 +1,33 @@
+{
+  "slug": "amplitude",
+  "name": "Amplitude",
+  "tagline": "Product analytics",
+  "description": "Amplitude lets agents query events, charts, dashboards, and experiments in the projects that the signed-in user can access. Each user signs in to their own Amplitude account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Amplitude",
+  "iconUrl": "https://avatars.githubusercontent.com/u/2291562?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-retention", "text": "How did week-one retention change after the last release?" },
+    { "id": "prompt-funnel", "text": "Where do users drop off in the signup funnel?" },
+    { "id": "prompt-experiment", "text": "Summarize the results of the running checkout experiment." }
+  ],
+  "apps": [
+    {
+      "id": "app-amplitude-mcp",
+      "name": "Amplitude",
+      "description": "Product analytics queries and charts, over Amplitude's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/2291562?s=256&v=4",
+      "server": {
+        "name": "amplitude",
+        "transport": "http",
+        "url": "https://mcp.amplitude.com/mcp",
+        "auth": [{ "id": "amplitude-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://amplitude.com",
+  "privacyPolicyUrl": "https://amplitude.com/privacy",
+  "termsUrl": "https://amplitude.com/terms"
+}

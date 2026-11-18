@@ -1,0 +1,36 @@
+{
+  "slug": "sunsama",
+  "name": "Sunsama",
+  "tagline": "Daily planning and tasks",
+  "description": "Sunsama lets agents read the daily plan, create and update tasks and subtasks, and organize them into channels. Each user signs in to their own Sunsama account through the browser.",
+  "category": "productivity",
+  "creatorName": "Sunsama",
+  "iconUrl": "https://pub-f7ae218077e542729e28e6f8f45a9a40.r2.dev/images/62f64efc18d02fdccc4c7723_favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-today", "text": "What is on my plan for today, and how much time is planned?" },
+    { "id": "prompt-backlog", "text": "Which tasks in my backlog have no time estimate?" },
+    {
+      "id": "prompt-add-task",
+      "text": "Add a task for tomorrow to review the quarterly budget, with a 30 minute estimate."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-sunsama-mcp",
+      "name": "Sunsama",
+      "description": "Daily plan, task, and subtask management, over Sunsama's MCP server with browser sign-in.",
+      "iconUrl": "https://pub-f7ae218077e542729e28e6f8f45a9a40.r2.dev/images/62f64efc18d02fdccc4c7723_favicon.ico",
+      "server": {
+        "name": "sunsama",
+        "transport": "http",
+        "url": "https://api.sunsama.com/mcp",
+        "auth": [{ "id": "sunsama-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.sunsama.com",
+  "privacyPolicyUrl": "https://www.sunsama.com/privacy",
+  "termsUrl": "https://www.sunsama.com/terms"
+}

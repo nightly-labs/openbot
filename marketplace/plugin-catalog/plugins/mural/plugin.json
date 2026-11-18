@@ -1,0 +1,33 @@
+{
+  "slug": "mural",
+  "name": "Mural",
+  "tagline": "Canvases, stickies and diagrams",
+  "description": "Mural lets agents read murals and add sticky notes, text, and diagrams to them in the workspaces the user can access. Each user signs in to their own Mural account through the browser.",
+  "category": "design",
+  "creatorName": "Mural",
+  "iconUrl": "https://cdn.prod.website-files.com/62e11362da2667ac3d0e6ed5/638f8a64c53eead78bc582a7_Favicon_256x.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-summarize", "text": "Summarize the ideas on my brainstorming mural." },
+    { "id": "prompt-cluster", "text": "Group the sticky notes on this mural into themes." },
+    { "id": "prompt-journey", "text": "Create a customer journey map for our checkout on a new mural." }
+  ],
+  "apps": [
+    {
+      "id": "app-mural-mcp",
+      "name": "Mural",
+      "description": "Mural reading and canvas editing, over Mural's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/62e11362da2667ac3d0e6ed5/638f8a64c53eead78bc582a7_Favicon_256x.png",
+      "server": {
+        "name": "mural",
+        "transport": "http",
+        "url": "https://mcp-canvas.mural.co/mcp",
+        "auth": [{ "id": "mural-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.mural.co",
+  "privacyPolicyUrl": "https://www.mural.co/terms/privacy-statement",
+  "termsUrl": "https://www.mural.co/terms/terms-of-service"
+}

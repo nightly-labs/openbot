@@ -1,0 +1,33 @@
+{
+  "slug": "mem",
+  "name": "Mem",
+  "tagline": "Notes and collections",
+  "description": "Mem lets agents search, read, and create notes and organize them in collections. Each user signs in to their own Mem account through the browser.",
+  "category": "productivity",
+  "creatorName": "Mem",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/83/28/66/83286612-9476-6bf1-72a5-db2c6f460175/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-notes", "text": "Find my notes about the Q3 planning meeting and summarize them." },
+    { "id": "prompt-new-note", "text": "Create a note with the action items from this conversation." },
+    { "id": "prompt-collection", "text": "List the notes in my Research collection from the last month." }
+  ],
+  "apps": [
+    {
+      "id": "app-mem-mcp",
+      "name": "Mem",
+      "description": "Note search, reading, note creation, and collections, over Mem's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/83/28/66/83286612-9476-6bf1-72a5-db2c6f460175/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "mem",
+        "transport": "http",
+        "url": "https://mcp.mem.ai/mcp",
+        "auth": [{ "id": "mem-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://mem.ai",
+  "privacyPolicyUrl": "https://mem.ai/privacy",
+  "termsUrl": "https://mem.ai/terms"
+}

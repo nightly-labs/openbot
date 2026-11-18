@@ -34,6 +34,7 @@ const meta = {
     maxWidth: () => 640,
     onClose: fn(),
     onStartNewChat: fn(async () => {}),
+    onDeleteHistory: fn(async () => {}),
     onResize: fn(),
     onResizeEnd: fn(),
     onUpdateAgent: fn(async () => undefined),
@@ -53,6 +54,15 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Working: Story = { args: { working: true } };
+/** A Codex model with a fast tier: the Model picker menu shows Effort and the Fast switch, as in the chat header. */
+export const FastMode: Story = {
+  args: {
+    agent: { ...STORY_AGENT, provider: "codex", model: "gpt-6-luna", reasoningEffort: "high", fastMode: true },
+    runtimeSettings: { provider: "codex", model: "gpt-6-luna", reasoningEffort: "high" },
+    fastMode: true,
+    onFastModeChange: fn(),
+  },
+};
 /** The user's own level of the agent. The row opens the notification settings, the one place that changes it. */
 export const NotificationLevel: Story = {
   args: { notificationLevel: { current: null, serverLevel: "needs-me", onOpen: fn() } },
@@ -105,7 +115,7 @@ export const SteersWhileWorking: Story = { args: { agent: { ...STORY_AGENT, busy
 export const SteerUnsupportedProvider: Story = {
   args: {
     defaultBusyMessageMode: "steer",
-    runtimeSettings: { provider: "opencode", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
+    runtimeSettings: { provider: "cursor", model: STORY_AGENT.model, reasoningEffort: STORY_AGENT.reasoningEffort },
   },
 };
 /** An agent on a remote host: the setting belongs to that host, so the row is hidden. */
@@ -151,24 +161,6 @@ export const NewBrowserProfile: Story = {
         />
       </main>
     );
-  },
-};
-/** An OpenCode model with no reasoning setting: OpenCode decides, and the row says so. */
-export const ReasoningSetByProvider: Story = {
-  args: {
-    runtimeSettings: { provider: "opencode", model: "opencode/big-pickle", reasoningEffort: "medium" },
-    modelOptions: [
-      ...STORY_MODELS,
-      {
-        provider: "opencode",
-        id: "opencode/big-pickle",
-        name: "Big Pickle",
-        description: "Free OpenCode model.",
-        defaultReasoningEffort: "medium",
-        supportedReasoningEfforts: ["medium"],
-        reasoningEffortConfigurable: false,
-      },
-    ],
   },
 };
 export const SaveFailure: Story = {

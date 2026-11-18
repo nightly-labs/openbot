@@ -290,6 +290,7 @@
 .context-compaction-notice .composer-notice-icon {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .context-compaction-notice-copy {

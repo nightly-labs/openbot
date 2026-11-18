@@ -1,0 +1,33 @@
+{
+  "slug": "longbridge",
+  "name": "Longbridge",
+  "tagline": "Brokerage and market data",
+  "description": "Longbridge lets agents read quotes, market data, positions, and account balances for the signed-in Longbridge account. Each user signs in to their own Longbridge account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Longbridge",
+  "iconUrl": "https://assets.wbrks.com/assets/manifest-icons/icon-152x152.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-positions", "text": "Summarize my positions and their profit and loss today." },
+    { "id": "prompt-quote", "text": "Show the latest quote and trading volume for TSLA." },
+    { "id": "prompt-watch", "text": "Compare the price change this month for AAPL, MSFT, and NVDA." }
+  ],
+  "apps": [
+    {
+      "id": "app-longbridge-mcp",
+      "name": "Longbridge",
+      "description": "Quotes, market data, positions, and balances, over Longbridge's MCP server with browser sign-in.",
+      "iconUrl": "https://assets.wbrks.com/assets/manifest-icons/icon-152x152.png",
+      "server": {
+        "name": "longbridge",
+        "transport": "http",
+        "url": "https://mcp.longbridge.com",
+        "auth": [{ "id": "longbridge-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://longbridge.com",
+  "privacyPolicyUrl": "https://longbridge.com/sg/support/topics/Other/privacy-policy",
+  "termsUrl": "https://open.longbridge.com/docs/legal",
+  "skills": []
+}

@@ -277,6 +277,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} の OpenBot は Telegram のメッセージを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
   "connector.telegram.helpError": "OpenBot はこのチャットに接続できません。再接続するか、チャットを切断してください。",
+  "connector.telegram.helpNotLinked":
+    "このチャットはこのサーバーにリンクされていません。リンクするには「再接続」を選択してください。",
   "connector.telegram.retryAt": "Telegram から待機するよう求められました。{time} に再試行します。",
   "connector.telegram.pause": "一時停止",
   "connector.telegram.resume": "再開",
@@ -359,6 +361,8 @@ export const messages = {
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot はこの番号の保存済みキーを読み取れません。番号をもう一度リンクしてください。",
   "connector.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
   "connector.whatsapp.pause": "一時停止",
   "connector.whatsapp.resume": "再開",
@@ -373,7 +377,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "個人の番号",
   "connector.whatsapp.ownNumberDescription":
-    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
+  "connector.whatsapp.workingMessage": "「対応しています…」メッセージ",
+  "connector.whatsapp.workingMessageDescription":
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
+  "connector.whatsapp.statusReactions": "ステータスのリアクション",
+  "connector.whatsapp.statusReactionsDescription":
+    "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",
@@ -392,10 +402,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "番号",
   "connector.whatsapp.kindPersonal": "自分の個人番号",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。",
+    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。それ以外の人には返信しません。",
   "connector.whatsapp.kindDedicated": "OpenBot 専用の番号",
   "connector.whatsapp.kindDedicatedDescription":
-    "知らない人には、あなたに伝えるためのコードが届きます。ここでその人を承認します。",
+    "OpenBot はこの番号から、知らない人それぞれに、あなたに伝えるためのコードを返信します。ここでその人を承認します。",
   "connector.whatsapp.methodLabel": "リンク方法",
   "connector.whatsapp.methodQr": "QR コード",
   "connector.whatsapp.methodCode": "ペアリングコード",
@@ -563,4 +573,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API キーの client_secret",
   "connector.bitwarden.masterPassword": "マスターパスワード",
   "connector.bitwarden.connecting": "接続中",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "共有の Proton Pass 保管庫のログイン情報で、エージェントがサイトにサインインします。",
+  "connector.protonPass.descriptionHost":
+    "{host} のエージェントが、共有の Proton Pass 保管庫のログイン情報でサイトにサインインします。",
+  "connector.protonPass.connect": "接続",
+  "connector.protonPass.moreWays": "その他の接続方法",
+  "connector.protonPass.useKey": "アクセスキーを使う",
+  "connector.protonPass.keyLabel": "アクセスキー",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "設定",
+  "connector.protonPass.setupDescription":
+    "「接続」でブラウザーに Proton のサインインが開きます。その後、OpenBot が共有保管庫を作成し、読み取り専用キーだけを保持します。",
+  "connector.protonPass.setupDescriptionHost":
+    "「接続」でブラウザーに Proton のサインインが開きます。その後、{host} が共有保管庫を作成し、読み取り専用キーだけを保持します。",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "接続すると OpenBot がこの保管庫を作成します。共有するログイン情報をここに移動してください。",
+  "connector.protonPass.showSteps": "手順を表示",
+  "connector.protonPass.stepsLabel": "接続の手順",
+  "connector.protonPass.stepSignIn": "サインイン",
+  "connector.protonPass.stepVault": "共有保管庫を作成",
+  "connector.protonPass.stepDone": "完了",
+  "connector.protonPass.signInTitle": "Proton にサインイン",
+  "connector.protonPass.signInStarting": "OpenBot がサインインを開始します。Proton のページがブラウザーで開きます。",
+  "connector.protonPass.signInDescription":
+    "サインインがブラウザーで開いています。Proton がパスワードと 2 要素目を求めます。",
+  "connector.protonPass.signInDescriptionHost":
+    "{host} のサインインがブラウザーで開いています。Proton がパスワードと 2 要素目を求めます。",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass が追加パスワードを求めています。",
+  "connector.protonPass.extraPasswordWrong": "追加パスワードが正しくありません。もう一度入力してください。",
+  "connector.protonPass.extraPasswordLabel": "追加パスワード",
+  "connector.protonPass.continue": "続ける",
+  "connector.protonPass.setupStepTitle": "共有保管庫を作成中",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot が保管庫「{vault}」と読み取り専用キーを作成します。その後、Proton のセッションからサインアウトします。",
+  "connector.protonPass.doneTitle": "Proton Pass に接続しました",
+  "connector.protonPass.doneDescription":
+    "ログイン情報を「{vault}」に移動すると、エージェントがそれでサインインできます。",
+  "connector.protonPass.failedTitle": "Proton Pass に接続できませんでした",
+  "connector.protonPass.copyLink": "リンクをコピー",
+  "connector.protonPass.linkCopied": "コピーしました",
+  "connector.protonPass.openAgain": "もう一度開く",
+  "connector.protonPass.done": "完了",
+  "connector.protonPass.close": "閉じる",
+  "connector.protonPass.statusConnecting": "接続中",
+  "connector.protonPass.statusConnected": "接続済み",
+  "connector.protonPass.statusExpired": "キーの期限切れ",
+  "connector.protonPass.expiredTitle": "Proton Pass のキーの期限が切れました",
+  "connector.protonPass.expiredDescription":
+    "もう一度サインインするまで、エージェントは共有ログイン情報でサインインできません。",
+  "connector.protonPass.reconnect": "再接続",
+  "connector.protonPass.planTitle": "Proton Pass には有料プランが必要です",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI は有料の Proton プランでのみ使えます。プランを変更してから、もう一度接続してください。",
+  "connector.protonPass.vaultTitle": "共有保管庫",
+  "connector.protonPass.vaultDescription":
+    "エージェントはこの保管庫のログイン情報でサインインできます。共有するログイン情報をここに移動してください。",
+  "connector.protonPass.loginCount": { other: "ログイン情報 {count} 件" },
+  "connector.protonPass.loginsLoading": "ログイン情報を数えています…",
+  "connector.protonPass.keyExpires": "読み取り専用。{date} に期限切れ。",
+  "connector.protonPass.keyExpired": "読み取り専用。{date} に期限切れになりました。",
+  "connector.protonPass.keyNoExpiry": "読み取り専用。期限なし。",
+  "connector.protonPass.disconnectTitle": "Proton Pass を切断",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot はこのコンピューター上のアクセスキーを削除します。保管庫とそのログイン情報は Proton アカウントに残ります。",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot は {host} 上のアクセスキーを削除します。保管庫とそのログイン情報は Proton アカウントに残ります。",
+  "connector.protonPass.disconnect": "切断",
+  "connector.protonPass.actionFailed": "OpenBot は Proton Pass の接続を変更できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

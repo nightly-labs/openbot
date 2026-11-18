@@ -6,14 +6,19 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // endpoints. On a joined server they belong to the host, so the request goes there, and the host
 // answers only an owner or admin. A key only travels towards the host; no result carries one.
 
-import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
+import type { DownloadableProviderId } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentProviderId,
   type AgentStatus,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
+  decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostProviderAccountUsage,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
@@ -23,20 +28,49 @@ import {
   type McpTestResult,
   type PasteProviderRelaySignInInput,
   type ProviderRelaySignInStatus,
+  type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
+  withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  CUSTOM_PROVIDER_EDIT_CAPABILITY,
+  CUSTOM_PROVIDER_EDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_DEFAULT_CAPABILITY,
+  PROVIDER_DEFAULT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-default-v1";
 import {
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
@@ -50,6 +84,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -69,30 +104,39 @@ import { sourceText } from "@openbot/i18n/source";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
-import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
-  decodeAgentStatusFromHost,
+  decodeHostDefaultProviderFromHost,
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
   decodeProviderUsageResetsFromHost,
+  decodeProviderUseFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { type SignInRelayClient, signInRelayRemote } from "../sign-in-relay-client";
-import { parseProviderId } from "./app-inputs";
-import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
+import { parseProviderId, parseSetup } from "./app-inputs";
+import {
+  parseDeleteCustomProvider,
+  parseSaveCustomProvider,
+  parseUpdateCustomProvider,
+} from "./custom-provider-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseConnectProviderAccountInput,
-  parseManagedProviderId,
+  parseConnectProviderAccountKeyInput,
+  parseDownloadableProviderId,
   parseProviderApiKeyInput,
+  parseProviderUseInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString } from "./validation";
 
@@ -112,6 +156,10 @@ interface ProviderAdminIpcDependencies {
     | "startProviderCodeLogin"
     | "submitProviderCodeLogin"
     | "cancelProviderCodeLogin"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "changeProviderCredential"
     | "clearProviderCredential"
     | "signInCodexWithApiKey"
@@ -121,7 +169,7 @@ interface ProviderAdminIpcDependencies {
     ProviderRuntimeManager,
     "getStatus" | "download" | "cancel" | "checkForUpdates" | "ensureKeyProviderCli"
   >;
-  customProviders: PeerCustomProviderChanges;
+  customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
@@ -132,6 +180,9 @@ interface RelayedSignIn {
   fiber: Fiber.Fiber<McpTestResult, unknown>;
   result: { error: string | null } | null;
 }
+
+/** As the host's long provider start (3 minutes), with the key check and the model list after it. */
+const ACCOUNT_KEY_CONNECT_TIMEOUT_MS = 4 * 60_000;
 
 export function providerAdminIpcHandlers({
   service,
@@ -150,7 +201,7 @@ export function providerAdminIpcHandlers({
   /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
-    return runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost));
+    return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
   }
 
   /**
@@ -226,6 +277,35 @@ export function providerAdminIpcHandlers({
       },
     });
 
+  /** The code sign-in of an account of a joined server's host, which only a host with `provider-account-code-v1` runs. */
+  function accountCode<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_CODE_CAPABILITY))
+      throw new Error(sourceText("error.team.providersUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  }
+
+  /**
+   * The provider that a new agent of a joined server's host starts on, which only a host with
+   * `provider-default-v1` serves. This computer's own is `app.saveSetup`.
+   */
+  function hostDefaultProvider(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_DEFAULT_CAPABILITY))
+      throw new Error(sourceText("error.team.providerDefaultUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeHostDefaultProviderFromHost, { method: "POST", body }),
+    );
+  }
+
+  /**
+   * The on/off switch of a joined server's host's built-in providers, which only a host with
+   * `provider-use-v1` serves. This computer's own switch is `providers.setProviderOn`.
+   */
+  function providerUse(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_USE_CAPABILITY))
+      throw new Error(sourceText("error.team.providerUseUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeProviderUseFromHost, { method: "POST", body }));
+  }
+
   /**
    * The usage reset credits of a joined server's host's accounts, which only a host with
    * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
@@ -268,6 +348,9 @@ export function providerAdminIpcHandlers({
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
     await stopRelay(key);
+    // Two quick starts both pass the stop above before either one runs its flow. The later start stops
+    // the flow of the earlier one here, so no flow runs on the host that the status and cancel cannot reach.
+    while (relayed.has(key)) await stopRelay(key);
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
     const start = post(path, decodeSignInRelayFlow, body);
@@ -287,8 +370,15 @@ export function providerAdminIpcHandlers({
     if (running) await Effect.runPromise(Fiber.interrupt(running.fiber));
   }
 
-  /** `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does not. */
+  /**
+   * `custom-provider-harness-choice-v1` also lets a save or an edit name the harness;
+   * `custom-provider-edit-v1` also names the header names of each endpoint, so an edit keeps them;
+   * `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does neither.
+   */
   function customRoutes(serverId: string) {
+    if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY))
+      return CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES;
+    if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY)) return CUSTOM_PROVIDER_EDIT_ROUTES;
     return remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CAPABILITY)
       ? CUSTOM_PROVIDER_HARNESS_ROUTES
       : PROVIDERS_ADMIN_ROUTES;
@@ -300,8 +390,9 @@ export function providerAdminIpcHandlers({
       ? decodeProviderRuntimeSnapshotV8
       : decodeProviderRuntimeSnapshot;
   }
-  const runtime = (route: "runtimesDownload" | "runtimesCancel") => (provider: ManagedProviderId, serverId: string) =>
-    remote(serverId, runtimeRoutes(serverId)[route], { provider }, runtimeDecoder(serverId));
+  const runtime =
+    (route: "runtimesDownload" | "runtimesCancel") => (provider: DownloadableProviderId, serverId: string) =>
+      remote(serverId, runtimeRoutes(serverId)[route], { provider }, runtimeDecoder(serverId));
 
   return {
     providerAdmin: {
@@ -336,7 +427,49 @@ export function providerAdminIpcHandlers({
       cancelHostSignIn: hostSignIn((provider, serverId) =>
         remoteChange(serverId, PROVIDER_HOST_SIGN_IN_ROUTES.cancel, { provider }),
       ),
-      accounts: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.list, decodeHostProviderAccountsFromHost),
+      // A host with `provider-account-models-v1` also gives the models of each account after the
+      // first. When that read fails, the accounts come without them, as from an older host.
+      accounts: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (serverId) => {
+          requireAccounts(serverId);
+          const list = remoteServers.request(
+            serverId,
+            PROVIDER_ACCOUNTS_ROUTES.list,
+            decodeHostProviderAccountsFromHost,
+            {
+              method: "POST",
+              body: {},
+            },
+          );
+          const models = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
+          // A host with `provider-account-pool-v1` also gives its pools. When that read fails, the
+          // accounts come without them, as from an older host.
+          const pools = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
+          return runCauseEffect(
+            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled]) => {
+                const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
+                return pooled ? { ...withModels, pools: pooled } : withModels;
+              }),
+            ),
+          );
+        },
+      }),
       accountUsage: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.usage, decodeHostProviderAccountUsage),
       startAccountSignIn: accountsRequest(
         parseConnectProviderAccountInput,
@@ -355,8 +488,78 @@ export function providerAdminIpcHandlers({
         acceptEmpty,
         (provider) => ({ provider }),
       ),
+      connectAccountKey: scopedHandler(parseConnectProviderAccountKeyInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_KEYS_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            // The host answers after it checked the key in a new provider process, which can start slowly.
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_KEYS_ROUTES.connect, acceptEmpty, {
+              method: "POST",
+              body: input,
+              timeoutMs: ACCOUNT_KEY_CONNECT_TIMEOUT_MS,
+            }),
+          );
+        },
+      }),
+      startAccountCodeLogin: scopedHandler(parseConnectProviderAccountInput, {
+        local: ({ provider, accountId }) => runCauseEffect(service.startProviderAccountCodeLogin(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.start, input, decodeProviderAccountCodeLoginStart),
+      }),
+      submitAccountCodeLogin: scopedHandler(parseSubmitAccountCodeLoginInput, {
+        local: async ({ provider, accountId, code }) =>
+          service.submitProviderAccountCodeLogin(provider, accountId, code),
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.submit, input, acceptEmpty),
+      }),
+      accountCodeLoginStatus: scopedHandler(parseRemoveProviderAccountInput, {
+        local: ({ provider, accountId }) =>
+          Promise.resolve(service.providerAccountCodeLoginStatus(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.status, input, decodeProviderAccountCodeLoginStatus),
+      }),
+      cancelAccountCodeLogin: scopedHandler(parseRemoveProviderAccountInput, {
+        local: async ({ provider, accountId }) => {
+          await runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId));
+        },
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.cancel, input, acceptEmpty),
+      }),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
+      setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      hostDefaultProvider: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
+        remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
+      }),
+      setHostDefaultProvider: scopedHandler(parseSetup, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
+        remote: (input, serverId) =>
+          hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.update, {
+            provider: input.preferredProvider,
+            model: input.preferredModel,
+          }),
+      }),
+      providerUse: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.list, {}),
+      }),
+      setProviderUse: scopedHandler(parseProviderUseInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (input, serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.set, input),
+      }),
       usageResets: usageResetRequest(
         parseProviderId,
         PROVIDER_USAGE_RESET_ROUTES.list,
@@ -406,9 +609,7 @@ export function providerAdminIpcHandlers({
       ),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
-        return runCauseEffect(
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
-        );
+        return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
       }),
       getApiKeyState: scopedHandler(parseProviderId, {
         local: (provider) => ({ provider, status: credentials.status(provider) }),
@@ -454,11 +655,11 @@ export function providerAdminIpcHandlers({
         local: () => runtimes.getStatus(),
         remote: (serverId) => remote(serverId, runtimeRoutes(serverId).runtimesStatus, {}, runtimeDecoder(serverId)),
       }),
-      downloadRuntime: scopedHandler(parseManagedProviderId, {
+      downloadRuntime: scopedHandler(parseDownloadableProviderId, {
         local: (provider) => runCauseEffect(runtimes.download(provider)),
         remote: runtime("runtimesDownload"),
       }),
-      cancelRuntime: scopedHandler(parseManagedProviderId, {
+      cancelRuntime: scopedHandler(parseDownloadableProviderId, {
         local: (provider) => runCauseEffect(runtimes.cancel(provider)),
         remote: runtime("runtimesCancel"),
       }),
@@ -472,8 +673,46 @@ export function providerAdminIpcHandlers({
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
         local: (input) => runCauseEffect(customProviders.save(input)),
-        remote: (input, serverId) =>
-          remote(serverId, customRoutes(serverId).customSave, input, decodeCustomProviderResult),
+        remote: (input, serverId) => {
+          const routes = customRoutes(serverId);
+          // The harness choice route needs a harness; a client that names none adds the endpoint on
+          // the default one, as the older routes do.
+          const body =
+            routes === CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
+              ? { ...input, harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS }
+              : input;
+          return remote(serverId, routes.customSave, body, decodeCustomProviderResult);
+        },
+      }),
+      updateCustomProvider: scopedHandler(parseUpdateCustomProvider, {
+        local: (input) => runCauseEffect(customProviders.update(input)),
+        remote: (input, serverId) => {
+          // A host without `custom-provider-edit-v1` has no edit route.
+          if (!remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY))
+            throw new Error(sourceText("error.provider.localOnly"));
+          // The host keeps the model settings; the wire has none. An edit that names a harness moves
+          // the endpoint to it on a host with `custom-provider-harness-choice-v1`; otherwise the
+          // endpoint keeps its harness.
+          const body = {
+            id: input.id,
+            name: input.name,
+            baseUrl: input.baseUrl,
+            models: input.models.map(({ id, name }) => ({ id, name })),
+            ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+            ...(input.headers !== undefined ? { headers: input.headers } : {}),
+          };
+          if (
+            input.harness !== undefined &&
+            remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY)
+          )
+            return remote(
+              serverId,
+              CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate,
+              { ...body, harness: input.harness },
+              decodeCustomProviderResult,
+            );
+          return remote(serverId, CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, body, decodeCustomProviderResult);
+        },
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
         local: ({ id }) => runCauseEffect(customProviders.remove(id)),
@@ -488,6 +727,15 @@ export function providerAdminIpcHandlers({
 function parseSubmitCodeLoginInput(value: unknown): SubmitProviderCodeLoginInput {
   if (!isDynamicRecord(value) || !isString(value.code)) throw new Error(sourceText("error.provider.codeLoginBadCode"));
   return { provider: parseProviderId(value.provider), code: normalizePastedCode(value.code) };
+}
+
+/** As `parseSubmitCodeLoginInput`, with the account whose sign-in waits for the code. */
+function parseSubmitAccountCodeLoginInput(value: unknown): SubmitProviderAccountCodeLoginInput {
+  const { provider, code } = parseSubmitCodeLoginInput(value);
+  return {
+    ...parseRemoveProviderAccountInput({ provider, accountId: isDynamicRecord(value) ? value.accountId : null }),
+    code,
+  };
 }
 
 /** The address holds a grant, so the error never quotes it. */

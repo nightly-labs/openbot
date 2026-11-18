@@ -10,8 +10,11 @@
 import type { IncomingMessage } from "node:http";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   agentAccessRank,
+  CHANNEL_RESUME_ITEM_TYPE,
+  type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
@@ -32,16 +35,22 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   type TeamMemberSummary,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
+  CHANNEL_BROWSER_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_CAPABILITIES_HEADER,
@@ -49,7 +58,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -59,6 +68,71 @@ export const JSON_LIMIT = 1024 * 1024;
 /** A response body leaves room in one WebRTC frame for the response envelope around it. */
 export const WEBRTC_FRAME_BODY_BUDGET = Math.floor(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES * 0.75);
 
+/** A client draws a text of a few megabytes for seconds, so a cut text keeps at most this much. */
+const CUT_TEXT_BYTES = 256 * 1024;
+
+/**
+ * A page of one message can still be larger than one WebRTC frame, and a remote client could then not
+ * open the chat or read the history behind that message. The texts of `messages` give up
+ * `excessBytes` of their JSON size: the largest texts are cut to one size, at most `CUT_TEXT_BYTES`,
+ * and the smaller texts stay whole. The start and the end of a cut text stay, with a note between
+ * them. The host keeps the whole text.
+ */
+export function messageTextCut(
+  messages: readonly ConversationMessage[],
+  excessBytes: number,
+): (message: ConversationMessage) => ConversationMessage {
+  const sizes = new Map(messages.map((message) => [message, jsonBytes(message.text)]));
+  // A message that is also a reply reference is in the page twice, so its size counts twice.
+  const ascending = messages.map((message) => sizes.get(message) ?? 0).sort((left, right) => left - right);
+  let remaining = ascending.reduce((sum, size) => sum + size, 0) - excessBytes;
+  // The rest of the page alone is too large: a cut cannot help, so every text stays whole.
+  if (remaining <= 0) return (message) => message;
+  let cap = Number.POSITIVE_INFINITY;
+  for (const [index, size] of ascending.entries()) {
+    const left = ascending.length - index;
+    if (size * left > remaining) {
+      cap = Math.max(0, Math.floor(remaining / left));
+      break;
+    }
+    remaining -= size;
+  }
+  const limit = Math.min(cap, CUT_TEXT_BYTES);
+  return (message) =>
+    (sizes.get(message) ?? 0) > limit ? { ...message, text: cutText(message.text, limit) } : message;
+}
+
+function cutText(text: string, maxBytes: number): string {
+  const textBytes = Buffer.byteLength(text);
+  for (let keep = Math.floor(text.length / 2); ; ) {
+    // Do not split a surrogate pair at either cut.
+    const end = isHighSurrogate(text.charCodeAt(keep - 1)) ? keep - 1 : keep;
+    const start = isLowSurrogate(text.charCodeAt(text.length - keep)) ? text.length - keep + 1 : text.length - keep;
+    const head = text.slice(0, end);
+    const tail = text.slice(start);
+    // Rounded up to 0.1 MB, so a cut never reads as 0.0 MB.
+    const size = (Math.ceil((textBytes - Buffer.byteLength(head) - Buffer.byteLength(tail)) / 104_857.6) / 10).toFixed(
+      1,
+    );
+    const cut = `${head}\n\n${sourceText("status.remote.messageCut", { size })}\n\n${tail}`;
+    const bytes = jsonBytes(cut);
+    if (bytes <= maxBytes || keep === 0) return cut;
+    keep = Math.floor(keep * Math.min(0.99, maxBytes / bytes));
+  }
+}
+
+function jsonBytes(value: string): number {
+  return Buffer.byteLength(JSON.stringify(value));
+}
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
+
 export function requestCapabilities(request: IncomingMessage): Set<string> {
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
   const value = Array.isArray(header) ? header.join(",") : header;
@@ -66,10 +140,7 @@ export function requestCapabilities(request: IncomingMessage): Set<string> {
   // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
 }
 
@@ -122,21 +193,30 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
   excludeRoutineRunEvents: boolean;
   excludeHostedSiteEvents: boolean;
   excludeRoutineQuietAnswers: boolean;
+  excludeSettingLinks?: boolean;
 } {
   return {
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
     excludeRoutineQuietAnswers: true,
+    excludeSettingLinks: !capabilities.has(SETTING_LINK_MARKERS_CAPABILITY),
   };
 }
 
 /**
  * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
- * into its run, so a quiet answer goes to none: it would show as a new answer to every client.
+ * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
+ * agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
+ * agent only, so they go to none either.
  */
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return false;
+  if (
+    itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+    itemType === AGENT_WELCOME_ITEM_TYPE ||
+    itemType === CHANNEL_RESUME_ITEM_TYPE
+  )
+    return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
@@ -146,6 +226,7 @@ function markerSupported(itemType: string | undefined, capabilities: ReadonlySet
   if (itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX)) {
     return capabilities.has("hosted-site-event-markers");
   }
+  if (itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX)) return capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
   return true;
 }
 
@@ -256,12 +337,16 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     const value = JSON.parse(body.toString("utf8"));
     const path = request.url ?? "/";
     const sideRoute = teamSideRouteCodec(path);
+    const capabilities = requestCapabilities(request);
     if (sideRoute) {
-      const input = sideRoute.request(path, value);
+      const input = sideRoute.request(path, value, {
+        channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+        channelPicture: capabilities.has(CHANNEL_PICTURE_CAPABILITY),
+        channelBrowser: capabilities.has(CHANNEL_BROWSER_CAPABILITY),
+      });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;
     }
-    const capabilities = requestCapabilities(request);
     return teamHttpCodec(requestProtocol(request)).decodeRequest(request.method ?? "GET", path, value, {
       preserveSemanticTags: supportsTeamSemanticTags(capabilities),
       agentCreateModel: capabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),

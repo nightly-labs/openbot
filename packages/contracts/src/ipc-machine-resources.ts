@@ -63,6 +63,20 @@ export function machineMetricRatio(metrics: MachineMetrics, metric: MachineMetri
   return Math.min(1, Math.max(0, (total - free) / total));
 }
 
+export type MachineMetricTone = "normal" | "warning" | "danger";
+
+/** The whole percent in use, or null when the host could not read the metric. 0% is a reading too. */
+export function machineMetricPercent(metrics: MachineMetrics, metric: MachineMetric): number | null {
+  const ratio = machineMetricRatio(metrics, metric);
+  return ratio === null ? null : Math.floor(ratio * 100);
+}
+
+/** Warning from the alert level, and danger far above it: at 95%, or 10 points above a higher level. */
+export function machineMetricTone(percent: number | null, level: number | null): MachineMetricTone {
+  if (percent === null || level === null || percent < level) return "normal";
+  return percent >= Math.max(95, level + 10) ? "danger" : "warning";
+}
+
 const isCount = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const isNullableCount = (value: unknown): value is number | null => value === null || isCount(value);

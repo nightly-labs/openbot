@@ -244,7 +244,7 @@ function padExtent(pieces: readonly PlushPiece[]) {
 export type Matrix = readonly [number, number, number, number, number, number];
 
 /** The six numbers of a `matrix(a,b,c,d,e,f)` string. */
-function matrixOf(transform: string): Matrix {
+export function matrixOf(transform: string): Matrix {
   const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = (transform.match(/-?[\d.]+(?:e-?\d+)?/g) ?? []).map(Number);
   return [a, b, c, d, e, f];
 }

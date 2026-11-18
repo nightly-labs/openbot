@@ -1,5 +1,6 @@
 import type { NotificationSound } from "@openbot/contracts/notification-relay";
 import type { NotificationPermission } from "@/features/settings/model/push-notifications";
+import type { OutsideTarget } from "@/features/workspace/model/outside-target";
 
 /** The data key of a sound preview. The notification handler plays it and shows nothing. */
 export const SOUND_PREVIEW_KEY = "openbotSoundPreview";
@@ -33,10 +34,8 @@ export interface PushNotificationsNative {
   previewSound(sound: NotificationSound): Promise<void>;
 }
 
-/** What a notification names: its agent, and the server and thread of the event. */
-export interface NotificationTarget {
-  agentId: string;
-  serverId: string | null;
-  /** The thread of the event. A thread of a channel opens the channel. */
-  threadId: string | null;
-}
+/**
+ * What a notification names: its agent, and the server and thread of the event. A thread of a channel
+ * opens the channel, and a side thread of the agent opens that thread.
+ */
+export type NotificationTarget = OutsideTarget;

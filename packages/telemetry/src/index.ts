@@ -3,10 +3,12 @@ export type { CauseCode, FailureProperties, NotificationMetadata, Operation, Rep
 export {
   ANALYTICS_GENERATIONS,
   classifyFailure,
+  httpStatusCause,
   isCauseCode,
   operationForCode,
   safeProperties,
   safeReport,
+  structuredCause,
 } from "./events";
 export { currentAnalyticsInstallId, newAnalyticsInstallId } from "./install-id";
 export type { ReportStorage, ReportTransport } from "./queue";

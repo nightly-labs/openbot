@@ -1,22 +1,31 @@
+import { useThemeColor } from "heroui-native/hooks";
 import { useMemo } from "react";
 import { StyleSheet, type ViewStyle } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { isAndroid } from "@/shared/lib/platform";
 
 /**
- * The glass of the search field and the bar buttons on Android: the solid glass of the design, an
- * almost opaque fill with a hairline edge and a soft shadow. Android has no Liquid Glass, and its
- * blur does not work over a scroll view (`BlurTargetView` draws a grainy band and stops the row
- * layout animations). Without the blur, the clear glass would show the rows through the field.
+ * The fill of the bar buttons where there is no Liquid Glass. Android has no glass: the buttons are
+ * plain, with the fill of the chat composer and its buttons, and no edge or shadow. iOS without Liquid
+ * Glass keeps the solid glass of the design: an almost opaque fill with a hairline edge and a soft
+ * shadow.
+ *
+ * A bar button sets `shadow: false`: the native header clips a view to its bounds, so the soft shadow
+ * of a 40 dp circle in a 48 dp button showed as a grey square around it.
  */
-export function useChromeGlass(): ViewStyle {
+export function useChromeGlass({ shadow = true }: { shadow?: boolean } = {}): ViewStyle {
   const [fill, edge] = useCSSVariable(["--openbot-bg-chrome-glass", "--openbot-border-chrome-glass"]);
+  const plain = useThemeColor("default");
   return useMemo(
-    () => ({
-      backgroundColor: String(fill),
-      borderColor: String(edge),
-      borderWidth: StyleSheet.hairlineWidth,
-      boxShadow: "0 6px 18px rgba(0, 0, 0, 0.07)",
-    }),
-    [fill, edge],
+    () =>
+      isAndroid
+        ? { backgroundColor: String(plain) }
+        : {
+            backgroundColor: String(fill),
+            borderColor: String(edge),
+            borderWidth: StyleSheet.hairlineWidth,
+            boxShadow: shadow ? "0 6px 18px rgba(0, 0, 0, 0.07)" : undefined,
+          },
+    [fill, edge, plain, shadow],
   );
 }

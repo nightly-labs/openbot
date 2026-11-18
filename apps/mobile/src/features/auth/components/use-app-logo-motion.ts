@@ -6,7 +6,6 @@ import {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -19,7 +18,6 @@ const VIEWBOX_SIZE = 240;
 const BLINK_INTERVAL_MS = 4_800;
 const BLINK_START_DELAY_MS = 2_112;
 const BLINK_HALF_DURATION_MS = 96;
-const BLINK_END_DELAY_MS = BLINK_INTERVAL_MS - BLINK_START_DELAY_MS - BLINK_HALF_DURATION_MS * 2;
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const WINK_DURATION_MS = 360;
@@ -29,18 +27,15 @@ const WINK_OPEN_DURATION_MS = WINK_DURATION_MS - WINK_CLOSE_DURATION_MS - WINK_H
 const WINK_RIGHT_REACTION_DURATION_MS = 173;
 const WINK_RIGHT_RECOVERY_DURATION_MS = WINK_DURATION_MS - WINK_RIGHT_REACTION_DURATION_MS;
 
+/**
+ * One blink. A timer starts each one, so the display does not draw frames in the long open time
+ * between blinks, as a repeated animation with a delay does.
+ */
 function createBlinkAnimation(): number {
-  return withRepeat(
-    withSequence(
-      ReduceMotion.Never,
-      withDelay(BLINK_START_DELAY_MS, withTiming(0.08, { duration: BLINK_HALF_DURATION_MS, easing: EASE_IN_OUT })),
-      withTiming(1, { duration: BLINK_HALF_DURATION_MS, easing: EASE_IN_OUT }),
-      withDelay(BLINK_END_DELAY_MS, withTiming(1, { duration: 0 })),
-    ),
-    -1,
-    false,
-    undefined,
+  return withSequence(
     ReduceMotion.Never,
+    withTiming(0.08, { duration: BLINK_HALF_DURATION_MS, easing: EASE_IN_OUT }),
+    withTiming(1, { duration: BLINK_HALF_DURATION_MS, easing: EASE_IN_OUT }),
   );
 }
 
@@ -51,8 +46,11 @@ export function useAppLogoMotion({ animation, size }: { animation: AppLogoAnimat
   const rightEyeScaleY = useSharedValue(1);
   const rightEyeTranslateY = useSharedValue(0);
   const resumeBlinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopEyeAnimations = useCallback(() => {
+    if (blinkTimer.current) clearTimeout(blinkTimer.current);
+    blinkTimer.current = null;
     cancelAnimation(leftEyeScaleY);
     cancelAnimation(rightEyeScaleX);
     cancelAnimation(rightEyeScaleY);
@@ -72,8 +70,12 @@ export function useAppLogoMotion({ animation, size }: { animation: AppLogoAnimat
 
     if (animation !== "blink" || reduceMotion) return;
 
-    leftEyeScaleY.set(createBlinkAnimation());
-    rightEyeScaleY.set(createBlinkAnimation());
+    const blink = () => {
+      leftEyeScaleY.set(createBlinkAnimation());
+      rightEyeScaleY.set(createBlinkAnimation());
+      blinkTimer.current = setTimeout(blink, BLINK_INTERVAL_MS);
+    };
+    blinkTimer.current = setTimeout(blink, BLINK_START_DELAY_MS);
   }, [animation, leftEyeScaleY, reduceMotion, resetEyes, rightEyeScaleY, stopEyeAnimations]);
 
   useEffect(() => {

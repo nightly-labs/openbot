@@ -1,21 +1,28 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ClientSideConnection, ContentBlock, InitializeResponse } from "@agentclientprotocol/sdk";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import { parse as parseToml } from "smol-toml";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { GROK_ACP_FLAVOR } from "./acp-flavor";
 import type { GrokCliInfo } from "./cli";
+import { isMissingFileError } from "./file-errors";
+import { MCP_STDIO_PROBE_TIMEOUT_MS } from "./mcp-probe";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
-import { confineSpawnTarget, grokStatePaths, type ProcessConfinement } from "./process-confinement";
-import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
+import { confineSpawnTarget, grokHomeDirectory, grokStatePaths, type ProcessConfinement } from "./process-confinement";
+import { type AccountRateLimitsReadResult, getRecord, getString, isRecord } from "./protocol";
 import { providerCall } from "./provider-client-effects";
 
 export class GrokAgentClient extends AcpAgentClient {
   constructor(
     cli: GrokCliInfo,
     requestTimeoutMs = 30_000,
-    profileGeneration = false,
+    /** `"media"`: a profile-generation client that may run only the image and video tools. */
+    profileGeneration: boolean | "media" = false,
     mcpServers: McpServerSource = () => [],
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
@@ -33,24 +40,39 @@ export class GrokAgentClient extends AcpAgentClient {
               confineSpawnTarget(target, confinement, grokStatePaths({ ...process.env, ...agentEnvironment?.() })),
           }
         : {}),
-      profileGeneration,
+      profileGeneration: profileGeneration !== false,
+      mediaGeneration: profileGeneration === "media",
       // A profile-generation client asks one question and must not act, so it is given none.
-      mcpServers: profileGeneration ? () => [] : mcpServers,
+      mcpServers: profileGeneration !== false ? () => [] : mcpServers,
       reportMcpDrops,
       mcpToolRuntimes,
       mcpEndpoint,
       argv: [
         "--no-auto-update",
-        ...(profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
+        ...(profileGeneration === "media"
+          ? [
+              "--no-subagents",
+              "--disable-web-search",
+              ...GROK_NON_MEDIA_TOOLS.flatMap((tool) => ["--deny", tool]),
+              "--deny",
+              "mcp__*",
+            ]
+          : profileGeneration
+            ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"]
+            : // Grok asks OpenBot before a tool that needs approval, and the agent's access decides.
+              // Before, a `dontAsk` mode in the user's Grok or Claude settings refused OpenBot's tools
+              // without a request (#9435), and an always-approve mode skipped Ask first.
+              ["--permission-mode", "default"]),
         "agent",
         "stdio",
       ],
-      // Grok declares `send_feedback` and `workflow` in each request, about 6.7k characters. Feedback
-      // goes to xAI, and a workflow runs a background agent fleet that OpenBot does not show. Without
-      // workflows Grok declares `update_goal`, about 1k characters. Grok `agent stdio` ignores
-      // `--disallowed-tools`, so only these switches remove the tools.
-      env: { GROK_OAUTH2_REFERRER: "openbot", GROK_FEEDBACK_ENABLED: "0", GROK_WORKFLOWS: "0" },
-      ...(agentEnvironment ? { extraEnv: () => ({ ...agentEnvironment() }) } : {}),
+      env: { GROK_OAUTH2_REFERRER: "openbot" },
+      // Read at each spawn, so a change to the user's `config.toml` applies to the next process.
+      extraEnv: () => {
+        const environment = { ...agentEnvironment?.() };
+        const merged = { ...process.env, ...environment };
+        return { ...grokFeatureEnvironment(merged), ...grokMcpStartupEnvironment(merged), ...environment };
+      },
       history,
       signInMessage: sourceText("error.provider.grokSignIn"),
       authenticate,
@@ -61,6 +83,125 @@ export class GrokAgentClient extends AcpAgentClient {
       steer,
     });
   }
+}
+
+/**
+ * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`grok-media.ts`). A
+ * media client denies each by name, and every MCP tool with `mcp__*`: a deny rule wins over an allow
+ * rule, so `--deny *` would also refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
+ * (`AcpAgentOptions.mediaGeneration`).
+ */
+const GROK_NON_MEDIA_TOOLS = [
+  "run_terminal_command",
+  "read_file",
+  "search_replace",
+  "write",
+  "list_dir",
+  "grep",
+  "kill_command_or_subagent",
+  "get_command_or_subagent_output",
+  "todo_write",
+  "scheduler_create",
+  "scheduler_delete",
+  "scheduler_list",
+  "monitor",
+  "search_tool",
+  "use_tool",
+  "workflow",
+  "enter_plan_mode",
+  "exit_plan_mode",
+  "ask_user_question",
+  "send_feedback",
+  "web_search",
+  "web_fetch",
+] as const;
+
+/**
+ * Grok features that OpenBot agents do not use, each with its `config.toml` key and the environment
+ * value that turns it off. Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only
+ * these switches remove a tool. Measured with `bun run bench:grok-prompt-settings` on Grok CLI 1.0.70
+ * and Grok Build Fast, in prompt tokens:
+ * - `send_feedback` and `workflow`: 1,707 in each request. Feedback goes to xAI, and a workflow runs
+ *   a background agent fleet that OpenBot does not show. Without workflows Grok declares `update_goal`.
+ * - The turn summary: one more request of about 1,600 after each turn, for a line that OpenBot does
+ *   not show.
+ * - The skills of `~/.claude/skills`: 2,811 in each request with one developer's skills. OpenBot runs
+ *   Claude agents without the user's Claude Code setup by default, too.
+ * The image, video, search, subagent and question tools stay (2026-11-07 user decision): together
+ * they cost 6,104, but an agent can use each of them.
+ */
+const GROK_FEATURE_SWITCHES: ReadonlyArray<{ key: string; env: string }> = [
+  { key: "features.feedback", env: "GROK_FEEDBACK_ENABLED" },
+  { key: "workflows.enabled", env: "GROK_WORKFLOWS" },
+  { key: "features.turn_summary", env: "GROK_TURN_SUMMARY" },
+  { key: "compat.claude.skills", env: "GROK_CLAUDE_SKILLS_ENABLED" },
+];
+
+/**
+ * The environment values that turn off `GROK_FEATURE_SWITCHES`. An environment value wins over all
+ * Grok config layers, so OpenBot sets one only for a feature that neither the user's environment nor
+ * a config layer sets. When a layer does not read or parse, OpenBot sets none, so that it never hides
+ * a value of the user. A project `.grok/config.toml` sets only MCP servers, plugins and permissions.
+ */
+function grokFeatureEnvironment(env: NodeJS.ProcessEnv, home = homedir()): Record<string, string> {
+  const layers = grokConfigLayers(env, grokHomeDirectory(env, home));
+  if (!layers) return {};
+  return Object.fromEntries(
+    GROK_FEATURE_SWITCHES.filter(
+      (feature) => !env[feature.env]?.trim() && !layers.some((layer) => hasConfigKey(layer, feature.key)),
+    ).map((feature) => [feature.env, "0"]),
+  );
+}
+
+/**
+ * Grok CLI 1.0.77 gives each MCP server 30 s to start, and OpenBot's connection test gives a stdio
+ * server 60 s. A server that started in between passed the test as ready, and Grok left it out of
+ * each session with no error (#8083). These variables set Grok's default for all servers; a server's
+ * own `startup_timeout_sec` in the user's Grok settings still wins. OpenBot sets one only when the
+ * user's environment sets neither. Grok starts the servers in the background, so a turn does not wait.
+ */
+function grokMcpStartupEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
+  if (env.MCP_TIMEOUT?.trim() || env.GROK_MCP_STARTUP_TIMEOUT_SECS?.trim()) return {};
+  return { GROK_MCP_STARTUP_TIMEOUT_SECS: String(MCP_STDIO_PROBE_TIMEOUT_MS / 1_000) };
+}
+
+/**
+ * The parsed config layers that Grok reads below the environment: `managed_config.toml` and
+ * `config.toml` of the Grok home, the `GROK_CONFIG_PATH` file (JSON or TOML) and the `GROK_CONFIG`
+ * JSON. A missing file is no layer. Null when a layer does not read or parse.
+ */
+function grokConfigLayers(env: NodeJS.ProcessEnv, grokHome: string): DynamicRecord[] | null {
+  const files = [join(grokHome, "managed_config.toml"), join(grokHome, "config.toml"), env.GROK_CONFIG_PATH?.trim()];
+  const inline = env.GROK_CONFIG?.trim();
+  try {
+    const layers = files.flatMap((file) => {
+      const text = file ? readOptionalFile(file) : null;
+      if (text === null) return [];
+      return [file?.endsWith(".json") ? JSON.parse(text) : parseToml(text)];
+    });
+    if (inline) layers.push(JSON.parse(inline));
+    return layers.every(isRecord) ? layers : null;
+  } catch {
+    return null;
+  }
+}
+
+function readOptionalFile(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) return null;
+    throw error;
+  }
+}
+
+/** Whether a config layer sets a dotted key, such as `features.turn_summary`. */
+function hasConfigKey(layer: DynamicRecord, key: string): boolean {
+  const [part = "", ...rest] = key.split(".");
+  if (!Object.hasOwn(layer, part)) return false;
+  if (rest.length === 0) return true;
+  const value = layer[part];
+  return isRecord(value) && hasConfigKey(value, rest.join("."));
 }
 
 const authenticate = Effect.fn("Grok.authenticate")(function* (

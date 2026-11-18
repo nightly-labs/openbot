@@ -1,11 +1,12 @@
-// Lists and selects Gemini models end to end on the real Antigravity driver, with a fake server that
+// Lists and selects Gemini models end to end on the real Antigravity driver, with a fake CLI that
 // answers as Antigravity 1.3.0 and later do: the `models` field lists each reasoning effort as a model
 // of its own, and `configOptions` offers each family once, with a `thought_level` option. Checks that
 // the picker gets one model for each family with that family's efforts, that the discovery session
 // goes back to the exact model it opened on, that a selected family and effort reach the session, and
-// that an agent whose option lists the same models keeps today's catalog, also with a provider option.
-// Like Antigravity 1.4.3, the fake server offers its Claude and GPT models only to a client that names
-// itself `zed` (or Xcode, JetBrains, Android Studio), so the picker also checks the name OpenBot sends.
+// that an agent whose option lists the same models keeps today's catalog, also with a provider option,
+// and is asked for each model's efforts only when its opening model has no effort option (#10976).
+// Like the Antigravity CLI 1.5.4, the fake offers its Claude and GPT models to every client, so OpenBot
+// sends its own name (`openbot`), not `zed` as it did for Antigravity 1.4.
 // `bun scripts/acp-effort-variants-e2e.ts`. Writes .openbot-build/acp-effort-variants-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -31,6 +32,10 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-effort-variants-
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4" + NL);
+  process.exit(0);
+}
 const provider = process.env.FAKE_AGY_MODE === "provider";
 const flat = provider || process.env.FAKE_AGY_MODE === "flat";
 const LEVELS = ["low", "medium", "high"];
@@ -47,7 +52,7 @@ const THIRD_PARTY = [
   { modelId: "claude-opus-4-6-thinking", name: "Claude Opus 4.6 (Thinking)" },
   { modelId: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" },
 ];
-let LISTED = GEMINI;
+const LISTED = [...GEMINI, ...THIRD_PARTY];
 const FAMILIES = { "gemini-3.8-flash": "Gemini 3.8 Flash", "gemini-3.1-pro": "Gemini 3.1 Pro" };
 const sessions = new Map();
 let count = 0;
@@ -108,10 +113,7 @@ function handle(message) {
   if (message.id === undefined) return;
   const params = message.params ?? {};
   if (message.method === "initialize") {
-    const name = String(params.clientInfo?.name ?? "").toLowerCase();
     log({ event: "initialize", sessionId: "", model: null, value: params.clientInfo?.name });
-    const thirdParty = name === "zed" || name === "xcode" || name.startsWith("jetbrains.") || name.startsWith("android studio");
-    LISTED = thirdParty ? [...GEMINI, ...THIRD_PARTY] : GEMINI;
     write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods: [] } });
     return;
   }
@@ -181,6 +183,8 @@ const log = join(root, "agy.jsonl");
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 process.env.FAKE_AGY_LOG = log;
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 
 async function readLog(): Promise<LogEntry[]> {
   const text = await readFile(log, "utf8").catch(() => "");
@@ -227,13 +231,13 @@ async function runTurn(client: AgentClient, thread: string, model: string, effor
 }
 
 try {
-  const executable = join(root, "agy", "bin", "agy_acp_server");
+  const executable = join(root, "agy", "1.5.4", "bin", "antigravity");
   const workspace = join(root, "workspace");
-  await mkdir(join(root, "agy", "bin"), { recursive: true });
+  await mkdir(join(root, "agy", "1.5.4", "bin"), { recursive: true });
   await mkdir(workspace);
   await writeFile(executable, FAKE_AGY);
   await chmod(executable, 0o755);
-  const cli: AgentCliInfo = { executable, version: "1.4.0", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
 
   // 1. A grouping agent: one model for each family, with the efforts of that family alone.
   process.env.FAKE_AGY_MODE = "grouped";
@@ -262,8 +266,8 @@ try {
   const clientNames = discovery.filter((entry) => entry.event === "initialize").map((entry) => entry.value);
   assert.ok(clientNames.length > 0, "The discovery process is initialized.");
   assert.ok(
-    clientNames.every((name) => name === "zed"),
-    "OpenBot names itself zed to Antigravity, which offers Claude and GPT models only to the clients it lists.",
+    clientNames.every((name) => name === "openbot"),
+    "OpenBot names itself openbot to the Antigravity CLI 1.5, which offers Claude and GPT models to every client.",
   );
   const discoveryEndsOn: Record<string, string | null> = {};
   for (const entry of discovery) if (entry.event === "set") discoveryEndsOn[entry.sessionId] = entry.model;
@@ -292,14 +296,18 @@ try {
   }
   report.grouped = { clientNames, models: grouped, discoveryEndsOn, turns };
 
-  // 4. An agent whose option lists the same models keeps the listed catalog, and is not asked again.
-  // A provider option of the model category before the model option (Cline) changes nothing.
+  // 4. An agent whose option lists the same models keeps the listed catalog. When its session opened
+  // on a model with no effort option, each model is asked for its own (#10976): this fake has none,
+  // so no model gets an Effort menu, and the session goes back to its opening model. A provider
+  // option of the model category before the model option (Cline) is not asked.
   await runCauseEffect(client.stop());
   for (const mode of ["flat", "provider"] as const) {
     await rm(log, { force: true });
     process.env.FAKE_AGY_MODE = mode;
-    const listed = (await listModels(open(cli))).map((model) => model.model ?? "");
-    const discoveryRequests = (await readLog()).filter((entry) => entry.event === "set").length;
+    const catalog = await listModels(open(cli));
+    const listed = catalog.map((model) => model.model ?? "");
+    const sets = (await readLog()).filter((entry) => entry.event === "set");
+    const discoveryRequests = sets.length;
     assert.deepEqual(
       listed,
       [
@@ -315,7 +323,20 @@ try {
       ],
       `An agent that does not group (${mode}) keeps its listed models.`,
     );
-    assert.equal(discoveryRequests, 0, `An agent that does not group (${mode}) is not asked for each model's efforts.`);
+    assert.ok(
+      catalog.every((model) => model.reasoningEffortConfigurable === false),
+      `No model of an agent without effort options (${mode}) gets an Effort menu.`,
+    );
+    if (mode === "flat") {
+      assert.ok(discoveryRequests > 0, "An agent whose opening model has no effort option is asked for each model's.");
+      const endsOn: Record<string, string | null> = {};
+      for (const entry of sets) endsOn[entry.sessionId] = entry.model;
+      for (const [session, model] of Object.entries(endsOn)) {
+        assert.equal(model, "gemini-3.8-flash-high", `Discovery session ${session} goes back to its opening model.`);
+      }
+    } else {
+      assert.equal(discoveryRequests, 0, "An agent whose first model option is a provider is not asked.");
+    }
     report[mode] = { models: listed, discoveryRequests };
   }
   report.passed = true;

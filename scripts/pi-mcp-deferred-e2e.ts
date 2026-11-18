@@ -3,7 +3,9 @@
 // tools, must wait for Pi's `tool_search` and not be declared in each request. The OpenBot tools stay
 // declared. The fake model first answers with a `tool_search` call, so the second request must
 // declare the loaded tool, which Pi then keeps for the rest of the session. The system prompt names
-// the server, so the model knows what to search for, and it stays the same in each request.
+// the server, so the model knows what to search for, and it stays the same in each request. The
+// OpenBot extension removes Pi's `<docs>` section, and the `<mcp_servers>` section must stay. The
+// extension adds a note to the result of Pi's `tool_search` that names OpenBot's search (#10799).
 // `PI_CLI=<pi> bun scripts/pi-mcp-deferred-e2e.ts`. Writes .openbot-build/pi-mcp-deferred-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -11,7 +13,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { VISIBLE_DYNAMIC_TOOLS } from "../src/backend/agent/tool-catalog";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -50,6 +52,8 @@ interface Report {
   requests: string[][];
   /** The `<mcp_servers>` section of the system prompt in the first request. */
   servers?: string;
+  /** The tool results in the second request: the result of Pi's `tool_search`. */
+  toolResults?: string;
   reply?: string;
   error?: string;
 }
@@ -101,6 +105,13 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
           )
           .join(NL),
       );
+      if (report.requests.length === 2)
+        report.toolResults = (parsed.messages ?? [])
+          .filter((message) => message.role === "tool")
+          .map(({ content }) =>
+            typeof content === "string" ? content : (content ?? []).map((part) => part.text).join(""),
+          )
+          .join(NL);
     }
     response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     if (names.length > 0 && report.requests.length === 1) {
@@ -173,7 +184,7 @@ try {
   const started = await runCauseEffect(
     client.request(
       "thread/start",
-      { cwd: workspace, model: "spark-e2e/fake-coder", dynamicTools: VISIBLE_DYNAMIC_TOOLS },
+      { cwd: workspace, model: "spark-e2e/fake-coder", dynamicTools: visibleDynamicTools("pi") },
       (value) => value,
     ),
   );
@@ -191,9 +202,17 @@ try {
   assert.ok(first.includes("tool_search"), `The first request has no tool_search: ${first.join(", ")}`);
   assert.ok(bridge(first).length > 0, `The first request declares no OpenBot tool: ${first.join(", ")}`);
   assert.equal(external(second).length, 1, `tool_search did not load the user's tool: ${second.join(", ")}`);
+  // A model that searched with Pi's tool_search for an OpenBot tool said the tool was missing (#10799).
+  const openbotSearch = bridge(first).find((name) => name.endsWith("__tool_search"));
+  assert.ok(openbotSearch, `The first request has no OpenBot tool_search: ${first.join(", ")}`);
+  assert.ok(
+    report.toolResults?.includes(`find them with ${openbotSearch},`),
+    `Pi's tool_search result does not name ${openbotSearch}: ${report.toolResults}`,
+  );
   // The model finds the server by its name, and a fixed system prompt keeps the provider's cache.
   report.servers = systems[0]?.match(/<mcp_servers>[\s\S]*?<\/mcp_servers>/u)?.[0] ?? "";
   assert.match(report.servers, /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
+  assert.ok(!systems.some((system) => system.includes("<docs>")), "The system prompt has Pi's <docs> section.");
   assert.equal(systems[1], systems[0], "The system prompt changed after tool_search.");
   report.passed = true;
 } catch (error) {

@@ -1,0 +1,29 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/uiBlock";
+
+export const messages = {
+  "uiBlock.status.answered": "נענה",
+  "uiBlock.status.waiting": "ממתין לך",
+  "uiBlock.outcome.expired": "לא ניתנה תשובה בזמן",
+  "uiBlock.outcome.closed": "נסגר בלי תשובה",
+  "uiBlock.outcome.autoAnswered": "{outcome} (איש לא ענה בזמן)",
+  "uiBlock.confirm.holdHint": "יש ללחוץ לחיצה ארוכה על הכפתור כדי לאשר, או ללחוץ עליו כדי לאשר בשלב שני",
+  "uiBlock.confirm.prompt": "לאשר: {action}?",
+  "uiBlock.confirm.accept": "אישור",
+  "uiBlock.confirm.autoActionLabel": "{action} · {seconds} שנ'",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
+  "uiBlock.confirm.previewLabel": "תצוגה מקדימה",
+  "uiBlock.confirm.showFullPreview": "הצגת הכול",
+  "uiBlock.confirm.hideFullPreview": "הצגת פחות",
+  "uiBlock.choice.submit": "שליחה",
+  "uiBlock.choice.shortcutHint": "יש ללחוץ על {first} עד {last} כדי לבחור",
+  "uiBlock.quick.label": "תשובות מהירות",
+  "uiBlock.form.submit": "שליחה",
+  "uiBlock.form.required": "שדה חובה",
+  "uiBlock.form.choose": "יש לבחור אפשרות",
+  "uiBlock.form.notSet": "לא הוגדר",
+  "uiBlock.form.invalid": "חלק מהתשובות אינן תקינות. יש לבדוק אותן ולנסות שוב.",
+  "uiBlock.form.hiddenValue": "מוסתר",
+  "uiBlock.skip": "דילוג",
+  "uiBlock.error.answerFailed": "לא ניתן לשלוח את התשובה. אפשר לנסות שוב.",
+} as const satisfies PartialTranslation<typeof source>;

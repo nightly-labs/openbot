@@ -34,7 +34,7 @@ async function openGitHub(address: string | null): Promise<void> {
 }
 
 /**
- * Server settings › Connectors › GitHub of a joined server. The host runs the device flow: the phone
+ * Marketplace › Apps › GitHub of a joined server. The host runs the device flow: the phone
  * shows the code and opens GitHub's page, where the user types it. The host sees the sign-in by itself.
  */
 export function GitHubConnectorPage({

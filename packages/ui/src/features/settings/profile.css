@@ -502,31 +502,6 @@
     --profile-step: calc(var(--openbot-duration-fast) / 3);
   }
 
-  /* The page builds from the top: each block rises one step after the block above it. */
-  .profile-panel > * {
-    animation: profile-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
-  }
-
-  .profile-panel > :nth-child(2) {
-    animation-delay: var(--profile-step);
-  }
-
-  .profile-panel > :nth-child(3) {
-    animation-delay: calc(var(--profile-step) * 2);
-  }
-
-  .profile-panel > :nth-child(4) {
-    animation-delay: calc(var(--profile-step) * 3);
-  }
-
-  .profile-panel > :nth-child(n + 5) {
-    animation-delay: calc(var(--profile-step) * 4);
-  }
-
-  .profile-hero-avatar {
-    animation: profile-pop var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
-  }
-
   .profile-tile {
     transition:
       background-color var(--openbot-duration-normal) var(--openbot-ease-out),
@@ -592,20 +567,6 @@
 
   .profile-hero-actions button:hover .profile-icon-edit {
     transform: rotate(-14deg);
-  }
-}
-
-@keyframes profile-rise {
-  from {
-    opacity: 0;
-    transform: translateY(var(--openbot-space-2));
-  }
-}
-
-@keyframes profile-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
   }
 }
 

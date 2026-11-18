@@ -1,0 +1,67 @@
+diff --git a/Common/cpp/reanimated/RuntimeDecorators/RNRuntimeDecorator.cpp b/Common/cpp/reanimated/RuntimeDecorators/RNRuntimeDecorator.cpp
+index c1f2a8fd902926ae2490879bf565277d79ed1d9e..2506a47a14dc1592b43e95ce369ae43805d2f1de 100644
+--- a/Common/cpp/reanimated/RuntimeDecorators/RNRuntimeDecorator.cpp
++++ b/Common/cpp/reanimated/RuntimeDecorators/RNRuntimeDecorator.cpp
+@@ -33,6 +33,18 @@ void RNRuntimeDecorator::decorate(
+ 
+   rnRuntime.global().setProperty(
+       rnRuntime, "__reanimatedModuleProxy", reanimatedModuleProxy->toOptimizedObject(rnRuntime));
++
++#ifdef ANDROID
++  // OpenBot patch: React Native writes `ShadowNodeWrapper::shadowNode` of a mounted view on the JS
++  // thread at each commit, while the UI thread copies the same `shared_ptr` in animated updates. The
++  // copy races with the write and corrupts the reference count (double free). A detached wrapper
++  // holds the same family and tag, and nothing writes it.
++  jsi_utils::installJsiFunction(
++      rnRuntime, "_reanimatedDetachShadowNodeWrapper", [](jsi::Runtime &rt, const jsi::Value &shadowNodeWrapper) {
++        using ShadowNodeBridging = facebook::react::Bridging<std::shared_ptr<const facebook::react::ShadowNode>>;
++        return ShadowNodeBridging::toJs(rt, ShadowNodeBridging::fromJs(rt, shadowNodeWrapper));
++      });
++#endif // ANDROID
+ }
+ 
+ #ifdef IS_REANIMATED_EXAMPLE_APP
+diff --git a/lib/module/fabricUtils.native.js b/lib/module/fabricUtils.native.js
+index fde44fface4d5a2a64aac6e4a3a8acdc14fca0f1..604d621b9f9a068269ed13a55889798dfbbc0289 100644
+--- a/lib/module/fabricUtils.native.js
++++ b/lib/module/fabricUtils.native.js
+@@ -38,6 +38,8 @@ export function getShadowNodeWrapperFromRef(ref, hostInstance) {
+   if (!shadowNodeWrapper) {
+     throw new Error(`[Reanimated] Failed to find shadow node for a ref.`);
+   }
+-  return shadowNodeWrapper;
++  // OpenBot patch: only Android installs this function. See RNRuntimeDecorator.cpp.
++  const detachShadowNodeWrapper = global._reanimatedDetachShadowNodeWrapper;
++  return detachShadowNodeWrapper ? detachShadowNodeWrapper(shadowNodeWrapper) : shadowNodeWrapper;
+ }
+ //# sourceMappingURL=fabricUtils.native.js.map
+\ No newline at end of file
+diff --git a/src/fabricUtils.native.ts b/src/fabricUtils.native.ts
+index 4d478fc28a8035ae2f43eef2caf4873c600910a5..58e6a2d66f65e045f6511861ceb044cc63ea6232 100644
+--- a/src/fabricUtils.native.ts
++++ b/src/fabricUtils.native.ts
+@@ -65,5 +65,9 @@ export function getShadowNodeWrapperFromRef(
+     throw new Error(`[Reanimated] Failed to find shadow node for a ref.`);
+   }
+ 
+-  return shadowNodeWrapper;
++  // OpenBot patch: only Android installs this function. See RNRuntimeDecorator.cpp.
++  const detachShadowNodeWrapper = global._reanimatedDetachShadowNodeWrapper;
++  return detachShadowNodeWrapper
++    ? detachShadowNodeWrapper(shadowNodeWrapper)
++    : shadowNodeWrapper;
+ }
+diff --git a/src/privateGlobals.d.ts b/src/privateGlobals.d.ts
+index 60a468aff33de26b7b87ff3714e8926f805afe21..042bc783572fc4c270ac98d6e24c46a6f6169e13 100644
+--- a/src/privateGlobals.d.ts
++++ b/src/privateGlobals.d.ts
+@@ -23,6 +23,9 @@ declare global {
+   var _REANIMATED_VERSION_CPP: string | undefined;
+   var _REANIMATED_VERSION_JS: string | undefined;
+   var __reanimatedModuleProxy: ReanimatedModuleProxy | undefined;
++  var _reanimatedDetachShadowNodeWrapper:
++    | ((shadowNodeWrapper: ShadowNodeWrapper) => ShadowNodeWrapper)
++    | undefined;
+   var _log: (value: unknown) => void;
+   var _startProfiling: (meanHzFreq?: number) => void;
+   var _stopProfiling: () => string;

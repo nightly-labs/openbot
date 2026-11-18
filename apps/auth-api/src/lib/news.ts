@@ -18,6 +18,10 @@ export const NEWS_COLLECTION: ContentCollection<"news"> = {
   indexTitle: "OpenBot News: Updates on the Local AI Agent App",
   indexDescription:
     "Notes on building OpenBot: local-first storage, agents that outlive their provider, and how the pieces fit together.",
+  indexSocialImage: {
+    path: "/social/news.jpg",
+    alt: "Good things in the making. OpenBot agents on a paper moon under the stars",
+  },
   feedTitle: "OpenBot news",
   backLabel: "All news",
   moreTitle: "More from OpenBot",

@@ -12,8 +12,15 @@ import { sourceText } from "@openbot/i18n/source";
 import { Schema } from "effect";
 import { initializeAgentMemorySelection } from "./agent-memory-selection";
 import { databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
-import { MemoryStore, type MemoryTables, type SaveMemoryInput } from "./memory-store";
+import { MemoryStore, type MemoryTables, memorySitesForHost, type SaveMemoryInput } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
+
+/**
+ * Scripts where a searched word is often part of a longer unicode61 word: no spaces between words,
+ * or, in Korean, particles attached to the word.
+ */
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
 export class AgentMemorySelectionError extends Schema.TaggedError<AgentMemorySelectionError>()(
   "AgentMemorySelectionError",
@@ -30,6 +37,8 @@ export interface SaveAutomaticMemoryInput {
   sourceTurnId: string;
   expectedUpdatedAt?: string | null;
   expectedSelectionRevision?: number;
+  /** A normalized site. Absent, an update keeps the site that the memory has. */
+  site?: string;
 }
 
 export interface RetrievedAgentMemory extends AgentMemory {
@@ -47,6 +56,9 @@ export interface AgentMemoryListPage extends AgentMemorySearchResult {
   nextCursor: string | null;
 }
 
+/** How many site memories a page shows. Each one has at most 500 characters. */
+const SITE_MEMORY_LIMIT = 5;
+
 function agentMemoryTables(limit: () => number): MemoryTables {
   return {
     table: "projection_agent_memories",
@@ -55,6 +67,7 @@ function agentMemoryTables(limit: () => number): MemoryTables {
     aggregateType: "agent-memory",
     limit,
     limitMessage: (current) => sourceText("error.backend.agentMemoryLimit", { limit: current }),
+    siteColumn: true,
   };
 }
 
@@ -107,6 +120,32 @@ export class AgentMemoryStore extends MemoryStore {
       return null;
     const memory = this.saveAutomaticEntry(input.agentId, input);
     return memory && { ...memory, agentId: input.agentId };
+  }
+
+  /**
+   * The newest memories tied to one of `sites`, for the browser to show on a page of that site.
+   * `agent_memories_site` serves the lookup. An essential memory is already in the agent's
+   * instructions with its site, so the browser does not show it again.
+   */
+  listForSites(agentId: string, sites: readonly string[], limit: number): AgentMemory[] {
+    if (sites.length === 0) return [];
+    const ids = databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT m.memory_id FROM projection_agent_memories m
+       LEFT JOIN agent_memory_selections s ON s.memory_id = m.memory_id
+       WHERE m.agent_id = ? AND m.site IN (${sites.map(() => "?").join(", ")})
+         AND COALESCE(s.inclusion, 'searchable') <> 'essential'
+       ORDER BY m.updated_at DESC, m.memory_id LIMIT ?`,
+        )
+        .all(agentId, ...sites, limit),
+    ).map((row) => requiredStringColumn(row, "memory_id"));
+    return ids.flatMap((id) => this.get(agentId, id) ?? []);
+  }
+
+  /** The newest memories about the site of a page host or of a parent domain. */
+  forHost(agentId: string, hostname: string, limit = SITE_MEMORY_LIMIT): AgentMemory[] {
+    return this.listForSites(agentId, memorySitesForHost(hostname), limit);
   }
 
   /** Dispatch reuses an existing transaction and otherwise owns commit and rollback. */
@@ -243,7 +282,7 @@ export class AgentMemoryStore extends MemoryStore {
         }),
       ),
     ].join(" OR ");
-    const ids = databaseRows(
+    const indexed = databaseRows(
       this.database.connection
         .prepare(
           `SELECT m.memory_id FROM agent_memory_search JOIN projection_agent_memories m ON m.rowid = agent_memory_search.rowid
@@ -252,6 +291,26 @@ export class AgentMemoryStore extends MemoryStore {
         )
         .all(expression, agentId, limit + 1),
     ).map((row) => requiredStringColumn(row, "memory_id"));
+    // A word inside a run of unspaced text is not an index word, so match it as a substring of this
+    // agent's few memories. Terms hold only letters, numbers and marks: LIKE needs no escape.
+    const unspaced = [...new Set(terms.filter((term) => UNSPACED_SCRIPT.test(term)))];
+    const ids =
+      unspaced.length === 0 || indexed.length > limit
+        ? indexed
+        : [
+            ...new Set([
+              ...indexed,
+              ...databaseRows(
+                this.database.connection
+                  .prepare(
+                    `SELECT memory_id FROM projection_agent_memories
+       WHERE agent_id = ? AND (${unspaced.map(() => "text LIKE ?").join(" OR ")})
+       ORDER BY updated_at DESC, memory_id LIMIT ?`,
+                  )
+                  .all(agentId, ...unspaced.map((term) => `%${term}%`), limit + 1),
+              ).map((row) => requiredStringColumn(row, "memory_id")),
+            ]),
+          ].slice(0, limit + 1);
     const result: AgentMemorySearchResult = { memories: [], hasMore: ids.length > limit };
     for (const id of ids.slice(0, limit)) {
       const memory = this.#retrieved(agentId, id);

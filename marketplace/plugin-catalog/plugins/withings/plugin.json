@@ -1,0 +1,36 @@
+{
+  "slug": "withings",
+  "name": "Withings",
+  "tagline": "Health measurements",
+  "description": "Withings lets agents read the user's weight, body composition, blood pressure, sleep, and activity data, and log measurements after the user approves. It needs an active Withings+ membership, and each user signs in to their own Withings account through the browser.",
+  "category": "other",
+  "creatorName": "Withings",
+  "iconUrl": "https://www.withings.com/cdn/shop/files/favicon_www_withings_com_64x64_213c642c-0ccc-4d46-ab87-f3e7cf7ec36d.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-weight-trend", "text": "How has my weight changed over the last three months?" },
+    {
+      "id": "prompt-blood-pressure",
+      "text": "Summarize my blood pressure readings from the last month for my doctor."
+    },
+    { "id": "prompt-sleep-steps", "text": "Did I sleep better on days when I walked more than 8,000 steps?" }
+  ],
+  "apps": [
+    {
+      "id": "app-withings-mcp",
+      "name": "Withings",
+      "description": "Weight, blood pressure, sleep, and activity data, over Withings's MCP server with browser sign-in.",
+      "iconUrl": "https://www.withings.com/cdn/shop/files/favicon_www_withings_com_64x64_213c642c-0ccc-4d46-ab87-f3e7cf7ec36d.png",
+      "server": {
+        "name": "withings",
+        "transport": "http",
+        "url": "https://mcp.withings.com/mcp",
+        "auth": [{ "id": "withings-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.withings.com",
+  "privacyPolicyUrl": "https://www.withings.com/en-us/policies/privacy-policy",
+  "termsUrl": "https://www.withings.com/en-us/policies/terms-of-service"
+}

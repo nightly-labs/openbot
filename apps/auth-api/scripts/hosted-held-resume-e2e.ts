@@ -22,7 +22,14 @@ const OUT = join(ROOT, ".openbot-build", "hosted-held-resume-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SERVER_ID = "server-1";
 const SANDBOX_ID = "bx_1";
-const OWNER = { id: "owner", email: "owner@example.test", name: null, avatarUrl: null, analyticsEnabled: null };
+const OWNER = {
+  id: "owner",
+  email: "owner@example.test",
+  name: null,
+  avatarUrl: null,
+  analyticsEnabled: null,
+  chatColor: null,
+};
 const FLAG = "/run/openbot-pre-stop";
 
 type ResumeAnswer = "running" | "resuming" | "conflict";

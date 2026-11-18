@@ -1,4 +1,9 @@
-import { type AgentModelOption, type AgentSummary, defaultProviderModel } from "@openbot/contracts/ipc";
+import {
+  AGENT_REASONING_EFFORTS,
+  type AgentModelOption,
+  type AgentSummary,
+  defaultProviderModel,
+} from "@openbot/contracts/ipc";
 import { inputPrice } from "./usage-pricing";
 
 /**
@@ -16,4 +21,19 @@ export function backgroundModel(agent: AgentSummary, models: readonly AgentModel
   const ownPrice = inputPrice(agent.provider, own.id);
   const smallerPrice = inputPrice(agent.provider, smaller.id);
   return ownPrice !== null && smallerPrice !== null && smallerPrice < ownPrice ? smaller : own;
+}
+
+/**
+ * The model of a background call, such as a memory review, a channel summary or a profile draft,
+ * at the least reasoning that it takes from `minimal` up. The answer is short structured text, and
+ * the effort of the agent's turns spent 0.5k to 3k output tokens on it. `none` is not used: a
+ * model with no reasoning at all can miss the requested shape. A model with no reasoning setting
+ * stays as it is.
+ */
+export function withBackgroundEffort(model: AgentModelOption): AgentModelOption {
+  if (model.reasoningEffortConfigurable === false) return model;
+  const effort = AGENT_REASONING_EFFORTS.find(
+    (candidate) => candidate !== "none" && model.supportedReasoningEfforts.includes(candidate),
+  );
+  return effort ? { ...model, defaultReasoningEffort: effort } : model;
 }

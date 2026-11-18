@@ -38,10 +38,13 @@ was older than #1520. It had no `/v1/webhooks` route and refused webhook-only in
 
 ## 1. Find the running version
 
-First read `commit` from the public health route:
+First read `commit` from the public health route of both machines:
 
 ```sh
-curl -fsS https://signal.openbot.run/health/live
+curl -fsS https://signal1.openbot.run/health/live
+curl -fsS https://signal2.openbot.run/health/live
+curl -fsS https://signal-us.openbot.run/health/live
+curl -fsS https://signal-au.openbot.run/health/live
 ```
 
 If `commit` is missing (a build from before this field) or `unknown` (built without
@@ -120,8 +123,8 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
 
 - `docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'` shows
   the new image and `healthy`.
-- `curl --fail https://signal.openbot.run/health/ready` succeeds.
-- `curl --fail https://signal.openbot.run/health/live` shows `commit` equal to the tag commit (tags
+- `curl --fail https://signal1.openbot.run/health/ready` succeeds (not `signal.openbot.run`: the entry name can point to `signal2`).
+- `curl --fail https://signal1.openbot.run/health/live` shows `commit` equal to the tag commit (tags
   from before this field show no `commit`; use the checksums then).
 - The container `sha256sum` of `/app/remote/api/src/*.ts` matches the tag.
 - `docker logs --since <deploy time> openbot-remote-remote-api-1 2>&1 | grep -iE 'error|disabled|off|telegram|discord|slack'`
@@ -129,11 +132,16 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
 - Unauthenticated probes of each public route that the diff adds give 401 or 403, not 404 or 502.
   For example, `POST /v1/webhooks/x` with `content-type: application/json` gives 401.
 
-Then deploy the same tag to the standby on the ssh host `signal2` (see "Standby Signal" in the
+Then deploy the same tag to the second machine `signal2.openbot.run` (see "Second Signal machine" in the
 deployment document) with the same steps, `before-<tag>` image and rollback. Do the step 3 key
 comparison against `signal2` too, and copy each added encrypted line into its host file. Make the
 same Nginx change there. `https://signal2.openbot.run/health/ready` must succeed, and `/health/live` must show
 the tag commit.
+
+Then do the same on the regional machines `signal-us.openbot.run` (`root@23.106.44.143`) and
+`signal-au.openbot.run` (`root@23.106.243.56`), see "Regional Signal machines" in the deployment
+document. Their Release, `runtime` and `node_modules` layout is the same as on `signal2`, and
+`remote-api` listens on `127.0.0.1:8081`. Each home in `REMOTE_SIGNAL_HOMES` must run the same commit.
 
 If a check fails, use the rollback commands of the deployment document with the `before-<tag>` image.
 Keep that image until the developer confirms the device checks of the deployment document.

@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
   "composer.queueEdit.cancel": "Bewerking annuleren",
+  "composer.feedbackFix.body":
+    "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
+  "composer.feedbackFix.cancel": "Annuleren",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",
@@ -15,10 +18,21 @@ export const messages = {
   "composer.signIn.label": "Inloggen bij {provider}",
   "composer.signIn.action": "Inloggen",
   "composer.updateKey.action": "Sleutel bijwerken",
+  "composer.verifyAccount.action": "Account verifiëren",
   "composer.update.body": "Werk {provider} bij om door te gaan.",
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.imageInput.body":
+    "{model} krijgt alleen tekst en ziet de afbeeldingen die je bijvoegt dus niet. Als dit model afbeeldingen kan lezen, zet afbeeldingen ervoor aan.",
+  "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
+  "composer.imageInput.pending": "Aanzetten…",
+  "composer.imageInput.action": "Afbeeldingen aan",
+  "composer.usageLimit.credits":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
+  "composer.usageLimit.creditsResets":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken je tegoed tot de limiet {reset} wordt gereset.",
+  "composer.usageLimit.creditsTitle": "Tegoed in gebruik",
   "composer.usageLimit.resets":
     "Je hebt je limiet voor {provider} volledig gebruikt. De limiet wordt op {reset} gereset.",
   "composer.usageLimit.selectModel":
@@ -38,10 +52,15 @@ export const messages = {
   "composer.picker.badge.marketplace": "Marktplaats",
   "composer.picker.badge.channel": "Kanaal",
   "composer.picker.skillLabel": "Vaardigheid of MCP-server invoegen",
+  "composer.picker.channelAgentLabel": "Kies agent of MCP-server",
   "composer.picker.mentionLabel": "Vermelding invoegen",
   "composer.picker.noSkills": "Deze agent heeft geen vaardigheden.",
   "composer.picker.noSkillMatch": "Geen vaardigheid gevonden voor “{query}”.",
   "composer.picker.skillsLoadFailed": "Vaardigheden zijn niet geladen.",
+  "composer.picker.channelChooseAgent": "Kies eerst een agent in dit kanaal.",
+  "composer.picker.channelSingleAgent":
+    "Een vaardigheidsbericht moet aan één agent zijn gericht. Verwijder extra vermeldingen of @everyone.",
+  "composer.picker.skillsLoading": "Vaardigheden laden…",
   "composer.token.attachment": "Bijgevoegd bestand {name} openen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Vaardigheid {name}",
@@ -76,9 +95,9 @@ export const messages = {
   "composer.placeholder.message": "Bericht aan {name}",
   "composer.placeholder.messageAgent": "Bericht aan agent",
   "composer.add.label": "Toevoegen aan prompt",
-  "composer.add.image": "Afbeelding bijvoegen",
+  "composer.add.files": "Bestanden bijvoegen",
+  "composer.add.teach": "Een taak aanleren",
   "composer.add.skill": "Vaardigheid gebruiken",
-  "composer.add.context": "Context toevoegen",
   "composer.upload.cancel": "Uploaden annuleren",
   "composer.upload.uploading": "{name} wordt geüpload",
   "composer.upload.progress": "{sent} van {total}",
@@ -107,6 +126,13 @@ export const messages = {
   "composer.error.holdQueued": "Kan het bericht in de wachtrij niet vasthouden om te bewerken.",
   "composer.error.cancelEdit": "Kan de bewerking in de wachtrij niet annuleren. Probeer het opnieuw.",
   "composer.error.updateQueued": "Kan het bericht in de wachtrij niet bijwerken. Probeer het opnieuw.",
+  "composer.queueEdit.received": "De agent heeft dit bericht al ontvangen, dus je bewerking is beëindigd.",
+  "composer.queueEdit.receivedKept":
+    "De agent heeft dit bericht al ontvangen, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
+  "composer.queueEdit.deletedKept":
+    "Dit bericht is verwijderd, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
+  "composer.queueEdit.endedKept":
+    "Deze bewerking is beëindigd voordat ze werd opgeslagen. Je wijzigingen staan nog in het berichtvak.",
   "composer.voice.prepareFailed": "Kan het spraakmodel niet voorbereiden. Probeer het opnieuw.",
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",
@@ -116,6 +142,10 @@ export const messages = {
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeEffort": "Kan het denkniveau niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeFastMode": "Kan de snelle modus niet wijzigen. Probeer het opnieuw.",
+  "composer.fastMode.confirmTitle": "Snelle modus inschakelen?",
+  "composer.fastMode.confirmDescription":
+    "Claude antwoordt sneller, maar elk token kost meer. Met een Claude-abonnement gebruikt de snelle modus altijd gebruikstegoed, ook als je abonnement nog gebruik over heeft.",
+  "composer.fastMode.confirm": "Inschakelen",
   "composer.context.label": "Context {percent} vol",
   "composer.context.labelEstimated": "Context ongeveer {percent} vol",
   "composer.context.labelCompacting": "Context comprimeren",
@@ -141,4 +171,15 @@ export const messages = {
   "composer.newChat.action": "Nieuwe chat",
   "composer.context.compact": "Nu comprimeren",
   "composer.context.compactFailed": "Kan de context niet comprimeren. Probeer het opnieuw.",
+  "composer.picker.option.tab": "Browsertabblad {name}",
+  "composer.picker.option.thread": "Thread {name}",
+  "composer.picker.section.agents": "Agents",
+  "composer.picker.section.files": "Bestanden",
+  "composer.picker.section.tabs": "Browsertabbladen",
+  "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In berichten",
+  "composer.token.tab": "Browsertabblad {name}",
+  "composer.token.thread": "Thread {name}",
+  "composer.token.unavailableTab": "Gesloten browsertabblad {name}",
+  "composer.token.unavailableThread": "Niet-beschikbare thread {name}",
 } as const satisfies PartialTranslation<typeof source>;

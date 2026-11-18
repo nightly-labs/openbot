@@ -68,6 +68,8 @@ for the development application.
 - When a server has a list of roles, OpenBot ignores a mention from a member who has none of them.
 - A direct message to OpenBot gets one fixed answer: a direct message has no server, so Signal cannot
   find the OpenBot server that answers it.
+- An agent's post (`messaging_post`) can have at most 10 embeds, with 6,000 characters of embed text
+  in all. Only a new post has embeds: an edit and the answer in a conversation have text only.
 - Discord limits a bot's file to 10 MB unless the server has a higher boost level. OpenBot sends at
   most 10 MB for each file.
 - Discord asks for verification before a bot can be in more than 100 servers.

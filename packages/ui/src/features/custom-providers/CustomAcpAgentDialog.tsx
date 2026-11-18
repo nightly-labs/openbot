@@ -72,6 +72,8 @@ interface CustomAcpAgentDialogProps {
   onSubmit: (value: CustomAcpAgentDraft) => void;
   onCancel: () => void;
   onBack?: (() => void) | undefined;
+  /** The command runs on a joined server, not on this computer. */
+  host?: boolean | undefined;
 }
 
 export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
@@ -271,7 +273,9 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
 
                 <Field
                   label={t("customProvider.acp.command")}
-                  description={t("customProvider.acp.commandHint")}
+                  description={t(
+                    props.host ? "customProvider.acp.commandHintServer" : "customProvider.acp.commandHint",
+                  )}
                   error={shown()?.command}
                   required
                 >
@@ -438,8 +442,14 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                     <ShieldCheck />
                   </AlertIcon>
                   <AlertContent>
-                    <AlertTitle>{t("customProvider.acp.trustTitle")}</AlertTitle>
-                    <AlertDescription>{t("customProvider.acp.trustDescription")}</AlertDescription>
+                    <AlertTitle>
+                      {t(props.host ? "customProvider.acp.hostTrustTitle" : "customProvider.acp.trustTitle")}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {t(
+                        props.host ? "customProvider.acp.hostTrustDescription" : "customProvider.acp.trustDescription",
+                      )}
+                    </AlertDescription>
                   </AlertContent>
                 </Alert>
               </div>

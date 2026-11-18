@@ -1,0 +1,33 @@
+{
+  "slug": "allo",
+  "name": "Allo",
+  "tagline": "Business phone and SMS",
+  "description": "Allo lets agents read call transcripts and SMS, look up and update contacts, and draft text messages in the signed-in workspace. Each user signs in to their own Allo account through the browser.",
+  "category": "productivity",
+  "creatorName": "Allo",
+  "iconUrl": "https://www.withallo.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-missed", "text": "Which calls did I miss today, and what did the callers want?" },
+    { "id": "prompt-transcript", "text": "Summarize my last call with this customer." },
+    { "id": "prompt-contact", "text": "Update the contact for Tom Becker with his new company name." }
+  ],
+  "apps": [
+    {
+      "id": "app-allo-mcp",
+      "name": "Allo",
+      "description": "Call, SMS, and contact tools, over Allo's MCP server with browser sign-in.",
+      "iconUrl": "https://www.withallo.com/favicon.ico",
+      "server": {
+        "name": "allo",
+        "transport": "http",
+        "url": "https://mcp.withallo.com/mcp",
+        "auth": [{ "id": "allo-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.withallo.com",
+  "privacyPolicyUrl": "https://www.withallo.com/privacy-policy",
+  "termsUrl": "https://www.withallo.com/terms-conditions"
+}

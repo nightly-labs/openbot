@@ -15,8 +15,9 @@ import type { McpKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { Button, Text } from "@openbot/ui";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import type { MarketplacePluginApp } from "@openbot/ui/features/settings/marketplace-plugins";
+import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, Show } from "solid-js";
 import { createPluginAppConfig } from "../src/features/settings/marketplace-plugin-catalog";
 import { STORY_MARKETPLACE_PLUGINS } from "../src/preview/fixtures";
 
@@ -92,6 +93,8 @@ export function ConnectStage(props: {
   onOpen: () => void;
   children: JSX.Element;
 }) {
+  // The dialogs stand above the stage as they do above the Marketplace page.
+  onCleanup(holdFlag(document.body, "skills-marketplace"));
   return (
     <main class="foundation-story skills-marketplace">
       <div class="foundation-story-row">

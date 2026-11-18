@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Создание…",
   "mobile.onboarding.task.withoutTask": "Создать без задачи",
   "mobile.onboarding.task.failed": "Не удалось создать агента. Повторите попытку.",
+  "mobile.onboarding.task.sendFailed": "Первая задача не отправлена. Отправьте её в чате.",
   "mobile.onboarding.idea.builder1": "Сделайте небольшое веб-приложение для списка дел.",
   "mobile.onboarding.idea.builder2": "Объясните на примерах, как работают ветки в Git.",
   "mobile.onboarding.idea.builder3": "Напишите скрипт, который сортирует мои фото по дате.",

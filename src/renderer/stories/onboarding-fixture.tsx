@@ -67,6 +67,8 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   devin: { phase: "not-downloaded", progress: null, message: null, version: null },
+  copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
+  mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 

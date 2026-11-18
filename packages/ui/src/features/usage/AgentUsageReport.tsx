@@ -2,6 +2,7 @@ import { type AnalyticsTotals, analyticsTokens, type HostAnalytics } from "@open
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, SlidingTabs } from "@openbot/ui";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { UsageChart } from "./UsageChart";
 import { UsageProviderMark } from "./UsageProviderMark";
@@ -237,13 +238,18 @@ export function AgentUsageReport(props: {
             <SlidingTabs.Trigger value="model">{t("usage.breakdown.model")}</SlidingTabs.Trigger>
             <SlidingTabs.Trigger value="agent">{t("usage.breakdown.agent")}</SlidingTabs.Trigger>
             <SlidingTabs.Trigger value="day">{t("usage.breakdown.day")}</SlidingTabs.Trigger>
+            {/* Only this computer counts skill loads; a report from another host has none. */}
+            <Show when={props.result.skills}>
+              <SlidingTabs.Trigger value="skill">{t("usage.breakdown.skill")}</SlidingTabs.Trigger>
+            </Show>
           </SlidingTabs.List>
         </div>
         {/* Every panel is force-mounted, and the grid slot is what makes the hidden ones
-            share one cell instead of each reserving its own height below the visible table. */}
-        <SlidingTabs.ContentSlot>
+            share one cell instead of each reserving its own height below the visible table.
+            The hidden panels also get no height, so the open table alone sets the height. */}
+        <SlidingTabs.ContentSlot class="agent-usage-breakdown">
           <SlidingTabs.Content value="model">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byModel")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byModel")}</caption>
                 <thead>
@@ -270,10 +276,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="agent">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byAgent")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byAgent")}</caption>
                 <thead>
@@ -295,10 +301,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="day">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byDay")}>
               <table ref={dailyTable} tabindex={-1}>
                 <caption class="sr-only">{t("usage.breakdown.byDay")}</caption>
                 <thead>
@@ -320,8 +326,58 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
+          <Show when={props.result.skills}>
+            {(skills) => (
+              <SlidingTabs.Content value="skill">
+                <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.bySkill")}>
+                  <table>
+                    <caption class="sr-only">{t("usage.breakdown.bySkill")}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">{t("usage.breakdown.skill")}</th>
+                        <th scope="col">{t("usage.column.loads")}</th>
+                        <th scope="col">{t("usage.column.cost")}</th>
+                        <th scope="col">{t("usage.column.share")}</th>
+                        <th scope="col">{t("usage.column.tokens")}</th>
+                        <th scope="col">{t("usage.column.agents")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For
+                        each={skills()}
+                        fallback={
+                          <tr>
+                            <td colspan={6} class="agent-usage-table-empty">
+                              {t("usage.breakdown.skillEmpty")}
+                            </td>
+                          </tr>
+                        }
+                      >
+                        {(skill) => (
+                          <tr>
+                            <th scope="row">{skill.skill}</th>
+                            <td>{format.number(skill.loads)}</td>
+                            <td>
+                              <Amount value={skill.estimatedCostUsd} cost />
+                            </td>
+                            <td>
+                              {format.percent(skill.share, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                            </td>
+                            <td>
+                              <Amount value={skill.tokens} />
+                            </td>
+                            <td>{format.number(skill.agents)}</td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </ScrollEdges>
+              </SlidingTabs.Content>
+            )}
+          </Show>
         </SlidingTabs.ContentSlot>
       </SlidingTabs.Root>
       <footer class="agent-usage-footer">

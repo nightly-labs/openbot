@@ -1,35 +1,16 @@
 import { router } from "expo-router";
-import type { NativeStackNavigationProp } from "expo-router/native-stack";
-import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { KeyboardController } from "react-native-keyboard-controller";
 
 /**
- * Leaves the chat, once. A swipe back can close the chat while Back is pressed. Two closes put the
- * native stack out of step with JS, so Back does nothing while the chat closes.
+ * Leaves the chat, once. A second press during the close would pop the screen under the chat. A
+ * swipe back does not block Back: a swipe that starts and does not finish leaves the chat open.
  */
 export function useLeaveChat(): () => void {
-  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
-  const closing = useRef(false);
-  useEffect(() => {
-    const unsubscribes = [
-      navigation.addListener("transitionStart", (event) => {
-        if (event.data.closing) closing.current = true;
-      }),
-      navigation.addListener("transitionEnd", (event) => {
-        if (!event.data.closing) closing.current = false;
-      }),
-      navigation.addListener("gestureCancel", () => {
-        closing.current = false;
-      }),
-    ];
-    return () => {
-      for (const unsubscribe of unsubscribes) unsubscribe();
-    };
-  }, [navigation]);
+  const leaving = useRef(false);
   return useCallback(() => {
-    if (closing.current) return;
-    closing.current = true;
+    if (leaving.current) return;
+    leaving.current = true;
     void KeyboardController.dismiss();
     if (router.canGoBack()) router.back();
     else router.replace("/connected");

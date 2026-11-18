@@ -4,7 +4,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, ExternalLink, ItemGroup, SettingsSection } from "@openbot/ui";
 import { createEffect, createSignal, For, Match, Switch } from "solid-js";
 import { useText } from "../../text";
-import { TelegramMark } from "./brand-marks";
+import { TelegramTile } from "./brand-marks";
 import {
   type ChannelAgent,
   ChannelConnectChecklist,
@@ -18,6 +18,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import { type IntegrationPageSlots, Stepper, UNKNOWN_STATUS, WizardDialog, type WizardLink } from "./IntegrationLayout";
 import { messagingStateUnknown } from "./SlackIntegrationPanel";
@@ -93,6 +94,7 @@ const TELEGRAM_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   removed: "connector.telegram.helpRemoved",
   relay_unavailable: "connector.telegram.helpRelayUnavailable",
+  not_linked: "connector.telegram.helpNotLinked",
   invalid_token: "connector.telegram.helpError",
   secret_storage_unavailable: "connector.telegram.helpError",
   error: "connector.telegram.helpError",
@@ -128,7 +130,9 @@ export function telegramIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.telegram.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.telegram.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.telegram.statusConnected", attention }
+  );
 }
 
 /** Where the connect dialog starts: at the chat link, or at the orchestrator of the linked chats. */
@@ -175,7 +179,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
   return (
     <ChannelPage
       text={TELEGRAM_TEXT}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       state={telegramIntegrationState(props.connections, props.agents, props.loadError)}
       connections={props.connections}
       unknown={messagingStateUnknown(props)}
@@ -209,7 +213,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
                 {(connection) => (
                   <ChannelConnectionRow
                     text={TELEGRAM_TEXT}
-                    logo={<TelegramMark />}
+                    logo={<TelegramTile />}
                     connection={connection}
                     note={note(connection)}
                     busy={props.busy}
@@ -247,7 +251,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
       />
       <ChannelDisconnectDialog
         text={TELEGRAM_TEXT}
-        logo={<TelegramMark />}
+        logo={<TelegramTile />}
         connection={disconnecting()}
         title={t("connector.telegram.disconnectTitle", { chat: disconnectingName() })}
         description={t("connector.telegram.leaveDescription", { chat: disconnectingName() })}
@@ -339,7 +343,7 @@ export function TelegramConnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.telegram.close")}
       onClose={props.onClose}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       link={dialogLink()}
       title={copy().title}
       description={copy().description}

@@ -5,14 +5,19 @@ import { Directory, File, Paths } from "expo-file-system";
  * The agent photos, kept on this phone between launches, so a photo shows without a request to the
  * host. The host gives each upload a new version `v` in the photo URL, so a saved file never becomes
  * stale. A file is at `<server>/<agent>/<v>.<extension>`. `Paths.cache` is `Library/Caches` on iOS,
- * and the system can delete it when the device is low on storage.
+ * and the system can delete it when the device is low on storage. Channel images are kept the same
+ * way, at `<server>/_channels/<channel>/<v>.<extension>`, so they share the size limit and go with
+ * the server.
  */
 const ROOT = "agent-avatars-v1";
+const CHANNELS = "_channels";
 const MAX_BYTES = 20 * 1024 * 1024;
 
 const segment = (value: string) => value.replace(/[^A-Za-z0-9._-]/gu, "_").replace(/^\.+/u, "_");
 const agentFolder = (serverId: string, agentId: string) =>
   new Directory(Paths.cache, ROOT, segment(serverId), segment(agentId));
+const channelFolder = (serverId: string, channelId: string) =>
+  new Directory(Paths.cache, ROOT, segment(serverId), CHANNELS, segment(channelId));
 const version = (avatarUrl: string) => new URL(avatarUrl).searchParams.get("v");
 const filesIn = (folder: Directory): File[] =>
   folder.list().flatMap((entry) => (entry instanceof Directory ? filesIn(entry) : [entry]));
@@ -32,10 +37,24 @@ function evict() {
 
 /** The saved photo as a `file://` URI, or `null` when this phone has no copy of this version. */
 export function savedAgentAvatar(serverId: string, agentId: string, avatarUrl: string): string | null {
+  return savedImage(() => agentFolder(serverId, agentId), avatarUrl);
+}
+
+/** The saved channel image as a `file://` URI, or `null` when this phone has no copy of this version. */
+export function savedChannelImage(serverId: string, channelId: string, imageUrl: string): string | null {
+  return savedImage(() => channelFolder(serverId, channelId), imageUrl);
+}
+
+/** Saves a channel image that the host sent as a data URL, as `saveAgentAvatar` saves a photo. */
+export function saveChannelImage(serverId: string, channelId: string, imageUrl: string, dataUrl: string): string {
+  return saveImage(() => channelFolder(serverId, channelId), imageUrl, dataUrl);
+}
+
+function savedImage(folderOf: () => Directory, url: string): string | null {
   try {
-    const v = version(avatarUrl);
+    const v = version(url);
     if (!v) return null;
-    const folder = agentFolder(serverId, agentId);
+    const folder = folderOf();
     for (const type of AVATAR_MIME_TYPES) {
       const file = new File(folder, `${segment(v)}.${avatarFileExtension(type)}`);
       if (file.exists) return file.uri;
@@ -51,11 +70,15 @@ export function savedAgentAvatar(serverId: string, agentId: string, avatarUrl: s
  * of the agent's photo go. When the phone cannot save it, the data URL comes back unchanged.
  */
 export function saveAgentAvatar(serverId: string, agentId: string, avatarUrl: string, dataUrl: string): string {
+  return saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
+}
+
+function saveImage(folderOf: () => Directory, url: string, dataUrl: string): string {
   const match = /^data:([a-z/]+);base64,(.+)$/u.exec(dataUrl);
-  const v = version(avatarUrl);
+  const v = version(url);
   if (!v || !match?.[1] || !match[2] || !isAvatarMimeType(match[1])) return dataUrl;
   try {
-    const folder = agentFolder(serverId, agentId);
+    const folder = folderOf();
     folder.create({ intermediates: true, idempotent: true });
     const name = `${segment(v)}.${avatarFileExtension(match[1])}`;
     // A crash during the write leaves only the temporary file, and the next save of this agent deletes it.

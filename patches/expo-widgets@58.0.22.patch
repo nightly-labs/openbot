@@ -1,0 +1,20 @@
+diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
+index 76b2199c2d3f879463fed5d2bd49038b0428a2e7..70b6475fdb00eda1f25b986f242965cbd16b3e24 100644
+--- a/ios/Widgets/Utils.swift
++++ b/ios/Widgets/Utils.swift
+@@ -121,11 +121,14 @@ func getLiveActivityEnvironment(for environment: EnvironmentValues, in context:
+   var env: [String: Any] = [
+     "colorScheme": "\(environment.colorScheme)",
+     "isLuminanceReduced": environment.isLuminanceReduced,
+-    "isActivityFullscreen": environment.isActivityFullscreen,
++    "isActivityFullscreen": false,
+     "isStale": context.isStale
+   ]
+ 
+   if #available(iOS 18.0, *) {
++    // OpenBot patch: the SDK back-deploys this getter before iOS 17.0 only. iOS 17 WidgetKit does
++    // not export it, so the weak symbol is null there and the widget extension jumps to 0x0.
++    env["isActivityFullscreen"] = environment.isActivityFullscreen
+     env["isActivityUpdateReduced"] = environment.isActivityUpdateReduced
+     env["activityFamily"] = "\(environment.activityFamily)"
+   }

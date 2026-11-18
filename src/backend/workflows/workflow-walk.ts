@@ -9,6 +9,16 @@
  * answer. A due node with incoming edges and no active one is skipped, so a failure or the other
  * branch never leaves a run waiting.
  *
+ * A join is a node with more than one edge from the nodes before it, apart from loop edges. When a
+ * node before a join failed or was stopped, the join still runs on the other answers. At a model or
+ * agent join, that node keeps its place in the inputs with the reason it has no answer, so the model
+ * can see that a branch is missing. A node that was skipped because a node before it failed or was
+ * stopped gives that reason too; a node after the branch that a condition did not choose gives none.
+ * The other steps get only the answers: an output posts its input, and a condition or an approval
+ * hands its input on to the nodes after it, outputs too. The files of image and asset steps are not
+ * text inputs: an image step and an agent step get them as files, and a failed image step before a
+ * join gives no reason.
+ *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
  * answer as one more input: that is the next pass of the loop, and the nodes after it follow. A loop
@@ -17,17 +27,27 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   isWorkflowStepKind,
+  WORKFLOW_VIDEO_VOICES,
   type WorkflowEdge,
+  type WorkflowFields,
   type WorkflowGraph,
+  type WorkflowMediaKind,
+  type WorkflowMediaModel,
+  type WorkflowMediaProvider,
+  type WorkflowMediaSpecs,
   type WorkflowNode,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
+import { runtimeFields } from "./workflow-graph";
 import { isOpenStep, type StoredWorkflowStep } from "./workflow-run-store";
 
 /** Node kinds and settings that this version cannot run. The canvas does not offer them. */
 export function unsupportedNode(node: WorkflowNode): boolean {
-  if (node.kind === "image" || node.kind === "asset") return true;
+  // An asset runs only with a file of the library: its answer is the attachment id of the file.
+  if (node.kind === "asset") return fieldText(node, "fileId") === "";
   if (node.kind === "trigger") return node.fields.trigger === "message";
   if (node.kind === "output") return node.fields.target === "file";
   return false;
@@ -83,6 +103,42 @@ export function runScope(
   return { nodes, reused: new Set(graphOrder(graph.nodes, forward, reused)) };
 }
 
+/**
+ * The earlier answers that a run from a node can give again. An answer is out of date when its node
+ * reads other fields or other inputs than in the graph that it ran with, or when such a node is
+ * before it, so that an edit before the start node takes effect. A trigger gives its event again,
+ * whatever its fields. When `ranWith` does not know the graph of an answer, the answer stays.
+ */
+export function currentAnswers(
+  graph: WorkflowGraph,
+  answered: ReadonlyMap<string, StoredWorkflowStep>,
+  ranWith: (step: StoredWorkflowStep) => WorkflowGraph | undefined,
+): Map<string, StoredWorkflowStep> {
+  const changed = [...answered.values()].flatMap((step) => {
+    const earlier = ranWith(step);
+    return earlier && nodeChanged(step.nodeId, earlier, graph) ? [step.nodeId] : [];
+  });
+  const loops = workflowLoopEdges(graph.nodes, graph.edges);
+  const next = outgoing(graph.edges.filter((edge) => !loops.has(edge.id)));
+  const stale = new Set(changed.flatMap((id) => [...reach(id, next)]));
+  return new Map([...answered].filter(([id]) => !stale.has(id)));
+}
+
+function nodeChanged(id: string, earlier: WorkflowGraph, current: WorkflowGraph): boolean {
+  const before = earlier.nodes.find((node) => node.id === id);
+  const now = current.nodes.find((node) => node.id === id);
+  if (!before || !now || before.kind !== now.kind) return true;
+  return now.kind !== "trigger" && readsOf(before, earlier) !== readsOf(now, current);
+}
+
+/** What a step reads in a run: its run fields and the edges into it, in input order. */
+function readsOf(node: WorkflowNode, graph: WorkflowGraph): string {
+  const inputs = graph.edges
+    .filter((edge) => edge.to === node.id)
+    .map((edge) => [edge.from, edge.type, edge.branch ?? null]);
+  return JSON.stringify([runtimeFields(node), inputs]);
+}
+
 export type WalkAction = { nodeId: string; action: "run"; inputs: string[] } | { nodeId: string; action: "skip" };
 
 /**
@@ -97,6 +153,8 @@ export function nextActions(
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
   const forward = graph.edges.filter((edge) => !loops.has(edge.id));
   const before = incoming(graph.edges);
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  const reasons = { before, loops, latest };
   const due = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
@@ -118,15 +176,16 @@ export function nextActions(
     if (ahead.some((edge) => due.has(edge.from) || isWaiting(latest.get(edge.from)))) continue;
     // Another trigger's edge never becomes active in this run.
     const outside = (before.get(nodeId) ?? []).length > edges.length;
-    const inputs = edges.flatMap((edge) => {
+    const answered = edges.some((edge) => {
       const source = latest.get(edge.from);
-      return source && edgeActive(edge, source) ? [source.output ?? ""] : [];
+      return source !== undefined && edgeActive(edge, source);
     });
-    if (inputs.length === 0 && (ahead.length > 0 || outside)) {
+    if (!answered && (ahead.length > 0 || outside)) {
       actions.push({ nodeId, action: "skip" });
       continue;
     }
-    actions.push({ nodeId, action: "run", inputs });
+    const join = isJoin(kinds.get(nodeId), before.get(nodeId) ?? [], loops);
+    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, textEdges(kinds, edges), reasons) });
   }
   return actions;
 }
@@ -137,10 +196,181 @@ export function soloInputs(
   nodeId: string,
   answered: ReadonlyMap<string, StoredWorkflowStep>,
 ): string[] {
-  return (incoming(graph.edges).get(nodeId) ?? []).flatMap((edge) => {
-    const source = answered.get(edge.from);
-    return source && edgeActive(edge, source) ? [source.output ?? ""] : [];
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  const loops = workflowLoopEdges(graph.nodes, graph.edges);
+  const before = incoming(graph.edges);
+  const edges = before.get(nodeId) ?? [];
+  return edgeInputs(isJoin(kinds.get(nodeId), edges, loops), textEdges(kinds, edges), {
+    before,
+    loops,
+    latest: answered,
   });
+}
+
+/**
+ * The edges that give text. The answer of an image or an asset step is the id of an attachment: an
+ * image step reads it as a file (`mediaInputs`), an agent step gets the file with its message
+ * (`agentFileInputs`), and no step gets the id as text.
+ */
+function textEdges(
+  kinds: ReadonlyMap<string, WorkflowNode["kind"]>,
+  edges: readonly WorkflowEdge[],
+): readonly WorkflowEdge[] {
+  return edges.filter((edge) => {
+    const kind = kinds.get(edge.from);
+    return kind !== "image" && kind !== "asset";
+  });
+}
+
+/** A picture that an image step reads: the image or asset node it comes from and the attachment of its file. */
+export interface MediaInput {
+  from: string;
+  attachmentId: string;
+}
+
+/**
+ * The pictures that come into an image step, in edge order: the newest file of each image node with
+ * an `image` edge into it, and the file of each asset node. A node before it with no file gives none.
+ */
+export function mediaInputs(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): MediaInput[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  return graph.edges.flatMap((edge) =>
+    edge.to === nodeId && edge.type === "image" ? edgeFile(nodes.get(edge.from), latest) : [],
+  );
+}
+
+/**
+ * The files that come into an agent step, as attachment ids in edge order, each one time: the newest
+ * file of each image node and the file of each asset node with an edge into it. The agent gets them
+ * with its message.
+ */
+export function agentFileInputs(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): string[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const files = graph.edges.flatMap((edge) => (edge.to === nodeId ? edgeFile(nodes.get(edge.from), latest) : []));
+  return [...new Set(files.map((file) => file.attachmentId))];
+}
+
+/** The file that `node` gives on an edge: its newest file for an image node, its own file for an asset. */
+function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, StoredWorkflowStep>): MediaInput[] {
+  // An asset gives its file also to a step that runs alone, before the asset ran in a run.
+  if (node?.kind === "asset") {
+    const attachmentId = fieldText(node, "fileId");
+    return attachmentId ? [{ from: node.id, attachmentId }] : [];
+  }
+  if (node?.kind !== "image") return [];
+  const source = latest.get(node.id);
+  return source?.status === "done" && source.output ? [{ from: node.id, attachmentId: source.output }] : [];
+}
+
+/** How an image step uses a picture: the first or the last frame of a video, or a reference. */
+export type MediaImageRole = "first" | "last" | "reference";
+
+/**
+ * The pictures that an image step sends with its request. For a video, the nodes that `firstFrame`
+ * and `lastFrame` name give the first and the last frame; one node can give both, for a loop. Every
+ * other picture is a reference.
+ */
+export function mediaImages(
+  fields: WorkflowFields,
+  kind: WorkflowMediaKind,
+  inputs: readonly MediaInput[],
+): { role: MediaImageRole; attachmentId: string }[] {
+  const frame = (name: string) => (kind === "video" && typeof fields[name] === "string" ? fields[name] : null);
+  const first = frame("firstFrame");
+  const last = frame("lastFrame");
+  return inputs.flatMap((input) => {
+    const roles: MediaImageRole[] = [];
+    if (input.from === first) roles.push("first");
+    if (input.from === last) roles.push("last");
+    if (roles.length === 0) roles.push("reference");
+    return roles.map((role) => ({ role, attachmentId: input.attachmentId }));
+  });
+}
+
+/** The preset voice of a video step, or null when it has none or names a voice the host does not know. */
+export function mediaVoice(fields: WorkflowFields, kind: WorkflowMediaKind, model: WorkflowMediaModel): string | null {
+  const voice = fields.voice;
+  if (kind !== "video" || !model.voices || typeof voice !== "string") return null;
+  return WORKFLOW_VIDEO_VOICES.some((preset) => preset.id === voice) ? voice : null;
+}
+
+/** The account that pays for the file of a media step, or null for the provider's own sign-in. */
+export function mediaAccount(fields: WorkflowFields): string | null {
+  const account = fields.account;
+  return typeof account === "string" && account !== "" && account !== DEFAULT_PROVIDER_ACCOUNT_ID ? account : null;
+}
+
+/** The longest error that a missing answer quotes, in characters, so a long error costs few tokens. */
+const MISSING_ERROR_LIMIT = 300;
+
+/** What a missing answer reads to find its reason: the edges into each node and the newest steps. */
+interface Reasons {
+  before: ReadonlyMap<string, readonly WorkflowEdge[]>;
+  loops: ReadonlySet<string>;
+  latest: ReadonlyMap<string, StoredWorkflowStep>;
+}
+
+/**
+ * A model or agent node with more than one edge from the nodes before it, apart from loop edges. It
+ * counts every edge in the graph, so a run and a retry of the node agree.
+ */
+function isJoin(
+  kind: WorkflowNode["kind"] | undefined,
+  edges: readonly WorkflowEdge[],
+  loops: ReadonlySet<string>,
+): boolean {
+  return (kind === "llm" || kind === "agent") && edges.filter((edge) => !loops.has(edge.id)).length > 1;
+}
+
+/**
+ * The inputs of a node by its edges, in edge order: the answer of each active edge, and at a join,
+ * the reason for each node before it that has no answer.
+ */
+function edgeInputs(join: boolean, edges: readonly WorkflowEdge[], reasons: Reasons): string[] {
+  return edges.flatMap((edge) => {
+    const source = reasons.latest.get(edge.from);
+    if (!source) return [];
+    if (edgeActive(edge, source)) return [source.output ?? ""];
+    if (!join || reasons.loops.has(edge.id)) return [];
+    const reason = missingAnswer(source, reasons, new Set());
+    return reason ? [reason] : [];
+  });
+}
+
+/**
+ * Why a node before a join has no answer, or null when it chose to give none. A skipped node gives
+ * the reason of the first node before it that failed or was stopped. A provider reads it, so the
+ * words stay English, and the error is redacted.
+ */
+function missingAnswer(source: StoredWorkflowStep, reasons: Reasons, seen: Set<string>): string | null {
+  if (source.status === "failed") return withError("No answer: this step failed.", source.error);
+  if (source.status === "stopped") return withError("No answer: this step was stopped.", source.error);
+  if (source.status !== "skipped" || seen.has(source.nodeId)) return null;
+  seen.add(source.nodeId);
+  for (const edge of reasons.before.get(source.nodeId) ?? []) {
+    const earlier = reasons.latest.get(edge.from);
+    if (reasons.loops.has(edge.id) || !earlier || earlier.status === "done") continue;
+    const reason = missingAnswer(earlier, reasons, seen);
+    if (reason) return reason.replace("No answer: this step", "No answer: a step before this one");
+  }
+  return null;
+}
+
+function withError(text: string, error: string | null | undefined): string {
+  const clean = redactText(error?.trim() ?? "");
+  if (!clean) return text;
+  const characters = Array.from(clean);
+  const quoted =
+    characters.length > MISSING_ERROR_LIMIT ? `${characters.slice(0, MISSING_ERROR_LIMIT).join("")}…` : clean;
+  return `${text} Error: ${quoted}`;
 }
 
 function edgeActive(edge: WorkflowEdge, source: StoredWorkflowStep): boolean {
@@ -240,17 +470,95 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
   return [system.trim(), prompt.trim(), input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
 }
 
+/**
+ * How an image step asks for a transparent background. Codex's image tool makes clear pixels when the
+ * request asks for them. Grok's tool cannot, so Grok gets one flat colour that the host removes
+ * (`clearFlatBackground`). A provider reads it, so the words stay English.
+ */
+const TRANSPARENT_ASK = {
+  codex: "Give it a transparent background: a cut-out PNG with clear pixels around the subject.",
+  grok: "Put the subject on one flat, solid background colour, with no shadow, floor, gradient or texture, and keep a margin around the subject. Use pure green #00FF00, or pure magenta #FF00FF when the subject is green. Do not use that colour in the subject.",
+} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield">, string>;
+
+/**
+ * The request of an image step: the frame and, for a video, its length and resolution, then the
+ * description and the text that comes in. Sunra and Higgsfield take the frame, the length and the
+ * resolution as fields of their tools, so their request is the description and the input only.
+ */
+export function mediaStepPrompt(
+  fields: WorkflowFields,
+  kind: WorkflowMediaKind,
+  input: string,
+  specs: WorkflowMediaSpecs,
+  provider: WorkflowMediaProvider,
+): string {
+  const ask =
+    provider === "sunra" || provider === "higgsfield"
+      ? ""
+      : kind === "video"
+        ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`
+        : [`Make one image, aspect ratio ${specs.aspect}.`, specs.transparent ? TRANSPARENT_ASK[provider] : ""]
+            .filter(Boolean)
+            .join(" ");
+  const description = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
+  // With no description and no text, the host sends the step only when pictures come in. Sunra and
+  // Higgsfield get no other request, so they get one line rather than an empty prompt.
+  const fallback = ask || description || input ? "" : `Make one ${kind} from the input pictures.`;
+  return [ask, description, input ? `--- input ---\n${input}` : "", fallback].filter(Boolean).join("\n\n");
+}
+
+/** The most reference pictures that Grok's `reference_to_video` tool takes (Grok CLI 1.0.77). */
+const GROK_VIDEO_REFERENCE_LIMIT = 14;
+
+/**
+ * How the model uses the pictures and the voice of an image step. Grok's tools take local paths, so
+ * the text names the tool and its inputs. Codex gets the pictures in the turn and reads them itself.
+ * A provider reads it, so the words stay English.
+ */
+export function mediaInputText(
+  provider: WorkflowMediaProvider,
+  kind: WorkflowMediaKind,
+  images: readonly { role: MediaImageRole; path: string }[],
+  voice: string | null,
+): string {
+  const paths = (role: MediaImageRole) => images.filter((image) => image.role === role).map((image) => image.path);
+  const references = paths("reference");
+  if (provider === "codex")
+    return references.length > 0 ? "Use the attached pictures as references for the new image." : "";
+  if (kind === "image")
+    return references.length > 0
+      ? [
+          "Edit these pictures into the new image with the image_edit tool:",
+          ...references.map((path) => `- ${path}`),
+        ].join("\n")
+      : "";
+  if (images.length === 0 && !voice) return "";
+  const lines = ["Make the video with the reference_to_video tool and these inputs:"];
+  const first = paths("first")[0];
+  const last = paths("last")[0];
+  if (first) lines.push(`- first_frame: ${first}`);
+  if (last) lines.push(`- last_frame: ${last}`);
+  if (references.length > 0) {
+    lines.push("- images, in this order; refer to each in the prompt with its <IMAGE_n> tag:");
+    lines.push(...references.slice(0, GROK_VIDEO_REFERENCE_LIMIT).map((path) => `  - ${path}`));
+  }
+  if (voice) lines.push(`- voices: ["${voice}"]; the person who speaks is <AUDIO_1> in the prompt.`);
+  return lines.join("\n");
+}
+
 /** The prompt of a condition. The model must answer one word. */
 export function conditionPrompt(rule: string, input: string): string {
   return [
-    "You judge one condition of a workflow. Read the input, then answer with one word: yes or no.",
+    "You judge one condition of a workflow. Read the input, then answer with one English word: yes or no. Answer in English also when the condition or the input uses another language.",
     `Condition: ${rule.trim() || "The input is not empty."}`,
     `--- input ---\n${input || "(empty)"}`,
   ].join("\n\n");
 }
 
-/** The answer of a condition, or null when the model did not answer yes or no. */
+/** The answer of a condition, or null when the model did not answer yes or no. "true" and "false" count too. */
 export function conditionAnswer(text: string): "yes" | "no" | null {
   const word = /^[^a-z]*([a-z]+)/iu.exec(text.trim())?.[1]?.toLowerCase();
-  return word === "yes" || word === "no" ? word : null;
+  if (word === "yes" || word === "true") return "yes";
+  if (word === "no" || word === "false") return "no";
+  return null;
 }

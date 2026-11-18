@@ -28,6 +28,9 @@ const executable = join(root, "claude.cjs");
 const logPath = join(root, "claude.jsonl");
 // A key in the shell would reach the CLI in every case.
 delete process.env.ANTHROPIC_API_KEY;
+// The own sign-in reads its stored login before it asks the CLI. An empty folder keeps the login of
+// this computer out, so the fake CLI answers each account check.
+process.env.CLAUDE_CONFIG_DIR = join(root, "own-sign-in");
 process.env.FAKE_CLAUDE_LOG = logPath;
 
 /** Records each start, never the key itself: only whether it is the expected one. */
@@ -123,6 +126,8 @@ function unused(name: string) {
 function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApiKey">): ProviderAccountsHost {
   return {
     ...key,
+    accountKey: () => null,
+    saveAccountKey: unused("saveAccountKey"),
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
     defaultLogin: () => null,
@@ -133,6 +138,7 @@ function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApi
     isAccountBusy: () => false,
     stopAgentClients: unused("stopAgentClients"),
     readUsage: unused("readUsage"),
+    readModels: unused("readModels"),
     resetCredits: () => undefined,
     consumeUsageReset: unused("consumeUsageReset"),
     changed: () => {},
@@ -216,7 +222,7 @@ try {
     "the added account got the key or another folder",
   );
 
-  const rowIds = () => accounts.rows("claude", null)?.map((row) => row.id) ?? [];
+  const rowIds = () => accounts.rows("claude", null, null)?.map((row) => row.id) ?? [];
   assert.deepEqual(rowIds(), ["default", CLAUDE_API_KEY_ACCOUNT_ID, added.id], "the key account row is missing");
   defaultUsesApiKey = true;
   assert.deepEqual(rowIds(), ["default", added.id], "the key account row shows while the own sign-in uses the key");
@@ -244,8 +250,14 @@ try {
       listAgents: unused("listAgents"),
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
+      connectProviderAccountKey: unused("connectProviderAccountKey"),
+      startProviderAccountCodeLogin: unused("startProviderAccountCodeLogin"),
+      submitProviderAccountCodeLogin: unused("submitProviderAccountCodeLogin"),
+      providerAccountCodeLoginStatus: unused("providerAccountCodeLoginStatus"),
+      cancelProviderAccountSignIn: unused("cancelProviderAccountSignIn"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
+      setProviderAccountPool: unused("setProviderAccountPool"),
     },
     browser: { openPrivate: unused("openPrivate"), privateTab: unused("privateTab"), close: unused("close") },
   });

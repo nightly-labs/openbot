@@ -1,26 +1,29 @@
-import { chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import {
+  type ChatTagReference,
+  chatTagReferences,
+  serializeChatTagReference,
+} from "@openbot/contracts/chat-tag-references";
 
 export function mentionDraft(source: string) {
   let cursor = 0;
   let text = "";
   const mentions = [];
   for (const reference of chatTagReferences(source)) {
-    if (
-      reference.kind !== "agent" &&
-      reference.kind !== "quote" &&
-      reference.kind !== "skill" &&
-      reference.kind !== "mcp"
-    )
-      continue;
     text += source.slice(cursor, reference.start);
     const start = text.length;
     // A quote keeps its marker through an edit, as a mention does. The phone cannot jump to its source.
     // A skill or an app reads as its name after @, as the desktop chip does; its marker goes to the host.
-    text += reference.kind === "quote" ? `“${reference.name}”` : `@${reference.name}`;
+    // A browser tab or a thread of the agent reads as its name, as the desktop chip does.
+    text += mentionText(reference);
     mentions.push({ start, end: text.length, reference, wire: source.slice(reference.start, reference.end) });
     cursor = reference.end;
   }
   return { text: text + source.slice(cursor), mentions };
+}
+
+function mentionText(reference: ChatTagReference): string {
+  if (reference.kind === "quote") return `“${reference.name}”`;
+  return reference.kind === "tab" || reference.kind === "thread" ? reference.name : `@${reference.name}`;
 }
 
 // Preserve identities outside the edit. Editing a mention itself turns it into plain text.
@@ -55,12 +58,15 @@ export function mentionQuery(source: string, cursor: number) {
   return { start, end: cursor, query: query.toLocaleLowerCase() };
 }
 
-/** Writes an agent mention, or a skill or app reference as the desktop chip sends it, over the typed `@query`. */
+/**
+ * Writes an agent mention, or a skill, app, browser tab or thread reference as the desktop chip sends
+ * it, over the typed `@query`.
+ */
 export function insertMention(
   source: string,
   range: { start: number; end: number },
   agent: { id: string; name: string },
-  kind: "agent" | "skill" | "mcp" = "agent",
+  kind: "agent" | "skill" | "mcp" | "tab" | "thread" = "agent",
 ) {
   const wireOffset = (position: number) => {
     let offset = position;

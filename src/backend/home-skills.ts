@@ -8,6 +8,8 @@ import { readSkillFrontmatter } from "./skill-frontmatter";
 /** The user's own skill folder, which the Agent Skills tools share across CLIs. */
 export const HOME_SKILL_FOLDER = ".agents/skills";
 const MAX_HOME_SKILLS = 200;
+/** The file in a skill folder that OpenBot writes and updates itself (`managed-skill-service.ts`). */
+export const SKILL_OWNERSHIP_MARKER = ".openbot-managed.json";
 const MAX_SKILL_FILE_BYTES = 256 * 1024;
 
 /** A skill in `~/.agents/skills` whose `SKILL.md` follows the Agent Skills specification. */
@@ -62,6 +64,18 @@ export const skillFolderNames = Effect.fn("HomeSkills.folderNames")(function* (d
   for (const name of entries.value.filter((entry) => !entry.startsWith(".")).sort()) {
     const file = yield* optionalRead(() => stat(join(directory, name, "SKILL.md")));
     if (Option.isSome(file) && file.value.isFile()) names.add(name);
+  }
+  return names;
+});
+
+/** The skills in a workspace skill folder that OpenBot did not write: the user's own and installed ones. */
+export const userSkillFolderNames = Effect.fn("HomeSkills.userFolderNames")(function* (directory: string) {
+  const names: string[] = [];
+  for (const name of yield* skillFolderNames(directory)) {
+    // `.openbot-stage-` and `.openbot-backup-` folders are an install in progress.
+    if (name.includes(".openbot-")) continue;
+    const marker = yield* optionalRead(() => stat(join(directory, name, SKILL_OWNERSHIP_MARKER)));
+    if (Option.isNone(marker)) names.push(name);
   }
   return names;
 });

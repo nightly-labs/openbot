@@ -14,6 +14,7 @@ interface WindowSize {
 interface MainWindowPresentationTarget {
   isMinimized(): boolean;
   restore(): void;
+  hide(): void;
   show(): void;
   focus(): void;
 }
@@ -32,9 +33,15 @@ export function presentMainWindow(
   window: MainWindowPresentationTarget,
   platform: NodeJS.Platform,
   showApplication: () => void,
+  waylandWindows: boolean,
 ): void {
   if (platform === "darwin") showApplication();
-  if (window.isMinimized()) window.restore();
+  if (window.isMinimized()) {
+    window.restore();
+    // Wayland has no request to unminimize a window, so `restore()` leaves it minimized (#6207).
+    // A window that is shown again is not minimized.
+    if (waylandWindows) window.hide();
+  }
   window.show();
   window.focus();
 }

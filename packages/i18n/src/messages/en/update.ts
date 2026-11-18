@@ -18,6 +18,10 @@ export const messages = defineMessages("update", {
   "update.provider.checking": "Checking for {name} updates",
   "update.provider.available": "{name} update available",
   "update.provider.updating": "Updating {name}",
+  "update.provider.downloading": "Downloading {name}",
+  "update.provider.downloaded": "{name} is downloaded",
+  "update.provider.downloadFailed": "{name} download failed",
+  "update.provider.downloadFailedRetry": "The download failed. Try again.",
   "update.provider.waiting": "Waiting to update {name}",
   "update.provider.failed": "{name} update failed",
   "update.provider.settingUp": "Setting up",
@@ -69,4 +73,11 @@ export const messages = defineMessages("update", {
   "update.whatsNew.changelog": "Full changelog",
   "update.whatsNew.changelogFailed": "OpenBot could not open the changelog.",
   "update.whatsNew.done": "Got it",
+
+  // The screen in place of the app while this version is below the lowest supported one.
+  "update.required.title": "Update required",
+  "update.required.description": "OpenBot {version} is no longer supported. Update to {minimum} or newer to continue.",
+  "update.required.download": "Download OpenBot",
+  "update.required.continue": "Continue without updating",
+  "update.required.failed": "The update did not finish.",
 });

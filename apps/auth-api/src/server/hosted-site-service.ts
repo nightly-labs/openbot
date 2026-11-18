@@ -33,7 +33,16 @@ import {
   sourceIpHash,
   uploadRequestHash,
 } from "./hosted-site-records";
-import { type HostedSiteScope, holdsSiteSlotSql, hostedSiteLimit, scopeServerId } from "./hosted-site-server";
+import {
+  bucketHasRoomSql,
+  bucketServerId,
+  type HostedSiteBucket,
+  type HostedSiteScope,
+  type HostedSiteSlots,
+  hostedSiteSlots,
+  resolveHostedSiteBucket,
+  scopeServerId,
+} from "./hosted-site-server";
 
 export interface HostedSiteUploadSession {
   uploadId: string;
@@ -77,11 +86,11 @@ export class HostedSiteService {
           .bind(...binds)
           .all<SiteRow & { file_count: number; total_bytes: number }>(),
       );
-      const [limit, used] = yield* Effect.all(
-        [hostedSiteLimit(database, serverId, now), this.activeSiteSlotCountEffect(scope.userId, serverId, null, now)],
-        { concurrency: "unbounded" },
-      );
-      return { sites: rows.results.map((row) => mapSite(row, this.localSiteOrigin)), limit, used };
+      const bucket = yield* resolveHostedSiteBucket(database, scope.userId, serverId, now);
+      const { limit, used, reason } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
+      const sites = rows.results.map((row) => mapSite(row, this.localSiteOrigin));
+      // `limitReason` is optional: released desktops read only `sites`, `limit` and `used`.
+      return reason === null ? { sites, limit, used } : { sites, limit, used, limitReason: reason };
     },
     (operation) => operation.pipe(Effect.provide(HostedSiteStorage.layer(this.database, this.bucket))),
   );
@@ -188,7 +197,8 @@ export class HostedSiteService {
       }
 
       yield* this.enforceCreationRateEffect(userId, now);
-      const siteLimit = yield* hostedSiteLimit(database, serverId, now);
+      const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
+      const room = bucketHasRoomSql(bucket, userId, null, now);
       const siteId = crypto.randomUUID();
       const hostname = yield* this.uniqueHostnameEffect(`${request.title} ${request.description}`);
       const statements = [
@@ -199,8 +209,7 @@ export class HostedSiteService {
              created_at, updated_at
            )
            SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?
-           WHERE (SELECT COUNT(*) FROM hosted_sites x
-                  WHERE x.user_id = ? AND x.server_id IS ? AND ${holdsSiteSlotSql("x")}) < ?
+           WHERE ${room.sql}
              AND (SELECT COUNT(*) FROM site_deployments
                   WHERE user_id = ? AND status = 'uploading' AND upload_expires_at > ?) < ?
              AND (SELECT COUNT(*) FROM site_creation_events WHERE user_id = ? AND created_at > ?) < ?
@@ -217,11 +226,7 @@ export class HostedSiteService {
             request.spaFallback === true ? 1 : 0,
             now,
             now,
-            userId,
-            serverId,
-            now,
-            now,
-            siteLimit,
+            ...room.binds,
             userId,
             now,
             HOSTED_SITE_LIMITS.concurrentUploads,
@@ -308,7 +313,7 @@ export class HostedSiteService {
           );
         }
         yield* this.enforceCreationRateEffect(userId, now);
-        return yield* siteLimitError(serverId, siteLimit);
+        return yield* siteLimitError(bucket, yield* hostedSiteSlots(database, userId, bucket, now));
       }
       return yield* this.uploadSessionEffect(yield* this.requireDeploymentEffect(userId, deploymentId));
     },
@@ -941,8 +946,9 @@ export class HostedSiteService {
       const { database } = yield* HostedSiteStorage;
 
       const previousDeployment = deployment.base_deployment_id;
-      // The site keeps the server it was created for, so the activation counts against that server's plan.
-      const siteLimit = yield* hostedSiteLimit(database, site.server_id, now);
+      // The site keeps the server it was created for, so the activation counts against that server's bucket.
+      const bucket = yield* resolveHostedSiteBucket(database, userId, site.server_id, now);
+      const room = bucketHasRoomSql(bucket, userId, site.id, now);
       const results = yield* siteCall(() =>
         database.batch([
           database
@@ -954,10 +960,7 @@ export class HostedSiteService {
              AND (status = 'uploading' OR expires_at > ?)
              AND (
                -- An active site already holds its slot, so a replacement is allowed after a downgrade.
-               status = 'active' OR (
-                 SELECT COUNT(*) FROM hosted_sites x
-                 WHERE x.user_id = ? AND x.server_id IS ? AND x.id != ? AND ${holdsSiteSlotSql("x")}
-               ) < ?
+               status = 'active' OR (${room.sql})
              )
              AND current_deployment_id IS ?
              AND EXISTS (SELECT 1 FROM site_deployments WHERE id = ? AND status = 'activating')`,
@@ -973,12 +976,7 @@ export class HostedSiteService {
               site.id,
               userId,
               now,
-              userId,
-              site.server_id,
-              site.id,
-              now,
-              now,
-              siteLimit,
+              ...room.binds,
               previousDeployment,
               deployment.id,
             ),
@@ -1048,11 +1046,8 @@ export class HostedSiteService {
           if (currentSite.status === "active" && (!currentSite.expires_at || currentSite.expires_at <= now)) {
             return yield* inactiveSiteError("expired");
           }
-          if (
-            currentSite.status === "uploading" &&
-            (yield* this.activeSiteSlotCountEffect(userId, site.server_id, site.id, now)) >= siteLimit
-          ) {
-            return yield* siteLimitError(site.server_id, siteLimit);
+          if (currentSite.status === "uploading" && !(yield* this.bucketHasRoomEffect(userId, bucket, site.id, now))) {
+            return yield* siteLimitError(bucket, yield* hostedSiteSlots(database, userId, bucket, now));
           }
           return yield* new HostedSiteInputError(409, "activation_superseded", "A newer site deployment is active.");
         }
@@ -1195,27 +1190,24 @@ export class HostedSiteService {
     },
   );
 
-  /** The sites that hold a slot of one server, or of the unlinked bucket when `serverId` is null. */
-  private readonly activeSiteSlotCountEffect = Effect.fn("HostedSites.activeSiteSlotCount")(
+  /** True when the bucket has a free slot for one more site, not counting `excludeSiteId`. */
+  private readonly bucketHasRoomEffect = Effect.fn("HostedSites.bucketHasRoom")(
     { self: this },
     function* (
       userId: string,
-      serverId: string | null,
+      bucket: HostedSiteBucket,
       excludeSiteId: string | null,
       now: number,
-    ): Effect.fn.Return<number, HostedSiteFailure, HostedSiteStorage> {
+    ): Effect.fn.Return<boolean, HostedSiteFailure, HostedSiteStorage> {
       const { database } = yield* HostedSiteStorage;
-
+      const room = bucketHasRoomSql(bucket, userId, excludeSiteId, now);
       const row = yield* siteCall(() =>
         database
-          .prepare(
-            `SELECT COUNT(*) AS count FROM hosted_sites x
-         WHERE x.user_id = ? AND x.server_id IS ? AND x.id IS NOT ? AND ${holdsSiteSlotSql("x")}`,
-          )
-          .bind(userId, serverId, excludeSiteId, now, now)
-          .first<{ count: number }>(),
+          .prepare(`SELECT (${room.sql}) AS room`)
+          .bind(...room.binds)
+          .first<{ room: number }>(),
       );
-      return row?.count ?? 0;
+      return row?.room === 1;
     },
   );
 
@@ -1764,8 +1756,22 @@ function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
   throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");
 }
 
-function siteLimitError(serverId: string | null, limit: number): HostedSiteInputError {
-  const owner = serverId === null ? "This account has no server, and it" : "This server";
-  const sites = limit === 1 ? "1 active site" : `${limit} active sites`;
-  return new HostedSiteInputError(409, "site_limit", `${owner} is at its limit of ${sites}.`);
+function siteLimitError(bucket: HostedSiteBucket, slots: HostedSiteSlots): HostedSiteInputError {
+  const sites = (count: number) => (count === 1 ? "1 active site" : `${count} active sites`);
+  if (slots.accountFull) {
+    return new HostedSiteInputError(
+      409,
+      "site_limit",
+      `This account is at its limit of ${sites(HOSTED_SITE_LIMITS.accountSites)} on all servers.`,
+    );
+  }
+  if (bucket.kind === "shared") {
+    return new HostedSiteInputError(
+      409,
+      "site_limit",
+      `The servers of this account with no plan share ${sites(bucket.limit)}, and all are in use.`,
+    );
+  }
+  const owner = bucketServerId(bucket) === null ? "This account has no server, and it" : "This server";
+  return new HostedSiteInputError(409, "site_limit", `${owner} is at its limit of ${sites(bucket.limit)}.`);
 }

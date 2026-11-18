@@ -1,0 +1,50 @@
+{
+  "slug": "composio",
+  "name": "Composio",
+  "tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
+  "description": "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
+  "category": "automation",
+  "creatorName": "Composio",
+  "iconUrl": "https://composio.dev/favicon.ico",
+  "version": "1.2.0",
+  "prompts": [
+    { "id": "prompt-inbox", "text": "Summarize my unread email and draft replies to the urgent ones." },
+    { "id": "prompt-handoff", "text": "Post a summary of this pull request to our team channel." },
+    { "id": "prompt-apps", "text": "Which apps and actions can you use through Composio?" }
+  ],
+  "apps": [
+    {
+      "id": "app-composio-mcp",
+      "name": "Composio",
+      "description": "The apps you connect in your Composio account. An agent asks you to connect an app when it needs it.",
+      "iconUrl": "https://composio.dev/favicon.ico",
+      "server": {
+        "name": "composio",
+        "transport": "http",
+        "url": "https://connect.composio.dev/mcp",
+        "earlierUrls": ["https://composio.dev/"],
+        "auth": [
+          { "id": "composio-oauth", "kind": "link", "label": "Sign in" },
+          {
+            "id": "composio-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "api-key",
+                "label": "API key",
+                "header": "x-consumer-api-key",
+                "placeholder": "ck_…",
+                "hint": "Find it in your Composio account, in Settings > Sessions & API Key."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "websiteUrl": "https://composio.dev",
+  "privacyPolicyUrl": "https://composio.dev/privacy-policy",
+  "termsUrl": "https://composio.dev/terms-of-service",
+  "skills": []
+}

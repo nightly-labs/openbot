@@ -8,7 +8,11 @@ import { AgentAvatar } from "./AgentAvatar";
 export const AGENT_DELETE_UNDO_MS = 8_000;
 const TICK_MS = 100;
 
-/** The time to undo. It stops while the pointer or the keyboard focus is on the toast, and while the window is hidden. */
+/**
+ * The time to undo. It stops while the pointer or the keyboard focus is on the toast of a visible window.
+ * It does not stop while the window is hidden: until it ends, the agent stays live for its teammates and
+ * its routines, and a minimized window would hold the delete back for as long as it stays minimized (#7931).
+ */
 export interface UndoCountdown {
   /** The part of the time that is left, from 1 to 0. */
   readonly left: Accessor<number>;
@@ -30,7 +34,8 @@ export function startUndoCountdown(onExpire: () => void, durationMs = AGENT_DELE
     const now = performance.now();
     const elapsed = now - last;
     last = now;
-    if (holds.size > 0 || document.hidden) return;
+    // A window that hides with the pointer or the focus on the toast does not always say that they left.
+    if (holds.size > 0 && !document.hidden) return;
     const next = Math.max(0, remaining() - elapsed);
     setRemaining(next);
     if (next === 0) {
@@ -78,9 +83,11 @@ export function AgentDeleteUndoToast(props: AgentDeleteUndoToastProps) {
         <strong class="agent-delete-undo-toast-title">{t("agent.deleteUndo.title", { name: props.agent.name })}</strong>
         {props.agent.title && <span class="agent-delete-undo-toast-detail">{props.agent.title}</span>}
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={() => props.onUndo()}>
-        {t("agent.deleteUndo.action")}
-      </Button>
+      <div class="ui-toast-card-actions agent-delete-undo-toast-actions">
+        <Button type="button" variant="default" size="sm" onClick={() => props.onUndo()}>
+          {t("agent.deleteUndo.action")}
+        </Button>
+      </div>
       <Progress
         value={props.countdown.left() * 100}
         minValue={0}

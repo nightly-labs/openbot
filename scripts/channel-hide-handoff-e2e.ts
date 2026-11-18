@@ -4,32 +4,19 @@
 // three visible agents whose provider is signed in, and a second signed-in provider for the switch
 // (default: the first other provider that lists a model).
 //
-// It checks that a hidden lead does not route and that a restore lets it route, that a hidden owner
-// keeps its queued task and does not start it until the restore, and that after a provider switch
-// the owner answers in the channel on the new provider, with the channel context. It makes its own
+// It checks that a hidden lead routes a task, that a hidden owner does its task, each while the
+// agent stays hidden, and that after a provider switch the owner answers in the channel on the new
+// provider, with the channel context. It makes its own
 // channels and deletes them, restores each agent it hides, and gives the agent its provider back.
 // Writes .openbot-build/channel-hide-handoff-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor, isAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, ChannelPage, ChannelTask } from "@openbot/contracts/ipc";
-import {
-  argument,
-  ChannelClient,
-  connectChannelE2e,
-  LONG_PROMPT,
-  queueBusy,
-  SHORT_PROMPT,
-  waitFor,
-  writeReport,
-} from "./channel-e2e-support";
-
-// A hidden agent must not route or start channel work. The script cannot wait for an event that
-// does not come, so it watches the task for this long before the restore.
-const QUIET_WINDOW_MS = 8_000;
+import { argument, ChannelClient, connectChannelE2e, SHORT_PROMPT, waitFor, writeReport } from "./channel-e2e-support";
 
 interface Report {
-  hiddenLead?: { ownerWhileHidden: string | null; ownerAfterRestore: string | null };
-  hiddenOwner?: { ownerWhileHidden: string | null; stateWhileHidden: string; stateAfterRestore: string };
+  hiddenLead?: { ownerWhileHidden: string | null; stillHidden: boolean };
+  hiddenOwner?: { ownerWhileHidden: string | null; stateWhileHidden: string; stillHidden: boolean };
   providerSwitch?: { from: string; to: string; replied: boolean };
   passed: boolean;
 }
@@ -49,77 +36,51 @@ try {
   const [lead, b, c] = agents;
   assert.ok(lead && b && c);
 
-  // 1. A hidden lead routes nothing; the restore routes the waiting task.
+  const isHidden = async (agentId: string) =>
+    (await page.evaluate(() => window.openbot.agent.listHiddenAgents())).agents.some(
+      (agent) => agent.agentId === agentId,
+    );
+
+  // 1. A hidden lead routes the task of a request that names no owner.
   const routed = await client.create("E2E hidden lead", [lead.id, b.id, c.id], lead.id);
   await client.setHidden(lead.id, true);
   hidden.add(lead.id);
   await client.send(routed.id, SHORT_PROMPT, null);
-  const queued = await waitFor(
+  const afterRoute = await waitFor(
     page,
-    "the request makes a task",
+    "the hidden lead routes the task",
     () => client.read(routed.id),
-    (channel) => newestTask(channel) !== undefined,
-  );
-  const waiting = newestTask(queued);
-  assert.ok(waiting);
-  await page.waitForTimeout(QUIET_WINDOW_MS);
-  const stillWaiting = (await client.read(routed.id)).tasks.find((task) => task.id === waiting.id);
-  await client.setHidden(lead.id, false);
-  hidden.delete(lead.id);
-  const afterRestore = await waitFor(
-    page,
-    "the restored lead routes the task",
-    () => client.read(routed.id),
-    (channel) => channel.tasks.find((task) => task.id === waiting.id)?.ownerAgentId != null,
+    (channel) => newestTask(channel)?.ownerAgentId != null,
   );
   report.hiddenLead = {
-    ownerWhileHidden: stillWaiting?.ownerAgentId ?? null,
-    ownerAfterRestore: afterRestore.tasks.find((task) => task.id === waiting.id)?.ownerAgentId ?? null,
+    ownerWhileHidden: newestTask(afterRoute)?.ownerAgentId ?? null,
+    stillHidden: await isHidden(lead.id),
   };
-  assert.equal(stillWaiting?.ownerAgentId, null, "A hidden lead routed the task.");
-  assert.equal(stillWaiting?.state, "queued");
+  assert.ok(report.hiddenLead.stillHidden, "The channel work put the lead back in the list.");
+  await client.setHidden(lead.id, false);
+  hidden.delete(lead.id);
 
-  // 2. A hidden owner keeps its task and does not start it. Its own chat turn keeps it busy until
-  // the hide, so the task is still queued then; the script then stops that turn to free the agent.
+  // 2. A hidden owner does its task.
   const kept = await client.create("E2E hidden owner", [b.id, c.id], b.id);
-  await client.sendToAgent(b.id, LONG_PROMPT);
-  await waitFor(page, "the owner's own chat runs", () => client.queue(b.id), queueBusy);
-  await client.send(kept.id, SHORT_PROMPT, b.id);
-  const assigned = await waitFor(
-    page,
-    "the task waits for the busy owner",
-    () => client.read(kept.id),
-    (channel) => newestTask(channel)?.ownerAgentId === b.id,
-  );
-  const owned = newestTask(assigned);
-  assert.ok(owned);
-  assert.equal(owned.state, "queued", "The channel turn started while the owner's own chat ran.");
   await client.setHidden(b.id, true);
   hidden.add(b.id);
-  await client.stopOwnChat(b.id);
-  await waitFor(
+  await client.send(kept.id, SHORT_PROMPT, b.id);
+  const done = await waitFor(
     page,
-    "the owner's own chat stops",
-    () => client.queue(b.id),
-    (snapshot) => !queueBusy(snapshot),
-  );
-  await page.waitForTimeout(QUIET_WINDOW_MS);
-  const whileHidden = (await client.read(kept.id)).tasks.find((task) => task.id === owned.id);
-  await client.setHidden(b.id, false);
-  hidden.delete(b.id);
-  const restored = await waitFor(
-    page,
-    "the restored owner does the task",
+    "the hidden owner does the task",
     () => client.read(kept.id),
-    (channel) => channel.tasks.find((task) => task.id === owned.id)?.state === "completed",
+    (channel) => ["completed", "failed", "paused"].includes(newestTask(channel)?.state ?? ""),
   );
   report.hiddenOwner = {
-    ownerWhileHidden: whileHidden?.ownerAgentId ?? null,
-    stateWhileHidden: whileHidden?.state ?? "missing",
-    stateAfterRestore: restored.tasks.find((task) => task.id === owned.id)?.state ?? "missing",
+    ownerWhileHidden: newestTask(done)?.ownerAgentId ?? null,
+    stateWhileHidden: newestTask(done)?.state ?? "missing",
+    stillHidden: await isHidden(b.id),
   };
-  assert.equal(whileHidden?.ownerAgentId, b.id, "The task lost its owner.");
-  assert.equal(whileHidden?.state, "queued", "A hidden owner started the channel task.");
+  assert.equal(report.hiddenOwner.ownerWhileHidden, b.id, "The task lost its owner.");
+  assert.equal(report.hiddenOwner.stateWhileHidden, "completed", "A hidden owner did not do the channel task.");
+  assert.ok(report.hiddenOwner.stillHidden, "The channel work put the owner back in the list.");
+  await client.setHidden(b.id, false);
+  hidden.delete(b.id);
 
   // 3. After a provider switch the owner answers in the channel on the new provider.
   const providerId = argument("provider");

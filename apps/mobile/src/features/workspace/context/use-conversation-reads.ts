@@ -1,17 +1,22 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CONVERSATION_UNREAD_FROM_ROUTE } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { type createRemoteReadRefresh, mergeRemoteUnreadIds, runTeamEffect } from "@openbot/team-client";
 import { Effect } from "effect";
 import { type RefObject, useCallback, useRef } from "react";
 import { showFailureAlert, showWarningAlert } from "@/features/analytics/failure-reports";
+import { latestReadBoundaryMessage } from "@/features/chat/model/chat-messages";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
 import { decodeConversationPage } from "@/features/workspace/model/conversation";
 import type { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import type { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import { hasCapability, type ServerCapabilities } from "@/features/workspace/model/server-capabilities";
-import { decodeConversationReads } from "@/features/workspace/model/workspace-records";
+import { decodeConversationReads, type MobileConversationRead } from "@/features/workspace/model/workspace-records";
 import type { MobileAgent, MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
+
+/** A read mark write: through a message (the newest the host counts when unset), or unread from one (the whole chat when unset). */
+type ReadMark = { kind: "read"; throughMessageId?: string } | { kind: "unread"; fromMessageId?: string };
 
 /**
  * The read state of the agent chats: the host's unread counts, and the read cursors that this phone
@@ -44,12 +49,23 @@ export function useConversationReads({
   const readWrites = useRef(new Map<string, Promise<void>>());
   /** Applies host read state. The Live Activity also shows the message counts. */
   const applyConversationReads = useCallback(
-    (reads: Record<string, { unreadCount: number }>) => {
+    (reads: Record<string, MobileConversationRead>) => {
       liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
       liveState.update("unreadCounts", (current) => ({
         ...current,
         ...Object.fromEntries(Object.entries(reads).map(([agentId, read]) => [agentId, read.unreadCount])),
       }));
+      // An open chat reads the line, so an unchanged state keeps the same record.
+      liveState.update("firstUnreadMessageIds", (current) =>
+        Object.entries(reads).every(([agentId, read]) => current[agentId] === read.firstUnreadMessageId)
+          ? current
+          : {
+              ...current,
+              ...Object.fromEntries(
+                Object.entries(reads).map(([agentId, read]) => [agentId, read.firstUnreadMessageId]),
+              ),
+            },
+      );
     },
     [liveState],
   );
@@ -101,39 +117,55 @@ export function useConversationReads({
   );
 
   /**
-   * Writes one agent's read cursor on `serverId` after its earlier writes. It rejects when the host refuses it.
+   * Writes one agent's read mark on `serverId` after its earlier writes. It rejects when the host refuses it.
    */
   const writeAgentRead = useCallback(
-    (agentId: string, visibleMessageId?: string | null, serverId = activeServerId.current): Promise<void> => {
+    (agentId: string, mark: ReadMark, serverId = activeServerId.current): Promise<void> => {
       if (!serverId) return Promise.resolve();
       const isCurrentRead = readRefresh.invalidate(serverId);
       const generation = loadGeneration.current;
       liveState.update("unreadAgentIds", (current) =>
-        visibleMessageId === null ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
+        mark.kind === "unread" ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
       );
       const write = (readWrites.current.get(agentId) ?? Promise.resolve())
         .then(async () => {
           if (generation !== loadGeneration.current) return;
-          const cached = conversationStore.get(agentId);
-          // A window around a searched message, or a chat that missed changes, does not hold the latest message.
-          const snapshot =
-            visibleMessageId !== undefined
-              ? null
-              : cached && conversationStore.isUpToDate(agentId)
-                ? cached
-                : await loadConversation(agentId, serverId);
-          if (generation !== loadGeneration.current) return;
-          const throughMessageId = visibleMessageId !== undefined ? visibleMessageId : snapshot?.messages.at(-1)?.id;
-          if (throughMessageId === undefined) return;
-          const reads = await request(
-            "POST",
-            visibleMessageId === null
-              ? TEAM_API_ROUTES.agent.conversationUnread(agentId)
-              : TEAM_API_ROUTES.agent.conversationRead(agentId),
-            (value) => decodeConversationReads({ [agentId]: value }),
-            visibleMessageId === null ? {} : { throughMessageId },
-            serverId,
-          );
+          const decode = (value: unknown) => decodeConversationReads({ [agentId]: value });
+          let reads: Record<string, MobileConversationRead>;
+          if (mark.kind === "unread") {
+            reads =
+              mark.fromMessageId === undefined
+                ? await request("POST", TEAM_API_ROUTES.agent.conversationUnread(agentId), decode, {}, serverId)
+                : await request(
+                    "POST",
+                    CONVERSATION_UNREAD_FROM_ROUTE,
+                    decode,
+                    { agentId, fromMessageId: mark.fromMessageId },
+                    serverId,
+                  );
+          } else {
+            const cached = conversationStore.get(agentId);
+            // A window around a searched message, or a chat that missed changes, does not hold the latest message.
+            const snapshot =
+              mark.throughMessageId !== undefined
+                ? null
+                : cached && conversationStore.isUpToDate(agentId)
+                  ? cached
+                  : await loadConversation(agentId, serverId);
+            if (generation !== loadGeneration.current) return;
+            // The same boundary as a read from the open chat. A chat with no message the host counts reads through its newest message.
+            const throughMessageId =
+              mark.throughMessageId ??
+              (snapshot && (latestReadBoundaryMessage(snapshot.messages) ?? snapshot.messages.at(-1)))?.id;
+            if (throughMessageId === undefined) return;
+            reads = await request(
+              "POST",
+              TEAM_API_ROUTES.agent.conversationRead(agentId),
+              decode,
+              { throughMessageId },
+              serverId,
+            );
+          }
           if (generation === loadGeneration.current && isCurrentRead()) {
             readRefresh.invalidate(serverId);
             applyConversationReads(reads);
@@ -175,7 +207,13 @@ export function useConversationReads({
         );
         return;
       }
-      void writeAgentRead(agentId, visibleMessageId, serverId ?? undefined).catch((error: unknown) => {
+      const mark: ReadMark =
+        visibleMessageId === null
+          ? { kind: "unread" }
+          : visibleMessageId === undefined
+            ? { kind: "read" }
+            : { kind: "read", throughMessageId: visibleMessageId };
+      void writeAgentRead(agentId, mark, serverId ?? undefined).catch((error: unknown) => {
         if (visibleMessageId === null)
           showFailureAlert(
             error,
@@ -206,7 +244,7 @@ export function useConversationReads({
           serverId,
         );
         const latestId = page.messages.at(-1)?.id;
-        if (latestId) await writeAgentRead(agentId, latestId, serverId);
+        if (latestId) await writeAgentRead(agentId, { kind: "read", throughMessageId: latestId }, serverId);
       }),
     );
     const failure = results.find((result) => result.status === "rejected");
@@ -216,5 +254,15 @@ export function useConversationReads({
     throw failure.reason;
   }, [activeServerId, agents, liveState, request, writeAgentRead, refreshConversationReads]);
 
-  return { applyConversationReads, refreshConversationReads, markAgentRead, markAllRead };
+  /**
+   * Marks `fromMessageId` and the messages after it unread, through `conversation-unread-from-v1`.
+   * It rejects when the host refuses it. The caller keeps the open chat from reading itself again.
+   */
+  const markAgentUnreadFrom = useCallback(
+    (agentId: string, fromMessageId: string, serverId: string) =>
+      writeAgentRead(agentId, { kind: "unread", fromMessageId }, serverId),
+    [writeAgentRead],
+  );
+
+  return { applyConversationReads, refreshConversationReads, markAgentRead, markAgentUnreadFrom, markAllRead };
 }

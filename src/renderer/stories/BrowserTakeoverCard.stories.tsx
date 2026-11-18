@@ -54,9 +54,10 @@ export const PreviewUnavailable: Story = {
   args: { preview: null, previewStatus: "failed" },
 };
 
+// The narrowest chat: a pop-out chat window at its 380px minimum width.
 export const Narrow: Story = {
   render: (args) => (
-    <div style={{ width: "280px", "max-width": "100%" }}>
+    <div style={{ width: "340px", "max-width": "100%" }}>
       <BrowserTakeoverCard {...args} />
     </div>
   ),

@@ -90,6 +90,18 @@ export function createMockBrowser(
     stop: async () => undefined,
     takeControl: async (tabId) => setUserControl(tabId, true),
     releaseControl: async (tabId) => setUserControl(tabId, false),
+    // The preview has no page to record, so a saved recording gives the page of the tab and one click.
+    startTeach: async (tabId) => setUserControl(tabId, true),
+    stopTeach: async ({ tabId, save }) => {
+      const tab = browserTabs.find((entry) => entry.id === tabId);
+      setUserControl(tabId, false);
+      if (!save || !tab || !URL.canParse(tab.url)) return [];
+      const { hostname: host, pathname: path } = new URL(tab.url);
+      return [
+        { kind: "page", host, path, title: tab.title },
+        { kind: "click", host, path, role: "button", name: "Search" },
+      ];
+    },
     close: async (tabId) => {
       const closedTab = browserTabs.find((tab) => tab.id === tabId);
       const closedIds = new Set([tabId]);

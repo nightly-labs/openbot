@@ -13,7 +13,7 @@ import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bo
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 /** The Grok Bot page of the ready export agent. */
-export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/gI0XdhhDYPJeyQaqQBC0O";
+export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/pOUBH2kQK8CKvM7nW8stG";
 
 /** The apps OpenBot ships an export skill for. Each is also the `source.app` its export writes. */
 export const AGENT_IMPORT_SKILL_SOURCES = ["grok-bot", "hermes-agent"] as const;
@@ -39,8 +39,11 @@ export const HERMES_EXPORT_PROMPT = "/openbot-export";
 export const AGENT_IMPORT_EXPORT_AGENT_NAME = "OpenBot export";
 
 export const AGENT_IMPORT_LIMITS = {
-  archiveBytes: 500 * 1024 * 1024,
-  files: 5_000,
+  /**
+   * Files in a local import. The archive is streamed from disk, so it has no size limit: an agent is
+   * skipped when the disk has less free space than its files need.
+   */
+  files: 200_000,
   /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
   key: 64,
   sourceApp: 64,

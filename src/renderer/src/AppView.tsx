@@ -1,6 +1,8 @@
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
+import { UpdateRequiredScreen } from "@openbot/ui/features/updates/UpdateRequiredScreen";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, Loading, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import { createLanguageStep } from "./features/onboarding/language-step";
@@ -10,15 +12,25 @@ import { useSetupProviderProps } from "./features/onboarding/setup-provider-prop
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useSettings } from "./features/settings/settings-context";
+import { useUpdates } from "./features/updates/updates-context";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
 import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
+import { reportWorkspaceReady } from "./renderer-timing";
 import { WorkspaceShell } from "./WorkspaceShell";
 
 // A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
 let startupSplashPlayed = false;
+
+/**
+ * Lets the next start fade the splash as soon as the app is ready, as after a server switch.
+ * Prototype stories render the whole app on each page load and do not need the crew each time.
+ */
+export function skipStartupSplash(): void {
+  startupSplashPlayed = true;
+}
 
 /** The placeholder every lazy view below falls back to while its code loads. */
 function LoadingScreen() {
@@ -55,8 +67,17 @@ export function AppAccessGate() {
   const detection = useProviderDetection();
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
-  const started = () => setup.setupLoaded() && platform.appInfo() !== null;
-  const [splashShown, setSplashShown] = createSignal(true);
+  const updates = useUpdates();
+  // An install that cannot update itself, or whose update failed, can close the screen until the next start.
+  const [requiredUpdateDismissed, setRequiredUpdateDismissed] = createSignal(false);
+  // Main sets it only after a check confirms that this version is below the supported minimum.
+  const updateRequired = () => updates.status().requiredVersion !== undefined && !requiredUpdateDismissed();
+  // The splash also waits for the catalogs of the first language, so the first screen is not in
+  // English. A later language change does not bring the splash back.
+  const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
+  const started = () => setup.setupLoaded() && platform.appInfo() !== null && languageLoaded();
+  // The landing demo opens on the workspace at once, with no splash.
+  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
   // A chat window is a new page too, but it fades as soon as it is ready.
   const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
   // The splash lets the workspace mount its heavy views before the crew hop out.
@@ -67,7 +88,10 @@ export function AppAccessGate() {
   const [workspaceReady, setWorkspaceReady] = createSignal(false);
   const workspaceShown = () =>
     !!auth.visibleSignedInAccount() && (setup.setupState()?.completed === true || !scope.connection.hasContent);
-  const splashReady = () => started() && (!workspaceShown() || workspaceReady());
+  // While main loads the account, the splash cannot know if the workspace follows. It holds: a splash
+  // that ended before the account came would rain again on the workspace's first load.
+  const splashReady = () =>
+    started() && auth.centralAuth().status !== "loading" && (!workspaceShown() || workspaceReady() || updateRequired());
   const languageStep = createLanguageStep();
   // Only a settled sign-out: a code in flight or a retry keeps the sign-in screen it belongs to.
   // The language button reopens the wheel from an error too, so that state does not hide it.
@@ -84,10 +108,23 @@ export function AppAccessGate() {
   createEffect(started, (ready) => {
     if (ready) performance.mark("openbot:app-started");
   });
+  // For the `system_startup` summary: main reads the time of the main window's first workspace load.
+  createEffect(workspaceReady, (ready) => {
+    if (ready && platform.chatWindow === null) reportWorkspaceReady();
+  });
 
   return (
     <>
-      <Show when={started()}>
+      <Show when={started() && updateRequired()}>
+        <UpdateRequiredScreen
+          status={updates.status()}
+          logoVariant={platform.appInfo()?.variant ?? "production"}
+          onUpdate={updates.runAction}
+          onOpenDownloadPage={() => void appPort().openExternal("download")}
+          onDismiss={() => setRequiredUpdateDismissed(true)}
+        />
+      </Show>
+      <Show when={started() && !updateRequired()}>
         <Show
           when={auth.visibleSignedInAccount()}
           fallback={
@@ -187,6 +224,7 @@ export function AppAccessGate() {
       <WhatsNewOverlay
         ready={
           !platform.chatWindow &&
+          !updateRequired() &&
           !splashShown() &&
           !!auth.visibleSignedInAccount() &&
           (setup.setupState()?.completed === true || !scope.connection.hasContent)

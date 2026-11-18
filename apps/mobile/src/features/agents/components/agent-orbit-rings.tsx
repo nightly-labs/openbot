@@ -20,6 +20,7 @@ import {
   prepareOrbitFrames,
 } from "@/features/agents/model/bloub-orbit";
 import { useMotionPreference } from "@/shared/lib/motion";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useScreenFocusedWhile } from "@/shared/lib/use-screen-focused-while";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -107,18 +108,20 @@ function OrbitLayer({ clock, layer, size }: { clock: SharedValue<number>; layer:
 /**
  * The desktop's orbit rings around a working agent. The half of each ring behind the body draws
  * under the avatar and the other half over it. With reduced motion, or with the Settings switch for
- * faces off, the rings hold still, as on the desktop. They stop while the screen is not focused.
+ * faces off, the rings hold still, as on the desktop. They stop while the screen is not focused or
+ * the app is in the background.
  */
 export function AgentOrbitRings({ active, size, children }: PropsWithChildren<{ active: boolean; size: number }>) {
   const clock = useSharedValue(0);
   const animate = useMotionPreference("agentFaces");
   const focused = useScreenFocusedWhile(active && animate);
+  const foreground = useAppForeground();
   useEffect(() => {
     if (active) prepareOrbitFrames();
   }, [active]);
   useEffect(() => {
     clock.set(0);
-    if (!active || !animate || !focused) return;
+    if (!active || !animate || !focused || !foreground) return;
     clock.set(
       withRepeat(
         withTiming(ORBIT_CYCLE, {
@@ -131,7 +134,7 @@ export function AgentOrbitRings({ active, size, children }: PropsWithChildren<{ 
       ),
     );
     return () => cancelAnimation(clock);
-  }, [active, animate, clock, focused]);
+  }, [active, animate, clock, focused, foreground]);
   return (
     <View style={{ width: size, height: size }}>
       {active ? <OrbitLayer clock={clock} layer="back" size={size} /> : null}

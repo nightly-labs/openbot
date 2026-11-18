@@ -4,12 +4,15 @@ import { lstat, open, readdir, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   checkHostedSitePath,
+  HOSTED_SITE_ACCOUNT_LIMIT,
   HOSTED_SITE_HOST_ID_HEADER,
   HOSTED_SITE_HOST_TOKEN_HEADER,
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UNLINKED_LIMIT,
   HOSTED_SITE_UPLOAD_LIMITS,
+  type HostedSiteLimitReason,
   type HostedSitePathProblem,
+  parseHostedSiteLimitReason,
   parseHostedSiteList,
   parseHostedSiteSummary,
 } from "@openbot/contracts/hosted-sites";
@@ -314,24 +317,30 @@ export class HostedSiteDesktopService {
   }
 
   /**
-   * The Worker's `site_limit` text is English and does not tell the agent or the user what to do. The text names
-   * the limit of the bucket that refused the site; a server's limit comes from its plan, so its list supplies it.
-   * When the list fails, the Worker's own failure stays.
+   * The Worker's `site_limit` text is English and does not tell the agent or the user what to do. The list of the
+   * bucket that refused the site supplies the limit and its `limitReason`. When a server's list fails, the Worker's
+   * own failure stays; when the unlinked list fails, the text names the unlinked limit.
    */
   private siteLimitFailure(failure: HostedSiteFailure, serverScoped: boolean): Effect.Effect<never, HostedSiteFailure> {
     if (authErrorCode(failure.cause) !== "site_limit") return Effect.fail(failure);
-    const limitFailure = (key: "error.site.serverLimit" | "error.site.unlinkedLimit", count: number) =>
-      new HostedSiteFailure({ cause: new Error(sourceText(key, { count })) });
     const credential = serverScoped ? this.serverCredential() : null;
-    if (!credential) return Effect.fail(limitFailure("error.site.unlinkedLimit", HOSTED_SITE_UNLINKED_LIMIT));
-    return this.auth
-      .requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList)
-      .pipe(
-        Effect.matchEffect({
-          onFailure: () => Effect.fail(failure),
-          onSuccess: (list) => Effect.fail(limitFailure("error.site.serverLimit", list.limit)),
-        }),
-      );
+    const list = credential
+      ? this.auth.requestAuthorized(
+          "/v1/sites/",
+          { method: "GET", headers: serverHeaders(credential) },
+          decodeSiteSlots,
+        )
+      : this.auth.requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteSlots);
+    const unlinkedFailure = new HostedSiteFailure({
+      cause: new Error(sourceText("error.site.unlinkedLimit", { count: HOSTED_SITE_UNLINKED_LIMIT })),
+    });
+    return list.pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.fail(credential ? failure : unlinkedFailure),
+        onSuccess: (slots) =>
+          Effect.fail(new HostedSiteFailure({ cause: new Error(siteLimitText(slots, credential !== null)) })),
+      }),
+    );
   }
 
   private prunePendingUploads(): void {
@@ -515,6 +524,18 @@ function decodeSiteList(value: unknown): HostedSiteList {
   const list = parseHostedSiteList(value);
   if (!list) throw new Error("The site list response is invalid.");
   return list;
+}
+
+/** The limit of a site list and why other sites can take its slots. */
+function decodeSiteSlots(value: unknown): { limit: number; reason: HostedSiteLimitReason | null } {
+  return { limit: decodeSiteList(value).limit, reason: parseHostedSiteLimitReason(value) };
+}
+
+/** The text of a site limit. Only a shared pool or the account cap can give a limit of 0. */
+function siteLimitText(slots: { limit: number; reason: HostedSiteLimitReason | null }, server: boolean): string {
+  if (slots.reason === "account") return sourceText("error.site.accountLimit", { count: HOSTED_SITE_ACCOUNT_LIMIT });
+  if (slots.reason === "shared") return sourceText("error.site.sharedLimit");
+  return sourceText(server ? "error.site.serverLimit" : "error.site.unlinkedLimit", { count: slots.limit });
 }
 
 function serverHeaders(credential: HostedSiteServerCredential | null): Record<string, string> {

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
 // Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
@@ -66,12 +67,24 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
+/** Migration 55 adds the first; migration 56 adds the proxy tables after it. */
+const LATER_TABLES = {
+  projection_deleted_thread_messages: [],
+  browser_proxies: [],
+  browser_profile_proxies: [],
+  agent_usage_skill_loads: [],
+  projection_messaging_pings: [],
+  projection_messaging_history: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
+  projection_pinned_thread_messages: [],
+};
+
 function deletedTables(db: DatabaseSync) {
   return db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%deleted_thread_messages%' ORDER BY name").all();
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 55 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -88,7 +101,7 @@ describe("deleted thread messages migration", () => {
       const before = contents(db);
       expect(before.projection_thread_messages).toHaveLength(2);
       migrateOpenBotDatabase(db);
-      expect(contents(db)).toEqual({ ...before, projection_deleted_thread_messages: [] });
+      expect(contents(db)).toEqual({ ...before, ...LATER_TABLES });
       expectHealthy(db);
     },
   );
@@ -106,7 +119,7 @@ describe("deleted thread messages migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...before, projection_deleted_thread_messages: [] });
+    expect(contents(db)).toEqual({ ...before, ...LATER_TABLES });
     expectHealthy(db);
   });
 
@@ -114,9 +127,9 @@ describe("deleted thread messages migration", () => {
     const db = databaseAt(54);
     seed(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(56,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=56; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(deletedTables(db)).toEqual([]);

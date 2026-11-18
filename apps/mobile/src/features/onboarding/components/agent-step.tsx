@@ -39,6 +39,7 @@ import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 
 // The characters stand on a stage: one in the middle at full size, a neighbour on each side,
 // smaller, lower and dimmer, as on a character select screen.
@@ -135,7 +136,7 @@ function StageItem({
       <Animated.View
         style={{
           opacity: leaving && !staying ? 0 : 1,
-          transform: [{ translateX: leaving && !staying ? away * STEP_ASIDE : 0 }],
+          transform: [{ translateX: leaving && !staying ? away * END_X * STEP_ASIDE : 0 }],
           transitionProperty: ["opacity", "transform"],
           transitionDuration: motion === "none" ? 0 : 280,
           transitionTimingFunction: EASE_OUT_CSS,
@@ -232,10 +233,10 @@ export function AgentStep({
           start.set(progress.get());
         })
         .onUpdate((event) => {
-          progress.set(rubberBand(start.get() - event.translationX / ITEM_WIDTH, last));
+          progress.set(rubberBand(start.get() - (event.translationX * END_X) / ITEM_WIDTH, last));
         })
         .onEnd((event) => {
-          const velocity = -event.velocityX / ITEM_WIDTH;
+          const velocity = (-event.velocityX * END_X) / ITEM_WIDTH;
           const target = Math.max(0, Math.min(last, Math.round(progress.get() + velocity * MOMENTUM_SECONDS)));
           progress.set(
             full
@@ -310,7 +311,8 @@ export function AgentStep({
     },
     [full, progress],
   );
-  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -progress.get() * ITEM_WIDTH }] }));
+  // The row runs toward the end of the layout: to the left in a right-to-left layout.
+  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -END_X * progress.get() * ITEM_WIDTH }] }));
 
   const role = choice === CUSTOM_CHOICE ? null : (ONBOARDING_ROLES[choice] ?? null);
   const title = role ? t(role.title) : t("mobile.onboarding.role.custom");

@@ -26,31 +26,31 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const FILL_DURATION_MS = 600;
 
 /**
- * The arc of what is left of one window. A new reading moves the arc from its last value; the first
- * reading draws it at once, so the header does not animate each time it shows.
+ * An arc filled to `percent`, such as what is left of one window. A new reading moves the arc from its
+ * last value; the first reading draws it at once, so the header does not animate each time it shows.
  */
-function RingArc({
+export function RingArc({
   center,
   radius,
   stroke,
   color,
-  remainingPercent,
+  percent,
 }: {
   center: number;
   radius: number;
   stroke: number;
   color: string;
-  remainingPercent: number;
+  percent: number;
 }) {
   const circumference = 2 * Math.PI * radius;
-  const remaining = useSharedValue(remainingPercent);
+  const filled = useSharedValue(percent);
   useEffect(() => {
-    remaining.set(
-      withTiming(remainingPercent, { duration: FILL_DURATION_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }),
+    filled.set(
+      withTiming(percent, { duration: FILL_DURATION_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }),
     );
-  }, [remaining, remainingPercent]);
+  }, [filled, percent]);
   const props = useAnimatedProps(() => ({
-    strokeDashoffset: (circumference * (100 - remaining.get())) / 100,
+    strokeDashoffset: (circumference * (100 - filled.get())) / 100,
   }));
   return (
     <AnimatedCircle
@@ -126,7 +126,7 @@ export function PlanLimitRing({
                     radius={radius}
                     stroke={stroke}
                     color={tones[window.tone]}
-                    remainingPercent={window.remainingPercent}
+                    percent={window.remainingPercent}
                   />
                 </G>
               );
