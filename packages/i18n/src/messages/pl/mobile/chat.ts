@@ -200,6 +200,8 @@ export const messages = {
     "Ten plik przekracza limit {limit} na telefonie. Otwórz go na komputerze.",
   "mobile.chat.attachment.sharingUnavailable": "Udostępnianie plików jest niedostępne na tym urządzeniu.",
   "mobile.chat.attachment.unavailable": "Załącznik jest niedostępny. Spróbuj ponownie.",
+  "mobile.chat.attachment.downloadStopped":
+    "Pobieranie zostało przerwane. Rozpocznie się ponownie po połączeniu z serwerem.",
   "mobile.chat.attachment.openFailed": "Nie udało się otworzyć załącznika",
   "mobile.chat.attachment.photosNeedUpdate": "Zapisywanie zdjęć wymaga najnowszej wersji aplikacji.",
   "mobile.chat.attachment.photosPermission": "Zezwól OpenBot na dodawanie zdjęć w Ustawieniach, aby zapisać ten obraz.",

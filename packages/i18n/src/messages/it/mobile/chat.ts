@@ -139,6 +139,7 @@ export const messages = {
     "Questo file supera il limite di {limit} per il telefono. Aprilo sul desktop.",
   "mobile.chat.attachment.sharingUnavailable": "La condivisione dei file non è disponibile su questo dispositivo.",
   "mobile.chat.attachment.unavailable": "L'allegato non è disponibile. Riprova.",
+  "mobile.chat.attachment.downloadStopped": "Il download si è interrotto. Ricomincia quando il server è connesso.",
   "mobile.chat.attachment.openFailed": "Impossibile aprire l'allegato",
   "mobile.chat.attachment.photosNeedUpdate": "Per salvare le foto serve l'ultima versione dell'app.",
   "mobile.chat.attachment.photosPermission":

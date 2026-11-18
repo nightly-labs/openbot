@@ -197,6 +197,7 @@ export const messages = {
   "mobile.chat.attachment.tooLargeForMobile": "Файл больше мобильного лимита в {limit}. Откройте его на компьютере.",
   "mobile.chat.attachment.sharingUnavailable": "На этом устройстве нельзя делиться файлами.",
   "mobile.chat.attachment.unavailable": "Вложение недоступно. Повторите попытку.",
+  "mobile.chat.attachment.downloadStopped": "Скачивание остановилось. Оно начнётся снова, когда сервер подключится.",
   "mobile.chat.attachment.openFailed": "Не удалось открыть вложение",
   "mobile.chat.attachment.photosNeedUpdate": "Для сохранения фото нужна последняя версия приложения.",
   "mobile.chat.attachment.photosPermission":

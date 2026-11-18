@@ -19,7 +19,7 @@ import { playbackTime } from "../model/playback-time";
 import { shareTypeOptions } from "../model/share-file-type";
 import { knownImageDimensions, rememberImageDimensions } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
-import { useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
+import { mediaFileErrorText, useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
 import { VideoDownloadRing } from "./video-download-ring";
 import { VideoViewer } from "./video-viewer";
 
@@ -185,7 +185,7 @@ export function ChatVideoAttachment({
   unknownRatio?: number;
 }) {
   const text = useText();
-  const { t, format, sourceText } = text;
+  const { t, format } = text;
   const muted = useThemeColor("muted");
   const { width } = useWindowDimensions();
   const settled = useListSettled();
@@ -209,9 +209,11 @@ export function ChatVideoAttachment({
   const reducedMotion = useReducedMotion();
   const live = useMediaDownloadedBytes(serverId, attachment.id);
   // The count clears when the download ends, a moment before the query gives the file. The card keeps
-  // the last count until then, so it does not go back to 0%.
+  // the last count until then, so it does not go back to 0%. A failed download forgets it, so the next
+  // download does not start at the old count.
   const [lastReceived, setLastReceived] = useState<number | null>(null);
   if (live !== null && live !== lastReceived) setLastReceived(live);
+  else if (live === null && failed && lastReceived !== null) setLastReceived(null);
   const received = live ?? (uri || failed ? null : lastReceived);
   // The download view shows only once the host sends the file: a file already on the phone, or one
   // that waits for another download, shows the play button.
@@ -294,7 +296,7 @@ export function ChatVideoAttachment({
             <View className="items-center justify-center gap-2 p-3" style={FILL}>
               <VideoOff size={24} color={String(muted)} />
               <Typography.Paragraph type="body-xs" align="center" className="text-muted">
-                {query.error ? sourceText(query.error.message) : t("mobile.chat.attachment.unavailable")}
+                {query.error ? mediaFileErrorText(query.error, text) : t("mobile.chat.attachment.unavailable")}
               </Typography.Paragraph>
             </View>
           ) : (

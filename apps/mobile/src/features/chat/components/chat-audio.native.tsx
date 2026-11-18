@@ -20,7 +20,7 @@ import type { AttachmentTint } from "./chat-attachment";
 import { runFileAction } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
-import { useMediaFile } from "./use-media-file";
+import { mediaFileErrorText, useMediaFile } from "./use-media-file";
 
 /** How often the position moves, in seconds. */
 const TIME_STEP = 0.1;
@@ -145,7 +145,7 @@ function AudioCard({
   player,
 }: AudioAttachmentProps & { query: MediaFileQuery; uri: string | null; player: VideoPlayer | null }) {
   const text = useText();
-  const { t, format, sourceText } = text;
+  const { t, format } = text;
   const [muted, foreground] = useThemeColor(["muted", "foreground"]);
   // On the message color the icon has the text color of the user's messages, which reads on that
   // color. Without a message color the button has the chat background and the text color.
@@ -302,7 +302,7 @@ function AudioCard({
           <View className="flex-row items-center gap-2" style={{ height: WAVE_HEIGHT + 4 }}>
             {failed ? (
               <Typography.Paragraph type="body-xs" numberOfLines={1} className="min-w-0 flex-1 text-muted">
-                {query.error ? sourceText(query.error.message) : t("mobile.chat.audio.unplayable")}
+                {query.error ? mediaFileErrorText(query.error, text) : t("mobile.chat.audio.unplayable")}
               </Typography.Paragraph>
             ) : (
               <AudioWaveform

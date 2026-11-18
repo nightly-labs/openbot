@@ -1528,8 +1528,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       connectionWaits.setResuming(hostId, resuming && status.phase !== "online");
       // A waiting request goes when the server is online, and fails with the attempt. An attempt that
       // still runs after the quiet time keeps it waiting.
-      if (status.phase === "online") connectionWaits.settle(hostId, null);
-      else if (!resuming && status.phase !== "connecting")
+      if (status.phase === "online") {
+        connectionWaits.settle(hostId, null);
+        // A file download that a lost connection stopped, such as when the user left the app, starts
+        // again. A download that runs now goes on.
+        void queryClient.refetchQueries(
+          {
+            queryKey: queryKeys.chatMediaFiles(hostId),
+            type: "active",
+            predicate: (query) => query.state.status === "error",
+          },
+          { cancelRefetch: false },
+        );
+      } else if (!resuming && status.phase !== "connecting")
         connectionWaits.settle(hostId, new Error(sourceText("error.remote.selectedServerOffline")));
       if (status.phase === "online" && hostId === activeServerIdRef.current) setHold(null);
       // The status repeats each second while it waits, so each failed attempt asks once.
@@ -1539,7 +1550,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       wakeAttempts.current.set(hostId, status.attempt);
       wakeSelectedServer(hostId);
     },
-    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection],
+    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection, queryClient],
   );
   // The next retry of an offline server can be 30 seconds away, so a server starts when it is selected.
   useEffect(() => {

@@ -140,6 +140,8 @@ export const messages = {
     "Este archivo supera el límite de {limit} del móvil. Ábrelo en el escritorio.",
   "mobile.chat.attachment.sharingUnavailable": "No se pueden compartir archivos en este dispositivo.",
   "mobile.chat.attachment.unavailable": "El archivo adjunto no está disponible. Vuelve a intentarlo.",
+  "mobile.chat.attachment.downloadStopped":
+    "La descarga se detuvo. Empezará de nuevo cuando el servidor esté conectado.",
   "mobile.chat.attachment.openFailed": "No se pudo abrir el archivo adjunto",
   "mobile.chat.attachment.photosNeedUpdate": "Para guardar fotos necesitas la versión más reciente de la app.",
   "mobile.chat.attachment.photosPermission": "Permite que OpenBot añada fotos en Ajustes para guardar esta imagen.",
