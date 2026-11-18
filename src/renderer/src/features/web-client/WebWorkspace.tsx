@@ -236,6 +236,7 @@ import {
 } from "../../WorkspaceOverlayViews";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
+import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
@@ -2685,6 +2686,34 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const agent = conversationAgent();
     return ask && agent ? { agentId: agent.id, ask } : undefined;
   });
+  /** The side threads under each agent row of the sidebar. */
+  const sidebarThreads = createMemo(() => {
+    const current = agentThreads();
+    if (!current) return undefined;
+    const openChat = (agentId: string) => {
+      setMobilePane("conversation");
+      void select(agentId);
+    };
+    return sidebarAgentThreads({
+      tasks: current.tasks,
+      tabs: current.tabs,
+      activeAgentId: () => (tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")),
+      waits: () => ({
+        approvals: workspace.state.approvals,
+        prompts: workspace.state.prompts,
+        takeovers: workspace.state.takeovers,
+      }),
+      // The tab is written first, so the chat opens on it.
+      openThread: (agentId, threadId) => {
+        current.tabs.open(agentId, threadId);
+        openChat(agentId);
+      },
+      onNew: (agentId) => {
+        openChat(agentId);
+        current.tabs.startNew(agentId);
+      },
+    });
+  });
   /** The selected agent's threads. A host without side threads shows only the agent's own chat. */
   const threads = createMemo((): ConversationThreads | undefined => {
     const agent = workspace.selected();
@@ -3379,6 +3408,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     }}
                     agents={workspace.profiles()}
                     activeAgentId={tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")}
+                    agentThreads={sidebarThreads()}
                     people={[]}
                     directThreads={[]}
                     activeDirectMemberId={null}

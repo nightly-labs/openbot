@@ -1,6 +1,7 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -37,6 +38,7 @@ import {
   useComposerDictationWithSettings,
 } from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
+import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
@@ -62,6 +64,7 @@ import { useAgentMentionSkills } from "@/features/chat/model/use-agent-mention-s
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
@@ -86,16 +89,15 @@ const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 /** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
+/**
+ * The client ids of thread messages. A failed send can still have stored its message on the server
+ * (the answer got lost), so a send again of the same message, which the failure put back in the
+ * composer, sends the same id and the server stores no second copy.
+ */
+const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
 function onThreadDeleted(task: AgentTask) {
   router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
-}
-
-/** Leaves the task. A task opened from a notification or a link has no screen under it. */
-function leaveTask() {
-  void Keyboard.dismiss();
-  if (router.canGoBack()) router.back();
-  else router.replace("/connected");
 }
 
 /**
@@ -132,6 +134,7 @@ export function AgentTaskScreen() {
 /** A full screen note with a way back, for a task or an agent that this phone cannot show. */
 function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   const { t } = useText();
+  const leaveTask = useLeaveChat();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   return (
@@ -171,6 +174,7 @@ function AgentTaskChat({
   focusMessageId: string | null;
 }) {
   const { t, errorMessage } = useText();
+  const leaveTask = useLeaveChat();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
@@ -554,15 +558,22 @@ function AgentTaskChat({
     // A new thread starts with this message, and the screen then shows the thread.
     if (isDraft) {
       setSending(true);
+      const start = taskStartId(
+        serverId,
+        agentId,
+        text,
+        files.map((file) => file.id),
+      );
       try {
         const started = await withFiles((attachmentDraftIds) =>
-          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() }, serverId),
+          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: start.id }, serverId),
         );
         attachments.clear();
         // The thread shows in the menu before its list event arrives.
         addStartedTask(queryClient, queryScope, serverId, started);
         router.setParams<"/task/[taskId]">({ taskId: started.id });
       } catch (error) {
+        start.failed();
         void haptics.notification("error");
         setDraft((current) => (current.trim() ? current : value));
         setSendError(errorMessage(error, t("mobile.server.threads.error.start")));
@@ -576,16 +587,15 @@ function AgentTaskChat({
     if (startsTurn && ready) motion.beginSend();
     else motion.scrollToLatest();
     setSending(true);
+    const message = taskMessageId([serverId, agentId, taskId, text, files.map((file) => file.id)]);
     try {
       await withFiles((attachmentDraftIds) =>
-        sendAgentTaskMessage(
-          { agentId, taskId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() },
-          serverId,
-        ),
+        sendAgentTaskMessage({ agentId, taskId, text, attachmentDraftIds, clientMessageId: message.id }, serverId),
       );
       attachments.clear();
       if (startsTurn) setAwaitingTurn(true);
     } catch (error) {
+      message.failed();
       motion.cancelSend();
       void haptics.notification("error");
       setDraft((current) => (current.trim() ? current : value));
@@ -683,6 +693,7 @@ function AgentTaskChat({
           onBack={leaveTask}
         />
         <ChatMessageList
+          bubbleSurface={String(background)}
           pullGesture={endPull.gesture}
           pullShift={endPull.shift}
           agents={serverAgents}

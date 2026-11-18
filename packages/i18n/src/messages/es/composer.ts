@@ -70,6 +70,8 @@ export const messages = {
     "El acceso al micrófono está bloqueado. Permite que OpenBot use el micrófono en los ajustes del sistema.",
   "composer.voice.noMicrophone": "No hay ningún micrófono disponible.",
   "composer.voice.startFailed": "OpenBot no pudo iniciar la grabación de voz.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot no pudo abrir el micrófono. Cierra otras apps que lo usen, comprueba que esté conectado y permitido en los ajustes del sistema, y vuelve a intentarlo.",
   "composer.voice.transcribeFailed": "OpenBot no pudo transcribir esta grabación.",
   "composer.reply.toYou": "Respondiendo a tu mensaje",
   "composer.reply.toAgent": "Respondiendo al agente",

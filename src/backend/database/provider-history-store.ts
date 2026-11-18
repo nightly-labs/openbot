@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { migration as compactionMigration } from "../migrations/0064-provider-history-compaction";
 import { decodeThreadItem, type ThreadItem } from "../protocol";
 import type { ProviderHistoryFragment } from "../provider-history";
 import type { DatabaseCore } from "./database-core";
@@ -30,6 +32,22 @@ export interface ProviderHistoryImportState extends ProviderHistorySessionInput 
 /** The import state after staging, and whether the staged turn is still imported unchanged. */
 export interface ProviderHistoryStageResult extends ProviderHistoryImportState {
   turnImported: boolean;
+  /**
+   * The turn had compacted items, and this fragment wrote each of its items in full: the turn changed
+   * in this fragment, or an earlier read found a change. The turn is then not imported, so each later
+   * fragment of the read writes its items in full too.
+   */
+  rewroteItems: boolean;
+  /** The turn still has compacted items. Its import must wait: a compacted item has no content. */
+  compactedItems: boolean;
+}
+
+/** One batch of `compactImportedItems`. `lastRowId` is null when no row is left to compact. */
+export interface ProviderHistoryCompactionBatch {
+  lastRowId: number | null;
+  rows: number;
+  /** The `item_json` bytes that the batch replaced with hashes. */
+  bytes: number;
 }
 
 export interface ProviderHistoryStagedTurn {
@@ -63,6 +81,33 @@ export interface ProviderHistoryStagedItem {
   updatedAt: string;
 }
 
+/**
+ * The providers whose imported items are compacted. Their staged items are only an import cache: the
+ * provider keeps the transcript, and the import wrote the turn's messages to the conversation. The
+ * other providers keep their transcript in staging (`provider-history-persistence.ts`), so their items
+ * are user data and stay in full.
+ */
+const COMPACTED_PROVIDERS_SQL = "('codex', 'claude')";
+/** A compacted item is a JSON string. A thread item is always a JSON object, so the two never mix. */
+const COMPACTED_PREFIX = '"sha256:';
+const compactedSql = (column: string) => `substr(${column}, 1, ${COMPACTED_PREFIX.length}) = '${COMPACTED_PREFIX}'`;
+/**
+ * A release before this schema version reads a compacted item as a thread item and fails the import.
+ * The migration makes such a release refuse the database, so items are compacted only at this version.
+ */
+const COMPACTION_SCHEMA_VERSION = compactionMigration.version;
+const COMPACTION_BATCH_ROWS = 256;
+const COMPACTION_BATCH_BYTES = 4 * 1024 * 1024;
+
+/** The stored value of a compacted item: the SHA-256 of its full JSON, as a JSON string. */
+export function compactedItemJson(itemJson: string): string {
+  return JSON.stringify(`sha256:${createHash("sha256").update(itemJson).digest("hex")}`);
+}
+
+function isCompactedItemJson(itemJson: string): boolean {
+  return itemJson.startsWith(COMPACTED_PREFIX);
+}
+
 export interface ProviderHistoryStoreOptions {
   core: DatabaseCore;
 }
@@ -73,6 +118,10 @@ export interface ProviderHistoryStoreOptions {
  * A provider page is written as item rows and a cursor update in one transaction. The staging
  * rows are additive: a partial page never replaces or deletes an older conversation row. The
  * class owns only provider replay state and never imports the OpenBot facade.
+ *
+ * After a Codex or Claude turn is imported, each of its items keeps only a hash of its JSON
+ * (`compactedItemJson`). The hash still shows whether the provider changed the item. When it did,
+ * the turn waits until a read writes each of its items in full again, and only then imports.
  */
 export class ProviderHistoryStore {
   readonly #core: DatabaseCore;
@@ -136,6 +185,9 @@ export class ProviderHistoryStore {
       );
       const maxItemIndex = maxItemRow ? optionalNumberColumn(maxItemRow, "max_item_index") : null;
       const itemOffset = input.fragment.itemOffset ?? (maxItemIndex === null ? 0 : maxItemIndex + 1);
+      const turnWasImported = existingTurn !== null && requiredNumberColumn(existingTurn, "imported") === 1;
+      const compactedBefore =
+        existingTurn !== null && this.#hasCompactedItems(db, input.sessionId, input.fragment.turnId);
       let changed =
         !existingTurn ||
         requiredNumberColumn(existingTurn, "complete") !==
@@ -179,6 +231,10 @@ export class ProviderHistoryStore {
         `SELECT item_index, item_json FROM provider_history_staging
          WHERE session_id = ? AND turn_id = ? AND item_key = ?`,
       );
+      // A compacted turn imports again only from full items. Once it must import, each item of the
+      // fragment is written in full, also an unchanged one.
+      let expand = compactedBefore && (changed || !turnWasImported);
+      const unchangedCompacted: Array<() => void> = [];
       for (const [itemIndex, item] of input.fragment.items.entries()) {
         const provisionalIndex = itemOffset + itemIndex;
         const provisionalKey = item.id ?? `${item.type}:${provisionalIndex}`;
@@ -189,17 +245,31 @@ export class ProviderHistoryStore {
               itemJson: requiredStringColumn(previousRow, "item_json"),
             }
           : null;
+        const previousCompacted = previous !== null && isCompactedItemJson(previous.itemJson);
         const absoluteIndex =
           previous && item.id && input.fragment.itemOffset === undefined ? previous.itemIndex : provisionalIndex;
         const itemKey = item.id ?? `${item.type}:${absoluteIndex}`;
         const storedItem =
-          previous && item.id && input.fragment.itemOffset === undefined
+          previous && !previousCompacted && item.id && input.fragment.itemOffset === undefined
             ? mergeHistoryItem(previous.itemJson, item)
             : item;
         const itemJson = JSON.stringify(storedItem);
-        if (previous && previous.itemIndex === absoluteIndex && previous.itemJson === itemJson) continue;
+        const write = () =>
+          writeItem.run(input.sessionId, input.fragment.turnId, itemKey, absoluteIndex, itemJson, now);
+        const unchanged =
+          previous !== null &&
+          previous.itemIndex === absoluteIndex &&
+          previous.itemJson === (previousCompacted ? compactedItemJson(itemJson) : itemJson);
+        if (unchanged && !(previousCompacted && expand)) {
+          if (previousCompacted) unchangedCompacted.push(write);
+          continue;
+        }
         changed = true;
-        writeItem.run(input.sessionId, input.fragment.turnId, itemKey, absoluteIndex, itemJson, now);
+        if (compactedBefore && !expand) {
+          expand = true;
+          for (const writeEarlier of unchangedCompacted.splice(0)) writeEarlier();
+        }
+        write();
       }
       if (changed) {
         db.prepare(
@@ -226,7 +296,9 @@ export class ProviderHistoryStore {
       }
       return {
         ...this.#requireImport(db, input.sessionId),
-        turnImported: !changed && existingTurn !== null && requiredNumberColumn(existingTurn, "imported") === 1,
+        turnImported: !changed && turnWasImported,
+        rewroteItems: compactedBefore && expand,
+        compactedItems: compactedBefore && this.#hasCompactedItems(db, input.sessionId, input.fragment.turnId),
       };
     });
   }
@@ -325,15 +397,21 @@ export class ProviderHistoryStore {
         )
         .all(...parameters),
     );
-    return rows.map((row) => ({
-      sessionId: requiredStringColumn(row, "session_id"),
-      turnId: requiredStringColumn(row, "turn_id"),
-      itemKey: requiredStringColumn(row, "item_key"),
-      itemIndex: requiredNumberColumn(row, "item_index"),
-      item: decodeStoredThreadItem(JSON.parse(requiredStringColumn(row, "item_json"))),
-      imported: requiredNumberColumn(row, "imported") === 1,
-      updatedAt: requiredStringColumn(row, "updated_at"),
-    }));
+    return rows.map((row) => {
+      const itemJson = requiredStringColumn(row, "item_json");
+      // A compacted item has no content. The importer never reads a turn that has one, so this
+      // stops an import before it can write a partial or empty message.
+      if (isCompactedItemJson(itemJson)) throw new Error("A compacted provider history item has no content.");
+      return {
+        sessionId: requiredStringColumn(row, "session_id"),
+        turnId: requiredStringColumn(row, "turn_id"),
+        itemKey: requiredStringColumn(row, "item_key"),
+        itemIndex: requiredNumberColumn(row, "item_index"),
+        item: decodeStoredThreadItem(JSON.parse(itemJson)),
+        imported: requiredNumberColumn(row, "imported") === 1,
+        updatedAt: requiredStringColumn(row, "updated_at"),
+      };
+    });
   }
 
   /** Marks only the staged rows covered by one normalized page. */
@@ -360,6 +438,87 @@ export class ProviderHistoryStore {
         turnId,
       );
     });
+  }
+
+  /**
+   * Replaces the items of one imported Codex or Claude turn with hashes of their JSON. It changes
+   * nothing for another provider, or for a turn or an item that is not imported.
+   */
+  compactImportedTurn(sessionId: string, turnId: string): void {
+    this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return;
+      const rows = databaseRows(
+        db
+          .prepare(
+            `SELECT s.rowid AS row_id, s.item_json FROM provider_history_staging s
+             JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
+             JOIN provider_history_imports i ON i.session_id = s.session_id
+             WHERE s.session_id = ? AND s.turn_id = ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
+               AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}`,
+          )
+          .all(sessionId, turnId),
+      );
+      compactRows(db, rows);
+    });
+  }
+
+  /**
+   * Compacts one bounded batch of imported Codex and Claude items with a row id above `afterRowId`,
+   * in its own transaction. A database from before compaction is compacted after start in batches,
+   * so the start does not wait and the WAL stays small.
+   */
+  compactImportedItems(afterRowId: number): ProviderHistoryCompactionBatch {
+    return this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return { lastRowId: null, rows: 0, bytes: 0 };
+      // CROSS JOIN keeps the staging rows as the outer loop, read in row id order from `afterRowId`.
+      // Another join order sorts the whole table for each batch.
+      const select = db.prepare(
+        `SELECT s.rowid AS row_id, s.item_json FROM provider_history_staging s
+         CROSS JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
+         CROSS JOIN provider_history_imports i ON i.session_id = s.session_id
+         WHERE s.rowid > ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
+           AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}
+         ORDER BY s.rowid`,
+      );
+      const rows: DynamicRecord[] = [];
+      let lastRowId = afterRowId;
+      let bytes = 0;
+      for (const value of select.iterate(afterRowId)) {
+        const row = databaseRow(value);
+        if (!row) continue;
+        rows.push(row);
+        lastRowId = requiredNumberColumn(row, "row_id");
+        bytes += Buffer.byteLength(requiredStringColumn(row, "item_json"));
+        if (rows.length >= COMPACTION_BATCH_ROWS || bytes >= COMPACTION_BATCH_BYTES) break;
+      }
+      const saved = compactRows(db, rows);
+      return { lastRowId: rows.length === 0 ? null : lastRowId, rows: rows.length, bytes: saved };
+    });
+  }
+
+  /**
+   * Deletes the compacted items of a turn that a full read wrote again. The provider did not send
+   * these items in that read, and each holds only a hash: their messages are in the conversation.
+   */
+  dropCompactedItems(sessionId: string, turnId: string): void {
+    this.#transaction((db) => {
+      db.prepare(
+        `DELETE FROM provider_history_staging WHERE session_id = ? AND turn_id = ? AND ${compactedSql("item_json")}`,
+      ).run(sessionId, turnId);
+    });
+  }
+
+  #hasCompactedItems(db: DatabaseSync, sessionId: string, turnId: string): boolean {
+    return (
+      databaseRow(
+        db
+          .prepare(
+            `SELECT 1 AS found FROM provider_history_staging
+             WHERE session_id = ? AND turn_id = ? AND ${compactedSql("item_json")} LIMIT 1`,
+          )
+          .get(sessionId, turnId),
+      ) !== null
+    );
   }
 
   #readImport(db: DatabaseSync, sessionId: string): ProviderHistoryImportState | null {
@@ -399,6 +558,53 @@ export class ProviderHistoryStore {
     const db = this.#core.connection;
     return withTransaction(db, () => operation(db));
   }
+}
+
+/**
+ * Replaces each row's `item_json` with its hash and gives the bytes it replaced. The row keeps its
+ * row id and its other columns. It is deleted and inserted again, not updated: SQLite merges a page
+ * that is less than one third full only on a delete. An update leaves the page of each large item
+ * almost empty, at about 4 KiB for each item.
+ */
+function hasCompactionSchema(db: DatabaseSync): boolean {
+  return (
+    databaseRow(
+      db.prepare("SELECT 1 AS found FROM schema_migrations WHERE version = ?").get(COMPACTION_SCHEMA_VERSION),
+    ) !== null
+  );
+}
+
+function compactRows(db: DatabaseSync, rows: readonly DynamicRecord[]): number {
+  const select = db.prepare(
+    `SELECT session_id, turn_id, item_key, item_index, imported, updated_at
+     FROM provider_history_staging WHERE rowid = ?`,
+  );
+  const remove = db.prepare("DELETE FROM provider_history_staging WHERE rowid = ?");
+  const insert = db.prepare(
+    `INSERT INTO provider_history_staging
+       (rowid, session_id, turn_id, item_key, item_index, item_json, imported, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  let bytes = 0;
+  for (const row of rows) {
+    const rowId = requiredNumberColumn(row, "row_id");
+    const itemJson = requiredStringColumn(row, "item_json");
+    const kept = databaseRow(select.get(rowId));
+    if (!kept) continue;
+    remove.run(rowId);
+    insert.run(
+      rowId,
+      requiredStringColumn(kept, "session_id"),
+      requiredStringColumn(kept, "turn_id"),
+      requiredStringColumn(kept, "item_key"),
+      requiredNumberColumn(kept, "item_index"),
+      compactedItemJson(itemJson),
+      requiredNumberColumn(kept, "imported"),
+      requiredStringColumn(kept, "updated_at"),
+    );
+    bytes += Buffer.byteLength(itemJson);
+  }
+  return bytes;
 }
 
 function boundedLimit(value: number): number {

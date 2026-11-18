@@ -197,6 +197,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     window.clearTimeout(holdTimer);
     const next = Math.max(0, Math.min(total(), step));
     const keepFocus = stage?.closest(".question-prompt-bubble")?.contains(document.activeElement) ?? false;
+    // Only keyboard focus goes on to an option. After a click, a key that the user presses to scroll
+    // or to write would pick an answer there that they do not see (#11506). The stage takes it.
+    const toOption = keepFocus && document.activeElement?.matches(":focus-visible") === true;
     const question = props.questions[next];
     setState((draft) => {
       draft.step = next;
@@ -208,7 +211,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     queueMicrotask(() => {
       const page = stage?.children[next];
       const target =
-        next < total()
+        next < total() && toOption
           ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
           : null;
       (target ?? stage)?.focus({ preventScroll: true });

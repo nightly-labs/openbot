@@ -291,7 +291,15 @@ export async function routeAgents(
     if (method === "DELETE" && !action) {
       if (!canAdministerServer(member.role))
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
-      await runCauseEffect(agents.deleteAgent(agentId));
+      try {
+        await runCauseEffect(agents.deleteAgent(agentId));
+      } catch (error) {
+        // A busy agent, or a delete that runs, is a refusal the member can act on. The web client shows
+        // a refusal's text, but for a 500 only that the server could not complete the request (#7023).
+        if (error instanceof Error && DELETE_REFUSALS().includes(error.message))
+          throw new HttpError(409, error.message);
+        throw error;
+      }
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
       if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
@@ -435,3 +443,6 @@ function refusedPromptAnswer(error: unknown): never {
   if (error instanceof ForbiddenAttentionAnswer) throw new HttpError(403, error.message);
   return inactiveAsConflict(error);
 }
+
+/** The texts with which the agent service refuses a delete until the agent is idle. */
+const DELETE_REFUSALS = () => [sourceText("error.agent.stopBeforeDelete"), sourceText("error.agent.deletionBusy")];

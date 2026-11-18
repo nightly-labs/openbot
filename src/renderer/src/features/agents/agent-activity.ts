@@ -1,10 +1,11 @@
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { createMemo } from "solid-js";
 import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useConversation } from "../conversation/conversation-context";
-import { attentionByAgent } from "./agent-runtime-snapshot";
+import { attentionByAgent, keepEqualRecord } from "./agent-runtime-snapshot";
 import { agentThreadAttention } from "./agent-thread-attention";
 import { useAgents } from "./agents-context";
 
@@ -21,7 +22,7 @@ export function createAgentActivity() {
 
   /* The turn events of a side thread reach only its thread list, so an agent that works in a side
    * thread is found there. A subagent that runs on after its turn keeps its agent at work. */
-  const workingTurns = createMemo(() => {
+  const workingTurns = createMemo((previous?: Record<string, string | null>) => {
     const turns = { ...activeTurns() };
     const subagents = subagentTurns();
     for (const agent of agentList()) {
@@ -30,38 +31,53 @@ export function createAgentActivity() {
       const subagentTurn = subagents[agent.id];
       if (subagentTurn && !turns[agent.id]) turns[agent.id] = subagentTurn;
     }
-    return turns;
+    return keepPrevious(previous, turns);
   });
 
   /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
-   * thread stays out of "Needs you", because selecting the row cannot answer it. */
-  const agentStates = createMemo(() =>
-    computeSidebarAgentStates({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      unreadReplies: unreadReplies(),
-      unreadThreadReplies: agentTasks.unreadTotals(),
-      recentReplies: recentReplies(),
-      ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
-      failedTurns: failedTurns(),
-      usageLimits: usageLimits(),
-    }),
+   * thread stays out of "Needs you", because selecting the row cannot answer it. A state that did not
+   * change keeps its object, so a progress event of one agent does not run the rows of all agents. */
+  const agentStates = createMemo((previous?: Record<string, SidebarAgentState>) =>
+    keepPrevious(
+      previous,
+      computeSidebarAgentStates({
+        agentIds: agentList().map((agent) => agent.id),
+        activeTurns: workingTurns(),
+        queues: queues(),
+        unreadReplies: unreadReplies(),
+        unreadThreadReplies: agentTasks.unreadTotals(),
+        recentReplies: recentReplies(),
+        ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
+        failedTurns: failedTurns(),
+        usageLimits: usageLimits(),
+      }),
+    ),
   );
 
   /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
    * shared, and a routine mark only replaces the badge for that same agent. */
-  const agentMoods = createMemo(() =>
-    computeAgentAvatarMoods({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      failedTurns: failedTurns(),
-      pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
-      pendingApprovals: pendingApprovals(),
-      recentReplies: recentReplies(),
-    }),
+  const agentMoods = createMemo((previous?: ReturnType<typeof computeAgentAvatarMoods>) =>
+    keepPrevious(
+      previous,
+      computeAgentAvatarMoods({
+        agentIds: agentList().map((agent) => agent.id),
+        activeTurns: workingTurns(),
+        queues: queues(),
+        failedTurns: failedTurns(),
+        pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
+        pendingApprovals: pendingApprovals(),
+        recentReplies: recentReplies(),
+      }),
+    ),
   );
 
   return { workingTurns, agentStates, agentMoods };
+}
+
+/** The previous record when no entry changed. The first run has none. */
+function keepPrevious<Value>(
+  previous: Record<string, Value> | undefined,
+  next: Record<string, Value>,
+): Record<string, Value> {
+  return previous ? keepEqualRecord(previous, next) : next;
 }

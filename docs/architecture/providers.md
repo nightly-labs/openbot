@@ -902,7 +902,11 @@ logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FilePr
 absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
 (`googleSignInByOpenBot`): the page opens from the CLI itself. A remote host cannot relay it, as
 with 1.4.5 (#4521), so OpenBot refuses a sign-in from another device before the process starts, and
-a Reconnect does not sign the account out. The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+a Reconnect does not sign the account out. A relayed sign-in from the desktop app that runs a server
+on this computer is not from another device: its Team API session is a password session of the
+owner, which only that app can open. The owner's other devices connect through Signal and stay
+refused. The sign-in runs as a Connect on this computer, the CLI opens the page here, and the relay
+ends with no page (#11677). The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
 So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
 `initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
 and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old
@@ -1155,6 +1159,12 @@ empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-
 change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
 and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
 session.
+
+Devin CLI 3000.14.30821 keeps a session after a plain `session/close`, also in the background process
+that outlives OpenBot for about 10 minutes, and a later `session/load` keeps the MCP servers that the
+session got first. It advertises `sessionCapabilities.close._meta["cognition.ai/force"]`, so the ACP
+client sends that `_meta` with each `session/close`, and a forced close before it loads a session that
+it does not hold. The session then gets the new token of the OpenBot bridge (#12082).
 
 No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.

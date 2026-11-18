@@ -236,9 +236,11 @@ export class MailboxSync {
       if (!snapshot) continue;
       const previousSignature = conversationContentSignature(snapshot);
       this.syncMailboxMessages(snapshot);
-      if (conversationContentSignature(snapshot) !== previousSignature) this.#conversation.emitConversation(snapshot);
+      const signature = conversationContentSignature(snapshot);
+      if (signature !== previousSignature) this.#conversation.emitConversation(snapshot);
+      // The signature is of this snapshot, so the publish does not make it again.
       else if (!this.#conversation.hasPublishedConversation(affectedAgentId))
-        this.#conversation.publishConversation(snapshot);
+        this.#conversation.publishConversation(snapshot, signature);
     }
   }
 

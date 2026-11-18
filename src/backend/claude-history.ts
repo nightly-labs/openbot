@@ -251,11 +251,14 @@ async function buildIndex(
   identity: FileIdentity,
   signal: AbortSignal,
 ): Promise<number> {
+  // A transcript can write one record more than once (#11557). Keep the first copy: an indexed row
+  // never changes, because a resumed read does not send the turns before its resume point again.
   const insert = database.prepare(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
        parent_agent_id, is_sidechain, is_meta, team_name, subtype, compact_metadata, visible_user)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(uuid) DO NOTHING`,
   );
   let nextOffset = startOffset;
   let lineNumber = 0;

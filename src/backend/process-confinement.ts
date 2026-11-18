@@ -473,6 +473,11 @@ export function museStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The home folder of the first ChatGPT account, as Codex reads it: `$CODEX_HOME`, or `~/.codex`. */
+export function codexHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.CODEX_HOME?.trim() || join(home, ".codex");
+}
+
 /** The home folder of the GitHub Copilot CLI: `$COPILOT_HOME`, or `~/.copilot`. */
 export function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.COPILOT_HOME?.trim() || join(home, ".copilot");

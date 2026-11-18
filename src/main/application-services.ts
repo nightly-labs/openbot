@@ -19,15 +19,28 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import {
+  createRoutineFlows,
+  type RoutineFlowsHandle,
+  routineFlowNoticeEvent,
+} from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
-import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import {
+  createRoutineResults,
+  type RoutineResultsHandle,
+  routineResultNoticeEvent,
+} from "../backend/routine-results/routine-results";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowNotice,
+  type WorkflowsHandle,
+  workflowNoticeEvent,
+} from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
@@ -56,6 +69,7 @@ import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
+import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
@@ -352,6 +366,7 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -892,7 +907,7 @@ async function accountServiceFetch(input: string | URL | Request, init?: Request
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
-  if (state.status === "permissions-required") return "setup-required";
+  if (state.status === "permissions-required" || state.status === "restart-required") return "setup-required";
   return "unavailable";
 }
 
@@ -1543,6 +1558,7 @@ export async function createApplicationServices({
         Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
+    hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
@@ -1801,10 +1817,13 @@ export async function createApplicationServices({
   });
   // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
   let updateCheckWait: Fiber.Fiber<void> | null = null;
+  // The start asks the model servers which models cannot reason, and asks again while one is not up.
+  let modelReasoningWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
     runCauseEffect(
       Effect.gen(function* () {
         if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        if (modelReasoningWait) yield* Fiber.interrupt(modelReasoningWait);
         yield* providerRuntimes.stop();
       }),
     ),
@@ -1814,6 +1833,7 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
     cipher: secretCipher,
   });
+  const modelReasoning = createModelReasoningSupport(() => customProviders.configs());
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   // The same reasons as the endpoints: before the service, and a file this build cannot read only
@@ -2442,7 +2462,8 @@ export async function createApplicationServices({
       providerEnvironment: (provider) => providerEnvironmentSetting.resolve(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
-      customProviders: () => customProviders.configs(),
+      // With the models that an Ollama server reports as not able to reason (#8381).
+      customProviders: () => modelReasoning.configs(),
       // The same rule: `configs()`, with the environment values, goes to the agent process only.
       customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
@@ -2494,6 +2515,7 @@ export async function createApplicationServices({
     crm: () => crmHandle,
     // `host` is built later, after the agent service; a CRM tool reads it when it runs.
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
+    personCanAdminister: (personId) => host.personCanAdminister(personId),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
@@ -2817,10 +2839,7 @@ export async function createApplicationServices({
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
       store: new RoutineResultStore(store.database),
-      delivery: (deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        return found ? { turnId: found.turnId } : null;
-      },
+      runTurns: (deliveryId) => mailbox.routineRunTurns(deliveryId),
       turnAnswer,
       connection: (connectionId) => {
         const record = service.messaging.store.connection(connectionId);
@@ -2833,10 +2852,12 @@ export async function createApplicationServices({
       },
     }),
   );
+  // Most events are streamed text that no sweep waits for, so a fiber starts only for an event that a
+  // sweep uses.
   service.on("event", (event) => {
-    Effect.runFork(routineFlowRuntime.notice(event));
-    Effect.runFork(routineResultRuntime.notice(event));
-    Effect.runFork(workflowRuntime.notice(event));
+    if (routineFlowNoticeEvent(event)) Effect.runFork(routineFlowRuntime.notice(event));
+    if (routineResultNoticeEvent(event)) Effect.runFork(routineResultRuntime.notice(event));
+    if (workflowNoticeEvent(event)) Effect.runFork(workflowRuntime.notice(event));
   });
   teardown.push(TEARDOWN_ORDER.routineResults, "the routine results", () =>
     Effect.runPromise(routineResultRuntime.close()),
@@ -3228,7 +3249,25 @@ export async function createApplicationServices({
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("connected", (memberId) => browser.forgetComputerFailures(memberId));
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
+  const customProviderChanges = createCustomProviderChanges({
+    service,
+    customProviders,
+    providerRuntimes,
+    refreshModelReasoning: () => modelReasoning.refresh().pipe(Effect.map(({ changed }) => changed)),
+  });
+  // The endpoints saved before this start. The start does not wait for their servers: an OpenCode
+  // that started before the answer restarts with it, after a turn in progress. A server that starts
+  // with the computer can come up after OpenBot, so the question is asked again a few times.
+  modelReasoningWait = Effect.runFork(
+    Effect.gen(function* () {
+      for (const wait of MODEL_REASONING_RETRY_WAITS_MS) {
+        yield* Effect.sleep(wait);
+        const { changed, unreachable } = yield* modelReasoning.refresh();
+        if (changed) yield* service.reloadCustomProviderConfig("opencode").pipe(Effect.ignore);
+        if (!unreachable) return;
+      }
+    }),
+  );
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),
@@ -3363,8 +3402,11 @@ export async function createApplicationServices({
       return {
         list: () =>
           library.pipe(
-            Effect.flatMap((local) => local.list()),
-            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+            Effect.flatMap((local) => local.listWithUnreadable()),
+            Effect.map(({ skills, unreadable }) => ({
+              skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+              unreadable: unreadable.map(({ skillId }) => skillId),
+            })),
           ),
         assigned: (agentIds: readonly string[]) =>
           Effect.forEach(agentIds, (agentId) =>
@@ -3470,6 +3512,7 @@ export async function createApplicationServices({
     providers: providerSignIns,
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
+    receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
     // The search ignores case, so the exact address is checked again on each agent message it finds.
     printedLink: (agentId, url) =>
       agentPrintedLink(
@@ -3477,6 +3520,8 @@ export async function createApplicationServices({
         url,
         Date.now(),
       ),
+    // A server on this computer: only the desktop app here signs in with its owner password.
+    atHost: (sessionId) => localServerChild !== null && teamStore.isStoredOwnerSession(sessionId),
   });
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),
@@ -4389,6 +4434,10 @@ export async function createApplicationServices({
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
     );
   }
+  // A model file that this version replaced, such as the int8 Whisper turbo decoder.
+  void Effect.runPromise(voice.removeRetiredModelFiles()).catch((error) =>
+    logger.warn("Could not remove the old voice model files.", toLogValue(error)),
+  );
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);

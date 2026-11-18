@@ -84,7 +84,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Zdalny host nie ma przypiętego klucza urządzenia.",
   "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
-  "error.remote.hostDisconnected": "Host WebRTC rozłączył się.",
+  "error.remote.hostDisconnected":
+    "Połączenie z serwerem zostało przerwane. Sprawdź, czy działanie się zakończyło, i spróbuj ponownie.",
   "error.remote.eventGap": "W sekwencji zdarzeń hosta jest luka.",
   "error.remote.malformedKnownEvent": "Host zwrócił uszkodzone znane zdarzenie.",
   "error.remote.fileTransportIsStopped": "Transport plików WebRTC jest zatrzymany.",
@@ -203,6 +204,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
   "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",
   "error.remote.taskHistoryRefreshFailed": "Zadanie zostało zmienione, ale nie udało się odświeżyć historii czatu.",
+  "error.remote.serverNotLoaded": "Nie udało się wczytać serwera. Spróbuj ponownie.",
+  "error.remote.localServerNotStarted":
+    "Serwer na tym komputerze się nie uruchomił. Spróbuj ponownie. Jeśli nadal się nie uruchamia, uruchom ponownie OpenBot na tym komputerze.",
   "error.remote.localServerAccountRemovalFailed":
     "Serwer został usunięty na swoim komputerze, ale konto nadal go pokazuje. Usuń go ponownie, aby usunąć go z konta.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1087,7 +1087,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "Opcjonalnie. Bez nazwy lista pokazuje numer telefonu.",
   "mobile.server.connectors.whatsapp.add": "Dodaj",
   "mobile.server.connectors.whatsapp.groupTitle": "Dodaj grupę",
-  "mobile.server.connectors.whatsapp.groupDescription": "Osoby w tej grupie mogą zlecać pracę twoim agentom.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Osoby w tej grupie mogą zlecać pracę twoim agentom, gdy oznaczą ten numer lub odpowiedzą na jego wiadomości.",
   "mobile.server.connectors.whatsapp.groupSearch": "Szukaj grup",
   "mobile.server.connectors.whatsapp.groupsLoading": "Odczytywanie grup…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot nie mógł odczytać grup",
@@ -1818,7 +1819,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Do",
   "mobile.server.transfer.copyNoAgents": "Ten serwer nie ma agentów.",
   "mobile.server.transfer.copyNotMoved":
-    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+    "Ich kanały, przepływy rutyn, przepływy pracy i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
   "mobile.server.transfer.copySubmit": {
     one: "Kopiuj {count} agenta",
     few: "Kopiuj {count} agentów",

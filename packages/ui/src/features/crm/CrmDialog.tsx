@@ -13,7 +13,7 @@ import { Button, Checkbox, Dialog, Field, IconButton, Input, Plus, SearchSelect,
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, createUniqueId, For, Show } from "solid-js";
-import { ChoiceSelect, LabelledControl, OwnerSelect } from "./CrmParts";
+import { ChoiceSelect, CrmPopupLayer, LabelledControl, OwnerSelect, usePopupMount } from "./CrmParts";
 import { CrmSourceDialog } from "./CrmSourceDialog";
 import { addDays, CRM_CURRENCIES, EVERY_KEY, FIELD_KEY, METHOD_KEY, moneyInput, parseMoney } from "./crm-model";
 import type { CrmForm, CrmViewModel } from "./crm-state";
@@ -49,6 +49,7 @@ function FormDialog(props: {
 }) {
   const { t } = useText();
   const [busy, setBusy] = createSignal(false);
+  const [layer, setLayer] = createSignal<HTMLElement>();
   const submit = async () => {
     if (!props.valid || busy()) return;
     setBusy(true);
@@ -62,25 +63,27 @@ function FormDialog(props: {
     <Dialog.Root open onOpenChange={(open: boolean) => !open && props.crm.closeForm()}>
       <Dialog.Portal>
         <Dialog.Overlay class="ui-confirm-dialog-overlay">
-          <Dialog.Content as="section" class="ui-confirm-dialog crm-form">
-            <form
-              class="crm-form-body"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submit();
-              }}
-            >
-              <Dialog.Title class="crm-form-title">{props.title}</Dialog.Title>
-              <div class="crm-form-grid">{props.children}</div>
-              <div class="crm-form-actions">
-                <Button type="button" variant="ghost" onClick={() => props.crm.closeForm()}>
-                  {t("common.cancel")}
-                </Button>
-                <Button type="submit" disabled={!props.valid || busy()}>
-                  {props.submit}
-                </Button>
-              </div>
-            </form>
+          <Dialog.Content as="section" class="ui-confirm-dialog crm-form" ref={setLayer}>
+            <CrmPopupLayer value={layer}>
+              <form
+                class="crm-form-body"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submit();
+                }}
+              >
+                <Dialog.Title class="crm-form-title">{props.title}</Dialog.Title>
+                <div class="crm-form-grid">{props.children}</div>
+                <div class="crm-form-actions">
+                  <Button type="button" variant="ghost" onClick={() => props.crm.closeForm()}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button type="submit" disabled={!props.valid || busy()}>
+                    {props.submit}
+                  </Button>
+                </div>
+              </form>
+            </CrmPopupLayer>
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>
@@ -275,6 +278,32 @@ function AmountField(props: { label: string; value: string; currency: string; on
   );
 }
 
+/** The customer of a new payment. It reads the dialog layer, so it must render in the dialog. */
+function CustomerSelect(props: {
+  crm: CrmViewModel;
+  options: string[];
+  value: string;
+  onChange: (id: string) => void;
+  labelledBy: string;
+}) {
+  const mount = usePopupMount();
+  // A ternary in the prop compiles to a getter that makes a memo on each read. The list reads the value
+  // in a tracked effect, where Solid does not permit a new memo, and then all updates stop.
+  const value = () => (props.value === "" ? null : props.value);
+  return (
+    <SearchSelect<string>
+      mount={mount()}
+      options={props.options}
+      value={value()}
+      onChange={props.onChange}
+      label={(id) => props.crm.customer(id)?.name ?? id}
+      size="sm"
+      class="crm-select"
+      aria-labelledby={props.labelledBy}
+    />
+  );
+}
+
 interface PaymentDraft {
   customerId: string;
   label: string;
@@ -351,9 +380,10 @@ function PaymentForm(props: { crm: CrmViewModel; customerId: string | null; paym
       <Show when={!editing && props.customerId === null}>
         <LabelledControl label={t("crm.form.customer")} wide>
           {(labelId) => (
-            <SearchSelect<string>
+            <CustomerSelect
+              crm={crm}
               options={customerIds}
-              value={form.customerId === "" ? null : form.customerId}
+              value={form.customerId}
               onChange={(id) => {
                 if (id === form.customerId) return;
                 setForm((draft) => {
@@ -361,10 +391,7 @@ function PaymentForm(props: { crm: CrmViewModel; customerId: string | null; paym
                   draft.method = crm.customer(id)?.method ?? "none";
                 });
               }}
-              label={(id) => crm.customer(id)?.name ?? id}
-              size="sm"
-              class="crm-select"
-              aria-labelledby={labelId}
+              labelledBy={labelId}
             />
           )}
         </LabelledControl>

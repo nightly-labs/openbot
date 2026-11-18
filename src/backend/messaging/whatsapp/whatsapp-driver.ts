@@ -363,9 +363,11 @@ class WhatsAppAdapter implements MessagingAdapter {
       }
       const known = this.#handle.chats.groupName(platformChannelId);
       if (known) return known;
-      const metadata = yield* this.#handle.session
-        .groupMetadata(platformChannelId)
-        .pipe(Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }));
+      // A name is not worth a failed list: a slow or refused lookup gives the fallback name, and the next call asks again.
+      const metadata = yield* this.#handle.session.groupMetadata(platformChannelId).pipe(
+        Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+        Effect.orElseSucceed(() => null),
+      );
       this.#handle.chats.rememberGroup(platformChannelId, metadata?.subject);
       return this.#handle.chats.groupName(platformChannelId) ?? "WhatsApp group";
     });

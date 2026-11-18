@@ -1,7 +1,7 @@
 import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
-import { type Href, router, Stack } from "expo-router";
+import { type Href, router, Stack, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
@@ -42,6 +42,13 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatListRail } from "@/features/agents/components/chat-list-rail";
 import { EmptyAgentsScene, type WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
+import {
+  HOME_CARD_RADIUS,
+  HomeCardBackdrop,
+  HomeCardRow,
+  HomeCardTop,
+  useHomeCard,
+} from "@/features/agents/components/home-backdrop-card";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -107,6 +114,8 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
+/** The move of the card top to the header of a new server. */
+const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 // A row is about 80 pt high. The list keeps a few screens of rows mounted instead of the default 21,
 // so a server with many agents mounts fewer avatars, swipe handlers and menus.
 const LIST_WINDOW_SIZE = 7;
@@ -549,6 +558,19 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();
+  const focused = useIsFocused();
+  // With a backdrop, the list is a card under the pinned agents.
+  const homeCard = useHomeCard();
+  const cardBackground = String(useThemeColor("background"));
+  /** The height of the band at rest: the list header (the title, the pinned agents and the card top). */
+  const [stageHeight, setStageHeight] = useState(0);
+  // The backdrop draws the card top at `cardEdge`. After a change of server it moves there from the
+  // header of the last server. Until it arrives, the card top and the rows of the list are clear, so
+  // the moving card top shows through them; then they are opaque again for the scroll. Both values
+  // change on the UI thread, so the list does not render again for them.
+  const cardEdge = useSharedValue(-1);
+  /** The server whose card is in place. Its rows and card top are opaque. */
+  const cardServer = useSharedValue("");
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
@@ -605,6 +627,30 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [finishGate],
   );
   const listReveal = useAgentListReveal(listReady, activeServer.id);
+  const cardMotionOff = listReveal.reducedMotion;
+  const layoutStage = useCallback(
+    (height: number) => {
+      const edge = height - HOME_CARD_RADIUS;
+      const serverId = activeServer.id;
+      if (cardServer.get() === serverId || cardEdge.get() < 0 || cardMotionOff) {
+        cancelAnimation(cardEdge);
+        cardEdge.set(edge);
+        cardServer.set(serverId);
+        setStageHeight(height);
+        return;
+      }
+      // The band keeps the taller of the two heights while the card top moves.
+      setStageHeight((current) => Math.max(current, height));
+      cardEdge.set(
+        withTiming(edge, CARD_MOVE, (finished) => {
+          if (!finished) return;
+          cardServer.set(serverId);
+          scheduleOnRN(setStageHeight, height);
+        }),
+      );
+    },
+    [activeServer.id, cardEdge, cardMotionOff, cardServer],
+  );
   // Collapse keeps stable list cells and changes their heights on the UI thread.
   // Enable cell reflow again when a host layout update moves agents or sections.
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
@@ -662,8 +708,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [serverId, sidebarLayout, workspace],
   );
   // Rows are memoized, so a new message for one agent renders only that agent's row.
-  const rowOffset = hasPins ? 1 : 0;
-  const renderItem = useCallback(
+  // In the reveal, the title is first, then each pinned tile, then the rows.
+  const rowOffset = hasPins ? 1 + pinnedAgents.length + pinnedChannels.length : 0;
+  const renderRow = useCallback(
     ({ item, index }: { item: MobileSidebarItem; index: number }) =>
       item.kind === "waiting" ? (
         <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
@@ -721,6 +768,21 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       toggleSection,
       visibleSectionIds,
     ],
+  );
+  // In card mode each row is opaque, so the fixed backdrop under the clear list does not show through.
+  const renderItem = useCallback(
+    (info: { item: MobileSidebarItem; index: number }) => (
+      <HomeCardRow
+        card={homeCard}
+        background={cardBackground}
+        serverId={serverId}
+        cardServer={cardServer}
+        settled={listReveal.finished}
+      >
+        {renderRow(info)}
+      </HomeCardRow>
+    ),
+    [renderRow, homeCard, cardBackground, serverId, cardServer, listReveal.finished],
   );
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
@@ -922,6 +984,18 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     <View className="flex-1 bg-background">
       {/* The bar blurs the home content. */}
       <AndroidBlurTarget target={barBlurTarget} surface="canvas">
+        {/* The backdrop is fixed under the list, so the scroll moves nothing in it. It draws the card top
+            and follows a pull past the top; see `HomeCardBackdrop` before you change it. */}
+        {homeCard && !onboarding.active && !sceneShows ? (
+          <HomeCardBackdrop
+            height={headerHeight + stageHeight}
+            top={headerHeight}
+            edge={cardEdge}
+            scrolled={scroll.scrolled}
+            background={cardBackground}
+            active={focused}
+          />
+        ) : null}
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
             // The scene has the insets of the welcome, so the characters stand in the same places on
@@ -949,7 +1023,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 }
                 skipEnteringExitingAnimations
                 removeClippedSubviews={false}
-                className="flex-1 bg-background"
+                // Over a backdrop the list is clear, so the fixed backdrop shows above the card.
+                className={homeCard ? "flex-1" : "flex-1 bg-background"}
                 // The side insets (the iPhone Duo rail, the landscape cutout) go outside the list. With
                 // `always`, iOS would also inset the content by them.
                 style={{ marginLeft: insets.left, marginRight: insets.right }}
@@ -973,37 +1048,42 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 // A drag scrolls the list, and the dragged row must stay mounted for its gesture to go on.
                 windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
-                  <AgentListRowReveal index={0} reveal={listReveal}>
-                    {hasSelectedServer ? (
-                      <LargeTitle
-                        scroll={scroll}
-                        title={activeServer.name}
-                        above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
-                        accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
-                        onPress={openDrawer}
-                      />
-                    ) : null}
-                    {sidebar?.error ? (
-                      <View className="gap-2 px-4">
-                        <Typography.Paragraph className="text-danger-text">
-                          {sourceText(sidebar.error)}
-                        </Typography.Paragraph>
-                        <Button
-                          variant="secondary"
-                          onPress={() =>
-                            void workspace()
-                              .refreshServer(activeServer.id)
-                              .catch(() => undefined)
-                          }
-                        >
-                          <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
-                        </Button>
-                      </View>
-                    ) : null}
+                  // Its height places the bottom of the fixed backdrop at the top of the card.
+                  <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
+                    <AgentListRowReveal index={0} reveal={listReveal}>
+                      {hasSelectedServer ? (
+                        <LargeTitle
+                          scroll={scroll}
+                          title={activeServer.name}
+                          above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
+                          accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
+                          onPress={openDrawer}
+                        />
+                      ) : null}
+                      {sidebar?.error ? (
+                        <View className="gap-2 px-4">
+                          <Typography.Paragraph className="text-danger-text">
+                            {sourceText(sidebar.error)}
+                          </Typography.Paragraph>
+                          <Button
+                            variant="secondary"
+                            onPress={() =>
+                              void workspace()
+                                .refreshServer(activeServer.id)
+                                .catch(() => undefined)
+                            }
+                          >
+                            <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
+                          </Button>
+                        </View>
+                      ) : null}
+                    </AgentListRowReveal>
                     <PinnedAgentsGrid
                       agents={pinnedAgents}
                       animateLayout={!updateHeader.moving}
                       dropZone={dragging && !hasPins}
+                      reveal={listReveal}
+                      revealOffset={1}
                     >
                       {pinnedChannels.length > 0
                         ? pinnedChannels.map((channel) => (
@@ -1017,7 +1097,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                           ))
                         : null}
                     </PinnedAgentsGrid>
-                  </AgentListRowReveal>
+                    <HomeCardTop
+                      card={homeCard}
+                      background={cardBackground}
+                      serverId={activeServer.id}
+                      cardServer={cardServer}
+                      settled={listReveal.finished}
+                    />
+                  </View>
                 }
                 ListEmptyComponent={
                   serverDirectoryState === "error" && servers.length === 0 ? (
@@ -1095,6 +1182,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           scroll={scroll}
           title={activeServer.name}
           blurTarget={barBlurTarget}
+          // Over the backdrop the Android bar has no blur at rest: it fades in and out with the small title.
+          androidSurfaceWithTitle={homeCard}
           // The connection state takes the place of the title in the bar.
           hidden={!searchShows || statusShows || search.open}
         >

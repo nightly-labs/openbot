@@ -1084,7 +1084,8 @@ export const messages = {
     "Необязательно. Если пусто, в списке будет номер телефона.",
   "mobile.server.connectors.whatsapp.add": "Добавить",
   "mobile.server.connectors.whatsapp.groupTitle": "Добавить группу",
-  "mobile.server.connectors.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "mobile.server.connectors.whatsapp.groupSearch": "Поиск групп",
   "mobile.server.connectors.whatsapp.groupsLoading": "Загрузка групп…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
@@ -1814,7 +1815,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Куда",
   "mobile.server.transfer.copyNoAgents": "На этом сервере нет агентов.",
   "mobile.server.transfer.copyNotMoved":
-    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+    "Их каналы, схемы регулярных задач, рабочие процессы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
   "mobile.server.transfer.copySubmit": {
     one: "Копировать {count} агента",
     few: "Копировать {count} агентов",

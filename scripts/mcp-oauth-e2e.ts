@@ -38,7 +38,12 @@ import {
   secureOAuthFetch,
 } from "../src/backend/mcp-oauth-provider";
 import type { McpOAuthProxySettings } from "../src/backend/mcp-oauth-proxy";
-import { claudeMcpServers, codexMcpServers, usableMcpServers } from "../src/backend/mcp-provider-shapes";
+import {
+  claudeMcpServers,
+  codexMcpServerKey,
+  codexMcpServers,
+  usableMcpServers,
+} from "../src/backend/mcp-provider-shapes";
 import { McpServerStore } from "../src/backend/mcp-server-store";
 import { AddressLookupError, isPublicAddress } from "../src/backend/network-address";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -741,7 +746,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const port = saved.value?.port;
     assert.ok(port);
     assert.match(directRoute.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}$`, "u"));
-    const codexDirect = codex.servers.Resource;
+    const codexDirect = codex.servers[codexMcpServerKey(direct)];
     assert.ok(codexDirect && "url" in codexDirect);
     assert.match(codexDirect.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}/[0-9a-f]{32}$`, "u"));
     assert.equal(codexDirect.url, chiefRoute.url);

@@ -502,7 +502,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcjonalnie. Bez nazwy lista pokazuje numer telefonu.",
   "connector.whatsapp.add": "Dodaj",
   "connector.whatsapp.groupTitle": "Dodaj grupę",
-  "connector.whatsapp.groupDescription": "Osoby w tej grupie mogą zlecać pracę twoim agentom.",
+  "connector.whatsapp.groupDescription":
+    "Osoby w tej grupie mogą zlecać pracę twoim agentom, gdy oznaczą ten numer lub odpowiedzą na jego wiadomości.",
   "connector.whatsapp.groupSearch": "Szukaj grup",
   "connector.whatsapp.groupsLoading": "Odczytywanie grup…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot nie mógł odczytać grup",

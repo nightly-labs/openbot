@@ -88,7 +88,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",
   "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
-  "error.remote.hostDisconnected": "WebRTC ホストの接続が切れました。",
+  "error.remote.hostDisconnected":
+    "サーバーとの接続が切れました。操作が完了したか確認してから、もう一度お試しください。",
   "error.remote.eventGap": "ホストのイベントのシーケンスに欠落があります。",
   "error.remote.malformedKnownEvent": "ホストが不正な形式の既知のイベントを返しました。",
   "error.remote.fileTransportIsStopped": "WebRTC ファイル転送は停止しています。",
@@ -209,6 +210,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",
   "error.remote.taskHistoryRefreshFailed": "タスクは変更されましたが、チャット履歴を更新できませんでした。",
+  "error.remote.serverNotLoaded": "OpenBot はサーバーを読み込めませんでした。もう一度お試しください。",
+  "error.remote.localServerNotStarted":
+    "このコンピューターのサーバーが起動しませんでした。もう一度お試しください。起動しない場合は、このコンピューターで OpenBot を再起動してください。",
   "error.remote.localServerAccountRemovalFailed":
     "サーバーはそのコンピュータで削除されましたが、アカウントにはまだ表示されています。アカウントから外すには、もう一度削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

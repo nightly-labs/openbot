@@ -183,12 +183,14 @@ export function isUsageReadDiagnostic(message: string): boolean {
  * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
  * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
  * Windows computer without Git. Grok continues without the repository state. The user met the line
- * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
+ * as a "Grok error" toast with nothing failing (#4789). Grok CLI 1.0.89 writes the same failure as
+ * `ERROR git_cli: spawn failed error=program not found error_kind=NotFound` (#11788). It belongs in
+ * the log.
  *
  * Only a spawn failure counts. A `git` command that ran and failed stays visible.
  */
 export function isGitSpawnDiagnostic(message: string): boolean {
-  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
+  return /\bERROR\s+git_cli:\s+(?:Command::output\(\) FAILED \(spawn error\)|spawn failed\b)/.test(message);
 }
 
 /**
@@ -401,8 +403,12 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
  */
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
-/** A count of images in one clause, such as "at most 8 images". */
-const IMAGE_COUNT_LIMIT = /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])/iu;
+/**
+ * A count of images in one clause, such as "at most 8 images", or Azure's "Exceeded maximum number of
+ * images (50) allowed in the request" (#11628).
+ */
+const IMAGE_COUNT_LIMIT =
+  /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])|\bmaximum number of images\b/iu;
 
 /** A limit over time, such as "at most 50 images per day", which a new session does not change. */
 const IMAGE_QUOTA_PERIOD =
@@ -417,9 +423,9 @@ const IMAGE_QUOTA_PERIOD =
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
  * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
  * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
- * "maximum of", a number, and "images". A daily quota of images is not a count in one request, so a
- * clause that names a period does not match. A period in a different clause, such as "try again in a
- * minute", does not stop the match.
+ * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not
+ * a count in one request, so a clause that names a period does not match. A period in a different
+ * clause, such as "try again in a minute", does not stop the match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
   return (
@@ -457,10 +463,11 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
  * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
  * at position 124 with role 'user' contains an invalid part type: file" (#8654). Z.ai's text-only
  * GLM models refuse an image with error 1210: "messages.content.type is invalid, allowed values:
- * ['text']" (#10012).
+ * ['text']" (#10012). A local server refuses a screenshot that a tool returned to a text-only model:
+ * "MiniMax-M2.7-AWQ-4bit is not a multimodal model" (#11679).
  */
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }

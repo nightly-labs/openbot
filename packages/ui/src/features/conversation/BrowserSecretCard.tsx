@@ -107,8 +107,12 @@ export function BrowserSecretCard(props: {
   );
   const valid = () => (password() ? value().length > 0 : value().length === digits());
   onCleanup(() => setValue(""));
+  // An effect runs again for an equal value, and each update of the dock or the runtime gives a new
+  // request object. The memos keep the typed value and the preview until the request or the variant changes.
+  const requestId = createMemo(() => props.request.requestId);
+  const showsPreview = createMemo(() => variant() === "card");
   createEffect(
-    () => ({ requestId: props.request.requestId, showPreview: variant() === "card" }),
+    () => ({ requestId: requestId(), showPreview: showsPreview() }),
     ({ showPreview }) => {
       setValue("");
       setError("");

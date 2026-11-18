@@ -302,6 +302,10 @@
   .app-window
   .message-entry-agent
   .ui-bubble-variant-muted.message-bubble-colored
+  > .ui-bubble-content,
+:root[data-openbot-window-glass]
+  .app-window
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored
   > .ui-bubble-content {
   background: color-mix(
     in srgb,

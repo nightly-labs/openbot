@@ -412,7 +412,7 @@ export function CrmCustomerPanel(props: { crm: CrmViewModel; customer: CrmCustom
               </dd>
             </div>
             <div class="crm-field">
-              <dt>{t("crm.customer.since")}</dt>
+              <dt>{t("crm.customer.added")}</dt>
               <dd class="crm-static">
                 {format.date(new Date(props.customer.createdAt), { month: "long", year: "numeric" })}
               </dd>

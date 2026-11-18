@@ -14,6 +14,8 @@ export const messages = {
     "A ferramenta não foi executada. tool_call não pode executar openbot.tool_search nem openbot.tool_describe. Chame-as diretamente com os mesmos argumentos.",
   "error.agent.toolCallEnvelopeKeys":
     "A ferramenta não foi executada. tool_call aceita apenas name e arguments. Coloque os argumentos da ferramenta em arguments, como objeto, e envie a chamada novamente.",
+  "error.agent.toolCallMissingName":
+    "A ferramenta não foi executada. O tool_call não tem name. Coloque em name o nome qualificado que tool_search fornece, como openbot.history_read, e envie a chamada novamente.",
   "error.agent.toolCallUnknownTool":
     "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. Use o nome qualificado exato que tool_search fornece, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -125,6 +127,8 @@ export const messages = {
   "error.agent.stopBeforeDelete": "Interrompa o agente e cancele as mensagens na fila antes de excluí-lo.",
   "error.agent.deleteIncomplete":
     "Não foi possível remover todos os dados do agente. Tente excluir o agente novamente.",
+  "error.agent.deleteFolderInUse":
+    "O trabalho de outro agente ainda usa a pasta deste agente. Exclua este agente de novo quando esse trabalho terminar ou depois de reiniciar o OpenBot.",
   "error.agent.duplicationBusy": "Este agente já está sendo duplicado.",
   "error.agent.waitBeforeDuplicate": "Aguarde o agente terminar e esvaziar a fila antes de duplicá-lo.",
   "error.agent.saveOtherAgent": "Este registro salvo pertence a outro agente.",

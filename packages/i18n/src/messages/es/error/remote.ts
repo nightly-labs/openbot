@@ -86,7 +86,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "El host remoto no tiene una clave de dispositivo fijada.",
   "error.remote.hostDidNotConnect": "El host WebRTC no se conectó.",
   "error.remote.connectionCancelled": "Se canceló la conexión remota.",
-  "error.remote.hostDisconnected": "El host WebRTC se desconectó.",
+  "error.remote.hostDisconnected":
+    "Se perdió la conexión con el servidor. Comprueba si la acción se completó y vuelve a intentarlo.",
   "error.remote.eventGap": "La secuencia de eventos del host tiene un vacío.",
   "error.remote.malformedKnownEvent": "El host devolvió un evento conocido con formato incorrecto.",
   "error.remote.fileTransportIsStopped": "El transporte de archivos WebRTC está detenido.",
@@ -206,6 +207,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",
   "error.remote.taskHistoryRefreshFailed": "La tarea se cambió, pero no se pudo actualizar el historial del chat.",
+  "error.remote.serverNotLoaded": "OpenBot no pudo cargar el servidor. Inténtalo de nuevo.",
+  "error.remote.localServerNotStarted":
+    "El servidor de este equipo no se inició. Inténtalo de nuevo. Si no se inicia, reinicia OpenBot en este equipo.",
   "error.remote.localServerAccountRemovalFailed":
     "El servidor está eliminado en su ordenador, pero la cuenta aún lo muestra. Elimínalo otra vez para quitarlo de la cuenta.",
 } as const satisfies PartialTranslation<typeof source>;

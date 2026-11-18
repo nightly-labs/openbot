@@ -40,6 +40,7 @@ import {
   unpinThreadMessage,
 } from "./database/pinned-thread-messages";
 import {
+  type ProviderHistoryCompactionBatch,
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
   type ProviderHistoryStagedItem,
@@ -51,6 +52,7 @@ import {
 } from "./database/provider-history-store";
 import { type ProviderSession, ProviderSessions } from "./database/provider-sessions";
 import { withTransaction } from "./database/sqlite-transaction";
+import { ThreadEventCompaction, type ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 import { ThreadReplay } from "./database/thread-replay";
 import { type StoredThreadSummary, ThreadSummaries } from "./database/thread-summaries";
 
@@ -63,6 +65,7 @@ export type {
   PendingHostedSiteTerminalEvent,
 } from "./database/hosted-site-event-log";
 export type {
+  ProviderHistoryCompactionBatch,
   ProviderHistoryImportState,
   ProviderHistorySessionInput,
   ProviderHistoryStagedItem,
@@ -72,7 +75,20 @@ export type {
   ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
 export type { ProviderSession } from "./database/provider-sessions";
+export type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 export type { StoredThreadSummary } from "./database/thread-summaries";
+
+/** One streamed message to write, for a caller that knows only that message changed. */
+export interface StreamingMessageWrite {
+  snapshot: ConversationSnapshot;
+  messageId: string;
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+}
+
+/** The revision of a streamed write that is kept, or the error of one that failed. */
+export type StreamingMessageResult = { revision: number } | { error: unknown };
 
 /**
  * The local OpenBot event log and its read projections.
@@ -93,6 +109,7 @@ export class OpenBotDatabase {
   readonly #agentHistory: AgentHistoryQueries;
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
+  readonly #threadEvents: ThreadEventCompaction;
 
   constructor(
     readonly userDataPath: string,
@@ -110,6 +127,7 @@ export class OpenBotDatabase {
     this.#sessions = new ProviderSessions({ core: this.#core });
     this.#providerHistory = new ProviderHistoryStore({ core: this.#core });
     this.#summaries = new ThreadSummaries({ core: this.#core });
+    this.#threadEvents = new ThreadEventCompaction({ core: this.#core });
   }
 
   get path(): string {
@@ -309,14 +327,32 @@ export class OpenBotDatabase {
   }
 
   /** Writes one message of a thread, for a caller that knows only that message changed. */
-  persistStreamingMessage(input: {
-    snapshot: ConversationSnapshot;
-    messageId: string;
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  persistStreamingMessage(input: StreamingMessageWrite): number {
     return this.#conversationWrites.persistStreamingMessage(input);
+  }
+
+  /**
+   * Writes the streamed messages of several threads in one transaction. Each write in its own
+   * transaction made each agent that streams commit ten times a second, and with many agents the
+   * commits took most of the main process. Each write keeps its own savepoint: a write that fails
+   * rolls back only itself, and its error takes its place in the result. A failed commit throws, and
+   * then no write is kept.
+   */
+  persistStreamingMessages(inputs: readonly StreamingMessageWrite[]): StreamingMessageResult[] {
+    const db = this.connection;
+    return withTransaction(db, () =>
+      inputs.map((input): StreamingMessageResult => {
+        try {
+          return { revision: this.#conversationWrites.persistStreamingMessage(input) };
+        } catch (error) {
+          // SQLite ends the whole transaction itself on some failures, such as a full disk. The
+          // writes before this one are then gone, and the next ones would commit alone, so the
+          // whole call fails with this error.
+          if (!db.isTransaction) throw error;
+          return { error };
+        }
+      }),
+    );
   }
 
   appendConversationMessage(input: {
@@ -414,6 +450,8 @@ export class OpenBotDatabase {
     messages: readonly ConversationMessage[];
     throughItemIndex?: number;
     complete: boolean;
+    /** Keep only hashes of the turn's items once it is imported (Codex and Claude only). */
+    compact?: boolean;
     detail?: unknown;
   }): void {
     withTransaction(this.connection, () => {
@@ -429,7 +467,10 @@ export class OpenBotDatabase {
       if (input.throughItemIndex !== undefined) {
         this.#providerHistory.markItemsImportedThrough(input.sessionId, input.turnId, input.throughItemIndex);
       }
-      if (input.complete) this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+      if (input.complete) {
+        this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+        if (input.compact) this.#providerHistory.compactImportedTurn(input.sessionId, input.turnId);
+      }
     });
   }
 
@@ -588,6 +629,20 @@ export class OpenBotDatabase {
     pendingOnly?: boolean;
   }): ProviderHistoryStagedItem[] {
     return this.#providerHistory.readStagedItems(input);
+  }
+
+  /** Compacts one batch of imported Codex and Claude items after `afterRowId`. */
+  compactImportedProviderHistory(afterRowId: number): ProviderHistoryCompactionBatch {
+    return this.#providerHistory.compactImportedItems(afterRowId);
+  }
+
+  /** Removes the message copies that a replay does not need from one batch of old thread events. */
+  compactThreadEvents(): ThreadEventCompactionBatch {
+    return this.#threadEvents.compactNext();
+  }
+
+  dropCompactedProviderHistoryItems(sessionId: string, turnId: string): void {
+    this.#providerHistory.dropCompactedItems(sessionId, turnId);
   }
 
   markProviderHistoryTurnImported(sessionId: string, turnId: string): void {

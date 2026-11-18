@@ -219,7 +219,7 @@ export const messages = defineMessages("crm", {
   "crm.customer.paidOn": "Paid {date}",
   "crm.customer.billing": "Billing",
   "crm.customer.details": "Details",
-  "crm.customer.since": "Customer since",
+  "crm.customer.added": "Added",
   "crm.customer.activity": "Activity",
   "crm.customer.loading": "Loading…",
 

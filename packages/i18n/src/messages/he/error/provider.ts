@@ -162,10 +162,17 @@ export const messages = {
   "error.provider.cliNotReady": "ה-CLI של {provider} אינו מוכן או שאינו מחובר.",
   "error.provider.cliTimedOut": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. OpenBot ינסה שוב.",
   "error.provider.cliTimedOutRefresh": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. יש לרענן את הספקים כדי לנסות שוב.",
+  "error.provider.stoppedBeforeStart": "{provider} נעצר לפני שההודעה הזו התחילה. יש לשלוח את ההודעה שוב.",
+  "error.provider.serviceUnreachable":
+    "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט. OpenBot ינסה שוב.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט ואז לרענן את הספקים.",
   "error.provider.acpStartTimedOut": "{provider} לא סיים להתחיל תוך {seconds} שניות. ייתכן שהמחשב עמוס.",
   "error.provider.acpModelsTimedOut": "{provider} לא הציג את המודלים שלו תוך {seconds} שניות. ייתכן שהמחשב עמוס.",
   "error.provider.startStopped":
     "{provider} לא התחיל כמה פעמים ברצף, ולכן OpenBot הפסיק לנסות. יש לרענן את הספקים כדי לנסות שוב.",
+  "error.provider.startPaused":
+    "{provider} לא הופעל כמה פעמים ברציפות. OpenBot ינסה שוב בהודעה או בשגרה הבאה. כדי לנסות עכשיו, רענן את הספקים.",
   "error.provider.tempDiskSpace":
     "{provider} צריך לפחות 1 GB של שטח דיסק פנוי כדי להתחיל. יש לפנות מקום ואז לרענן את הספקים.",
   "error.provider.noCodeSignIn": "לא ניתן להתחבר אל {provider} באמצעות קוד.",
@@ -244,6 +251,8 @@ export const messages = {
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",
@@ -273,6 +282,7 @@ export const messages = {
     "Google לא קיבלה את ההתחברות ל-Gemini עבור הבקשה הזו. יש לשלוח את ההודעה שוב. אם השגיאה נמשכת, יש לחבר מחדש את Gemini בהגדרות.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini איבד את החיבור ל-Google. יש לשלוח שוב את ההודעה. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
   "error.provider.antigravityHistoryUnreadable":
@@ -338,6 +348,8 @@ export const messages = {
     "Codex לא הצליח להמשיך את הצ'אט הזה, כי פריט בהיסטוריה השמורה שלו חסר. OpenBot התחיל סשן חדש של Codex עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.codexRequestRefused":
     "{provider} דחה את הבקשה של הצ'אט הזה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך עם הרבה תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.codexAudioRefused":
+    "המודל לא קיבל אודיו בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
@@ -456,12 +468,14 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",
   "error.provider.piSessionMissing": "קובץ הסשן של Pi אינו זמין במחשב הזה.",
   "error.provider.piResumeCancelled": "Pi ביטל את חידוש הסשן. יש לנסות שוב.",
   "error.provider.piSessionIdentity": "Pi החזיר סשן אחר. הסשן השמור לא הוחלף.",
   "error.provider.piExtensionFailed":
     "Pi נעצר כי לא הצליח לטעון הרחבה. יש להסיר או לעדכן את ההרחבה הזו ולנסות שוב. {detail}",
+  "error.provider.piThreadStopped": "Pi נעצר באופן בלתי צפוי לפני שסיים את התור הזה. שלחו הודעה כדי להמשיך.",
   "error.provider.piModelInvalid": "יש לבחור מודל Pi שכולל את הספק שלו.",
   "error.provider.piToolInvalid": "הכלי החזיר תוצאה לא תקינה.",
   "error.provider.piSignIn": "יש להשתמש ב-/login ב-Pi במחשב המארח. יש לסגור את Pi כשההתחברות הושלמה.",

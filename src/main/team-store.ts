@@ -1076,6 +1076,19 @@ export class TeamStore {
     }
   }
 
+  /**
+   * Whether `sessionId` is a session of the owner that a sign-in to this store made, not one of a
+   * Signal connection (`openRemoteSession`). On a server on this computer, the owner has a password
+   * that only the desktop app here knows, and the owner's other devices connect through Signal.
+   */
+  isStoredOwnerSession(sessionId: string): boolean {
+    const ownerId = this.getOwnerMemberId();
+    return (
+      ownerId !== null &&
+      (this.#state?.sessions.some((session) => session.id === sessionId && session.memberId === ownerId) ?? false)
+    );
+  }
+
   getMember(memberId: string): TeamMemberSummary | null {
     const member = this.#state?.members.find((candidate) => candidate.id === memberId);
     return member ? publicMember(member) : null;

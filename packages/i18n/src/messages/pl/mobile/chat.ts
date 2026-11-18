@@ -147,7 +147,9 @@ export const messages = {
   "mobile.chat.preview.wrapLines": "Zawijaj wiersze",
   "mobile.chat.preview.selectHint": "Dotknij i przytrzymaj, aby zaznaczyć część kodu.",
   "mobile.chat.preview.share": "Udostępnij",
-  "mobile.chat.preview.truncated": "Podgląd ucięty po {limit} znakach.",
+  "mobile.chat.preview.part": "Część {part} z {total}",
+  "mobile.chat.preview.previousPart": "Poprzednia część",
+  "mobile.chat.preview.nextPart": "Następna część",
   "mobile.chat.preview.pdfFailed": "Nie udało się wyświetlić tego pliku PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
   "mobile.chat.preview.spreadsheetTruncated":
@@ -198,6 +200,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "PLIK",
   "mobile.chat.attachment.tooLargeForMobile":
     "Ten plik przekracza limit {limit} na telefonie. Otwórz go na komputerze.",
+  "mobile.chat.backdrop.agentSet": "Agent {name} ustawił tło",
+  "mobile.chat.backdrop.undo": "Cofnij",
+  "mobile.chat.backdrop.dismiss": "Zamknij",
   "mobile.chat.attachment.sharingUnavailable": "Udostępnianie plików jest niedostępne na tym urządzeniu.",
   "mobile.chat.attachment.unavailable": "Załącznik jest niedostępny. Spróbuj ponownie.",
   "mobile.chat.attachment.openFailed": "Nie udało się otworzyć załącznika",
@@ -570,7 +575,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Najnowsze",
   "mobile.chat.history.loadingOlder": "Wczytywanie starszych wiadomości…",
   "mobile.chat.history.retryOlder": "Spróbuj ponownie wczytać starsze wiadomości",
-  "mobile.chat.history.loadOlder": "Wczytaj starsze wiadomości",
   "mobile.chat.history.connecting": "Łączenie z serwerem",
   "mobile.chat.history.loading": "Wczytywanie historii czatu",
   "mobile.chat.history.waiting": "Oczekiwanie na połączenie",

@@ -180,11 +180,19 @@ export const messages = {
     "{provider} no respondió a tiempo. El equipo puede estar ocupado. OpenBot lo intentará de nuevo.",
   "error.provider.cliTimedOutRefresh":
     "{provider} no respondió a tiempo. El equipo puede estar ocupado. Actualiza los proveedores para intentarlo de nuevo.",
+  "error.provider.stoppedBeforeStart":
+    "{provider} se detuvo antes de que empezara este mensaje. Envía el mensaje de nuevo.",
+  "error.provider.serviceUnreachable":
+    "{provider} no puede conectarse a su servicio. Comprueba tu conexión a internet. OpenBot lo intentará de nuevo.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} no puede conectarse a su servicio. Comprueba tu conexión a internet y luego actualiza los proveedores.",
   "error.provider.acpStartTimedOut":
     "{provider} no terminó de iniciarse en {seconds} s. El equipo puede estar ocupado.",
   "error.provider.acpModelsTimedOut": "{provider} no listó sus modelos en {seconds} s. El equipo puede estar ocupado.",
   "error.provider.startStopped":
     "{provider} no se inició varias veces seguidas, así que OpenBot dejó de intentarlo. Actualiza los proveedores para intentarlo de nuevo.",
+  "error.provider.startPaused":
+    "{provider} no se inició varias veces seguidas. OpenBot lo intentará de nuevo con el siguiente mensaje o rutina. Para intentarlo ahora, actualiza los proveedores.",
   "error.provider.tempDiskSpace":
     "{provider} necesita al menos 1 GB de espacio libre en disco para iniciarse. Libera espacio y luego actualiza los proveedores.",
   "error.provider.noCodeSignIn": "No se puede iniciar sesión en {provider} con un código.",
@@ -272,6 +280,8 @@ export const messages = {
     "El modelo de OpenCode terminó el turno después de razonar, sin respuesta. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} terminó el turno sin respuesta. Envía el mensaje de nuevo o empieza un nuevo chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} hizo algunos pasos y terminó el turno sin respuesta. Pregunta al agente qué hizo antes de enviar la misma solicitud otra vez.",
   "error.provider.chatgptPageFailed": "OpenBot no pudo abrir la página de conexión de ChatGPT.",
   "error.provider.noneReady": "Ningún proveedor de agentes está listo.",
   "error.provider.claudeTurnActive": "Espera a que termine el turno activo de Claude antes de actualizar su contexto.",
@@ -303,6 +313,7 @@ export const messages = {
     "Google no aceptó el inicio de sesión de Gemini para esta solicitud. Envía tu mensaje de nuevo. Si el error continúa, vuelve a conectar Gemini en Ajustes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini rechazó esta solicitud. Elige otro modelo y vuelve a enviar tu mensaje. Si vuelve a fallar, inicia un nuevo chat.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini perdió la conexión con Google. Vuelve a enviar tu mensaje. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini rechazó esta solicitud y no indicó la causa. Un elemento del historial del chat puede causarlo, como una imagen que abrió el agente. OpenBot inició una nueva sesión de Gemini con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo.",
   "error.provider.antigravityHistoryUnreadable":
@@ -370,6 +381,8 @@ export const messages = {
     "Codex no pudo continuar este chat porque falta un elemento en su historial guardado. OpenBot inició una nueva sesión de Codex con el historial del chat. Inténtalo de nuevo.",
   "error.provider.codexRequestRefused":
     "{provider} rechazó la solicitud de este chat y no indicó la causa. Esto puede ocurrir en un chat largo con muchas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
+  "error.provider.codexAudioRefused":
+    "El modelo no aceptó el audio de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":
@@ -500,12 +513,16 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "No se pudo leer la versión de la CLI de {provider}.",
   "error.provider.piSessionBusy": "Espera a que termine el turno actual de Pi.",
   "error.provider.acpSessionBusy": "{provider} aún termina un turno detenido. Inténtalo de nuevo en un momento.",
+  "error.provider.acpModelNotOffered":
+    "{provider} no ofrece {model} ahora. Elige otro modelo para este agente y vuelve a intentarlo.",
   "error.provider.piStopped": "Pi no se está ejecutando. Conecta Pi e inténtalo de nuevo.",
   "error.provider.piSessionMissing": "El archivo de sesión de Pi no está disponible en este equipo.",
   "error.provider.piResumeCancelled": "Pi canceló la reanudación de la sesión. Inténtalo de nuevo.",
   "error.provider.piSessionIdentity": "Pi devolvió una sesión diferente. La sesión guardada no se reemplazó.",
   "error.provider.piExtensionFailed":
     "Pi se detuvo porque no pudo cargar una extensión. Elimina o actualiza esa extensión e inténtalo de nuevo. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi se detuvo de forma inesperada antes de terminar este turno. Envía un mensaje para continuar.",
   "error.provider.piModelInvalid": "Selecciona un modelo de Pi que incluya su proveedor.",
   "error.provider.piToolInvalid": "La herramienta devolvió un resultado no válido.",
   "error.provider.piSignIn": "Usa /login en Pi en el equipo host. Cierra Pi cuando termines de iniciar sesión.",

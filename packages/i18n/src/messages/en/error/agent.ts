@@ -13,6 +13,8 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
   "error.agent.toolCallEnvelopeKeys":
     "The tool did not run. tool_call takes only name and arguments. Put the arguments of the tool in arguments, as an object, and send the call again.",
+  "error.agent.toolCallMissingName":
+    "The tool did not run. The tool_call has no name. Put the qualified name that tool_search gives in name, such as openbot.history_read, and send the call again.",
   "error.agent.toolCallUnknownTool":
     "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -120,6 +122,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.deletionBusy": "Agent deletion is already in progress.",
   "error.agent.stopBeforeDelete": "Stop the agent and cancel its queued messages before deleting it.",
   "error.agent.deleteIncomplete": "The agent data could not be removed completely. Retry deleting the agent.",
+  "error.agent.deleteFolderInUse":
+    "Work of another agent still uses this agent's folder. Delete this agent again when that work ends, or after you restart OpenBot.",
   "error.agent.duplicationBusy": "This agent is already being duplicated.",
   "error.agent.waitBeforeDuplicate": "Wait for the agent to finish and clear its queue before duplicating it.",
   "error.agent.saveOtherAgent": "This save belongs to another agent.",

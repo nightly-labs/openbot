@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync } from "node:fs";
 import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { Effect, Result } from "effect";
 import {
   assertQuickCheckResult,
@@ -12,6 +12,7 @@ import {
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { withTransaction } from "./sqlite-transaction";
+import { cachedStatement, forgetStatements } from "./statement-cache";
 
 export interface OrchestrationEventInput {
   aggregateType: string;
@@ -20,6 +21,8 @@ export interface OrchestrationEventInput {
   payload: unknown;
   occurredAt?: string;
 }
+
+const SELECT_RECEIPT_SQL = "SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?";
 
 interface ReceiptRow {
   last_sequence: number;
@@ -120,6 +123,7 @@ export class DatabaseCore {
   }, Effect.uninterruptible);
 
   close(): void {
+    if (this.#db) forgetStatements(this.#db);
     this.#db?.close();
     this.#db = null;
   }
@@ -129,22 +133,23 @@ export class DatabaseCore {
     return this.#db;
   }
 
+  /** A prepared statement of the open connection, kept as `cachedStatement` says. */
+  statement(sql: string): StatementSync {
+    return cachedStatement(this.connection, sql);
+  }
+
   dispatch<T>(
     commandId: string,
     events: OrchestrationEventInput[],
     project: (db: DatabaseSync, sequences: number[]) => T,
   ): T {
     const db = this.connection;
-    const receipt = decodeReceiptRow(
-      db
-        .prepare("SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?")
-        .get(commandId),
-    );
+    const receipt = decodeReceiptRow(this.statement(SELECT_RECEIPT_SQL).get(commandId));
     if (receipt) return JSON.parse(receipt.result_json);
 
     return withTransaction(db, () => {
       const sequences: number[] = [];
-      const append = db.prepare(`
+      const append = this.statement(`
         INSERT INTO orchestration_events (
           event_id, command_id, aggregate_type, aggregate_id, event_type, occurred_at, payload_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -165,9 +170,11 @@ export class DatabaseCore {
       // A receipt is deleted with its command's events. A command that keeps no event, such as the
       // memory transaction wrapper or a channel delete that removes its own event, gets no receipt,
       // because nothing would delete it.
-      const keepsEvent = db.prepare("SELECT 1 FROM orchestration_events WHERE command_id = ? LIMIT 1").get(commandId);
+      const keepsEvent = this.statement("SELECT 1 FROM orchestration_events WHERE command_id = ? LIMIT 1").get(
+        commandId,
+      );
       if (keepsEvent) {
-        db.prepare(
+        this.statement(
           `INSERT INTO orchestration_command_receipts
             (command_id, accepted_at, first_sequence, last_sequence, result_json)
            VALUES (?, ?, ?, ?, ?)`,
@@ -184,11 +191,7 @@ export class DatabaseCore {
   }
 
   commandResult(commandId: string): unknown | undefined {
-    const receipt = decodeReceiptRow(
-      this.connection
-        .prepare("SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?")
-        .get(commandId),
-    );
+    const receipt = decodeReceiptRow(this.statement(SELECT_RECEIPT_SQL).get(commandId));
     return receipt ? JSON.parse(receipt.result_json) : undefined;
   }
 
@@ -243,7 +246,8 @@ function decodeReceiptRow(value: unknown): ReceiptRow | null {
  */
 export function deleteReceiptsOf(db: DatabaseSync, commandIds: readonly string[]): void {
   if (commandIds.length === 0) return;
-  const deleteReceipt = db.prepare(
+  const deleteReceipt = cachedStatement(
+    db,
     `DELETE FROM orchestration_command_receipts
      WHERE command_id = ?
        AND NOT EXISTS (SELECT 1 FROM orchestration_events WHERE command_id = ?)`,

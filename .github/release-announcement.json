@@ -1,10 +1,10 @@
 {
-  "version": "0.72.0",
+  "version": "0.73.0",
   "highlights": [
-    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
-    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
-    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
-    "Answer an agent in the agent dock chat without the main window.",
-    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
+    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
+    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
+    "Edit one workflow together with other people at the same time.",
+    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
+    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
   ]
 }
