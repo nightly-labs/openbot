@@ -1,7 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { plainTaskTitle } from "@openbot/team-client/agent-tasks";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -12,6 +11,7 @@ import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -75,16 +75,15 @@ export function NewTaskScreen() {
     pending.current = true;
     setSaving(true);
     setError(null);
+    const attempt = taskStartId(serverId, chosen.id, draft);
     try {
-      const task = await startAgentTask(
-        { agentId: chosen.id, text: draft, clientMessageId: Crypto.randomUUID() },
-        serverId,
-      );
+      const task = await startAgentTask({ agentId: chosen.id, text: draft, clientMessageId: attempt.id }, serverId);
       // The task shows before its list event arrives.
       addStartedTask(queryClient, queryScope, serverId, task);
       void haptics.notification("success");
       setFinished(true);
     } catch (cause) {
+      attempt.failed();
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.server.threads.error.start")));
       pending.current = false;

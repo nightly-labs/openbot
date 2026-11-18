@@ -91,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "La mise à jour de l’environnement d’exécution ne s’est pas terminée.",
   "error.provider.downloadHttp": "Le téléchargement de l’environnement d’exécution a échoué avec HTTP {status}.",
   "error.provider.downloadNoData": "Le téléchargement de l’environnement d’exécution n’a renvoyé aucune donnée.",
+  "error.provider.downloadStalled":
+    "Le téléchargement s'est arrêté, car aucune donnée n'est arrivée pendant une minute. Vérifiez la connexion Internet, puis réessayez.",
   "error.provider.downloadSize": "Le téléchargement de l’environnement d’exécution a une taille inattendue.",
   "error.provider.downloadIntegrity":
     "Le téléchargement de l’environnement d’exécution a échoué au contrôle d’intégrité.",
@@ -191,6 +193,8 @@ export const messages = {
     "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. OpenBot va réessayer.",
   "error.provider.cliTimedOutRefresh":
     "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. Actualisez les fournisseurs pour réessayer.",
+  "error.provider.stoppedBeforeStart":
+    "{provider} s’est arrêté avant le début de ce message. Envoyez de nouveau le message.",
   "error.provider.serviceUnreachable":
     "{provider} ne parvient pas à se connecter à son service. Vérifiez votre connexion internet. OpenBot va réessayer.",
   "error.provider.serviceUnreachableRefresh":
@@ -201,6 +205,8 @@ export const messages = {
     "{provider} n’a pas listé ses modèles en {seconds} s. L’ordinateur est peut-être occupé.",
   "error.provider.startStopped":
     "{provider} n’a pas démarré plusieurs fois de suite, OpenBot a donc arrêté d’essayer. Actualisez les fournisseurs pour réessayer.",
+  "error.provider.startPaused":
+    "{provider} n’a pas démarré plusieurs fois de suite. OpenBot réessaiera au prochain message ou à la prochaine routine. Pour réessayer maintenant, actualisez les fournisseurs.",
   "error.provider.tempDiskSpace":
     "{provider} a besoin d’au moins 1 Go d’espace disque libre pour démarrer. Libérez de l’espace, puis actualisez les fournisseurs.",
   "error.provider.noCodeSignIn": "{provider} ne permet pas de se connecter avec un code.",
@@ -239,6 +245,8 @@ export const messages = {
     "OpenCode a refusé ce modèle gratuit. Certains modèles gratuits ne sont pas disponibles dans tous les pays. Choisissez un autre modèle avec l’étiquette Gratuit, ou collez une clé OpenCode Go dans les réglages d’OpenCode et choisissez un modèle OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Le point de terminaison « {provider} » a refusé sa clé d’API ou ses en-têtes. Saisissez-les de nouveau dans Réglages du serveur → Fournisseurs, puis réessayez.",
+  "error.provider.customEndpointAccessRefused":
+    "Le point de terminaison « {provider} » a refusé la requête. Sa clé d’API ou ses en-têtes sont peut-être incorrects, ou son compte ne peut pas utiliser ce modèle. Vérifiez-les dans Réglages du serveur → Fournisseurs, ou choisissez un autre modèle. Puis réessayez.",
   "error.provider.customEndpointKeyMissing":
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.opencodeKeyExpired":
@@ -255,6 +263,8 @@ export const messages = {
     "Le fournisseur de modèles d’OpenCode a signalé une demande d’envoi non valide. Choisissez un autre modèle et continuez. Vérifiez les routines enregistrées avant de les créer à nouveau.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Envoyez à nouveau votre message sans le fichier, ou choisissez un modèle qui sait lire les fichiers. Si vous avez ajouté ce modèle à un fournisseur personnalisé, décochez « Images » dans « Accepte » dans ses réglages.",
+  "error.provider.opencodeOutOfMemory":
+    "Le serveur du modèle manque de mémoire pour cette conversation. Commencez une nouvelle conversation, ou chargez le modèle avec un contexte plus court, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "Cette conversation ne tient pas dans la fenêtre de contexte du modèle. Dans Ollama ou LM Studio, chargez le modèle avec un contexte plus long, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot. Ou choisissez un modèle plus grand.",
   "error.provider.opencodeFreeLimit":
@@ -267,6 +277,8 @@ export const messages = {
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode n'a pas pu lire le raisonnement de ce modèle avec cet effort. Sélectionnez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
+  "error.provider.opencodeModelNotServed":
+    "Le fournisseur du modèle ne propose pas ce modèle à votre compte pour le moment. Choisissez un autre modèle, puis renvoyez votre message.",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":
@@ -285,6 +297,9 @@ export const messages = {
     "Le modèle OpenCode a terminé le tour après son raisonnement, sans réponse. Réessayez ou choisissez un autre modèle.",
   "error.provider.acpNoAnswer":
     "{provider} a terminé le tour sans réponse. Renvoyez le message ou démarrez une nouvelle discussion.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
+  "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",
   "error.provider.chatgptPageFailed": "OpenBot n’a pas pu ouvrir la page de connexion ChatGPT.",
   "error.provider.noneReady": "Aucun fournisseur d’agent n’est prêt.",
   "error.provider.claudeTurnActive": "Attendez la fin du tour Claude actif avant d’actualiser son contexte.",
@@ -316,6 +331,7 @@ export const messages = {
     "Google n’a pas accepté la connexion Gemini pour cette requête. Renvoyez votre message. Si l’erreur continue, reconnectez Gemini dans les réglages.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini a perdu la connexion à Google. Renvoyez votre message. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini a refusé cette requête sans en donner la cause. Un élément de l’historique de la conversation peut en être la cause, comme une image que l’agent a ouverte. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle.",
   "error.provider.antigravityHistoryUnreadable":
@@ -337,6 +353,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "L’agent Cursor a été trouvé, mais sa version est illisible.",
   "error.provider.cursorVersionUnreadable": "Impossible de lire la version de l’agent Cursor.",
   "error.provider.cursorSignIn": "Connectez-vous avec Cursor ou définissez CURSOR_API_KEY pour utiliser Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor n’a pas pu se connecter à son serveur avec votre connexion. Vérifiez votre connexion Internet, puis reconnectez-vous à Cursor.",
   "error.provider.clineArchivePath": "L’archive Cline contient un chemin inattendu.",
   "error.provider.clinePackageMismatch":
     "Le paquet Cline ne correspond pas au catalogue des environnements d’exécution.",
@@ -379,6 +397,8 @@ export const messages = {
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.claudeApiKeyNoCredit":
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
+  "error.provider.claudeAccountNoCredit":
+    "Le solde de crédits de votre compte Claude est trop bas. Certaines requêtes, comme le mode rapide, utilisent des crédits d’utilisation même si votre forfait Claude n’est pas épuisé. Ajoutez des crédits dans votre compte Claude, ou choisissez un autre modèle dans le menu des modèles de l’agent.",
   "error.provider.claudeServiceBlocked":
     "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":
@@ -387,6 +407,8 @@ export const messages = {
     "Codex n’a pas pu continuer cette conversation, car un élément manque dans son historique enregistré. OpenBot a ouvert une nouvelle session Codex avec l’historique de la conversation. Réessayez.",
   "error.provider.codexRequestRefused":
     "{provider} a refusé la requête de ce chat sans en donner la cause. Cela peut arriver dans un long chat avec beaucoup d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.codexAudioRefused":
+    "Le modèle n'a pas accepté l'audio de ce chat. OpenBot a démarré une nouvelle session Codex avec l'historique du chat. Réessayez.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooLarge":
@@ -516,6 +538,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossible de lire la version de la CLI {provider}.",
   "error.provider.piSessionBusy": "Attendez la fin du tour Pi en cours.",
   "error.provider.acpSessionBusy": "{provider} termine encore un tour arrêté. Réessayez dans un instant.",
+  "error.provider.acpModelNotOffered":
+    "{provider} ne propose pas {model} pour le moment. Choisissez un autre modèle pour cet agent, puis réessayez.",
   "error.provider.piStopped": "Pi n’est pas en cours d’exécution. Connectez Pi et réessayez.",
   "error.provider.piSessionMissing": "Le fichier de session Pi n’est pas disponible sur cet ordinateur.",
   "error.provider.piResumeCancelled": "Pi a annulé la reprise de la session. Réessayez.",

@@ -314,12 +314,18 @@ export class CuaDriverRuntime {
   readonly #tap: CuaDriverActionTap;
   /** What the last check read from the driver. See `waylandInputRefused`. */
   #waylandInputRefused = false;
+  /**
+   * macOS refused an Accessibility call although the check said that both grants are in place
+   * (#10658). The check cannot see this, so the answer stays until OpenBot restarts.
+   */
+  #restartRequired = false;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
     this.#spawn = options.spawnProcess ?? nodeSpawn;
     this.#executable = options.executable;
     this.#tap = options.actionTap ?? new CuaDriverActionTap();
+    this.#tap.onAccessibilityRefused(() => this.#requireRestart());
     this.#state = initialState(options.platform, options.supported, options.executable);
   }
 
@@ -518,7 +524,13 @@ export class CuaDriverRuntime {
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),
     );
-    const state = this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    const state = this.#publish(
+      !granted
+        ? { status: "permissions-required", permissions, message: null }
+        : this.#restartRequired
+          ? restartRequiredState(permissions)
+          : { status: "ready", permissions, message: null },
+    );
     // macOS keeps a "not granted" answer for the life of the process that asked (#7937), so this
     // daemon would not see a grant the user gives now. The next check starts a new one. The stop
     // comes after the publish, which has already taken the entry back from the agents.
@@ -728,6 +740,19 @@ export class CuaDriverRuntime {
     return alias;
   });
 
+  /**
+   * Takes the tools back from the agents and asks the user to restart OpenBot.
+   *
+   * The upstream driver guide says that the host must be relaunched after its Accessibility grant
+   * changes. A new daemon is not enough: it is started by the same OpenBot process.
+   */
+  #requireRestart(): void {
+    if (this.#restartRequired) return;
+    this.#restartRequired = true;
+    this.#options.onDiagnostic?.("OpenBot: macOS refused Accessibility to Computer Use (AXError -25211).\n");
+    if (this.#state.status === "ready") this.#publish(restartRequiredState(this.#state.permissions));
+  }
+
   #announceMcpServer(): void {
     const config = this.mcpServerForProviders();
     const announced = config ? [config.command, ...config.args].join(" ") : "";
@@ -789,6 +814,11 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
     };
   }
   return { status: "permissions-required", permissions: ungranted(platform), message: null };
+}
+
+/** The panel writes its own steps for this status, so the state carries no message. */
+function restartRequiredState(permissions: readonly ComputerUsePermission[]): ComputerUseState {
+  return { status: "restart-required", permissions, message: null };
 }
 
 function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {

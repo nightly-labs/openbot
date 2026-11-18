@@ -1,6 +1,6 @@
-import * as Application from "expo-application";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
+import { nativeApplication } from "@/shared/lib/native-application";
 
 export type PushEnvironment = "production" | "development";
 
@@ -37,7 +37,7 @@ async function readPushEnvironment(): Promise<PushEnvironment> {
   if (Platform.OS !== "ios") return fallback();
   try {
     // `null` when the app has no profile: an App Store or TestFlight build, or the simulator.
-    return (await Application.getIosPushNotificationServiceEnvironmentAsync()) ?? fallback();
+    return (await nativeApplication?.getIosPushNotificationServiceEnvironmentAsync()) ?? fallback();
   } catch {
     return fallback();
   }

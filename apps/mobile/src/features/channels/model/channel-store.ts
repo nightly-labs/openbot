@@ -58,6 +58,34 @@ export interface ChannelState {
   /** The last load failure. A screen renders it in the interface language. */
   error: { cause: unknown } | null;
 }
+/** The fields of a channel state other than the list and the pages. */
+type ChannelFlags = Omit<ChannelState, "channels" | "pages">;
+const FLAG_KEYS: readonly (keyof ChannelFlags)[] = [
+  "supported",
+  "canDelete",
+  "canCancelTasks",
+  "canSetPicture",
+  "canUseContextActions",
+  "loading",
+  "listed",
+  "error",
+];
+function sameFlags(a: ChannelFlags, b: ChannelFlags) {
+  return FLAG_KEYS.every((key) => a[key] === b[key]);
+}
+/**
+ * One channel of a server: its list row, its loaded page and the server flags. The store gives the same
+ * object while these stay the same, so a change to another channel does not render an open channel again.
+ */
+export interface ChannelView extends ChannelFlags {
+  summary: ChannelSummary | undefined;
+  page: ChannelPage | undefined;
+}
+/**
+ * The shortest time between two reads that host change events start. A streamed reply sends an event
+ * on each flush, so a burst of events gives one read now and one read at the end of the time.
+ */
+const CHANGE_READ_INTERVAL_MS = 250;
 const EMPTY: ChannelState = {
   channels: [],
   pages: new Map(),
@@ -80,17 +108,29 @@ interface Entry {
   valid: boolean;
   writes: number;
   historyWaiters: Map<string, Set<(success: boolean) => void>>;
+  views: Map<string, ChannelView>;
+  /** The trailing read of host change events, while one waits for its time. */
+  changeTimer: ReturnType<typeof setTimeout> | null;
+  changeReadAt: number;
+  /** A change event came while the app was active, and its read did not start before the app stopped. */
+  changeMissed: boolean;
 }
 
 export class ChannelHistoryRefreshError extends Error {}
 
-/** Channel events are invalidations. Keep one read in flight and one trailing read per host. */
+/**
+ * Channel events are invalidations. Keep one read in flight and one trailing read per host. Host change
+ * events also start at most one read in each `CHANGE_READ_INTERVAL_MS`.
+ */
 export class MobileChannelStore {
   private entries = new Map<string, Entry>();
   private listeners = new Map<string, Set<() => void>>();
   private active = true;
   setActive(active: boolean) {
     this.active = active;
+    if (!active) return;
+    // A change that came before the app stopped is read now, so the page is not older than the last event.
+    for (const [serverId, entry] of this.entries) if (entry.changeMissed) this.readChanges(serverId, entry);
   }
   retainServers(ids: string[]) {
     const available = new Set(ids);
@@ -116,6 +156,10 @@ export class MobileChannelStore {
         valid: true,
         writes: 0,
         historyWaiters: new Map(),
+        views: new Map(),
+        changeTimer: null,
+        changeReadAt: 0,
+        changeMissed: false,
       };
       this.entries.set(serverId, entry);
     }
@@ -123,6 +167,10 @@ export class MobileChannelStore {
   }
   get(serverId: string) {
     return this.entry(serverId).state;
+  }
+  /** The state of a server, or `undefined` when the store has none. It does not make an entry. */
+  peek(serverId: string): ChannelState | undefined {
+    return this.entries.get(serverId)?.state;
   }
   /**
    * The state once the host list has loaded or failed, or after `timeoutMs` with what the phone has.
@@ -151,21 +199,22 @@ export class MobileChannelStore {
       entry.listeners.delete(listener);
     };
   }
+  /** The state of one channel. The object stays the same until its row, its page or a flag changes. */
+  channelView(serverId: string, channelId: string): ChannelView {
+    const entry = this.entry(serverId);
+    const { channels, pages, ...flags } = entry.state;
+    const summary = channels.find((channel) => channel.id === channelId);
+    const page = pages.get(channelId);
+    const cached = entry.views.get(channelId);
+    if (cached && cached.summary === summary && cached.page === page && sameFlags(cached, flags)) return cached;
+    const view = { ...flags, summary, page };
+    entry.views.set(channelId, view);
+    return view;
+  }
   private publish(entry: Entry, patch: Partial<ChannelState>) {
     if (!entry.valid) return;
     const next = { ...entry.state, ...patch };
-    if (
-      next.channels === entry.state.channels &&
-      next.pages === entry.state.pages &&
-      next.supported === entry.state.supported &&
-      next.canDelete === entry.state.canDelete &&
-      next.canCancelTasks === entry.state.canCancelTasks &&
-      next.canSetPicture === entry.state.canSetPicture &&
-      next.canUseContextActions === entry.state.canUseContextActions &&
-      next.loading === entry.state.loading &&
-      next.listed === entry.state.listed &&
-      next.error === entry.state.error
-    )
+    if (next.channels === entry.state.channels && next.pages === entry.state.pages && sameFlags(next, entry.state))
       return;
     entry.state = next;
     for (const listener of entry.listeners) listener();
@@ -220,6 +269,8 @@ export class MobileChannelStore {
     if (!entry) return;
     this.publish(entry, EMPTY);
     entry.valid = false;
+    if (entry.changeTimer) clearTimeout(entry.changeTimer);
+    entry.changeTimer = null;
     for (const id of entry.historyWaiters.keys()) this.finishHistory(entry, id, false);
     this.entries.delete(serverId);
   }
@@ -235,6 +286,8 @@ export class MobileChannelStore {
       if (count) entry.observed.set(channelId, count);
       else {
         entry.observed.delete(channelId);
+        // The kept view holds the full page. Without a screen it goes, so the trimmed page is all that stays.
+        entry.views.delete(channelId);
         // Match single chats: keep short windows for reopening while offline.
         if ((entry.state.pages.get(channelId)?.messages.length ?? 0) > 50) {
           const pages = new Map(entry.state.pages);
@@ -248,12 +301,46 @@ export class MobileChannelStore {
       }
     };
   }
+  /**
+   * A host event says that a channel changed. The event has no data of the change, so the store reads the
+   * list and the page of that channel, if a screen shows it. A burst of events starts one read at once and
+   * one trailing read. The trailing read starts after the last event, so no change is lost.
+   */
+  changed(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    if (!this.active || !entry.state.supported) return;
+    if (entry.observed.has(channelId)) entry.readChannels.add(channelId);
+    if (entry.changeTimer) return;
+    const wait = entry.changeReadAt + CHANGE_READ_INTERVAL_MS - Date.now();
+    if (wait <= 0) {
+      this.readChanges(serverId, entry);
+      return;
+    }
+    entry.changeTimer = setTimeout(() => {
+      entry.changeTimer = null;
+      if (entry.valid) this.readChanges(serverId, entry);
+    }, wait);
+  }
+  private readChanges(serverId: string, entry: Entry) {
+    if (!this.active) {
+      entry.changeMissed = true;
+      return;
+    }
+    entry.changeMissed = false;
+    if (!entry.state.supported) return;
+    entry.changeReadAt = Date.now();
+    void this.read(serverId, entry);
+  }
   refresh(serverId: string, channelId?: string): Promise<void> {
     const entry = this.entry(serverId);
     if (!this.active || !entry.state.supported) return Promise.resolve();
     for (const id of entry.observed.keys()) {
       if (!channelId || channelId === id) entry.readChannels.add(id);
     }
+    return this.read(serverId, entry);
+  }
+  /** Reads the list and the pages in `readChannels`. A read in flight takes a request as one trailing read. */
+  private read(serverId: string, entry: Entry): Promise<void> {
     if (entry.pending) {
       entry.dirty = true;
       return entry.pending;

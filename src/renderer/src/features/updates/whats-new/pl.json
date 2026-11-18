@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Po zainstalowaniu tej wersji nie będziesz mógł wrócić do starszej wersji OpenBot na tym komputerze lub serwerze. Ta wersja zmniejsza bazę danych, a starsza wersja nie może jej otworzyć.",
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze niestandardowe rozmiary obrazów, modele i ceny Sunra oraz Higgsfield, a także szybsze ładowanie wielu agentów działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zobacz wątki boczne każdego agenta na pasku bocznym. Wybierz strzałkę na końcu wiersza agenta albo trzymaj wskaźnik nad wierszem, aby zobaczyć wszystkie jego wątki.",
+          "Filtruj pasek boczny przyciskiem filtra na końcu pola wyszukiwania. Pokaż tylko agentów lub kanały, tylko nieprzeczytane czaty albo agentów w pracy, albo tylko czaty w wybranych folderach.",
+          "Nadaj krokowi obrazu na kanwie przepływu pracy własny rozmiar w pikselach albo użyj proporcji 4:5 lub 5:4.",
+          "Kanwa przepływu pracy pokazuje wszystkie modele obrazów i wideo Sunra oraz Higgsfield, a przycisk Uruchom pokazuje cenę w kredytach.",
+          "Wyłącz Rozmycie tła i Ruchome twarze agentów w Ustawienia → Wygląd → Ruch, aby OpenBot działał szybciej na wolnym komputerze."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kilka osób może jednocześnie edytować jeden przepływ pracy. Kanwa dodaje zmiany innych osób, gdy je zapisują.",
+          "OpenBot zużywa dużo mniej CPU, gdy pracuje wielu agentów, a ty możesz pisać bez opóźnień.",
+          "Agenci kończą płatność, gdy bank prosi o kod 3-D Secure. Gdy kod jest w e-mailu lub SMS-ie, który agent może odczytać, agent go wpisuje.",
+          "Ustawienia serwera → Przeniesienie → Kopiuj na inny serwer kopiuje teraz także przepływy pracy i przepływy rutyn agentów."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Baza danych OpenBot zajmuje dużo mniej miejsca. Po aktualizacji OpenBot w małych krokach usuwa stare kopie wiadomości czatu.",
+          "W systemie Windows aktualizacja znów pokazuje postęp.",
+          "Serwer, do którego dołączyłeś, z wieloma agentami oraz duży kanał otwierają się szybciej.",
+          "Czaty Gemini z dużą liczbą obrazów lub długą historią nie przestają działać, a Gemini nie prosi już o ponowne logowanie, gdy zaczyna się nowy czat.",
+          "Aplikacja na komputer znów łączy się z serwerem z OpenBot v0.34.1 lub starszym."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

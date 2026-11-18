@@ -17,6 +17,8 @@ export const messages = defineMessages("error.messaging", {
   "error.messaging.telegramUnsupported": "This computer cannot connect to Telegram.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot cannot reach Telegram on this computer. Sign in, give this computer a name, and try again.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot cannot connect to its service from this computer. Check the internet connection, VPN, proxy, or firewall, and try again.",
   "error.messaging.telegramServiceUnavailable": "OpenBot cannot connect Telegram now. Try again later.",
   // Errors of a linked WhatsApp number, which the host sends.
   "error.messaging.whatsappNotConnected": "This WhatsApp number is not connected.",

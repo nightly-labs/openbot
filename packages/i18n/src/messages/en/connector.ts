@@ -497,7 +497,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "connector.whatsapp.add": "Add",
   "connector.whatsapp.groupTitle": "Add a group",
-  "connector.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "connector.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "connector.whatsapp.groupSearch": "Search groups",
   "connector.whatsapp.groupsLoading": "Reading the groups…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
@@ -660,9 +661,9 @@ export const messages = defineMessages("connector", {
   "connector.protonPass.expiredTitle": "The Proton Pass key expired",
   "connector.protonPass.expiredDescription": "Agents cannot sign in with your shared logins until you sign in again.",
   "connector.protonPass.reconnect": "Reconnect",
-  "connector.protonPass.planTitle": "Proton Pass needs a paid plan",
+  "connector.protonPass.planTitle": "Proton Pass needs a plan with Pass Plus",
   "connector.protonPass.planDescription":
-    "The Proton Pass CLI works only with a paid Proton plan. Change your plan, then connect again.",
+    "The Proton Pass CLI needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change your plan, then connect again.",
   "connector.protonPass.vaultTitle": "Shared vault",
   "connector.protonPass.vaultDescription":
     "Agents can sign in with the logins in this vault. Move a login into it to share it.",

@@ -10,6 +10,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -196,6 +197,7 @@ export function LargeTitleBar({
   insetRight = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   surface = "canvas",
   blurTarget,
+  androidSurfaceWithTitle = false,
   children,
 }: PropsWithChildren<{
   scroll: LargeTitleScroll;
@@ -207,6 +209,12 @@ export function LargeTitleBar({
   surface?: "canvas" | "sheet";
   /** Android: the scrolling content, in an `AndroidBlurTarget`, that blurs under the bar. */
   blurTarget?: RefObject<ViewInstance | null>;
+  /**
+   * Android: the bar surface (the blur, or the solid bar) comes in step by step, with the scroll, while
+   * the big title fades out under the bar, so the small title always reads over it. Before that the
+   * bar has no surface, such as over the backdrop of Home. Off, the surface always shows.
+   */
+  androidSurfaceWithTitle?: boolean;
 }>) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
@@ -231,6 +239,20 @@ export function LargeTitleBar({
   const androidFadeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrolled.get(), [0, ANDROID_FADE], [0, 1], Extrapolation.CLAMP),
   }));
+  // With `androidSurfaceWithTitle`, the bar surface comes in over the same 24 pt of scroll in which the
+  // big title fades out under the bar, so the small title has its surface when it shows. Else it is full.
+  const surfaceProgress = useDerivedValue(() => {
+    if (!androidSurfaceWithTitle) return 1;
+    const height = titleHeight.get();
+    if (height <= 0) return 0;
+    return interpolate(
+      scrolled.get(),
+      [height - TITLE_BOTTOM_PADDING - TITLE_FADE, height - TITLE_BOTTOM_PADDING],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+  }, [androidSurfaceWithTitle]);
+  const solidBarStyle = useAnimatedStyle(() => ({ opacity: surfaceProgress.get() }));
   // The scroll crosses the line on the UI thread; React learns of it only at the crossing. React then
   // owns the style, so a later render cannot put back a stale first-render opacity.
   useAnimatedReaction(
@@ -245,9 +267,21 @@ export function LargeTitleBar({
   return (
     <>
       {isAndroid && ANDROID_BLUR && blurTarget ? (
-        <AndroidHeaderBlur target={blurTarget} height={scroll.headerHeight} surface={surface} shape="screen" />
+        <AndroidHeaderBlur
+          target={blurTarget}
+          height={scroll.headerHeight}
+          surface={surface}
+          shape="screen"
+          progress={surfaceProgress}
+        />
       ) : isAndroid ? (
-        <>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            { position: "absolute", top: 0, left: 0, right: 0, height: scroll.headerHeight + ANDROID_FADE },
+            solidBarStyle,
+          ]}
+        >
           <View
             pointerEvents="none"
             className={surface === "sheet" ? "bg-sheet" : "bg-background"}
@@ -262,7 +296,7 @@ export function LargeTitleBar({
           >
             <SheetScrollEdgeEffect surface={surface} style={{ flex: 1 }} />
           </Animated.View>
-        </>
+        </Animated.View>
       ) : (
         <SheetScrollEdgeEffect
           surface={surface}
@@ -313,12 +347,27 @@ export function LargeTitleBar({
   );
 }
 
+/** The props of the scroll view of a large-title page: its side insets, its header clearance and its scroll handler. */
+export interface LargeTitleScrollProps {
+  className: string;
+  style: { marginLeft: number; marginRight: number };
+  alwaysBounceVertical: boolean;
+  contentInsetAdjustmentBehavior: "never" | "always";
+  contentContainerClassName: string;
+  contentContainerStyle: { paddingTop: number } | undefined;
+  keyboardShouldPersistTaps: "handled";
+  scrollEventThrottle: number;
+  showsVerticalScrollIndicator: boolean;
+  onScroll: LargeTitleScroll["onScroll"];
+}
+
 /** A full screen of grouped content under a big header, such as Routines and Usage. */
 export function LargeTitleScrollView({
   title,
   caption,
   contentContainerClassName,
   barButtonsRight = 1,
+  renderScroll,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -326,31 +375,42 @@ export function LargeTitleScrollView({
   contentContainerClassName?: string;
   /** The number of bar buttons at the right: the small title stops before them. */
   barButtonsRight?: number;
+  /**
+   * Draws another scroll view, such as a virtualized list, in place of the scroll view. It gets the props
+   * of the scroll view and the big title, which goes first in its content. `children` are then not used.
+   */
+  renderScroll?: (scrollProps: LargeTitleScrollProps, largeTitle: ReactNode) => ReactNode;
 }>) {
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
   const blurTarget = useRef<ViewInstance>(null);
+  const scrollProps: LargeTitleScrollProps = {
+    className: "flex-1",
+    // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
+    // `always`, iOS would also inset the content by them, and the content would go off the other side.
+    style: { marginLeft: insets.left, marginRight: insets.right },
+    alwaysBounceVertical: false,
+    contentInsetAdjustmentBehavior: scroll.ownsInset ? "never" : "always",
+    contentContainerClassName: "pb-safe-offset-5",
+    // Without a content inset from iOS, the content starts below the transparent header.
+    contentContainerStyle: scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined,
+    keyboardShouldPersistTaps: "handled",
+    scrollEventThrottle: 16,
+    showsVerticalScrollIndicator: false,
+    onScroll: scroll.onScroll,
+  };
+  const largeTitle = <LargeTitle scroll={scroll} title={title} caption={caption} />;
   return (
     <View className="flex-1 bg-sheet">
       <AndroidBlurTarget target={blurTarget} surface="sheet">
-        <Animated.ScrollView
-          className="flex-1"
-          // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
-          // `always`, iOS would also inset the content by them, and the content would go off the other side.
-          style={{ marginLeft: insets.left, marginRight: insets.right }}
-          alwaysBounceVertical={false}
-          contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-          contentContainerClassName="pb-safe-offset-5"
-          // Without a content inset from iOS, the content starts below the transparent header.
-          contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          onScroll={scroll.onScroll}
-        >
-          <LargeTitle scroll={scroll} title={title} caption={caption} />
-          <View className={contentContainerClassName}>{children}</View>
-        </Animated.ScrollView>
+        {renderScroll ? (
+          renderScroll(scrollProps, largeTitle)
+        ) : (
+          <Animated.ScrollView {...scrollProps}>
+            {largeTitle}
+            <View className={contentContainerClassName}>{children}</View>
+          </Animated.ScrollView>
+        )}
       </AndroidBlurTarget>
       <LargeTitleBar
         scroll={scroll}

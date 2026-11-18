@@ -36,6 +36,50 @@ index fde44fface4d5a2a64aac6e4a3a8acdc14fca0f1..604d621b9f9a068269ed13a55889798d
  }
  //# sourceMappingURL=fabricUtils.native.js.map
 \ No newline at end of file
+diff --git a/lib/module/mutables.native.js b/lib/module/mutables.native.js
+index 79e05ce357a48364aeca4ac0c148b35f19583396..2438195b04076db420f9c8c6adfc4585a184829d 100644
+--- a/lib/module/mutables.native.js
++++ b/lib/module/mutables.native.js
+@@ -2,6 +2,17 @@
+ 
+ import { createShareable, createSynchronizable, runOnUISync, scheduleOnUI, UIRuntimeId } from 'react-native-worklets';
+ import { checkInvalidReadDuringRender, checkInvalidWriteDuringRender, mutableHostDecorator } from "./mutablesCommon.js";
++// OpenBot patch: see src/mutables.native.ts.
++function assignOnUI(mutable, newValue) {
++  'worklet';
++
++  mutable.value = newValue;
++}
++function modifyOnUI(mutable, modifier, forceUpdate) {
++  'worklet';
++
++  mutable.modify(modifier, forceUpdate);
++}
+ function mutableGuestDecorator(initial, mutable, dirtyFlag) {
+   'worklet';
+ 
+@@ -26,9 +37,7 @@ function mutableGuestDecorator(initial, mutable, dirtyFlag) {
+       set(newValue) {
+         if (globalThis.__RUNTIME_KIND === 1) {
+           checkInvalidWriteDuringRender();
+-          scheduleOnUI(() => {
+-            mutable.value = newValue;
+-          });
++          scheduleOnUI(assignOnUI, mutable, newValue);
+         } else {
+           mutable.setAsync(newValue);
+         }
+@@ -64,9 +73,7 @@ function mutableGuestDecorator(initial, mutable, dirtyFlag) {
+     },
+     modify: {
+       value: (modifier, forceUpdate = true) => {
+-        scheduleOnUI(() => {
+-          mutable.modify(modifier, forceUpdate);
+-        });
++        scheduleOnUI(modifyOnUI, mutable, modifier, forceUpdate);
+       },
+       writable: true,
+       enumerable: true,
 diff --git a/src/fabricUtils.native.ts b/src/fabricUtils.native.ts
 index 4d478fc28a8035ae2f43eef2caf4873c600910a5..58e6a2d66f65e045f6511861ceb044cc63ea6232 100644
 --- a/src/fabricUtils.native.ts
@@ -51,6 +95,62 @@ index 4d478fc28a8035ae2f43eef2caf4873c600910a5..58e6a2d66f65e045f6511861ceb044cc
 +    ? detachShadowNodeWrapper(shadowNodeWrapper)
 +    : shadowNodeWrapper;
  }
+diff --git a/src/mutables.native.ts b/src/mutables.native.ts
+index 79d2ea3df0b57d2285089cdec07a6cf6217daf60..26c685421295aacfbb85a6bbc92307bcc348a2a0 100644
+--- a/src/mutables.native.ts
++++ b/src/mutables.native.ts
+@@ -19,6 +19,24 @@ import {
+   mutableHostDecorator,
+ } from './mutablesCommon';
+ 
++// OpenBot patch: writes from the RN runtime use these module worklets and send the value as an
++// argument. A new closure for each write was a retaining worklet: the UI runtime kept it, with the
++// value it captured, until the RN runtime collected the closure. Skia images and pictures stayed
++// counted at full size on the UI heap, and Hermes stopped the app at its heap limit.
++function assignOnUI<TValue>(mutable: Mutable<TValue>, newValue: TValue) {
++  'worklet';
++  mutable.value = newValue;
++}
++
++function modifyOnUI<TValue>(
++  mutable: Mutable<TValue>,
++  modifier: (value: TValue) => TValue,
++  forceUpdate: boolean
++) {
++  'worklet';
++  mutable.modify(modifier, forceUpdate);
++}
++
+ function mutableGuestDecorator<TValue>(
+   initial: TValue,
+   mutable: ShareableGuest<TValue> & Mutable<TValue>,
+@@ -48,9 +66,7 @@ function mutableGuestDecorator<TValue>(
+       set(newValue) {
+         if (globalThis.__RUNTIME_KIND === 1) {
+           checkInvalidWriteDuringRender();
+-          scheduleOnUI(() => {
+-            mutable.value = newValue;
+-          });
++          scheduleOnUI(assignOnUI, mutable as Mutable<TValue>, newValue);
+         } else {
+           mutable.setAsync(newValue);
+         }
+@@ -99,9 +115,12 @@ function mutableGuestDecorator<TValue>(
+ 
+     modify: {
+       value: (modifier: (value: TValue) => TValue, forceUpdate = true) => {
+-        scheduleOnUI(() => {
+-          mutable.modify(modifier, forceUpdate);
+-        });
++        scheduleOnUI(
++          modifyOnUI,
++          mutable as Mutable<TValue>,
++          modifier,
++          forceUpdate
++        );
+       },
+       writable: true,
+       enumerable: true,
 diff --git a/src/privateGlobals.d.ts b/src/privateGlobals.d.ts
 index 60a468aff33de26b7b87ff3714e8926f805afe21..042bc783572fc4c270ac98d6e24c46a6f6169e13 100644
 --- a/src/privateGlobals.d.ts

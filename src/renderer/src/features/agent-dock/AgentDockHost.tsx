@@ -1,3 +1,4 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -41,7 +42,7 @@ import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-or
 import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -55,6 +56,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import {
   channelConversationRows,
   channelMessageHasContent,
+  channelWorkingTurns,
   sentChannelMessageId,
 } from "../channels/channel-conversation-rows";
 import { useChannels } from "../channels/channels-context";
@@ -62,6 +64,7 @@ import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
+import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -167,7 +170,8 @@ export function AgentDockHost() {
 
 /** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
-  const { agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } = useAgents();
+  const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
+    useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
     useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
@@ -383,9 +387,20 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn);
+    return withStepAnswers(
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      new Set(channelWorkingTurns(page, new Set())),
+      (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
+    );
   });
-  const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
+  const agentMessages = (agentId: string): AgentMessage[] => {
+    const running = workingTurns()[agentId];
+    return withStepAnswers(
+      (conversations[agentId]?.messages ?? []).map(asOwn),
+      new Set(running ? [running] : []),
+      () => agentList().find((agent) => agent.id === agentId)?.provider,
+    );
+  };
 
   /* The answers that failed, by request. A failure shows the card's controls again. */
   const [failedAnswers, setFailedAnswers] = createSignal<Record<string, number>>({});
@@ -559,6 +574,32 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!open?.latest || !readable()) return;
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
+    },
+  );
+  /* A joined server that connects again, as after its restart, sends only the newest reply of each agent.
+     The main window reads its open agent's latest page again. Each other agent chat that the dock loaded
+     reads its page here, or the messages from the time without a connection stay missing (#11748). A second
+     read of the open agent would replace the main window's read, which then keeps its loading state. */
+  let connectedSequence: number | undefined;
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.state === "online" ? server.connectionSequence : undefined;
+    },
+    (sequence) => {
+      if (sequence === undefined || sequence === connectedSequence) return;
+      const reconnected = connectedSequence !== undefined;
+      connectedSequence = sequence;
+      if (!reconnected) return;
+      const loaded = untrack(() =>
+        seats().flatMap((seat) =>
+          seat.kind === "agent" && seat.agent.id !== activeAgentId() && conversations[seat.agent.id]?.messages?.length
+            ? [seat.agent.id]
+            : [],
+        ),
+      );
+      // A failed read keeps the chat as it is; the next change of the agent's chat reads it again.
+      for (const agentId of loaded) void loadLatestAgentMessages(agentId).catch(() => undefined);
     },
   );
   /* A channel is read through the newest message of its page, once for each new message. */
@@ -958,6 +999,7 @@ function dockAgent(agent: ComposerAgent): AgentDockAgent {
     avatarHue: agent.avatarHue ?? null,
     avatarColor: agent.avatarColor ?? null,
     avatarUrl: agent.avatarUrl && agent.avatarUrl.length <= INPUT_LIMITS.avatarUrl ? agent.avatarUrl : null,
+    ...(agent.chatColor === undefined ? {} : { chatColor: agent.chatColor }),
   };
 }
 
@@ -1091,6 +1133,49 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
         previewUrl: attachment.previewUrl,
       })),
   };
+}
+
+/**
+ * The rows of a dock chat. A turn that ends on a tool call has no answer: its text stays in the turn's
+ * steps, which the dock does not show, so the chat showed only the reader's messages (#12030). Such a
+ * turn shows its last note to the reader as its answer, at the time of the note, as the main chat
+ * places it. A turn in `running` waits until it ends, so a note does not show and then go when the
+ * answer comes.
+ */
+function withStepAnswers(
+  messages: readonly AgentMessage[],
+  running: ReadonlySet<string>,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage[] {
+  const answered = new Set<string>();
+  for (const message of messages)
+    if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
+  const notes: AgentMessage[][] = [];
+  const rows = messages.flatMap((message) => {
+    const turnId = message.turnId;
+    if (message.kind !== "thinking" || message.streaming || !turnId || answered.has(turnId) || running.has(turnId))
+      return [message];
+    const note = stepNote(message, provider);
+    if (!note) return [message];
+    if (!note.createdAt) return [note];
+    notes.push([note]);
+    return [];
+  });
+  return notes.length > 0 ? placeTurnRowsByTime(rows, notes) : rows;
+}
+
+/** The note of each steps row. A row keeps its note while its steps stay, so the chat does not draw it again. */
+const stepNotes = new WeakMap<AgentMessage, { count: number; note: AgentMessage | undefined }>();
+function stepNote(
+  steps: AgentMessage,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage | undefined {
+  const count = steps.items?.length ?? 0;
+  const known = stepNotes.get(steps);
+  if (known?.count === count) return known.note;
+  const note = narrationRows(steps, provider(steps)).at(-1);
+  stepNotes.set(steps, { count, note });
+  return note;
 }
 
 /** The unread agent answers: from the first unread message, or the last `count` messages. */

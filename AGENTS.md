@@ -49,6 +49,9 @@ adding a module or moving ownership between workspaces.
   phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
   values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
   on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
+  (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
+  removal delete it too.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
@@ -190,7 +193,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
-- Migrations and the separate latest schema for new databases.
+- Migrations, which also build each new database.
 - Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 

@@ -294,6 +294,20 @@ export function servesCustomProvider(openCode: ProviderPickerOption | undefined)
   return openCode?.state === "available" || openCode?.state === "sign-in-required";
 }
 
+/**
+ * The OpenCode download that makes Add of a custom endpoint usable, while it is not. The onboarding
+ * picker and the Custom provider page of settings show it in place of Add (#9191).
+ */
+export function customEngineDownloadAction(
+  openCode: ProviderPickerOption | undefined,
+): "download" | "cancel" | "retry" | undefined {
+  const phase = openCode?.runtimeStatus?.phase;
+  if (phase === "not-downloaded") return "download";
+  if (phase === "downloading") return "cancel";
+  if (phase === "download-error") return "retry";
+  return undefined;
+}
+
 export type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting" | "update-available";
 
 export function providerStatusVariant(
@@ -317,7 +331,7 @@ export function providerStatusLabel(
   updatable = false,
 ): string {
   // Downloads outrank connection words; the row reports progress until it ends. An update that waits
-  // for the provider's turns to end has a message and no progress yet.
+  // for the provider's turns to end has a message, after its download.
   if (runtimeStatus?.phase === "downloading" && runtimeStatus.message)
     return translate("provider.status.updateWaiting");
   if (runtimeStatus?.phase === "downloading") {

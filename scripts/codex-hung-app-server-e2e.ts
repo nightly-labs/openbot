@@ -4,8 +4,9 @@
 // 1. Control: a process that does not answer `model/list`, as on a slow network, but answers the
 //    `config/read` probe, keeps running.
 // 2. A process that answers nothing is ended, with the error that says why.
-// 3. With an MCP server configured, a delivery that meets a hung process fails with the timeout
-//    message, not with the `config.toml` guidance. The runtime starts a new process, and the next turn runs.
+// 3. With an MCP server configured, a delivery that meets a hung process does not fail, and it does not
+//    get the `config.toml` guidance. Nothing ran, so it waits, and it runs on the new process that the
+//    runtime starts (#11843). The next turn runs on that process too.
 // `bun run test:codex-hung-app-server`. Writes .openbot-build/codex-hung-app-server-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -40,7 +41,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { decodeRecordResponse } = await import("../src/backend/protocol");
-const { providerLabel } = await import("../src/backend/agent/thread-items");
 
 // A Codex app-server whose behaviour the check sets for each process id in the modes file:
 // `slow` leaves `model/list` unanswered, and `hung` leaves every request unanswered. The process
@@ -131,6 +131,7 @@ interface Report {
     hungPid: number;
     restartedPid: number;
     failedDeliveryError: string | null;
+    secondTurnPid: number | null;
     nextTurnPid: number | null;
   };
   error?: string;
@@ -280,21 +281,25 @@ try {
   const restarted = await waitFor("Codex to start again", () =>
     protocol().find((line) => line.start && line.pid !== hungPid && line.pid !== clientPid),
   );
-  await waitFor("the second message to settle", idle);
+  // The retry waits for the new process, and at most the first session retry wait.
+  await waitFor("the second message to settle", idle, 40_000);
   await waitFor("the provider to be ready again", () => agents.getStatus().phase === "ready");
   const failed = agents
     .listQueue(agent.id)
     .deliveries.find((delivery) => delivery.status === "failed" && delivery.error !== null);
+  const secondTurn = protocol().find((line) => line.pid === restarted.pid && line.method === "turn/start");
 
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Third message." }));
-  const turn = await waitFor("a turn on the new process", () =>
-    protocol().find((line) => line.pid === restarted.pid && line.method === "turn/start"),
+  const turn = await waitFor(
+    "a turn on the new process",
+    () => protocol().filter((line) => line.pid === restarted.pid && line.method === "turn/start")[1],
   );
   await waitFor("the third turn to end", idle);
   report.service = {
     hungPid,
     restartedPid: restarted.pid,
     failedDeliveryError: failed?.error ?? null,
+    secondTurnPid: secondTurn?.pid ?? null,
     nextTurnPid: turn.pid,
   };
 
@@ -304,8 +309,8 @@ try {
     report.slowProcess.answeredAfter &&
     report.hungProcess.exitMessage === sourceText("error.provider.codexUnresponsive") &&
     !report.hungProcess.alive &&
-    report.service.failedDeliveryError ===
-      sourceText("error.provider.cliTimedOut", { provider: providerLabel("codex") }) &&
+    report.service.failedDeliveryError === null &&
+    report.service.secondTurnPid === restarted.pid &&
     report.service.nextTurnPid === restarted.pid;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -274,7 +274,7 @@ export function useChatMotion(
    * message is known. A sent message now moves to the top of the chat.
    */
   const onAnchorReady = useCallback(
-    (info: AnchorReadyInfo) => {
+    (info: AnchorReadyInfo, anchorMaxSize?: number) => {
       const send = pending.current;
       const list = listRef.current;
       if (!send || !list || info.anchorKey === undefined || info.anchorKey === send.baseline) return;
@@ -297,7 +297,9 @@ export function useChatMotion(
       if (!send.first || info.anchorIndex === undefined) return;
       const m = measurements.current;
       const lift = Math.max(0, keyboardHeight.get() - keyboardOffset);
-      const userHeight = Math.max(0, list.getState().sizeAtIndex(info.anchorIndex) - CHAT_ROW_GAP);
+      // A long message shows only its end, `anchorMaxSize` high, under the header.
+      const rowHeight = list.getState().sizeAtIndex(info.anchorIndex);
+      const userHeight = Math.max(0, Math.min(rowHeight, anchorMaxSize ?? rowHeight) - CHAT_ROW_GAP);
       // The first message rises from the composer to its place under the header.
       firstOffset.set(Math.max(0, m.viewport - lift - m.composer - header - userHeight));
       firstOpacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));

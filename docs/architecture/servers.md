@@ -335,10 +335,19 @@ Server settings > Transfer > Copy to another server joins the two directions in 
 desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
 this computer's included. `instance-transfer:copy` is scoped to the destination and takes
 `{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
-without chat history or server settings to a temporary file. As in a file export, the file also has
+server settings and without chat history to a temporary file. As in a file export, the file also has
 the channels that have a selected agent as a member and the Shared folder. Each apply adds the
-channels again as new channels. Main then stages the file at the destination, applies all of its
-agents, and removes the file. Each side uses the routes above, in parts when its host has
+channels again as new channels. Main then keeps only the settings of the copied agents in the file
+(`InstanceTransferService.keepCopiedSettings`, with `@openbot/team-client/instance-transfer-copy`): the
+routine flows between them, the places on their routine canvas, and the workflows with a step for one
+of them or an output to one of their channels. MCP servers, custom providers and agents, sidebar
+sections and shared skills stay out. It writes a new manifest and a new central directory over the old
+directory, so the other entries are not copied; nothing reads the old manifest that stays in the file.
+This computer's export leaves the shared skills out; a joined source server still puts them in the
+file, and the new directory leaves them out. The manifest must be stored, not compressed, as every
+export writes it. Each host
+in the support window reads the result, so the copy needs no new capability. Main stages the file at
+the destination, applies all of its agents with the settings, and removes the file. Each side uses the routes above, in parts when its host has
 `instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
@@ -346,7 +355,9 @@ added beside it. The browser client has no copy: it connects to one host at a ti
 The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
 is the server of the page, and the destination is another online server that the user administers
 with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
-sends it to the destination with the upload route, and applies all of its agents. The phone uses
+keeps the same settings as the desktop (`copiedTransferUpload` in `@openbot/team-client`, which decodes
+only the Base64 of the manifest and the end of the file), sends it to the destination with the upload
+route, and applies all of its agents with the settings. The phone uses
 only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
 is not written to its storage. A token that the destination keeps when the page closes before the
 apply is discarded.
@@ -945,6 +956,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
+| `webhook-agent-secret-v1` | Give a new signing secret of an agent's webhook routine to that agent as an API key. The answer has only the key name | `events` |
 | `vault-v1` | The host's Vault: list, add, change and delete logins, cards and contact info; show one saved password, card number or security code; reset a Vault that the host cannot read. No CSV import. A change sends `vault-changed` with no data, so a client reads the list again | `vault` |
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
@@ -1811,7 +1823,9 @@ the time until the workspace can be used, and the host requests that block that 
   the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
   by the full time and each data-channel send and message by half of it. The desktop Signal socket is
   in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
-  `--latency`.
+  `--latency`. `OPENBOT_DEV_DOWNLINK_KBPS=<kbit/s>` also limits the data that an unpackaged desktop
+  client receives on the data channel to that rate. `scripts/workflow-canvas-pictures-perf-e2e.ts`
+  uses both values to measure the pictures of the Workflows canvas on a joined server.
 - A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
   an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
   or a host.

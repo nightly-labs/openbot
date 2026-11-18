@@ -43,6 +43,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentAccessLevel,
+  canAdministerServer,
   conversationMessageSender,
   DEFAULT_REMOTE_CONTROL_POLICY,
   isAvatarColor,
@@ -174,6 +175,7 @@ interface HostServiceOptions {
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
   mailbox: ForwardedApiOptions["mailbox"];
+  attachmentPreviews?: ForwardedApiOptions["attachmentPreviews"];
   browser: ForwardedApiOptions["browser"];
   chat?: TeamChatStore;
   /**
@@ -550,6 +552,7 @@ export class HostService extends EventEmitter<HostEvents> {
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
+      ...(options.attachmentPreviews === undefined ? {} : { attachmentPreviews: options.attachmentPreviews }),
       browser: options.browser,
       browserView: this.#browserView,
       remoteScreen: this.#remoteScreen,
@@ -2244,6 +2247,16 @@ export class HostService extends EventEmitter<HostEvents> {
       .some(
         (member) => member.role === "member" && !member.disabled && this.#api.agentLevel(member, agentId) !== "none",
       );
+  }
+
+  /**
+   * Whether `personId` can change the server settings: this computer's user, or an active owner or
+   * admin of the team.
+   */
+  personCanAdminister(personId: string): boolean {
+    if (!this.channelPersonIsRemote(personId)) return true;
+    const member = this.#options.store.getMember(personId);
+    return member !== null && !member.disabled && canAdministerServer(member.role);
   }
 
   /**

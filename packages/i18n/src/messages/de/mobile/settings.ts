@@ -128,10 +128,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Helligkeit",
   "mobile.settings.appearance.messageColorFooter":
     "Mit Agentenfarbe verwenden deine Nachrichten in einem Agentenchat die Farbe dieses Agenten. Mit eigener Farbe verwenden deine Nachrichten in allen Chats die gewählte Farbe. Die Textfarbe passt sich an, damit der Text lesbar bleibt.",
+  "mobile.settings.appearance.bubbleStyle": "Blasenstil",
+  "mobile.settings.appearance.bubbleStyleSolid": "Voll",
+  "mobile.settings.appearance.bubbleStyleTint": "Getönt",
+  "mobile.settings.appearance.seeThroughBubbles": "Durchsichtige Blasen",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Agentenblasen und Blasen ohne Farbe lassen den Hintergrund durchscheinen. Ohne Hintergrund sind Blasen immer deckend.",
+  "mobile.settings.appearance.tab.colors": "Farben",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 Routinenläufe",
+  "mobile.settings.appearance.preview.thinking": "4 Sekunden nachgedacht",
+  "mobile.settings.appearance.preview.memory": "1 Erinnerung gespeichert",
+  "mobile.settings.appearance.backdrop.title": "Hintergrund",
+  "mobile.settings.appearance.backdrop.footer":
+    "Erscheint auf diesem Telefon hinter dem Startbildschirm und deinen Chats. Ein Agent kann ihn für dich festlegen; „Rückgängig“ im Chat stellt den alten wieder her.",
+  "mobile.settings.appearance.backdrop.none": "Keiner",
+  "mobile.settings.appearance.backdrop.pond": "Koi-Teich",
+  "mobile.settings.appearance.backdrop.jellyfish": "Quallen",
+  "mobile.settings.appearance.backdrop.sunset": "Retro-Sonnenuntergang",
+  "mobile.settings.appearance.backdrop.snowfall": "Schneefall",
+  "mobile.settings.appearance.backdrop.fireflies": "Glühwürmchen",
+  "mobile.settings.appearance.backdrop.agentPage": "Agentenseite",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Von einem Agenten festgelegt",
+  "mobile.settings.appearance.backdrop.photo": "Foto",
+  "mobile.settings.appearance.backdrop.photoChoose": "Aus deinen Fotos wählen",
+  "mobile.settings.appearance.backdrop.photoChange": "Erneut tippen, um ein anderes Foto zu wählen",
+  "mobile.settings.appearance.backdrop.strength": "Stärke des Hintergrunds",
+  "mobile.settings.appearance.backdrop.calm": "Ruhig",
+  "mobile.settings.appearance.backdrop.vivid": "Lebhaft",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Ein ruhiger Hintergrund hält lange Antworten gut lesbar. Oben auf dem Startbildschirm ist am meisten davon zu sehen.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Kannst du die Release Notes schreiben?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Hier ist ein Entwurf: Der Hintergrund, den ein Agent festlegt, erscheint jetzt auch auf deinem Telefon.",
   "mobile.settings.appearance.chatBackground": "Chathintergrund",
   "mobile.settings.appearance.chatBackgroundDefault": "Standard",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Jedes Design behält seine eigene Farbe. Eine Farbe, die Text schwer lesbar macht, wird dunkler oder heller.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Der Hintergrund ersetzt den Chathintergrund. Wähle „Keiner“ als Hintergrund, um eine Farbe zu verwenden.",
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
@@ -554,7 +589,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot ist gesperrt",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot öffnen",
   "mobile.settings.shortcuts.footer":
-    "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht.",
+    "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht. Open Agent öffnet seinen Chat.",
   "mobile.settings.shortcuts.send.sent": "Gesendet",
   "mobile.settings.shortcuts.send.failed": "OpenBot konnte das nicht senden.",
   "mobile.settings.shortcuts.send.unconfirmed": "Keine Antwort vom Server. Die Nachricht kann im Chat sein.",

@@ -43,7 +43,7 @@ import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesS
 import { filesPort } from "../files/files-port";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
-import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
+import { AgentRoutinesSettings, type DetailLeaveGuard, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
@@ -517,8 +517,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   // A setting card opens the page of a link row here, and gives each other row to the shared panel.
   const settingReveal = createMemo(() => props.settingReveal);
   const [panelReveal, setPanelReveal] = createSignal<AgentSettingReveal | null>(null);
+  // The open detail page that can hold a card, such as to ask before it discards an edit.
+  let detailLeaveGuard: DetailLeaveGuard | null = null;
   createEffect(settingReveal, (request) => {
     if (!request) return;
+    props.onSettingRevealHandled?.(request.nonce);
+    const guard = detailLeaveGuard;
+    untrack(() => (guard ? guard(() => revealSetting(request)) : revealSetting(request)));
+  });
+  function revealSetting(request: AgentSettingReveal): void {
     const detail = revealDetail(request.settingId);
     setDraft((state) => {
       state.instructions.open = detail === "instructions";
@@ -530,8 +537,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     // A detail page covers the panel, and its Back goes to the root list that holds its link row, so the
     // panel still moves to that page. The skills dialog opens over the page that the panel shows.
     setPanelReveal(detail === "skills" ? null : request);
-    props.onSettingRevealHandled?.(request.nonce);
-  });
+  }
   /** The page that a link row opens for the setting, when this agent shows that row. */
   function revealDetail(settingId: AgentSettingLinkId): "instructions" | "memories" | "skills" | "routines" | null {
     if (settingId === "agent.instructions" && props.instructionsFile) return "instructions";
@@ -719,10 +725,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               })
             }
             onClose={props.onClose}
+            registerLeaveGuard={(guard) => {
+              detailLeaveGuard = guard;
+            }}
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
             onOpenThread={props.onOpenRoutineThread}
+            agentName={props.agent.name}
           />
         </div>
       </Show>

@@ -119,8 +119,8 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     snapshot document only through `describeTarget`.
 
 SQLite migration history starts at the frozen version 8 compatibility baseline. Keep the baseline
-schema unchanged, append every later migration in numeric order, and update the separate latest
-schema used for new databases. Never remove or rewrite a migration that may have shipped.
+schema unchanged and append every later migration in numeric order. A new database runs the same
+migrations from the baseline. Never remove or rewrite a migration that may have shipped.
 
 At startup, chat recovery reads all saved provider sessions for each thread, including inactive
 sessions from an upgrade or a provider change. It uses each session's provider and merges the

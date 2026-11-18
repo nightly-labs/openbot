@@ -210,9 +210,10 @@ export class ConversationQueries {
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     if (!threadId) return { activeTurnId: null, latestMessage: null };
+    // Each runtime snapshot reads this for each agent whose chat is not loaded.
     const thread = databaseRow(
-      this.#core.connection
-        .prepare(
+      this.#core
+        .statement(
           "SELECT active_turn_id, last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?",
         )
         .get(threadId, agentId),

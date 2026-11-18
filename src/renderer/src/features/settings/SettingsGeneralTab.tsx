@@ -45,6 +45,7 @@ import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
 import { ChatBackdropSetting } from "./ChatBackdropSetting";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
+import { MotionSwitches } from "./MotionSwitches";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
 const quitGuardOptions = [...QUIT_GUARDS];
@@ -426,6 +427,11 @@ function AppearanceRows(props: SettingsGeneralTabProps) {
               />
             </ItemActions>
           </Item>
+        </ItemGroup>
+      </SettingsSection>
+      <SettingsSection title={i18n.t("settings.motion.title")}>
+        <ItemGroup class="settings-modal-card">
+          <MotionSwitches />
         </ItemGroup>
       </SettingsSection>
     </>

@@ -18,7 +18,7 @@ import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
-import { writeUpdateHandover } from "./update-install-guard";
+import { writeUpdateHandover, writeUpdateInstallRecord } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
@@ -135,6 +135,10 @@ interface UpdateServiceOptions {
   shipItDirectory?: string | undefined;
   /** macOS: the record that keeps a launch during the install from cancelling it (`update-install-guard.ts`). */
   handoverPath?: string | undefined;
+  /** macOS: the record that tells the next start which update a restart did not install. */
+  installRecordPath?: string | undefined;
+  /** The version that the last update restart did not install, read from that record at start. */
+  notInstalledVersion?: string | null | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
   updaterCacheDirectory?: string | undefined;
   initialCheckDelayMs?: number;
@@ -226,7 +230,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       | "checkSiblingInstances"
       | "currentUid"
       | "handoverPath"
+      | "installRecordPath"
       | "logDirectory"
+      | "notInstalledVersion"
       | "shipItDirectory"
       | "updaterCacheDirectory"
     > & {
@@ -287,6 +293,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         installing: options.installTimeoutMs ?? DEFAULT_PHASE_TIMEOUTS.installing,
       },
     };
+    if (options.notInstalledVersion)
+      logger.warn(`The last update restart did not install OpenBot ${options.notInstalledVersion}.`);
     this.#status = {
       phase: options.enabled ? "idle" : "unsupported",
       currentVersion: options.currentVersion,
@@ -451,18 +459,32 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
-    if (!managed) {
-      this.#downloadedVersion = null;
-      this.#setStatus({
-        phase: this.#options.enabled ? "idle" : "unsupported",
-        availableVersion: null,
-        progress: null,
-        message: null,
-        errorCode: null,
-      });
-      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    if (managed) {
+      // The host owns the updates now. A check or a download of this tenant that is still out must not
+      // write its result over the host state, and the download must not use the network for nothing.
+      this.#checkGeneration += 1;
+      this.#downloadGeneration += 1;
+      this.#activeDownload = null;
+      this.#cancellationToken?.cancel();
+      this.#cancellationToken = null;
+      // An install keeps its phase: its shutdown preparation runs, and the app quits.
+      if (this.#installStarted) {
+        this.#setStatus({});
+        return;
+      }
     }
-    this.#setStatus({});
+    // Also on a takeover: no phase deadline runs while the host manages the updates, so a busy phase
+    // of this tenant would stay on screen until the host state replaces it, and forever for a tenant
+    // that the host does not list.
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: this.#options.enabled ? "idle" : "unsupported",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      errorCode: null,
+    });
+    if (!managed && this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   setHostState(state: HostUpdateState): void {
@@ -713,6 +735,18 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
               ),
             );
           }
+          const { installRecordPath } = this.#options;
+          if (this.#options.platform === "darwin" && installRecordPath && this.#downloadedVersion) {
+            yield* writeUpdateInstallRecord(
+              installRecordPath,
+              this.#options.currentVersion,
+              this.#downloadedVersion,
+            ).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update install record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
           // Visible, so the Windows installer shows its progress until the new version opens. In an
           // update it shows only that page and opens the app again (`customFinishPage` in
           // `build/installer.nsh`). Other updaters only relaunch, from `autoRunAppAfterInstall`.
@@ -859,7 +893,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       phase: "ready",
       availableVersion: version,
       progress: 100,
-      message: null,
+      // The last restart did not install this same update (#11768). A newer one is a normal "ready".
+      message: version !== null && version === this.#options.notInstalledVersion ? NOT_INSTALLED_MESSAGE : null,
       errorCode: null,
     });
   }
@@ -975,6 +1010,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
 const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
 const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
+const NOT_INSTALLED_MESSAGE = sourceText("error.update.notInstalled");
 const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
 const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
 const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");

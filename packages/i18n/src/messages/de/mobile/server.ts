@@ -731,6 +731,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Erstelle in Proton Pass einen Zugriffsschlüssel, der nur den mit OpenBot geteilten Tresor lesen kann, und füge ihn hier ein. {host} speichert den Schlüssel, dieses Telefon nicht.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Dein Proton-Tarif enthält das Befehlszeilentool von Proton Pass nicht. Es braucht einen Proton-Tarif, der Pass Plus enthält. Andere bezahlte Tarife wie Mail Plus enthalten es nicht. Ändere den Tarif deines Kontos und verbinde dann erneut.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} ist auf diesem Server nicht verfügbar.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Melde dich auf diesem Telefon bei {name} an. Dann erstellt {host} einen geteilten Tresor und einen schreibgeschützten Zugriffsschlüssel dafür und speichert nur diesen Schlüssel. Agenten sehen nie ein Passwort.",
@@ -760,8 +762,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Nur Lesen",
   "mobile.server.connectors.passwordManager.keyExpires": "Nur Lesen. Läuft am {date} ab.",
   "mobile.server.connectors.passwordManager.keyExpired": "Abgelaufen am {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Das Befehlszeilentool von {name} erfordert einen kostenpflichtigen Tarif. Ändere den Tarif deines Kontos und verbinde dann erneut.",
   "mobile.server.connectors.passwordManager.expiredTitle": "Der Schlüssel für {name} ist abgelaufen",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agenten auf {host} können sich erst wieder mit deinen geteilten Logins anmelden, wenn du erneut verbindest.",
@@ -1015,7 +1015,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Hinzufügen",
   "mobile.server.connectors.whatsapp.groupTitle": "Gruppe hinzufügen",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "Personen in dieser Gruppe können deinen Agenten Aufgaben geben.",
+    "Personen in dieser Gruppe können deinen Agenten Aufgaben geben, wenn sie die Nummer erwähnen oder auf ihre Nachrichten antworten.",
   "mobile.server.connectors.whatsapp.groupSearch": "Gruppen suchen",
   "mobile.server.connectors.whatsapp.groupsLoading": "Gruppen werden gelesen…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot konnte die Gruppen nicht lesen",
@@ -1672,8 +1672,12 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Nach",
   "mobile.server.transfer.copyNoAgents": "Dieser Server hat keine Agenten.",
   "mobile.server.transfer.copyNotMoved":
-    "Ihre Kanäle und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
+    "Ihre Kanäle, Routinenabläufe, Workflows und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
   "mobile.server.transfer.copySubmit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Doppelte Agenten kopieren?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} hat bereits Agenten mit diesen Namen: {names}. Die Kopie fügt jeweils einen zweiten Agenten hinzu. Jede Kopie ist ein eigener Agent mit eigenen Chats, Dateien und Erinnerungen.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Duplikate kopieren",
   "mobile.server.transfer.copying": "Wird kopiert…",
   "mobile.server.transfer.copyFailed": "Das Kopieren wurde nicht abgeschlossen.",
   "mobile.server.transfer.copied": {

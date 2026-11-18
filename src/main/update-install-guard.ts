@@ -44,6 +44,44 @@ export const writeUpdateHandover = Effect.fn("writeUpdateHandover")(function* (
 });
 
 /**
+ * In user data, macOS (#11768). ShipIt replaces the app after OpenBot quits, so a failed replace (for
+ * example "Too many attempts to install") never reaches the app: the next start found the same update
+ * and showed "Update ready" again with no error. The next start reads this record. When it still runs
+ * `fromVersion`, the restart did not install `targetVersion`. Unlike the handover, it has no age limit.
+ */
+export const UPDATE_INSTALL_RECORD_FILE = "update-install.json";
+
+const UpdateInstallRecord = Schema.Struct({ fromVersion: Schema.String, targetVersion: Schema.String });
+const decodeInstallRecord = Schema.decodeUnknownOption(Schema.fromJsonString(UpdateInstallRecord));
+
+export const writeUpdateInstallRecord = Effect.fn("writeUpdateInstallRecord")(function* (
+  path: string,
+  fromVersion: string,
+  targetVersion: string,
+) {
+  yield* Effect.try(() => writeFileSync(path, JSON.stringify({ fromVersion, targetVersion }), { mode: 0o600 }));
+});
+
+/** The version that the last update restart did not install, or null. Any other record is removed. */
+export const readNotInstalledUpdate = Effect.fn("readNotInstalledUpdate")(function* (
+  path: string,
+  currentVersion: string,
+) {
+  const record = yield* Effect.try(() => readFileSync(path, "utf8")).pipe(
+    Effect.map(decodeInstallRecord),
+    Effect.orElseSucceed(() => Option.none<typeof UpdateInstallRecord.Type>()),
+  );
+  if (
+    Option.isSome(record) &&
+    record.value.fromVersion === currentVersion &&
+    record.value.targetVersion !== currentVersion
+  )
+    return record.value.targetVersion;
+  yield* Effect.try(() => rmSync(path, { force: true })).pipe(Effect.ignore);
+  return null;
+});
+
+/**
  * Synchronous I/O: it runs before the single-instance lock, and a launch that it stops must end at once.
  * A record of this version that is still young stays, also when ShipIt has not started yet, so a later
  * launch in the same install is still stopped. Any other record is removed.

@@ -95,6 +95,7 @@ import {
   antigravityStatePaths,
   COPILOT_CONFINED_ENV,
   clineStatePaths,
+  codexHomeDirectory,
   confineSpawnTarget,
   copilotHomeDirectory,
   copilotStatePaths,
@@ -1080,6 +1081,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
+    // `codex login` writes `auth.json`, and so does each token refresh of any Codex process on this
+    // sign-in. An account that an update or a refresh by another process found signed out connects
+    // again without a click (#11713). A sign-in in the keychain writes no file, and is not watched.
+    signInFiles: () => [join(codexHomeDirectory(), "auth.json")],
     // Codex reads its list only at its start. The idle reread compares its start settings, so a model
     // that the user adds in `config.toml` comes without a restart from the user (#10268).
     catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },

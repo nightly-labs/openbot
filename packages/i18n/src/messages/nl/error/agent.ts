@@ -14,6 +14,8 @@ export const messages = {
     "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
   "error.agent.toolCallEnvelopeKeys":
     "De tool is niet uitgevoerd. tool_call accepteert alleen name en arguments. Zet de argumenten van de tool in arguments, als object, en stuur de aanroep opnieuw.",
+  "error.agent.toolCallMissingName":
+    "De tool is niet uitgevoerd. De tool_call heeft geen name. Zet in name de gekwalificeerde naam die tool_search geeft, zoals openbot.history_read, en stuur de aanroep opnieuw.",
   "error.agent.toolCallUnknownTool":
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -134,6 +136,8 @@ export const messages = {
   "error.agent.stopBeforeDelete": "Stop de agent en annuleer de berichten in de wachtrij voordat je hem verwijdert.",
   "error.agent.deleteIncomplete":
     "De gegevens van de agent konden niet volledig worden verwijderd. Probeer de agent opnieuw te verwijderen.",
+  "error.agent.deleteFolderInUse":
+    "Werk van een andere agent gebruikt de map van deze agent nog. Verwijder deze agent opnieuw als dat werk klaar is, of nadat je OpenBot opnieuw start.",
   "error.agent.duplicationBusy": "Deze agent wordt al gedupliceerd.",
   "error.agent.waitBeforeDuplicate": "Wacht tot de agent klaar is en de wachtrij leeg is voordat je hem dupliceert.",
   "error.agent.saveOtherAgent": "Deze opslag hoort bij een andere agent.",

@@ -4,7 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import type { BillingDetails } from "@openbot/contracts/billing-details";
+import { type BillingDetails, isEuConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -26,6 +26,7 @@ import type {
   CreateHostedServerInput,
   HostedServerSetupStatus,
 } from "@openbot/ui/features/servers/AddServerDialog";
+import type { OrderConsent } from "@openbot/ui/features/servers/HostedPricingPage";
 import {
   guessHostedCurrency,
   HOSTED_BILLING_CURRENCY,
@@ -141,7 +142,10 @@ interface AddServerState {
   currency: HostedCurrency | null;
   /** The pricing page order, as the dialog's choices. */
   order: CreateHostedServerInput | null;
-  /** The web pricing page order that the pricing page starts with, when the account must give its country first. */
+  /**
+   * The web pricing page order that the pricing page starts with, when the account must give its country first, or
+   * when a consumer in the EU must ask for the early start of the server.
+   */
   pageOrder: PricingOrder | null;
   /** The plans with their prices, for the order form of the pricing page. */
   catalog: HostedServerCatalogPlan[];
@@ -304,11 +308,13 @@ function AddServerSession(
         );
     draft.server = resumed ?? null;
     draft.paid = resume?.paid ?? false;
-    // An order with no billing country cannot pay, so the pricing page asks for the country first.
+    // An order with no billing country cannot pay, so the pricing page asks for the country first. A consumer in the
+    // EU must ask on the pricing page that the server begin before the withdrawal period ends; the dialog cannot ask.
     const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
     const order = resume ? null : (untrack(() => props.order) ?? null);
-    draft.order = needsCountry ? null : dialogOrderOf(order, licenseState);
-    draft.pageOrder = needsCountry ? order : null;
+    const needsPage = needsCountry || (isEuConsumer(details) && order?.server != null);
+    draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
+    draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
     draft.currency =
       HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
@@ -458,7 +464,7 @@ function AddServerSession(
 
   function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
     const interval: BillingInterval = input.billing === "yearly" ? "year" : "month";
-    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null);
+    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null, false);
   }
 
   async function createPlan(
@@ -466,6 +472,8 @@ function AddServerSession(
     interval: BillingInterval,
     currency: BillingCurrency,
     license: LicenseOrder | null,
+    /** The early start request of a consumer in the EU, from the pricing page. */
+    earlyStart: boolean,
   ): Promise<CreatedHostedServer> {
     const choice = license
       ? `${plan}:${interval}:${currency}:${license.tier}:${license.users}`
@@ -482,6 +490,7 @@ function AddServerSession(
         requestId: key.requestId,
         ...(entryPoint ? { entryPoint } : {}),
         ...(license ? { license } : {}),
+        ...(earlyStart ? { earlyStart: true } : {}),
       })
       .catch(async (error: unknown) => {
         await refreshCount();
@@ -527,7 +536,7 @@ function AddServerSession(
    * The order of the pricing page. A server goes to the payment page, and the dialog then shows its setup. A license
    * alone goes to the payment page of the license.
    */
-  async function submitOrder(order: PricingOrder): Promise<void> {
+  async function submitOrder(order: PricingOrder, consent: OrderConsent): Promise<void> {
     if (state.ordering) return;
     setState((draft) => {
       draft.ordering = true;
@@ -547,7 +556,13 @@ function AddServerSession(
       }
       if (!(await saveDetails())) return;
       if (order.server) {
-        await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
+        await createPlan(
+          order.server,
+          order.interval,
+          order.currency,
+          state.ownLicense ? null : order.license,
+          consent.earlyStart,
+        );
       } else if (order.license) {
         const license = props.license;
         if (!license) return;
@@ -691,7 +706,7 @@ function AddServerSession(
                       draft.detailsEdited = true;
                     })
                   }
-                  onSubmit={(order) => void submitOrder(order)}
+                  onSubmit={(order, consent) => void submitOrder(order, consent)}
                   onClose={close}
                   onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
                   onOpenTerms={() => props.onOpenUrl(TERMS_URL)}

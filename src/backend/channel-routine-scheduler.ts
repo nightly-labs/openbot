@@ -13,6 +13,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import { failedRunReason } from "./agent/delivery-content";
 import { quietRoutineRun } from "./agent/routine-quiet-runs";
 import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
@@ -422,8 +423,9 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   /** Writes only on a change, so a channel that publishes often does not rewrite every run row. */
   #settle(run: ChannelRoutineRun, next: { status: ChannelRoutineRunStatus; error: string | null }): boolean {
-    if (run.status === next.status && run.error === next.error) return false;
-    this.#routines.updateRunStatus(run.id, next.status, next.error);
+    const error = next.status === "failed" ? failedRunReason(next.error, run) : next.error;
+    if (run.status === next.status && run.error === error) return false;
+    this.#routines.updateRunStatus(run.id, next.status, error);
     return true;
   }
 

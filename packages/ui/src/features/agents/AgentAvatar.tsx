@@ -14,13 +14,16 @@ import {
 } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { documentFocused } from "../../document-focus";
-import { documentSoftwareRendering } from "../../document-rendering";
+import { documentStillFaces } from "../../document-rendering";
+import { observeOnScreen } from "../../on-screen";
 
-// Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
-// for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
-// The bloub patch in `patches/` waits between capped frames instead of asking for every display
-// frame. Each of those frames also restyled every running CSS animation in the window.
-const AVATAR_FPS = 30;
+// Cap avatar animation so that it draws at least 60 times per second. Uncapped bloub clocks asked
+// for every display frame and measured 30% renderer / 24% GPU for two visible avatars. The bloub
+// patch in `patches/` waits between capped frames instead. bloub skips a display frame that comes
+// sooner than 1/fps, so a cap equal to the display rate skips about half of them: a cap of 60
+// measured 38 draws per second on a 75 Hz display. With 80, a model of the loop gives 60, 75, 60
+// and 72 draws per second on a 60, 75, 120 and 144 Hz display.
+const AVATAR_FPS = 80;
 
 interface PlushMood {
   state: PlushState;
@@ -165,12 +168,16 @@ interface AgentAvatarProps {
 }
 
 export function AgentAvatar(props: AgentAvatarProps) {
-  const seed = () => props.seed ?? props.agent?.avatarSeed ?? "agent";
-  const hue = () => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null));
-  const color = () =>
-    props.color !== undefined || props.hue !== undefined ? (props.color ?? null) : (props.agent?.avatarColor ?? null);
+  // Memos, so that a new `agent` object with the same values changes nothing: each update of a list
+  // brings new objects, and an effect runs again also on an equal value. With 100 working agents, the
+  // idle avatars of the channel header and of the messages woke their animation 17-34 times in 2 s.
+  const seed = createMemo(() => props.seed ?? props.agent?.avatarSeed ?? "agent");
+  const hue = createMemo(() => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null)));
+  const color = createMemo(() =>
+    props.color !== undefined || props.hue !== undefined ? (props.color ?? null) : (props.agent?.avatarColor ?? null),
+  );
   const motion = () => props.motion ?? "hover";
-  const url = () => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null));
+  const url = createMemo(() => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null)));
   const mood = (): AvatarMood => props.mood ?? "idle";
   const [imageFailed, setImageFailed] = createSignal(false);
   createEffect(
@@ -250,9 +257,10 @@ function GeneratedAvatar(props: {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
   const [prefersReduced, setPrefersReduced] = createSignal(prefersReducedMotion());
-  // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
-  // avatars of reduced motion, which run no animation loop.
-  const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
+  const [onScreen, setOnScreen] = createSignal(true);
+  // On the CPU, six moving avatars took a third of a core. When faces stay still (by default on the
+  // CPU), avatars show as in reduced motion, with no animation loop.
+  const reducedMotion = () => prefersReduced() || documentStillFaces();
   const ambientMotion = useAmbientMotion();
   const cyclesFaces = () => props.workingFaces && props.mood === "working";
   const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
@@ -281,34 +289,40 @@ function GeneratedAvatar(props: {
   const [hoverFace, setHoverFace] = createSignal<HoverFace | null>(null);
   // The silhouette and the colour are identity and come only from the seed. The mood may lend the
   // face an expression; when it does not, the seeded one is the resting face, or the hover face.
-  const appearance = createMemo(() => {
-    const hover = hovered() ? hoverFace() : null;
-    return {
-      shape: props.shape ?? profile().shape,
-      color: profile().color,
-      expression: plushMood().expression ?? hover?.expression ?? restingExpression(),
-      state: hover?.state ?? plushMood().state,
-    };
-  });
+  const appearance = createMemo(
+    () => {
+      const hover = hovered() ? hoverFace() : null;
+      return {
+        shape: props.shape ?? profile().shape,
+        color: profile().color,
+        expression: plushMood().expression ?? hover?.expression ?? restingExpression(),
+        state: hover?.state ?? plushMood().state,
+      };
+    },
+    { equals: sameAppearance },
+  );
   // A seed that `avatarSeedForFace` made for the flat style draws the Bloub that agents had before the
   // plush. It shows each mood with the flat faces, and a busy one breathes. It has no orbit rings, as
   // the plush has none.
   const flat = createMemo(() => avatarStyleForSeed(props.seed) === "flat");
-  const flatAppearance = createMemo(() => {
-    const presentation = avatarMoodPresentation(props.mood);
-    const hover = hovered() ? hoverFace() : null;
-    // The flat Bloub takes the face of a step, and of its states only `wide` and `wink`, which keep the body.
-    const stepMood = activityMood();
-    const working = cyclesFaces() ? plushMood().expression : (stepMood?.expression ?? null);
-    const motionState = stepMood?.state === "wide" || stepMood?.state === "wink" ? stepMood.state : null;
-    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
-    return {
-      shape: props.shape ?? profile().shape,
-      color: profile().color,
-      expression: working ?? presentation.expression ?? hover?.expression ?? restingExpression(),
-      state,
-    };
-  });
+  const flatAppearance = createMemo(
+    () => {
+      const presentation = avatarMoodPresentation(props.mood);
+      const hover = hovered() ? hoverFace() : null;
+      // The flat Bloub takes the face of a step, and of its states only `wide` and `wink`, which keep the body.
+      const stepMood = activityMood();
+      const working = cyclesFaces() ? plushMood().expression : (stepMood?.expression ?? null);
+      const motionState = stepMood?.state === "wide" || stepMood?.state === "wink" ? stepMood.state : null;
+      const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
+      return {
+        shape: props.shape ?? profile().shape,
+        color: profile().color,
+        expression: working ?? presentation.expression ?? hover?.expression ?? restingExpression(),
+        state,
+      };
+    },
+    { equals: sameAppearance },
+  );
   const flatBreathe = () => {
     const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
@@ -329,8 +343,10 @@ function GeneratedAvatar(props: {
     interacting();
 
   // Reduced motion keeps one face: it is a frozen plush, and a frozen plush cannot morph between faces.
+  // An avatar off screen keeps its face: with 100 working agents, the avatars changed faces about 50
+  // times a second, most of them in sidebar rows that were scrolled away.
   createEffect(
-    () => cyclesFaces() && !reducedMotion() && ambientMotion(),
+    () => cyclesFaces() && !reducedMotion() && ambientMotion() && onScreen(),
     (cycling) => {
       if (!cycling) return;
       let timer = 0;
@@ -353,6 +369,7 @@ function GeneratedAvatar(props: {
     const syncReducedMotion = () => setPrefersReduced(media?.matches ?? false);
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
+    const stopObservingVisibility = element ? observeOnScreen(element, setOnScreen) : undefined;
 
     // What must be hovered or focused for a resting avatar to move: the control the avatar sits in or
     // beside, marked with `data-avatar-hover` when the avatar is only a neighbour of it. A dialog and a
@@ -381,6 +398,7 @@ function GeneratedAvatar(props: {
     interactionTarget?.addEventListener("focusout", stopFocusInteraction);
 
     return () => {
+      stopObservingVisibility?.();
       media?.removeEventListener?.("change", syncReducedMotion);
       interactionTarget?.removeEventListener("pointerenter", startInteraction);
       interactionTarget?.removeEventListener("pointerleave", stopInteraction);
@@ -533,6 +551,15 @@ function createHeldActivity(value: () => AgentStepActivity | null, holdMs: numbe
     return () => window.clearTimeout(timer);
   });
   return shown;
+}
+
+/**
+ * An equal appearance must not notify: each prop of the plush wakes its animation loop. It compares
+ * each field, so a field added to an appearance is compared too.
+ */
+function sameAppearance<T extends object>(a: T, b: T): boolean {
+  for (const key in a) if (a[key] !== b[key]) return false;
+  return true;
 }
 
 function avatarAnimationPhase(seed: string): number {

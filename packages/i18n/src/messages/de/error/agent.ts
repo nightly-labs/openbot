@@ -14,6 +14,8 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
   "error.agent.toolCallEnvelopeKeys":
     "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallMissingName":
+    "Das Werkzeug wurde nicht ausgeführt. Der tool_call hat keinen name. Gib in name den qualifizierten Namen aus tool_search an, zum Beispiel openbot.history_read, und sende den Aufruf erneut.",
   "error.agent.toolCallUnknownTool":
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -140,6 +142,8 @@ export const messages = {
     "Stoppe den Agenten und storniere seine Nachrichten in der Warteschlange, bevor du ihn löschst.",
   "error.agent.deleteIncomplete":
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
+  "error.agent.deleteFolderInUse":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",
   "error.agent.waitBeforeDuplicate":
     "Warte, bis der Agent fertig ist, und leere seine Warteschlange, bevor du ihn duplizierst.",

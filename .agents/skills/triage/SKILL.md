@@ -297,7 +297,7 @@ Introduced by: <commit and PR>, or "unknown".
 When Step 3 proves the root cause, continue to the fix. Do not wait for
 the user. Stop and ask the user before you fix only when the fix:
 
-- changes a database migration or the latest schema,
+- changes a database migration,
 - changes a released Team API adapter or a wire protocol,
 - touches the renderer-to-main trust boundary or a security test,
 - needs a product decision, or has more than one reasonable behavior.

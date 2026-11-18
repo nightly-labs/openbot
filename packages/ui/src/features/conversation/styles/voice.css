@@ -50,6 +50,64 @@
 }
 
 /*
+ * A recording whose message box a page covers: a bar at the bottom of the window, over the page.
+ * Below menus and dialogs, so a menu or a dialog that opens on the page still covers it.
+ */
+.covered-voice-recording {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+  bottom: var(--openbot-space-4);
+  inset-inline: 0;
+  display: flex;
+  width: min(360px, calc(100vw - 2 * var(--openbot-space-4)));
+  align-items: center;
+  margin-inline: auto;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
+  animation: speaking-bar-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+.covered-voice-recording-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--openbot-accent);
+}
+
+.covered-voice-recording-label {
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+}
+
+.covered-voice-recording-waveform {
+  color: var(--openbot-accent);
+}
+
+.covered-voice-recording[data-tone="warning"] :is(.covered-voice-recording-icon, .covered-voice-recording-waveform) {
+  color: var(--openbot-warning-text);
+}
+
+.covered-voice-recording[data-tone="warning"] .voice-recording-remaining {
+  color: var(--openbot-warning-text);
+}
+
+.covered-voice-recording-time {
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-sm);
+}
+
+/*
  * A voice conversation: a pill below the top edge of the chat, over the messages. It comes out of the
  * edge as liquid. The dock spans the chat column and lets clicks through, so the messages beside the
  * pill stay usable.
