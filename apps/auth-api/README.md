@@ -368,8 +368,10 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_SIGNAL_HOME_COUNTRIES`: the homes of the hosts in a country, as `CC=id+id,...` with the
   Cloudflare country code (`request.cf.country`), for example `CN=us+au`. A host in a listed country
-  gets one of its homes by the same hash, and the distance rule does not apply to it. When each of its
-  homes failed for the host, the distance rule chooses again. Empty means the distance rule for each
+  gets one of its homes by the same hash, and the distance rule does not apply to it. When its home
+  fails, the host moves to another home of its country; when its country has no other home, the
+  distance rule chooses. A host reports only one failed home, so with two homes that are both down it
+  goes between them, as with the distance rule. Empty means the distance rule for each
   country. Each ID must be a home of `REMOTE_SIGNAL_HOMES`, or each ticket request fails with
   `503 remote_not_configured`, so remove a home from this list in the same deploy. Use it where the
   network routes do not follow the map. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.

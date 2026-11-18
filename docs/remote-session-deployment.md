@@ -318,10 +318,14 @@ request fail with `503 remote_not_configured`. The entry failover tries the home
 keep `a` and `b` first.
 
 Country rule: `REMOTE_SIGNAL_HOME_COUNTRIES` (`CC=id+id`, with `request.cf.country`) replaces the
-distance rule for the hosts in a listed country. Production sets `CN=us+au`: on 2026-11-18, TCP tests
+distance rule for the hosts in a listed country. Production sets `CN=us`: on 2026-11-18, TCP tests
 from 12 Chinese networks (China Telecom, Unicom, Mobile, Tencent, Alibaba) reached `us` in about
 200 ms and `au` in about 260 ms, but Helsinki in about 340 ms, with packets sent again in 13 of
-72 tests. The distance rule sent most hosts in China to Helsinki. No port was blocked.
+72 tests. The distance rule sent most hosts in China to Helsinki. No port was blocked. `au` is not in
+the rule because its 5 TB monthly traffic pack is too small for the China relay traffic; `us` has
+30 TB. When the home of its country fails for a host, the distance rule chooses again. A rule with
+two homes moves the host to the other home first; when both are down, the host goes between them, as
+it does between two near homes of the distance rule, because a host reports only one failed home.
 
 To revert the country rule, set `REMOTE_SIGNAL_HOME_COUNTRIES` to `""` in `apps/auth-api/wrangler.jsonc`
 and merge; CI deploys the Worker. Each host in China moves back to the distance rule at its next
@@ -331,8 +335,10 @@ is necessary. For a faster revert, set the same empty value in the Cloudflare da
 `wrangler.jsonc` replaces the dashboard value, so each later push to `main` puts the rule back until
 the empty value is merged.
 
-To roll back one machine, remove it from the Worker variables of the homes in one deploy. Its hosts
-move at their next ticket, or after 20 seconds without Signal when the machine is stopped.
+To roll back one machine, remove it from `REMOTE_SIGNAL_HOMES`, `REMOTE_SIGNAL_HOME_LOCATIONS`,
+`REMOTE_AUTH_WEBHOOK_URLS` and `REMOTE_SIGNAL_HOME_COUNTRIES` in one deploy. A home that stays in
+one list fails each ticket with `503 remote_not_configured`. Its hosts move at their next ticket, or
+after 20 seconds without Signal when the machine is stopped.
 
 ## Required device validation — pending
 
