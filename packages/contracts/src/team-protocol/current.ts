@@ -168,6 +168,7 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "./routine-quiet-answers-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
@@ -439,6 +440,7 @@ export {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_QUIET_ANSWERS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -797,6 +799,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SERVER_SAFE_MODE_CAPABILITY, V10],
   [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
+  [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

@@ -31,6 +31,7 @@ import {
   isContextResetMarker,
   marketplaceSuggestionEvent,
   parseConversationPlanText,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -550,6 +551,9 @@ export function projectChatMessages(
       continue;
     }
     if (settingLinkMessage(message)) continue;
+    // The text of a run that had nothing to report (`routine-quiet-answers-v1`). The phone shows the run
+    // row only, as before the host sent it.
+    if (message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) continue;
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;

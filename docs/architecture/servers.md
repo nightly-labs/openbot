@@ -621,6 +621,14 @@ so the closed card shows what the agent got; the stored resolution leaves the ke
 web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
 `edit_preview` button answers as any other button, and the agent asks what to change.
 
+`routine-quiet-answers-v1` (`team-protocol/routine-quiet-answers-v1.ts`, protocol 10 only) adds no
+route and no field. A host with it sends the `routine_quiet_answer` messages, the text of a routine run
+or a teammate update that ended with nothing to report, in pages, live events and read state to a
+client that sends it, as the local desktop chat has them. The desktop with a joined server and the web
+client show them under their run or update, which starts closed. The mobile app sends it too, but
+shows the run row only. Before it, a user on a server could never read a report that the agent ended
+quiet by mistake (#11174). A host or client without it leaves these messages out, as before.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see

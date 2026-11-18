@@ -78,6 +78,7 @@ import {
   type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type Routine,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -384,6 +385,7 @@ import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
@@ -1534,7 +1536,32 @@ const fakeAgents: TeamApiAgents = {
   setAvatar: unused("setAvatar"),
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
-  readConversationFor: unused("readConversationFor"),
+  // A quiet routine run: its run row and the report that the agent ended quiet (#11174).
+  readConversationFor: (agentId) =>
+    Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "run-answer",
+          author: "assistant",
+          text: "Reply",
+          createdAt: "2026-11-05T08:00:00.000Z",
+          status: "completed",
+        },
+        {
+          id: "quiet-report",
+          author: "assistant",
+          text: "Inbox rundown",
+          createdAt: "2026-11-05T08:01:00.000Z",
+          status: "completed",
+          itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "quiet-report" },
+    }),
   // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
   readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
     record("readConversationPageFor", agentId, memberId, anchor, limit, options);
@@ -6203,6 +6230,64 @@ try {
         withoutCards.status === 200 &&
         withoutCardsExcluded === true,
       [summary(withCards), withCardsExcluded, summary(withoutCards), withoutCardsExcluded],
+    );
+  }
+
+  // ---- Quiet routine answers (routine-quiet-answers-v1) ----
+  {
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises routine-quiet-answers-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(ROUTINE_QUIET_ANSWERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // A user on a server reads a report that the agent ended quiet in its closed run, as on desktop.
+    const ids = (response: Awaited<ReturnType<typeof call>>) =>
+      list(field(response.body, "messages")).map((message) => field(message, "id"));
+    const conversationPath = TEAM_API_ROUTES.agent.conversation("agent-ada");
+    const withQuiet = await call("GET", conversationPath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withoutQuiet = await call("GET", conversationPath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const through = (response: Awaited<ReturnType<typeof call>>) =>
+      field(field(response.body, "readState"), "throughMessageId");
+    check(
+      "a conversation keeps a quiet routine answer, and a read through it, only for a client with routine-quiet-answers-v1",
+      withQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withQuiet), ["run-answer", "quiet-report"]) &&
+        through(withQuiet) === "quiet-report" &&
+        withoutQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withoutQuiet), ["run-answer"]) &&
+        through(withoutQuiet) === "run-answer",
+      [summary(withQuiet), summary(withoutQuiet)],
+    );
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=quiet-report`;
+    const pageExcludes = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeRoutineQuietAnswers" in options
+        ? options.excludeRoutineQuietAnswers
+        : undefined;
+    };
+    await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withQuietExcluded = pageExcludes();
+    await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const withoutQuietExcluded = pageExcludes();
+    check(
+      "a conversation page keeps quiet routine answers only for a client with routine-quiet-answers-v1",
+      withQuietExcluded === false && withoutQuietExcluded === true,
+      [withQuietExcluded, withoutQuietExcluded],
     );
   }
 
