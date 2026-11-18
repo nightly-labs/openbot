@@ -1,5 +1,5 @@
 ### Fixed
 
-- An OpenCode agent no longer stays stuck when its model puts code for the `execute` tool in a code
-  fence. Each such call failed with "The called value is not a function", and browser and computer
-  work stopped for that agent. The agent now sends plain code, or removes the fence and tries again.
+- An OpenCode agent whose model put code for the `execute` tool in a code fence failed on each call
+  with "The called value is not a function", and its browser and computer work stopped. OpenCode
+  agents now get a rule to send plain code, and to remove the fence and try again after this error.
