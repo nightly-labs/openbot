@@ -1,11 +1,13 @@
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AgentAccess,
   MCP_TRANSPORTS,
   type McpServerConfig,
   type McpSignInState,
   mcpConfigErrors,
   normalizeMcpConfig,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -21,8 +23,9 @@ import { ToolOperationFailed, toolStep } from "./tool-operation";
 
 /**
  * The MCP tools: an agent adds, changes, tests, turns on or off, and removes the MCP servers of its
- * OpenBot server when the user asks. A server applies to every agent there, so each change waits
- * for the user's approval as other tools do, and an agent with Full access is answered for.
+ * OpenBot server when the user asks. A server goes to the agents that the user selects for it, and
+ * a new one to every agent there, so each change waits for the user's approval as other tools do,
+ * and an agent with Full access is answered for.
  *
  * No value of a header or of the environment goes in or out: a key stays in the Marketplace form, where
  * the user enters it. A sign-in is handed to the user with a card in the conversation.
@@ -57,14 +60,15 @@ const saveMcpServerToolSchema = z.strictObject({
 const namedServerSchema = z.strictObject({ name: serverName });
 const setEnabledSchema = z.strictObject({ name: serverName, enabled: z.boolean() });
 
-const MCP_SCOPE = "Every agent on this OpenBot server gets the tools of an enabled MCP server.";
+// The agents of each server are the user's choice (#10992): an agent that says they cannot be limited misleads the user.
+const MCP_SCOPE = "The user selects which agents get each server, in Marketplace, Apps.";
 const MCP_APPROVAL =
   "The user's request is the permission: call the tool without asking first. OpenBot asks the user to approve when your access needs it.";
 
 export const MCP_SERVER_TOOL_DEFINITIONS = [
   {
     name: "list_mcp_servers",
-    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in. Values are never shown. ${MCP_SCOPE} Read-only.`,
+    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, sign-in, and forYou: you get its tools when it is on. Values are never shown. ${MCP_SCOPE} Read-only.`,
     shape: {},
   },
   {
@@ -116,14 +120,26 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled http servers that the agent gets. */
+  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
   forAgent(agentId: string): McpServerConfig[];
+  /** Whether the agents that the user selected for this saved server include the agent. */
+  allowsAgent(mcpServerId: string, agentId: string): boolean;
   /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
   callTool(
     config: McpServerConfig,
     name: string,
     args: McpToolArguments,
   ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+/**
+ * Whether OpenBot can run a tool of this server itself, for a provider that left the tool out (#7427).
+ * An http server can always run. A stdio server runs only for a Full access agent: a Workspace only
+ * provider starts it in its sandbox, and OpenBot would start it outside. A Full access provider has
+ * no sandbox, so OpenBot starts the server as the Test button does (#10146).
+ */
+export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
+  return config.transport === "http" || !workspaceAccessEnforced(agent);
 }
 
 /**
@@ -178,10 +194,14 @@ export function mcpServersFromGateway(
   gateway: McpGateway,
   prepareTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>,
   forAgent: (agentId: string) => McpServerConfig[] = () => [],
+  allowsAgent: (mcpServerId: string, agentId: string) => boolean = () => true,
 ): AgentMcpServers {
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
   );
+  // A stdio server that the fallback starts waits for the same runtimes as a test (#10146).
+  const prepared = (config: McpServerConfig) =>
+    (prepareTest?.(config) ?? Effect.void).pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
   return {
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
@@ -190,19 +210,20 @@ export function mcpServersFromGateway(
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
     inspect: (config, tested) =>
-      (prepareTest?.(config) ?? Effect.void).pipe(
-        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
-      ),
+      prepared(config).pipe(Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure))),
     signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
     forAgent,
-    callTool: (config, name, args) => gateway.callTool(config, name, args).pipe(toToolFailure),
+    allowsAgent,
+    callTool: (config, name, args) =>
+      prepared(config).pipe(Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure))),
   };
 }
 
 export interface McpServerToolCall {
   tool: McpServerToolName;
+  /** The agent that calls the tool. */
+  agentId: string;
   arguments: unknown;
   /**
    * Asks the user to approve the change that `reason` states. `cwd` is the folder a stdio server
@@ -290,7 +311,10 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const signIns = servers.signIns();
       return openBotToolResult({
         servers: [
-          ...servers.list().map((config) => describeServer(config, signIns)),
+          ...servers.list().map((config) => ({
+            ...describeServer(config, signIns),
+            forYou: servers.allowsAgent(config.id, call.agentId),
+          })),
           ...servers.builtIn().map(describeBuiltInServer),
         ],
       });

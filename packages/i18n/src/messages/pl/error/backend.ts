@@ -92,6 +92,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
+  "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
   "error.backend.channelTaskComplete": "To zadanie jest już ukończone.",
@@ -125,6 +126,8 @@ export const messages = {
   "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
   "error.backend.routineGone": "Ta rutyna już nie istnieje.",
   "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
+  "error.backend.routineRunFailedNoReason":
+    "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
@@ -249,7 +252,11 @@ export const messages = {
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
     "Serwer logowania nie zaakceptował OpenBot przy kończeniu logowania. Zaloguj się ponownie: OpenBot zarejestruje się ponownie na serwerze.",
+  "error.backend.mcpSignInAppRefused":
+    "Serwer logowania nie zaakceptował aplikacji logowania tego serwera. Sprawdź identyfikator klienta i sekret klienta aplikacji logowania, a potem zaloguj się ponownie.",
   "error.backend.mcpCommandNotFound": "Nie znaleziono polecenia: {command}",
+  "error.backend.mcpProviderLimit":
+    "Ten agent może używać tylko ograniczonej liczby serwerów MCP. Aby użyć tego serwera, wyłącz serwer MCP, którego agent nie potrzebuje.",
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
@@ -271,9 +278,11 @@ export const messages = {
     "Serwer logowania wysłał odpowiedź, której OpenBot nie może odczytać. Jeśli usługa daje Ci klucz API lub token, dodaj go w ustawieniach tego serwera, a potem ponownie przetestuj połączenie.",
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
+  "error.backend.mcpServerExitedWithOutput": "Serwer zatrzymał się przed odpowiedzią. Napisał: {detail}",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
+  "error.backend.mcpServerStoppedDuringCall": "Serwer MCP zatrzymał się, zanim odpowiedział na to wywołanie.",
   "error.backend.mcpToolSchemaRefused":
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
@@ -288,6 +297,8 @@ export const messages = {
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
     "Logowanie do tego serwera MCP wygasło. Użytkownik musi zalogować się ponownie w OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot nie mógł teraz odnowić logowania do tego serwera MCP. Logowanie zostaje zachowane, a następne żądanie spróbuje ponownie. Jeśli błąd się powtarza, użytkownik może wylogować się z serwera w OpenBot i zalogować ponownie.",
   "error.backend.mcpServerUnreachable": "OpenBot nie mógł połączyć się z serwerem. Sprawdź URL i sieć.",
   "error.backend.mcpLocalServerOff":
     "Żaden serwer nie odpowiada pod adresem {address} na tym komputerze. Uruchom serwer lub włącz go w aplikacji, która go obsługuje, i spróbuj ponownie.",
@@ -347,6 +358,8 @@ export const messages = {
   "error.backend.promptInactive": "Ten prompt nie jest już aktywny.",
   "error.backend.promptAnswerMismatch": "Odpowiedź na prompt nie pasuje do aktywnego pytania.",
   "error.backend.approvalInactive": "To zatwierdzenie nie jest już aktywne.",
+  "error.backend.feedbackNeedsPhone":
+    "To zgłoszenie może wysłać tylko aplikacja OpenBot na telefon, bo dodaje wersję i dziennik pomocy telefonu. Otwórz ten czat na telefonie. Jeśli zobaczysz tam ten komunikat, zaktualizuj aplikację na telefonie.",
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
@@ -426,6 +439,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Zatrzymaj bieżącą turę, zanim utworzysz odgałęzienie tego czatu.",
   "error.backend.branchMessageNotFound": "Odgałęzienie możesz utworzyć tylko od ukończonej odpowiedzi agenta.",
   "error.backend.branchRemoteUnsupported": "Odgałęzienia są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Aby usunąć to zgłoszenie, poproś o to agenta.",
   "error.backend.threadMoveRefused": "W nowym wątku można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":

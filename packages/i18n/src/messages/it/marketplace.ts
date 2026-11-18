@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} non è completo",
   "marketplace.app.partialDescription": "Alcune delle sue app o skill non sono installate. Riconnetti le installa.",
   "marketplace.app.notConnected": "Non connessa",
+  "marketplace.app.paused": "In pausa",
   "marketplace.app.custom": "Server MCP",
   "marketplace.app.githubTagline": "Repository, issue e pull request",
   "marketplace.app.onePasswordTagline": "Accedi ai siti con le credenziali che condividi",
@@ -137,6 +138,7 @@ export const messages = {
     "{host} usa una versione precedente di OpenBot che non può collegare app. Aggiorna OpenBot su {host} o chiedi al proprietario di aggiornarlo.",
   "marketplace.app.blocked.member":
     "Solo un proprietario o un admin di {host} può collegare app lì. Chiedi a uno di loro di collegare {name} o di aggiornare OpenBot su {host}, così i membri potranno collegare app.",
+  "marketplace.app.blocked.mac": "{name} funziona solo su un Mac che esegue OpenBot.",
   "marketplace.app.connectAgain": "Connetti di nuovo",
   "marketplace.app.automation.askOnInstall": "Chiedi accesso a macOS all'installazione",
   "marketplace.app.automation.title": "Accesso alle app Apple",
@@ -399,8 +401,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Salva questa decisione come nuova nota nel mio vault.",
   "marketplace.plugin.obsidian.prompt.log":
     "Aggiungi un riepilogo del lavoro di oggi alla mia nota Registro di lavoro.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, apri Settings > Local REST API. Copia la chiave API e attiva "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, apri Settings > Local REST API e copia la chiave API.",
   "marketplace.plugin.resend.tagline": "Email transazionali",
   "marketplace.plugin.resend.description":
     "Resend permette agli agenti di inviare email transazionali e controllarne la consegna con una sola API. Una chiave API presa dalla dashboard di Resend viene passata al server locale come variabile d'ambiente.",

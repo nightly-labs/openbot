@@ -83,6 +83,8 @@ jobs:
             exit 1
           fi
           bun scripts/check-release-notes.ts
+          # The start recovery reads which schema each release before this check can open.
+          bun scripts/released-schema-versions.ts
           # The `discord-announce` job of a tag push needs the role, so stop before the release.
           if [[ "$GITHUB_EVENT_NAME" == "push" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
             echo "DISCORD_RELEASE_ROLE_ID is not set. See docs/RELEASING.md#discord-announcement." >&2

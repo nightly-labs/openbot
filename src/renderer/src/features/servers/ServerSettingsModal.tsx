@@ -9,6 +9,7 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import {
@@ -25,6 +26,7 @@ import {
   Button,
   CalendarClock,
   Download,
+  FlaskConical,
   Globe2,
   HardDrive,
   History,
@@ -58,6 +60,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
+import type { CrmHost } from "../crm/crm-port";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { hostedPlanStorageGb } from "../files/storage-usage";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
@@ -66,6 +69,7 @@ import type {
   ProviderClaudeCompactWindowSource,
 } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
+import type { HostProviderEnvironmentOptions, ProviderEnvironmentSource } from "../settings/provider-environment";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
@@ -74,6 +78,7 @@ import { createServerAgentsSection, type ServerAgentDefaultsOptions } from "./Se
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
+import { ServerCrmSetting } from "./ServerCrmSetting";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import {
@@ -245,6 +250,11 @@ export interface ServerSettingsModalProps {
    */
   claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
   /**
+   * The provider pages show their Environment section only when a caller supplies this, and only for
+   * the local server or a remote host with `provider-environment-v1` that this member administers.
+   */
+  providerEnvironment?: HostProviderEnvironmentOptions | undefined;
+  /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
    */
@@ -282,8 +292,17 @@ export interface ServerSettingsModalProps {
   browserProfiles?: ServerBrowserProfilesOptions | undefined;
   /** The Vault section: this computer, or a joined server that serves `vault-v1` to an owner or admin. */
   vault?: ServerVaultOptions | undefined;
+  /**
+   * The CRM of this server, for the CRM switch of the Experimental section. The section shows to an
+   * owner or admin of a server with `crm-v1`.
+   */
+  crm?: CrmHost | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
+  /** Counts the open requests, so a new request moves to its section also when the section did not change. */
+  initialSectionRequest?: number | undefined;
+  /** Gets the section on screen, so the rail can mark the page that it opened. */
+  onSectionChange?: ((section: ServerSettingsSection) => void) | undefined;
   /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
   /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
@@ -321,7 +340,8 @@ export type ServerSettingsSection =
   | "import"
   | "transfer"
   | "routines"
-  | "browser-profiles";
+  | "browser-profiles"
+  | "experimental";
 type Section = ServerSettingsSection;
 
 const sections = {
@@ -342,6 +362,10 @@ const sections = {
   transfer: { title: "server.settings.transferTitle", description: "server.settings.transferDescription" },
   routines: { title: "server.settings.routinesTitle", description: "server.settings.routinesDescription" },
   "browser-profiles": { title: "browser.profiles.title", description: "browser.profiles.subtitle" },
+  experimental: {
+    title: "server.settings.experimentalTitle",
+    description: "server.settings.experimentalDescription",
+  },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
 /** The row names of a section, so that the section search also finds a section by one of its rows. */
@@ -376,6 +400,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.companySignIn.scim",
   ],
   storage: ["settings.backgroundProcesses.title"],
+  experimental: ["server.settings.experimentalCrm"],
 };
 
 /**
@@ -400,11 +425,18 @@ const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group
   { value: "desktop", icon: Monitor, group: "server.settings.group.server" },
   { value: "import", icon: Download, group: "server.settings.group.server" },
   { value: "transfer", icon: ArrowLeftRight, group: "server.settings.group.server" },
+  { value: "experimental", icon: FlaskConical, group: "server.settings.group.server" },
 ];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const { t, errorMessage } = useText();
   const [section, setSection] = createSignal<Section>("general");
+  createEffect(
+    () => ({ shown: section(), notify: props.onSectionChange }),
+    ({ shown, notify }) => {
+      notify?.(shown);
+    },
+  );
   /** Set while a provider page is open, so the header reads `Providers › Codex`. */
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   /** Set while an import source is open, so the header reads `Import › Hermes Agent`. */
@@ -457,6 +489,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return undefined;
     return { ...options, serverId: props.server.id };
   }
+  function providerEnvironmentSource(): ProviderEnvironmentSource | undefined {
+    const options = props.providerEnvironment;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "provider-environment-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
+  }
   function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
     const options = props.hostModelVisibility;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "model-visibility-v1")) return undefined;
@@ -472,6 +510,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const options = props.hostPersonality;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "host-personality-v1")) return undefined;
     return options;
+  }
+  /** The CRM switch needs an owner or admin, a host with `crm-v1`, and a host that answers. */
+  function crmHost(): CrmHost | undefined {
+    if (!props.crm || !actionsAvailable() || !serverCanAdminister(props.server, CRM_CAPABILITY)) return undefined;
+    return props.crm;
   }
   const availableInitialSection = (): Section | null =>
     props.initialSection === "updates" && !props.hostUpdate ? null : (props.initialSection ?? null);
@@ -554,6 +597,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return Boolean(props.routineFeed);
       case "browser-profiles":
         return Boolean(props.browserProfiles);
+      case "experimental":
+        return Boolean(crmHost());
     }
   };
   /** Whether the title or the description of the section holds the search of the page. */
@@ -715,9 +760,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
 
   /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
+  const requestedSection = createMemo(() => (props.open ? availableInitialSection() : null));
   createEffect(
-    () => (props.open ? availableInitialSection() : null),
-    (requested) => {
+    () => ({ requested: requestedSection(), request: props.initialSectionRequest }),
+    ({ requested }) => {
       if (requested) setSection(requested);
     },
   );
@@ -754,7 +800,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "import" ||
         value === "transfer" ||
         value === "routines" ||
-        value === "browser-profiles"
+        value === "browser-profiles" ||
+        value === "experimental"
       )
         setSection(value);
     },
@@ -991,6 +1038,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   promptCache={promptCacheSource()}
                   claudeUserSetup={claudeUserSetupSource()}
                   claudeCompactWindow={claudeCompactWindowSource()}
+                  providerEnvironment={providerEnvironmentSource()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />
@@ -1060,6 +1108,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               data-tab="browser-profiles"
             >
               <ServerBrowserProfilesPanel {...browserProfiles()} menuMount={modalElement()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={crmHost()}>
+          {(crm) => (
+            <Tabs.Content
+              value="experimental"
+              class="settings-modal-tab-panel server-settings-panel"
+              data-tab="experimental"
+            >
+              <SettingsSection title={t("server.settings.experimentalFeatures")}>
+                <ItemGroup class="settings-modal-card">
+                  <ServerCrmSetting host={crm()} disabled={Boolean(busy())} run={run} />
+                </ItemGroup>
+              </SettingsSection>
             </Tabs.Content>
           )}
         </Show>

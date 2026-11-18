@@ -35,7 +35,10 @@ export function SettingsPageFrame(props: {
     props.onMounts({ nav, content, path });
     // As on the usage and schedule pages, the heading takes the focus, so a screen reader reads the
     // page that opened. The settings shell puts the focus back on the opener when the page closes.
-    root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
+    // A setting card that opened the page at a row already put the focus on the row's control.
+    if (!content.contains(document.activeElement)) {
+      root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
+    }
     // Escape closes the page, as it closed the settings dialog. On the document and after the
     // delegated handlers, so a control that handles Escape keeps it. A click can put the focus back on
     // the rail or the server menu, so a target outside the page also counts, except an open popup or a

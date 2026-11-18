@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
   "marketplace.app.notConnected": "未连接",
+  "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",
   "marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",
@@ -142,6 +143,7 @@ export const messages = {
     "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
   "marketplace.app.blocked.member":
     "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
+  "marketplace.app.blocked.mac": "{name} 仅在运行 OpenBot 的 Mac 上可用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -357,8 +359,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "我的笔记里关于这个项目的决定是怎么写的？",
   "marketplace.plugin.obsidian.prompt.save": "把这个决定作为新笔记保存到我的仓库。",
   "marketplace.plugin.obsidian.prompt.log": "把今天工作的总结添加到我的“工作日志”笔记中。",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    '在 Obsidian 中打开 Settings > Local REST API。复制 API 密钥并开启 "Enable non-encrypted (HTTP) server"。',
+  "marketplace.plugin.obsidian.hint.apiKey": "在 Obsidian 中打开 Settings > Local REST API，然后复制 API 密钥。",
   "marketplace.plugin.resend.tagline": "事务性邮件",
   "marketplace.plugin.resend.description":
     "Resend 让助手通过一个 API 发送事务性邮件并检查投递情况。把 Resend 控制台中的 API 密钥作为一个环境变量传给本地服务器即可。",

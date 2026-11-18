@@ -151,6 +151,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Ana makine eki reddetti.",
   "error.remote.attachmentTooLarge": "Ekler 10 MB veya daha küçük olmalıdır.",
   "error.remote.attachmentBusy": "Mevcut ekin tamamlanmasını bekleyin.",
+  "error.remote.attachmentChanged": "Dosya değişti veya kullanılamıyor. Yeniden seçin.",
   "error.remote.uploadTimeout": "Ek yükleme zaman aşımına uğradı.",
   "error.remote.hostSessionActive": "Ana makinede zaten etkin bir uzak oturum var.",
   "error.remote.tooManyConnections": "Çok fazla etkin uzak bağlantı.",

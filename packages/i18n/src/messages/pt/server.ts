@@ -305,6 +305,12 @@ export const messages = {
   "server.settings.group.agents": "Agentes",
   "server.settings.group.people": "Pessoas",
   "server.settings.group.server": "Servidor",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Ative recursos que ainda não estão prontos.",
+  "server.settings.experimentalFeatures": "Recursos",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Mostra a página do CRM a proprietários e administradores, permite que os agentes leiam o CRM e sincroniza o Stripe. Ao desativar, os dados ficam.",
   "server.settings.agentDefaultsTitle": "Padrões dos agentes",
   "server.settings.threadsCard": "Tópicos e fuso horário",
   "server.settings.memoryTitle": "Memória",
@@ -343,7 +349,7 @@ export const messages = {
     "Escolha o que os agentes deste servidor podem fazer quando você não define isso para um agente.",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
-    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
+    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
   "server.settings.turnLimit": "Tópicos ao mesmo tempo",

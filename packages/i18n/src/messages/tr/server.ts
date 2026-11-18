@@ -310,6 +310,12 @@ export const messages = {
   "server.settings.group.agents": "Ajanlar",
   "server.settings.group.people": "Kişiler",
   "server.settings.group.server": "Sunucu",
+  "server.settings.experimentalTitle": "Deneysel",
+  "server.settings.experimentalDescription": "Henüz tamamlanmamış özellikleri açın.",
+  "server.settings.experimentalFeatures": "Özellikler",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "CRM sayfasını sahiplere ve yöneticilere gösterin, ajanların CRM'i okumasına izin verin ve Stripe'ı eşitleyin. Kapattığınızda veriler kalır.",
   "server.settings.agentDefaultsTitle": "Ajan varsayılanları",
   "server.settings.threadsCard": "Mesaj dizileri ve saat dilimi",
   "server.settings.memoryTitle": "Bellek",
@@ -348,7 +354,7 @@ export const messages = {
     "Bir ajan için ayarlamadığınızda bu sunucudaki ajanların neler yapabileceğini seçin.",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
-    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
+    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",

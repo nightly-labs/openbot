@@ -73,6 +73,25 @@ export type AgentTaskOutcome = (typeof AGENT_TASK_OUTCOMES)[number];
 /** The most characters of a queued message that a task row shows. */
 export const AGENT_TASK_QUEUED_PREVIEW = 500;
 
+/** The states of a request whose answer has not come back yet. */
+export const AGENT_TASK_AWAITED_STATES = ["queued", "starting", "running"] as const;
+
+/** A request that the agent sent from a task to another agent, whose answer has not come back yet. */
+export interface AgentTaskAwaitedReply {
+  messageId: string;
+  recipientAgentId: string;
+  status: (typeof AGENT_TASK_AWAITED_STATES)[number];
+}
+
+export function isAgentTaskAwaitedReply(value: unknown): value is AgentTaskAwaitedReply {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.messageId) &&
+    isIdentifier(value.recipientAgentId) &&
+    isOneOf(AGENT_TASK_AWAITED_STATES, value.status)
+  );
+}
+
 /** A message that waits to start in a task. */
 export interface AgentTaskQueuedMessage {
   deliveryId: string;
@@ -110,6 +129,11 @@ export interface AgentTask {
    * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
    */
   queue?: QueueDelivery[];
+  /**
+   * The requests that the agent sent from this task and that wait for their answer. A joined server
+   * sends them through `agent-thread-requests-v1`; the frozen `agent-tasks-v1` routes do not.
+   */
+  awaitedReplies?: AgentTaskAwaitedReply[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -272,6 +296,8 @@ export function isAgentTask(value: unknown): value is AgentTask {
     Array.isArray(value.queuedMessages) &&
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
     (value.queue === undefined || (Array.isArray(value.queue) && value.queue.every(isQueueDelivery))) &&
+    (value.awaitedReplies === undefined ||
+      (Array.isArray(value.awaitedReplies) && value.awaitedReplies.every(isAgentTaskAwaitedReply))) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&

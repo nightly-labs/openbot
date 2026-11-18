@@ -21,12 +21,13 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
+import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
 import { bytesResponse, fileResponse } from "./file-response";
 import { canAnswerRemoteRanges } from "./remote-attachment-cache";
 import type { RemoteServerManager } from "./remote-server-manager";
-import { parseRemoteAvatarUrl } from "./remote-server-urls";
+import { parseRemoteAvatarUrl, remoteAttachmentPreviewSize } from "./remote-server-urls";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
 import type { TeamStore } from "./team-store";
 import { isTrustedRendererUrl } from "./trusted-renderer";
@@ -93,7 +94,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
             ...attachmentCorsHeaders(request.headers.get("Origin")),
             ...attachmentDocumentHeaders(attachment.mimeType),
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": "inline",
+            "Content-Disposition": inlineContentDisposition(attachment.name),
           },
           request.headers.get("Range"),
         ),
@@ -108,7 +109,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const serverId = decodeURIComponent(url.hostname);
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
-      const attachment = await runCauseEffect(remoteServers.downloadAttachment(attachmentId, serverId, true));
+      const attachment = await runCauseEffect(
+        remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
+      );
       return bytesResponse(
         attachment.bytes,
         {
@@ -117,7 +120,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
           ...attachmentCorsHeaders(request.headers.get("Origin")),
           ...attachmentDocumentHeaders(attachment.mimeType),
           "X-Content-Type-Options": "nosniff",
-          "Content-Disposition": "inline",
+          "Content-Disposition": inlineContentDisposition(attachment.name),
         },
         canAnswerRemoteRanges(attachment) ? request.headers.get("Range") : undefined,
       );
@@ -132,7 +135,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
   session.defaultSession.protocol.handle("openbot-visual", async (request) => {
     try {
       const url = new URL(request.url);
-      if (url.hostname === "preview") return filePreviewPages.response(request);
+      if (url.hostname === "preview") return await filePreviewPages.response(request);
       const id = url.hostname === "file" ? url.pathname.split("/").filter(Boolean).at(-1) : undefined;
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
       if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });

@@ -1,5 +1,7 @@
 import type { AddedAgent, McpSignInState, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
@@ -8,6 +10,7 @@ import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
 import type { ConnectorRegistry } from "./features/connectors/connector-registry";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
+import { conversationPort } from "./features/conversation/conversation-port";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { canManageStorage, serverHasBackgroundProcesses, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
@@ -82,7 +85,12 @@ export function MarketplaceOverlay(props: {
   connectors?: ConnectorRegistry | undefined;
   /** What the Marketplace calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
-  /** This computer runs macOS. The web client leaves it out: it cannot ask macOS for anything. */
+  /** The live view of `server`'s browser. Absent: this computer's bridge. */
+  browserRuntime?: BrowserViewRuntime | undefined;
+  /**
+   * This computer runs macOS; false on another system, absent while it is not known. The web client
+   * leaves it out: it cannot ask macOS for anything.
+   */
   macOS?: boolean | undefined;
   /**
    * One sentence about the managed runtime that starts a STDIO server, for the computer whose
@@ -101,6 +109,27 @@ export function MarketplaceOverlay(props: {
      `mcp-servers-v1` from an admin, or from a member with `mcp-member-access-v1`; another member
      browses the listings and installs nothing. */
   const pluginServerId = createMemo(() => (serverCanManageMcp(props.server) ? props.server.id : undefined));
+  /* Memos, as `pluginServerId` is: the Marketplace reads these props when a sign-in starts, also from
+     an effect, and a conditional expression in a prop makes a new memo on each read. An effect cannot
+     make one, so an agent card's Sign in stopped there. */
+  const pluginHostName = createMemo(() =>
+    props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined,
+  );
+  const pluginSignInRelay = createMemo(
+    () => props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1"),
+  );
+  // The live view streams the active server, which is the one the Marketplace opens for. The host
+  // shows its private sign-in tab only to an owner or admin: a member gets a sentence.
+  const pluginHostView = createMemo(() =>
+    props.server?.kind === "remote" &&
+    serverSupportsCapability(props.server, "mcp-sign-in-v1") &&
+    serverSupportsCapability(props.server, "browser-view")
+      ? {
+          runtime: props.browserRuntime ?? conversationPort().browser,
+          clipboard: serverSupportsCapability(props.server, "browser-view-clipboard"),
+        }
+      : undefined,
+  );
   /* Why a joined server's apps do not connect, so the app page says it rather than hide Connect. A
      host always lists capabilities, so an empty list on a live connection is one that this app has
      not read yet. An offline, failed or incompatible server has its own notice. */
@@ -137,6 +166,12 @@ export function MarketplaceOverlay(props: {
           open={true}
           calls={props.calls}
           macOS={props.macOS}
+          // This computer, or a joined server that says it is not a Mac (`mac-apps-limit-v1`).
+          macAppsUnavailable={
+            props.server?.kind === "remote"
+              ? serverSupportsCapability(props.server, MAC_APPS_LIMIT_CAPABILITY)
+              : props.macOS === false
+          }
           connectors={props.connectors}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}
@@ -177,12 +212,9 @@ export function MarketplaceOverlay(props: {
           mcpSignInRequest={props.mcpSignInRequest}
           onMcpSignInRequestHandled={props.onMcpSignInRequestHandled}
           onMcpSignIns={props.onMcpSignIns}
-          pluginHostName={
-            props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
-          }
-          pluginSignInRelay={
-            props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1")
-          }
+          pluginHostName={pluginHostName()}
+          pluginSignInRelay={pluginSignInRelay()}
+          pluginHostView={pluginHostView()}
           pluginAccounts={serverSupportsCapability(props.server, "mcp-accounts-v1")}
           pluginAccess={serverCanAdminister(props.server, "mcp-access-v1")}
           onRunPluginPrompt={

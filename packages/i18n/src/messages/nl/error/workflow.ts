@@ -34,6 +34,8 @@ export const messages = {
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":
     "Een afbeelding van een eerdere stap is niet beschikbaar. Voer die stap opnieuw uit.",
+  "error.workflow.mediaEmptyRequest":
+    "Schrijf een beschrijving, of voer de stappen ervoor uit zodat er een tekst of afbeelding binnenkomt.",
   "error.workflow.mediaInputNotImage":
     "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",

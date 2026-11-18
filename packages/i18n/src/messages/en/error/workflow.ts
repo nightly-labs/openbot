@@ -30,6 +30,8 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaEmptyRequest":
+    "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",

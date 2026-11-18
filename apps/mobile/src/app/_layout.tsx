@@ -1,7 +1,7 @@
 import "../../global.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { usePathname } from "expo-router";
+import { usePathname, useSegments } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
@@ -17,6 +17,7 @@ import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
 import { AppLockOverlay } from "@/features/app-lock/components/app-lock-overlay";
 import { installAppLock } from "@/features/app-lock/model/app-lock";
+import { UpdateRequiredOverlay } from "@/features/app-update/components/update-required-overlay";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
@@ -26,6 +27,9 @@ import { installQuickActions, resetQuickActions } from "@/features/quick-actions
 import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadChatBackdrop } from "@/features/settings/model/chat-backdrop";
+import { loadChatBackground } from "@/features/settings/model/chat-background";
+import { loadChatDetailPreferences } from "@/features/settings/model/chat-details";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
 import { loadChatPullPreference, loadChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
@@ -44,6 +48,7 @@ import { loadFullVisualPreference } from "@/features/settings/model/visual-previ
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { resetShortcutDirectory } from "@/features/shortcuts/model/shortcut-directory";
 import { installShortcuts, resetShortcuts } from "@/features/shortcuts/shortcuts-native";
+import { supportLog } from "@/features/support/model/support-log";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
@@ -86,6 +91,13 @@ function RootNavigator() {
   const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
+  const segments = useSegments();
+  // The screen goes to the support log by its route name, such as `chat/[agentId]`: a report then
+  // shows where the user was. Never the path: it has the IDs of agents and chats.
+  const screen = segments.filter((segment) => !segment.startsWith("(")).join("/") || "start";
+  useEffect(() => {
+    supportLog.add("info", "app", `Screen: ${screen}`);
+  }, [screen]);
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
   // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
@@ -195,6 +207,7 @@ function RootNavigator() {
         </View>
         <BloubStage nativeSplashHidden={nativeHidden} onLayout={() => reportArtwork("stage")} />
         <ThemeSweep />
+        <UpdateRequiredOverlay />
         <AppLockOverlay />
       </View>
     </SplashContentReadyContext.Provider>
@@ -230,7 +243,10 @@ export default function RootLayout() {
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
+      void loadChatBackground().catch(() => undefined);
+      void loadChatBackdrop().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadChatDetailPreferences().catch(() => undefined);
       void loadFullVisualPreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
       void loadChatSwipePreference().catch(() => undefined);

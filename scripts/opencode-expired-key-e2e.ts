@@ -7,13 +7,15 @@
 // that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; that the stored
 // key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
 // models (#7550); that a model whose provider has no sign-in names that provider and its fix
-// (#2746); and that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
-// sign-in (#9095).
+// (#2746); that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
+// sign-in (#9095); and that a `-32000` for a provider with a key in OpenCode 2's own database says
+// that the provider refused the request, as a firewall's 403 does, not that a sign-in is missing (#10166).
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
@@ -42,6 +44,7 @@ interface Report {
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
   refusedV2?: { saved: string; notSaved: string };
+  providerRefused?: { error: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -53,6 +56,11 @@ let endpoints: CustomProviderConfig[] = [];
 process.env.FAKE_LOG = log;
 // `FAKE_AUTH_KEY` stands for the key in OpenCode's own `auth.json`.
 process.env.FAKE_AUTH_KEY = "expired";
+// OpenBot reads OpenCode's own key store here, never the developer's.
+const openCodeData = join(root, "data", "opencode");
+process.env.XDG_DATA_HOME = join(root, "data");
+delete process.env.OPENCODE_AUTH_CONTENT;
+delete process.env.OPENCODE_DB;
 
 /** A new process, as the provider runtime starts after a key change. The key is read at spawn. */
 function open(cli: AgentCliInfo): AgentClient {
@@ -166,6 +174,12 @@ try {
   await runCauseEffect(sixth.stop());
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "expired-v2";
+  // The Go key in OpenCode's own `auth.json` keeps the Go text, which names OpenBot's settings (#10166).
+  await mkdir(openCodeData, { recursive: true });
+  await writeFile(
+    join(openCodeData, "auth.json"),
+    JSON.stringify({ "opencode-go": { type: "api", key: "expired-v2" } }),
+  );
   const seventh = open(cli);
   const { error: notSaved } = await runTurn(seventh, await startThread(seventh, { cwd: workspace }));
   assert.equal(
@@ -174,6 +188,28 @@ try {
     "With no saved key, the error stays the missing sign-in.",
   );
   report.refusedV2 = { saved, notSaved };
+  await runCauseEffect(seventh.stop());
+
+  // 8. OpenCode 2.3.0 sends each 403 of a provider as `-32000`, also a firewall's block of a VPN
+  // address. With a key for that provider in OpenCode's own database, the provider refused the
+  // request: the error must not say that a sign-in is missing.
+  const database = new DatabaseSync(join(openCodeData, "opencode.db"));
+  database.exec(
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",
+  );
+  database
+    .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
+    .run("cred_1", "anthropic", "API key", JSON.stringify({ type: "key", key: "valid" }), 1);
+  database.close();
+  process.env.FAKE_PROVIDER_AUTH = "1";
+  const eighth = open(cli);
+  const { error: refused } = await runTurn(eighth, await startThread(eighth, { cwd: workspace }));
+  assert.equal(
+    refused,
+    sourceText("error.provider.opencodeProviderRefused", { provider: "anthropic" }),
+    "A provider with a stored key reads as a refused request, not a missing sign-in.",
+  );
+  report.providerRefused = { error: refused };
   report.passed = true;
 } finally {
   await stopClients(clients);

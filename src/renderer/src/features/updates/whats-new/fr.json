@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, le CRM, Ajouter un compte par code, un arrière-plan défini par un agent, les dossiers de la Bibliothèque que les agents organisent et les messages envoyés dans une exécution en cours de Devin ne fonctionnent que si le serveur a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Affichez un arrière-plan animé derrière toute la fenêtre. Choisissez une scène, comme Bassin à koïs ou Lucioles, dans Réglages > Arrière-plan de la fenêtre, ou demandez à un agent d’en créer une pour vous.",
+          "Gérez les prospects, les clients et les paiements sur la nouvelle page CRM. Elle est expérimentale : un propriétaire ou un administrateur l’active dans Réglages du serveur > Expérimental. Elle peut importer depuis Stripe, et les agents proposent des modifications qu’un propriétaire ou un administrateur approuve.",
+          "Répondez à un agent dans la discussion du Dock des agents. Autorisez ou refusez une commande, répondez à une question ou terminez une étape du navigateur sans la fenêtre principale.",
+          "Organisez la Bibliothèque avec des vignettes de dossiers, Favoris, Récents et Annuler. Faites glisser des fichiers sur Nouveau dossier pour créer un dossier, ou demandez à un agent d’organiser ses dossiers.",
+          "Ajoutez un compte ChatGPT (Codex), Grok ou Claude avec un code. Ouvrez le menu à côté d’Ajouter un compte et sélectionnez Ajouter un compte par code.",
+          "Un message que vous envoyez pendant qu’un agent Devin ou OpenCode travaille rejoint l’exécution en cours. Cela nécessite Devin CLI 3000.12.57 ou OpenCode 2.3.0, ou une version ultérieure."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Les réglages ont une nouvelle mise en page. Les sections sont regroupées sous des titres, et les Réglages du serveur ont de nouvelles sections Mémoire et Valeurs par défaut des agents. Sur macOS, OpenBot utilise la police du système.",
+          "Ajoutez et modifiez vos serveurs MCP personnalisés dans Marketplace > Apps. Les Réglages du serveur n’ont plus de section MCP.",
+          "Dans une discussion avec un agent, vos bulles prennent désormais la couleur de l’avatar de l’agent. Modifiez cela dans Réglages > Apparence > Vos bulles.",
+          "Une conversation vocale n’ouvre plus le panneau latéral. Une petite barre en haut de la discussion affiche les commandes vocales."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Une discussion qui perd sa session enregistrée, ou devient trop volumineuse, ne reste plus bloquée. L’agent démarre une nouvelle session avec l’historique de la discussion et répond à votre message.",
+          "Davantage d’agents passent à leur modèle de secours lorsqu’une limite d’utilisation ou une erreur du fournisseur arrête une exécution, y compris les agents Grok, Hermes et Claude.",
+          "Les agents peuvent utiliser une connexion enregistrée à plus d’endroits, comme un formulaire de connexion dans un cadre.",
+          "Une routine reste active après une exécution échouée, et une exécution prévue alors que le fournisseur ne peut pas démarrer est lancée plus tard.",
+          "OpenBot consomme moins de CPU et de batterie : les vidéos de la discussion et des onglets masqués du navigateur se mettent en pause lorsque vous ne les voyez pas."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

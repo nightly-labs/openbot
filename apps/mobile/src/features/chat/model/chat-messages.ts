@@ -1,6 +1,6 @@
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type {
@@ -29,8 +29,10 @@ import {
   isContextResetMarker,
   marketplaceSuggestionEvent,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -224,7 +226,10 @@ export function presentChatMessages(
 }
 
 // The reader decides whether a user message is their own, so a bubble is kept for one reader.
-const projectedBubbles = new WeakMap<ConversationMessage, { readerKey: string; bubble: ChatMessage }>();
+const projectedBubbles = new WeakMap<
+  ConversationMessage,
+  { readerKey: string; replaced: boolean; bubble: ChatMessage }
+>();
 const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
@@ -243,10 +248,30 @@ export interface ProgressUpdates {
 
 /**
  * Narration that the agent finished writing. A narration that still streams waits, so its bubble
- * enters with all of its text and does not grow, as on desktop.
+ * enters with all of its text and does not grow, as on desktop. A filler note, or one that repeats an
+ * earlier note of the turn, stays only in the steps; `shown` holds the notes that the turn showed.
  */
-function shownProgressUpdate(message: ConversationMessage, provider: AgentProviderRef | undefined): boolean {
-  return message.status !== "streaming" && Boolean(message.text.trim()) && isNarrationItemId(message.id, provider);
+function shownProgressUpdate(
+  message: ConversationMessage,
+  provider: AgentProviderRef | undefined,
+  shown: Set<string>,
+): boolean {
+  return (
+    message.status !== "streaming" && isNarrationItemId(message.id, provider) && showsNarration(message.text, shown)
+  );
+}
+
+/** The notes that each turn showed as progress updates, for `shownProgressUpdate`. */
+function turnShownNotes(): (turnKey: string) => Set<string> {
+  const byTurn = new Map<string, Set<string>>();
+  return (turnKey) => {
+    let shown = byTurn.get(turnKey);
+    if (!shown) {
+      shown = new Set();
+      byTurn.set(turnKey, shown);
+    }
+    return shown;
+  };
 }
 
 /**
@@ -286,6 +311,15 @@ function suggestedApp(message: ConversationMessage): string | null {
   const appId = marketplaceSuggestionEvent(message)?.appId;
   if (!appId) return null;
   return isMobileConnectorId(appId) || MOBILE_PLUGINS.some((plugin) => plugin.slug === appId) ? appId : null;
+}
+
+/**
+ * A setting card that an agent showed. It opens a row of the desktop app's settings or of the agent
+ * settings side panel, and the phone has neither, so the phone shows no row. The agent's reply still
+ * says what the setting does.
+ */
+function settingLinkMessage(message: ConversationMessage): boolean {
+  return message.author === "system" && message.itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX) === true;
 }
 
 const ROUTINE_RUN_LABELS = {
@@ -367,7 +401,7 @@ const PLAN_HEADING_LIMIT = 80;
  * text, so the plan is read back from it. The last line of a streaming text can be incomplete, so
  * it is left out. Returns null when the text is not a checklist; the message then shows as text.
  */
-function projectPlan(message: ConversationMessage): ChatMessage | null {
+function projectPlan(message: ConversationMessage, replaced: boolean): ChatMessage | null {
   if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
   const streaming = message.status === "streaming";
   const lastLine = message.text.lastIndexOf("\n");
@@ -389,7 +423,9 @@ function projectPlan(message: ConversationMessage): ChatMessage | null {
     heading: short ? plan.explanation : null,
     explanation: short ? null : plan.explanation,
     stopped:
-      (message.status === "interrupted" || message.status === "failed") && steps.some((step) => step.state !== "done"),
+      !replaced &&
+      (message.status === "interrupted" || message.status === "failed") &&
+      steps.some((step) => step.state !== "done"),
     steps,
   };
 }
@@ -479,6 +515,17 @@ export function projectChatMessages(
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
+  const shownNotes = turnShownNotes();
+  // As on desktop, only the agent's own output counts: not an exchange with a teammate or a routine marker.
+  const replacedIds = replacedConversationPlans(
+    sorted.map((message) => ({
+      id: message.id,
+      turnId: message.turnId,
+      agent:
+        message.author === "assistant" && !message.exchange && !message.routine ? (message.senderAgentId ?? "") : null,
+      plan: message.itemType === CONVERSATION_PLAN_ITEM_TYPE,
+    })),
+  );
   for (const message of sorted) {
     // Routine events are system messages, skipped below. Like desktop, a routine instruction shows only as its marker.
     const routine = projectRoutineMarker(message, latestRuns);
@@ -500,6 +547,7 @@ export function projectChatMessages(
         );
       continue;
     }
+    if (settingLinkMessage(message)) continue;
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;
@@ -557,7 +605,8 @@ export function projectChatMessages(
       // The steps keep a progress update too, as the desktop steps do.
       const update =
         progressUpdates && answered
-          ? shownProgressUpdate(message, progressUpdates.provider(undefined)) && beforeAnswer(message, answered)
+          ? beforeAnswer(message, answered) &&
+            shownProgressUpdate(message, progressUpdates.provider(undefined), shownNotes(key))
           : false;
       thinking.steps.push({
         id: message.id,
@@ -568,12 +617,13 @@ export function projectChatMessages(
       if (update) result.push(projectedMarker(projectedUpdates, message, () => progressBubble(message.id, message)));
     } else {
       const cached = projectedBubbles.get(message);
-      let bubble = cached?.readerKey === readerKey ? cached.bubble : undefined;
+      const replaced = replacedIds.has(message.id);
+      let bubble = cached?.readerKey === readerKey && cached.replaced === replaced ? cached.bubble : undefined;
       if (!bubble) {
         const sender = message.author === "user" ? message.senderMember : undefined;
         const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
         const otherMember = sender !== undefined && reader !== null && !ownSender;
-        bubble = projectPlan(message) ??
+        bubble = projectPlan(message, replaced) ??
           projectSubagents(message) ?? {
             id: message.id,
             kind: "message",
@@ -592,7 +642,7 @@ export function projectChatMessages(
             createdAt: message.createdAt,
             reactions: messageReactions(message),
           };
-        projectedBubbles.set(message, { readerKey, bubble });
+        projectedBubbles.set(message, { readerKey, replaced, bubble });
       }
       result.push(bubble);
     }
@@ -901,7 +951,7 @@ export function latestReadBoundaryMessage(messages: ConversationMessage[]) {
 
 const projectedChannelMessages = new WeakMap<
   ChannelMessage,
-  { self: boolean; latest: boolean; progress: boolean; rows: readonly ChatMessage[] }
+  { self: boolean; latest: boolean; progress: boolean; replaced: boolean; rows: readonly ChatMessage[] }
 >();
 
 function projectChannelMessage(
@@ -909,6 +959,7 @@ function projectChannelMessage(
   self: boolean,
   latestRuns: ReadonlySet<string>,
   progress: boolean,
+  replaced: boolean,
 ): ChatMessage | null {
   const routine = routineMarker(entry.message);
   if (routine) {
@@ -938,6 +989,7 @@ function projectChannelMessage(
     const appId = suggestedApp(entry.message);
     return appId ? { id: entry.id, kind: "app-suggestion", appId } : null;
   }
+  if (settingLinkMessage(entry.message)) return null;
   const routing = channelRoutingConversationEvent(entry.message);
   if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
   // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.
@@ -959,7 +1011,7 @@ function projectChannelMessage(
       };
   }
   // A plan card of channel work shows as in an agent chat.
-  const plan = entry.author.kind === "agent" ? projectPlan(entry.message) : null;
+  const plan = entry.author.kind === "agent" ? projectPlan(entry.message, replaced) : null;
   if (plan) return { ...plan, id: entry.id };
   if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
     if (progress) return { ...progressBubble(entry.id, entry.message), speaker: entry.author };
@@ -997,13 +1049,26 @@ export function projectChannelMessages(
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
   const answered = progressUpdates ? answerTimes(messages.map((entry) => entry.message)) : undefined;
+  const shownNotes = turnShownNotes();
+  const replacedIds = replacedConversationPlans(
+    messages.map((entry) => ({
+      id: entry.id,
+      turnId: entry.message.turnId,
+      agent: entry.author.kind === "agent" && !entry.message.routine ? entry.author.id : null,
+      plan: entry.message.itemType === CONVERSATION_PLAN_ITEM_TYPE,
+    })),
+  );
   const showsUpdate = (entry: ChannelMessage) =>
     Boolean(progressUpdates && answered) &&
     entry.author.kind === "agent" &&
     !entry.superseded &&
     entry.message.itemType === "commentary" &&
-    shownProgressUpdate(entry.message, progressUpdates?.provider(entry.author.id)) &&
-    (!answered || beforeAnswer(entry.message, answered));
+    (!answered || beforeAnswer(entry.message, answered)) &&
+    shownProgressUpdate(
+      entry.message,
+      progressUpdates?.provider(entry.author.id),
+      shownNotes(entry.message.turnId ?? entry.message.id),
+    );
   return messages
     .filter(
       (entry) =>
@@ -1018,9 +1083,16 @@ export function projectChannelMessages(
       const cached = projectedChannelMessages.get(entry);
       const latest = latestRuns.has(entry.message.id);
       const progress = showsUpdate(entry);
-      if (cached && cached.self === self && cached.latest === latest && cached.progress === progress)
+      const replaced = replacedIds.has(entry.id);
+      if (
+        cached &&
+        cached.self === self &&
+        cached.latest === latest &&
+        cached.progress === progress &&
+        cached.replaced === replaced
+      )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced);
       // A progress update keeps a steps row of its own, so the activity row knows that the member's
       // latest step is this update and does not show an older thought.
       const rows: readonly ChatMessage[] = !message
@@ -1036,7 +1108,7 @@ export function projectChannelMessages(
               },
             ]
           : [message];
-      projectedChannelMessages.set(entry, { self, latest, progress, rows });
+      projectedChannelMessages.set(entry, { self, latest, progress, replaced, rows });
       return rows;
     });
 }

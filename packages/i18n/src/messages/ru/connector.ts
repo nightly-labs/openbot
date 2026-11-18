@@ -409,10 +409,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Личный номер",
   "connector.whatsapp.ownNumberDescription":
-    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "connector.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
+  "connector.whatsapp.statusReactions": "Реакции статуса",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
   "connector.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
@@ -428,10 +431,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Номер",
   "connector.whatsapp.kindPersonal": "Мой личный номер",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили. Другие люди не получают ответа.",
   "connector.whatsapp.kindDedicated": "Номер только для OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+    "OpenBot отвечает с этого номера каждому незнакомому человеку кодом, который нужно передать вам. Вы одобряете их здесь.",
   "connector.whatsapp.methodLabel": "Способ привязки",
   "connector.whatsapp.methodQr": "QR-код",
   "connector.whatsapp.methodCode": "Код привязки",

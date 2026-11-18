@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Einige Apps oder Skills sind nicht installiert. „Neu verbinden“ installiert sie.",
   "marketplace.app.notConnected": "Nicht verbunden",
+  "marketplace.app.paused": "Pausiert",
   "marketplace.app.custom": "MCP-Server",
   "marketplace.app.githubTagline": "Repositorys, Issues und Pull Requests",
   "marketplace.app.onePasswordTagline": "Bei Websites mit von dir geteilten Zugangsdaten anmelden",
@@ -143,6 +144,7 @@ export const messages = {
     "Auf {host} läuft eine ältere OpenBot-Version, die keine Apps verbinden kann. Aktualisiere OpenBot auf {host} oder bitte den Inhaber darum.",
   "marketplace.app.blocked.member":
     "Nur ein Inhaber oder Admin von {host} kann dort Apps verbinden. Bitte eine dieser Personen, {name} zu verbinden oder OpenBot auf {host} zu aktualisieren, damit Mitglieder Apps verbinden können.",
+  "marketplace.app.blocked.mac": "{name} funktioniert nur auf einem Mac, auf dem OpenBot läuft.",
   "marketplace.app.connectAgain": "Erneut verbinden",
   "marketplace.app.automation.askOnInstall": "Bei Installation macOS um Zugriff bitten",
   "marketplace.app.automation.title": "Zugriff auf Apple-Apps",
@@ -413,7 +415,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.log":
     "Füge eine Zusammenfassung der heutigen Arbeit zu meiner Notiz Arbeitsprotokoll hinzu.",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Öffne in Obsidian Settings > Local REST API. Kopiere den API-Schlüssel und aktiviere "Enable non-encrypted (HTTP) server".',
+    "Öffne in Obsidian Settings > Local REST API und kopiere den API-Schlüssel.",
   "marketplace.plugin.resend.tagline": "Transaktions-E-Mails",
   "marketplace.plugin.resend.description":
     "Mit Resend senden Agenten Transaktions-E-Mails und prüfen die Zustellung über eine API. Ein API-Schlüssel aus dem Resend-Dashboard wird dem lokalen Server als eine Umgebungsvariable übergeben.",

@@ -43,6 +43,8 @@ import {
   type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type QueueSnapshot,
+  WITHDRAW_FEEDBACK_STATUSES,
+  type WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -53,7 +55,11 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import {
+  type AgentActiveQueues,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 
 export function decodeAttachmentDownloadProgress(value: unknown): AttachmentDownloadProgress {
   const progress = decodeRecord(value, "attachment download progress");
@@ -73,6 +79,13 @@ export function decodeAttachmentImportProgress(value: unknown): AttachmentImport
     sent: requiredNumber(progress, "sent"),
     total: requiredNumber(progress, "total"),
   };
+}
+
+/** The address of a temporary page that main keeps, or null when its page store is full. */
+export function decodeOptionalFilePreviewPageUrl(value: unknown): string | null {
+  if (value === null) return null;
+  if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL response.");
+  return value;
 }
 
 export function decodeFilePreview(value: unknown): FilePreview {
@@ -176,6 +189,12 @@ export function decodeReadState(value: unknown): ConversationReadState {
   return value;
 }
 
+export function decodeWithdrawFeedbackResult(value: unknown): WithdrawFeedbackResult {
+  const result = decodeRecord(value, "feedback withdraw result");
+  if (!isOneOf(WITHDRAW_FEEDBACK_STATUSES, result.status)) throw new Error("Invalid feedback withdraw result.");
+  return { status: result.status };
+}
+
 export function decodeReadStates(value: unknown): Record<string, ConversationReadState> {
   const item = decodeRecord(value, "conversation reads");
   return Object.fromEntries(Object.entries(item).map(([agentId, state]) => [agentId, decodeReadState(state)]));
@@ -261,6 +280,10 @@ export function decodeTaskWindow(value: unknown): AgentTaskWindow {
     throw new Error("Invalid task part response.");
   }
   return value;
+}
+
+export function decodeActiveQueues(value: unknown): AgentActiveQueues | null {
+  return value === null ? null : decodeAgentActiveQueues(value);
 }
 
 export function decodeQueue(value: unknown): QueueSnapshot {

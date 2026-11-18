@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, open, realpath, stat } from "node:fs/promises";
+import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -924,6 +924,14 @@ function parseMistralVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
+/**
+ * GitHub Copilot CLI 1.0.105 updates itself unless told not to, and without this variable it also runs
+ * the newest package in its cache, so `--version` names that package (#9888). OpenBot owns the
+ * version, so every process gets the variable, the version check too: `copilot login` rejects the
+ * `--no-auto-update` flag.
+ */
+export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
+
 /** The providers whose CLI is one native program that OpenBot can download. */
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
@@ -977,7 +985,12 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
  */
 export interface InstalledFirstChoice<Cli> {
   readonly cli: Cli;
-  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+  readonly passedOver: {
+    readonly source: "system" | "managed";
+    readonly version: string;
+    /** The user's CLI lacks parts that it needs (`AgentCliInfo.incomplete`). */
+    readonly incomplete?: boolean;
+  } | null;
 }
 
 /**
@@ -1002,7 +1015,14 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
       const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
       return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
     }
-    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+    return {
+      cli: resolved,
+      passedOver: {
+        source: "system",
+        version: installed.version,
+        ...(installed.incomplete ? { incomplete: true } : {}),
+      },
+    };
   };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
@@ -1121,6 +1141,7 @@ function windowsFallbackPaths(
     paths.push(win32.join(userHome, ".opencode", "bin", "opencode.exe"));
     if (localAppData) paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "opencode.exe"));
   }
+  if (command === "kimi") paths.push(win32.join(userHome, ".kimi-code", "bin", "kimi.exe"));
   if (appData) paths.push(win32.join(appData, "npm", `${command}.cmd`));
   paths.push(
     win32.join(userHome, ".local", "bin", `${command}.exe`),
@@ -1326,6 +1347,8 @@ function posixFallbackPaths(
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
   if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));
   if (command === "grok") paths.push(posix.join(userHome, ".grok", "bin", "grok"));
+  // Kimi Code's installer adds its folder to `PATH` only in `~/.bashrc` or `~/.zshrc` (#11790).
+  if (command === "kimi") paths.push(posix.join(userHome, ".kimi-code", "bin", "kimi"));
   paths.push(
     posix.join(userHome, ".npm-global", "bin", command),
     posix.join(userHome, ".volta", "bin", command),
@@ -1427,6 +1450,8 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
   const slow = slowVersionReads.has(candidate);
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // A Copilot CLI without `COPILOT_ENV` reports the newest package in its cache (#9888).
+  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
   // The signal stops the process when the start that waits for it ends.
   const output = yield* Effect.tryPromise({
     try: (signal) =>
@@ -1438,6 +1463,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
               signal,
               timeout,
               maxBuffer: 64 * 1024,
+              env: { ...process.env, ...providerEnv },
               windowsHide: true,
               windowsVerbatimArguments: true,
             },
@@ -1447,7 +1473,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
             timeout,
             maxBuffer: 64 * 1024,
             windowsHide: process.platform === "win32",
-            env: { ...process.env, ...cliPathEnvironment(launch) },
+            env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
           }),
     catch: providerFailure,
   }).pipe(
@@ -1471,6 +1497,15 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return (await stat(path)).isFile();
+    return await stat(path).then(
+      (info) => info.isFile(),
+      async (error: unknown) => {
+        // A Microsoft Store install puts only an app execution alias in WindowsApps on the `PATH`
+        // (#10985). It is a link that `stat` refuses with `EACCES`, but it starts as a program, so
+        // the version read decides.
+        if (process.platform !== "win32" || !isDynamicRecord(error) || error.code !== "EACCES") throw error;
+        return (await lstat(path)).isSymbolicLink();
+      },
+    );
   }).pipe(Effect.match({ onSuccess: (file) => file, onFailure: () => false })),
 );

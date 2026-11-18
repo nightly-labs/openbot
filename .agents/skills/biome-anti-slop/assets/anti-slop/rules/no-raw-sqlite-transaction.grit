@@ -1,0 +1,19 @@
+language js(typescript)
+
+// scope: global
+
+// A statement that opens, ends or nests a SQLite transaction by hand: `BEGIN`, `COMMIT`, `END`,
+// `ROLLBACK`, `SAVEPOINT` or `RELEASE` as the start of the SQL given to `exec` or `prepare`. A hand
+// written transaction misses one of the cases that the shared helper covers: a nested `BEGIN` that
+// SQLite rejects, a `ROLLBACK` after SQLite already rolled back, or an error that leaves the
+// connection in a transaction. SQL that only contains the word, such as a trigger body
+// (`CREATE TRIGGER ... BEGIN ... END`), starts with another keyword and is not matched.
+`$receiver.$method($sql)` as $call where {
+  $method <: or { `exec`, `prepare` },
+  $sql <: r"(?is)^[\"'`]\s*(?:BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b.*",
+  register_diagnostic(
+    span=$call,
+    message="Do not write a SQLite transaction statement by hand. Use withTransaction (or withTransactionAsync) from src/backend/database/sqlite-transaction.ts: it opens BEGIN IMMEDIATE, nests with a savepoint, rolls back only the failed level and never leaves the connection in a transaction. See src/backend/AGENTS.md.",
+    severity="error"
+  )
+}

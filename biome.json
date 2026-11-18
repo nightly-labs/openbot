@@ -281,6 +281,10 @@
       ]
     },
     {
+      "includes": ["src/backend/**", "src/main/**", "!src/backend/database/sqlite-transaction.ts"],
+      "plugins": ["./tools/biome/anti-slop/rules/no-raw-sqlite-transaction.grit"]
+    },
+    {
       "includes": ["**/*.stories.ts", "**/*.stories.tsx"],
       "plugins": ["./tools/ui-foundation/no-story-play.grit"]
     },

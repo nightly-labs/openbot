@@ -116,6 +116,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
   "marketplace.app.notConnected": "Not connected",
+  // The status of a messaging app whose places are all paused: agents cannot use it until Resume.
+  "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
@@ -166,6 +168,7 @@ export const messages = defineMessages("marketplace", {
     "{host} runs an older OpenBot version that cannot connect apps. Update OpenBot on {host}, or ask its owner to update it.",
   "marketplace.app.blocked.member":
     "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
+  "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
@@ -415,8 +418,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.obsidian.prompt.recall": "What do my notes say about the decisions on this project?",
   "marketplace.plugin.obsidian.prompt.save": "Save this decision as a new note in my vault.",
   "marketplace.plugin.obsidian.prompt.log": "Add a summary of today's work to my Work log note.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, open Settings > Local REST API and copy the API key.",
   "marketplace.plugin.resend.tagline": "Transactional email",
   "marketplace.plugin.resend.description":
     "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",

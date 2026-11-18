@@ -7,6 +7,11 @@
   color: var(--openbot-text-primary);
   background: var(--openbot-bg-canvas);
 }
+/* A backdrop paints at -1 under the page, so the page is clear while it shows. The root keeps the
+ * canvas color behind the backdrop. */
+:root[data-openbot-window-glass] .web-app {
+  background: transparent;
+}
 .web-app-frame {
   min-width: 0;
   height: 100%;

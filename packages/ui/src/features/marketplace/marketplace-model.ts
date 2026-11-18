@@ -148,6 +148,14 @@ export function pluginAppSetup(app: MarketplacePluginApp): AppSetup {
   return flow ? FLOW_SETUP[flow.kind] : "open";
 }
 
+/** The plugin drives Apple apps, which run only on a Mac, and the host of its apps is not one. */
+export function pluginNeedsMac(
+  model: Pick<MarketplaceModel, "macAppsUnavailable">,
+  plugin: { apps: readonly MarketplacePluginApp[] },
+): boolean {
+  return model.macAppsUnavailable === true && plugin.apps.some((app) => (app.macAutomation?.length ?? 0) > 0);
+}
+
 /**
  * The status text of a server that the user added. It says what the user set: OpenBot connects to
  * the server only for a test, so it cannot say that the server answers.
@@ -305,6 +313,8 @@ export interface MarketplaceModel {
   appHostName?: string | undefined;
   /** Absent when this client cannot ask macOS, or when a joined server runs the apps. */
   macAutomation?: MarketplaceMacAutomation | undefined;
+  /** The host of the apps is not a Mac, so an app that drives Apple apps does not run there. */
+  macAppsUnavailable?: boolean | undefined;
   /** Asks for a confirmation, then removes what the catalog app installed. */
   disconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => void;
   /** Removes a custom MCP server. */

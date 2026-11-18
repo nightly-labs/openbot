@@ -10,10 +10,12 @@ import {
   exceptionDescription,
   frameAutomationContextId,
   frameIds,
+  isFrameGone,
   isRecord,
   numberValue,
   recordValue,
   type SendCommand,
+  skipGoneFrame,
   stringValue,
   textMatches,
 } from "./browser-cdp-values";
@@ -52,14 +54,30 @@ const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
  */
 type HiddenSubtreeRule = "strict" | "drawn" | "drawn-usable";
 
+/** SVG elements whose content the browser never draws where it is in the document. */
+const SVG_RESOURCE_TAGS = [
+  "clipPath",
+  "defs",
+  "filter",
+  "linearGradient",
+  "marker",
+  "mask",
+  "pattern",
+  "radialGradient",
+  "symbol",
+];
+
 function skipHiddenSubtrees(rule: HiddenSubtreeRule): string {
   const strict = rule === "strict";
   return `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
   // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
   if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
+  // An SVG resource is drawn only where a use, fill, clip or mask references it, never in place.
+  // An icon sprite of thousands of symbols would otherwise use the budget before the page (#9897).
+  let hidden = node.namespaceURI === 'http://www.w3.org/2000/svg' && ${JSON.stringify(SVG_RESOURCE_TAGS)}.includes(node.localName);
   // The attributes, not the properties: a form control named "hidden" or "inert" replaces the form's property (#7187).
-  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
+  hidden ||= Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (${strict} && style.opacity === '0');
@@ -420,7 +438,10 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     const scanBudgetMs = Math.max(1, deadline - Date.now());
-    const contextId = yield* automationContextId(send, capture.sessionId);
+    const contextId = yield* automationContextId(send, capture.sessionId).pipe(
+      skipGoneFrame(capture.sessionId, undefined),
+    );
+    if (contextId === undefined) continue;
     const result = yield* send(
       "Runtime.evaluate",
       {
@@ -575,8 +596,15 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
   const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
-  for (const frameId of frameIds(frameTree)) {
-    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+  const ids = frameIds(frameTree);
+  for (const frameId of ids) {
+    // A child frame that the page removed after the tree was read has no match.
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId).pipe(
+      Effect.catchIf(
+        (failure) => frameId !== ids[0] && isFrameGone(failure),
+        () => Effect.succeed({ nodes: [] }),
+      ),
+    );
     yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;

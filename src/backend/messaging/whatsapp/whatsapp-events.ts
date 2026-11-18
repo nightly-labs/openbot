@@ -13,6 +13,7 @@ import {
 } from "@openbot/whatsapp/baileys";
 import type { InboundAction, InboundFile, InboundMessage, MessageTarget } from "../messaging-types";
 import type { WhatsAppChatState } from "./whatsapp-chats";
+import { isOtherOpenBotPost } from "./whatsapp-loop-guard";
 import { type SenderDecision, senderDecision, type WhatsAppSenderRules } from "./whatsapp-senders";
 
 /** The conversation of a direct chat: the whole chat. */
@@ -58,7 +59,9 @@ export type WhatsAppEvent =
   | { type: "message"; message: InboundMessage; chatJid: string; isGroup: boolean }
   | { type: "action"; action: InboundAction }
   /** An unknown person wrote to a dedicated number. */
-  | { type: "pairing"; chatJid: string; senderId: string; name: string };
+  | { type: "pairing"; chatJid: string; senderId: string; name: string }
+  /** Another OpenBot linked to the same number posted in the owner's own chat. Nothing answers it. */
+  | { type: "otherOpenBot"; chatJid: string };
 
 /** The socket facts that tell a held message from history. */
 export interface WhatsAppUpsertWindow {
@@ -140,6 +143,10 @@ export async function whatsAppInbound(
     applyChange(protocol, chatJid, authorId, context.chats);
     return null;
   }
+  // An HD photo or video comes twice: the normal copy, then the HD copy, which names the first. When
+  // the first copy was read, the second is not a new message.
+  const firstCopy = firstCopyId(message.message);
+  if (firstCopy && context.chats.keyOf(firstCopy)) return null;
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
   if (decision.type === "pair")
     return authorNumber && !historyOnly ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
@@ -154,6 +161,7 @@ export async function whatsAppInbound(
     (context.isOwnPost(quotedId) ||
       (contextInfo?.participant ? isMe(jidNormalizedUser(contextInfo.participant), context.me) : false));
   const text = textOf(content);
+  if (isSelfChat && isOtherOpenBotPost(text)) return historyOnly ? null : { type: "otherOpenBot", chatJid };
   const files = filesOf(content, chatJid, id);
   context.chats.rememberKey(id, { fromMe: Boolean(key.fromMe), participant: key.participant ?? null, text });
   if (files[0]) context.chats.rememberMedia(files[0].id, message);
@@ -237,6 +245,25 @@ export function whatsAppQuoteId(target: MessageTarget): string | null {
   const [threadKey = "", replyTo = ""] = target.replyThreadId.split(":");
   if (replyTo) return replyTo;
   return threadKey && threadKey !== WHATSAPP_DIRECT_THREAD ? threadKey : null;
+}
+
+const SECOND_UPLOADS: ReadonlySet<number> = new Set([
+  proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+  proto.MessageAssociation.AssociationType.HD_VIDEO_DUAL_UPLOAD,
+  proto.MessageAssociation.AssociationType.HEVC_VIDEO_DUAL_UPLOAD,
+]);
+
+/** The id of the normal copy that this HD copy of a photo or video names, or null for any other message. */
+function firstCopyId(message: proto.IMessage): string | null {
+  let current: proto.IMessage | null | undefined = message;
+  // The link can be on the outer message or inside its envelopes (a disappearing chat, the HD wrapper).
+  for (let depth = 0; current && depth < 4; depth++) {
+    const association = current.messageContextInfo?.messageAssociation;
+    if (association?.associationType != null && SECOND_UPLOADS.has(association.associationType))
+      return association.parentMessageKey?.id ?? null;
+    current = current.ephemeralMessage?.message ?? current.associatedChildMessage?.message;
+  }
+  return null;
 }
 
 /** A delete for everyone or a change of text, which the saved copy of the message follows. */
@@ -430,7 +457,8 @@ function userOf(jid: string | null | undefined): string | null {
 }
 
 /** The send time in milliseconds. Baileys gives a number, or a protobuf Long after a decode. */
-function sentAt(message: WAMessage): number {
+/** When the message was sent, in milliseconds, or 0 when WhatsApp did not say. */
+export function sentAt(message: WAMessage): number {
   const value = message.messageTimestamp;
   const seconds = typeof value === "number" ? value : value ? value.toNumber() : 0;
   return seconds * 1_000;

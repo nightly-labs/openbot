@@ -518,7 +518,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.provider": "Provider",
   "mobile.server.route.providerModels": "Models",
   "mobile.server.route.acpRegistry": "ACP registry",
-  "mobile.server.route.mcp": "MCP servers",
   "mobile.server.route.mcpServer": "MCP server",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (you)",
@@ -554,7 +553,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneNoMatch": "No timezone matches this search.",
   "mobile.server.settings.timezoneMore": "Type more of the name to see other timezones.",
   "mobile.server.settings.timezoneDescription":
-    "New routines use this timezone when the message does not give the sender's timezone.",
+    "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "mobile.server.settings.timezoneLoading": "Loading timezone…",
   "mobile.server.settings.timezoneLoadFailed": "Could not load the server timezone.",
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
@@ -810,6 +809,17 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.variableNameHint":
     "The environment variable that a program reads: capital letters, digits and _. Agents find the key by this name.",
   "mobile.server.vault.apiKey": "API key",
+  "mobile.server.vault.agents": "Agents",
+  "mobile.server.vault.agentsAll": "All agents",
+  "mobile.server.vault.agentsAllHint": "All agents also includes each agent that is added later.",
+  "mobile.server.vault.agentsNone": "Choose at least one agent.",
+  "mobile.server.vault.agentsSome": "{chosen} of {total}",
+  "mobile.server.vault.agentsListed": "Agents: {agents}",
+  "mobile.server.vault.searchAgents": "Search agents",
+  "mobile.server.vault.noAgentMatches": "No agents match this search.",
+  "mobile.server.vault.agentOptions": "Options",
+  "mobile.server.vault.selectAll": "Select all",
+  "mobile.server.vault.deselectAll": "Deselect all",
   "mobile.server.vault.delete": "Delete item",
   "mobile.server.vault.deleteTitle": "Delete this item?",
   "mobile.server.vault.deleteBody": "Agents on {host} can no longer use it. You cannot undo this.",
@@ -1170,10 +1180,13 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.linkAgain": "Link again",
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+    "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Status reactions",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -1190,10 +1203,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.kindLabel": "Number",
   "mobile.server.connectors.whatsapp.kindPersonal": "My personal number",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+    "OpenBot answers only your “Message yourself” chat and the people you allow. Other people get no reply.",
   "mobile.server.connectors.whatsapp.kindDedicated": "A number only for OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Unknown people get a code to give you. You approve them here.",
+    "OpenBot replies from this number to each unknown person, with a code to give you. You approve them here.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Phone number",
   "mobile.server.connectors.whatsapp.phoneDescription": "With the country code, such as +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Type the phone number with its country code.",
@@ -1356,12 +1369,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.accountsOnComputer":
     "Each agent uses one account. Choose it in the agent's settings. Add an account in OpenBot on a computer.",
   "mobile.server.providers.addAccount": "Add account",
+  "mobile.server.providers.addAccountWithCode": "Add account with code",
   "mobile.server.providers.accountGone": "This account is no longer on this server.",
   "mobile.server.providers.accountFailed": "Could not change this account. Try again.",
   "mobile.server.providers.accountName": "Name",
   "mobile.server.providers.accountNameHint":
     "Only for you and the admins of this server. Leave it empty to show the email.",
   "mobile.server.providers.accountSignInAgain": "Sign in again",
+  "mobile.server.providers.accountSignInWithCode": "Log in with code",
   // An account that is an API key of the provider (`provider-account-keys-v1`), such as a Cursor account after the first.
   "mobile.server.providers.accountsKeyHint":
     "Each agent uses one account. Choose it in the agent's settings. A new account needs an API key of that account.",
@@ -1415,6 +1430,22 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.compactWindowDefault": "Claude Code default",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Could not load the compaction size of this server.",
+  "mobile.server.environment.row": "Variables",
+  "mobile.server.environment.title": "Environment",
+  "mobile.server.environment.hint":
+    "API keys, base URLs and other settings that each {name} process gets. A change applies when the current turns end.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, with OPENAI_API_KEY as its key, sends the model requests of ChatGPT to that address.",
+  "mobile.server.environment.shellNote": "The commands that agents run can read these values.",
+  "mobile.server.environment.add": "Add variable",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Value",
+  "mobile.server.environment.saved": "Saved",
+  "mobile.server.environment.sensitive": "Sensitive",
+  "mobile.server.environment.remove": "Remove",
+  "mobile.server.environment.save": "Save",
+  "mobile.server.environment.loadFailed": "Could not load the variables of {name}.",
+  "mobile.server.environment.invalid": "Correct the names first.",
   "mobile.server.providers.disconnect": "Disconnect",
   "mobile.server.providers.disconnectTitle": "Disconnect {name}?",
   "mobile.server.providers.disconnectBody":
@@ -1622,22 +1653,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.customProviders.removeTitle": "Remove {name}?",
   "mobile.server.customProviders.removeBody": "Agents on this server can no longer use its models.",
   "mobile.server.customProviders.removeFailed": "OpenBot could not remove this endpoint.",
-  "mobile.server.settings.mcp": "MCP servers",
-  "mobile.server.settings.mcpCount": { one: "{count} server", other: "{count} servers" },
   "mobile.server.mcp.unsupported": "Update OpenBot on this server to manage its MCP servers here.",
   "mobile.server.mcp.unavailable": "Connect to this server as an owner or admin to manage its MCP servers.",
   "mobile.server.mcp.accessUnsupported": "Update OpenBot on this server to choose who gets its MCP servers.",
-  "mobile.server.mcp.description":
-    "MCP servers give the agents of this server more tools. Claude and Codex agents get only the servers in this list.",
   "mobile.server.mcp.loading": "Loading MCP servers…",
-  "mobile.server.mcp.loadFailed": "Could not load the MCP servers.",
-  "mobile.server.mcp.empty": "No MCP servers yet.",
-  "mobile.server.mcp.retry": "Try again",
-  "mobile.server.mcp.add": "Add MCP server",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "On",
-  "mobile.server.mcp.disabled": "Off",
-  "mobile.server.mcp.signedIn": "Signed in",
   "mobile.server.mcp.gone": "This MCP server is no longer on this server.",
   "mobile.server.mcp.addTitle": "Add MCP server",
   "mobile.server.mcp.addConfirm": "Add",
@@ -2058,7 +2077,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.transfer.copyTo": "To",
   "mobile.server.transfer.copyNoAgents": "This server has no agents.",
   "mobile.server.transfer.copyNotMoved":
-    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+    "Their channels, routine flows, workflows, and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
   "mobile.server.transfer.copying": "Copying…",
   "mobile.server.transfer.copyFailed": "The copy did not finish.",

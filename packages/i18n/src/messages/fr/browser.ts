@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Fermer {name}",
   "browser.tab.closeUnnamed": "Fermer l’onglet du navigateur",
   "browser.newTab": "Nouvel onglet du navigateur",
-  "browser.hide": "Masquer le navigateur",
+  "browser.backToChat": "Retour au chat",
   "browser.goBack": "Revenir en arrière",
   "browser.goForward": "Avancer",
   "browser.reload": "Actualiser la page",
@@ -67,6 +67,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Ce texte est trop long pour être collé. Collez moins de 100 000 caractères.",
   "browser.liveView.copyTooLarge": "La sélection est trop longue pour être copiée. Sélectionnez moins de texte.",
   "browser.liveView.copyFailed": "Impossible de copier le texte. Cliquez sur la page et réessayez.",
+  "browser.liveView.pageCopied":
+    "La page a copié du texte. Choisissez Copier pour le mettre dans votre presse-papiers.",
   "browser.previews.label": "Aperçus du navigateur",
   "browser.previews.resize": "Redimensionner le panneau de droite",
   "browser.previews.empty": "Aucun onglet de navigateur",

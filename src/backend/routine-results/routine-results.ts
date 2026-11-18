@@ -81,6 +81,11 @@ interface RoutineResultsShape {
   notice(event: AgentEvent): Effect.Effect<void>;
 }
 
+/** Whether `notice` sweeps after this event. A caller checks it first, so most events start no fiber. */
+export function routineResultNoticeEvent(event: AgentEvent): boolean {
+  return event.type === "turn-completed" || event.type === "queue-changed" || event.type === "routines-changed";
+}
+
 class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape>()("openbot/backend/RoutineResults") {
   static layer(dependencies: RoutineResultsDependencies) {
     return Layer.effect(
@@ -302,8 +307,7 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         });
 
         const notice = Effect.fn("RoutineResults.notice")(function* (event: AgentEvent) {
-          if (event.type !== "turn-completed" && event.type !== "queue-changed" && event.type !== "routines-changed")
-            return;
+          if (!routineResultNoticeEvent(event)) return;
           yield* Effect.forkIn(sweep(), scope);
         });
 

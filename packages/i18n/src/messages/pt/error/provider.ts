@@ -12,6 +12,8 @@ export const messages = {
     "O {provider} perdeu o login, então o OpenBot encerrou o processo dele. Envie sua mensagem de novo.",
   "error.provider.acpRefusedUntilRestart":
     "O {provider} recusou uma mensagem, então o OpenBot encerrou o processo dele. Envie sua mensagem de novo.",
+  "error.provider.acpServerLost": "O {provider} perdeu a conexão. Envie sua mensagem de novo.",
+  "error.provider.acpServerLostEnded": "O {provider} perdeu a conexão, então o OpenBot encerrou o processo dele.",
   "error.provider.acpSettingsTimedOut": "O {provider} não respondeu a tempo. Tente novamente em instantes.",
   "error.provider.acpPlanUsedUp":
     "O {provider} informa que seu plano se esgotou. Escolha outro modelo ou faça upgrade do seu plano do {provider}.",
@@ -44,6 +46,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Há endereços ou pastas demais.",
   "error.provider.credentialFileUnreadable": "O arquivo de credenciais do provedor não pode ser lido.",
   "error.provider.credentialFileTooLarge": "O arquivo de credenciais do provedor é muito grande.",
+  "error.provider.environmentNameInvalid":
+    "{name} não é um nome de variável válido. Use letras, dígitos e _, sem começar com um dígito.",
+  "error.provider.environmentNameReserved": "O OpenBot define {name} para este provedor. Remova esta variável.",
+  "error.provider.environmentNameDuplicate": "{name} aparece mais de uma vez na lista.",
+  "error.provider.environmentValueTooLong": "O valor de {name} é longo demais.",
+  "error.provider.environmentTooMany": "Um provedor pode ter no máximo {limit} variáveis.",
+  "error.provider.environmentSecretsTooLarge":
+    "Os valores sensíveis são longos demais juntos. Salve valores mais curtos ou menos valores.",
   "error.provider.archiveSpecialFile":
     "O arquivo compactado do ambiente de execução contém um link ou arquivo especial.",
   "error.provider.archiveUnsafePath": "O arquivo compactado do ambiente de execução contém um caminho inseguro.",
@@ -169,6 +179,11 @@ export const messages = {
     "{provider} não respondeu a tempo. O computador pode estar ocupado. O OpenBot tentará de novo.",
   "error.provider.cliTimedOutRefresh":
     "{provider} não respondeu a tempo. O computador pode estar ocupado. Atualize os provedores para tentar de novo.",
+  "error.provider.stoppedBeforeStart": "{provider} parou antes de esta mensagem começar. Envie a mensagem de novo.",
+  "error.provider.serviceUnreachable":
+    "{provider} não consegue se conectar ao serviço dele. Verifique sua conexão com a internet. O OpenBot tentará de novo.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} não consegue se conectar ao serviço dele. Verifique sua conexão com a internet e depois atualize os provedores.",
   "error.provider.acpStartTimedOut":
     "{provider} não terminou de iniciar em {seconds} s. O computador pode estar ocupado.",
   "error.provider.acpModelsTimedOut":
@@ -185,6 +200,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "O provedor não aceitou o código. Inicie o login novamente.",
   "error.provider.codeLoginUnsupported":
     "Este servidor não permite entrar com um código colado. Entre pelo navegador no computador do servidor.",
+  "error.provider.claudeLoginNotSaved":
+    "O Claude não conseguiu salvar o login no Mac. Reinicie o Mac que executa o OpenBot e conecte o Claude novamente.",
   "error.provider.cliBusyRetry": "A CLI de {provider} está executando um turno. Aguarde o término e tente novamente.",
   "error.provider.cliSigningIn": "A CLI de {provider} está entrando na conta. Conclua ou cancele o login e atualize.",
   "error.provider.cliBusyUpdate": "A CLI de {provider} está executando um turno. Aguarde o término e atualize.",
@@ -205,6 +222,8 @@ export const messages = {
     'O OpenCode não tem login no provedor do modelo "{provider}". Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.',
   "error.provider.opencodeAuthRequiredUnknown":
     "O OpenCode não tem login no provedor deste modelo. Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.",
+  "error.provider.opencodeProviderRefused":
+    'O provedor do modelo "{provider}" recusou a solicitação. O OpenCode tem uma chave para este provedor, então a causa pode ser a sua rede: alguns provedores bloqueiam VPNs, proxies ou alguns países. Desative a VPN ou use outra rede e tente novamente. Se o erro continuar, a chave pode estar incorreta: execute `opencode auth login` em um terminal e digite a chave novamente.',
   "error.provider.opencodeFreeModelRefused":
     "O OpenCode recusou este modelo grátis. Alguns modelos grátis não estão disponíveis em todos os países. Escolha outro modelo com o rótulo Grátis ou cole uma chave do OpenCode Go nas configurações do OpenCode e escolha um modelo do OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
@@ -231,6 +250,8 @@ export const messages = {
     "Os modelos gratuitos do OpenCode atingiram o limite de uso. Todos os modelos gratuitos compartilham esse limite. Para continuar, cole uma chave do OpenCode Go nas configurações do OpenCode ou escolha um modelo de outro provedor.",
   "error.provider.opencodeProviderFailed":
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Este modelo não está disponível para você. Escolha outro modelo para este agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -253,6 +274,8 @@ export const messages = {
     "O modelo do OpenCode encerrou o turno depois do raciocínio, sem resposta. Tente novamente ou escolha outro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} encerrou o turno sem resposta. Envie a mensagem novamente ou inicie um novo chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} executou alguns passos e terminou o turno sem resposta. Pergunte ao agente o que ele fez antes de enviar o mesmo pedido de novo.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",
@@ -279,8 +302,14 @@ export const messages = {
     "O Gemini não pode usar este modelo agora. Escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "O Google não aceitou o login do Gemini para esta solicitação. Envie sua mensagem novamente. Se o erro continuar, reconecte o Gemini em Configurações.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "O Gemini recusou esta solicitação. Escolha outro modelo e envie sua mensagem novamente. Se falhar de novo, inicie um novo chat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "O Gemini recusou esta solicitação e não informou a causa. Um item do histórico do chat pode causar isso, como uma imagem que o agente abriu. O OpenBot iniciou uma nova sessão do Gemini com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo.",
+  "error.provider.antigravityHistoryUnreadable":
+    "O Gemini não conseguiu ler o histórico salvo deste chat. O OpenBot iniciou uma nova sessão do Gemini com o histórico do chat. Envie sua mensagem novamente.",
   "error.provider.antigravityLocationUnsupported":
     "O Google não permite que o Gemini funcione a partir da localização de rede do computador que executa este agente. Use o Gemini em outro computador ou escolha outro provedor para este agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -327,6 +356,8 @@ export const messages = {
     "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o na Loja, Apps, e envie sua mensagem de novo.",
   "error.provider.hermesRefused":
     "O Hermes recusou esta mensagem antes de começar. Envie-a de novo. Se o Hermes recusar todas as mensagens, reinicie o OpenBot no computador que executa este agente.",
+  "error.provider.hermesConnectionLost":
+    "O Hermes perdeu a conexão durante esta mensagem, então não sabe se o trabalho terminou. Confira o que o agente fez antes de enviar a mensagem de novo.",
   "error.provider.copilotThinkingRejected":
     "O GitHub Copilot não conseguiu usar este modelo: o modelo não aceitou a configuração de raciocínio. Selecione outro modelo para este agente e envie a mensagem de novo.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
@@ -338,12 +369,20 @@ export const messages = {
     "O serviço do Claude bloqueou esta solicitação. Normalmente é um problema rápido do lado do Claude, não da sua conta. Envie a mensagem de novo em alguns minutos.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.codexHistoryItemMissing":
+    "O Codex não pôde continuar este chat porque falta um item no histórico salvo. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
+  "error.provider.codexRequestRefused":
+    "O {provider} recusou a solicitação deste chat e não informou a causa. Isso pode acontecer em um chat longo com muitas imagens. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.codexAudioRefused":
+    "O modelo não aceitou o áudio deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
   "error.provider.imageTooSmall":
     "O modelo não aceitou uma imagem deste chat porque a imagem é pequena demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooLarge":
     "O modelo não aceitou uma imagem deste chat porque a imagem é grande demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageCountLimit":
     "O modelo não aceitou este chat porque ele tem imagens demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.imageUnreadable":
+    "O modelo não conseguiu ler uma imagem deste chat. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente. Se você enviou uma imagem, envie outra.",
   "error.provider.requestTooLarge":
     "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
@@ -462,12 +501,18 @@ export const messages = {
   "error.provider.nativeNotStarted": "A CLI do {provider} não conseguiu iniciar.",
   "error.provider.nativeVersionUnreadable": "A versão da CLI do {provider} não pôde ser lida.",
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
+  "error.provider.acpSessionBusy":
+    "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
+  "error.provider.acpModelNotOffered":
+    "{provider} não oferece {model} agora. Escolha outro modelo para este agente e tente novamente.",
   "error.provider.piStopped": "O Pi não está rodando. Conecte o Pi e tente de novo.",
   "error.provider.piSessionMissing": "O arquivo de sessão do Pi não está disponível neste computador.",
   "error.provider.piResumeCancelled": "O Pi cancelou a retomada da sessão. Tente de novo.",
   "error.provider.piSessionIdentity": "O Pi retornou uma sessão diferente. A sessão salva não foi substituída.",
   "error.provider.piExtensionFailed":
     "O Pi parou porque não conseguiu carregar uma extensão. Remova ou atualize essa extensão e tente de novo. {detail}",
+  "error.provider.piThreadStopped":
+    "O Pi parou inesperadamente antes de terminar este turno. Envie uma mensagem para continuar.",
   "error.provider.piModelInvalid": "Selecione um modelo do Pi que inclua seu provedor.",
   "error.provider.piToolInvalid": "A ferramenta retornou um resultado inválido.",
   "error.provider.piSignIn": "Use /login no Pi no computador anfitrião. Feche o Pi quando o login terminar.",

@@ -97,6 +97,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
+  "error.backend.channelArchiveRunning": "Pare o trabalho em andamento neste canal e depois exclua-o.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
   "error.backend.channelTaskComplete": "Esta tarefa já está concluída.",
@@ -130,6 +131,8 @@ export const messages = {
   "error.backend.memoryGone": "Esta memória não existe mais.",
   "error.backend.routineGone": "Esta rotina não existe mais.",
   "error.backend.routineRunGone": "Esta execução da rotina não existe mais.",
+  "error.backend.routineRunFailedNoReason":
+    "A execução parou com um erro, mas nenhum motivo foi informado. Abra a execução para ver o que o agente fez.",
   "error.backend.turnNotStarted": "O provedor não iniciou este turno.",
   "error.backend.routineResultConnectionOff":
     "Esta conexão de mensagens está desativada ou foi removida. Escolha outro lugar.",
@@ -258,7 +261,11 @@ export const messages = {
     "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
     "O servidor de login não aceitou o OpenBot ao concluir o login. Entre de novo: o OpenBot se registra outra vez no servidor.",
+  "error.backend.mcpSignInAppRefused":
+    "O servidor de login não aceitou o app de login deste servidor. Confira o ID do cliente e o segredo do cliente do app de login e entre de novo.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
+  "error.backend.mcpProviderLimit":
+    "Este agente só pode usar um número limitado de servidores MCP. Para usar este servidor, desative um servidor MCP de que o agente não precisa.",
   "error.backend.mcpRegistrationRefused":
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",
@@ -280,9 +287,11 @@ export const messages = {
     "O servidor de login enviou uma resposta que o OpenBot não consegue ler. Se o serviço fornecer uma chave de API ou um token, adicione-o nas configurações deste servidor e teste a conexão novamente.",
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
+  "error.backend.mcpServerExitedWithOutput": "O servidor parou antes de responder. Ele escreveu: {detail}",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
+  "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
@@ -305,6 +314,8 @@ export const messages = {
     "O OpenBot não conseguiu iniciar a conexão local de login para este servidor. Reinicie o OpenBot e tente novamente.",
   "error.backend.mcpOAuthSignInNeeded":
     "O login neste servidor MCP terminou. O usuário precisa entrar novamente no OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "O OpenBot não conseguiu renovar agora o login neste servidor MCP. O login continua salvo, e a próxima solicitação tentará de novo. Se o erro continuar, o usuário pode sair do servidor no OpenBot e entrar de novo.",
   "error.backend.mcpServerUnreachable": "O OpenBot não conseguiu acessar o servidor. Verifique a URL e sua rede.",
   "error.backend.mcpLocalServerOff":
     "Nenhum servidor responde em {address} neste computador. Inicie o servidor ou ative-o no app que o executa e tente novamente.",
@@ -362,6 +373,8 @@ export const messages = {
   "error.backend.promptInactive": "Esta pergunta não está mais ativa.",
   "error.backend.promptAnswerMismatch": "Uma resposta não corresponde a uma pergunta ativa.",
   "error.backend.approvalInactive": "Esta aprovação não está mais ativa.",
+  "error.backend.feedbackNeedsPhone":
+    "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
@@ -446,6 +459,7 @@ export const messages = {
   "error.backend.branchMessageNotFound":
     "Só é possível criar uma ramificação a partir de uma resposta concluída do agente.",
   "error.backend.branchRemoteUnsupported": "As ramificações só estão disponíveis para agentes neste computador.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Para remover este relato, peça ao agente para removê-lo.",
   "error.backend.threadMoveRefused":
     "Só uma mensagem que você enviou apenas para este agente pode ser executada em um novo tópico.",
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",

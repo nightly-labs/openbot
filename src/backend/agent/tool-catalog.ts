@@ -7,6 +7,7 @@ import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
+import { withSchemaTypes } from "./schema-typed-arguments";
 import { toolGuidance } from "./tool-guidance";
 
 /** Discovery changes visibility only. Original definitions and execution owners stay authoritative. */
@@ -63,7 +64,7 @@ const DIRECT_BROWSER_DYNAMIC_TOOLS = BROWSER_DYNAMIC_TOOLS.map((namespace) => ({
  * long as the inline search (`bun run bench:codex-web-search`). The Pi-based providers have no web search,
  * and a custom ACP agent can have none, so they get the tool. Some CLIs need a condition that the OpenBot
  * sign-in meets: an Anthropic or Grok account, `kimi login`, a Mistral key, the Cline account. OpenCode
- * asks once for consent and then searches without a key.
+ * searches without a key; OpenBot gives the consent that it asks for (`opencode-agent-defaults.ts`).
  */
 const OWN_WEB_SEARCH_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "codex",
@@ -529,6 +530,9 @@ function refusedCallError(params: DynamicToolCallParams, provider: AgentProvider
   if (!parsed.success) {
     const { issues } = parsed.error;
     if (issues.some(({ code }) => code === "unrecognized_keys")) return sourceText("error.agent.toolCallEnvelopeKeys");
+    // The `callSchema` refinement: the call has neither `name` nor `tool`. The general error did not
+    // say which field to add, and a Pi agent sent the same call without a name for minutes (#11725).
+    if (issues.some(({ code }) => code === "custom")) return sourceText("error.agent.toolCallMissingName");
     return issues.some(({ path }) => path[0] === "arguments")
       ? sourceText("error.agent.toolCallArgumentsNotObject")
       : null;
@@ -559,7 +563,8 @@ export function resolveDeferredTool(
   if (!parsed.success) return null;
   const entry = catalogEntry(catalogFor(provider), calledName(parsed.data));
   if (!entry) return null;
-  return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
+  const args = withSchemaTypes(parsed.data.arguments, entry.inputSchema);
+  return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: args };
 }
 
 /** The name and the arguments of a `tool_call`, read as `resolveDeferredTool` reads them, or `null`. */
@@ -660,11 +665,52 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
   }
   const parsed = describeSchema.safeParse(params.arguments);
   if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
-  const names = [...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])];
-  const entries = [...new Set(names)].map((name) => requireTool(name, catalog));
+  const names = [...new Set([...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])])];
+  // The MCP names of a catalog tool, such as mcp__openbot__list_agents, count, as they do in tool_call.
+  const entries = new Set<(typeof catalog)[number]>();
+  const notFound: string[] = [];
+  for (const name of names) {
+    const entry = catalogEntry(catalog, name);
+    if (entry) entries.add(entry);
+    else notFound.push(name);
+  }
+  if (entries.size === 0) throw new UnknownToolNamesError(notFound);
   return {
     call: CALL_NOTE,
-    tools: entries.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
-    guidance: toolGuidanceFor(entries),
+    tools: [...entries].map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    guidance: toolGuidanceFor([...entries]),
+    ...(notFound.length > 0 ? { notFound, note: unknownToolNamesText(notFound) } : {}),
   };
+}
+
+/** True for OpenBot's discovery tools. They are not catalog tools, so tool_describe does not describe them. */
+function isDiscoveryTool(name: string): boolean {
+  return /^openbot\.tool_(?:search|describe|call)$/.test(qualifiedToolName(name));
+}
+
+/** True when a name that tool_describe did not find can be a tool of the user's MCP servers. */
+export function mayNameMcpTool(names: readonly string[]): boolean {
+  return names.some((name) => !isDiscoveryTool(name));
+}
+
+/** A tool_describe call that named no catalog tool. The message names each refused name. */
+export class UnknownToolNamesError extends Error {
+  constructor(readonly names: readonly string[]) {
+    super(unknownToolNamesText(names));
+  }
+}
+
+/**
+ * The text for the names that tool_describe did not find. One general error for the whole call did not
+ * tell the agent which name to correct, so it tried the same wrong names again (#9930).
+ */
+function unknownToolNamesText(names: readonly string[]): string {
+  const discovery = names.filter(isDiscoveryTool);
+  const other = names.filter((name) => !isDiscoveryTool(name));
+  return [
+    ...(other.length > 0 ? [sourceText("error.agent.toolDescribeUnknownNames", { names: other.join(", ") })] : []),
+    ...(discovery.length > 0
+      ? [sourceText("error.agent.toolDescribeDiscoveryNames", { names: discovery.join(", ") })]
+      : []),
+  ].join(" ");
 }

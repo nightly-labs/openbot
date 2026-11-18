@@ -2,6 +2,7 @@ import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
@@ -17,6 +18,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { openTurnActivity } from "@/features/workspace/model/agent-activity";
+import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { currentText, useText } from "@/shared/lib/text";
 import {
@@ -34,6 +36,7 @@ import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { useAgentBackdrops } from "./use-agent-backdrops";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useComposerContextMeter } from "./use-context-usage";
@@ -56,7 +59,9 @@ export function MobileChatView({
 }) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
-  const agents = useMobileWorkspaceSelector((current) => current.agents);
+  // The chat does not show the latest message of each agent, so a new message keeps the same list and
+  // the messages do not render again.
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === agent.serverId));
   const loadConversation = useMobileWorkspaceSelector((current) => current.loadConversation);
@@ -93,6 +98,13 @@ export function MobileChatView({
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
+  useAgentBackdrops({
+    serverId: agent.serverId,
+    agentId: agent.id,
+    messages: conversation?.messages,
+    memberId,
+    accountUserId,
+  });
   const projected = useMemo(
     () =>
       withQuestionContext(
@@ -146,11 +158,14 @@ export function MobileChatView({
   );
   // The history and the queue load again when the connection is back, so they read the live state.
   const online = server?.state === "online";
+  // As on desktop, an agent that cannot steer offers Send now: the message goes first and the turn stops.
+  const { steers } = useAgentSteers(agent);
   const queue = useChatQueue(
     agent.id,
     agent.serverId,
     online,
     conversation?.activeTurnId ?? null,
+    steers,
     conversation?.messages,
   );
   const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
@@ -411,6 +426,7 @@ export function MobileChatView({
   const threadsShown = threadMenu !== undefined;
   const swipeForward = useMemo(() => {
     const params = { agentId: agent.id, serverId: agent.serverId };
+    if (swipeAction === "off") return null;
     if (swipeAction === "threads")
       return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
     return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;

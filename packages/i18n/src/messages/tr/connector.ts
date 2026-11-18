@@ -414,10 +414,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Kişisel numara",
   "connector.whatsapp.ownNumberDescription":
-    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+  "connector.whatsapp.statusReactions": "Durum tepkileri",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "connector.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
@@ -437,10 +440,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Numara",
   "connector.whatsapp.kindPersonal": "Kişisel numaram",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar. Diğer kişiler yanıt almaz.",
   "connector.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
   "connector.whatsapp.kindDedicatedDescription":
-    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+    "OpenBot bu numaradan tanımadığınız her kişiye, size iletmesi için bir kodla yanıt verir. Onları burada onaylarsınız.",
   "connector.whatsapp.methodLabel": "Bağlama yöntemi",
   "connector.whatsapp.methodQr": "QR kodu",
   "connector.whatsapp.methodCode": "Eşleme kodu",

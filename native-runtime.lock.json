@@ -2,44 +2,44 @@
   "schemaVersion": 1,
   "codex": {
     "repository": "https://github.com/openai/codex",
-    "version": "0.160.1",
-    "tag": "rust-v0.160.1",
+    "version": "0.170.0",
+    "tag": "rust-v0.170.0",
     "license": "Apache-2.0",
     "licenseSha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
     "artifacts": {
       "darwin-arm64": {
         "asset": "codex-package-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "f73527ee09c6db869acbb37b709866b339ea74ef91d2de255e9c74ec960c6314",
-        "downloadBytes": 129977637,
-        "installedBytes": 360000000,
+        "assetSha256": "975524bf13aedd1b122d8d0e00c09ee67091b8f688c0b374943dbb3cf22c7893",
+        "downloadBytes": 173593904,
+        "installedBytes": 490000000,
         "executable": "bin/codex"
       },
       "darwin-x64": {
         "asset": "codex-package-x86_64-apple-darwin.tar.gz",
-        "assetSha256": "a98f330c9b1652cef2edc7bc2ee4c47a0fe19fa098b686381be3c8842abf0ac0",
-        "downloadBytes": 141316108,
-        "installedBytes": 380000000,
+        "assetSha256": "2e971524460a570b913dbdc9b49e5e9c14556e44e7f62f00b95b4a8f1e2cdf25",
+        "downloadBytes": 188621592,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-x64": {
         "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
-        "assetSha256": "340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0",
-        "downloadBytes": 160785122,
-        "installedBytes": 410000000,
+        "assetSha256": "a77ff87be7ba809d715728270a78f5ce3527dc07529416d1ef8929b90b8475eb",
+        "downloadBytes": 193641516,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-arm64": {
         "asset": "codex-package-aarch64-unknown-linux-musl.tar.gz",
-        "assetSha256": "dff0954438fa455c2197ddb1f421d8d68625d98de610f76bedb6e5bc837ea35b",
-        "downloadBytes": 150931915,
-        "installedBytes": 380000000,
+        "assetSha256": "3f7e1ae38c4fe27322e082b855e8eec936d08fa538d62b71c07e2a53f34e8847",
+        "downloadBytes": 195884517,
+        "installedBytes": 500000000,
         "executable": "bin/codex"
       },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
-        "assetSha256": "25c6fe4e46d5bff939312fc46de67ace37561f6f1f89b409af63fd8cc6098425",
-        "downloadBytes": 157434529,
-        "installedBytes": 450000000,
+        "assetSha256": "6ff4b22c63645ffd83aed9b722cbb0b9e5b79dc6e8916f50e362b3015fb327a9",
+        "downloadBytes": 210098091,
+        "installedBytes": 610000000,
         "executable": "bin/codex.exe"
       }
     }
@@ -241,57 +241,57 @@
   },
   "cuaDriver": {
     "repository": "https://github.com/trycua/cua",
-    "tag": "cua-driver-rs-v0.43.2",
-    "version": "0.43.2",
+    "tag": "cua-driver-rs-v0.52.9",
+    "version": "0.52.9",
     "license": "MIT",
     "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "cua-driver-rs-0.43.2-darwin-universal-binary.tar.gz",
-        "assetSha256": "16b3ea310f10ad1d72c552314a5257807e6399511c79fb55acb4c7a901929a64",
-        "downloadBytes": 54293870,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "07e83a6632e95d4d241437b066e07fe9cf8bc4256a9e248e5898e27d21d61516"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "darwin-x64": {
-        "asset": "cua-driver-rs-0.43.2-darwin-universal-binary.tar.gz",
-        "assetSha256": "16b3ea310f10ad1d72c552314a5257807e6399511c79fb55acb4c7a901929a64",
-        "downloadBytes": 54293870,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "07e83a6632e95d4d241437b066e07fe9cf8bc4256a9e248e5898e27d21d61516"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "linux-x64": {
-        "asset": "cua-driver-rs-0.43.2-linux-x86_64-binary.tar.gz",
-        "assetSha256": "6f57880235d00e6ce6c5483b41eec9f1fd731dea1ba862fe06b82fce02de9c78",
-        "downloadBytes": 38578416,
+        "asset": "cua-driver-rs-0.52.9-linux-x86_64-binary.tar.gz",
+        "assetSha256": "f20c3d3b468778d03ec25bef32a40be2b83b3ef8961cf7816295acdbcf5ff273",
+        "downloadBytes": 30098066,
         "files": {
-          "cua-driver": "ef02033933d9a969dc00164266dbcd890d007c9ae64c0950345e8322850847cd",
+          "cua-driver": "d0f329e0304ccb54059b8bfce940694b945475730380b463da67a22fbcd34600",
           "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
           "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
           "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
-          "wayland-helper/winrects@cua/extension.js": "b7b5b922e68a8ee53eb549a3d2f85dd28259140633c0c34123f16910f7ac8e0c"
+          "wayland-helper/winrects@cua/extension.js": "80903729beb0f4d87fc6e70ee302e969706c70e05ce41e268e5bae87ca43ac4e"
         }
       },
       "linux-arm64": {
-        "asset": "cua-driver-rs-0.43.2-linux-arm64-binary.tar.gz",
-        "assetSha256": "7a9cd278c3d447a19b313259ad4f5f23e270d6e0b0f540fa8db3bf8f93060920",
-        "downloadBytes": 38110878,
+        "asset": "cua-driver-rs-0.52.9-linux-arm64-binary.tar.gz",
+        "assetSha256": "b3c1be792b132b9af8a0b3f54e9d2e3edab74860d27c1ed539f4907d111daf0a",
+        "downloadBytes": 28009360,
         "files": {
-          "cua-driver": "1100e214e0588f30396cf23252655fd3aa5fd0ff815540e8fa71b09108e8601b",
+          "cua-driver": "09779104ad8e5fd26bc6d6ba8e85cca1be426f46938e938e4e74fc2ed8475d35",
           "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
           "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
           "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
-          "wayland-helper/winrects@cua/extension.js": "b7b5b922e68a8ee53eb549a3d2f85dd28259140633c0c34123f16910f7ac8e0c"
+          "wayland-helper/winrects@cua/extension.js": "80903729beb0f4d87fc6e70ee302e969706c70e05ce41e268e5bae87ca43ac4e"
         }
       },
       "win32-x64": {
-        "asset": "cua-driver-rs-0.43.2-windows-x86_64-binary.zip",
-        "assetSha256": "72f610fa66c898e73d017eee186143a7010a65478d60db40f294d6d10e167faa",
-        "downloadBytes": 35831345,
+        "asset": "cua-driver-rs-0.52.9-windows-x86_64-binary.zip",
+        "assetSha256": "b05c6ab050100d2b532dfa948c94742d0b95bfaf13e46e6ce44c1ee4224290e3",
+        "downloadBytes": 32377889,
         "files": {
-          "cua-driver.exe": "bbb2ea8f200034ace97c6021131ecc6928683cf1efe044881d96dde7589e04c3"
+          "cua-driver.exe": "e21d21d25205d7c188fea6776185abb1cbd437410df6243c512d1523b0c8cbfa"
         }
       }
     }

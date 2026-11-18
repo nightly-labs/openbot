@@ -1,4 +1,4 @@
-import type { McpSignInRelaySource } from "@openbot/ui/features/settings/McpSignInPage";
+import type { McpSignInPageSource, McpSignInRelaySource } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import type { McpPanelSignInApp } from "./McpSignInAppSection";
 import {
@@ -49,6 +49,11 @@ export interface McpServerSignIn {
    * browser. Absent when this computer signs in.
    */
   relay?: McpServerRelay | undefined;
+  /**
+   * A relaying joined server that opens a sign-in page in its own browser tab, for a page that only
+   * the host can reach (`mcp-sign-in-v1`, `browser-view`). Absent when this client cannot show it.
+   */
+  hostTab?: McpServerHostTab | undefined;
   /** A pre-registered OAuth app for a server without client registration. Absent when the host has none. */
   app?: McpPanelSignInApp | undefined;
 }
@@ -61,6 +66,12 @@ interface McpServerRelay {
   open: (url: string) => Promise<void>;
   /** Sends the address that the browser shows at the end of the sign-in. */
   paste: (url: string, address: string) => Promise<void>;
+}
+
+interface McpServerHostTab {
+  hostName: string;
+  /** The host tab with the sign-in page of the address it signs in to, while it waits. */
+  page: (url: string) => McpSignInPageSource | undefined;
 }
 
 /** A test or a sign-in that has answered. */

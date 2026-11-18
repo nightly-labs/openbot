@@ -309,6 +309,12 @@ export const messages = {
   "server.settings.group.agents": "Agenten",
   "server.settings.group.people": "Personen",
   "server.settings.group.server": "Server",
+  "server.settings.experimentalTitle": "Experimentell",
+  "server.settings.experimentalDescription": "Funktionen einschalten, die noch nicht fertig sind.",
+  "server.settings.experimentalFeatures": "Funktionen",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Die CRM-Seite für Eigentümer und Admins zeigen, Agenten das CRM lesen lassen und Stripe synchronisieren. Beim Ausschalten bleiben die Daten erhalten.",
   "server.settings.agentDefaultsTitle": "Standardwerte für Agenten",
   "server.settings.threadsCard": "Threads und Zeitzone",
   "server.settings.memoryTitle": "Gedächtnis",
@@ -347,7 +353,7 @@ export const messages = {
     "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
-    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
+    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
   "server.settings.turnLimit": "Threads gleichzeitig",
