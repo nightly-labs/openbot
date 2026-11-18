@@ -15,6 +15,7 @@ import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
+import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
@@ -35,10 +36,11 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
   const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
   const wait = () => (rowProps.waiting ? channelWait() : undefined);
-  const waitLabel = () => {
+  const stateLabel = () => {
     const current = channelWait();
-    return current ? `. ${sidebarAgentStateLabel(current, t, format)}` : "";
+    return current ? sidebarAgentStateLabel(current, t, format) : "";
   };
+  const waitLabel = () => (stateLabel() ? `. ${stateLabel()}` : "");
   const draggable = () => !rowProps.channel.archived && chatsDraggable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
@@ -140,9 +142,26 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.channel.id)}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip
+            name={rowProps.channel.name}
+            title={title()}
+            preview={preview()}
+            detail={stateLabel()}
+            menuOpen={menuOpen()}
+          >
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
-          <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
+          <SidebarWaitTooltip
+            wait={current()}
+            menuOpen={menuOpen()}
+            name={props.compact ? rowProps.channel.name : undefined}
+          >
             {row()}
           </SidebarWaitTooltip>
         )}

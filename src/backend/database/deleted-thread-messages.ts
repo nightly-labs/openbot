@@ -4,6 +4,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./conversation-queries";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { unpinThreadHistory, unpinThreadMessage } from "./pinned-thread-messages";
+import { cachedStatement } from "./statement-cache";
 
 /**
  * The messages that a person deleted from a thread (`projection_deleted_thread_messages`).
@@ -31,9 +32,10 @@ export function threadMessageIds(db: DatabaseSync, threadId: string): string[] {
 export function isDeletedThreadMessage(db: DatabaseSync, threadId: string, messageId: string): boolean {
   return (
     databaseRow(
-      db
-        .prepare("SELECT 1 AS deleted FROM projection_deleted_thread_messages WHERE thread_id = ? AND message_id = ?")
-        .get(threadId, messageId),
+      cachedStatement(
+        db,
+        "SELECT 1 AS deleted FROM projection_deleted_thread_messages WHERE thread_id = ? AND message_id = ?",
+      ).get(threadId, messageId),
     ) !== null
   );
 }

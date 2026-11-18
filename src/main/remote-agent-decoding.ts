@@ -7,6 +7,7 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  decodeUsageCredits,
   type GithubSkillSource,
   type HostDefaultProvider,
   type HostProviderAccounts,
@@ -46,6 +47,7 @@ import type {
   QueuedMessageReceipt,
   QueueSnapshot,
   SidebarLayoutSnapshot,
+  UsageCredits,
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
@@ -75,6 +77,7 @@ import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contr
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { isAgentThreadRequests } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
@@ -91,6 +94,7 @@ export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remo
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
+export const decodeRemoteAgentThreadRequests = guardedDecoder(isAgentThreadRequests, "remote thread requests");
 export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
@@ -117,13 +121,9 @@ export function decodeDraftAttachment(value: unknown): DraftAttachment {
 export function decodeAgentSummary(value: unknown): ClientAgentSummary {
   // Backup models stay on their host, and this decoder drops them. A later host can save a provider
   // or more models than this version accepts, so they are not checked. An owner or admin reads them
-  // on `agent-backup-models-v1`.
-  const {
-    backupModels: _backupModels,
-    usageLimitReturn: _usageLimitReturn,
-    pendingRuntime: _pendingRuntime,
-    ...record
-  } = decodeRecord(value, "agent");
+  // on `agent-backup-models-v1`. `pendingRuntime` comes only under `agent-pending-runtime-v1`, whose
+  // codec has already left out one that this version does not know.
+  const { backupModels: _backupModels, usageLimitReturn: _usageLimitReturn, ...record } = decodeRecord(value, "agent");
   // Servers older than 63b55606 omit `avatarUrl` entirely. The shared guard requires the field, so
   // normalize the absent case to null before validating rather than loosening the guard for everyone.
   const candidate = record.avatarUrl === undefined ? { ...record, avatarUrl: null } : record;
@@ -146,6 +146,7 @@ export function decodeAgentSummary(value: unknown): ClientAgentSummary {
     avatarHue: candidate.avatarHue,
     avatarUrl: candidate.avatarUrl,
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
+    ...(candidate.pendingRuntime === undefined ? {} : { pendingRuntime: candidate.pendingRuntime }),
   };
 }
 
@@ -249,6 +250,12 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
     throw new Error("Invalid remote account usage.");
   }
   return value;
+}
+
+/** The `usage-credits-v1` list: an unknown provider is left out. */
+export function decodeUsageCreditsList(value: unknown): UsageCredits[] {
+  if (!isDynamicRecord(value)) throw new Error("Invalid usage credits.");
+  return decodeUsageCredits(value.accounts);
 }
 
 // Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed

@@ -145,7 +145,7 @@ export function PasswordManagerConnectorPage({
   };
   /** The known failures have their own text. Another failure shows the host's sentence. */
   const statusFailure = (): string | null => {
-    if (status.errorCode === "plan") return t("mobile.server.connectors.passwordManager.plan", { name });
+    if (status.errorCode === "plan") return t(text.plan);
     if (status.errorCode === "extra-password") return t("mobile.server.connectors.passwordManager.extraPasswordWrong");
     if (status.errorCode === "expired")
       return status.state === "connected" ? null : t("mobile.server.connectors.passwordManager.expiredTitle", { name });

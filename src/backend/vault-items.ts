@@ -131,6 +131,11 @@ export interface VaultItems {
    * key for chosen agents that names it, or else the key for every agent. None while the Vault is not ready.
    */
   apiKeys(agentId: string): VaultAgentKey[];
+  /**
+   * The API keys for every agent, not for chosen agents, which `AgentApiKeys` also writes to the shared
+   * path of earlier versions. None while the Vault is not ready.
+   */
+  sharedApiKeys(): Omit<VaultAgentKey, "own">[];
   /** Whether a card that `agentId` can use is saved now. Agents are told about card fill only while one is. */
   hasCards(agentId: string): boolean;
   /** Whether contact info that `agentId` can use is saved now. */
@@ -174,8 +179,9 @@ export interface VaultItems {
   /** Deletes the API key of this name that is for `agentId` only. False when it has none. */
   removeAgentApiKey(agentId: string, name: string): Effect.Effect<boolean, PasswordVaultError>;
   /**
-   * Adds an item that the user typed, for every agent. The values are checked as the Vault page checks
-   * them; a wrong value fails with text that the user reads.
+   * Adds an item that the user typed, for every agent. A login for the host and username of a saved
+   * login that the agent can use changes that login instead. The values are checked as the Vault page
+   * checks them; a wrong value fails with text that the user reads.
    */
   addEntered(item: VaultEnteredItem, agent: VaultAgent): Effect.Effect<VaultAgentResult, PasswordVaultError>;
 }

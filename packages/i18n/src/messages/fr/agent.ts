@@ -87,7 +87,7 @@ export const messages = {
   "agent.error.continueFailed": "L’agent n’a pas pu continuer. Réessayez.",
   "agent.error.copyDetails": "Copier les détails",
   "agent.error.mcpNotStarted": "Serveur MCP non démarré",
-  "agent.error.openMcpSettings": "Ouvrir les réglages MCP",
+  "agent.error.openMarketplace": "Ouvrir la Marketplace",
   "agent.error.provider": "Erreur du fournisseur",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Erreur de {provider}",

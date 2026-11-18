@@ -47,10 +47,11 @@ import {
   type RemoteMemberRole,
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
-import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
+import { Deferred, Duration, Effect, Exit, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -103,6 +104,11 @@ interface CentralAuthManagerOptions {
   emailCodeRequestTimeoutMs?: number;
   /** Opens the company provider page. Without it, a company email cannot sign in. */
   companySignInBrowser?: CompanySignInBrowser | null;
+  /**
+   * True: the start waits for the account service before it reports a stored session as signed in.
+   * A hosted server sets it: its claim signs it in only when the stored session has ended.
+   */
+  confirmSessionAtStart?: boolean;
 }
 
 /** The persistent Mobile Connect link of this desktop. The account service keeps only its hash. */
@@ -118,6 +124,20 @@ const logger = createOpenBotLogger("central-auth");
 
 /** The step of a session file read or write that failed, for the account log. */
 type StoredSessionStage = "read" | "decrypt" | "decode" | "encrypt" | "write";
+
+/**
+ * A Slack or Telegram route ticket, and the workspace or chat IDs that the account service names beside
+ * it. The host reads the IDs to show a connection that Signal does not route here. Null without IDs.
+ */
+function decodeLinkedRoute(
+  value: unknown,
+  label: string,
+  field: "teams" | "chats",
+): { ticket: string; ids: string[] | null } {
+  const record = decodeRecord(value, label);
+  const ids = record[field];
+  return { ticket: requiredString(record, "ticket"), ids: Array.isArray(ids) && ids.every(isString) ? ids : null };
+}
 
 /**
  * The stage, error name and system code only. A decode message can quote the decrypted text, and a
@@ -192,6 +212,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #sessionToken: string | null = null;
   /** The session token in the stored file, or null when the file holds none that this start could read. */
   #storedSessionToken: string | null = null;
+  /**
+   * The profile of the signed-in account and the session token that it belongs to. The stored file
+   * holds a copy, so the next start shows the account before the account service answers.
+   */
+  #sessionUser: { token: string; user: CentralAuthUser } | null = null;
+  /** The profile in the stored file, as JSON, or null when the file holds none. */
+  #storedUserJson: string | null = null;
   readonly #teamHostTokens = new Map<string, string>();
   /** Belongs to the session that made it: the account service rejects it when that session ends. */
   #mobileConnectLink: StoredMobileConnectLink | null = null;
@@ -229,6 +256,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       startupRetryDelaysMs: options.startupRetryDelaysMs ?? STARTUP_RETRY_DELAYS_MS,
       emailCodeRequestTimeoutMs: options.emailCodeRequestTimeoutMs ?? EMAIL_CODE_REQUEST_TIMEOUT_MS,
       companySignInBrowser: options.companySignInBrowser ?? null,
+      confirmSessionAtStart: options.confirmSessionAtStart ?? false,
     };
   }
 
@@ -815,12 +843,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Slack route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Slack route", "teams"),
       );
     },
     (operation) => this.#owned(operation),
@@ -899,12 +927,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/telegram-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Telegram route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Telegram route", "chats"),
       );
     },
     (operation) => this.#owned(operation),
@@ -1082,7 +1110,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ticket: string,
     ): Effect.fn.Return<VerifiedRemoteSessionTicket, CentralAuthOperationError, CentralAuthTransport> {
       const verify = Effect.gen({ self: this }, function* () {
-        if (!this.#remoteTicketJwks) this.#remoteTicketJwks = yield* Effect.cached(this.#fetchRemoteTicketJwks());
+        // Keep only a loaded key set. A failed load must not refuse every later client until a restart.
+        if (!this.#remoteTicketJwks)
+          this.#remoteTicketJwks = yield* this.#fetchRemoteTicketJwks().pipe(
+            Effect.cachedWithTTL((exit) => (Exit.isSuccess(exit) ? Duration.infinity : 0)),
+          );
         const jwks = yield* this.#remoteTicketJwks;
         const keySet = yield* authDecode(() => createLocalJWKSet(jwks));
         return yield* authCall(() =>
@@ -1333,6 +1365,28 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /** Copies the server plush look (`host-appearance-v1`) to the host list. `null` clears it. */
+  readonly updateRemoteHostAppearance = Effect.fn("CentralAuth.updateRemoteHostAppearance")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      appearance: ServerAppearance | null,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/appearance`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appearance }),
+        },
+        (value) => {
+          decodeRecord(value, "remote host appearance");
+        },
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly downloadRemoteHostLogo = Effect.fn("CentralAuth.downloadRemoteHostLogo")(
     function* (
       this: CentralAuthManager,
@@ -1546,6 +1600,14 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       );
     }
     const sessionToken = this.#sessionToken;
+    // The stored profile shows the account at once. The account service confirms the session after
+    // that, and a refusal signs this device out as it does at any later time.
+    const storedUser = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
+    if (storedUser && !this.#options.confirmSessionAtStart) {
+      const state = this.#setState({ status: "signed_in", user: storedUser });
+      Effect.runFork(this.#owned(this.#confirmRestoredSession(sessionToken)).pipe(Effect.ignore));
+      return state;
+    }
     return yield* Effect.gen({ self: this }, function* () {
       const user = yield* this.#startupRequestEffect("/v1/me", { method: "GET" }, decodeCentralAuthUser, sessionToken);
       return this.#setState({ status: "signed_in", user: this.#resolveUserAvatar(user) });
@@ -1560,6 +1622,35 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         }),
       ),
     );
+  });
+
+  /**
+   * Asks the account service about a session that the start took from the stored file. A 401 ends
+   * the session. With no answer the account stays signed in: the next authorized request asks again.
+   */
+  readonly #confirmRestoredSession = Effect.fn("CentralAuth.confirmRestoredSession")(function* (
+    this: CentralAuthManager,
+    sessionToken: string,
+  ): Effect.fn.Return<void, never, CentralAuthTransport> {
+    const answer = yield* this.#startupRequestEffect(
+      "/v1/me",
+      { method: "GET" },
+      decodeCentralAuthUser,
+      sessionToken,
+    ).pipe(Effect.result);
+    if (this.#disposed || this.#sessionToken !== sessionToken) return;
+    if (Result.isFailure(answer)) {
+      const error = answer.failure.cause;
+      if (error instanceof AuthApiError && error.status === 401) {
+        yield* this.#endRevokedSession(sessionToken, true);
+        return;
+      }
+      logger.warn("The account service did not confirm the stored session.", toLogValue(error));
+      return;
+    }
+    if (this.#state.status !== "signed_in") return;
+    const user = this.#resolveUserAvatar(answer.success);
+    if (JSON.stringify(user) !== JSON.stringify(this.#state.user)) this.#setState({ status: "signed_in", user });
   });
 
   readonly requestEmailCode = Effect.fn("CentralAuth.requestEmailCode")(
@@ -1923,6 +2014,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /** True while this device has a session, also when the account service has not confirmed it yet. */
+  hasSession(): boolean {
+    return this.#sessionToken !== null;
+  }
 
   /** False when the session can live only in memory, so it would be lost at the next start. */
   canPersistSession(): boolean {
@@ -2323,11 +2419,14 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     const temporaryPath = `${this.#options.storagePath}.${randomUUID()}.tmp`;
     let stage: StoredSessionStage = "encrypt";
     yield* Effect.gen({ self: this }, function* () {
+      // An older version reads only the fields that it knows, so the file stays version 2.
+      const user = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
       const value = JSON.stringify({
         version: 2,
         sessionToken,
         teamHostTokens: Object.fromEntries(this.#teamHostTokens),
         ...(this.#mobileConnectLink ? { mobileConnectLink: this.#mobileConnectLink } : {}),
+        ...(user ? { user } : {}),
       });
       const encrypted = yield* authDecode(() => this.#options.encrypt(value).toString("base64"));
       stage = "write";
@@ -2336,6 +2435,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       yield* authCall(() => chmod(temporaryPath, 0o600));
       yield* authCall(() => rename(temporaryPath, this.#options.storagePath));
       this.#storedSessionToken = sessionToken;
+      this.#storedUserJson = user ? JSON.stringify(user) : null;
     }).pipe(
       // A required write fails, and its caller puts back the session that the file still holds.
       Effect.catch((failure) => {
@@ -2356,6 +2456,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       .withPermit(authCall(() => rm(this.#options.storagePath, { force: true })))
       .pipe(Effect.uninterruptible);
     this.#storedSessionToken = null;
+    this.#storedUserJson = null;
   });
 
   /**
@@ -2373,12 +2474,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   #forgetSession(): void {
     this.#sessionToken = null;
+    this.#sessionUser = null;
     this.#sessionAccountId = null;
     this.#teamHostTokens.clear();
     this.#mobileConnectLink = null;
   }
 
   #restoreStoredSession(value: string): void {
+    this.#sessionUser = null;
+    this.#storedUserJson = null;
     if (!value.trimStart().startsWith("{")) {
       this.#sessionToken = value;
       this.#teamHostTokens.clear();
@@ -2399,12 +2503,30 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       }
     }
     this.#mobileConnectLink = restoreMobileConnectLink(stored.mobileConnectLink);
+    // A profile that does not decode is not an error: the start asks the account service as before.
+    try {
+      const user = decodeCentralAuthUser(stored.user);
+      this.#sessionUser = { token: stored.sessionToken, user };
+      this.#storedUserJson = JSON.stringify(user);
+    } catch {
+      this.#sessionUser = null;
+    }
   }
 
   #setState(state: CentralAuthState): CentralAuthState {
     // Held apart from the state, which passes through `code_sent` on the way to another
     // account: this is whose credentials the store is holding, until they are cleared.
-    if (state.status === "signed_in") this.#sessionAccountId = state.user.id;
+    if (state.status === "signed_in") {
+      this.#sessionAccountId = state.user.id;
+      const sessionToken = this.#sessionToken;
+      if (sessionToken) {
+        this.#sessionUser = { token: sessionToken, user: state.user };
+        // The file gets the profile, or its change, so the next start does not wait for the network.
+        if (JSON.stringify(state.user) !== this.#storedUserJson && !this.#disposed && this.#options.canPersist()) {
+          Effect.runFork(this.#owned(this.#writeStoredSession()).pipe(Effect.ignore));
+        }
+      }
+    }
     this.#state = state;
     const copy = this.getState();
     this.emit("changed", copy);
@@ -2468,6 +2590,11 @@ export function isHostNotOnAccount(error: unknown): boolean {
 export function authApiRateLimit(error: unknown): { code: string; retryAfterSeconds: number | null } | null {
   if (!(error instanceof AuthApiError) || error.status !== 429) return null;
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
+}
+
+/** The error code that the account service sent, such as `feedback_not_yours`, or null for another failure. */
+export function authApiErrorCode(error: unknown): string | null {
+  return error instanceof AuthApiError ? error.code : null;
 }
 
 /**
@@ -2536,6 +2663,9 @@ const INTERCEPTED_TLS_CODES = new Set([
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
   "CERT_UNTRUSTED",
   "ERR_TLS_CERT_ALTNAME_INVALID",
+  // Chromium's names for the same failures, when the app sends the requests through `net.fetch`.
+  "ERR_CERT_AUTHORITY_INVALID",
+  "ERR_CERT_COMMON_NAME_INVALID",
 ]);
 
 function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
@@ -2594,7 +2724,8 @@ function authApiIssue(error: AuthApiError): CentralAuthIssue {
 
 /**
  * Why the account service did not answer: no network, no answer in time, or a 5xx. The errno of a
- * network failure is a fixed token, such as `ECONNREFUSED`, so it can go in the reference.
+ * network failure is a fixed token, such as `ECONNREFUSED` or Chromium's `ERR_CONNECTION_REFUSED`, so
+ * it can go in the reference.
  */
 function serviceUnavailableText(error: unknown): { message: string; reference: string | null } {
   if (error instanceof AuthApiError) {

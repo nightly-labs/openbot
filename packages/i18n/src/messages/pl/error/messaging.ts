@@ -19,6 +19,8 @@ export const messages = {
   "error.messaging.whatsappNotConnected": "Ten numer WhatsApp nie jest połączony.",
   "error.messaging.whatsappUnsupported": "Ten komputer nie może połączyć się z WhatsApp.",
   "error.messaging.whatsappTooManySenders": "Numer WhatsApp może dopuścić maksymalnie 200 kontaktów i grup.",
+  "error.messaging.whatsappNumberNotFound":
+    "Ten numer nie ma konta WhatsApp. Wpisz go z kodem kraju, np. +44 7700 900123.",
   "error.messaging.whatsappRequestEnded": "Ta prośba wygasła. Poproś tę osobę, aby napisała ponownie po nowy kod.",
   "error.messaging.memoryLimit":
     "Połączony obszar roboczy może mieć maksymalnie {limit} wspomnień. Najpierw usuń jedno.",

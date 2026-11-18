@@ -1,5 +1,5 @@
 /**
- * What the MCP settings panel needs beyond the shared contract: a blank draft, a reopened draft,
+ * What the Marketplace MCP server form and controls need beyond the shared contract: a blank draft, a reopened draft,
  * the dirty check, and the badge text and variant.
  *
  * The types and the rules the main process also applies - validation, normalization, the id - live
@@ -40,15 +40,20 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInRequired": "sign-in",
   "error.backend.mcpSignInOnHost": "sign-in",
   "error.backend.mcpSignInTimedOut": "sign-in",
+  "error.backend.mcpSignInRefused": "sign-in",
   "error.mcp.signInOnHost": "sign-in",
   "error.backend.mcpSignInNotAccepted": "refused",
+  "error.backend.mcpSignInAccountRefused": "refused",
   "error.backend.mcpServerHttpCredentials": "refused",
+  "error.backend.mcpServerBearerKey": "refused",
   "error.backend.mcpRegistrationRefused": "refused",
+  "error.backend.mcpSignInAppRefused": "refused",
   "error.backend.mcpSignInNeedsHttps": "url",
   "error.backend.mcpServerHttpUrl": "url",
   "error.backend.mcpServerNoAnswer": "timeout",
   "error.backend.mcpSignInResponseTimedOut": "timeout",
   "error.backend.mcpServerExited": "startup",
+  "error.backend.mcpServerExitedWithOutput": "startup",
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",
@@ -97,26 +102,12 @@ export function mcpSignInRecord(states: readonly McpSignInState[]): Record<strin
   return Object.fromEntries(states.map((state) => [state.mcpServerId, state]));
 }
 
-/**
- * Whether the sign-ins hold one for the row at `url`. The host keeps a sign-in by address, and an
- * agent can change a row's address after the sign-ins were read: a sign-in counts only when the rows
- * read with it name the same address (#8194).
- */
-export function mcpRowSignedIn(
-  signIns: Readonly<Record<string, McpSignInState>>,
-  rows: readonly McpServerConfig[],
-  mcpServerId: string,
-  url: string,
-): boolean {
-  return signIns[mcpServerId]?.signedIn === true && rows.some((row) => row.id === mcpServerId && row.url === url);
-}
-
 /** The whole sentence a test produced, for the form. The row shows the short badge instead. */
 export function mcpTestMessage(test: McpTestState, t: AppTranslate, hostName?: string | undefined): string {
   if (test.status === "testing") return t("common.connecting");
   if (test.status === "signing-in") {
     const count = MCP_SIGN_IN_TIMEOUT_MS / 60_000;
-    // A joined server's sign-in page opens on that host's browser, which keeps what it gets.
+    // A joined server without the relay opens the page in that host's browser, which keeps what it gets.
     return hostName
       ? t("mcp.panel.signInWaitingOn", { count, host: hostName })
       : t("mcp.panel.signInWaiting", { count });

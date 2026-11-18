@@ -25,29 +25,44 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
   let request = 0;
   // An agent that saves a server asks for its sign-in with a card, which draws from this list. Each
   // new card, in the chat or in a thread, is read again, or the card would wait for the settings to close.
-  // By card, not by server: an agent that changes the address of a server posts another card for
-  // that server, and the card must show the new address (#8194).
-  const signInCards = createMemo(() => {
+  const signInCardList = createMemo(() => {
     const threads = deps.props.threads;
     const threadMessages = [
       threads?.conversation,
       ...(threads?.side.tabs ?? []).map((tab) => threads?.side.thread(tab.id)?.conversation),
     ].flatMap((conversation) => conversation?.messages ?? []);
-    // Sorted and without repeats, so a tab that moves reads nothing again. A tab or older history that
-    // brings cards reads the list once more.
-    const ids = new Set([
-      ...deps.props.messages.flatMap((message) => (message.actionMarker?.kind === "mcp-sign-in" ? [message.id] : [])),
-      ...threadMessages.flatMap((message) => (mcpSignInEvent(message) ? [message.id] : [])),
-    ]);
-    return [...ids].sort().join(",");
+    return [
+      ...deps.props.messages.flatMap((message) =>
+        message.actionMarker?.kind === "mcp-sign-in"
+          ? [{ messageId: message.id, mcpServerId: message.actionMarker.mcpServerId }]
+          : [],
+      ),
+      ...threadMessages.flatMap((message) => {
+        const signIn = mcpSignInEvent(message);
+        return signIn ? [{ messageId: message.id, mcpServerId: signIn.mcpServerId }] : [];
+      }),
+    ];
   });
+  // Each new card reads the sign-in states and this list again, a second card for the same server too:
+  // an agent that tests again after the server refused the sign-in makes a new card for the same row
+  // (#6661), and so does an agent that changes the row's address, which the card must show (#8194).
+  // Sorted and without repeats, so a tab that moves reads nothing again.
+  const signInCardMessages = createMemo(() =>
+    [...new Set(signInCardList().map((card) => card.messageId))].sort().join(","),
+  );
+  createEffect(
+    () => [signInCardMessages(), deps.props.refreshMcpSignIns] as const,
+    ([key, refresh]) => {
+      if (key) refresh?.();
+    },
+  );
   const source = createMemo(() => {
     const server = deps.props.server;
     // A host that predates the capability answers 404, and a host without `mcp-member-access-v1`
     // refuses its list to a member with 403, because the list holds the servers' environment and
     // header values. Neither is asked.
     const supported = server?.kind !== "remote" || serverCanManageMcp(server);
-    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCards()}`;
+    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCardMessages()}`;
   });
   createEffect(source, (key) => {
     const current = ++request;

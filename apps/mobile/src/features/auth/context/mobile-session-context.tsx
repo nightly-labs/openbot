@@ -28,6 +28,7 @@ import {
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 import { deleteComposerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
 import { deleteWorkspaceCaches } from "@/features/workspace/model/workspace-cache";
@@ -74,7 +75,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       deleteComposerDrafts();
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
-    if (sessionRef.current && !session) void deleteWorkspaceCaches();
+    if (sessionRef.current && !session) {
+      void deleteWorkspaceCaches();
+      deleteAgentBackdrops();
+    }
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);

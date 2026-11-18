@@ -145,6 +145,7 @@ const ingress: MessagingIngress = {
   telegram: { available: () => false, call: unused, download: unused, upload: unused },
   reconnect: () => {},
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   discord: (request, decode) => {
     hostRequests.push(request);
     const decoded = decodeDiscordApiRequest(JSON.parse(JSON.stringify(request)));
@@ -352,7 +353,7 @@ try {
         assert.equal(sent.requests.length, 0, "A refused call reached Signal.");
         errors.push(String(sent.result.error));
       }
-      assert.ok(errors[0]?.includes("Give text, embeds, or both."));
+      assert.ok(errors[0]?.includes("Give text, files, embeds, or more than one."));
       assert.ok(errors[1]?.includes("An embed needs a title"));
       assert.ok(errors[6]?.includes("longer than 6000 characters"));
       return { refused: cases.length };
