@@ -76,6 +76,13 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   // Host-managed tenants watch the status but never act on it.
   const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
+  // A "ready" status with a message: the last restart did not install this update. Like a failure, the
+  // island shows a short label and keeps the full sentence for its title.
+  const notInstalledMessage = createMemo(() =>
+    phase() === "ready" && !managed() && props.updateStatus.message?.trim()
+      ? formatErrorMessage(props.updateStatus.message, t("account.update.notInstalled"))
+      : undefined,
+  );
   const progress = createMemo(() => {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
@@ -98,6 +105,8 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     if (downloading() && percent !== null) return t("account.update.downloadingLabel", { percent });
     if (phase() === "installing" || (actionPending() && ready())) return t("account.update.restartingLabel");
     if (failed()) return t("account.update.retryLabel", { reason: errorMessage() });
+    const notInstalled = notInstalledMessage();
+    if (notInstalled) return t("account.update.retryLabel", { reason: notInstalled });
     return ready() ? t("account.update.restartLabel") : t("account.update.downloadLabel");
   });
 
@@ -160,8 +169,12 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
           <strong data-text="available" aria-hidden={ready() || failed() ? "true" : undefined}>
             {t("account.update.available")}
           </strong>
-          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"}>
-            {t("account.update.ready")}
+          <strong
+            data-text="ready"
+            aria-hidden={ready() && !failed() ? undefined : "true"}
+            title={notInstalledMessage()}
+          >
+            {notInstalledMessage() ? t("account.update.notInstalled") : t("account.update.ready")}
           </strong>
           <strong data-text="error" aria-hidden={failed() ? undefined : "true"} title={errorMessage()}>
             {errorMessage()}

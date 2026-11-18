@@ -8,6 +8,7 @@ export const messages = {
   "error.update.restartFailed": "OpenBot이 업데이트를 설치하기 위해 다시 시작하지 못했어요.",
   "error.update.downloadStalled": "업데이트 다운로드가 응답하지 않아요. 다시 시도해 주세요.",
   "error.update.installFailed": "업데이트를 설치할 수 없었어요. OpenBot을 종료한 후 다시 열고 다시 시도해 주세요.",
+  "error.update.notInstalled": "마지막 재시작에서 업데이트가 설치되지 않았어요. 다시 시작해서 다시 시도해 주세요.",
   "error.update.downloadFailed": "업데이트를 다운로드할 수 없었어요. 다시 시도해 주세요.",
   "error.update.checkFailed": "업데이트를 확인할 수 없었어요. 다시 시도해 주세요.",
   "error.update.checkStalled": "업데이트 확인이 응답하지 않아요. 다시 시도해 주세요.",

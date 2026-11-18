@@ -8,6 +8,7 @@ export const messages = {
   "error.update.restartFailed": "OpenBot güncellemeyi yüklemek için yeniden başlatılamadı.",
   "error.update.downloadStalled": "Güncelleme indirmesi yanıt vermeyi durdurdu. Tekrar deneyin.",
   "error.update.installFailed": "Güncelleme yüklenemedi. OpenBot'tan çıkıp yeniden açın, ardından tekrar deneyin.",
+  "error.update.notInstalled": "Son yeniden başlatma güncellemeyi yüklemedi. Tekrar denemek için yeniden başlatın.",
   "error.update.downloadFailed": "Güncelleme indirilemedi. Tekrar deneyin.",
   "error.update.checkFailed": "Güncellemeler denetlenemedi. Tekrar deneyin.",
   "error.update.checkStalled": "Güncelleme denetimi yanıt vermeyi durdurdu. Tekrar deneyin.",

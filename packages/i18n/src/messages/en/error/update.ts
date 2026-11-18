@@ -7,6 +7,7 @@ export const messages = defineMessages("error.update", {
   "error.update.restartFailed": "OpenBot could not restart to install the update.",
   "error.update.downloadStalled": "The update download stopped responding. Try again.",
   "error.update.installFailed": "Could not install the update. Quit and reopen OpenBot, then try again.",
+  "error.update.notInstalled": "The last restart did not install the update. Restart to try again.",
   "error.update.downloadFailed": "Could not download the update. Try again.",
   "error.update.checkFailed": "Could not check for updates. Try again.",
   "error.update.checkStalled": "The update check stopped responding. Try again.",
