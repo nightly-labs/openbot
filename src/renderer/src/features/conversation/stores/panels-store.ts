@@ -6,10 +6,12 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
+import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
 import { createAttachmentDownloads } from "../attachment-downloads";
@@ -24,7 +26,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
-import { SHARED_FOLDER_PATH } from "../message-image-files";
+import { decodedPath, SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -51,6 +53,8 @@ interface SidePanelFile {
   name: string;
   folder: boolean;
   source: SidebarFilePreview["source"];
+  /** The last read of the tab's file failed. See `fileTabReadFailed`. */
+  unavailable: boolean;
 }
 
 /** The panes and files of one agent's side panel. The panel keeps them while it is closed. */
@@ -347,6 +351,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
+      fileTabReadFailed(place);
     }
   }
 
@@ -407,7 +412,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             // The fallback is for the conversation that was open at the click.
             if (fallback) {
               if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
-            } else deps.setComposerError(filePreviewError(error, path), target);
+            } else {
+              deps.setComposerError(filePreviewError(error, path), target);
+              fileTabReadFailed(place);
+            }
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -438,8 +446,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
     // Agents also write a shared file as `Shared/…`, as the host reads it. It opens from the shared
-    // folder when the workspace has nothing at that path (#5657).
-    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(path, place, fallback) : fallback;
+    // folder when the workspace has nothing at that path (#5657). The workspace resolver decodes `%XX`
+    // and the shared-file resolver does not, so the shared path is decoded here once (#12104).
+    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(decodedPath(path), place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -468,7 +477,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             if (!attachment || !canPreviewAttachment(attachment)) {
               if (next) {
                 if (current()) next();
-              } else deps.setComposerError(filePreviewError(error, path), target);
+              } else {
+                deps.setComposerError(filePreviewError(error, path), target);
+                fileTabReadFailed(place);
+              }
               return;
             }
             // The attachment is of the conversation that was open at the click.
@@ -476,6 +488,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           },
         ),
     );
+  }
+
+  /**
+   * Opens a file that a message of a side thread links to, as the chat does. A file name that a chip joins
+   * to a folder opens as written, from the workspace of `agentId`, when the folder has no such file.
+   */
+  function openThreadFile(kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) {
+    const written = asWritten && agentId ? () => openWorkspaceFile(asWritten, undefined, agentId) : undefined;
+    if (kind === "shared") openSharedFile(path, "tab", written);
+    else if (agentId) openWorkspaceFile(path, undefined, agentId, "tab", undefined, written);
   }
 
   /** The agent whose workspace the shown file or folder is in, so that its links open there too. */
@@ -501,6 +523,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         (error) => {
           if (generation !== deps.currentFilePreviewGeneration()) return;
           deps.setComposerError(filePreviewError(error, path), target);
+          fileTabReadFailed(place);
         },
       );
   }
@@ -532,6 +555,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       name: file.directory?.name ?? file.preview?.name ?? key,
       folder: source.kind === "workspace-folder",
       source,
+      unavailable: false,
     };
     updateSidePanel(ownerAgentId, (state) => {
       const files = [...state.files];
@@ -544,6 +568,23 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     });
     deps.setSidebarFilePreview(file);
     setActiveRightPanel("file-preview", ownerAgentId);
+  }
+
+  /** The file tab whose file the last tab read opens. A newer read makes an older one drop its result. */
+  let openingFileTab: { ownerAgentId: string; key: string } | null = null;
+  function setFileTabUnavailable(ownerAgentId: string, key: string, unavailable: boolean) {
+    updateSidePanel(ownerAgentId, (state) => ({
+      ...state,
+      files: state.files.map((item) => (item.key === key ? { ...item, unavailable } : item)),
+    }));
+  }
+  /**
+   * A read of a file tab failed. The tab stays and is not selected; while it has the focus, its X can
+   * close it (`side-panel.css`). Only a failed read does this, so a click while the file reads selects it.
+   */
+  function fileTabReadFailed(place: FileTabPlace) {
+    if (place === "open" && openingFileTab)
+      setFileTabUnavailable(openingFileTab.ownerAgentId, openingFileTab.key, true);
   }
 
   /** Shows the file of a tab. The shown file shows at once; another file is read again. */
@@ -559,6 +600,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setActiveRightPanel("file-preview", ownerAgentId);
       return;
     }
+    openingFileTab = { ownerAgentId, key };
+    // A new read clears the last failure, so a second click while the file reads selects the tab again.
+    if (tab.unavailable) setFileTabUnavailable(ownerAgentId, key, false);
     const source = tab.source;
     if (source.kind === "attachment") void previewAttachment(source.attachment, "open");
     else if (source.kind === "shared") openSharedFile(source.path, "open");
@@ -767,6 +811,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentAction,
     attachmentDownloads,
     openSharedFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
@@ -791,18 +836,23 @@ function filePreviewKey(source: SidebarFilePreview["source"]): string {
 }
 
 function filePreviewError(error: unknown, path: string): string {
-  let decodedPath = path;
-  try {
-    decodedPath = decodeURIComponent(path);
-  } catch {
-    // A literal percent sign can be part of a file name.
-  }
-  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
+  const name = decodedPath(path).replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
   if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
     return t("attachment.error.fileNotFound", { name });
   }
-  return errorMessage(error, t("attachment.error.previewFile", { name }));
+  const fallback = t("attachment.error.previewFile", { name });
+  const message = errorMessage(error, fallback);
+  // The host names the missing path. A sentence with a full path shows only the fallback, and a retry
+  // does not find the path either (#9010).
+  return message === fallback && matchingSourceKeys(normalizeMessage(error)).some((key) => MISSING_PATH_KEYS.has(key))
+    ? t("attachment.error.fileNotFound", { name })
+    : message;
 }
+
+const MISSING_PATH_KEYS = new Set([
+  "error.backend.workspacePathMissing",
+  "error.backend.workspacePathMissingForMember",
+]);
 
 /** The same file content, so a read again need not replace the shown one. */
 function samePreview(next: FilePreview, shown: FilePreview): boolean {

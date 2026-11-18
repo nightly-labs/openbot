@@ -342,7 +342,9 @@
   --message-bubble-base: var(--openbot-bg-surface-raised);
 }
 
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored {
+/* The agent dock draws an agent's bubble with no message row around it. */
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored {
   --message-bubble-base: var(--openbot-bg-surface);
 }
 
@@ -362,7 +364,8 @@
  * border.
  */
 .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
   --message-surface-lift: 5%;
   --openbot-bg-canvas: color-mix(
     in srgb,
@@ -495,7 +498,8 @@
  */
 :is(
   .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
 ) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
   background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
@@ -1530,9 +1534,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(
-    :is(.image-generation, .media-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
-  )
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .media-generation, .image-gallery))
   > .ui-bubble-content {
   width: 100%;
 }

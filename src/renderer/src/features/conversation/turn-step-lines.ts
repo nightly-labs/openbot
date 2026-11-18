@@ -15,7 +15,8 @@ interface TurnStepLine {
 
 export type TurnStepLines = Readonly<Record<string, readonly TurnStepLine[]>>;
 
-const TURN_LIMIT = 50;
+// Above the count of agents that work at once, so a busy agent does not lose the steps of another.
+const TURN_LIMIT = 200;
 const LINE_LIMIT = 200;
 
 /**

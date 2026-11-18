@@ -44,6 +44,8 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-support", name: "support" },
   ],
   mediaSize: true,
+  // A fixed quote for the Sunra and Higgsfield steps: a video costs per second.
+  mediaPrice: async (request) => ({ credits: request.kind === "video" ? request.duration * 2.5 : 1.5 }),
   imageModels: [
     {
       id: "gpt-image",

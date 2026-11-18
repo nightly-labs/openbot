@@ -1,6 +1,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
-import { bytesToBase64 } from "./base64";
+import { base64ToBytes, bytesToBase64 } from "./base64";
+import { copyTransfer } from "./instance-transfer-copy";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
@@ -600,6 +601,32 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
     }),
   );
 });
+
+/**
+ * Copy to another server: the host's transfer file with only the settings of the copied agents, their
+ * routine flows and workflows (`instance-transfer-copy.ts`). Only the Base64 of the
+ * manifest and of the end of the file is decoded; the rest stays as it is. Null when the file is not
+ * a transfer file.
+ */
+export function copiedTransferUpload(upload: RemoteFileUpload): RemoteFileUpload | null {
+  const { base64 } = upload;
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  // Four Base64 characters hold three bytes, so a range is decoded from whole groups.
+  const read = (offset: number, length: number) => {
+    const first = Math.floor(offset / 3);
+    const bytes = base64ToBytes(base64.slice(first * 4, Math.ceil((offset + length) / 3) * 4));
+    return bytes.subarray(offset - first * 3, offset - first * 3 + length);
+  };
+  // Also right for Base64 without padding.
+  const copy = copyTransfer({ size: Math.floor((base64.length * 3) / 4) - padding, read });
+  if (!copy) return null;
+  const kept = Math.floor(copy.offset / 3);
+  const rest = read(kept * 3, copy.offset - kept * 3);
+  const changed = new Uint8Array(rest.length + copy.tail.length);
+  changed.set(rest);
+  changed.set(copy.tail, rest.length);
+  return { ...upload, base64: base64.slice(0, kept * 4) + bytesToBase64(changed) };
+}
 
 /** The host's export in parts: the whole file's size and SHA-256, and the SHA-256 of each part. */
 export interface InstanceTransferExportState {

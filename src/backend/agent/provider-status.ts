@@ -165,3 +165,37 @@ export const waitForSignInProcess = Effect.fnUntraced(function* (
     ),
   );
 });
+
+/** The version of a CLI's saved sign-in when its sign-in started, and how to read it again. */
+export interface SavedSignInWatch {
+  readonly before: string | null;
+  readonly read: Effect.Effect<string | null>;
+}
+
+/** Reads the version of the saved sign-in before a sign-in starts. Undefined for a CLI with no `read`. */
+export const watchSavedSignIn = (
+  read: Effect.Effect<string | null> | undefined,
+): Effect.Effect<SavedSignInWatch | undefined> =>
+  read ? Effect.map(read, (before) => ({ before, read })) : Effect.succeed(undefined);
+
+/**
+ * `effect`, or `value` when it fails after the CLI saved a new sign-in. Kimi Code on Windows saves
+ * the sign-in and then crashes as it exits (#11615). The caller checks the new sign-in as after a
+ * clean exit, so a sign-in that the provider refuses still fails.
+ */
+export const orNewSavedSignIn = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  watch: SavedSignInWatch | undefined,
+  value: A,
+): Effect.Effect<A, E, R> =>
+  watch
+    ? effect.pipe(
+        Effect.catch((failure) =>
+          watch.read.pipe(
+            Effect.flatMap((after) =>
+              after !== null && after !== watch.before ? Effect.succeed(value) : Effect.fail(failure),
+            ),
+          ),
+        ),
+      )
+    : effect;

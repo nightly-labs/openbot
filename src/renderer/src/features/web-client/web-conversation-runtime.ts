@@ -29,6 +29,7 @@ import {
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -82,6 +83,7 @@ function webHostAdmin(
   routineRunPlaceEnabled?: () => boolean,
   routinesOnceEnabled?: () => boolean,
   routinePauseReasonsEnabled?: () => boolean,
+  webhookAgentSecretEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -92,6 +94,7 @@ function webHostAdmin(
     () => routineRunPlaceEnabled?.() === true,
     () => routinesOnceEnabled?.() === true,
     () => routinePauseReasonsEnabled?.() === true,
+    () => webhookAgentSecretEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -527,6 +530,8 @@ export function createWebConversationRuntime(
           routineRunPlaceEnabled,
           routinesOnceEnabled,
           routinePauseReasonsEnabled,
+          // The same owner or admin gives the signing secret of an agent's webhook routine to that agent.
+          () => eventsEnabled?.() === true && hasCapability?.(WEBHOOK_AGENT_SECRET_CAPABILITY) === true,
         )
       : undefined,
   };

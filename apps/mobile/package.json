@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "expo": {
     "install": {
       "exclude": [

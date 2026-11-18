@@ -45,6 +45,7 @@ export const messages = defineMessages("server", {
   "server.compatibility.updateHostTitle": "Update OpenBot on {name}",
   "server.compatibility.unsafeDataTitle": "The host returned unsafe data",
   "server.compatibility.cannotConnectTitle": "Cannot connect to {name}",
+  "server.compatibility.safeModeTitle": "{name} does not start",
   "server.compatibility.updateClientDescription":
     "This app supports only older protocols than the host. Update this app, then try again.",
   "server.compatibility.updateHostDescription":
@@ -125,6 +126,7 @@ export const messages = defineMessages("server", {
   "server.local.create": "Create server",
   "server.local.creating": "Creating server…",
   "server.local.createFailed": "Could not create the server.",
+  "server.local.createFailedRetry": "Something went wrong. Try again. If it fails again, restart OpenBot.",
   "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
   "server.local.deleteConfirmTitle": "Delete {name}?",
   "server.local.deleteConfirmDescription":

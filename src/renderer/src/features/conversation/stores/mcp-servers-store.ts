@@ -43,10 +43,10 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       }),
     ];
   });
-  // Sorted and without repeats, so a tab that moves or opens reads nothing again.
-  const signInCards = createMemo(() => [...new Set(signInCardList().map((card) => card.mcpServerId))].sort().join(","));
-  // Each new card reads the sign-in states again, a second card for the same server too: an agent
-  // that tests again after the server refused the sign-in makes a new card for the same row (#6661).
+  // Each new card reads the sign-in states and this list again, a second card for the same server too:
+  // an agent that tests again after the server refused the sign-in makes a new card for the same row
+  // (#6661), and so does an agent that changes the row's address, which the card must show (#8194).
+  // Sorted and without repeats, so a tab that moves reads nothing again.
   const signInCardMessages = createMemo(() =>
     [...new Set(signInCardList().map((card) => card.messageId))].sort().join(","),
   );
@@ -62,7 +62,7 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
     // refuses its list to a member with 403, because the list holds the servers' environment and
     // header values. Neither is asked.
     const supported = server?.kind !== "remote" || serverCanManageMcp(server);
-    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCards()}`;
+    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCardMessages()}`;
   });
   createEffect(source, (key) => {
     const current = ++request;

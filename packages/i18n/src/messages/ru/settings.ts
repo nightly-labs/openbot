@@ -23,6 +23,11 @@ export const messages = {
   "settings.codeFont.title": "Шрифт кода",
   "settings.codeFont.description": "Шрифт кода, терминалов и путей к файлам.",
   "settings.codeFont.default": "По умолчанию",
+  "settings.motion.title": "Движение",
+  "settings.backgroundBlur.title": "Размытие фона",
+  "settings.backgroundBlur.description": "Размытие за меню и диалогами. На компьютере без GPU сначала выключено.",
+  "settings.movingFaces.title": "Подвижные лица агентов",
+  "settings.movingFaces.description": "Лица агентов моргают и двигаются. На компьютере без GPU сначала неподвижны.",
   "settings.logoColor.title": "Цвет логотипа",
   "settings.logoColor.description": "Отображается в Dock, на панели задач и в Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -862,13 +867,17 @@ export const messages = {
   "settings.transfer.copy.noAgents": "На этом сервере нет агентов.",
   "settings.transfer.copy.new": "Новый",
   "settings.transfer.copy.notCopied":
-    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+    "Их каналы, схемы регулярных задач, рабочие процессы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
   "settings.transfer.copy.submit": {
     one: "Копировать {count} агента",
     few: "Копировать {count} агентов",
     many: "Копировать {count} агентов",
     other: "Копировать {count} агента",
   },
+  "settings.transfer.copy.duplicatesTitle": "Скопировать дубликаты агентов?",
+  "settings.transfer.copy.duplicatesDescription":
+    "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
+  "settings.transfer.copy.duplicatesConfirm": "Копировать дубликаты",
   "settings.transfer.copy.copying": "Копирование…",
   "settings.transfer.copy.done": {
     one: "{count} агент скопирован на {server}.",

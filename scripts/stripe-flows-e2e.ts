@@ -61,6 +61,14 @@
  *   the order in its metadata. After the payment a trialing license of the order starts on its own
  *   subscription, the order metadata leaves the server subscription, and a second order is refused.
  *
+ * The `promotion-link` scenario checks the code of a discount link (`?promo=CODE`), which the web client
+ * sends with a Checkout request. It makes a 20% coupon with two promotion codes in the sandbox and deletes
+ * them at the end. A server create with the active code gives a page with that discount and no code field.
+ * A code whose minimum amount the order does not meet, and an unknown code on a license page, give the page
+ * with the code field and no discount. A copy of the live Brazil partner code (server and storage Products,
+ * BRL only, lower case) gives a discount on a BRL server page, also in upper case, and the code field on a
+ * EUR server page and on a BRL license page.
+ *
  * The `vat` scenario needs the VAT Tax Rate of `bun run api:stripe:bootstrap`. It sets the billing details
  * of `PUT /v1/me/billing/details` and reads the VAT of each new Checkout page: Polish VAT for Poland and for
  * an EU consumer, none outside the EU, reverse charge for an Irish company that VIES confirms, Polish VAT
@@ -75,6 +83,7 @@ import { fileURLToPath } from "node:url";
 import {
   BILLING_BASE_CURRENCIES,
   BILLING_CURRENCIES,
+  BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingPlanId,
   type BillingPortalRequest,
@@ -110,7 +119,7 @@ import {
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
-import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
+import { EARLY_START_METADATA, STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -152,6 +161,7 @@ const SCENARIOS = [
   "license-self-hosted-limit",
   "license-trial",
   "order-trial",
+  "promotion-link",
   "vat",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
@@ -334,6 +344,11 @@ const checkoutLinesSchema = z.object({
     ),
   }),
 });
+const promotionSessionSchema = z.object({
+  allow_promotion_codes: z.boolean().nullable(),
+  discounts: z.array(z.object({ promotion_code: z.string().nullable().optional() })).nullable(),
+  total_details: z.object({ amount_discount: z.number() }).nullable(),
+});
 const licenseItemSchema = z.object({
   items: z.object({
     data: z.array(
@@ -351,6 +366,9 @@ const hostListSchema = z.object({ hosts: z.array(z.object({ hostId: z.string(), 
 /** The request bodies of the browser API routes that this check calls. */
 type BrowserApiBody =
   | { name: string; plan: BillingPlanId; interval: "month"; currency: "eur"; license?: LicenseOrder }
+  | { name: string; plan: BillingPlanId; interval: "month"; currency: BillingCurrency; promotionCode: string }
+  | (LicenseCheckoutRequest & { promotionCode: string })
+  | { promotionCode: string }
   | { confirmName: string }
   | BillingPortalRequest
   | BillingStorageRequest
@@ -547,12 +565,22 @@ class Account {
     return createdSchema.parse(response.body);
   }
 
-  /** A server create request, monthly in EUR, with a license order when one is given. */
-  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder) {
+  /**
+   * A server create request, monthly in EUR, with a license order when one is given. `earlyStart` is the
+   * value that the client sends for the early start request of a consumer in the EU.
+   */
+  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder, earlyStart?: unknown) {
     return this.request(
       "POST",
       "v2/hosting/servers",
-      { name, plan, interval: "month", currency: "eur", ...(license ? { license } : {}) },
+      {
+        name,
+        plan,
+        interval: "month",
+        currency: "eur",
+        ...(license ? { license } : {}),
+        ...(earlyStart === undefined ? {} : { earlyStart }),
+      },
       { "Idempotency-Key": `e2e-${this.scenario}-${randomBytes(8).toString("hex")}` },
     );
   }
@@ -1377,6 +1405,119 @@ function licenseSession(url: string) {
     "expand[0]": "line_items",
     "expand[1]": "line_items.data.price",
   });
+}
+
+/** The discount state of a Checkout page: the code field, the applied promotion codes and the discount. */
+async function promotionView(url: string) {
+  if (!url) return null;
+  const session = await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, promotionSessionSchema);
+  return {
+    codeField: session.allow_promotion_codes === true,
+    promotionCodes: (session.discounts ?? []).flatMap((discount) =>
+      discount.promotion_code ? [discount.promotion_code] : [],
+    ),
+    amountDiscount: session.total_details?.amount_discount ?? 0,
+  };
+}
+
+/**
+ * A copy of the live Brazil partner code: 20% once on the server and storage Products only, and only in BRL
+ * (a minimum amount of 1 in BRL). Its code is in lower case, as the live code is.
+ */
+async function brazilPromotionLink(account: Account, suffix: string) {
+  const coupon = await stripe("POST", "/v1/coupons", idSchema, {
+    percent_off: "20",
+    duration: "once",
+    name: `E2E Brazil link ${suffix}`,
+    ...Object.fromEntries(
+      BILLING_PLAN_IDS.flatMap((plan) => [`openbot_${plan}`, `openbot_storage_${plan}`]).map((product, index) => [
+        `applies_to[products][${index}]`,
+        product,
+      ]),
+    ),
+  });
+  const brazil = { id: "", code: `e2ebr${suffix.toLowerCase()}` };
+  try {
+    brazil.id = (
+      await stripe("POST", "/v1/promotion_codes", idSchema, {
+        coupon: coupon.id,
+        code: brazil.code,
+        "restrictions[minimum_amount]": "1",
+        "restrictions[minimum_amount_currency]": "brl",
+      })
+    ).id;
+    const order = (currency: BillingCurrency, promotionCode: string) =>
+      account.request(
+        "POST",
+        "v2/hosting/servers",
+        { name: "Brazil link", plan: "standard", interval: "month", currency, promotionCode },
+        { "Idempotency-Key": `e2e-${account.scenario}-${randomBytes(8).toString("hex")}` },
+      );
+    const brl = await order("brl", brazil.code);
+    const brlOrder = createdSchema.safeParse(brl.body).data;
+    const brlPage = await promotionView(brlOrder?.checkoutUrl ?? "");
+    record(
+      "promotion-link",
+      "the Brazil code gives a BRL server page with that promotion code, a discount and no code field",
+      brl.status === 201 &&
+        brlPage !== null &&
+        brlPage.promotionCodes.includes(brazil.id) &&
+        brlPage.amountDiscount > 0 &&
+        !brlPage.codeField,
+      { status: brl.status, code: brl.code, page: brlPage },
+    );
+    const upper = brlOrder
+      ? await account.request("POST", `v2/hosting/servers/${brlOrder.server.serverId}/checkout`, {
+          promotionCode: brazil.code.toUpperCase(),
+        })
+      : null;
+    const upperPage = await promotionView(checkoutSchema.safeParse(upper?.body).data?.checkoutUrl ?? "");
+    record(
+      "promotion-link",
+      "the Brazil code in upper case gives the same discount",
+      upper?.status === 200 &&
+        upperPage !== null &&
+        upperPage.promotionCodes.includes(brazil.id) &&
+        upperPage.amountDiscount > 0,
+      { status: upper?.status ?? null, code: upper?.code ?? null, page: upperPage },
+    );
+    const eur = await order("eur", brazil.code);
+    const eurPage = await promotionView(createdSchema.safeParse(eur.body).data?.checkoutUrl ?? "");
+    record(
+      "promotion-link",
+      "the Brazil code gives a EUR server page with the code field and no discount",
+      eur.status === 201 &&
+        eurPage !== null &&
+        eurPage.codeField &&
+        eurPage.promotionCodes.length === 0 &&
+        eurPage.amountDiscount === 0,
+      { status: eur.status, code: eur.code, page: eurPage },
+    );
+    const license = await account.request("POST", "v1/me/license/checkout", {
+      users: 5,
+      currency: "brl",
+      tier: "team",
+      interval: "month",
+      promotionCode: brazil.code,
+    });
+    const licenseUrl = licenseCheckoutSchema.safeParse(license.body).data?.url ?? "";
+    const licensePage = await promotionView(licenseUrl);
+    record(
+      "promotion-link",
+      "the Brazil code gives a BRL license page with the code field and no discount",
+      license.status === 200 &&
+        licensePage !== null &&
+        licensePage.codeField &&
+        licensePage.promotionCodes.length === 0 &&
+        licensePage.amountDiscount === 0,
+      { status: license.status, code: license.code, page: licensePage },
+    );
+    if (licenseUrl) await expireCheckout(licenseUrl);
+  } finally {
+    if (brazil.id)
+      await stripe("POST", `/v1/promotion_codes/${brazil.id}`, idSchema, { active: "false" }).catch(() => null);
+    await stripe("DELETE", `/v1/coupons/${coupon.id}`, idSchema).catch(() => null);
+  }
 }
 
 const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
@@ -3282,6 +3423,83 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
   },
 
+  async "promotion-link"(account) {
+    const suffix = randomBytes(4).toString("hex").toUpperCase();
+    const coupon = await stripe("POST", "/v1/coupons", idSchema, {
+      percent_off: "20",
+      duration: "once",
+      name: `E2E promotion link ${suffix}`,
+    });
+    const active = { id: "", code: `E2ELINK${suffix}` };
+    const limited = { id: "", code: `E2EMIN${suffix}` };
+    try {
+      active.id = (await stripe("POST", "/v1/promotion_codes", idSchema, { coupon: coupon.id, code: active.code })).id;
+      limited.id = (
+        await stripe("POST", "/v1/promotion_codes", idSchema, {
+          coupon: coupon.id,
+          code: limited.code,
+          "restrictions[minimum_amount]": "99999900",
+          "restrictions[minimum_amount_currency]": "eur",
+        })
+      ).id;
+      const created = await account.request(
+        "POST",
+        "v2/hosting/servers",
+        { name: "Promotion link", plan: "standard", interval: "month", currency: "eur", promotionCode: active.code },
+        { "Idempotency-Key": `e2e-${account.scenario}-${randomBytes(8).toString("hex")}` },
+      );
+      const order = createdSchema.safeParse(created.body).data;
+      const discounted = await promotionView(order?.checkoutUrl ?? "");
+      record(
+        "promotion-link",
+        "a server create with an active code gives a page with that promotion code, a discount and no code field",
+        created.status === 201 &&
+          discounted !== null &&
+          discounted.promotionCodes.includes(active.id) &&
+          discounted.amountDiscount > 0 &&
+          !discounted.codeField,
+        { status: created.status, code: created.code, page: discounted },
+      );
+      const reopened = order
+        ? await account.request("POST", `v2/hosting/servers/${order.server.serverId}/checkout`, {
+            promotionCode: limited.code,
+          })
+        : null;
+      const fallback = await promotionView(checkoutSchema.safeParse(reopened?.body).data?.checkoutUrl ?? "");
+      record(
+        "promotion-link",
+        "a code whose minimum amount the order does not meet gives a page with the code field and no discount",
+        reopened?.status === 200 &&
+          fallback !== null &&
+          fallback.codeField &&
+          fallback.promotionCodes.length === 0 &&
+          fallback.amountDiscount === 0,
+        { status: reopened?.status ?? null, code: reopened?.code ?? null, page: fallback },
+      );
+      const license = await account.request("POST", "v1/me/license/checkout", {
+        users: 5,
+        currency: "eur",
+        tier: "team",
+        interval: "month",
+        promotionCode: `E2ENONE${suffix}`,
+      });
+      const licenseUrl = licenseCheckoutSchema.safeParse(license.body).data?.url ?? "";
+      const unknown = await promotionView(licenseUrl);
+      record(
+        "promotion-link",
+        "an unknown code gives a license page with the code field and no discount",
+        license.status === 200 && unknown !== null && unknown.codeField && unknown.promotionCodes.length === 0,
+        { status: license.status, code: license.code, page: unknown },
+      );
+      if (licenseUrl) await expireCheckout(licenseUrl);
+      await brazilPromotionLink(account, suffix);
+    } finally {
+      for (const id of [active.id, limited.id].filter(Boolean))
+        await stripe("POST", `/v1/promotion_codes/${id}`, idSchema, { active: "false" }).catch(() => null);
+      await stripe("DELETE", `/v1/coupons/${coupon.id}`, idSchema).catch(() => null);
+    }
+  },
+
   async "license-member-limits"(account) {
     const fresh = await account.createServer("Starter now");
     const freshSub = await account.pay(fresh.server.serverId);
@@ -3653,6 +3871,35 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       "a buyer in Germany with no VAT ID pays Polish VAT: the seller is not in the One Stop Shop",
       consumer.status === 200 && addsPolishVat(consumerPage) && vatView(consumerPage)?.country === "DE",
       { status: consumer.status, vat: vatView(consumerPage) },
+    );
+
+    // The early start request of a consumer in the EU is the record on the page. A reopened page keeps its time.
+    const asked = createdSchema.safeParse(
+      (await account.orderServer("Early start server", "standard", undefined, true)).body,
+    ).data;
+    const askedPage = asked?.checkoutUrl ? await licenseSession(asked.checkoutUrl) : null;
+    const askedAt = askedPage?.metadata?.[EARLY_START_METADATA];
+    const reopened = asked ? await account.checkout(asked.server.serverId) : null;
+    const reopenedPage = reopened?.checkoutUrl ? await licenseSession(reopened.checkoutUrl) : null;
+    const notTrue = createdSchema.safeParse(
+      (await account.orderServer("No early start server", "standard", undefined, "yes")).body,
+    ).data;
+    const notTruePage = notTrue?.checkoutUrl ? await licenseSession(notTrue.checkoutUrl) : null;
+    record(
+      "vat",
+      "an early start request is on the page with its time, a reopened page keeps the same time, and a page with no request or a value other than true has none",
+      askedAt !== undefined &&
+        Number.isFinite(Date.parse(askedAt)) &&
+        reopenedPage?.metadata?.[EARLY_START_METADATA] === askedAt &&
+        consumerPage?.metadata?.[EARLY_START_METADATA] === undefined &&
+        notTruePage !== null &&
+        notTruePage.metadata?.[EARLY_START_METADATA] === undefined,
+      {
+        asked: askedPage?.metadata,
+        reopened: reopenedPage?.metadata,
+        none: consumerPage?.metadata,
+        notTrue: notTruePage?.metadata,
+      },
     );
 
     const outside = await save({ country: "US" });

@@ -69,7 +69,7 @@ function summary(input: LocalServerAttachInput): ServerSummary {
     name: READY.serverName,
     role: "owner",
     state: "online",
-    active: input.select,
+    active: false,
     thisComputer: true,
   };
 }

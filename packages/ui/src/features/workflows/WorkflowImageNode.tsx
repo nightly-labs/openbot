@@ -12,6 +12,7 @@ import {
   WORKFLOW_VIDEO_VOICES,
   type WorkflowMediaAspect,
   type WorkflowMediaKind,
+  type WorkflowMediaPriceRequest,
   type WorkflowMediaSize,
   workflowMediaAspects,
   workflowMediaResolutions,
@@ -60,6 +61,7 @@ import {
   useTextField,
   type WfnInputPort,
 } from "./workflow-node-parts";
+import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type Aspect = WorkflowMediaAspect;
 /** The frame of a step: an aspect ratio of the model, or a size of its own in pixels. */
@@ -230,6 +232,36 @@ function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
+/**
+ * The price of one file with the choices of the step, in the credits of the service, or null while
+ * there is no quote. It asks again when a choice changes; an answer for older choices is dropped.
+ */
+function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
+  const board = useBoard();
+  const [credits, setCredits] = createSignal<number | null>(null);
+  let asked = 0;
+  /** The choices as one string, so a new object with the same choices does not ask again. */
+  const key = () => {
+    const next = request();
+    return next && board.catalogs().mediaPrice ? JSON.stringify(next) : null;
+  };
+  createEffect(key, (choices) => {
+    asked += 1;
+    const sent = asked;
+    setCredits(null);
+    const next = untrack(request);
+    const quote = untrack(() => board.catalogs().mediaPrice);
+    if (!choices || !next || !quote) return;
+    quote(next).then(
+      (answer) => {
+        if (sent === asked) setCredits(answer.credits);
+      },
+      () => undefined,
+    );
+  });
+  return credits;
+}
+
 /** A glass chip on the media that opens a short list, as the aspect chip does. */
 function ChipMenu<T extends string>(props: {
   label: string;
@@ -316,7 +348,7 @@ function cardWidth(kind: WorkflowMediaKind, ratio: number): string | undefined {
  */
 export function ImageNode(props: { id: string; image?: string | undefined; prompt?: string; aspect?: Aspect }) {
   const board = useBoard();
-  const { t } = useText();
+  const { t, format } = useText();
   const [kind] = useField<WorkflowMediaKind>(() => props.id, "media", "image", oneOf(WORKFLOW_MEDIA_KINDS));
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[kind()][key]);
   const [prompt, setPrompt] = useTextField(
@@ -368,6 +400,21 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
+  /** A Sunra or Higgsfield step shows what one file costs with its choices. */
+  const price = useMediaPrice(() => {
+    const chosen = model();
+    if (!chosen?.credits || (chosen.provider !== "sunra" && chosen.provider !== "higgsfield")) return null;
+    const { aspect, duration, resolution, transparent } = specs();
+    return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
+  });
+  const runText = () => {
+    const credits = price();
+    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
+  };
+  const runLabel = () => {
+    const credits = price();
+    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+  };
   /**
    * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
    * stays from 9:16 to 16:9, so the card holds its controls; the picture fills the card.
@@ -403,7 +450,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const shown = board.shown(source);
     const file = board.field(source, "fileId");
     const value = shown && !shown.failed ? resultValue(shown) : typeof file === "string" && file ? file : undefined;
-    return value === undefined ? undefined : board.catalogs().media?.(value, "image");
+    return value === undefined ? undefined : (pictureUrl(value) ?? undefined);
   };
   const roleOf = (source: string): InputRole => {
     if (kind() !== "video") return "reference";
@@ -421,24 +468,37 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const seconds = useElapsed(run.running);
   /**
    * The address of a result: the attachment that the step made, else a workspace image by name, as
-   * a host without media results gives it.
+   * a host without media results gives it. Undefined while it loads, null when it cannot show.
    */
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
-    const made = board.catalogs().media?.(value, kind());
-    if (made) return made;
-    return (
-      board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ??
-      undefined
-    );
+    return orFile(board.catalogs().media?.(value, kind()), value);
+  };
+  const orFile = (made: string | null | undefined, value: string) => made ?? fileUrl(value) ?? made;
+  /** A workspace image by name, as a host without media results gives it. */
+  const fileUrl = (value: string) =>
+    board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined;
+  /**
+   * The small copy of a picture, which the card, its strip and its inputs show. A host that sends
+   * it gives no full file here, so the card does not download both. The viewer and a download read
+   * the file.
+   */
+  const pictureUrl = (value: string) => {
+    const preview = board.catalogs().mediaPreview;
+    return orFile(preview ? preview(value) : board.catalogs().media?.(value, "image"), value);
+  };
+  const smallUrlOf = (value: string | undefined) => {
+    if (value === undefined) return undefined;
+    return kind() === "image" ? pictureUrl(value) : urlOf(value);
   };
   const shownValue = () => {
     const shown = board.shown(props.id);
     return shown ? resultValue(shown) : props.image;
   };
   const shownUrl = () => urlOf(shownValue());
-  /** An image with clear pixels shows on the canvas with no card behind it. */
-  const shape = usePictureShape(() => (kind() === "image" ? shownUrl() : undefined));
+  const shownPicture = () => smallUrlOf(shownValue());
+  /** An image with clear pixels shows on the canvas with no card behind it. The copy keeps clear pixels. */
+  const shape = usePictureShape(() => (kind() === "image" ? (shownPicture() ?? undefined) : undefined));
   const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   /** The name that a download of the media takes. */
@@ -479,7 +539,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         kind="image"
         media
         clear={clear()}
-        thumb={(result) => (kind() === "image" ? urlOf(result.value) : undefined)}
+        thumb={(result) => (kind() === "image" ? (smallUrlOf(result.value) ?? undefined) : undefined)}
         inputs={["text", "image"]}
         inputPorts={kind() === "video" ? videoPorts(t) : undefined}
         output={kind() === "video" ? "file" : "image"}
@@ -525,27 +585,31 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           }
         >
           <Show
-            when={shownUrl()}
+            when={shownPicture()}
             fallback={
-              <span class="wfn-media-empty" aria-hidden="true">
-                <Show when={kind() === "video"} fallback={<Image />}>
-                  <Film />
-                </Show>
-              </span>
+              // A result with no address yet still comes from the host. Null: it cannot show here.
+              <Show
+                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
+                fallback={<CardPictureLoading />}
+              >
+                <span class="wfn-media-empty" aria-hidden="true">
+                  <Show when={kind() === "video"} fallback={<Image />}>
+                    <Film />
+                  </Show>
+                </span>
+              </Show>
             }
           >
             {(url) => (
               <Show
                 when={kind() === "video"}
                 fallback={
-                  <img
-                    ref={(element: HTMLImageElement) => {
+                  <CardPicture
+                    ref={(element) => {
                       media = element;
                     }}
-                    class="wfn-media"
                     src={url()}
                     alt={prompt() || text("description")}
-                    draggable="false"
                   />
                 }
               >
@@ -718,9 +782,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       loading={making()}
                       disabled={!runnable() || locked() || !model()}
                       onClick={run.start}
+                      aria-label={runLabel()}
                     >
                       <Play aria-hidden="true" />
-                      {t("workflow.node.run")}
+                      {runText()}
                     </Button>
                   }
                 >

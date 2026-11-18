@@ -348,6 +348,9 @@ export function providerAdminIpcHandlers({
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
     await stopRelay(key);
+    // Two quick starts both pass the stop above before either one runs its flow. The later start stops
+    // the flow of the earlier one here, so no flow runs on the host that the status and cancel cannot reach.
+    while (relayed.has(key)) await stopRelay(key);
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
     const start = post(path, decodeSignInRelayFlow, body);

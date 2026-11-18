@@ -36,10 +36,10 @@ export interface LoopbackCallbackServerOptions {
   /** The paths this listener answers. Everything else is a 404, including `/`. */
   paths: readonly string[];
   /**
-   * Answers a callback that passed the checks. It is synchronous, so the browser does not wait for
-   * the network: the sign-in shows its own end in OpenBot.
+   * Answers a callback that passed the checks. A promise keeps the browser on this request until
+   * the sign-in knows its end, so the page does not say "signed in" for a sign-in that then fails.
    */
-  receive: (url: URL) => CallbackAnswer;
+  receive: (url: URL) => CallbackAnswer | Promise<CallbackAnswer>;
   /** Read on each request, so the page uses the language that is set at that time. */
   language: Pick<LanguageService, "locale" | "translate">;
   /** `exact` binds that port or fails; `preferred` tries it first and then takes any free port. */
@@ -55,7 +55,8 @@ export async function startLoopbackCallbackServer(
   // every one of them - so shutdown would sit on a socket nobody is using. They are ended by hand.
   // A socket whose page is still on its way is ended when the page is sent: the callback that ends a
   // sign-in can close this listener before the browser has the page that says so.
-  // A socket whose form is still arriving has no page to wait for, so it is ended at once.
+  // A socket whose form is still arriving, or whose answer still waits for its sign-in, has no page
+  // to wait for, so it is ended at once.
   const sockets = new Set<Socket>();
   const answering = new Set<Socket>();
   const reading = new Set<Socket>();
@@ -76,9 +77,19 @@ export async function startLoopbackCallbackServer(
           "cache-control": "no-store",
         })
         .end(callbackPage(options.language.locale, options.language.translate(answer.message)));
+    const answer = (result: CallbackAnswer | Promise<CallbackAnswer>) => {
+      if (!(result instanceof Promise)) return send(result);
+      reading.add(socket);
+      void result
+        .catch((): CallbackAnswer => ({ status: 500, message: "error.mcp.redirectNotSaved" }))
+        .then((settled) => {
+          reading.delete(socket);
+          if (!socket.destroyed) send(settled);
+        });
+    };
     const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.paths);
     if (!(checked instanceof URL)) return send(checked);
-    if (request.method !== "POST") return send(options.receive(checked));
+    if (request.method !== "POST") return answer(options.receive(checked));
     // A server that answers with `response_mode=form_post` posts the same fields as a form (#7709).
     // They are added to the query, so the sign-in reads them exactly as it reads a redirect.
     reading.add(socket);
@@ -91,7 +102,7 @@ export async function startLoopbackCallbackServer(
         return send({ status: 400, message: "error.mcp.redirectNotSignIn" });
       }
       for (const [name, value] of new URLSearchParams(form)) checked.searchParams.set(name, value);
-      send(options.receive(checked));
+      answer(options.receive(checked));
     });
   });
   server.on("connection", (socket) => {

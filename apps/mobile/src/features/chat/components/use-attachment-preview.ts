@@ -9,7 +9,6 @@ import {
   type AttachmentPreviewKind,
   attachmentCodeLanguage,
   attachmentPreviewKind,
-  PREVIEW_TEXT_LIMIT,
 } from "../model/attachment-file-preview";
 import { type CodePreviewEntry, storeCodePreview } from "../model/code-preview-store";
 import { useAttachmentDownload } from "../model/large-files";
@@ -25,9 +24,8 @@ export async function openFilePreview(
     entry.source = await new File(file.uri).text();
     entry.language = "html";
   } else if (kind === "markdown" || kind === "text") {
-    const text = await new File(file.uri).text();
-    entry.source = text.slice(0, PREVIEW_TEXT_LIMIT);
-    entry.truncated = text.length > PREVIEW_TEXT_LIMIT;
+    // The whole file: the screen shows a long file in parts.
+    entry.source = await new File(file.uri).text();
     entry.language = kind === "markdown" ? "markdown" : attachmentCodeLanguage(file.name);
   }
   const previewId = storeCodePreview(entry);

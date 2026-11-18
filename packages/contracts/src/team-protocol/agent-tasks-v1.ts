@@ -35,7 +35,7 @@ import { withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
 import { toCurrentAgentKeys, toWireAgentKeys } from "./current-agent-keys";
 import { isProviderAwareConversationSnapshot, projectProviderAwareConversation } from "./provider-aware-codec";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const AGENT_TASKS_CAPABILITY = "agent-tasks-v1";
 export const AGENT_TASKS_ROUTES = {

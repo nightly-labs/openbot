@@ -24,6 +24,11 @@ export const messages = defineMessages("settings", {
   "settings.codeFont.title": "Code font",
   "settings.codeFont.description": "The font of code, terminals and file paths.",
   "settings.codeFont.default": "Default",
+  "settings.motion.title": "Motion",
+  "settings.backgroundBlur.title": "Background blur",
+  "settings.backgroundBlur.description": "Blur behind menus and dialogs. It starts off on a computer with no GPU.",
+  "settings.movingFaces.title": "Moving agent faces",
+  "settings.movingFaces.description": "Agent faces blink and move. They start still on a computer with no GPU.",
   "settings.logoColor.title": "Logo color",
   "settings.logoColor.description": "Shown in the Dock, the taskbar and the Dynamic Island.",
   "settings.logoColor.buildNote": "This build keeps its own logo color. The choice applies to the release app.",
@@ -890,8 +895,12 @@ export const messages = defineMessages("settings", {
   "settings.transfer.copy.noAgents": "This server has no agents.",
   "settings.transfer.copy.new": "New",
   "settings.transfer.copy.notCopied":
-    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+    "Their channels, routine flows, workflows, and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copy duplicate agents?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "settings.transfer.copy.duplicatesConfirm": "Copy duplicates",
   "settings.transfer.copy.copying": "Copying…",
   "settings.transfer.copy.done": {
     one: "{count} agent copied to {server}.",

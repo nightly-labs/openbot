@@ -1,8 +1,11 @@
 import { AGENT_IMPORT_LIMITS, type RemoteInstanceTransferResult } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { copiedTransferUpload } from "@openbot/team-client/team-api-requests";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { agentContents, IncludeRow, toggledKeys } from "@/features/servers/components/import-parts";
 import { TransferResult } from "@/features/servers/screens/server-transfer-import-screen";
@@ -21,8 +24,9 @@ type Phase = "idle" | "exporting" | "sending" | "applying";
 
 /**
  * Server settings › Transfer › Copy to another server. The phone downloads the chosen agents of this
- * server with their workspace files, and without chats or server settings, then sends that file to
- * the other server and applies all of its agents. It uses the routes of an export and an import, so a
+ * server with their workspace files and server settings, and without chats. It keeps only the
+ * settings of those agents, their routine flows and workflows (`copiedTransferUpload`), then sends that
+ * file to the other server and applies all of its agents. It uses the routes of an export and an import, so a
  * host needs no new route. The desktop does the same in main (`instanceTransfer.copy`).
  */
 export function ServerTransferCopyScreen() {
@@ -124,6 +128,8 @@ export function ServerTransferCopyScreen() {
   const busy = phase !== "idle";
   const selected = data.agents.filter((agent) => !excluded.has(agent.id));
   const usedNames = new Set(destination.data?.agents.map((agent) => agent.name.toLowerCase()) ?? []);
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = destination.isPending && destination.fetchStatus !== "idle";
 
   async function copy(to: { id: string; name: string }) {
     if (running.current) return;
@@ -134,10 +140,13 @@ export function ServerTransferCopyScreen() {
     let token: string | null = null;
     try {
       // `instance-transfer-v1` sends the file with no warnings.
-      const upload = await downloadInstanceTransfer(
-        { agentIds: selected.map((agent) => agent.id), includeFiles: true, includeSettings: false },
-        serverId,
+      const upload = copiedTransferUpload(
+        await downloadInstanceTransfer(
+          { agentIds: selected.map((agent) => agent.id), includeFiles: true, includeSettings: true },
+          serverId,
+        ),
       );
+      if (!upload) throw new Error(sourceText("error.import.transferNotFile"));
       if (closed.current) return;
       setPhase("sending");
       const preview = await stageInstanceTransfer(upload, to.id, (fraction) => setProgress(Math.floor(fraction * 100)));
@@ -146,7 +155,7 @@ export function ServerTransferCopyScreen() {
       setPhase("applying");
       setProgress(null);
       const done = await applyInstanceTransfer(
-        { token, keys: preview.agents.map((agent) => agent.key), includeSettings: false },
+        { token, keys: preview.agents.map((agent) => agent.key), includeSettings: true },
         to.id,
       );
       // The host releases the token and the staged file when the apply starts. A failed apply can stop
@@ -180,6 +189,22 @@ export function ServerTransferCopyScreen() {
         : phase === "applying"
           ? t("mobile.server.transfer.copying")
           : t("mobile.server.transfer.copySubmit", { count: selected.length });
+  // An agent whose name is already on the destination is copied as a second, separate agent: the user accepts that first.
+  const confirmAndCopy = (to: { id: string; name: string }) => {
+    const duplicates = selected.filter((agent) => usedNames.has(agent.name.toLowerCase()));
+    if (duplicates.length === 0) return void copy(to);
+    Alert.alert(
+      t("mobile.server.transfer.copyDuplicatesTitle"),
+      t("mobile.server.transfer.copyDuplicatesBody", {
+        server: to.name,
+        names: duplicates.map((agent) => agent.name).join(", "),
+      }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("mobile.server.transfer.copyDuplicatesConfirm"), onPress: () => void copy(to) },
+      ],
+    );
+  };
 
   return (
     <SettingsContent>
@@ -229,9 +254,9 @@ export function ServerTransferCopyScreen() {
       <SettingsSection footer={error ?? undefined}>
         <SettingsRow
           disclosure={false}
-          disabled={busy || selected.length === 0 || !target}
+          disabled={busy || selected.length === 0 || !target || readingDestination}
           onPress={() => {
-            if (target) void copy({ id: target.id, name: target.name });
+            if (target) confirmAndCopy({ id: target.id, name: target.name });
           }}
         >
           <Typography.Paragraph className="text-accent">{actionLabel}</Typography.Paragraph>

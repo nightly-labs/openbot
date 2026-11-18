@@ -2,7 +2,8 @@
 // and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
 // its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
 // keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
-// `workflows-sunra-v1`, and Higgsfield through `workflows-higgsfield-v1`.
+// `workflows-sunra-v1`, and Higgsfield through `workflows-higgsfield-v1`. It gives the live models of
+// both, and a price for a step, through `workflows-media-catalog-v1`.
 
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
@@ -12,6 +13,10 @@ import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
@@ -30,7 +35,9 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
@@ -64,6 +71,7 @@ import {
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
   parseWorkflowId,
+  parseWorkflowMediaPrice,
   parseWorkflowRunId,
   parseWorkflowRuns,
   parseWorkflowStepId,
@@ -79,7 +87,8 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_GITHUB_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CAPABILITY
       | typeof WORKFLOWS_SUNRA_CAPABILITY
-      | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY,
+      | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -253,6 +262,22 @@ export function workflowIpcHandlers({
           ]);
           return { ...sunra, ...higgsfield };
         },
+      }),
+      mediaCatalog: scopedQueryHandler({
+        local: () => runCauseEffect(workflows.mediaCatalog()),
+        // A host without `workflows-media-catalog-v1` runs only the fixed models, so it has no catalog.
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : Promise.resolve({ models: [] }),
+      }),
+      mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
+        local: (input) => runCauseEffect(workflows.mediaPrice(input)),
+        // A host without `workflows-media-catalog-v1` gives no quote.
+        remote: (input, serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : Promise.resolve({ credits: null }),
       }),
     },
   };

@@ -5,11 +5,11 @@ import {
   serverStorageGb,
 } from "@openbot/contracts/billing";
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
 import { StorageTierDialog } from "@openbot/ui/features/billing/StorageTierDialog";
 import type { SidebarStorageLevel } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show, untrack } from "solid-js";
-import { appPort } from "../../app-port";
 import { usePlatform } from "../../platform";
 import { readUpgradeOffered, writeUpgradeOffered } from "./storage-card";
 
@@ -33,8 +33,11 @@ interface Offer {
  * pays for the server gets the offer, because the tier is added to its subscription. A server with no
  * tier to buy (a boat sandbox, the largest tier, a plan that ends, or an account server from before
  * storage tiers) and a server that the account does not pay for get only the sidebar card.
+ * Desktop and the web client show it.
  */
 export function ServerUpgradeOffer(props: {
+  /** Desktop IPC, or the web client's account server requests. */
+  billing: Pick<BillingCalls, "getState" | "buyStorage">;
   card: StorageCard | null;
   server: ServerSummary | undefined;
   /** Another dialog is open, such as Server settings. The offer waits. */
@@ -78,34 +81,32 @@ export function ServerUpgradeOffer(props: {
     (key) => {
       if (!key) return;
       let current = true;
-      appPort()
-        .billing.getState()
-        .then(
-          (billing) => {
-            const card = untrack(() => props.card);
-            const server = untrack(() => props.server);
-            if (!current || !card || !server || `${card.serverId}:${card.level}` !== key) return;
-            const plan = billing.servers.find(
-              (entry) =>
-                entry.serverId === card.serverId &&
-                isOpenBillingStatus(entry.status) &&
-                !entry.cancelAtPeriodEnd &&
-                (entry.storageUpgrades?.length ?? 0) > 0,
-            );
-            if (!plan) {
-              noOffer.add(key);
-              return;
-            }
-            if (!writeUpgradeOffered(card.serverId, card.level)) return;
-            setState((draft) => {
-              draft.offer = { card: { ...card }, serverName: server.name, plan };
-              draft.pending = false;
-              draft.error = null;
-            });
-          },
-          // Without the plan there is nothing to offer. The sidebar card still shows; the next change asks again.
-          () => undefined,
-        );
+      props.billing.getState().then(
+        (billing) => {
+          const card = untrack(() => props.card);
+          const server = untrack(() => props.server);
+          if (!current || !card || !server || `${card.serverId}:${card.level}` !== key) return;
+          const plan = billing.servers.find(
+            (entry) =>
+              entry.serverId === card.serverId &&
+              isOpenBillingStatus(entry.status) &&
+              !entry.cancelAtPeriodEnd &&
+              (entry.storageUpgrades?.length ?? 0) > 0,
+          );
+          if (!plan) {
+            noOffer.add(key);
+            return;
+          }
+          if (!writeUpgradeOffered(card.serverId, card.level)) return;
+          setState((draft) => {
+            draft.offer = { card: { ...card }, serverName: server.name, plan };
+            draft.pending = false;
+            draft.error = null;
+          });
+        },
+        // Without the plan there is nothing to offer. The sidebar card still shows; the next change asks again.
+        () => undefined,
+      );
       // A change before the answer, such as a lost focus, drops the answer.
       return () => {
         current = false;
@@ -126,7 +127,7 @@ export function ServerUpgradeOffer(props: {
       draft.error = null;
     });
     try {
-      await appPort().billing.buyStorage({ subscriptionId: offer.plan.subscriptionId, tier });
+      await props.billing.buyStorage({ subscriptionId: offer.plan.subscriptionId, tier });
       close();
     } catch (error) {
       setState((draft) => {

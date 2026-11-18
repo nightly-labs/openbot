@@ -162,6 +162,8 @@ export class HostedServerDesktopService {
             // Analytics only. An older account service ignores it.
             ...(input.entryPoint ? { entryPoint: input.entryPoint } : {}),
             ...(input.license ? { license: input.license } : {}),
+            // An older account service ignores it, and the Checkout page has no record of the request.
+            ...(input.earlyStart ? { earlyStart: true } : {}),
           }),
         },
         decodeCheckout,

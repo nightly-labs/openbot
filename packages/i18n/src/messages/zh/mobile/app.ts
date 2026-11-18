@@ -63,6 +63,8 @@ export const messages = {
   "mobile.app.update.group.removed": "移除",
   "mobile.app.update.group.deprecated": "已弃用",
   "mobile.app.update.group.security": "安全",
+  "mobile.app.update.requiredTitle": "需要更新",
+  "mobile.app.update.requiredBody": "OpenBot {version} 已不再受支持。请更新到 {minimum} 或更高版本以继续使用。",
   "mobile.app.update.notesFailed": "无法加载版本说明。",
   "mobile.app.update.notesEmpty": "此版本暂无版本说明。",
   "mobile.app.update.fullChangelog": "完整更新日志",

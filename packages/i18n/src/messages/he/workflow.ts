@@ -62,6 +62,8 @@ export const messages = {
   "workflow.node.locked": "נעול",
   "workflow.node.missingInput": "יש לחבר קלט כדי להריץ את השלב הזה.",
   "workflow.node.run": "הרצה",
+  "workflow.node.runPrice": "הרצה · {credits}",
+  "workflow.node.runPriceLabel": "הרצה. מחיר בקרדיטים: {credits}",
   "workflow.node.running": "רץ",
   "workflow.node.stop": "עצירה",
   "workflow.node.retry": "ניסיון חוזר",

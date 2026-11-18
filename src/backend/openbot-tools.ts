@@ -769,7 +769,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "show_setting",
     description:
-      "When the user asks how to do something in OpenBot or asks for a feature, find the setting that does it and show a card in the chat that opens it: a row of OpenBot Settings, or of your own agent settings. Only the user changes it. Words return the matching settings; then call again with one id.",
+      "When the user asks how to do something in OpenBot or for a feature, find the setting that does it and show a card that opens it: a row of OpenBot Settings or your agent settings, or the steps of a server action. Only the user changes it. Words return matches; then call again with one id.",
     shape: {
       setting: z
         .string()

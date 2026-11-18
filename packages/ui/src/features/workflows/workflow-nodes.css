@@ -43,7 +43,9 @@
   display: grid;
   gap: var(--openbot-space-1-5);
   width: var(--wfn-width);
-  transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
+  transition:
+    width var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
 .wfn-node[data-kind="prompt"] {
@@ -497,6 +499,15 @@
 .wfn-card[data-media] > .wfn-media {
   position: absolute;
   inset: 0;
+}
+
+/* A picture that the host still sends: the card pulses where the picture comes. */
+.wfn-media-loading {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  border-radius: 0;
+  background: var(--wfn-hover);
 }
 
 .wfn-media-empty {
@@ -1626,6 +1637,41 @@ fieldset.wfn-picker-group {
   z-index: 1;
 }
 
+/*
+ * The ports sit outside the card, so a near node that comes later can cover them. A selected or
+ * focused node with ports goes above the other nodes until the selection ends. The saved order stays.
+ * A node that can take the open connection goes up too. The node that the connection starts from
+ * stays down while it is open, so it does not cover a target port in either order.
+ */
+.wfn-stage .wfn-node:has(> .wfn-ports):is([data-selected], :focus-within),
+.wfn-stage .wfn-node:has(.wfn-port[data-target]) {
+  z-index: 2;
+}
+
+/*
+ * The reference lines of a hovered or selected asset draw again in a layer above the other nodes. The
+ * asset and the nodes that it connects to go above that layer, so the lines end under their ports.
+ */
+.wfn-edges-focus {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-slot[data-focus] > :is(.wfn-node, .wfn-text) {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-node:has(.wfn-port[data-armed]) {
+  z-index: 1;
+}
+
+/*
+ * The other nodes fade a little, so the asset and its references stay clear on a full board. The node
+ * fades, not its slot: an opacity on the slot traps the z-index of the node in it.
+ */
+.wfn-stage .wfn-slot[data-dim] > :is(.wfn-node, .wfn-text) {
+  opacity: 0.9;
+}
+
 .wfn-edges {
   position: absolute;
   top: 0;
@@ -1650,9 +1696,19 @@ fieldset.wfn-picker-group {
   --wfn-edge: color-mix(in srgb, var(--openbot-text-primary) 72%, transparent);
 }
 
+/* The reference lines of the focused asset are solid, in the highlight colour. */
+.wfn-edge[data-focus] {
+  --wfn-edge: var(--openbot-chart-storage-downloads);
+}
+
 /* A selected edge is solid and bright, like the selected node ring. */
 .wfn-edge[data-selected] {
   --wfn-edge: var(--openbot-text-primary);
+}
+
+/* The focus layer draws a focused line, so its copy under the nodes does not show a second comet. */
+.wfn-edges:not(.wfn-edges-focus) > .wfn-edge[data-focus] > :is(.wfn-edge-line, .wfn-edge-comet) {
+  visibility: hidden;
 }
 
 .wfn-edge[data-removing] {
@@ -1674,7 +1730,7 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   stroke-dasharray: none;
 }
 
@@ -1682,8 +1738,12 @@ fieldset.wfn-picker-group {
   animation: wfn-march 1.2s linear infinite;
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   animation: none;
+}
+
+.wfn-edge[data-focus] .wfn-edge-line {
+  stroke-width: 2;
 }
 
 @keyframes wfn-march {
@@ -1769,10 +1829,11 @@ fieldset.wfn-picker-group {
 /*
  * The remove button of a connection sits on the line at the point nearest to the pointer, and keeps
  * its screen size at every zoom. It takes the danger colour, and so does the line while the pointer is on it.
+ * It stays above a raised node.
  */
 .wfn-edge-actions {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   transform-origin: 0 0;
   translate: calc(-50% / var(--wfn-scale, 1)) calc(-50% / var(--wfn-scale, 1));
@@ -2163,8 +2224,10 @@ fieldset.wfn-picker-group {
     calc(var(--wfn-snap-y, 0px) / var(--wfn-scale, 1));
 }
 
-/* Seven results fit. More scroll, and the arrows move through all of them. */
+/* Seven results fit. More scroll, and the arrows move through all of them. The list is the offset
+ * parent of its items, so the strip can scroll the result on view to the middle. */
 .wfn-strip-list {
+  position: relative;
   display: flex;
   gap: var(--openbot-space-1-5);
   align-items: center;

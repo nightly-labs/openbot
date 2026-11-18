@@ -97,7 +97,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         db.prepare(
@@ -274,12 +274,13 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
-        supersedeStreamedMessageEvents(db, threadId, messageId, input.eventType, sequence);
+        supersedeStreamedMessageEvents(db, this.#core, threadId, messageId, input.eventType, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
-        db.prepare(`
+        this.#core
+          .statement(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
             ordinal, message_json, last_event_sequence
@@ -293,26 +294,29 @@ export class ConversationWriter {
             ordinal = excluded.ordinal,
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
-        `).run(
-          threadId,
-          message.id,
-          message.turnId ?? null,
-          message.author,
-          message.status,
-          message.itemType ?? null,
-          message.createdAt,
-          ordinal,
-          JSON.stringify(message),
-          sequence,
-        );
+        `)
+          .run(
+            threadId,
+            message.id,
+            message.turnId ?? null,
+            message.author,
+            message.status,
+            message.itemType ?? null,
+            message.createdAt,
+            ordinal,
+            JSON.stringify(message),
+            sequence,
+          );
         refreshChangedOrder(db, threadId, orderBefore, [message.id]);
         // A no-op while the message streams - the helper ignores anything but a settled message -
         // and the one call that matters if a flush ever lands on a completed one.
         recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
-        db.prepare(
-          `UPDATE projection_threads
-           SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
-        ).run(snapshot.activeTurnId, new Date().toISOString(), sequence, threadId);
+        this.#core
+          .statement(
+            `UPDATE projection_threads
+             SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
+          )
+          .run(snapshot.activeTurnId, new Date().toISOString(), sequence, threadId);
         return { revision: sequence };
       },
     ).revision;
@@ -347,7 +351,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent || agent.threadId !== input.threadId) {
           throw new Error(`Unknown agent thread for conversation append: ${input.agentId}`);
         }
@@ -494,7 +498,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         const threadOwner = databaseRow(
           db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
         );
@@ -536,6 +540,7 @@ export class ConversationWriter {
             (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
           VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
         `);
+        let appendOrdinal: number | undefined;
         for (const imported of changedMessages) {
           const existingRow = databaseRow(findOrdinal.get(input.threadId, imported.id));
           const existing = existingRow
@@ -545,9 +550,18 @@ export class ConversationWriter {
           // merge below, but a streamed update must replace status and text from the caller. The
           // historical merge keeps the old turn id and can therefore preserve stale live state.
           const message = existing ? mergeLiveMessage(existing, imported) : imported;
-          const ordinal = existingRow
-            ? requiredNumberColumn(existingRow, "ordinal")
-            : requiredNumberColumn(databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 }, "ordinal");
+          let ordinal: number;
+          if (existingRow) {
+            ordinal = requiredNumberColumn(existingRow, "ordinal");
+          } else {
+            // Read the thread's next ordinal once; each new message of this write takes the one after.
+            appendOrdinal ??= requiredNumberColumn(
+              databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 },
+              "ordinal",
+            );
+            ordinal = appendOrdinal;
+            appendOrdinal += 1;
+          }
           upsert.run(
             input.threadId,
             message.id,
@@ -759,7 +773,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent) {
           throw new Error(`Unknown agent thread for provider history: ${input.agentId}`);
         }
@@ -1004,11 +1018,33 @@ function conversationRecoveryState(
  */
 function supersedeStreamedMessageEvents(
   db: DatabaseSync,
+  core: DatabaseCore,
   threadId: string,
   messageId: string,
   eventType: string,
   retainedSequence: number,
 ): void {
+  // Each flush deletes the event before it, so a message keeps at most one streamed event. When the
+  // projection row names that event, it is deleted by its key. The search below parses the kept
+  // event of every message that the thread ever streamed, and it ran on each flush of each agent.
+  const previous = databaseRow(
+    core
+      .statement(
+        `SELECT e.sequence, e.command_id FROM projection_thread_messages m
+         JOIN orchestration_events e ON e.sequence = m.last_event_sequence
+         WHERE m.thread_id = ? AND m.message_id = ? AND e.aggregate_type = 'thread' AND e.aggregate_id = ?
+           AND e.event_type = ? AND e.sequence < ? AND json_extract(e.payload_json, '$.streamedMessage.id') = ?`,
+      )
+      .get(threadId, messageId, threadId, eventType, retainedSequence, messageId),
+  );
+  if (previous) {
+    core
+      .statement("DELETE FROM orchestration_events WHERE sequence = ?")
+      .run(requiredNumberColumn(previous, "sequence"));
+    deleteReceiptsOf(db, [requiredStringColumn(previous, "command_id")]);
+    return;
+  }
+  // Another write of the message came after its last flush, or the message is new: search.
   // `event_type` is matched before the payload is read on purpose. A thread keeps one whole
   // snapshot, whose payload holds every message, and `json_extract` over it costs as much as the
   // history is long - the very cost this path exists to avoid. The type match rejects that row

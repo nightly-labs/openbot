@@ -72,7 +72,7 @@ import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
-import { kimiSavedSignInCheck } from "./kimi-sign-in-check";
+import { kimiSavedSignInCheck, kimiSavedSignInVersion } from "./kimi-sign-in-check";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
@@ -95,6 +95,7 @@ import {
   antigravityStatePaths,
   COPILOT_CONFINED_ENV,
   clineStatePaths,
+  codexHomeDirectory,
   confineSpawnTarget,
   copilotHomeDirectory,
   copilotStatePaths,
@@ -158,6 +159,12 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | readonly string[]
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
+  /**
+   * The version of the CLI's saved sign-in, or null with none. `env` is the environment of the
+   * sign-in process. When the process fails after the version changed, the sign-in still counts:
+   * for a CLI that can crash as it exits (`orNewSavedSignIn`).
+   */
+  readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -524,6 +531,10 @@ function kimiLoginEnv(
   return isPythonKimiCli(cli) ? { ...base, ...kimiPythonLoginEnv(region) } : { ...base };
 }
 
+/** Kimi Code 2.x on Windows can stop with a failure code after `kimi login` saved the sign-in (#11615). */
+const kimiSavedSignIn = (cli: AgentCliInfo, env: NodeJS.ProcessEnv) =>
+  kimiSavedSignInVersion(isPythonKimiCli(cli), env);
+
 /**
  * A Python CLI signed in on kimi.ai needs the global hosts in each process; Kimi Code 2.x keeps
  * them with its sign-in. The agent's own variables come last, so that they can name other hosts.
@@ -702,6 +713,12 @@ export interface ProviderClientContext {
    * (`PROVIDER_ENVIRONMENT_RESERVED_NAMES`). Optional for the same reason as `reportMcpDrops`.
    */
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
+  /**
+   * The HTTP requests that OpenBot itself sends to a provider's service, such as the Gemini quota
+   * read. The app gives Chromium's network stack, which uses the computer's proxy settings; Node
+   * `fetch` ignores them (#11278). Optional: without it the read uses Node `fetch`.
+   */
+  readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 /**
@@ -1064,6 +1081,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
+    // `codex login` writes `auth.json`, and so does each token refresh of any Codex process on this
+    // sign-in. An account that an update or a refresh by another process found signed out connects
+    // again without a click (#11713). A sign-in in the keychain writes no file, and is not watched.
+    signInFiles: () => [join(codexHomeDirectory(), "auth.json")],
     // Codex reads its list only at its start. The idle reread compares its start settings, so a model
     // that the user adds in `config.toml` comes without a restart from the user (#10268).
     catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },
@@ -1237,7 +1258,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             ...agentEnvironment,
             ...opencodeEnv(cli),
             // A file below the user's project config. `OPENCODE_AGENT_CONFIG` is above all of it.
-            ...openCodeAgentDefaultsEnv(context.providerStateDirectory, { ...process.env, ...agentEnvironment }),
+            ...openCodeAgentDefaultsEnv(
+              context.providerStateDirectory,
+              { ...process.env, ...agentEnvironment },
+              cli.version,
+            ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
@@ -1355,6 +1380,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                   ANTIGRAVITY_TOKEN_FILE,
                 ),
                 model,
+                ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
               }),
       }),
     // A profile-generation client asks one question and must not act: no MCP servers, and every
@@ -1502,6 +1528,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       command: {
         argv: (cli, region) => kimiLoginArgs(cli, kimiLoginEnv(KIMI_ENV, cli, region), { code: false, region }),
         env: (cli, region) => kimiLoginEnv(KIMI_ENV, cli, region),
+        savedSignIn: kimiSavedSignIn,
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
@@ -1512,6 +1539,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: (cli, region) =>
           kimiLoginArgs(cli, kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region), { code: true, region }),
         env: (cli, region) => kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region),
+        savedSignIn: kimiSavedSignIn,
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },

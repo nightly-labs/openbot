@@ -3,7 +3,10 @@ import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
 /** The tools of the drawer that the user can move and unpin. Server settings stays last and always shows. */
-/** `remoteDesktop` shows only for a host that shares its screen, and `library` for a host with `storage-v1`. */
+/**
+ * `remoteDesktop` shows only for a host that shares its screen, `library` for a host with `storage-v1`,
+ * and `providers` for an owner or admin of a host with `providers-v1`.
+ */
 const DRAWER_TOOL_IDS = [
   "tasks",
   "routines",
@@ -11,11 +14,15 @@ const DRAWER_TOOL_IDS = [
   "marketplace",
   "usage",
   "library",
+  "providers",
   "remoteDesktop",
   "members",
 ] as const;
 
 export type DrawerToolId = (typeof DRAWER_TOOL_IDS)[number];
+
+/** The tools that start unpinned, as Providers on the desktop rail. The user pins them in edit mode. */
+const DEFAULT_UNPINNED: readonly DrawerToolId[] = ["providers"];
 
 interface DrawerToolLayout {
   /** All tools, in the order that the user gave them. */
@@ -51,7 +58,10 @@ function decode(stored: string | null): DrawerToolLayout {
     value = null;
   }
   const fields = new Map<string, unknown>(typeof value === "object" && value !== null ? Object.entries(value) : []);
-  return { order: completeOrder(toolIds(fields.get("order"))), hidden: toolIds(fields.get("hidden")) };
+  const saved = toolIds(fields.get("order"));
+  // A default-unpinned tool that is not in the saved order is new to this layout, so it starts unpinned.
+  const added = DEFAULT_UNPINNED.filter((id) => !saved.includes(id));
+  return { order: completeOrder(saved), hidden: [...new Set([...toolIds(fields.get("hidden")), ...added])] };
 }
 
 function read(): DrawerToolLayout {

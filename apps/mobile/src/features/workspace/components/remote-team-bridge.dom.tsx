@@ -1,6 +1,7 @@
 "use dom";
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteTeamPeer,
@@ -99,7 +100,8 @@ export default function RemoteTeamBridge({
     },
   };
   const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
-  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions);
+  // The workspace speaks protocol 10 with a host of protocol 10, and protocol 9 with an older host.
+  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
   const peer = runtime.current;
   if (!browserView.current)
     browserView.current = createBrowserViewBridge(

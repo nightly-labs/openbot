@@ -23,6 +23,10 @@ export const messages = {
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
   "error.remote.windowsSessionDisconnected":
     "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
+  "error.remote.streamTooSlowLowerQuality":
+    "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 다시 시도해 주세요. 다음 연결은 더 낮은 화질을 사용해요.",
+  "error.remote.streamTooSlow":
+    "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 더 빠른 네트워크를 사용한 다음 다시 시도해 주세요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",
@@ -79,10 +83,13 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "소유자만 이 서버를 삭제할 수 있어요.",
   "error.remote.requestTimeout": "원격 요청 시간이 초과되었어요.",
   "error.remote.requestFailed": "원격 요청에 실패했어요.",
-  "error.remote.pinnedKeyMissing": "원격 호스트에 고정된 기기 키가 없어요.",
+  "error.remote.hostKeyMissing":
+    "보안 키가 없거나 변경되어 OpenBot이 이 서버를 확인할 수 없어요. 서버 소유자에게 서버를 확인해 달라고 요청하세요.",
+  "error.remote.connectionNotStarted":
+    "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
   "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
-  "error.remote.hostDisconnected": "WebRTC 호스트의 연결이 끊어졌어요.",
+  "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",
   "error.remote.malformedKnownEvent": "호스트가 형식이 잘못된 알려진 이벤트를 반환했어요.",
   "error.remote.fileTransportIsStopped": "WebRTC 파일 전송이 중지되었어요.",
@@ -202,6 +209,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",
   "error.remote.taskHistoryRefreshFailed": "작업을 변경했지만 채팅 기록을 새로 고칠 수 없었어요.",
+  "error.remote.serverNotLoaded": "OpenBot이 서버를 불러오지 못했어요. 다시 시도하세요.",
+  "error.remote.localServerNotStarted":
+    "이 컴퓨터의 서버가 시작되지 않았어요. 다시 시도하세요. 시작되지 않으면 이 컴퓨터에서 OpenBot을 다시 시작하세요.",
   "error.remote.localServerAccountRemovalFailed":
     "서버는 해당 컴퓨터에서 삭제되었지만 계정에는 아직 표시됩니다. 계정에서 제거하려면 다시 삭제하세요.",
 } as const satisfies PartialTranslation<typeof source>;

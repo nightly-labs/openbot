@@ -20,18 +20,27 @@
 //      columns of a new database, and no integrity or foreign-key fault.
 //
 // Usage: bun scripts/release-upgrade-e2e.ts <macos|windows|linux|linux-arm64>
-//          [--new=<artifact>] [--previous=<tag>] [--previous-artifact=<file>]
+//          [--new=<artifact>] [--previous=<tag> | --previous-age-days=<n>] [--previous-artifact=<file>]
+//          [--history]
 //   --new                The new build: the update ZIP (macOS), the NSIS installer (Windows) or the
 //                        AppImage (Linux). Default: the one such file in dist/.
 //   --previous           The tag of the release to start from. Default: found with `gh release list`.
+//   --previous-age-days  Start from the newest release that is at least this many days old.
 //   --previous-artifact  A downloaded artifact of that release, in place of the download.
+//   --history            The previous release is an old one, not the release before this one
+//                        (`.github/workflows/release-upgrade-history.yml`). The seed step uses only the
+//                        calls that the old release has: a release with no custom agents gets no agents,
+//                        so only its own start data is in the database. Then the check also compares
+//                        the row count of each table before and after the upgrade, and a forced end of
+//                        the old release is a warning, because the new build must start after it too.
 // The download needs `gh` with a token (GH_TOKEN or GITHUB_TOKEN). Windows installs in the real
 // %LOCALAPPDATA%\Programs\OpenBot, so it runs only on a GitHub Actions runner. Linux needs a display
 // (`xvfb-run -a`), a writable /opt/OpenBot and the AppArmor profile; it never uses `--no-sandbox`.
 // Writes .openbot-build/release-upgrade-e2e/report.json with versions and counts only, no user text.
 //
 // The seed step calls the API of the previous release. When a change renames or changes one of
-// these calls, keep the earlier call for the seed step until the next release ships.
+// these calls, keep the earlier call for the seed step until the next release ships. The seed step
+// looks for each call before it uses it; without `--history`, a missing call is a failure.
 //
 // The update itself is not downloaded by the old app's electron-updater. On macOS its feed is in
 // Contents/Resources/app-update.yml, which the code signature seals: a changed file breaks the
@@ -96,7 +105,7 @@ type Target = "macos" | "windows" | "linux" | "linux-arm64";
 const target = process.argv[2];
 if (target !== "macos" && target !== "windows" && target !== "linux" && target !== "linux-arm64") {
   throw new Error(
-    "Usage: bun scripts/release-upgrade-e2e.ts <macos|windows|linux|linux-arm64> [--new=<artifact>] [--previous=<tag>] [--previous-artifact=<file>]",
+    "Usage: bun scripts/release-upgrade-e2e.ts <macos|windows|linux|linux-arm64> [--new=<artifact>] [--previous=<tag> | --previous-age-days=<n>] [--previous-artifact=<file>] [--history]",
   );
 }
 const expectedPlatform = { macos: "darwin", windows: "win32", linux: "linux", "linux-arm64": "linux" }[target];
@@ -115,6 +124,8 @@ function option(name: string): string | undefined {
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
 }
 
+const history = process.argv.includes("--history");
+
 const newVersion = z
   .object({ version: z.string() })
   .parse(JSON.parse(await readFile(resolve(import.meta.dirname, "../package.json"), "utf8"))).version;
@@ -125,10 +136,13 @@ interface Report {
   target: Target;
   arch: string;
   previousVersion?: string;
+  history: boolean;
   newVersion: string;
   installedVersion?: string;
   oldQuit?: QuitResult;
   newQuit?: QuitResult;
+  /** The calls of the previous release that the seed step used. */
+  seedApi?: SeedApi;
   seeded?: Counts;
   afterUpgrade?: Counts;
   database?: DatabaseReport;
@@ -155,6 +169,8 @@ interface DatabaseReport {
   integrity: string;
   foreignKeyViolations: number;
   previousForeignKeyViolations: number;
+  /** The tables that have fewer rows after the upgrade, with the counts before and after. */
+  tablesWithFewerRows: Record<string, { before: number; after: number }>;
 }
 
 interface QuitResult {
@@ -167,7 +183,7 @@ interface QuitResult {
 /** The part of the run marker file that this check reads. */
 const runMarkerFile = z.object({ state: z.string() });
 
-const report: Report = { passed: false, target, arch: process.arch, newVersion };
+const report: Report = { passed: false, target, arch: process.arch, history, newVersion };
 const root = await mkdtemp(join(tmpdir(), "openbot-upgrade-"));
 const userDataPath = join(root, "user-data");
 const homePath = join(root, "home");
@@ -196,10 +212,13 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
-/** The newest published, non-prerelease release below the new version. */
-function previousTag(): string {
+/**
+ * The newest published, non-prerelease release below the new version. With `ageDays`, the newest one
+ * that was published at least that many days ago.
+ */
+function previousTag(ageDays?: number): string {
   const listed = z
-    .array(z.object({ tagName: z.string() }))
+    .array(z.object({ tagName: z.string(), publishedAt: z.string() }))
     .parse(
       JSON.parse(
         execFileSync(
@@ -214,20 +233,25 @@ function previousTag(): string {
             "--limit",
             "100",
             "--json",
-            "tagName",
+            "tagName,publishedAt",
           ],
           { encoding: "utf8" },
         ),
       ),
     );
+  const latestPublished = ageDays === undefined ? Number.POSITIVE_INFINITY : Date.now() - ageDays * 86_400_000;
   const versions = listed
+    .filter((entry) => Date.parse(entry.publishedAt) <= latestPublished)
     .map((entry) => entry.tagName)
     .filter((tag) => /^v\d+\.\d+\.\d+$/u.test(tag))
     .map((tag) => tag.slice(1))
     .filter((version) => compareVersions(version, newVersion) < 0)
     .sort(compareVersions);
   const newest = versions.at(-1);
-  check(newest, `No published release is older than ${newVersion}.`);
+  check(
+    newest,
+    `No published release is older than ${newVersion}${ageDays === undefined ? "" : ` and ${ageDays} days`}.`,
+  );
   return `v${newest}`;
 }
 
@@ -502,7 +526,10 @@ async function launch(): Promise<RunningApp> {
       try {
         return await page.evaluate(async () => {
           if (typeof window.openbot === "undefined") return null;
-          await window.openbot.agent.listAgents();
+          // The first releases have no agent list; their window reads the app information first.
+          if ("agent" in window.openbot && "listAgents" in window.openbot.agent)
+            await window.openbot.agent.listAgents();
+          else await window.openbot.getAppInfo();
           return true;
         });
       } catch {
@@ -648,17 +675,58 @@ function handle(message) {
 setInterval(() => {}, 1000);
 `;
 
+/** The calls that the previous release has. The first releases have only some of them. */
+interface SeedApi {
+  updatePreference: boolean;
+  customAgents: boolean;
+  memories: boolean;
+  channels: boolean;
+}
+
 interface Seed {
+  api: SeedApi;
   agentIds: string[];
   agentMessageIds: string[];
   memoryIds: string[];
-  channelId: string;
+  channelId: string | null;
   channelMessageIds: string[];
 }
 
+async function readSeedApi(page: Page): Promise<SeedApi> {
+  return page.evaluate(() => {
+    const agent = "agent" in window.openbot ? window.openbot.agent : null;
+    return {
+      updatePreference: "update" in window.openbot && "setPreference" in window.openbot.update,
+      customAgents: "customAgents" in window.openbot && agent !== null && "createAgent" in agent,
+      memories: agent !== null && "createMemory" in agent && "listMemories" in agent,
+      channels: agent !== null && "channelCommand" in agent && "listChannels" in agent && "readChannel" in agent,
+    };
+  });
+}
+
 async function seed(page: Page): Promise<Seed> {
-  // The old app must not download the public latest release while the test runs.
-  await page.evaluate(() => window.openbot.update.setPreference({ autoDownload: false, autoInstall: false }));
+  const api = await readSeedApi(page);
+  report.seedApi = api;
+  const missing = Object.entries(api)
+    .filter(([, present]) => !present)
+    .map(([name]) => name);
+  check(history || missing.length === 0, `The previous release has no ${missing.join(", ")} call. Use --history.`);
+  const seeded: Seed = {
+    api,
+    agentIds: [],
+    agentMessageIds: [],
+    memoryIds: [],
+    channelId: null,
+    channelMessageIds: [],
+  };
+
+  // The old app must not download the public latest release while the test runs. The first releases
+  // have no preference: their updater does not download by itself (`autoDownload = false`).
+  if (api.updatePreference) {
+    await page.evaluate(() => window.openbot.update.setPreference({ autoDownload: false, autoInstall: false }));
+  }
+  // The turns need the fake custom agent: with no custom agent, an agent needs a model on the network.
+  if (!api.customAgents) return seeded;
 
   const fakeAgentPath = join(root, "fake-acp-agent.mjs");
   await writeFile(fakeAgentPath, FAKE_AGENT);
@@ -699,7 +767,8 @@ async function seed(page: Page): Promise<Seed> {
 
   const agents = [await createAgent("Upgrade One"), await createAgent("Upgrade Two")];
   const agentIds = agents.map((agent) => agent.id);
-  const agentMessageIds: string[] = [];
+  seeded.agentIds = agentIds;
+  const agentMessageIds = seeded.agentMessageIds;
   for (const agentId of agentIds) {
     const messages = await waitFor(`the first turn of ${agentId}`, TURN_LIMIT_MS, async () => {
       const found = await searchSeedMessages(page, agentId);
@@ -712,15 +781,15 @@ async function seed(page: Page): Promise<Seed> {
     agentMessageIds.push(...messages.map((message) => message.id));
   }
 
-  const memoryIds: string[] = [];
-  for (const agentId of agentIds) {
+  for (const agentId of api.memories ? agentIds : []) {
     const memory = await page.evaluate(
       (id) => window.openbot.agent.createMemory({ agentId: id, text: "The release upgrade check made this memory." }),
       agentId,
     );
-    memoryIds.push(memory.id);
+    seeded.memoryIds.push(memory.id);
   }
 
+  if (!api.channels) return seeded;
   const channelId = randomUUID();
   await page.evaluate(
     ({ channelId, agentIds }) =>
@@ -760,13 +829,9 @@ async function seed(page: Page): Promise<Seed> {
     return answered && !working ? channelPage.messages : null;
   });
 
-  return {
-    agentIds,
-    agentMessageIds,
-    memoryIds,
-    channelId,
-    channelMessageIds: channelMessages.map((entry) => entry.id),
-  };
+  seeded.channelId = channelId;
+  seeded.channelMessageIds = channelMessages.map((entry) => entry.id);
+  return seeded;
 }
 
 /**
@@ -784,7 +849,8 @@ async function searchSeedMessages(page: Page, agentId: string) {
 
 /** What the running app shows of the seed. Every count is of seeded items that it still has. */
 async function readSeed(page: Page, seeded: Seed): Promise<Counts> {
-  const agents = await page.evaluate(() => window.openbot.agent.listAgents());
+  const { api } = seeded;
+  const agents = seeded.agentIds.length > 0 ? await page.evaluate(() => window.openbot.agent.listAgents()) : [];
   const agentIds = new Set(agents.map((agent) => agent.id));
   let agentMessages = 0;
   let memories = 0;
@@ -792,22 +858,23 @@ async function readSeed(page: Page, seeded: Seed): Promise<Counts> {
     if (!agentIds.has(agentId)) continue;
     const messageIds = new Set((await searchSeedMessages(page, agentId)).map((message) => message.id));
     agentMessages += seeded.agentMessageIds.filter((id) => messageIds.has(id)).length;
+    if (!api.memories) continue;
     const memoryList = await page.evaluate((id) => window.openbot.agent.listMemories(id), agentId);
     const memoryIds = new Set(memoryList.map((memory) => memory.id));
     memories += seeded.memoryIds.filter((id) => memoryIds.has(id)).length;
   }
-  const channels = await page.evaluate(() => window.openbot.agent.listChannels());
-  const channelFound = channels.some((channel) => channel.id === seeded.channelId);
+  const { channelId } = seeded;
+  const channels = channelId ? await page.evaluate(() => window.openbot.agent.listChannels()) : [];
+  const channelFound = channels.some((channel) => channel.id === channelId);
   let channelMessages = 0;
-  if (channelFound) {
-    const channelPage = await page.evaluate(
-      (id) => window.openbot.agent.readChannel({ channelId: id }),
-      seeded.channelId,
-    );
+  if (channelId && channelFound) {
+    const channelPage = await page.evaluate((id) => window.openbot.agent.readChannel({ channelId: id }), channelId);
     const messageIds = new Set(channelPage.messages.map((entry) => entry.id));
     channelMessages = seeded.channelMessageIds.filter((id) => messageIds.has(id)).length;
   }
-  const customAgents = await page.evaluate((server) => window.openbot.customAgents.list(server), LOCAL_SERVER_ID);
+  const customAgents = api.customAgents
+    ? await page.evaluate((server) => window.openbot.customAgents.list(server), LOCAL_SERVER_ID)
+    : [];
   const workspaceFolders = (await listWorkspaces()).filter((name) => !earlierWorkspaces.has(name)).length;
   return {
     agents: seeded.agentIds.filter((id) => agentIds.has(id)).length,
@@ -865,6 +932,16 @@ function tableColumns(db: DatabaseSync): Map<string, Set<string>> {
   );
 }
 
+/** The row count of each table. */
+function rowCounts(db: DatabaseSync): Map<string, number> {
+  return new Map(
+    [...tableColumns(db).keys()].map((name) => {
+      const [row] = rows(db, `SELECT count(*) AS count FROM "${name.replaceAll('"', '""')}"`);
+      return [name, isNumber(row?.count) ? row.count : -1];
+    }),
+  );
+}
+
 function foreignKeyViolations(db: DatabaseSync): number {
   return rows(db, "PRAGMA foreign_key_check").length;
 }
@@ -872,6 +949,7 @@ function foreignKeyViolations(db: DatabaseSync): number {
 async function checkDatabase(
   previousSchemaVersion: number,
   previousForeignKeyViolations: number,
+  previousRowCounts: ReadonlyMap<string, number>,
 ): Promise<DatabaseReport> {
   const fresh = new DatabaseSync(":memory:");
   migrateOpenBotDatabase(fresh);
@@ -898,6 +976,12 @@ async function checkDatabase(
         logger.error(`The upgraded database has no column ${table}.${column}.`);
       }
     }
+    // A table that a migration drops has no count after.
+    const tablesWithFewerRows: DatabaseReport["tablesWithFewerRows"] = {};
+    for (const [table, after] of rowCounts(db)) {
+      const before = previousRowCounts.get(table);
+      if (before !== undefined && after < before) tablesWithFewerRows[table] = { before, after };
+    }
     const integrity = rows(db, "PRAGMA integrity_check")
       .map((row) => String(Object.values(row)[0]))
       .join("; ");
@@ -912,6 +996,7 @@ async function checkDatabase(
       integrity,
       foreignKeyViolations: foreignKeyViolations(db),
       previousForeignKeyViolations,
+      tablesWithFewerRows,
     };
   } finally {
     db.close();
@@ -935,7 +1020,8 @@ async function printLogs(): Promise<void> {
 }
 
 try {
-  const tag = option("previous") ?? previousTag();
+  const ageDays = option("previous-age-days");
+  const tag = option("previous") ?? previousTag(ageDays === undefined ? undefined : Number(ageDays));
   const previousVersion = tag.replace(/^v/u, "");
   check(compareVersions(previousVersion, newVersion) < 0, `${tag} is not older than ${newVersion}.`);
   report.previousVersion = previousVersion;
@@ -955,6 +1041,7 @@ try {
   const before = await openDatabaseCopy("database-before");
   const previousSchemaVersion = Math.max(...appliedVersions(before));
   const previousForeignKeyViolations = foreignKeyViolations(before);
+  const previousRowCounts = rowCounts(before);
   before.close();
 
   await installNew(newBuild);
@@ -962,7 +1049,7 @@ try {
   report.installedVersion = await readAppVersion(newApp.page);
   report.afterUpgrade = await readSeed(newApp.page, seeded);
   report.newQuit = await quit(newApp, process.platform !== "darwin");
-  report.database = await checkDatabase(previousSchemaVersion, previousForeignKeyViolations);
+  report.database = await checkDatabase(previousSchemaVersion, previousForeignKeyViolations, previousRowCounts);
 
   const { afterUpgrade, database } = report;
   check(
@@ -970,10 +1057,12 @@ try {
     `The new build reports version ${report.installedVersion}, not ${newVersion}.`,
   );
   // A crash (no exit code) or a failed shutdown (a non-zero code) during the quit is a failure too.
-  check(
-    report.oldQuit.clean && report.oldQuit.exitCode === 0,
-    `The previous release did not quit cleanly on the quit request (exit code ${report.oldQuit.exitCode}).`,
-  );
+  // An old release can end in a different way on the quit request; the new build must start after
+  // a forced end too, so `--history` only records it.
+  const oldQuitClean = report.oldQuit.clean && report.oldQuit.exitCode === 0;
+  const oldQuitMessage = `The previous release did not quit cleanly on the quit request (exit code ${report.oldQuit.exitCode}).`;
+  if (history && !oldQuitClean) logger.warn(oldQuitMessage);
+  else check(oldQuitClean, oldQuitMessage);
   check(
     report.newQuit.clean && report.newQuit.exitCode === 0,
     `The new build did not quit cleanly on the quit request (exit code ${report.newQuit.exitCode}).`,
@@ -987,8 +1076,10 @@ try {
     JSON.stringify(afterUpgrade) === JSON.stringify(report.seeded),
     `The new build lost seeded data: before ${JSON.stringify(report.seeded)}, after ${JSON.stringify(afterUpgrade)}.`,
   );
-  check(report.seeded.agents === 2 && report.seeded.customAgents === 1, "The seed step did not make its agents.");
-  check(report.seeded.workspaceFolders === 2, "The seed step did not make the agents' workspace folders.");
+  if (seeded.api.customAgents) {
+    check(report.seeded.agents === 2 && report.seeded.customAgents === 1, "The seed step did not make its agents.");
+    check(report.seeded.workspaceFolders === 2, "The seed step did not make the agents' workspace folders.");
+  }
   check(database.integrity === "ok", `PRAGMA integrity_check failed: ${database.integrity}.`);
   check(
     database.foreignKeyViolations === 0,
@@ -1002,6 +1093,14 @@ try {
     database.missingTables === 0 && database.missingColumns === 0,
     `The upgraded database misses ${database.missingTables} tables and ${database.missingColumns} columns of a new database.`,
   );
+  // The new build can delete rows itself after the start, so only `--history`, where the release's
+  // own start data is most of the seed, makes this a failure.
+  const fewerRows = JSON.stringify(database.tablesWithFewerRows);
+  if (fewerRows !== "{}") {
+    const message = `The upgraded database has fewer rows in some tables: ${fewerRows}.`;
+    check(!history, message);
+    logger.warn(message);
+  }
   report.passed = true;
   logger.info(`Upgrade from ${tag} to ${newVersion} passed.`);
 } catch (error) {

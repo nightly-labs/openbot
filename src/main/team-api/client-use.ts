@@ -1,4 +1,5 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_ACTIVE_QUEUES_ROUTES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -82,6 +83,7 @@ import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/what
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
+import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
 /**
@@ -101,6 +103,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RESULTS_ROUTES.destination,
   ROUTINE_RUN_PLACE_ROUTES.list,
   ROUTINE_PAUSE_REASONS_ROUTES.list,
+  AGENT_ACTIVE_QUEUES_ROUTES.list,
   ROUTINES_ONCE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,
   HOST_RELEASE_ROUTES.status,
@@ -167,6 +170,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WORKFLOWS_SUNRA_ROUTES.credits,
   WORKFLOWS_HIGGSFIELD_ROUTES.providers,
   WORKFLOWS_HIGGSFIELD_ROUTES.credits,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES.price,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,

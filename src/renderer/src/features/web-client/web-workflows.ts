@@ -1,7 +1,8 @@
 // The Workflows page of the joined server in the browser client. The host serves the workflows
 // through `workflows-v1`, and the GitHub catalog, options, history and last-event runs through
-// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. The targets of an
-// output use the same capabilities as on desktop.
+// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. It gives the live
+// Sunra and Higgsfield models and a price for a step through `workflows-media-catalog-v1`. The targets
+// of an output use the same capabilities as on desktop.
 
 import {
   type AgentEvent,
@@ -11,6 +12,7 @@ import {
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
@@ -24,6 +26,10 @@ import {
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -57,7 +63,9 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
@@ -72,6 +80,7 @@ import {
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
+import { createSignal } from "solid-js";
 import type { GitHubConnectorPort } from "../connectors/github-connector-port";
 import { checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
 import { openWebLink } from "./web-attachments";
@@ -94,6 +103,8 @@ export interface WebWorkflowHostOptions {
   githubConnector: GitHubConnectorPort;
   /** The object URLs of the chat's host files. A media step shows its file through them. */
   attachmentMedia: AttachmentMediaSource | undefined;
+  /** The object URLs of the small copies of host pictures (`attachment-preview-v1`). */
+  previewMedia: AttachmentMediaSource | undefined;
 }
 
 /** The host sends only the id of a media step's file, so the name and type come from the step kind. */
@@ -118,6 +129,28 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
+  // The files that did not load: too large for the page, or a failed download. A card shows its icon
+  // for them, not a loading pulse that does not end. When the host is online again, which is also after
+  // a change of server, each of them loads again. The listener lives as long as the workspace.
+  const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
+  options.onReconnect(() => setUnloaded(new Set()));
+  const loaded = (
+    media: AttachmentMediaSource,
+    attachmentId: string,
+    kind: WorkflowMediaKind,
+    size: "thumbnail" | "generated",
+    key: string,
+  ) => {
+    if (unloaded().has(key)) return null;
+    void media.load(mediaSummary(attachmentId, kind), size).then((shown) => {
+      if (!shown) setUnloaded((keys) => new Set(keys).add(key));
+    });
+    return media.url(attachmentId);
+  };
+  const mediaUrl = (attachmentId: string, kind: WorkflowMediaKind) => {
+    const media = options.attachmentMedia;
+    return media ? loaded(media, attachmentId, kind, "thumbnail", `file:${attachmentId}`) : undefined;
+  };
 
   const post = async <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> => {
     if (!has(WORKFLOWS_CAPABILITY)) throw tooOld();
@@ -195,6 +228,15 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         ]);
         return { ...sunra, ...higgsfield };
       },
+      // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
+      mediaCatalog: async () =>
+        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+          : { models: [] },
+      mediaPrice: async (input) =>
+        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+          : { credits: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -290,11 +332,16 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
-    mediaUrl(attachmentId, kind) {
-      const media = options.attachmentMedia;
-      if (!media) return undefined;
-      void media.load(mediaSummary(attachmentId, kind));
-      return media.url(attachmentId);
+    mediaUrl,
+    mediaPreviewUrl(attachmentId) {
+      const previews = options.previewMedia;
+      const key = `preview:${attachmentId}`;
+      // A host without the capability, or with no copy of the picture (a large WebP or GIF file), gives
+      // the whole file.
+      if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY) || unloaded().has(key)) {
+        return mediaUrl(attachmentId, "image");
+      }
+      return loaded(previews, attachmentId, "image", "thumbnail", key);
     },
     githubConnector: options.githubConnector,
     hostName: options.hostName,

@@ -14,6 +14,7 @@ import PinOff from "lucide-react-native/icons/pin-off";
 import Plus from "lucide-react-native/icons/plus";
 import Settings from "lucide-react-native/icons/settings";
 import Settings2 from "lucide-react-native/icons/settings-2";
+import Sparkles from "lucide-react-native/icons/sparkles";
 import Store from "lucide-react-native/icons/store";
 import UsersRound from "lucide-react-native/icons/users-round";
 import Waypoints from "lucide-react-native/icons/waypoints";
@@ -633,6 +634,10 @@ function DrawerServerTools({
   const library = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canReadServerStorage(serverId)),
   );
+  // Only an owner or admin of a host with `providers-v1` manages its providers, as on the desktop rail.
+  const providers = useMobileWorkspaceSelector((current) =>
+    serverRowState(current, serverId, (checks) => checks.canManageProviders(serverId)),
+  );
   // Until the host answers, a server without kept values shows Threads and Workflows from its last connection.
   const tasksRow = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canUseTasks(serverId)),
@@ -648,6 +653,7 @@ function DrawerServerTools({
       marketplace: { pathname: "/server-marketplace", params: { serverId } },
       usage: { pathname: "/server-usage", params: { serverId } },
       library: { pathname: "/server-library", params: { serverId } },
+      providers: { pathname: "/server-settings/providers", params: { serverId } },
       remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
       settings: { pathname: "/server-settings", params: { serverId } },
@@ -683,6 +689,10 @@ function DrawerServerTools({
       library === "hidden"
         ? null
         : { icon: GalleryVerticalEnd, label: t("mobile.app.route.library"), disabled: library === "disabled" },
+    providers:
+      providers === "hidden"
+        ? null
+        : { icon: Sparkles, label: t("mobile.server.route.providers"), disabled: providers === "disabled" },
     remoteDesktop:
       remoteDesktop === "hidden"
         ? null

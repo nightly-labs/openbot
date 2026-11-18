@@ -1,6 +1,5 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { isAgentTaskOpen, taskNeedsYou } from "@openbot/team-client/agent-tasks";
-import * as Crypto from "expo-crypto";
 import { type Href, router, useFocusEffect } from "expo-router";
 import { useNavigation } from "expo-router/react-navigation";
 import { Spinner, Typography } from "heroui-native";
@@ -54,6 +53,7 @@ import { MobileSearchResults, SearchCaption } from "@/features/search/components
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { TaskListRow } from "@/features/servers/components/task-list-row";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
 import {
   type MobileAgent,
@@ -298,9 +298,10 @@ export function useHomeSearch(): HomeSearch {
       const task = text.trim();
       if (!task || sending) return;
       setSending(true);
+      const attempt = taskStartId(agent.serverId, agent.id, task);
       workspace()
         // The agent's own server: the person can change server while the task starts.
-        .startAgentTask({ agentId: agent.id, text: task, clientMessageId: Crypto.randomUUID() }, agent.serverId)
+        .startAgentTask({ agentId: agent.id, text: task, clientMessageId: attempt.id }, agent.serverId)
         .then(
           () => {
             void haptics.notification("success");
@@ -308,6 +309,7 @@ export function useHomeSearch(): HomeSearch {
             setResult({ id: Date.now(), agent, text: task, ok: true });
           },
           (error: unknown) => {
+            attempt.failed();
             // The field says that the task failed, so the failure is reported without an alert.
             reportMobileNotification(error, "agent", "banner");
             void haptics.notification("error");

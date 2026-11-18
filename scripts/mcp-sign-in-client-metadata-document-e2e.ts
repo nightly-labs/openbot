@@ -11,6 +11,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -465,6 +466,22 @@ async function main(): Promise<void> {
       `the stored client is ${JSON.stringify(redirectNoDocument.storedClient)}`,
     );
     report.cases.push(redirectNoDocument);
+
+    // Google: no registration endpoint and no document support (#8398). Only a sign-in app can be
+    // the client, so the sentence names it.
+    const noRegistration = await runCase("no-registration-no-document", false, false, false);
+    check(
+      noRegistration,
+      noRegistration.attempts[0]?.error === sourceText("error.backend.mcpRegistrationUnavailable"),
+      `the sign-in said: ${noRegistration.attempts[0]?.error}`,
+    );
+    check(
+      noRegistration,
+      noRegistration.registrations === 0,
+      `the sign-in registered ${noRegistration.registrations} times`,
+    );
+    check(noRegistration, !noRegistration.signedIn, "a token is stored with no client");
+    report.cases.push(noRegistration);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

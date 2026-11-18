@@ -82,6 +82,7 @@ import {
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
 import {
+  EARLY_START_METADATA,
   isBillingCurrency,
   parseStripeEvent,
   priceHasCurrency,
@@ -218,7 +219,14 @@ export interface FirstPlanStart {
 }
 
 /** A closed Checkout page. `paid` when the user paid on it, so no second page must open. */
-export type ClosedCheckout = { status: "paid" } | { status: "closed"; license: LicenseOrder | null };
+export type ClosedCheckout = { status: "paid" } | ({ status: "closed" } & CheckoutOrder);
+
+/** What a server Checkout page sells with the plan, and what the buyer asked for. A later page repeats it. */
+export interface CheckoutOrder {
+  license: LicenseOrder | null;
+  /** The time of the early start request (`EARLY_START_METADATA`), or null when the buyer did not ask. */
+  earlyStartAt: number | null;
+}
 
 /** The stored state of a subscription before a sync, to find the change that the sync made. */
 interface StoredSubscription {
@@ -255,6 +263,10 @@ export interface CheckoutRequest {
    * subscription (`LicenseService.splitOrder`).
    */
   license?: LicenseOrder;
+  /** The time when the buyer asked that the hosting service begin before the withdrawal period ends. */
+  earlyStartAt?: number;
+  /** The code of a discount link. Only the web client sends one. */
+  promotionCode?: string;
 }
 
 class BillingDependencies extends Context.Service<
@@ -477,6 +489,20 @@ export class BillingService {
             [ORDER_METADATA.licenseUsers]: String(order.users),
           }
         : null;
+      const trial = orderMetadata !== null && trialEnd !== null;
+      // The early start request goes on the session and on the subscription, as the record of it.
+      const metadata = {
+        ...(trial
+          ? {
+              ...orderMetadata,
+              [ORDER_METADATA.licenseInterval]: request.interval,
+              [ORDER_METADATA.licenseTrialEnd]: String(Math.floor(trialEnd / 1_000)),
+            }
+          : {}),
+        ...(request.earlyStartAt === undefined
+          ? {}
+          : { [EARLY_START_METADATA]: new Date(request.earlyStartAt).toISOString() }),
+      };
       const session = yield* this.#stripeCall(() =>
         dependencies.stripe.createCheckoutSession({
           customerId,
@@ -485,20 +511,14 @@ export class BillingService {
           userId: request.user.id,
           serverId: request.serverId,
           tax,
-          ...(orderMetadata && trialEnd !== null
+          ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+          ...(!trial && orderMetadata && order && licensePrice
             ? {
-                metadata: {
-                  ...orderMetadata,
-                  [ORDER_METADATA.licenseInterval]: request.interval,
-                  [ORDER_METADATA.licenseTrialEnd]: String(Math.floor(trialEnd / 1_000)),
-                },
+                extraItems: [{ priceId: licensePrice.id, quantity: order.users }],
+                sessionMetadata: orderMetadata,
               }
-            : orderMetadata && order && licensePrice
-              ? {
-                  extraItems: [{ priceId: licensePrice.id, quantity: order.users }],
-                  sessionMetadata: orderMetadata,
-                }
-              : {}),
+            : {}),
+          ...(request.promotionCode ? { promotionCode: request.promotionCode } : {}),
           // Stripe puts the session ID in the URL. The desktop return page sends it with the first
           // website visit of the browser, so that the saved checkout names the account.
           successUrl:
@@ -588,9 +608,11 @@ export class BillingService {
         const users = Number(session.metadata[ORDER_METADATA.licenseUsers]);
         const license = parseLicenseOrder({ tier: session.metadata[ORDER_METADATA.licenseTier], users });
         const userId = session.metadata[BILLING_METADATA.userId];
+        const earlyStartAt = Date.parse(session.metadata[EARLY_START_METADATA] ?? "");
         return {
           status: "closed",
           license: license && userId && !(yield* this.license.hasLicense(userId)) ? license : null,
+          earlyStartAt: Number.isFinite(earlyStartAt) ? earlyStartAt : null,
         };
       }
       const subscriptionId = session.subscription;
@@ -1264,6 +1286,7 @@ export class BillingService {
         {
           event,
           periodEnd: subscriptionEnd(subscription),
+          cancelRequest: subscription.canceled_at ?? null,
           ...(event === "ended" ? { endReason: planEndReason(previous) } : {}),
           product: "server",
           plan: key.plan,

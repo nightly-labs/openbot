@@ -17,9 +17,10 @@ import {
 } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
+import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
-import { useChannels } from "../components/use-channels";
+import { useChannel } from "../components/use-channels";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
 import { firstUnreadChannelMessageId } from "../model/channel-unread";
 
@@ -31,13 +32,16 @@ export function ChannelChatScreen() {
 function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
   const { t } = useText();
   const leaveChat = useLeaveChat();
-  const agents = useMobileWorkspaceSelector((current) => current.agents);
+  // The chat does not show the latest message of each agent, so a new message keeps the same list and
+  // the messages do not render again.
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
   // A sheet removes focus, but the chat remains mounted behind it. Release history
   // only when this route unmounts; the workspace pauses network reads in the background.
-  const state = useChannels(serverId, channelId);
-  const page = state.pages.get(channelId);
-  const summary = state.channels.find((item) => item.id === channelId);
+  // Only this channel: a change to another channel of the server does not render the chat again.
+  const state = useChannel(serverId, channelId);
+  const page = state.page;
+  const summary = state.summary;
   const channel = summary ?? page?.channel;
   const online = server?.state === "online";
   const archived = Boolean(channel?.archived);

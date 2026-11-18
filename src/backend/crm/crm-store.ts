@@ -54,6 +54,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import { CrmError } from "./crm-handle";
 
@@ -420,18 +421,7 @@ export class CrmStore {
   }
 
   transaction<T>(work: () => T): T {
-    const db = this.db;
-    const owns = !db.isTransaction;
-    if (owns) db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = work();
-      if (owns) db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (owns && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(this.db, work);
   }
 
   // --- Lookups ---------------------------------------------------------------------------------
@@ -693,22 +683,20 @@ export class CrmStore {
       reject();
       return { result: { ok: true, id: null }, error: crmRefused("error.crm.sourceOwned") };
     }
-    this.db.exec("SAVEPOINT crm_proposal");
+    let result: CrmApplyResult;
     try {
-      const result = new CrmWrite(this, actor, agentId).apply(change);
-      this.db.exec("RELEASE crm_proposal");
-      decide("approved");
-      return { result, error: null };
+      // A savepoint inside `apply`'s transaction: a failure rolls back only the change.
+      result = withTransaction(this.db, () => new CrmWrite(this, actor, agentId).apply(change));
     } catch (error) {
       if (!(error instanceof CrmError) || !this.db.isTransaction) throw error;
-      this.db.exec("ROLLBACK TO crm_proposal");
-      this.db.exec("RELEASE crm_proposal");
       // A change that can no longer apply, such as one for a deleted payment, ends the proposal. A
       // refused one stays pending, so the person can correct the CRM and approve it again.
       if (error.code === "refused") throw error;
       reject();
       return { result: { ok: true, id: null }, error };
     }
+    decide("approved");
+    return { result, error: null };
   }
 
   #sourceOwnsOrGone(change: CrmProposedChange): boolean {

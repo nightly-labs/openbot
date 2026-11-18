@@ -7,9 +7,9 @@ import { SPEECH_LIMITS } from "@openbot/contracts/ipc";
 const FIRST_PART_MINIMUM = 40;
 const FIRST_PART_LENGTH = 80;
 /**
- * A later part is synthesized while the part before it plays. On a fast computer a part may be at
+ * A later part is synthesized while earlier parts play. On a fast computer a part may be at
  * most three times as long as the part before it. On a slower computer, `partBudget` keeps it
- * shorter, so that it is ready before the part before it ends.
+ * shorter, so that it is ready before the audio that waits to play ends.
  */
 const PART_GROWTH = 3;
 const PART_LENGTH = 400;
@@ -65,8 +65,8 @@ export class SpeechParts {
 }
 
 /**
- * The most characters of the next part that the computer can synthesize while `part` plays, from
- * the time that the synthesis of `part` took. `seconds` is the length of its audio at normal speed.
+ * The most characters of the next part that the computer can synthesize while `seconds` of audio
+ * play, from the time that the synthesis of `part` took. `seconds` is at normal speed.
  */
 export function partBudget(part: string, seconds: number, synthesisMs: number, speed: number): number {
   if (!part || synthesisMs <= 0) return Number.POSITIVE_INFINITY;

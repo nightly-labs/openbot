@@ -40,6 +40,8 @@ export const TEAM_API_ROUTES = {
   me: "/v1/me",
   attachments: "/v1/attachments",
   attachment: (attachmentId: string) => `/v1/attachments/${segment(attachmentId)}`,
+  /** `attachment-preview-v1`: a small copy of an image attachment. */
+  attachmentPreview: (attachmentId: string) => `/v1/attachments/${segment(attachmentId)}/preview`,
   sharedFiles: "/v1/shared-files",
   workspaceFiles: "/v1/workspace-files",
   // The WebSocket upgrade path, not a JSON endpoint.

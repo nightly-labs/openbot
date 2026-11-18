@@ -1,9 +1,10 @@
 import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
+import { observeOnScreen } from "../../on-screen";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -60,6 +61,37 @@ function badgeSnapshot(state: SidebarAgentState | undefined): SidebarBadgeSnapsh
 /** The pill grows or shrinks to the width of the new count, with the digit roll. */
 const SIDEBAR_BADGE_RESIZE: KeyframeAnimationOptions = { duration: 280, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
 
+/** The steps of one badge resize. `runBadgeResizes` does each step for all badges before the next step. */
+interface BadgeResizeSteps {
+  readFrom(): void;
+  cancel(): void;
+  readTo(): void;
+  start(): void;
+}
+
+let queuedResizes: BadgeResizeSteps[] = [];
+
+/**
+ * A badge reads its width when its count changes, and its resize animation changes the style. When
+ * many agents work, the counts change in many flushes in each frame, and a read after each flush made
+ * the browser calculate the style of the page again each time. The badges therefore read and write
+ * together, in steps, in the next frame: the reads use the style calculation that the frame does
+ * anyway. The frame paints the new count and the start of its resize together.
+ */
+function queueBadgeResize(steps: BadgeResizeSteps): void {
+  queuedResizes.push(steps);
+  if (queuedResizes.length === 1) requestAnimationFrame(runBadgeResizes);
+}
+
+function runBadgeResizes(): void {
+  const batch = queuedResizes;
+  queuedResizes = [];
+  for (const steps of batch) steps.readFrom();
+  for (const steps of batch) steps.cancel();
+  for (const steps of batch) steps.readTo();
+  for (const steps of batch) steps.start();
+}
+
 /**
  * The badge on a sidebar avatar. The badge on screen follows `state` and moves with each change:
  * a badge lands, an unread count bounces and rolls its digits when it changes, and a felt badge
@@ -79,6 +111,10 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     if (state) return state;
     return isFeltBadge(previous) && previous !== gone() && !prefersReducedMotion() ? previous : undefined;
   });
+  /* The last badge that showed, for the reads inside the badge. When `shown` closes, Solid can run
+     the badge's effects once more before `Show` removes the badge. A read of `shown` there gave
+     undefined and threw, which stopped all updates of the window. */
+  const held = createMemo<SidebarAgentState | undefined>((previous) => shown() ?? previous);
   /* The badge that `shown` keeps while it shrinks away. */
   let leaving: SidebarBadgeSnapshot | undefined;
   let badge: HTMLSpanElement | undefined;
@@ -99,6 +135,39 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
      resizes, it is the width on screen, so a new change continues from there. */
   const measure = () => (badge?.isConnected ? Number.parseFloat(getComputedStyle(badge).width) : undefined);
 
+  /* What the queued resize does, as the last run of the effect before it sets. */
+  let resizeQueued = false;
+  let measureNext = false;
+  let animateNext = false;
+  let fromWidth: number | undefined;
+  const resizeSteps: BadgeResizeSteps = {
+    readFrom: () => {
+      fromWidth = resize?.playState === "running" ? measure() : pillWidth;
+    },
+    cancel: () => {
+      measureRun++;
+      resize?.cancel();
+      resize = undefined;
+    },
+    readTo: () => {
+      pillWidth = measureNext ? measure() : undefined;
+    },
+    start: () => {
+      resizeQueued = false;
+      /* A badge that has just appeared, or the first run, can come before the badge is in the
+         document; the next frame measures it. */
+      if (measureNext && pillWidth === undefined) {
+        const run = measureRun;
+        requestAnimationFrame(() => {
+          if (run === measureRun) pillWidth ??= measure();
+        });
+      }
+      if (animateNext && badge && fromWidth !== undefined && pillWidth !== undefined && fromWidth !== pillWidth) {
+        resize = badge.animate([{ width: `${fromWidth}px` }, { width: `${pillWidth}px` }], SIDEBAR_BADGE_RESIZE);
+      }
+    },
+  };
+
   createEffect(
     () => badgeSnapshot(props.state()),
     (next, previous) => {
@@ -106,18 +175,11 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       const current = previous ?? leavingBadge;
       /* The host can send the same count again; that run must not stop the resize. */
       if (leavingBadge === undefined && current?.count !== undefined && current.count === next?.count) return;
-      const fromWidth = resize?.playState === "running" ? measure() : pillWidth;
-      measureRun++;
-      resize?.cancel();
-      resize = undefined;
-      pillWidth = next?.count !== undefined ? measure() : undefined;
-      /* A badge that has just appeared, or the first run, can come before the badge is in the
-         document; the next frame measures it. */
-      if (next?.count !== undefined && pillWidth === undefined) {
-        const run = ++measureRun;
-        requestAnimationFrame(() => {
-          if (run === measureRun) pillWidth ??= measure();
-        });
+      measureNext = next?.count !== undefined;
+      animateNext = false;
+      if (!resizeQueued) {
+        resizeQueued = true;
+        queueBadgeResize(resizeSteps);
       }
       if (!mounted) {
         mounted = true;
@@ -143,9 +205,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           setPreviousCount(current.count);
           setPhase(untrack(phase) === "bump" ? "bump-b" : "bump");
         } else setPreviousCount(null);
-        if (badge && fromWidth !== undefined && pillWidth !== undefined && fromWidth !== pillWidth) {
-          resize = badge.animate([{ width: `${fromWidth}px` }, { width: `${pillWidth}px` }], SIDEBAR_BADGE_RESIZE);
-        }
+        animateNext = true;
         return;
       }
       setPreviousCount(null);
@@ -184,61 +244,71 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
 
   return (
     <Show when={shown()}>
-      {(state) => (
-        <span
-          ref={badge}
-          class={[
-            "agent-row-agent-status",
-            `agent-row-agent-status-${state().kind}`,
-            routinePhase(state()) ? `agent-row-agent-status-routine-${routinePhase(state())}` : "",
-            {
-              "agent-row-agent-status-entering": phase() === "in",
-              "agent-row-agent-status-bumping": phase() === "bump",
-              "agent-row-agent-status-bumping-b": phase() === "bump-b",
-              "agent-row-agent-status-leaving": phase() === "out",
-            },
-          ]}
-          aria-hidden="true"
-          onAnimationEnd={animationEnded}
-          onAnimationCancel={animationCancelled}
-        >
-          <Show when={state().kind === "working"}>
-            <TypingDots class="agent-row-thinking-dots" />
-          </Show>
-          <Show
-            when={
-              routinePhase(state()) === "running" || routinePhase(state()) === "queued" || state().kind === "limited"
-            }
+      {(state) => {
+        const current = () => held() ?? state();
+        /* The balls of a working badge hop only on screen. With 100 working agents, about 300 balls
+           hopped, most of them in rows scrolled away, and each frame restyled all of them. */
+        const [onScreen, setOnScreen] = createSignal(true);
+        onSettled(() => (badge ? observeOnScreen(badge, setOnScreen) : undefined));
+        return (
+          <span
+            ref={badge}
+            class={[
+              "agent-row-agent-status",
+              `agent-row-agent-status-${current().kind}`,
+              routinePhase(current()) ? `agent-row-agent-status-routine-${routinePhase(current())}` : "",
+              {
+                "agent-row-agent-status-entering": phase() === "in",
+                "agent-row-agent-status-bumping": phase() === "bump",
+                "agent-row-agent-status-bumping-b": phase() === "bump-b",
+                "agent-row-agent-status-leaving": phase() === "out",
+                "agent-row-agent-status-still": !onScreen(),
+              },
+            ]}
+            aria-hidden="true"
+            onAnimationEnd={animationEnded}
+            onAnimationCancel={animationCancelled}
           >
-            <Clock3 aria-hidden="true" />
-          </Show>
-          <Show when={waitReason(state())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
-          <Show when={routinePhase(state()) === "failed"}>
-            <X aria-hidden="true" />
-          </Show>
-          <Show when={state().kind === "responded"}>
-            <svg viewBox="0 0 12 12">
-              <title>{t("sidebar.state.responded")}</title>
-              <path d="m3 6.2 1.8 1.8L9 3.8" />
-            </svg>
-          </Show>
-          <Show when={state().kind === "unread"}>
-            <Show when={previousCount()}>
-              {(previous) => (
-                <span
-                  class={["agent-row-unread-count agent-row-unread-count-old", rollClass("out")]}
-                  onAnimationEnd={() => setPreviousCount(null)}
-                >
-                  {previous()}
-                </span>
-              )}
+            <Show when={current().kind === "working"}>
+              <TypingDots class="agent-row-thinking-dots" />
             </Show>
-            <Show when={count() > 0}>
-              <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            <Show
+              when={
+                routinePhase(current()) === "running" ||
+                routinePhase(current()) === "queued" ||
+                current().kind === "limited"
+              }
+            >
+              <Clock3 aria-hidden="true" />
             </Show>
-          </Show>
-        </span>
-      )}
+            <Show when={waitReason(current())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
+            <Show when={routinePhase(current()) === "failed"}>
+              <X aria-hidden="true" />
+            </Show>
+            <Show when={current().kind === "responded"}>
+              <svg viewBox="0 0 12 12">
+                <title>{t("sidebar.state.responded")}</title>
+                <path d="m3 6.2 1.8 1.8L9 3.8" />
+              </svg>
+            </Show>
+            <Show when={current().kind === "unread"}>
+              <Show when={previousCount()}>
+                {(previous) => (
+                  <span
+                    class={["agent-row-unread-count agent-row-unread-count-old", rollClass("out")]}
+                    onAnimationEnd={() => setPreviousCount(null)}
+                  >
+                    {previous()}
+                  </span>
+                )}
+              </Show>
+              <Show when={count() > 0}>
+                <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+              </Show>
+            </Show>
+          </span>
+        );
+      }}
     </Show>
   );
 }

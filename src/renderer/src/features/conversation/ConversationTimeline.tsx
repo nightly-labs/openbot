@@ -1,3 +1,4 @@
+import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
@@ -48,7 +49,6 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
 import {
   remoteRoutineRecovery,
   serverRoleCanAdminister,
@@ -91,6 +91,7 @@ import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggesti
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
 import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -239,7 +240,7 @@ export function ConversationTimeline() {
     sideThreadOpen,
     messagePins,
   } = useConversationViewScope();
-  const { t, format, sourceText } = useText();
+  const { t, format } = useText();
   const controller = useConversationController();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
@@ -361,12 +362,13 @@ export function ConversationTimeline() {
       return null;
     return { ...state.compaction, timestamp: new Date(state.compaction.startedAt).toISOString() };
   };
-  const compactionBefore = () => {
+  // Each row compares its id with this, so it is computed once for each change, not once for each row.
+  const compactionBefore = createMemo(() => {
     const startedAt = props.contextState?.compaction?.startedAt;
     return startedAt === undefined
       ? undefined
       : timelineMessages().find((message) => message.createdAt && Date.parse(message.createdAt) > startedAt)?.id;
-  };
+  });
   const CompactionMarker = () => (
     <Show when={compaction()}>{(state) => <ContextCompactionMarker compaction={state()} />}</Show>
   );
@@ -462,8 +464,15 @@ export function ConversationTimeline() {
       chatColor: member?.chatColor,
     };
   };
-  /** The reader's own chat color: the member of the server that is the reader. */
-  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
+  /**
+   * The reader's own chat color. The account gives it, so it shows also on a computer with no server
+   * and no member list. An account service from before chat colors sends none; then the member of the
+   * server that is the reader gives it.
+   */
+  const ownChatColor = () =>
+    props.currentUserChatColor === undefined
+      ? props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor
+      : (props.currentUserChatColor ?? undefined);
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
@@ -707,6 +716,22 @@ export function ConversationTimeline() {
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
   const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
+  /**
+   * Only the newest note of an expired sign-in offers Sign in: a later message shows the sign-in worked.
+   * The agent must still use that provider. OpenCode signs in with a key in settings, so its note has no
+   * button, as above the composer.
+   */
+  const signInAction = (message: AgentMessage | undefined) => {
+    const signIn = props.onSignInProvider;
+    const marker = message?.actionMarker;
+    return signIn &&
+      marker?.kind === "sign-in-failure" &&
+      marker.provider !== "opencode" &&
+      marker.provider === props.agent?.provider &&
+      props.messages.at(-1)?.id === message?.id
+      ? (provider: AgentProviderId) => void signIn(provider)
+      : undefined;
+  };
   /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
   const serverInstallCard = (marker: ChatActionMarkerModel) => {
     const watch = props.serverInstall;
@@ -756,26 +781,10 @@ export function ConversationTimeline() {
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
   const bubbleStyle = useChatBubbleStyle();
-  const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
+  const turnTrace = useTurnTrace({ turnSteps, agentName: () => props.agent?.name, agents: () => props.agents });
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
-    spans: () =>
-      turnSteps.traceAbove(messageId, {
-        agent: agentName ?? props.agent?.name ?? t("chat.message.agentFallback"),
-        thinking: t("chat.trace.step.thinking"),
-        answer: t("chat.trace.step.answer"),
-        progress: sourceText,
-        message: (agents) => t("chat.trace.step.message", { agents }),
-        subagent: (title) => t("chat.trace.step.subagent", { title }),
-        reply: t("chat.trace.step.reply"),
-        agentNames: (ids) =>
-          format.list(
-            ids.map(
-              (id) => props.agents.find((candidate) => candidate.id === id)?.name ?? t("chat.message.agentFallback"),
-            ),
-          ),
-      }),
-    keyboard: traceKeyboard,
+    ...turnTrace(messageId, agentName),
     // The chat shows a subagent of the trace in the side panel, as its card in the chat does.
     canSelectSpan: (id) => id.startsWith(SUBAGENT_SPAN_PREFIX),
     onSelectSpan: (id) => {
@@ -1029,8 +1038,9 @@ export function ConversationTimeline() {
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
                   if (!replyToMessageId) return undefined;
+                  const referencedIndex = timelineIndexById().get(replyToMessageId);
                   return (
-                    timelineMessages().find((candidate) => candidate.id === replyToMessageId) ??
+                    (referencedIndex === undefined ? undefined : timelineMessages()[referencedIndex]) ??
                     props.messageReferences?.[replyToMessageId]
                   );
                 });
@@ -1194,6 +1204,7 @@ export function ConversationTimeline() {
                                                             agentMessageText={agentMessageText}
                                                             instructions={changeMarkerActions.instructions}
                                                             onOpenInstructions={changeMarkerActions.onOpenInstructions}
+                                                            onSignInProvider={signInAction(message())}
                                                           />
                                                         }
                                                       >
@@ -1229,6 +1240,7 @@ export function ConversationTimeline() {
                                                     action={card().action}
                                                     routine={card().routine}
                                                     connected={webhookRoutines.state.connected}
+                                                    agentName={props.agent?.name}
                                                     secret={webhookRoutines.state.secrets[card().routine.id] ?? null}
                                                     onSecret={(secret) =>
                                                       webhookRoutines.setSecret(card().routine.id, secret)

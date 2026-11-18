@@ -7,6 +7,7 @@ import Paperclip from "lucide-react-native/icons/paperclip";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { Pressable as GesturePressable } from "react-native-gesture-handler";
 import Animated, {
   cubicBezier,
   Extrapolation,
@@ -22,6 +23,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { ChatCameraContent } from "./chat-camera-panel";
@@ -78,6 +80,14 @@ const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 // short rise, so a row is pressable from the first frame it is drawn.
 const ROW_STAGGER = 0.1;
 
+// On Android, the gesture handler Pressable, not the React Native one. That one measures the row
+// from the shadow tree when the press starts and cancels the press when the finger leaves that box.
+// With ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS, the card's animated transforms reach the shadow tree
+// about a second after the card stops, or at the next render: the first tap measured the closed card
+// at the plus and did nothing. This one checks the touch in the row's own coordinates, which the
+// transforms above it do not change. iOS commits the transforms to the shadow tree on each frame.
+const RowPressable = isAndroid ? GesturePressable : Pressable;
+
 function AttachmentOption({
   accessibilityLabel,
   busy,
@@ -126,7 +136,7 @@ function AttachmentOption({
           transitionTimingFunction: PRESS_EASING,
         }}
       >
-        <Pressable
+        <RowPressable
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel ?? label}
           accessibilityState={{ disabled, busy }}
@@ -154,7 +164,7 @@ function AttachmentOption({
               {value}
             </Typography.Paragraph>
           ) : null}
-        </Pressable>
+        </RowPressable>
       </Animated.View>
     </Animated.View>
   );

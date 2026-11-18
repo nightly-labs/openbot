@@ -15,6 +15,7 @@ const agents: AgentProfile[] = [
 const onSelectAgent = fn();
 const onOpenRoutine = fn();
 const onOpenHostedSite = fn();
+const onSignInProvider = fn();
 
 const meta = {
   title: "Conversation/Chat Action Marker",
@@ -112,6 +113,17 @@ export const AllStates: Story = {
           onSelectAgent={onSelectAgent}
         />
         <ChatActionMarker marker={{ kind: "context-reset", timestamp }} agents={agents} onSelectAgent={onSelectAgent} />
+        <ChatActionMarker
+          marker={{
+            kind: "sign-in-failure",
+            provider: "claude",
+            text: "Your Claude sign-in expired. Sign in again to continue.",
+            timestamp,
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onSignInProvider={onSignInProvider}
+        />
       </section>
     </main>
   ),

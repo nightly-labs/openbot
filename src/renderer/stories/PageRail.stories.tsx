@@ -242,7 +242,7 @@ export const MediaCreditsQuota: Story = {
   args: { mediaCredits: teamCredits },
 };
 
-/** The Canvas page with a personal Sunra account: the logo with no ring. The card has the number. */
+/** The Canvas page with a personal Sunra account: the logo with the number of credits under it. */
 export const MediaCreditsPersonal: Story = {
   args: { mediaCredits: personalCredits },
 };

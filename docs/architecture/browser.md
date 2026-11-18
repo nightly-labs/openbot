@@ -746,4 +746,13 @@ URL with GET to replace the document without replaying a form POST. Failure reta
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
-passkeys, and payment confirmation use takeover.
+passkeys, and a payment confirmation that the agent cannot complete, such as approval in a bank app,
+use takeover.
+
+A bank's payment code at checkout (3-D Secure) is not an OpenBot secret. When the code is in an email
+or SMS that the agent can read, such as a mail tab that it reloads, the agent types it into the bank's frame, so a weekly order
+does not wait for a person. The browser core guidance (`tool-guidance.ts`) limits this to a checkout
+that the user approved, and to a message that names the same merchant and amount; the agent types the
+newest code once. Any other case, or a refused code, goes to takeover, or in a routine run to the report.
+`bun run bench:browser-tools --variants=S --tasks=checkout-3ds-inbox-tab,checkout-3ds,checkout-3ds-mismatch`
+checks these cases on a loopback shop, bank frame and inbox.

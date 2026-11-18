@@ -109,6 +109,27 @@ export function MarketplaceOverlay(props: {
      `mcp-servers-v1` from an admin, or from a member with `mcp-member-access-v1`; another member
      browses the listings and installs nothing. */
   const pluginServerId = createMemo(() => (serverCanManageMcp(props.server) ? props.server.id : undefined));
+  /* Memos, as `pluginServerId` is: the Marketplace reads these props when a sign-in starts, also from
+     an effect, and a conditional expression in a prop makes a new memo on each read. An effect cannot
+     make one, so an agent card's Sign in stopped there. */
+  const pluginHostName = createMemo(() =>
+    props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined,
+  );
+  const pluginSignInRelay = createMemo(
+    () => props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1"),
+  );
+  // The live view streams the active server, which is the one the Marketplace opens for. The host
+  // shows its private sign-in tab only to an owner or admin: a member gets a sentence.
+  const pluginHostView = createMemo(() =>
+    props.server?.kind === "remote" &&
+    serverSupportsCapability(props.server, "mcp-sign-in-v1") &&
+    serverSupportsCapability(props.server, "browser-view")
+      ? {
+          runtime: props.browserRuntime ?? conversationPort().browser,
+          clipboard: serverSupportsCapability(props.server, "browser-view-clipboard"),
+        }
+      : undefined,
+  );
   /* Why a joined server's apps do not connect, so the app page says it rather than hide Connect. A
      host always lists capabilities, so an empty list on a live connection is one that this app has
      not read yet. An offline, failed or incompatible server has its own notice. */
@@ -191,24 +212,9 @@ export function MarketplaceOverlay(props: {
           mcpSignInRequest={props.mcpSignInRequest}
           onMcpSignInRequestHandled={props.onMcpSignInRequestHandled}
           onMcpSignIns={props.onMcpSignIns}
-          pluginHostName={
-            props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
-          }
-          pluginSignInRelay={
-            props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1")
-          }
-          // The live view streams the active server, which is the one the Marketplace opens for. The
-          // host shows its private sign-in tab only to an owner or admin: a member gets a sentence.
-          pluginHostView={
-            props.server?.kind === "remote" &&
-            serverSupportsCapability(props.server, "mcp-sign-in-v1") &&
-            serverSupportsCapability(props.server, "browser-view")
-              ? {
-                  runtime: props.browserRuntime ?? conversationPort().browser,
-                  clipboard: serverSupportsCapability(props.server, "browser-view-clipboard"),
-                }
-              : undefined
-          }
+          pluginHostName={pluginHostName()}
+          pluginSignInRelay={pluginSignInRelay()}
+          pluginHostView={pluginHostView()}
           pluginAccounts={serverSupportsCapability(props.server, "mcp-accounts-v1")}
           pluginAccess={serverCanAdminister(props.server, "mcp-access-v1")}
           onRunPluginPrompt={

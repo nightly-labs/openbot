@@ -210,9 +210,13 @@ export class MailboxSync {
    * wait as the event below.
    */
   queueSnapshot(agentId: string): QueueSnapshot {
-    const queue = this.#mailbox.listQueue(agentId);
+    return this.withHold(this.#mailbox.listQueue(agentId));
+  }
+
+  /** Adds the reason that a queue waits, as `queueSnapshot` does, to a queue read in another way. */
+  withHold(queue: QueueSnapshot): QueueSnapshot {
     if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
-    const hold = this.#hooks.queueHold(agentId);
+    const hold = this.#hooks.queueHold(queue.agentId);
     return hold ? { ...queue, hold } : queue;
   }
 
@@ -232,9 +236,11 @@ export class MailboxSync {
       if (!snapshot) continue;
       const previousSignature = conversationContentSignature(snapshot);
       this.syncMailboxMessages(snapshot);
-      if (conversationContentSignature(snapshot) !== previousSignature) this.#conversation.emitConversation(snapshot);
+      const signature = conversationContentSignature(snapshot);
+      if (signature !== previousSignature) this.#conversation.emitConversation(snapshot);
+      // The signature is of this snapshot, so the publish does not make it again.
       else if (!this.#conversation.hasPublishedConversation(affectedAgentId))
-        this.#conversation.publishConversation(snapshot);
+        this.#conversation.publishConversation(snapshot, signature);
     }
   }
 

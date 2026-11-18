@@ -375,7 +375,7 @@ export const messages = {
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "connector.whatsapp.workingMessage": "“正在处理…”消息",
   "connector.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
   "connector.whatsapp.statusReactions": "状态表情回应",
   "connector.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
@@ -460,7 +460,7 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "connector.whatsapp.add": "添加",
   "connector.whatsapp.groupTitle": "添加群组",
-  "connector.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "connector.whatsapp.groupDescription": "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "connector.whatsapp.groupSearch": "搜索群组",
   "connector.whatsapp.groupsLoading": "正在读取群组…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",
@@ -609,8 +609,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "Proton Pass 密钥已过期",
   "connector.protonPass.expiredDescription": "在你重新登录之前，智能体无法使用共享的登录信息登录。",
   "connector.protonPass.reconnect": "重新连接",
-  "connector.protonPass.planTitle": "Proton Pass 需要付费方案",
-  "connector.protonPass.planDescription": "Proton Pass CLI 仅适用于付费 Proton 方案。请更改方案，然后重新连接。",
+  "connector.protonPass.planTitle": "Proton Pass 需要包含 Pass Plus 的方案",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI 需要包含 Pass Plus 的 Proton 方案。Mail Plus 等其他付费方案不包含它。请更改方案，然后重新连接。",
   "connector.protonPass.vaultTitle": "共享保管库",
   "connector.protonPass.vaultDescription": "智能体可以使用此保管库中的登录信息登录。将登录信息移入其中即可共享。",
   "connector.protonPass.loginCount": { one: "{count} 条登录信息", other: "{count} 条登录信息" },

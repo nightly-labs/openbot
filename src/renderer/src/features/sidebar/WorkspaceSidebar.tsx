@@ -18,6 +18,8 @@ import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
+import type { ThreadWaits } from "../agent-threads/conversation-threads";
+import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { useAgentActions } from "../agents/agent-actions";
 import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
@@ -190,15 +192,29 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
 
   /* A wait in a channel thread goes to the channel instead. Selecting the channel opens the view
    * that answers it. */
-  const channelWaits = createMemo(() => {
+  const waits = createMemo((): ThreadWaits => {
     const prompts = Object.values(pendingPrompts());
-    return sidebarChannelWaits({
-      channels: visibleChannels(),
+    return {
       prompts: prompts.flatMap((event) => (event?.type === "prompt" ? [event] : [])),
       takeovers: prompts.flatMap((event) => (event?.type === "browser-takeover-requested" ? [event.request] : [])),
       approvals: approvals(),
-    });
+    };
   });
+  const channelWaits = createMemo(() => sidebarChannelWaits({ channels: visibleChannels(), ...waits() }));
+  const activeAgentId = () => (activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? ""));
+  /** The side threads under each agent row. A chat window shows one agent, so it has none. */
+  const sideThreads = createMemo(() =>
+    platform.chatWindow
+      ? undefined
+      : sidebarAgentThreads({
+          tasks: agentTasks,
+          tabs: agentThreads,
+          activeAgentId,
+          waits,
+          openThread: (agentId, threadId) => void selectAgent(agentId, threadId),
+          onNew: newAgentThread(),
+        }),
+  );
 
   return (
     <>
@@ -258,7 +274,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             : undefined
         }
         agents={agentList()}
-        activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
+        activeAgentId={activeAgentId()}
         showPeople={props.peopleEnabled}
         people={directPeople()}
         directThreads={directThreads()}
@@ -312,6 +328,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
+        agentThreads={sideThreads()}
         onOpenAgentWindow={
           platform.landingPreview
             ? undefined
@@ -374,6 +391,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       />
       {/* A compact sidebar hides the footer card, so the offer is outside the footer. */}
       <ServerUpgradeOffer
+        billing={appPort().billing}
         card={alertCards.storageCard.card()}
         server={activeServer()}
         blocked={serverSettingsOpen()}

@@ -41,6 +41,19 @@ function tokenHash(signIn: KimiSavedSignIn): string {
     .digest("hex");
 }
 
+/**
+ * The hash of the saved sign-in, which a new sign-in changes, or null with none. `python` and `env` as
+ * for `readKimiSavedSignIn`. Kimi Code 2.x on Windows can stop with a failure code after `kimi login`
+ * saved the sign-in (#11615): a changed hash then shows that the sign-in was saved.
+ */
+export const kimiSavedSignInVersion = Effect.fn("Kimi.savedSignInVersion")(function* (
+  python: boolean,
+  env: NodeJS.ProcessEnv,
+) {
+  const signIn = yield* readKimiSavedSignIn(python, env);
+  return Option.isSome(signIn) ? tokenHash(signIn.value) : null;
+});
+
 const modelsStatus = Effect.fn("Kimi.modelsStatus")(function* (signIn: KimiSavedSignIn) {
   const response = yield* Effect.tryPromise({
     try: (signal) =>

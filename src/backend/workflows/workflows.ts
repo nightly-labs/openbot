@@ -45,12 +45,16 @@ import {
   type StartWorkflowRunInput,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
+  type WorkflowCatalogProvider,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
   type WorkflowGitHubLastEventInput,
   type WorkflowGraph,
+  type WorkflowMediaCatalog,
   type WorkflowMediaCredits,
   type WorkflowMediaKind,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowMediaProvider,
   type WorkflowMediaProviders,
   type WorkflowMediaSize,
@@ -67,6 +71,8 @@ import {
   type WorkflowSummary,
   type WorkflowVersion,
   type WorkflowVersionInput,
+  workflowCatalogMediaModel,
+  workflowCatalogProvider,
   workflowMediaKind,
   workflowMediaModel,
   workflowMediaSpecs,
@@ -206,6 +212,8 @@ interface WorkflowMediaRequest {
   provider: WorkflowMediaProvider;
   /** The id of the model at its provider. */
   model: string;
+  /** The canvas id of the model, which finds its plan in the live model list of the service. */
+  catalogId: string;
   /** The account of the provider that pays for the file. Null is the provider's own sign-in. */
   account: string | null;
   /** The frame, the length and the resolution, read for the model. */
@@ -286,6 +294,10 @@ export interface WorkflowsDependencies {
   mediaProviders?: () => WorkflowMediaProviders;
   /** The credits of the media services that this host can spend now; with `only`, of that one. Absent: none. */
   mediaCredits?: (only?: keyof WorkflowMediaCredits) => Effect.Effect<WorkflowMediaCredits>;
+  /** The live models of the signed-in media services; with `only`, of that one. Absent: none. */
+  mediaCatalog?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCatalog>;
+  /** What one file of a media service model costs with the choices of a step. Absent: no quote. */
+  mediaPrice?: (request: WorkflowMediaPriceRequest) => Effect.Effect<WorkflowMediaPrice>;
   notify(notice: WorkflowNotice): void;
   /** Whether a messaging connection of this host is on. */
   connectionOn(connectionId: string): boolean;
@@ -381,6 +393,12 @@ interface WorkflowRunScope {
   agentIds: string[];
 }
 
+/** Whether `notice` sweeps after this event. A caller checks it first, so most events start no fiber. */
+export function workflowNoticeEvent(event: AgentEvent): boolean {
+  // A deleted agent leaves the steps it was answering without an answer.
+  return event.type === "turn-completed" || event.type === "queue-changed" || event.type === "agents-changed";
+}
+
 interface WorkflowsShape {
   list(): Effect.Effect<WorkflowSummary[], WorkflowFailed>;
   /** Every workflow with its graph, in one read. */
@@ -440,6 +458,13 @@ interface WorkflowsShape {
    * With `only`, it reads that service alone and the other one is null.
    */
   mediaCredits(only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits>;
+  /**
+   * The live models of this host's Sunra and Higgsfield sign-ins. A service that does not answer gives
+   * its fixed models. It never fails.
+   */
+  mediaCatalog(): Effect.Effect<WorkflowMediaCatalog>;
+  /** What one file of a Sunra or Higgsfield model costs with the choices of a step, or null credits. */
+  mediaPrice(request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -581,10 +606,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             return settle(step, { status: "done", output });
           }
           if (delivery.status === "cancelled") return settle(step, { status: "stopped", error: delivery.error });
+          // A turn that stopped, or failed with no reason, gives no error; its message is still there (#11508).
           if (delivery.status === "failed" || delivery.status === "interrupted")
             return settle(step, {
               status: "failed",
-              error: delivery.error ?? sourceText("error.workflow.agentStepEnded"),
+              error: delivery.error ?? sourceText("error.workflow.agentStepStopped"),
             });
           return false;
         };
@@ -634,12 +660,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           run: StoredWorkflowRun | null,
         ): Effect.Effect<void> => {
           const kind = workflowMediaKind(node.fields);
-          const model = workflowMediaModel(node.fields);
-          const specs = workflowMediaSpecs(node.fields, kind, model);
           const generateMedia = dependencies.generateMedia;
           const sizePicture = dependencies.sizePicture;
           /** The picture at the custom size of the step. When that fails, the step keeps the model's picture. */
-          const sized = (attachmentId: string) =>
+          const sized = (specs: WorkflowMediaSpecs) => (attachmentId: string) =>
             specs.size && sizePicture
               ? sizePicture(attachmentId, specs.size).pipe(
                   Effect.catch((failure) =>
@@ -660,6 +684,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           // A step with no description, no text and no picture would make media from nothing.
           const empty = !fieldText(node, "prompt").trim() && !step.input.trim() && images.length === 0;
           const make = Effect.gen(function* () {
+            // A Sunra or Higgsfield model comes from the live list of its service, which can have
+            // choices that the fixed list does not have. Only that list is read, and not for a step
+            // that fails as empty: a slow service does not hold a step of the other one.
+            const service =
+              !empty && typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
+            const live = service
+              ? (yield* mediaCatalog(service)).models.flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+              : [];
+            const model = workflowMediaModel(node.fields, live);
+            const specs = workflowMediaSpecs(node.fields, kind, model);
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model
@@ -670,12 +704,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                         kind,
                         provider: model.provider,
                         model: model.providerModel ?? model.id,
+                        catalogId: model.id,
                         account: mediaAccount(node.fields),
                         specs,
                         prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
                         images,
                         voice: mediaVoice(node.fields, kind, model),
-                      }).pipe(Effect.flatMap(sized)),
+                      }).pipe(Effect.flatMap(sized(specs))),
                     )
                     .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
@@ -1374,9 +1409,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         );
 
         const notice = Effect.fn("Workflows.notice")(function* (event: AgentEvent) {
-          // A deleted agent leaves the steps it was answering without an answer.
-          if (event.type !== "turn-completed" && event.type !== "queue-changed" && event.type !== "agents-changed")
-            return;
+          if (!workflowNoticeEvent(event)) return;
           yield* requestSweep();
         });
 
@@ -1978,6 +2011,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
         const mediaCredits = (only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits> =>
           dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null });
+        const mediaCatalog = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCatalog> =>
+          dependencies.mediaCatalog?.(only) ?? Effect.succeed({ models: [] });
+        const mediaPrice = (request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice> =>
+          dependencies.mediaPrice?.(request) ?? Effect.succeed({ credits: null });
 
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
           return yield* locked(
@@ -2165,6 +2202,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           keepPicture,
           mediaProviders,
           mediaCredits,
+          mediaCatalog,
+          mediaPrice,
           runStep,
           stopStep,
           stopRun,

@@ -21,6 +21,7 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
+import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
 import { bytesResponse, fileResponse } from "./file-response";
@@ -76,6 +77,14 @@ export interface AttachmentProtocolDependencies {
   remoteServers: RemoteServerManager;
 }
 
+/**
+ * True when the address asks for the small copy of a picture: `?preview=1`. Only a joined server's
+ * file has one. A file of this computer reads from its disk in some milliseconds.
+ */
+function asksForPreview(url: URL): boolean {
+  return url.searchParams.get("preview") === "1";
+}
+
 export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
   const logger = createOpenBotLogger("attachment-protocol");
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
@@ -93,7 +102,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
             ...attachmentCorsHeaders(request.headers.get("Origin")),
             ...attachmentDocumentHeaders(attachment.mimeType),
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": "inline",
+            "Content-Disposition": inlineContentDisposition(attachment.name),
           },
           request.headers.get("Range"),
         ),
@@ -109,7 +118,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
       const attachment = await runCauseEffect(
-        remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
+        asksForPreview(url)
+          ? remoteServers.downloadAttachmentPreview(attachmentId, serverId)
+          : remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
       );
       return bytesResponse(
         attachment.bytes,
@@ -119,7 +130,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
           ...attachmentCorsHeaders(request.headers.get("Origin")),
           ...attachmentDocumentHeaders(attachment.mimeType),
           "X-Content-Type-Options": "nosniff",
-          "Content-Disposition": "inline",
+          "Content-Disposition": inlineContentDisposition(attachment.name),
         },
         canAnswerRemoteRanges(attachment) ? request.headers.get("Range") : undefined,
       );
