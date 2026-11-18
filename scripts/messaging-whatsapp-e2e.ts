@@ -1001,6 +1001,51 @@ try {
       },
     );
 
+    await step("HD photo: the normal copy gets an answer, and its HD copy gets none (#11764)", async () => {
+      const author = `${FRIEND}@s.whatsapp.net`;
+      const photo = (id: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: {
+          imageMessage: {
+            mimetype: "image/jpeg",
+            caption: "@48600100200 what is on this photo?",
+            contextInfo: { mentionedJid: [OWNER_JID] },
+          },
+        },
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // WhatsApp sends the HD copy about 1 s later, with its own id, and names the normal copy.
+      const hdCopy = (id: string, firstId: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: {
+          messageContextInfo: {
+            messageAssociation: {
+              associationType: proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+              parentMessageKey: { remoteJid: GROUP, fromMe: false, id: firstId, participant: author },
+            },
+          },
+          associatedChildMessage: { message: photo(id).message },
+        },
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // Each message that the service takes gets a reaction: 👀, or ❌ when the agent's queue is full.
+      phone.current().receive([photo("IN-HD-NORMAL")]);
+      await until(() => phone.reactedTo("IN-HD-NORMAL"), "the answer to the normal copy");
+      // The messages are read in order, so the HD copy is read before the last one. An HD copy of a photo
+      // that this number never read is still a message.
+      phone.current().receive([hdCopy("IN-HD-COPY", "IN-HD-NORMAL"), hdCopy("IN-HD-ALONE", "IN-HD-NEVER-SEEN")]);
+      await until(() => phone.reactedTo("IN-HD-ALONE"), "the answer to the HD copy of an unread photo");
+      assert.equal(phone.reactedTo("IN-HD-COPY"), false, "The HD copy got a second answer.");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), GROUP, "IN-HD-COPY"),
+        null,
+        "The HD copy started a second conversation.",
+      );
+      return { normal: "answered", hdCopy: "skipped", hdCopyOfUnreadPhoto: "answered" };
+    });
+
     await step(
       "saved history: the oldest copies go over the size limit, a delete for everyone deletes, an edit changes",
       async () => {
