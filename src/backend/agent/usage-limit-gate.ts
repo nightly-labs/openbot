@@ -107,7 +107,7 @@ export class UsageLimitGate {
   /** Providers the user was told about in this limit, so a limit that closes again is not announced twice. */
   readonly #announced = new Set<AgentProvider>();
   readonly #failures = new Map<string, ProviderFailure>();
-  /** The agents that may start one turn while their limit holds, with that limit's key. */
+  /** The agents that may start one turn while a limit or a provider error holds their model, with its key. */
   readonly #tries = new Map<string, string>();
   /** The limits that a reading ended before the reset a refusal named, with that reset in epoch seconds. */
   readonly #readReleased = new Map<string, number>();
@@ -134,7 +134,19 @@ export class UsageLimitGate {
     if (this.#limits.has(key)) this.#tries.set(agentId, key);
   }
 
-  /** Whether the agent may start a turn that its limit holds, because the user sent it a message. */
+  /**
+   * A person or an agent chose the agent's model while a provider error passes over it, so one turn
+   * tries it before the agent moves to a backup again (#11992). The try ends when a turn starts or
+   * when the model fails again.
+   */
+  chosen(agentId: string): void {
+    const agent = this.#agent(agentId);
+    if (!agent) return;
+    const key = limitKey(providerForAgent(agent), accountOf(agent), agent.model);
+    if (this.#failures.has(key) && !this.#limits.has(key)) this.#tries.set(agentId, key);
+  }
+
+  /** Whether the agent may start a turn that holds its model, because the user sent it a message or chose it. */
   mayTry(agentId: string): boolean {
     const agent = this.#agent(agentId);
     return (
@@ -185,6 +197,8 @@ export class UsageLimitGate {
     const accountId = accountOf(agent);
     const turnModel = model ?? agent.model;
     const key = limitKey(provider, accountId, turnModel);
+    // The chosen model failed its try, so the agent moves to a backup.
+    if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
     // A later error with no reset, such as from another agent on the same model, keeps the named reset.
@@ -444,6 +458,8 @@ export class UsageLimitGate {
     if (!failure) return;
     clearTimeout(failure.timer);
     this.#failures.delete(key);
+    if (!this.#limits.has(key))
+      for (const [agentId, tryKey] of this.#tries) if (tryKey === key) this.#tries.delete(agentId);
     this.#hooks.emitRuntimeSnapshot();
     yield* this.#hooks.released({ provider: failure.provider, accountId: failure.accountId, model: failure.model });
   });
