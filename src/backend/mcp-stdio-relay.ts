@@ -41,6 +41,12 @@ export interface StdioMcpRelay {
 const STOP_GRACE_MS = 2_000;
 
 /**
+ * How long the relay reads a server's output after the server exits. A process of the server can keep
+ * the pipe open, so the wait has a limit.
+ */
+const OUTPUT_DRAIN_MS = 1_000;
+
+/**
  * Starts a stdio MCP server in OpenBot's process and serves it to one provider over Streamable HTTP
  * on 127.0.0.1, with a bearer token.
  *
@@ -216,7 +222,18 @@ function startServer(
   });
   child.stdin?.on("error", () => undefined);
   child.once("error", end);
-  child.once("exit", end);
+  // The last answers can still be in the pipe at `exit`. Without them, a call that the server answered got an error.
+  child.once("exit", () => {
+    const stdout = child.stdout;
+    if (!stdout || stdout.readableEnded || stdout.destroyed) return end();
+    const drained = () => {
+      clearTimeout(limit);
+      end();
+    };
+    const limit = setTimeout(drained, OUTPUT_DRAIN_MS);
+    stdout.once("end", drained);
+    stdout.once("close", drained);
+  });
   return child;
 }
 
