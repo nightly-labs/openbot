@@ -28,6 +28,7 @@ import {
 import { useChatAttachments } from "../components/use-chat-attachments";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import { useQueuedChat } from "../context/queued-messages-context";
+import { useComposerDraft } from "../model/composer-drafts";
 
 export function QueuedMessageEditScreen() {
   const { t } = useText();
@@ -46,6 +47,14 @@ export function QueuedMessageEditScreen() {
   const dirty = edit
     ? text !== edit.delivery.text || edit.keepAttachmentIds.length !== edit.delivery.attachments.length || added > 0
     : false;
+  // The message box of this chat. An edit that ended before its Save gives its text to it.
+  const [, setChatDraft] = useComposerDraft({
+    kind: "agent",
+    serverId: queue?.serverId ?? "",
+    id: queue?.agentId ?? "",
+  });
+  // Only changed text: the agent already has the original, and the files go with the edit.
+  const keptText = edit && text !== edit.delivery.text && text.trim() ? text : null;
 
   // The host hold is taken once per visit. `busy` only turns on once the controller
   // starts the request, so track it here as well and keep the failure copy until then.
@@ -134,13 +143,16 @@ export function QueuedMessageEditScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          {t("mobile.chat.queue.alreadyReceived")}
+          {t(keptText ? "mobile.chat.queue.alreadyReceivedKept" : "mobile.chat.queue.alreadyReceived")}
         </Typography.Paragraph>
         <SettingsSection>
           <SettingsRow
             disclosure={false}
             disabled={queue.busy}
-            onPress={() => exitAfter(queue.discardFinishedEdit(), () => router.back())}
+            onPress={() => {
+              if (keptText) setChatDraft((current) => (current.trim() ? `${current}\n\n${keptText}` : keptText));
+              exitAfter(queue.discardFinishedEdit(), () => router.back());
+            }}
           >
             <Typography>{t("common.close")}</Typography>
           </SettingsRow>

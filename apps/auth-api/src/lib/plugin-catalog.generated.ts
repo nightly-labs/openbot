@@ -44,9 +44,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "obsidian",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "37e15fe89d36e955c2b289f421b3a987a88841a3525281a0eb2b4f82974087ca",
+      detailSha256: "3869f8c6df24d2ea40bdc12fe627eedc27c2fc6886b486c30dcb26a48ef1b079",
     },
     {
       slug: "atlassian",
@@ -133,6 +133,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1",
     },
     {
+      slug: "appsignal",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "06ac0cae59af375996995d2ba631b0cae72c22031e74ba20f6e1d1d393e27a1f",
+    },
+    {
       slug: "gitlab",
       version: "1.0.0",
       featured: false,
@@ -185,6 +191,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "6f49588f09b44f27f82958b558efd0d8521a5784e35f55c755337ed4b07e4b42",
+    },
+    {
+      slug: "cloud66",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "a587a713c4a697281b8169d1067ee7d4ed02ca534d9e9264bbcc7a6e6868c7cd",
     },
     {
       slug: "context7",
@@ -242,9 +254,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "omnisend",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80",
+      detailSha256: "8697d90f79d5d0c84198497d55424078f81339fe9881d4124d6fba61cbe6df74",
     },
     {
       slug: "postiz",
@@ -806,9 +818,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "highlevel",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "4cbf826e4921fafe5120059c745fea2ea94710916141687b6209372d9fbc24b7",
+      detailSha256: "50bf58de77f174276da93bfeec699f2883dc646f3a16cfcb0727fe0e2a051eac",
     },
     {
       slug: "hospitable",
@@ -821,6 +833,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "c54e87442750f3536c4ec39dbf6deba4638fa6943528ba5371190ee06e3819aa",
+    },
+    {
+      slug: "hubspot",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "efb708a2f13a17c7dc7f7879b190f9e550949b7ac95737d04d589f21fbaefbb1",
     },
     {
       slug: "ibkr",
@@ -1031,12 +1049,6 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "d2aece992ac04b73ed82f7ad8bf318a30b4ff1829d835987dce81af836f6ec6f",
-    },
-    {
-      slug: "mongodb",
-      version: "1.0.0",
-      featured: false,
-      detailSha256: "cc895db953c8ace5f3fd438a5d4b7ff9365c142ef84ce2621d6b37afc3670587",
     },
     {
       slug: "moomoo",
@@ -1370,9 +1382,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "tessie",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "e72121c06335698e56fd223daf677a2742eac0e28a1fd05cc7c53d2d7fd9024b",
+      detailSha256: "a91a28e7f52f0283d427f6891850a694a3a24881b2a25e430f778756ac30c0ab",
     },
     {
       slug: "tinyfish",
@@ -1549,7 +1561,14 @@ export interface PluginCatalogApp {
 
 export type PluginCatalogServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: unknown;
+    };
 
 export interface PluginCatalogDetail {
   slug: string;
@@ -1716,7 +1735,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     category: "productivity",
     creatorName: "Obsidian",
     iconUrl: "https://obsidian.md/apple-touch-icon.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-recall", text: "What do my notes say about the decisions on this project?" },
       { id: "prompt-save", text: "Save this decision as a new note in my vault." },
@@ -1733,6 +1752,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
           transport: "stdio",
           command: "npx",
           args: ["-y", "obsidian-mcp-server@3.7.2"],
+          env: { OBSIDIAN_BASE_URL: "https://127.0.0.1:27124" },
           auth: [
             {
               id: "obsidian-key",
@@ -1743,7 +1763,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
                   id: "token",
                   label: "API key",
                   env: "OBSIDIAN_API_KEY",
-                  hint: 'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+                  hint: "In Obsidian, open Settings > Local REST API and copy the API key.",
                 },
               ],
               docsUrl: "https://github.com/coddingtonbear/obsidian-local-rest-api",
@@ -2293,6 +2313,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://sentry.io/terms/",
     skills: [],
   },
+  appsignal: {
+    slug: "appsignal",
+    name: "AppSignal",
+    tagline: "Errors, performance and logs",
+    description:
+      "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+    category: "coding",
+    creatorName: "AppSignal",
+    iconUrl: "https://www.appsignal.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+      { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+      { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+    ],
+    apps: [
+      {
+        id: "app-appsignal-mcp",
+        name: "AppSignal",
+        description:
+          "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+        iconUrl: "https://www.appsignal.com/favicon.ico",
+        server: {
+          name: "appsignal",
+          transport: "http",
+          url: "https://appsignal.com/api/mcp",
+          auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.appsignal.com",
+    privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+    termsUrl: "https://www.appsignal.com/terms",
+    skills: [],
+  },
   gitlab: {
     slug: "gitlab",
     name: "GitLab",
@@ -2621,6 +2676,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://render.com",
     privacyPolicyUrl: "https://render.com/privacy",
     termsUrl: "https://render.com/terms",
+    skills: [],
+  },
+  cloud66: {
+    slug: "cloud66",
+    name: "Cloud 66",
+    tagline: "Applications, deploys and servers",
+    description:
+      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
+    category: "coding",
+    creatorName: "Cloud 66",
+    iconUrl: "https://app.cloud66.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+      { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+      { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+    ],
+    apps: [
+      {
+        id: "app-cloud66-mcp",
+        name: "Cloud 66",
+        description:
+          "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+        iconUrl: "https://app.cloud66.com/favicon.ico",
+        server: {
+          name: "cloud66",
+          transport: "http",
+          url: "https://app.cloud66.com/mcp",
+          auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.cloud66.com",
+    privacyPolicyUrl: "https://www.cloud66.com/privacy",
+    termsUrl: "https://www.cloud66.com/terms",
     skills: [],
   },
   context7: {
@@ -3024,11 +3114,11 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Omnisend",
     tagline: "Email and SMS marketing",
     description:
-      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
     category: "automation",
     creatorName: "Omnisend",
     iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
       { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
@@ -3039,13 +3129,29 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-omnisend-mcp",
         name: "Omnisend",
         description:
-          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
         iconUrl: "https://www.omnisend.com/wp-content/uploads/2022/07/cropped-favi-192x192.png",
         server: {
           name: "omnisend",
           transport: "http",
           url: "https://mcp.omnisend.com/mcp",
-          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "omnisend-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "X-Api-Key",
+                  hint: "In Omnisend, open Store settings > API keys and create a key.",
+                },
+              ],
+              docsUrl: "https://app.omnisend.com/integrations/api-keys",
+              docsLabel: "Create a key",
+            },
+          ],
         },
       },
     ],
@@ -6317,11 +6423,11 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "HighLevel",
     tagline: "CRM and marketing workspace",
     description:
-      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
     category: "productivity",
     creatorName: "HighLevel",
     iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-new-leads", text: "List the contacts that were added this week." },
       { id: "prompt-pipeline", text: "Summarize the opportunities in my sales pipeline by stage." },
@@ -6332,13 +6438,37 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-highlevel-mcp",
         name: "HighLevel",
         description:
-          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
         iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
         server: {
           name: "highlevel",
           transport: "http",
           url: "https://services.leadconnectorhq.com/mcp",
-          auth: [{ id: "highlevel-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "highlevel-key",
+              kind: "key",
+              label: "Private Integration token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Private Integration token",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "pit-…",
+                  hint: "In your HighLevel sub-account, open Settings > Private Integrations and create a token.",
+                },
+                {
+                  id: "location-id",
+                  label: "Location ID",
+                  header: "locationId",
+                  hint: "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID.",
+                },
+              ],
+              docsUrl: "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+              docsLabel: "Create a token",
+            },
+          ],
         },
       },
     ],
@@ -6414,6 +6544,59 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.hostinger.com",
     privacyPolicyUrl: "https://www.hostinger.com/legal/privacy-policy",
     termsUrl: "https://www.hostinger.com/legal/universal-terms-of-service-agreement",
+    skills: [],
+  },
+  hubspot: {
+    slug: "hubspot",
+    name: "HubSpot",
+    tagline: "CRM records, deals and notes",
+    description:
+      "HubSpot lets agents search and read contacts, companies, deals and tickets, and create or update records, associations, notes and tasks. HubSpot's own local server runs with a service key from your HubSpot account. The scopes of the key set what agents can read and change. The server has no delete tools.",
+    category: "productivity",
+    creatorName: "HubSpot",
+    iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-deals", text: "Summarize my open deals by stage and amount." },
+      { id: "prompt-contact", text: "What do we know about the contacts at this company?" },
+      { id: "prompt-note", text: "Add a note about today's call to this contact in HubSpot." },
+    ],
+    apps: [
+      {
+        id: "app-hubspot-mcp",
+        name: "HubSpot",
+        description:
+          "CRM search, record and association updates, notes and tasks, over HubSpot's local MCP server with a service key.",
+        iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+        server: {
+          name: "hubspot",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@hubspot/mcp-server@0.4.0"],
+          auth: [
+            {
+              id: "hubspot-key",
+              kind: "key",
+              label: "Service key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Service key",
+                  env: "PRIVATE_APP_ACCESS_TOKEN",
+                  hint: "In HubSpot, open Development > Keys > Service keys, create a key with the CRM scopes you need, and copy it. A private app access token also works.",
+                },
+              ],
+              docsUrl:
+                "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.hubspot.com",
+    privacyPolicyUrl: "https://legal.hubspot.com/privacy-policy",
+    termsUrl: "https://legal.hubspot.com/terms-of-service",
     skills: [],
   },
   ibkr: {
@@ -7649,40 +7832,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://monday.com",
     privacyPolicyUrl: "https://monday.com/l/privacy/privacy-policy/",
     termsUrl: "https://monday.com/l/legal/tos/",
-    skills: [],
-  },
-  mongodb: {
-    slug: "mongodb",
-    name: "MongoDB Atlas",
-    tagline: "Atlas clusters and databases",
-    description:
-      "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-    category: "coding",
-    creatorName: "MongoDB",
-    iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-    version: "1.0.0",
-    prompts: [
-      { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-      { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-      { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-    ],
-    apps: [
-      {
-        id: "app-mongodb-mcp",
-        name: "MongoDB Atlas",
-        description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-        iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-        server: {
-          name: "mongodb",
-          transport: "http",
-          url: "https://mcp.mongodb.com",
-          auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-        },
-      },
-    ],
-    websiteUrl: "https://www.mongodb.com",
-    privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-    termsUrl: "https://www.mongodb.com/legal/terms-of-use",
     skills: [],
   },
   moomoo: {
@@ -9609,12 +9758,12 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Tessie",
     tagline: "Tesla vehicle data",
     description:
-      "Tessie lets agents read the state of the user's Tesla vehicles, such as battery, charging, location, and drive history, and send vehicle commands that the account allows. Each user signs in to their own Tessie account through the browser.",
+      "Tessie lets agents read the state of the user's Tesla vehicles, such as battery, charging, location, and drive history, and send vehicle commands that the account allows. Each user connects with an access token from their own Tessie account. The token can control the vehicles, so give it only to agents that you trust.",
     category: "other",
     creatorName: "Tessie",
     iconUrl:
       "https://cdn.prod.website-files.com/636438cc25b4915a5b7bc573/6552b78d94db7398c3281d27_square_crop_centered.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-battery", text: "What is my car's battery level and range right now?" },
       { id: "prompt-drives", text: "Summarize my drives from last week, with distance and energy used." },
@@ -9625,14 +9774,31 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-tessie-mcp",
         name: "Tessie",
         description:
-          "Vehicle state, drive history, and vehicle commands, over Tessie's MCP server with browser sign-in.",
+          "Vehicle state, drive history, and vehicle commands, over Tessie's MCP server with an access token.",
         iconUrl:
           "https://cdn.prod.website-files.com/636438cc25b4915a5b7bc573/6552b78d94db7398c3281d27_square_crop_centered.png",
         server: {
           name: "tessie",
           transport: "http",
           url: "https://mcp.tessie.com",
-          auth: [{ id: "tessie-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "tessie-key",
+              kind: "key",
+              label: "Access token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Access token",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "In Tessie, open Settings > Developer and create an access token.",
+                },
+              ],
+              docsUrl: "https://dash.tessie.com/settings/developer",
+              docsLabel: "Create a token",
+            },
+          ],
         },
       },
     ],

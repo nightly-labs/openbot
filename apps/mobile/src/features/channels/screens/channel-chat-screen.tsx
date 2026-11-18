@@ -1,6 +1,6 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
@@ -9,7 +9,12 @@ import { useQuestionPrompt } from "@/features/chat/components/use-question-promp
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
-import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
+import {
+  useApprovalRequests,
+  useBrowserRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
@@ -52,6 +57,43 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     () => (summary?.threads?.length ? new Set(summary.threads.map((thread) => thread.threadId)) : null),
     [summary?.threads],
   );
+  // A question of a member's thread here that the page has no row for, as the question of a turn that
+  // the provider started with no task: that turn copies no rows to the channel. Its card comes from
+  // the host's request, so "Waiting for you" leads to a question that the person can answer (#10178).
+  // A saved row is matched by its turn too: a custom agent counts its request ids again after a restart.
+  // The card waits for the page, which the answer needs.
+  const threadWaits = useThreadWaits(serverId);
+  const liveQuestions = useMemo(() => {
+    if (!online || archived || !threadIds || !page) return [];
+    const key = (agentId: string, turnId: string | undefined, requestId: string | number) =>
+      `${agentId}\n${turnId ?? ""}\n${String(requestId)}`;
+    const saved = new Set(
+      page.messages.flatMap((entry) =>
+        entry.message.questionPrompt
+          ? [key(entry.author.id, entry.message.turnId, entry.message.questionPrompt.requestId)]
+          : [],
+      ),
+    );
+    return threadWaits.flatMap(({ reason, questions, agentId, requestId, threadId, turnId }) =>
+      reason === "question" && questions && threadIds.has(threadId) && !saved.has(key(agentId, turnId, requestId))
+        ? [
+            {
+              agentId,
+              message: {
+                id: `question-prompt:${turnId}:${String(requestId)}`,
+                kind: "question" as const,
+                turnId,
+                prompt: { requestId, questions, resolution: null },
+              },
+            },
+          ]
+        : [],
+    );
+  }, [online, archived, threadIds, page, threadWaits]);
+  const shownMessages = useMemo(
+    () => (liveQuestions.length > 0 ? [...messages, ...liveQuestions.map((question) => question.message)] : messages),
+    [messages, liveQuestions],
+  );
   const serverApprovals = useApprovalRequests(serverId);
   const approvals = useMemo(() => {
     if (archived) return [];
@@ -80,6 +122,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
         !entry.message.questionPrompt.resolution
       )
         waits.set(entry.author.id, "question");
+    for (const question of liveQuestions) waits.set(question.agentId, "question");
     if (waits.size === 0) return working;
     const waiting = (activity: MobileAgentActivity, reason: MobileAgentWaitReason): MobileAgentActivity => ({
       ...activity,
@@ -95,7 +138,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       if (!next.some((activity) => activity.agentId === agentId))
         next.push(waiting({ agentId, turnId: null, phase: "working", detail: null }, reason));
     return next;
-  }, [archived, channel?.leadAgentId, page?.tasks, page?.messages, approvals, serverBrowserRequests, threadIds]);
+  }, [
+    archived,
+    channel?.leadAgentId,
+    page?.tasks,
+    page?.messages,
+    approvals,
+    serverBrowserRequests,
+    threadIds,
+    liveQuestions,
+  ]);
   const activities = useMemo(() => (online ? memberWork : []), [online, memberWork]);
   // The host says why a request does not start (channel-task-waits-v1); an older host says nothing.
   const statusNotes = useMemo(() => {
@@ -203,15 +255,20 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const canSend = Boolean(channel) && !archived;
   const messageDelete = useMessageDelete(serverId, { kind: "channel", channelId });
   const [selectedPromptId, selectPrompt] = useState<string | null>(null);
-  const pendingPrompts = messages.filter((message) => message.kind === "question" && !message.prompt.resolution);
+  const pendingPrompts = shownMessages.filter((message) => message.kind === "question" && !message.prompt.resolution);
   const activePrompt = pendingPrompts.find((message) => message.id === selectedPromptId) ?? pendingPrompts[0];
-  const promptAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
+  const savedAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
+  const promptAgentId = savedAuthor
+    ? savedAuthor.kind === "agent"
+      ? savedAuthor.id
+      : ""
+    : (liveQuestions.find((question) => question.message.id === activePrompt?.id)?.agentId ?? "");
   const respondToPrompt = useCallback(
     (agentId: string, input: RespondToPromptInput) => store.respondToPrompt(serverId, channelId, agentId, input),
     [store, serverId, channelId],
   );
   const questionForm = useQuestionPrompt(
-    promptAuthor?.kind === "agent" ? promptAuthor.id : "",
+    promptAgentId,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && canSend,
     respondToPrompt,
@@ -235,12 +292,19 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     }),
     [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
+  // A pull past the latest message opens the channel's info sheet on top of this chat, unless
+  // Settings turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/channel-info/[channelId]", params: { channelId, serverId } }),
+    [channelId, serverId],
+  );
   return (
     <ChatView
       target={target}
       agents={serverAgents}
       mentionAgents={members}
-      projectedMessages={messages}
+      projectedMessages={shownMessages}
       referenceMessages={messages}
       ready={Boolean(page)}
       historyLoadFailed={Boolean(state.error) || (!state.loading && !channel)}
@@ -273,6 +337,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       channelLeadAgentId={channel?.leadAgentId ?? null}
       channelTurnSummaries={turnSummaries}
       onLeave={leaveChat}
+      onPullPastEnd={pullOn ? openInfo : null}
     />
   );
 }

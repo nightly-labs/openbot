@@ -4,9 +4,11 @@ import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
+import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
@@ -35,6 +37,7 @@ import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_QUEUE_CAPABILITY } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CAPABILITY } from "./agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
@@ -53,12 +56,14 @@ import { BROWSER_SIGN_IN_STORAGE_CAPABILITY } from "./browser-sign-in-storage-v1
 import { BROWSER_SIGN_IN_CAPABILITY } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CAPABILITY } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "./browser-user-control-v1";
+import { BROWSER_VAULT_SKIP_CAPABILITY } from "./browser-vault-skip-v1";
 import {
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
@@ -81,16 +86,20 @@ import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
+import { CRM_CAPABILITY } from "./crm-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
+import { FEEDBACK_WITHDRAW_CAPABILITY } from "./feedback-withdraw-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
+import { HOST_APPEARANCE_CAPABILITY } from "./host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
@@ -108,21 +117,27 @@ import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "./mac-apps-limit-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { TEAM_MEMORY_CHANGES_CAPABILITY } from "./memory-changes-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
+import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
@@ -131,7 +146,9 @@ import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
@@ -149,16 +166,19 @@ import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
+import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
@@ -169,12 +189,15 @@ import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
+import { highestCommonTeamProtocol, type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "./v1";
+import { TEAM_PROTOCOL_V3 } from "./v3";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
-import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
@@ -184,16 +207,21 @@ import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
+import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "./workspace-only-process-limit-v1";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -258,9 +286,11 @@ export const TEAM_QUEUE_WINDOW_CAPABILITY = "queue-window-v1";
 export {
   ACP_REGISTRY_CAPABILITY,
   AGENT_ACCESS_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
@@ -288,6 +318,7 @@ export {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   AGENT_WAITS_CAPABILITY,
@@ -305,6 +336,7 @@ export {
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_TEACH_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
@@ -321,13 +353,17 @@ export {
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CRM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
   FOCUS_USE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
@@ -343,6 +379,7 @@ export {
   LIBRARY_FOLDERS_EVENTS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
   MCP_ACCESS_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
@@ -352,16 +389,19 @@ export {
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
   MESSAGE_PINS_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -376,16 +416,19 @@ export {
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -399,10 +442,12 @@ export {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -413,6 +458,7 @@ export {
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
@@ -422,16 +468,21 @@ export {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
@@ -630,6 +681,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  MISTRAL_CODE_SIGN_IN_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
@@ -650,6 +702,31 @@ export const TEAM_CURRENT_CAPABILITIES = [
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -714,12 +791,19 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-// Keep the first request readable by every released peer. The v7 marker lets a current
-// host return the expanded list; older hosts ignore the marker and retain all old features.
-// A protocol 6 peer reads at most 64 capabilities, so each new capability is v7 only.
-// The v8 marker stays out: a client sends it only after the host reports protocol 8.
+// Keep the first request readable by every released peer. A client also sends this list to a host
+// of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
+// over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
+// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
+// protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
+// stays out: a client sends it only after the host reports protocol 8.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    // No host of protocol 6 or older knows these three. They came after v0.34.1, the last protocol 6
+    // release, and took the list over 64. A host of protocol 7 or newer gets them in its own list.
+    capability !== TEAM_ZIP_ATTACHMENTS_CAPABILITY &&
+    capability !== AGENT_HOST_SETTINGS_CAPABILITY &&
+    capability !== MCP_SIGN_IN_CAPABILITY &&
     capability !== TEAM_OPEN_PROVIDERS_CAPABILITY &&
     capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
@@ -864,6 +948,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
     capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+    capability !== MISTRAL_CODE_SIGN_IN_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
     capability !== GITHUB_SKILLS_CAPABILITY &&
     capability !== HOST_RESTART_CAPABILITY &&
@@ -879,11 +964,36 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
     capability !== PENDING_APPROVAL_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_CODE_CAPABILITY &&
     capability !== USAGE_CREDITS_CAPABILITY &&
     capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
     capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
     capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
-    capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+    capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
+    capability !== HOST_APPEARANCE_CAPABILITY &&
+    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+    capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+    capability !== MODEL_STEERING_CAPABILITY &&
+    capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
+    capability !== PHONE_FEEDBACK_CAPABILITY &&
+    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+    capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+    capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
+    capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+    capability !== CRM_CAPABILITY &&
+    capability !== SETTING_LINK_MARKERS_CAPABILITY &&
+    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+    capability !== MAC_APPS_LIMIT_CAPABILITY &&
+    capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+    capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+    capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
+    capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+    capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+    capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
+    capability !== AGENT_CREATE_OPERATION_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -973,6 +1083,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  MISTRAL_CODE_SIGN_IN_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
@@ -993,6 +1104,31 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1006,6 +1142,23 @@ const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V8_CURRENT_CAPABILIT
     capability !== PROVIDERS_V8_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY,
 );
+/**
+ * The protocols that mobile and the web client speak through `packages/team-client`. They send protocol 9
+ * requests; an older host reads them with its own codec. Protocol 3 is the oldest host that they accepted.
+ */
+export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
+  minimum: TEAM_PROTOCOL_V3,
+  maximum: TEAM_PROTOCOL_V9,
+};
+
+/** The highest protocol that a WebRTC client and a host both speak, or which side must update. */
+export function teamWebRtcClientProtocol(
+  host: TeamProtocolSupportV1["protocol"],
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+) {
+  return { protocol: highestCommonTeamProtocol(client, host), update: teamProtocolUpdateDirection(client, host) };
+}
+
 export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
   if (protocol === null || protocol === undefined || protocol < 7) return TEAM_BOOTSTRAP_CAPABILITIES;
   if (protocol >= 9) return TEAM_CURRENT_CAPABILITIES;
@@ -1166,6 +1319,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
       capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+      capability !== MISTRAL_CODE_SIGN_IN_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
       capability !== GITHUB_SKILLS_CAPABILITY &&
       capability !== HOST_RESTART_CAPABILITY &&
@@ -1181,10 +1335,35 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
       capability !== PENDING_APPROVAL_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_CODE_CAPABILITY &&
       capability !== USAGE_CREDITS_CAPABILITY &&
       capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
       capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
       capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
-      capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+      capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
+      capability !== HOST_APPEARANCE_CAPABILITY &&
+      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+      capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+      capability !== MODEL_STEERING_CAPABILITY &&
+      capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
+      capability !== PHONE_FEEDBACK_CAPABILITY &&
+      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+      capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+      capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
+      capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+      capability !== CRM_CAPABILITY &&
+      capability !== SETTING_LINK_MARKERS_CAPABILITY &&
+      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+      capability !== MAC_APPS_LIMIT_CAPABILITY &&
+      capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+      capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+      capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
+      capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+      capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+      capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
+      capability !== AGENT_CREATE_OPERATION_CAPABILITY,
   );
 }

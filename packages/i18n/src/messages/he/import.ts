@@ -148,7 +148,7 @@ export const messages = {
   "import.hermes.reason.invalidSkill": "ב-SKILL.md שלו אין שם ותיאור תקינים.",
   "import.hermes.reason.duplicateSkill": "מיומנות אחרת בפרופיל הזה נושאת את אותו שם.",
   "import.hermes.reason.builtIn": "הן מגיעות עם Hermes. ל-OpenBot יש מיומנויות משלו.",
-  "import.hermes.reason.mcpOff": "הוא נוסף כבוי. יש לבדוק אותו ואז להפעיל אותו בהגדרות MCP.",
+  "import.hermes.reason.mcpOff": "הוא נוסף כבוי. יש לבדוק אותו ואז להפעיל אותו בחנות, אפליקציות.",
   "import.hermes.reason.mcpNameTaken": "כבר יש כאן שרת בשם הזה.",
   "import.hermes.reason.routineSchedule": "OpenBot אינו יכול להריץ את לוח הזמנים שלה, או שהזמן שלה עבר.",
   "import.hermes.reason.routineScript": "היא מריצה סקריפט, לא את הסוכן.",

@@ -1,19 +1,22 @@
 // Checks the WhatsApp connector end to end against a fake WhatsApp: the link by QR code and by pairing
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
-// alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard,
-// numbered approval answers, the journal replay after a restart, each close code, the send queue while
-// the socket is down, and the disconnect. Runs the real agent service, messaging service, WhatsApp
-// driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
-// message leaves this computer. `bun scripts/messaging-whatsapp-e2e.ts`.
+// alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
+// guard against another OpenBot on the same number and against a loop in the owner's own chat,
+// numbered approval answers, the saved history and its search, held messages after a wake, the
+// journal replay after a restart, each close code, the send queue while the socket is down, and the
+// disconnect. Runs the real agent service, messaging service, WhatsApp driver, runtime, session and
+// store on a temporary profile. Only the Baileys socket is fake: no message leaves this computer.
+// `bun scripts/messaging-whatsapp-e2e.ts`.
 // Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
 import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import {
   newStoreKey,
   WhatsAppAuthStore,
@@ -88,7 +91,7 @@ const report: { steps: Step[]; passed: boolean; unverified: string[] } = {
   unverified: [
     "The real WhatsApp servers and the Signal sessions: a fake socket stands in for Baileys. scripts/whatsapp-signal-e2e.ts checks the crypto; only a live smoke with two phones proves interop.",
     "An agent turn: no provider runs, so no answer is posted. Status posts, answers and approvals of a real turn use the same adapter calls that the steps make directly.",
-    "Media download: it needs WhatsApp's media servers.",
+    "Media download, also the download of a file at arrival: it needs WhatsApp's media servers. A file that the step writes stands in for the saved copy.",
   ],
 };
 
@@ -491,6 +494,34 @@ function received(agents: AgentService, chat: string, id: string): boolean {
   return agents.messaging.received(`messaging:${connectionId(agents)}:${chat}:${id}`);
 }
 
+interface HistoryRead {
+  messages: { author: string; sentAt: string; text: string; files?: { name: string; path?: string }[] }[];
+  note: string;
+}
+
+/** A `messaging_history` read of a named place, as a turn that answers no external chat calls it. */
+async function readHistory(
+  agents: AgentService,
+  args: { place: string; query?: string; before?: string },
+): Promise<HistoryRead> {
+  const result = await runCauseEffect(
+    agents.messaging.outboundTool(
+      "agent-whatsapp-e2e",
+      { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+      "messaging_history",
+      { connection: connectionId(agents), ...args },
+      () => Effect.succeed([]),
+    ),
+  );
+  const text = result.contentItems[0]?.text ?? "";
+  assert.ok(result.success, text);
+  return JSON.parse(text);
+}
+
+/** A saved message older than 90 days, with a copy of its file, which the next start deletes. */
+const OLD_ID = "IN-OLD";
+let oldCopy = "";
+
 async function linkState(messaging: MessagingService, done: (state: WhatsAppLinkState) => boolean, label: string) {
   return until(() => {
     const state = messaging.whatsappLinkState();
@@ -601,6 +632,26 @@ try {
       return { workspaceName: live.workspaceName, state: live.state };
     });
 
+    await step("no orchestrator: an allowed contact gets no setup text from the owner's number (#11438)", async () => {
+      const input = parseWhatsAppSenderInput({
+        workspaceId: OWNER,
+        sender: { id: FRIEND, kind: "contact", name: "Ewa" },
+      });
+      await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+      const friendJid = `${FRIEND}@s.whatsapp.net`;
+      const ownBefore = phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      phone.current().receive([message({ chat: friendJid, text: "Is the meeting still on?" })]);
+      // The owner's own chat still gets the notice, and it comes after the contact's message.
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "marker 0" })]);
+      await until(
+        () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length > ownBefore,
+        "the notice in the owner's own chat",
+      );
+      assert.equal(phone.textsTo(friendJid).length, 0, "OpenBot wrote setup text to an allowed contact.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, input.sender.id));
+      return { contactPosts: 0 };
+    });
+
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
       const added = await runCauseEffect(messaging.addWhatsAppOrchestrator({}));
       const agent = agents.listAgents().find((candidate) => candidate.id === added.agentId);
@@ -624,13 +675,68 @@ try {
       assert.ok(own);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "👀", id: own.id })]);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "echo", id: own.id })], "append");
-      // A later message is read, so the two echoes above were read and dropped.
+      // Another OpenBot linked to the same number posts with ids that this one does not know: its status
+      // post, and an answer of OpenBot 0.70 or older, which ends with a line of blank braille characters.
+      const otherStatus = message({ chat: OWNER_JID, fromMe: true, text: "Working on it…\n\nReply stop to stop." });
+      const otherAnswer = message({ chat: OWNER_JID, fromMe: true, text: `Here you go.\n${"\u2800".repeat(36)}` });
+      phone.current().receive([otherStatus, otherAnswer]);
+      // A later message is read, so the posts above were read and dropped.
       const later = message({ chat: OWNER_JID, fromMe: true, text: "And tomorrow?" });
       phone.current().receive([later]);
       await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the later message");
       assert.equal(received(agents, OWNER_JID, own.id), false, "An own post was read as a request.");
-      return { echoId: own.id };
+      for (const other of [otherStatus, otherAnswer])
+        assert.equal(received(agents, OWNER_JID, other.key.id ?? ""), false, "Another OpenBot's post was a request.");
+      const told = () => phone.textsTo(OWNER_JID).filter((text) => text.startsWith("Another OpenBot is linked")).length;
+      await until(() => told() === 1, "one notice about the other OpenBot");
+      return { echoId: own.id, otherOpenBotNotices: told() };
     });
+
+    await step(
+      "held messages: after a wake, a synced number answers what WhatsApp held; a new link does not",
+      async () => {
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        // The transport journals each message that it hands on, in the order that WhatsApp gives them.
+        const journaled = (id: string | null | undefined) =>
+          handle.store.unhandled().some((entry) => entry.dedupKey === `${OWNER_JID}:${id}`);
+        // WhatsApp sends the messages that it held for the device as `append`, with their send time.
+        const held = (text: string, minutesAgo: number) => {
+          const sent = message({ chat: OWNER_JID, fromMe: true, text });
+          sent.messageTimestamp = Math.floor((Date.now() - minutesAgo * 60_000) / 1_000);
+          return sent;
+        };
+        const readUpTo = async (label: string) => {
+          const marker = message({ chat: OWNER_JID, fromMe: true, text: label });
+          phone.current().receive([marker]);
+          await until(() => journaled(marker.key.id), label);
+        };
+
+        // The first socket after the link gets the number's history: an old `append` is not a new request.
+        const history = held("from before the link", 5);
+        phone.current().receive([history], "append");
+        await readUpTo("a live message on the new link");
+        assert.equal(journaled(history.key.id), false, "A new link answered a message from its history.");
+
+        // The computer sleeps and wakes. The next socket of the number gets no history, only held messages.
+        const sockets = phone.sockets.length;
+        messaging.resume();
+        await until(() => phone.sockets.length > sockets && connection(messaging)?.state === "connected", "the wake");
+        const recent = held("written while the computer slept", 5);
+        const old = held("written long before the wake", 30);
+        phone.current().receive([old, recent], "append");
+        await readUpTo("a live message after the wake");
+        assert.equal(journaled(recent.key.id), true, "A message that WhatsApp held during the sleep was dropped.");
+        assert.equal(journaled(old.key.id), false, "A message older than the held-message window was answered.");
+        // What is not answered is still saved, so an agent can read it with `messaging_history`.
+        const saved = new Set(
+          agents.messaging.history.recent(connectionId(agents), OWNER_JID, null, 200).map((entry) => entry.id),
+        );
+        assert.ok(saved.has(history.key.id ?? ""), "A message from the history of a new link was not saved.");
+        assert.ok(saved.has(old.key.id ?? ""), "A message older than the held-message window was not saved.");
+        return { history: false, recent: true, old: false, saved: true };
+      },
+    );
 
     await step("status post: a number with the setting off gets no “Working on it…” post", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
@@ -665,6 +771,57 @@ try {
       // The request waits again, as the steps below expect.
       await runCauseEffect(mailbox.restoreQueued(request.delivery.id));
       return { posts: working() - before };
+    });
+
+    await step("failed turn: the chat gets the catalog reason, never the provider's own text (#11303)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      // Posts and edits: the end of a request edits its status post.
+      const texts = () =>
+        phone.sent.flatMap((sent) =>
+          sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
+            ? [sent.content.text]
+            : [],
+        );
+      // No provider runs here, so the step ends each turn as the turn lifecycle does: the failure is
+      // stored on the request before the turn's end.
+      const failTurn = async (turnId: string, error: string) => {
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the owner's chat.");
+        await runCauseEffect(mailbox.markStarting(request.delivery.id));
+        const scope = Effect.runSync(Scope.make());
+        const turn = { agentId: link.agentId, threadId: link.threadId, turnId };
+        agents.messaging.event({ type: "turn-started", ...turn }, scope);
+        await runCauseEffect(mailbox.markTerminal(request.delivery.id, "failed", error));
+        agents.messaging.event({ type: "turn-completed", ...turn, status: "failed" }, scope);
+      };
+      const signIn = sourceText("error.provider.signInExpired", { provider: "Claude" });
+      await failTurn("turn-sign-in-expired", signIn);
+      await until(() => texts().includes(signIn), "the sign-in reason");
+      const general = sourceText("status.messaging.failed");
+      const generalPosts = () => texts().filter((text) => text === general).length;
+      const before = generalPosts();
+      await failTurn("turn-provider-text", "Claude Code failed: /home/ana/.claude/settings.json is not valid.");
+      await until(() => generalPosts() > before, "the general text");
+      assert.ok(!texts().some((text) => text.includes("/home/ana")), "The provider's own text reached WhatsApp.");
+      // Another OpenBot on the same number posts such a reason with ids that this one does not know.
+      const otherReason = message({ chat: OWNER_JID, fromMe: true, text: signIn });
+      phone.current().receive([otherReason]);
+      const later = message({ chat: OWNER_JID, fromMe: true, text: "after the other OpenBot's reason" });
+      phone.current().receive([later]);
+      await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the message after the other reason");
+      assert.equal(
+        received(agents, OWNER_JID, otherReason.key.id ?? ""),
+        false,
+        "Another OpenBot's reason was a request.",
+      );
+      // The steps below expect the owner to have as many waiting requests as the limit permits.
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `request again ${index}`);
+      }
+      return { reason: signIn, general };
     });
 
     await step(
@@ -725,6 +882,39 @@ try {
       },
     );
 
+    await step(
+      "prompt: an allowed person on a personal number writes to the owner, not to the agent (#11470)",
+      async () => {
+        const strangerJid = `${STRANGER}@s.whatsapp.net`;
+        const link = agents.messaging.store.linkByKey(connectionId(agents), strangerJid, "dm");
+        assert.ok(link, "No conversation for the allowed person.");
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the allowed person's chat.");
+        const prompt = async () =>
+          (await runCauseEffect(agents.messaging.prepare({ delivery: request.delivery, managedAttachments: [] })))
+            ?.text ?? "";
+        const dedicated = await prompt();
+        assert.ok(dedicated.includes("Place: a direct message to you."), "A dedicated number lost its own framing.");
+        assert.ok(!dedicated.includes("message from the OpenBot user"), "A dedicated number answers as the owner.");
+        await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, true));
+        try {
+          const personal = await prompt();
+          assert.ok(
+            personal.includes("The person writes to the OpenBot user, not to you."),
+            "The agent reads a message to the owner as a message to itself.",
+          );
+          assert.ok(
+            personal.includes("WhatsApp shows your answer as a message from the OpenBot user."),
+            "The agent does not know that its answer shows as the owner.",
+          );
+          assert.ok(!personal.includes("Place: a direct message to you."), "The personal number kept the bot framing.");
+        } finally {
+          await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, false));
+        }
+        return { dedicated: "direct message to you", personal: "writes to the OpenBot user" };
+      },
+    );
+
     await step("pairing limit: at most three requests wait, and the fourth person gets no answer", async () => {
       for (const suffix of ["01", "02", "03", "04"])
         phone.current().receive([message({ chat: `486009999${suffix}@s.whatsapp.net`, text: "hi" })]);
@@ -757,12 +947,29 @@ try {
           text: "@48600100200 summarize the release",
           mentions: [OWNER_JID],
         });
-        phone.current().receive([chatter, mention]);
+        // The owner writes in the group from the phone: saved for the history, never answered, also with a mention.
+        const ownerReply = message({
+          chat: GROUP,
+          fromMe: true,
+          text: "@48600100200 I can bring dessert",
+          mentions: [OWNER_JID],
+        });
+        phone.current().receive([chatter, ownerReply, mention]);
         await until(() => received(agents, GROUP, mention.key.id ?? ""), "the mention");
         assert.equal(
           received(agents, GROUP, chatter.key.id ?? ""),
           false,
           "A group message without a mention started work.",
+        );
+        assert.equal(
+          received(agents, GROUP, ownerReply.key.id ?? ""),
+          false,
+          "The owner's group message started work.",
+        );
+        const groupHistory = agents.messaging.history.recent(connectionId(agents), GROUP, null, 200);
+        assert.ok(
+          groupHistory.some((entry) => entry.id === ownerReply.key.id),
+          "The owner's message in an allowed group was not saved.",
         );
         const link = agents.messaging.store.linkByKey(connectionId(agents), GROUP, mention.key.id ?? "");
         assert.ok(link, "The mention did not start a conversation keyed by its message.");
@@ -791,6 +998,223 @@ try {
           "A group that is not allowed started work.",
         );
         return { threadKey: link.threadKey };
+      },
+    );
+
+    await step("HD photo: the normal copy gets an answer, and its HD copy gets none (#11764)", async () => {
+      const author = `${FRIEND}@s.whatsapp.net`;
+      const image: proto.IMessage = {
+        imageMessage: {
+          mimetype: "image/jpeg",
+          caption: "@48600100200 what is on this photo?",
+          contextInfo: { mentionedJid: [OWNER_JID] },
+        },
+      };
+      const photo = (id: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: image,
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // WhatsApp sends the HD copy about 1 s later, with its own id, and names the normal copy.
+      const hdCopy = (id: string, firstId: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: {
+          messageContextInfo: {
+            messageAssociation: {
+              associationType: proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+              parentMessageKey: { remoteJid: GROUP, fromMe: false, id: firstId, participant: author },
+            },
+          },
+          associatedChildMessage: { message: image },
+        },
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // Each message that the service takes gets a reaction: 👀, or ❌ when the agent's queue is full.
+      phone.current().receive([photo("IN-HD-NORMAL")]);
+      await until(() => phone.reactedTo("IN-HD-NORMAL"), "the answer to the normal copy");
+      // The messages are read in order, so the HD copy is read before the last one. An HD copy of a photo
+      // that this number never read is still a message.
+      phone.current().receive([hdCopy("IN-HD-COPY", "IN-HD-NORMAL"), hdCopy("IN-HD-ALONE", "IN-HD-NEVER-SEEN")]);
+      await until(() => phone.reactedTo("IN-HD-ALONE"), "the answer to the HD copy of an unread photo");
+      assert.equal(phone.reactedTo("IN-HD-COPY"), false, "The HD copy got a second answer.");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), GROUP, "IN-HD-COPY"),
+        null,
+        "The HD copy started a second conversation.",
+      );
+      return { normal: "answered", hdCopy: "skipped", hdCopyOfUnreadPhoto: "answered" };
+    });
+
+    await step(
+      "saved history: the oldest copies go over the size limit, a delete for everyone deletes, an edit changes",
+      async () => {
+        const id = connectionId(agents);
+        const author = `${FRIEND}@s.whatsapp.net`;
+        const fileMessage = (messageId: string, fileName: string): WAMessage => ({
+          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant: author },
+          message: { documentMessage: { fileName, mimetype: "text/plain", fileLength: 5, caption: messageId } },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        });
+        const change = (
+          messageId: string,
+          protocolMessage: proto.Message.IProtocolMessage,
+          participant = author,
+        ): WAMessage => ({
+          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant },
+          message: { protocolMessage },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        });
+        const other = `${STRANGER}@s.whatsapp.net`;
+        const savedText = (messageId: string) =>
+          agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === messageId)?.text;
+        phone.current().receive([fileMessage("IN-KEEP-1", "first.txt"), fileMessage("IN-KEEP-2", "second.txt")]);
+        await until(() => savedText("IN-KEEP-2"), "the two saved file messages");
+        // The fake messages have no media key, so the downloads at arrival fail; copies stand in for them.
+        const folder = runtime.filesPath(id);
+        mkdirSync(folder, { recursive: true });
+        const first = join(folder, "copy-first.txt");
+        const second = join(folder, "copy-second.txt");
+        writeFileSync(first, "first");
+        writeFileSync(second, "secnd");
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-1", `${GROUP}|IN-KEEP-1`, first, 5));
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-2", `${GROUP}|IN-KEEP-2`, second, 5));
+        assert.deepEqual(agents.messaging.history.trimFiles(id, 10), [], "Copies under the limit went.");
+        assert.deepEqual(agents.messaging.history.trimFiles(id, 9), [first], "The oldest copy did not go first.");
+        rmSync(first);
+        const trimmed = await readHistory(agents, { place: GROUP, query: "IN-KEEP-1" });
+        assert.deepEqual(trimmed.messages[0]?.files, [{ name: "first.txt" }], "A trimmed message kept its path.");
+
+        phone.current().receive([
+          change("EDIT-1", {
+            type: proto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
+            key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+            editedMessage: { conversation: "the first file, renamed" },
+          }),
+          // Another member names Ewa's message: the sender chooses the id, so neither change counts.
+          change(
+            "EDIT-FORGED",
+            {
+              type: proto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
+              key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+              editedMessage: { conversation: "forged" },
+            },
+            other,
+          ),
+          change(
+            "REVOKE-FORGED",
+            {
+              type: proto.Message.ProtocolMessage.Type.REVOKE,
+              key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+            },
+            other,
+          ),
+          change("REVOKE-1", {
+            type: proto.Message.ProtocolMessage.Type.REVOKE,
+            key: { remoteJid: GROUP, id: "IN-KEEP-2", participant: author },
+          }),
+        ]);
+        await until(() => savedText("IN-KEEP-1") === "the first file, renamed", "the edited text");
+        await until(() => savedText("IN-KEEP-2") === undefined && !existsSync(second), "the deleted message");
+        assert.equal(savedText("IN-KEEP-1"), "the first file, renamed", "Another member changed or deleted a message.");
+        assert.equal(received(agents, GROUP, "EDIT-1"), false, "An edit started work.");
+        assert.equal(received(agents, GROUP, "REVOKE-1"), false, "A delete for everyone started work.");
+        return { trimmed: 1, edited: true, revoked: true };
+      },
+    );
+
+    await step(
+      "saved history: a group message without a mention is saved with its file, and query and before find it",
+      async () => {
+        const id = connectionId(agents);
+        const fileMessage: WAMessage = {
+          key: { remoteJid: GROUP, fromMe: false, id: "IN-FILE", participant: `${FRIEND}@s.whatsapp.net` },
+          message: {
+            documentMessage: { fileName: "plan.pdf", mimetype: "application/pdf", fileLength: 4, caption: "the plan" },
+          },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        };
+        phone.current().receive([fileMessage]);
+        await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 50).some((entry) => entry.id === "IN-FILE"),
+          "the saved file message",
+        );
+        assert.equal(received(agents, GROUP, "IN-FILE"), false, "A group message without a mention started work.");
+        const all = await readHistory(agents, { place: GROUP });
+        const texts = all.messages.map((entry) => entry.text);
+        assert.ok(texts.includes("lunch?"), "A group message without a mention was not saved.");
+        assert.ok(texts.includes("and the changelog"), "A reply was not saved.");
+        const lunch = await readHistory(agents, { place: GROUP, query: "LUNCH" });
+        assert.deepEqual(
+          lunch.messages.map((entry) => entry.text),
+          ["lunch?"],
+        );
+        const byAuthor = await readHistory(agents, { place: GROUP, query: "ewa plan" });
+        assert.equal(byAuthor.messages.length, 1, "The query did not match the author and the text.");
+        assert.deepEqual(byAuthor.messages[0]?.files, [{ name: "plan.pdf" }]);
+        const early = await readHistory(agents, { place: GROUP, before: "2000-01-01T00:00:00Z" });
+        assert.equal(early.messages.length, 0, "before did not limit the read.");
+        const late = await readHistory(agents, { place: GROUP, before: "2999-01-01T00:00:00+02:00" });
+        assert.equal(late.messages.length, all.messages.length);
+        // The fake message has no media key, so the download at arrival fails; a copy stands in for it.
+        const folder = runtime.filesPath(id);
+        mkdirSync(folder, { recursive: true });
+        const copy = join(folder, "copy-plan.pdf");
+        writeFileSync(copy, "plan");
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-FILE", `${GROUP}|IN-FILE`, copy, 4));
+        const withPath = await readHistory(agents, { place: GROUP, query: "plan" });
+        assert.deepEqual(withPath.messages[0]?.files, [{ name: "plan.pdf", path: copy }]);
+        const values = credentials.get(id);
+        assert.ok(values);
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        await runCauseEffect(adapter.identify());
+        const destination = join(root, "downloaded-plan.pdf");
+        await runCauseEffect(
+          adapter.download(
+            {
+              id: `${GROUP}|IN-FILE`,
+              name: "plan.pdf",
+              mimeType: "application/pdf",
+              size: 4,
+              url: `${GROUP}|IN-FILE`,
+            },
+            destination,
+            1_024,
+          ),
+        );
+        assert.equal(readFileSync(destination, "utf8"), "plan", "The download did not use the saved copy.");
+        // A message that arrived 91 days ago: the next start deletes it and its copy.
+        oldCopy = join(folder, "copy-old.txt");
+        writeFileSync(oldCopy, "old");
+        const sentAt = new Date(Date.now() - 91 * 24 * 60 * 60_000).toISOString();
+        agents.messaging.history.save(
+          id,
+          GROUP,
+          OLD_ID,
+          FRIEND,
+          {
+            id: OLD_ID,
+            authorName: "Ewa",
+            text: "old news",
+            sentAt,
+            files: [
+              {
+                id: `${GROUP}|${OLD_ID}`,
+                name: "old.txt",
+                mimeType: "text/plain",
+                size: 3,
+                url: `${GROUP}|${OLD_ID}`,
+                path: oldCopy,
+              },
+            ],
+          },
+          sentAt,
+        );
+        return { saved: all.messages.length, lunch: lunch.messages.length, copy: true };
       },
     );
 
@@ -892,7 +1316,7 @@ try {
           me: { number: OWNER, lid: `${OWNER_LID}@lid` },
           openedAt: Date.now(),
           now: Date.now(),
-          rules: { ownNumber: true, contacts: new Set<string>(), groups: new Set<string>() },
+          rules: { ownNumber: true, contacts: new Map<string, string>(), groups: new Set<string>() },
           chats,
           isOwnPost: () => false,
           threadOf: () => null,
@@ -1064,6 +1488,97 @@ try {
       );
       return { reactions: phone.reactionsTo(OWNER_JID) };
     });
+
+    await step("status reactions: a number with the setting off gets no reaction, and its posts stay", async () => {
+      const busy = () => phone.textsTo(OWNER_JID).filter((text) => text.includes("Too many requests")).length;
+      const posts = busy();
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true, "Reactions are not on by default.");
+      await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, false));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, false);
+      // The owner still has requests waiting, so each new message gets the busy answer.
+      const quiet = message({ chat: OWNER_JID, fromMe: true, text: "no reaction, please" });
+      phone.current().receive([quiet]);
+      await until(() => busy() === posts + 1, "the busy answer with reactions off");
+      // The reverse action. The host reads messages in order, so this reaction shows that the first one is done.
+      await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, true));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true);
+      const loud = message({ chat: OWNER_JID, fromMe: true, text: "a reaction again" });
+      phone.current().receive([loud]);
+      await until(() => phone.reactedTo(loud.key.id), "the reaction with reactions on");
+      assert.equal(phone.reactedTo(quiet.key.id), false, "A number with reactions off got a reaction.");
+      return { busyPosts: busy() - posts };
+    });
+
+    await step(
+      "saved history: the messages stay after a restart, and one older than 90 days goes with its file",
+      async () => {
+        await until(() => !existsSync(oldCopy), "the prune of the old message's file");
+        const id = connectionId(agents);
+        const saved = agents.messaging.history.recent(id, GROUP, null, 200);
+        assert.ok(
+          saved.some((entry) => entry.text === "lunch?"),
+          "The saved messages went at the restart.",
+        );
+        assert.ok(!saved.some((entry) => entry.id === OLD_ID), "A message older than 90 days stayed.");
+        const lunch = await readHistory(agents, { place: GROUP, query: "lunch" });
+        assert.equal(lunch.messages.length, 1);
+        return { saved: saved.length };
+      },
+    );
+
+    await step(
+      "loop guard: a loop in the owner's own chat pauses it, a burst does not, and stop goes through",
+      async () => {
+        const paused = () =>
+          phone.textsTo(OWNER_JID).filter((text) => text.startsWith("OpenBot stopped answering here")).length;
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        const journaled = (chat: string, id: string | null | undefined) =>
+          handle.store.unhandled().some((entry) => entry.dedupKey === `${chat}:${id}`);
+        const mention = (text: string) =>
+          message({
+            chat: GROUP,
+            participant: `${FRIEND}@s.whatsapp.net`,
+            text: `@48600100200 ${text}`,
+            mentions: [OWNER_JID],
+          });
+        // A person who sends many messages at once, such as forwarded files, is not a loop.
+        const burst = Array.from({ length: 35 }, (_, index) =>
+          message({ chat: OWNER_JID, fromMe: true, text: `note ${index}` }),
+        );
+        phone.current().receive(burst);
+        const afterBurst = mention("after the burst");
+        phone.current().receive([afterBurst]);
+        // Messages are read in order, and the mention goes on after the joined burst.
+        await until(() => phone.reactedTo(afterBurst.key.id), "a group mention after the burst");
+        assert.equal(paused(), 0, "A burst of messages paused the owner's own chat.");
+        assert.equal(journaled(OWNER_JID, burst[0]?.key.id), true, "The burst did not go on as one request.");
+        // Two OpenBots that answer each other's posts send a request every few seconds, without end.
+        const start = Date.now() - 31 * 12_000;
+        const loop = Array.from({ length: 31 }, (_, index) => {
+          const sent = message({ chat: OWNER_JID, fromMe: true, text: `loop ${index}` });
+          sent.messageTimestamp = Math.floor((start + index * 12_000) / 1_000);
+          return sent;
+        });
+        phone.current().receive(loop);
+        await until(() => paused() === 1, "the pause notice");
+        // The requests before the limit go on as one joined burst first, so the next ones stand alone.
+        await until(() => !journaled(OWNER_JID, loop[1]?.key.id), "the loop requests before the limit");
+        const during = message({ chat: OWNER_JID, fromMe: true, text: "during the pause" });
+        const stop = message({ chat: OWNER_JID, fromMe: true, text: "stop" });
+        const marker = mention("during the pause");
+        phone.current().receive([during]);
+        phone.current().receive([stop]);
+        phone.current().receive([marker]);
+        // The mention goes on after the owner's messages above, so they were read.
+        await until(() => phone.reactedTo(marker.key.id), "a group mention during the pause");
+        assert.equal(journaled(OWNER_JID, during.key.id), false, "The paused chat took a request.");
+        assert.equal(journaled(OWNER_JID, stop.key.id), true, "A stop request did not go through the pause.");
+        assert.equal(journaled(OWNER_JID, loop.at(-1)?.key.id), false, "The loop went on past the limit.");
+        assert.equal(paused(), 1, "The pause notice came more than once.");
+        return { pauseNotices: paused() };
+      },
+    );
   });
 
   await step("normal stop: every message the service took is marked handled, so nothing replays", async () => {
@@ -1186,6 +1701,8 @@ try {
       assert.equal(phone.logouts, logouts + 1, "The device was not logged out.");
       assert.equal(existsSync(file), false, "The keys stayed on disk.");
       assert.equal(credentials.status(id), "missing");
+      assert.equal(agents.messaging.history.recent(id, GROUP, null, 200).length, 0, "The saved messages stayed.");
+      assert.equal(existsSync(runtime.filesPath(id)), false, "The saved files stayed.");
       assert.equal(connection(messaging), undefined);
       assert.ok(!agents.listAgents().some((agent) => agent.id === orchestrator), "The orchestrator stayed.");
       assert.ok(

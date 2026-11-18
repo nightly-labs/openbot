@@ -1,7 +1,9 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
+import { router } from "expo-router";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { BackHandler } from "react-native";
+import { BackHandler, Keyboard } from "react-native";
 import { Easing, ReduceMotion, type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
+import { speechNative } from "@/features/voice/model/speech-native";
 import type { DictationPhase } from "../model/voice-dictation";
 import { useVoiceDictation } from "./use-voice-dictation";
 
@@ -110,5 +112,28 @@ export function useComposerDictation({
   return useMemo(
     () => ({ available, active, busy: active || phase === "stopping", phase, level, presence, start, finish }),
     [available, active, phase, level, presence, start, finish],
+  );
+}
+
+/**
+ * A build without the speech module, such as Expo Go, still shows the mic, as it shows Settings > Voice.
+ * A tap opens Settings > Voice, which says that voice is not available.
+ */
+export function useComposerDictationWithSettings(dictation: ComposerDictation): ComposerDictation {
+  return useMemo(
+    () =>
+      !speechNative && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
+              Keyboard.dismiss();
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [dictation],
   );
 }

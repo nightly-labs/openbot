@@ -1,10 +1,10 @@
 {
-  "version": "0.70.0",
+  "version": "0.72.0",
   "highlights": [
-    "Update your joined servers to this version too: you can then restart a self-hosted server from the app and set its agent defaults and thread limits.",
-    "Choose which agents can use each Vault item. An API key saved for one agent now stays in the encrypted Vault.",
-    "Make pictures and short videos in Workflows with GPT Image, Grok Imagine and Sunra models.",
-    "Connect Sunra and TryPost from the Apps marketplace.",
-    "OpenBot opens faster when chats are long, and on Windows and Linux it asks before it quits while agents work."
+    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
+    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
+    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
+    "Answer an agent in the agent dock chat without the main window.",
+    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
   ]
 }

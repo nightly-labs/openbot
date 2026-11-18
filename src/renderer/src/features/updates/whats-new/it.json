@@ -1,5 +1,82 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, il CRM, Aggiungi account con codice, uno sfondo impostato da un agente, le cartelle della Libreria organizzate dagli agenti e i messaggi inviati a un turno di Devin in corso funzionano solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Mostra uno sfondo animato dietro l’intera finestra. Scegli una scena, come Laghetto koi o Lucciole, in Impostazioni > Sfondo della finestra, oppure chiedi a un agente di crearne una per te.",
+          "Gestisci lead, clienti e pagamenti nella nuova pagina del CRM. È sperimentale: un proprietario o un amministratore lo attiva in Impostazioni server > Sperimentale. Può importare da Stripe, e gli agenti propongono modifiche che un proprietario o un amministratore approva.",
+          "Rispondi a un agente nella chat del Dock degli agenti. Consenti o nega un comando, rispondi a una domanda o completa un passaggio del browser senza la finestra principale.",
+          "Organizza la Libreria con riquadri di cartelle, Preferiti, Recenti e Annulla. Trascina i file su Nuova cartella per creare una cartella, oppure chiedi a un agente di organizzare le sue cartelle.",
+          "Aggiungi un account ChatGPT (Codex), Grok o Claude con un codice. Apri il menu accanto ad Aggiungi account e seleziona Aggiungi account con codice.",
+          "Un messaggio che invii mentre lavora un agente Devin o OpenCode entra nel turno in corso. Serve Devin CLI 3000.12.57 o OpenCode 2.3.0, o una versione successiva."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Le impostazioni hanno un nuovo layout. Le sezioni sono in gruppi con etichetta, e le Impostazioni server hanno le nuove sezioni Memoria e Predefiniti degli agenti. Su macOS, OpenBot usa il carattere di sistema.",
+          "Aggiungi e modifica server MCP personalizzati in Marketplace > App. Le Impostazioni server non hanno più una sezione MCP.",
+          "In una chat con un agente, le tue bolle ora prendono il colore dell’avatar dell’agente. Cambialo in Impostazioni > Aspetto > Le tue bolle.",
+          "Una conversazione vocale non apre più il pannello laterale. Una piccola barra in alto nella chat mostra i controlli vocali."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una chat che perde la sessione salvata, o che diventa troppo grande, non resta più bloccata. L’agente avvia una nuova sessione con la cronologia della chat e risponde al tuo messaggio.",
+          "Più agenti passano al modello di riserva quando un limite di utilizzo o un errore del provider interrompe un turno, inclusi gli agenti Grok, Hermes e Claude.",
+          "Gli agenti possono usare un accesso salvato in più punti, come un modulo di accesso in un frame.",
+          "Una routine resta attiva dopo un’esecuzione non riuscita, e un’esecuzione prevista mentre il provider non può avviarsi viene eseguita più tardi.",
+          "OpenBot usa meno CPU e batteria: i video della chat e delle schede nascoste del browser si mettono in pausa quando non li vedi."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, Ferma per le esecuzioni delle routine, i file che gli agenti inviano senza testo e le chiavi API nel vecchio percorso funzionano solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Allarga due dita su un trackpad o su uno schermo touch per ingrandire la zona sotto il puntatore. I diagrammi, le tele e il visualizzatore di immagini mantengono il proprio zoom.",
+          "Ferma un’esecuzione di una routine dalla Tela delle routine: seleziona Ferma nella barra in alto o nei dettagli della routine. L’esecuzione termina con lo stato Annullata.",
+          "Gli agenti possono inviare un file o un’immagine senza testo a una chat di WhatsApp, Telegram, Slack o Discord.",
+          "Acquista di nuovo un server Starter ospitato. Ha 25 GB di spazio di archiviazione.",
+          "Usa un abbonamento ClinePass con gli agenti Cline. Il menu dei modelli mostra i modelli ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sulla Tela, trascina una nota, un testo libero, una forma o un passaggio dal suo testo. Un clic sul testo posiziona il cursore dove hai cliccato.",
+          "Un messaggio che invii mentre lavora un agente Antigravity entra nell’esecuzione in corso. Serve Antigravity CLI 1.5.0 o una versione successiva.",
+          "Una routine la cui attività dice di fermarsi quando il lavoro è finito ora si mette in pausa da sola. Riattivala dall’elenco delle routine.",
+          "Il Vault ora dice che ogni agente può leggere i file delle chiavi API degli altri agenti, perché tutti gli agenti girano con lo stesso utente di sistema."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Script, server MCP e impostazioni dei provider che leggono le chiavi API del Vault dai loro file funzionano di nuovo dopo l’aggiornamento a 0.70.0.",
+          "Un agente Claude mantiene il modello nel suo profilo quando Claude Code cambia il modello predefinito.",
+          "Quando Claude interrompe un’esecuzione al limite di spesa mensile, un agente con modelli di riserva continua con il modello successivo.",
+          "Gli agenti ottengono la trascrizione completa di un video con sottotitoli, come un video di YouTube.",
+          "OpenBot usa meno CPU: le schede del browser che non vedi rallentano, e la luce in movimento nella riga di attività di un agente è più leggera."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

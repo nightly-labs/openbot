@@ -2,6 +2,7 @@ import { NotificationObserver, Toaster } from "@openbot/ui";
 import { AppAccessGate } from "./AppView";
 import { type AppProps, AppProviders } from "./app-providers";
 import { reportNotification } from "./error-reports";
+import { nativeBrowserPageShown } from "./native-browser-page";
 
 export function App(props: AppProps = {}) {
   return (
@@ -13,7 +14,7 @@ export function App(props: AppProps = {}) {
       >
         <AppAccessGate />
       </AppProviders>
-      <Toaster onToastShown={reportNotification} />
+      <Toaster hidden={nativeBrowserPageShown()} onToastShown={reportNotification} />
     </NotificationObserver>
   );
 }

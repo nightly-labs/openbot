@@ -95,12 +95,14 @@ site (id, title, username), and `AttentionRegistry` answers a `submit_secret` pa
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
 `BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+the filled fields. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
-its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. It deletes the service workers when
+no page of the origin loads, after at most 10 seconds, because a deleted worker fails the requests of a page that loads
+(#9981). A fill waits for the Cache Storage purge, and clears both again when no other page of
 the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
 That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
 again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again
@@ -137,7 +139,9 @@ contract changed. When the Vault is ready, the form also has a segmented "Save f
 (Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
 value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
 `save_api_key` does; `AgentApiKeys.list` then writes the key to `.vault/<agentId>/<NAME>` for each
-agent that can use it. "Only this agent" saves a Vault key for the asking agent. All agents run as
+agent that can use it. A key for every agent also goes to `.vault/<NAME>`, the path of versions
+before 0.70.0, because scripts, MCP servers and provider configs read it (#8983); a key for chosen
+agents never does. "Only this agent" saves a Vault key for the asking agent. All agents run as
 the same system user, so an agent can read the key files of other agents: the scope controls which
 agents OpenBot gives a key to, not which agents can read it. The Vault text says this. Otherwise, `AttentionRegistry` saves the value with
 `AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as

@@ -10,8 +10,7 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
-import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
@@ -303,7 +302,7 @@ export function createWebHostConnections(options: {
           );
         const support = decodeTeamProtocolSupportV9(response.body);
         // The same rule as opening the host, so the rail and the open agree.
-        if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
+        if (teamWebRtcClientProtocol(support.protocol).update) {
           entry.incompatible = true;
           recovery.suspend();
         } else {

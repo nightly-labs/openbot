@@ -37,6 +37,7 @@ import type {
   InvitePreview,
   LocalBrowserSecretResponse,
   PinnedMessagesSnapshot,
+  ProviderModelSourceEntry,
   QueueSnapshot,
   ReadPendingApprovalInput,
   ReorderQueueInput,
@@ -70,6 +71,8 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeAgentSteeringModels,
+  decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
@@ -86,12 +89,21 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withModelSources,
+  withSteeringModels,
   withUsageCredits,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_ACTIVE_QUEUES_ROUTES,
+  type AgentActiveQueues,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -131,6 +143,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   CHANNEL_PICTURE_CAPABILITY,
@@ -152,7 +165,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -160,6 +173,7 @@ import {
   MESSAGE_PINS_CAPABILITY,
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -170,6 +184,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOW_STOP_ROUTES,
@@ -187,14 +205,14 @@ import {
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
-import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
+import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -215,6 +233,7 @@ import {
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
@@ -250,6 +269,7 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
+import { toast } from "@openbot/ui/toast";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
@@ -268,6 +288,7 @@ import {
   type WebHostState,
   type WebHostTabMessage,
 } from "./web-host-lock";
+import { closeWebChatNotifications } from "./web-notifications";
 
 /**
  * The host controls of the connected host. The host answers the Team API routes, and the account
@@ -359,7 +380,7 @@ export interface WebWorkspaceRuntime {
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
-  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
+  conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
@@ -412,6 +433,8 @@ export interface WebWorkspaceRuntime {
   /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
   queue(agentId: string): Promise<QueueSnapshot>;
+  /** The open work of the queues of these agents, on a host with `agent-active-queues-v1`. */
+  activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
   cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
   steerQueued(input: SteerQueuedMessageInput): Promise<void>;
@@ -478,6 +501,11 @@ export interface WebWorkspaceRuntime {
   agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
   models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
+  /**
+   * The model sources alone. A released status event carries none, so the client adds the last ones
+   * to each status event and reads them again after it (#9956).
+   */
+  modelSources?: () => Promise<ProviderModelSourceEntry[]>;
   accountUsage?: () => Promise<AccountUsage>;
   createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
@@ -563,6 +591,31 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "providerAccountId",
   "leaveUsageLimit",
 ]);
+
+/**
+ * Puts the text that the host's page copied on this computer's clipboard. A browser that refuses a
+ * write this long after the click, such as Safari, gets a button: a click on it is a new action.
+ */
+function writePageCopy(text: string): void {
+  // Called in the click itself, which is the user action that Safari asks for. A page that is not
+  // secure has no clipboard, and the call throws at once.
+  const write = () => {
+    try {
+      return navigator.clipboard.writeText(text);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
+  void write().catch(() => {
+    const { t } = currentText();
+    toast(t("browser.liveView.pageCopied"), {
+      action: {
+        label: t("common.copy"),
+        onClick: () => void write().catch(() => toast.error(t("browser.liveView.copyFailed"))),
+      },
+    });
+  });
+}
 
 function hostProtocolKey(accountId: string, hostId: string): string {
   return `openbot.web.host-protocol:${accountId}:${hostId}`;
@@ -723,7 +776,10 @@ export function createWebWorkspaceRuntime(
   let uploadGeneration = 0;
   let capabilities: string[] = [];
   let connectedHost: RemoteTeamHost | null = null;
-  const duplicateOperationIds = new Map<string, string>();
+  // A duplicate whose answer got lost sends its id again and gets the first copy.
+  const duplicateIds = retryOperationIds(() => crypto.randomUUID());
+  // A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`).
+  const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
   // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
@@ -797,6 +853,15 @@ export function createWebWorkspaceRuntime(
       : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
+  }
+  /**
+   * Where each provider's models come from (`provider-model-source-v1`). Optional: an older host, or a
+   * failed read, gives none, and the picker then shows no source.
+   */
+  function readModelSources(): Promise<ProviderModelSourceEntry[]> {
+    return capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
+      ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
+      : Promise.resolve([]);
   }
   async function request(
     method: string,
@@ -1046,6 +1111,12 @@ export function createWebWorkspaceRuntime(
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
     () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+    () => ({
+      cursor: false,
+      contextMenu: false,
+      viewport: null,
+      pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+    }),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
@@ -1151,12 +1222,9 @@ export function createWebWorkspaceRuntime(
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
       const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      if (knownProtocol !== undefined && support.protocol.maximum !== knownProtocol) early?.drop();
-      const updateDirection = teamProtocolUpdateDirection(
-        { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
-        support.protocol,
-      );
-      if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
+      const negotiated = teamWebRtcClientProtocol(support.protocol);
+      if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
+      if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;
@@ -1187,6 +1255,9 @@ export function createWebWorkspaceRuntime(
             (reason) =>
               emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
             (copied) => emitView({ ...copied, tabId }),
+            (message) => {
+              if (message.type === "pageCopied") writePageCopy(message.text);
+            },
           ),
         );
         if (currentGeneration !== liveViewGeneration) {
@@ -1324,6 +1395,9 @@ export function createWebWorkspaceRuntime(
         };
       },
       async channelCommand(command) {
+        // A read comes only while the user looks at the channel, so its notifications are done.
+        if (command.type === "read" && lockedHostId)
+          closeWebChatNotifications(lockedHostId, { channelId: command.channelId });
         const channel = await channels.channelCommand(command);
         if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
         return withChannelPicture(channel);
@@ -1415,13 +1489,15 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
-    async conversationAround(id, messageId) {
+    async conversationAround(id, messageId, limit = 50) {
       if (!capabilities.includes("conversation-pagination"))
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
-      const query = new URLSearchParams({ limit: "50", around: messageId });
+      const query = new URLSearchParams({ limit: String(limit), around: messageId });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
+      // As for a channel: the user looks at the chat.
+      if (lockedHostId) closeWebChatNotifications(lockedHostId, { agentId: id });
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
@@ -1560,6 +1636,7 @@ export function createWebWorkspaceRuntime(
     stop: (id, turnId) =>
       Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
+    activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, { agentIds }),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
     cancelQueued: (input) =>
@@ -1711,9 +1788,9 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
-      // models with no Fast switch or listing.
-      const [fast, listings] = await Promise.all([
+      // The fast tiers, the picker listing and the steering models are optional: when a route fails,
+      // the picker gets the models with no Fast switch or listing, and a custom agent shows Send now.
+      const [fast, listings, steering] = await Promise.all([
         // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
@@ -1723,14 +1800,21 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],
+        capabilities.includes(MODEL_STEERING_CAPABILITY)
+          ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
-      return withModelListings(withFastServiceTiers(models, fast), listings);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     async status() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.status);
+      const [value, sources] = await Promise.all([request("GET", TEAM_API_ROUTES.agents.status), readModelSources()]);
       if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withModelSources(value, sources);
     },
+    modelSources: readModelSources,
     async accountUsage() {
       // Whether an account works on credits is optional: when its read fails, the reading shows as before.
       const [value, credits] = await Promise.all([
@@ -1749,7 +1833,16 @@ export function createWebWorkspaceRuntime(
       // The released route does not carry the account either, so it goes on `provider-accounts-v1`
       // after it, as on the desktop.
       const { avatarColor, providerAccountId, ...profile } = input;
-      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
+      const operation = capabilities.includes(AGENT_CREATE_OPERATION_CAPABILITY)
+        ? createOperationId([lockedHostId, profile])
+        : null;
+      const value = await request("POST", TEAM_API_ROUTES.agents.all, {
+        ...profile,
+        ...(operation ? { operationId: operation.id } : {}),
+      }).catch((error: unknown) => {
+        operation?.failed();
+        throw error;
+      });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
       const agent: ClientAgentSummary = await withCreatedAgentAccount(value, providerAccountId);
       if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
@@ -1764,13 +1857,17 @@ export function createWebWorkspaceRuntime(
     },
     async duplicateAgent(agentId) {
       if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
-      const operationKey = `${lockedHostId ?? ""}\0${agentId}`;
-      const operationId = duplicateOperationIds.get(operationKey) ?? crypto.randomUUID();
-      duplicateOperationIds.set(operationKey, operationId);
-      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), { operationId });
-      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
+      const duplicate = duplicateIds([lockedHostId, agentId]);
+      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), {
+        operationId: duplicate.id,
+      }).catch((error: unknown) => {
+        duplicate.failed();
+        throw error;
+      });
+      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout)) {
+        duplicate.failed();
         throw new Error(currentText().t("error.remote.invalidData"));
-      duplicateOperationIds.delete(operationKey);
+      }
       // The released route answers the layout without the parents of the folders. The copy exists, so a
       // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
       const answered = value.layout;
@@ -1922,7 +2019,6 @@ export function createWebWorkspaceRuntime(
       disposed = true;
       generation += 1;
       connectedHost = null;
-      duplicateOperationIds.clear();
       revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);
@@ -1937,7 +2033,8 @@ export function createWebWorkspaceRuntime(
 
 /**
  * The largest file that the browser sends or reads through the host connection: the host's limit, as
- * on desktop. The phone keeps its smaller limit, because its native bridge copies each file.
+ * on desktop. The phone sends a large file in parts, but reads with a smaller limit, because its
+ * native bridge copies each file that it reads.
  */
 const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
 /** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */

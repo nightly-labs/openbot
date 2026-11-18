@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Stai modificando un messaggio in coda. Salva o annulla la modifica per farlo partire.",
   "composer.queueEdit.cancel": "Annulla modifica",
+  "composer.feedbackFix.body":
+    "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",
+  "composer.feedbackFix.cancel": "Annulla",
   "composer.providerWait.offlineTitle": "Nessuna connessione a Internet",
   "composer.providerWait.offline": "{provider} non può rispondere finché questo computer non torna online.",
   "composer.providerWait.silent": "{provider} non invia nulla da {duration}.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Aggiorna {provider} sul computer su cui è in esecuzione per continuare.",
   "composer.update.pending": "Aggiornamento…",
   "composer.update.action": "Aggiorna",
+  "composer.imageInput.body":
+    "{model} riceve solo testo, quindi non vede le immagini che alleghi. Se questo modello può leggere immagini, attiva le immagini.",
+  "composer.imageInput.label": "Attiva le immagini per {model}",
+  "composer.imageInput.pending": "Attivazione…",
+  "composer.imageInput.action": "Attiva immagini",
   "composer.usageLimit.credits":
     "Hai usato tutto il limite del piano {provider}. I tuoi agenti ora usano i tuoi crediti.",
   "composer.usageLimit.creditsResets":
@@ -113,6 +121,13 @@ export const messages = {
   "composer.error.holdQueued": "Impossibile bloccare il messaggio in coda per modificarlo.",
   "composer.error.cancelEdit": "Impossibile annullare la modifica della coda. Riprova.",
   "composer.error.updateQueued": "Impossibile aggiornare il messaggio in coda. Riprova.",
+  "composer.queueEdit.received": "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata.",
+  "composer.queueEdit.receivedKept":
+    "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.deletedKept":
+    "Questo messaggio è stato eliminato, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.endedKept":
+    "Questa modifica è terminata prima del salvataggio. Le tue modifiche sono ancora nella casella del messaggio.",
   "composer.voice.prepareFailed": "Impossibile preparare il modello vocale. Riprova.",
   "composer.voice.noSpeechRecorded": "Nessuna voce registrata.",
   "composer.voice.noSpeechDetected": "Nessuna voce rilevata.",
@@ -157,6 +172,7 @@ export const messages = {
   "composer.picker.section.files": "File",
   "composer.picker.section.tabs": "Schede del browser",
   "composer.picker.section.threads": "Thread",
+  "composer.picker.section.messages": "Nei messaggi",
   "composer.token.tab": "Scheda del browser {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Scheda del browser {name} chiusa",

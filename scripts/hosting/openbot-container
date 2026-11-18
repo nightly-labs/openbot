@@ -68,6 +68,9 @@ done
 # An empty :1 shows the default pointer of the X server, an "×", and remote desktop then looks
 # broken (#6091). An arrow is the pointer that users know.
 xsetroot -display :1 -cursor_name left_ptr || true
+# A window manager on :1, so that remote desktop shows title bars and a menu (openbot-desktop). The
+# subshell exits at once, so tini adopts it, as it adopts Xvfb.
+(DISPLAY=:1 bash /opt/OpenBot/app/resources/hosting/openbot-desktop </dev/null &)
 
 # Each data volume makes its own keyring password on its first start. The password only lets the
 # daemon open the keyring without a person; the file is 0600. A keyring with no password file is not

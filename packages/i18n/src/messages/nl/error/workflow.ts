@@ -19,12 +19,23 @@ export const messages = {
   "error.workflow.agentStepEnded": "Het bericht van de agent voor deze stap is verwijderd voordat de agent antwoordde.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
+  "error.workflow.modelTimedOut":
+    "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",
+  "error.workflow.modelToolUse":
+    "Het model probeerde een tool te gebruiken, maar deze stap kan alleen met tekst antwoorden. Voer de stap opnieuw uit of kies er een ander model voor.",
+  "error.workflow.modelUnavailable":
+    "Het model van deze stap is niet beschikbaar. Kies een ander model voor deze stap.",
+  "error.workflow.providerBusy": "De provider is bezet. Wacht een paar minuten en voer de stap dan opnieuw uit.",
+  "error.workflow.providerOffline":
+    "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":
     "Een afbeelding van een eerdere stap is niet beschikbaar. Voer die stap opnieuw uit.",
+  "error.workflow.mediaEmptyRequest":
+    "Schrijf een beschrijving, of voer de stappen ervoor uit zodat er een tekst of afbeelding binnenkomt.",
   "error.workflow.mediaInputNotImage":
     "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",
@@ -85,4 +96,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra kon het bestand niet maken: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra heeft het bestand niet op tijd gemaakt. Kijk in het project OpenBot op sunra.ai voordat je de stap opnieuw uitvoert.",
+  "error.workflow.higgsfieldSignIn": "Meld je aan bij Higgsfield in Apps om Higgsfield-modellen te gebruiken.",
+  "error.workflow.higgsfieldNoCredits":
+    "Je Higgsfield-account heeft niet genoeg tegoed. Voeg tegoed toe op higgsfield.ai/pricing en voer de stap daarna opnieuw uit.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Dit Higgsfield-model heeft een Higgsfield-abonnement nodig. Kies een abonnement op higgsfield.ai/pricing of selecteer een ander model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield heeft het bestand niet gemaakt, omdat de inhoudscontrole het heeft gestopt. Wijzig de prompt of de invoerafbeeldingen en voer de stap daarna opnieuw uit.",
+  "error.workflow.higgsfieldFailed": "Higgsfield kon het bestand niet maken: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield heeft het bestand niet op tijd afgemaakt. Kijk in je geschiedenis op higgsfield.ai voordat je de stap opnieuw uitvoert.",
 } as const satisfies PartialTranslation<typeof source>;

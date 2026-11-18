@@ -6,7 +6,6 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
-  DEFAULT_APP_LOGO_COLOR,
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
@@ -33,9 +32,10 @@ import {
   shell,
   systemPreferences,
 } from "electron";
+import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { NewerDatabaseError } from "../backend/openbot-database-schema";
+import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -52,12 +52,14 @@ import { requestNotificationPermission, showRetainedNotification } from "./deskt
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
+  developmentWorktreeColor,
   readAnalyticsCaptureUrl,
   readDevelopmentInstanceId,
   readDevelopmentProfile,
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { tintDevelopmentIcon } from "./development-worktree-icon";
 import { stopStuckExitAfterLimit } from "./exit-watchdog";
 import { filePreviewPages } from "./file-preview-pages";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
@@ -82,6 +84,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -147,7 +150,8 @@ import {
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
-import { startMainLog } from "./provider-log";
+import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
+import { flushMainLog, startMainLog } from "./provider-log";
 import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
@@ -156,18 +160,31 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import {
+  START_LOOP_EXIT_CODE,
+  type StartHaltReason,
+  type StartHaltRecord,
+  startHaltReason,
+  takeServerStartGuardTest,
+  takeStartHalt,
+  writeStartHalt,
+} from "./server-start-halt";
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
 import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { macShipItDirectory, shipItInstallInProgress } from "./update-install-guard";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
+import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 const logger = createOpenBotLogger("main");
 
@@ -182,6 +199,10 @@ let runMarker: RunMarker | null = null;
 let previousUncleanExit: UncleanExitProperties | null = null;
 /** The failed starts of this version in a row (`start-attempts.ts`). Only the process with the lock has one. */
 let startAttempts: StartAttempts | null = null;
+/** The reason file of the previous run, when that run stopped a server start loop (`server-start-halt.ts`). */
+let previousStartHalt: StartHaltRecord | null = null;
+/** Set when this run stops a server start loop. The process then exits with this code after the teardown. */
+let startHaltExitCode: number | null = null;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
@@ -205,7 +226,16 @@ function hideExceptionErrorBox(): void {
  * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
  * app, or a system logout on macOS.
  */
-type ExitReason = "main_window_closed" | "signal" | "session_end" | "menu" | "shortcut" | "tray" | "update" | "quit";
+type ExitReason =
+  | "main_window_closed"
+  | "signal"
+  | "session_end"
+  | "menu"
+  | "shortcut"
+  | "tray"
+  | "update"
+  | "quit"
+  | "start_loop";
 let exitRecorded = false;
 
 /**
@@ -257,6 +287,8 @@ const developmentRemoteRole =
 const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_TEST_CLIENT_ENABLED === "1";
 // Before any child process starts: agents must not run as part of a Claude Code session that started OpenBot.
 removeClaudeCodeSessionEnvironment(process.env);
+// Before any child process starts: agents must not report to the Orca pane that started OpenBot.
+removeOrcaPaneEnvironment(process.env);
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 // Before the first provider check: a restored disk gives the provider CLIs a longer limit.
@@ -268,6 +300,10 @@ const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env,
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 // Development builds only: `scripts/start-recovery-e2e.ts` makes the start fail.
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
+// A server stops its start loop; the desktop shows its recovery window. Development builds only:
+// `scripts/server-start-loop-e2e.ts` turns on the server behavior, because server mode needs a packaged build.
+const serverStartGuard =
+  serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
   ? openLocalServerControl(process.platform, (cause) =>
       logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
@@ -312,8 +348,28 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
+const systemTimezone =
+  serverMode || hostedServer || localServerChild
+    ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
+    : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Windows #11233: a start from a Microsoft Store app kept the data in that app's folder. Start again
+// outside it, before the single-instance lock and before any file goes into `userData`. `process.exit`,
+// as for a second launch: the new process must be able to take the lock.
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(
+    restartOutsideWindowsPackage(
+      process.env,
+      process.argv,
+      (value) => parseDeepLink(value, inviteLinkOptions) !== null,
+    ),
+  ))
+)
+  process.exit(0);
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
@@ -333,6 +389,23 @@ if (
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
+// macOS #9776: a launch while ShipIt installs an update cancels that install, and the old version stays.
+// Exit at once instead; ShipIt opens the new version when it is done. `process.exit`, as for a second
+// launch: no start marker or log may record this launch as a start that did not finish.
+if (
+  process.platform === "darwin" &&
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  Effect.runSync(
+    shipItInstallInProgress({
+      userDataPath: app.getPath("userData"),
+      shipItDirectory: macShipItDirectory(),
+      currentVersion: app.getVersion(),
+      now: Date.now(),
+    }),
+  )
+)
+  process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -361,10 +434,18 @@ if (hasSingleInstanceLock) {
       userDataPath: app.getPath("userData"),
       crashDumpsPath: app.getPath("crashDumps"),
       appVersion: app.getVersion(),
+      schemaVersion: LATEST_SCHEMA_VERSION,
       now: Date.now(),
       bootedAt: Date.now() - uptime() * 1_000,
     });
     const attempts = startAttempts.summary();
+    if (serverStartGuard) {
+      previousStartHalt = takeStartHalt(app.getPath("userData"));
+      if (previousStartHalt)
+        logger.warn(
+          `The previous run of OpenBot ${previousStartHalt.appVersion} stopped its start loop (${previousStartHalt.reason}). This start tries again.`,
+        );
+    }
     if (attempts.consecutiveFailures > 0)
       logger.warn(
         `OpenBot ${attempts.appVersion} did not finish its start ${attempts.consecutiveFailures} times in a row (previous start: ${attempts.previousOutcome}, last failure: ${attempts.lastFailure ?? "none"}).`,
@@ -532,6 +613,7 @@ const windowHolder = createMainWindowHolder();
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
+  closeChatNotifications,
   forwardAgentEvent,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
@@ -557,6 +639,7 @@ const {
   forwardDirectTyping,
   forwardAttachmentDownload,
   forwardAttachmentImportProgress,
+  forwardInstanceTransferUploadProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -631,22 +714,27 @@ let appIconColorImage: NativeImage | undefined;
 /**
  * A packaged release on macOS shows the icon of its bundle in the Dock. On macOS 26 that icon comes
  * from the Icon Composer catalog, with glass and with dark, clear and tinted versions; `dock.setIcon`
- * would replace it with one flat image until the app quits.
+ * would replace it with one flat image until the app quits. So the Dock keeps it only until the user
+ * chooses a logo color: a chosen color, the default one included, must not turn dark with the system.
  */
 const dockShowsBundleIcon = process.platform === "darwin" && app.isPackaged && appVariant === "production";
-/** Electron cannot give the Dock back to the bundle icon, so after one change each change sets an image. */
-let dockIconChanged = false;
 let backgroundTray: BackgroundTray | null = null;
 
 /**
  * Shows the chosen logo color on the Dock icon, or on each window icon where there is no Dock. A dev
- * or preview build keeps the icon of its build, so it is not mistaken for the release. macOS has no
+ * or preview build keeps the icon of its build, so it is not mistaken for the release; a dev build
+ * from source shows that icon in the color of its worktree. macOS has no
  * alternate app icon API, so when the app is closed the Dock shows the icon inside the app bundle:
  * changing that file would break the code signature.
  */
-function applyAppIconColor(color: AppLogoColor): void {
+function applyAppIconColor(color: AppLogoColor, chosen: boolean): void {
+  const worktreeIcon = developmentWorktreeIcon();
+  if (worktreeIcon) {
+    showAppIcon(worktreeIcon);
+    return;
+  }
   if (appVariant !== "production") return;
-  if (dockShowsBundleIcon && color === DEFAULT_APP_LOGO_COLOR && !dockIconChanged) return;
+  if (dockShowsBundleIcon && !chosen) return;
   const icon = nativeImage.createFromPath(
     resolveLogoColorIconPath({
       color,
@@ -657,8 +745,24 @@ function applyAppIconColor(color: AppLogoColor): void {
     }),
   );
   if (icon.isEmpty()) return;
+  showAppIcon(icon);
+}
+
+let developmentIcon: NativeImage | null | undefined;
+/**
+ * A dev build from source shows the dev icon in the color of its worktree, so the apps of two
+ * worktrees that are open at the same time are easy to tell apart in the Dock and the app switcher.
+ */
+function developmentWorktreeIcon(): NativeImage | null {
+  if (developmentIcon !== undefined) return developmentIcon;
+  const icon = appVariant === "dev" && !app.isPackaged ? nativeImage.createFromPath(appIconPath) : null;
+  developmentIcon =
+    icon && !icon.isEmpty() ? tintDevelopmentIcon(icon, developmentWorktreeColor(resolve(__dirname, "../.."))) : null;
+  return developmentIcon;
+}
+
+function showAppIcon(icon: NativeImage): void {
   if (process.platform === "darwin") {
-    dockIconChanged = true;
     app.dock?.setIcon(icon);
     return;
   }
@@ -798,6 +902,7 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   claudeCompactWindow,
+  providerEnvironment,
   modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
@@ -853,6 +958,7 @@ function registerIpcHandlers({
   routineFlows,
   workflows,
   workflowGitHub,
+  crm,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -905,6 +1011,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
+      chatRendererIds: () => new Set(windows.getChatWindows().map((window) => window.webContents.id)),
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
       keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
@@ -993,6 +1100,7 @@ function registerIpcHandlers({
       remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,
+      reportUploadProgress: forwardInstanceTransferUploadProgress,
     }),
     ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate, idleRestart }),
     ...notificationIpcHandlers({
@@ -1019,6 +1127,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -1046,6 +1155,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       claudeCompactWindow,
+      providerEnvironment,
       modelVisibility,
       agentAccess,
       serverAudit,
@@ -1117,6 +1227,7 @@ function registerIpcHandlers({
       }),
       openExternal: openLink,
       modelVisibility,
+      closeChatNotifications,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -1141,23 +1252,56 @@ function requestDesktopNotificationPermission(
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
 /** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
 /**
+ * A server stops its start loop: it records the reason and exits with `START_LOOP_EXIT_CODE` after
+ * the teardown, and systemd does not start it again (`server-start-halt.ts`).
+ */
+function haltServerStart(reason: StartHaltReason): void {
+  const appVersion = app.getVersion();
+  logger.error(
+    `OpenBot ${appVersion} stopped its start loop (${reason}). It starts again after an update or a restart of the server or of the service.`,
+  );
+  writeStartHalt(app.getPath("userData"), { reason, appVersion, haltedAt: Date.now() });
+  startHaltExitCode = START_LOOP_EXIT_CODE;
+  recordExit("start_loop");
+}
+
+/**
  * Shows the recovery window when this version did not finish its start several times in a row.
  * Resolves with the window to close after "Try again", with "quit", or with null when no loop is
- * found. A server has no window and nobody to read it: it logs the loop and starts as before.
+ * found. A server has no window and nobody to read it: it stops the loop, except in the one start
+ * after a halt, which tries again.
  */
 async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
   if (!startAttempts?.loopDetected) return null;
   const summary = startAttempts.summary();
-  if (serverMode || hostedServer) {
-    logger.warn(
-      `OpenBot ${summary.appVersion} is in a start loop. A server shows no recovery window and starts again.`,
-    );
-    return null;
+  if (serverStartGuard) {
+    if (previousStartHalt) {
+      logger.warn(`OpenBot ${summary.appVersion} is in a start loop. It stopped the loop before, so it tries again.`);
+      return null;
+    }
+    haltServerStart("start_failed");
+    return "quit";
   }
   logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
+  // An earlier release that cannot open the data would install this release again over it.
+  const databaseSchemaVersion = readDatabaseSchemaVersion(app.getPath("userData"));
+  const previousRelease = compatiblePreviousRelease({
+    summary,
+    databaseSchemaVersion,
+    appSchemaVersion: LATEST_SCHEMA_VERSION,
+  });
+  logger.info(
+    `Recovery window: database schema ${databaseSchemaVersion ?? "unknown"}, last good version ${summary.lastGoodVersion ?? "none"} (schema ${summary.lastGoodSchemaVersion ?? "unknown"}), offered release: ${previousRelease ?? "latest"}.`,
+  );
   // The saved language is in the database, which this window must not need.
   const locale = resolveLocale("system", app.getLocale());
-  const recovery = openStartRecoveryWindow({ summary, locale, translate: translateFor(locale), iconPath: appIconPath });
+  const recovery = openStartRecoveryWindow({
+    summary,
+    previousRelease,
+    locale,
+    translate: translateFor(locale),
+    iconPath: appIconPath,
+  });
   const choice = await recovery.choice;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
@@ -1478,12 +1622,14 @@ if (!hasSingleInstanceLock) {
       });
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon) app.dock?.setIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon)
+        app.dock?.setIcon(developmentWorktreeIcon() ?? appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
-      if (!localServerChild) await presentApplication();
+      // A server has no desktop: invitation links open on the client, and a container has no xdg-settings (#10861).
+      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");
@@ -1517,6 +1663,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        systemTimezone,
         previousUncleanExit,
         macHapticFeedback,
         teardown,
@@ -1606,11 +1753,12 @@ if (!hasSingleInstanceLock) {
             return;
         }
       };
-      // Routes belong to the signed-in account. A token refresh does not change them.
-      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      // Routes belong to the signed-in account, or, on a server on this computer, to the machine token
+      // that the desktop app gives it (`webhookPrincipal`). A token refresh does not change them.
+      let webhookPrincipalId = built.webhookPrincipal();
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
-      const refreshWebhookRoutes = (state: CentralAuthState): void => {
-        const principalId = centralAuthPrincipalId(state);
+      const refreshWebhookRoutes = (): void => {
+        const principalId = built.webhookPrincipal();
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
         built.eventsRuntime.setAccountPrincipal(principalId);
@@ -1623,7 +1771,7 @@ if (!hasSingleInstanceLock) {
         const hostIdentityChanged = status.serverId !== webhookHostId;
         webhookHostId = status.serverId;
         forwardHostStatus(status);
-        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        const principalId = built.webhookPrincipal();
         if (hostIdentityChanged && principalId !== null && status.serverId !== null)
           built.eventsRuntime.syncRoutes({ all: true });
       };
@@ -1696,10 +1844,11 @@ if (!hasSingleInstanceLock) {
       updater.on("status", (status) => {
         if (!shutdownStarted || status.errorCode !== "install_failed") return;
         logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
-        app.exit(0);
+        exitAfterLogFlush();
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
+      built.requiredUpdate?.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
@@ -1810,9 +1959,9 @@ if (!hasSingleInstanceLock) {
         }
         placeWindowButtons(BrowserWindow.getAllWindows());
       });
-      applyAppIconColor(logoColor.preference.color);
+      applyAppIconColor(logoColor.preference.color, logoColor.chosen);
       logoColor.subscribe((preference) => {
-        applyAppIconColor(preference.color);
+        applyAppIconColor(preference.color, logoColor.chosen);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLogoColorPreference, preference);
         }
@@ -1964,6 +2113,14 @@ if (!hasSingleInstanceLock) {
       logger.error("OpenBot failed to start:", toLogValue(error));
       // Data that a newer version saved has its own recovery, and a new release ends that loop.
       if (!(error instanceof NewerDatabaseError)) startAttempts?.failed("error");
+      // A server stops its start loop when a restart cannot help (data from a newer version), or at the
+      // third failed start in a row. A failed migration counts as a failed start.
+      if (serverStartGuard) {
+        const reason = startHaltReason(error);
+        if (reason === "newer_database" || startAttempts?.failureLimitReached) haltServerStart(reason);
+        app.quit();
+        return;
+      }
       // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
       // server on this computer has no window: the app that started it reports the failed start.
       if (!serverMode && !hostedServer && !localServerChild) {
@@ -1976,6 +2133,7 @@ if (!hasSingleInstanceLock) {
             window: windowHolder.current,
             translate,
             beforeInstall: prepareForUpdateInstall,
+            loopVersion: startAttempts?.summary().loopVersion ?? null,
           }).catch((recoveryError) => {
             logger.error("The update over newer data failed:", toLogValue(recoveryError));
             app.quit();
@@ -2017,7 +2175,8 @@ app.on("before-quit", (event) => {
   // through `window-all-closed` right after the first. Electron would end the process on it at
   // once, in the middle of the teardown, and the next start would count an unclean exit.
   if (shutdownStarted) return;
-  void prepareForShutdown().finally(() => app.quit());
+  // A halted server start exits with its own code, which `app.quit()` cannot give.
+  void prepareForShutdown().finally(() => (startHaltExitCode === null ? app.quit() : exitAfterLogFlush()));
 });
 
 /** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
@@ -2053,8 +2212,23 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
     logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
     runMarker?.quitTimedOut();
-    app.exit(0);
+    exitAfterLogFlush();
   }, deadlineMs);
+}
+
+/** Short, because the user waits: the window is already closed. */
+const LOG_FLUSH_DEADLINE_MS = 2_000;
+
+/**
+ * `app.exit` stops the log writes that are not done. An exit at once after a failed update install
+ * lost the error of the installer from `main.log` and `install_failed` from `update.log` (#5039).
+ */
+function exitAfterLogFlush(): void {
+  void Effect.runPromise(
+    Effect.all([flushMainLog(), services ? services.updater.flushLog() : Effect.void], {
+      concurrency: "unbounded",
+    }).pipe(Effect.timeoutOption(LOG_FLUSH_DEADLINE_MS)),
+  ).finally(() => app.exit(startHaltExitCode ?? 0));
 }
 
 /**

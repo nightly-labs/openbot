@@ -348,20 +348,6 @@ function outlineOrder(outline: WorkflowOutline): string[] {
   ];
 }
 
-/**
- * The step nodes of any graph in a reading order: the outline order and then the loose steps when
- * there is an outline, else from left to right and from top to bottom, as the canvas shows them.
- */
-export function readingOrder(graph: WorkflowGraph): WorkflowNode[] {
-  const steps = stepNodes(graph);
-  const outline = workflowOutline(graph);
-  if (outline) {
-    const byId = new Map(steps.map((node) => [node.id, node]));
-    return [...outlineOrder(outline), ...outline.loose].flatMap((id) => byId.get(id) ?? []);
-  }
-  return [...steps].sort((left, right) => left.at.x - right.at.x || left.at.y - right.at.y);
-}
-
 /** The width of a node on the canvas: its own size, else the width that the desktop gives its kind. */
 const KIND_WIDTH: Partial<Record<WorkflowNodeKind, number>> = {
   prompt: 296,

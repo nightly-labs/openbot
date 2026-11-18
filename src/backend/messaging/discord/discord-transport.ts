@@ -27,6 +27,8 @@ export class DiscordTransport implements MessagingTransport {
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
   #unsubscribeRoutes: (() => void) | null = null;
+  /** False when Signal does not route the guild to this host: it is linked to another host, or to none. */
+  #linked = true;
 
   constructor(ingress: MessagingIngress, guildId: string) {
     this.#ingress = ingress;
@@ -36,9 +38,11 @@ export class DiscordTransport implements MessagingTransport {
   start(sink: TransportSink): void {
     this.#sink = sink;
     // Before `acquire`, which can open the socket. The socket's route ticket is issued after this
-    // start, so a session without the guild means that it was unlinked or the bot left it.
+    // start, so a session without the guild means that it was linked to another host, unlinked, or
+    // the bot left it. Reconnect installs the bot again in each case.
     this.#unsubscribeRoutes ??= this.#ingress.onDiscordRoutes((guildIds) => {
-      if (!guildIds.has(this.#guildId)) this.#sink?.state("invalid_token");
+      this.#linked = guildIds.has(this.#guildId);
+      this.#report(this.#ingress.state());
     });
     this.#release ??= this.#ingress.acquire("discord");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
@@ -55,6 +59,7 @@ export class DiscordTransport implements MessagingTransport {
       this.#unsubscribe = null;
       this.#unsubscribeRoutes?.();
       this.#unsubscribeRoutes = null;
+      this.#linked = true;
       this.#release?.();
       this.#release = null;
     }),
@@ -83,7 +88,15 @@ export class DiscordTransport implements MessagingTransport {
   );
 
   #report(state: IngressState): void {
-    this.#sink?.state(state === "online" ? "connected" : state === "connecting" ? "connecting" : "relay_unavailable");
+    this.#sink?.state(
+      state === "online"
+        ? this.#linked
+          ? "connected"
+          : "not_linked"
+        : state === "connecting"
+          ? "connecting"
+          : "relay_unavailable",
+    );
   }
 
   /** True when the event was already handled. */

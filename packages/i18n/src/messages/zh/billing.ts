@@ -32,10 +32,13 @@ export const messages = {
   "billing.status.paused": "已暂停",
   "billing.otherServers": "其他服务器",
   "billing.action.menu": "{server} 的套餐操作",
-  "billing.action.change": "更改套餐",
+  "billing.action.addStorage": "添加存储空间",
   "billing.action.cancel": "取消套餐",
   "billing.action.renew": "续费套餐",
   "billing.action.updatePayment": "更新支付方式",
+  "billing.storage.title": "为 {server} 增加空间",
+  "billing.storage.add": "添加 {size}",
+  "billing.storage.failed": "无法添加存储空间。",
   "billing.lifecycle.cancelRenewal": "取消续费",
   "billing.lifecycle.cancelTitle": "取消 {name} 的续费？",
   "billing.lifecycle.cancelDescription":
@@ -204,4 +207,10 @@ export const messages = {
   "billing.license.invite.max": {
     other: "你的许可证已有 {count} 位用户，已达上限。如需更大的许可证，请联系我们。新成员无法加入你的服务器。",
   },
+  "billing.details.country": "账单国家/地区",
+  "billing.details.countryPlaceholder": "选择国家/地区",
+  "billing.details.vatId": "欧盟增值税号（可选）",
+  "billing.details.vatIdInvalid": "这不是所选国家/地区的增值税号。",
+  "billing.details.countryMissing": "请选择账单国家/地区。",
+  "billing.details.saveFailed": "无法保存账单信息",
 } as const satisfies PartialTranslation<typeof source>;

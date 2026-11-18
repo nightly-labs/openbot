@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "キュー内のメッセージを編集中です。実行するには編集を保存するかキャンセルしてください。",
   "composer.queueEdit.cancel": "編集をキャンセル",
+  "composer.feedbackFix.body":
+    "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
+  "composer.feedbackFix.cancel": "キャンセル",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.imageInput.body":
+    "{model} はテキストのみを受け取るため、添付した画像を見られません。このモデルが画像を読める場合は、画像をオンにしてください。",
+  "composer.imageInput.label": "{model} の画像をオンにする",
+  "composer.imageInput.pending": "オンにしています…",
+  "composer.imageInput.action": "画像をオン",
   "composer.usageLimit.credits":
     "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
   "composer.usageLimit.creditsResets":
@@ -113,6 +121,12 @@ export const messages = {
   "composer.error.holdQueued": "編集のためにキューのメッセージを保留できませんでした。",
   "composer.error.cancelEdit": "キューの編集をキャンセルできませんでした。もう一度お試しください。",
   "composer.error.updateQueued": "キューのメッセージを更新できませんでした。もう一度お試しください。",
+  "composer.queueEdit.received": "エージェントはこのメッセージをすでに受け取ったため、編集は終了しました。",
+  "composer.queueEdit.receivedKept":
+    "エージェントはこのメッセージをすでに受け取ったため、編集は終了しました。変更内容はメッセージ欄に残っています。",
+  "composer.queueEdit.deletedKept":
+    "このメッセージは削除されたため、編集は終了しました。変更内容はメッセージ欄に残っています。",
+  "composer.queueEdit.endedKept": "この編集は保存される前に終了しました。変更内容はメッセージ欄に残っています。",
   "composer.voice.prepareFailed": "音声モデルを準備できませんでした。もう一度お試しください。",
   "composer.voice.noSpeechRecorded": "音声が録音されませんでした。",
   "composer.voice.noSpeechDetected": "音声が検出されませんでした。",
@@ -157,6 +171,7 @@ export const messages = {
   "composer.picker.section.files": "ファイル",
   "composer.picker.section.tabs": "ブラウザーのタブ",
   "composer.picker.section.threads": "スレッド",
+  "composer.picker.section.messages": "メッセージ内",
   "composer.token.tab": "ブラウザーのタブ {name}",
   "composer.token.thread": "スレッド {name}",
   "composer.token.unavailableTab": "閉じたブラウザーのタブ {name}",
