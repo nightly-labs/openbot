@@ -83,6 +83,9 @@ export const messages = {
   "status.agent.skillReading": "Leest een vaardigheid…",
   "status.agent.toolStepFailed":
     "Een toolstap is mislukt; het resultaat wordt bekeken en bepaald wat ik daarna probeer…",
+  "status.agent.toolStepDeclined": "Deze stap is niet uitgevoerd, omdat hij niet was toegestaan.",
+  "status.agent.toolStepExitCode": "De opdracht is gestopt met foutcode {code}.",
+  "status.agent.toolStepNoReason": "De tool heeft niet gezegd waarom deze stap is mislukt.",
   "status.agent.toolResultReviewing": "Bekijkt het laatste toolresultaat…",
   "status.agent.sourcesSearching": "Zoekt naar actuele informatie…",
   "status.agent.sourcesReviewing": "Bekijkt de gevonden bronnen en informatie…",

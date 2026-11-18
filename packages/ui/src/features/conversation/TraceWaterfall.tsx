@@ -1197,6 +1197,7 @@ function TraceRowView(props: {
 
 /** The error of a failed tool row, under the row. It tells its height, which moves the handoff lines. */
 function TraceSpanError(props: { id: string; error: string; depth: number; onHeight: (height: number) => void }) {
+  const text = useText();
   const observer = new ResizeObserver((entries) => {
     for (const entry of entries) if (entry.target instanceof HTMLElement) props.onHeight(entry.target.offsetHeight);
   });
@@ -1205,7 +1206,7 @@ function TraceSpanError(props: { id: string; error: string; depth: number; onHei
   return (
     <div class="trace-span-error-row" style={rowStyle()} ref={(element) => observer.observe(element)}>
       <pre id={props.id} class="trace-span-error" dir="auto">
-        {props.error}
+        {text.sourceText(props.error)}
       </pre>
     </div>
   );

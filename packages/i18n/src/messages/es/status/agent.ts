@@ -79,6 +79,9 @@ export const messages = {
   "status.agent.skillReading": "Leyendo una habilidad…",
   "status.agent.toolStepFailed":
     "Un paso de herramienta falló; revisando el resultado y decidiendo qué probar después…",
+  "status.agent.toolStepDeclined": "Este paso no se ejecutó porque no estaba permitido.",
+  "status.agent.toolStepExitCode": "El comando se detuvo con el código de error {code}.",
+  "status.agent.toolStepNoReason": "La herramienta no indicó por qué falló este paso.",
   "status.agent.toolResultReviewing": "Revisando el último resultado de la herramienta…",
   "status.agent.sourcesSearching": "Buscando información actualizada…",
   "status.agent.sourcesReviewing": "Revisando las fuentes y la información que encontré…",

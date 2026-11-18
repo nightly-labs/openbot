@@ -143,7 +143,7 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
 
 /** The line of a failed tool step, with a closed toggle that shows its error. */
 function FailedStep(props: { text: string; error: string | undefined; newest: boolean }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const outputId = createUniqueId();
   const [open, setOpen] = createSignal(false);
   const expanded = () => (open() ? "true" : "false");
@@ -170,7 +170,8 @@ function FailedStep(props: { text: string; error: string | undefined; newest: bo
       </Button>
       <Show when={open()}>
         <pre id={outputId} class="agent-step-error" dir="auto">
-          {props.error}
+          {/* The host's reason of a step with no output is English source text; provider output stays as it is. */}
+          {props.error && sourceText(props.error)}
         </pre>
       </Show>
     </div>
