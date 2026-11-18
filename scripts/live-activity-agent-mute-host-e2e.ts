@@ -107,11 +107,7 @@ function pushCount(): number {
 /** The island view that the widget opens, with the fields that the checks read. */
 interface OpenedProps {
   mode: string;
-}
-
-/** The props that the widget opens, with the serialized view for the name checks. */
-interface OpenedProps {
-  mode: string;
+  /** The serialized view for the name checks. */
   content: string;
 }
 
