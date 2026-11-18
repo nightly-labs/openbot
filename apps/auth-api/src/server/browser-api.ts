@@ -522,6 +522,7 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
           currency: body.currency,
           entryPoint: body.entryPoint,
           license: body.license,
+          earlyStart: body.earlyStart,
         },
         request.headers.get("Idempotency-Key"),
         returnTo,

@@ -81,6 +81,12 @@ export const VAT_METADATA = {
   treatment: "openbot_vat_treatment",
 } as const;
 
+/**
+ * The time (ISO 8601) when a consumer in the EU asked that the hosting service begin before the 14-day
+ * withdrawal period ends. It is on the Checkout session and on the subscription, as the record of the request.
+ */
+export const EARLY_START_METADATA = "openbot_early_start_at";
+
 /** The tax facts of a Stripe customer that decide the VAT of a new subscription. */
 export interface StripeCustomerTax {
   /** A customer deleted in the Stripe Dashboard has no tax facts. */
