@@ -5,11 +5,10 @@
  * sidebar that has no room for them.
  */
 
-import { ArrowLeft, ArrowRight, Button, CircleFadingArrowUp, IconButton, Puzzle } from "@openbot/ui";
+import { ArrowLeft, ArrowRight, Button, CircleFadingArrowUp, IconButton, PanelLeft, Puzzle } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
 import { ServerMenu } from "../servers/ServerMenu";
-import { SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarTopbar() {
@@ -95,7 +94,7 @@ export function SidebarTopbar() {
             aria-expanded={props.compact ? "false" : "true"}
             title={toggleLabel()}
           >
-            <SidebarToggleIcon />
+            <PanelLeft aria-hidden="true" />
           </Button>
         </Show>
         <Show when={props.serverUpdate}>
