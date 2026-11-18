@@ -506,6 +506,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi devolvió una sesión diferente. La sesión guardada no se reemplazó.",
   "error.provider.piExtensionFailed":
     "Pi se detuvo porque no pudo cargar una extensión. Elimina o actualiza esa extensión e inténtalo de nuevo. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi se detuvo de forma inesperada antes de terminar este turno. Envía un mensaje para continuar.",
   "error.provider.piModelInvalid": "Selecciona un modelo de Pi que incluya su proveedor.",
   "error.provider.piToolInvalid": "La herramienta devolvió un resultado no válido.",
   "error.provider.piSignIn": "Usa /login en Pi en el equipo host. Cierra Pi cuando termines de iniciar sesión.",

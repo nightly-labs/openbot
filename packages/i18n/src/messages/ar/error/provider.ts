@@ -461,6 +461,7 @@ export const messages = {
   "error.provider.piSessionIdentity": "أرجع Pi جلسة مختلفة. لم تُستبدل الجلسة المحفوظة.",
   "error.provider.piExtensionFailed":
     "توقف Pi لأنه لم يتمكن من تحميل إضافة. أزل هذه الإضافة أو حدّثها، ثم حاول مرة أخرى. {detail}",
+  "error.provider.piThreadStopped": "توقف Pi بشكل غير متوقع قبل أن ينهي هذا الدور. أرسل رسالة للمتابعة.",
   "error.provider.piModelInvalid": "اختر نموذج Pi يتضمن مزوّده.",
   "error.provider.piToolInvalid": "أرجعت الأداة نتيجة غير صالحة.",
   "error.provider.piSignIn": "استخدم /login في Pi على الحاسوب المضيف. أغلق Pi عند اكتمال تسجيل الدخول.",

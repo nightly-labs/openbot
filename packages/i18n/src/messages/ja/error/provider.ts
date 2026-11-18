@@ -517,6 +517,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
   "error.provider.piExtensionFailed":
     "拡張機能を読み込めなかったため、Pi が停止しました。この拡張機能を削除または更新してから、もう一度お試しください。{detail}",
+  "error.provider.piThreadStopped":
+    "Pi がこのターンを終える前に予期せず停止しました。続けるにはメッセージを送信してください。",
   "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
   "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
   "error.provider.piSignIn":

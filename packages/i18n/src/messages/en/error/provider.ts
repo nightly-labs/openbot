@@ -481,6 +481,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.piSessionIdentity": "Pi returned a different session. The saved session was not replaced.",
   "error.provider.piExtensionFailed":
     "Pi stopped because it could not load an extension. Remove or update this extension, then try again. {detail}",
+  "error.provider.piThreadStopped": "Pi stopped unexpectedly before it finished this turn. Send a message to continue.",
   "error.provider.piModelInvalid": "Select a Pi model that includes its provider.",
   "error.provider.piToolInvalid": "The tool returned an invalid result.",
   "error.provider.piSignIn": "Use /login in Pi on the host computer. Close Pi when sign-in is complete.",
