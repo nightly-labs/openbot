@@ -209,7 +209,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.serverNotLoaded": "OpenBot could not load the server. Try again.",
   // Servers that the desktop app starts on this computer.
   "error.remote.localServerNotStarted":
-    "The server on this computer did not start. Try again. If it does not start, restart OpenBot.",
+    "The server on this computer did not start. Try again. If it does not start, restart OpenBot on this computer.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
   "error.remote.localServerAccountRemovalFailed":
     "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",

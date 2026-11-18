@@ -212,7 +212,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "タスクは変更されましたが、チャット履歴を更新できませんでした。",
   "error.remote.serverNotLoaded": "OpenBot はサーバーを読み込めませんでした。もう一度お試しください。",
   "error.remote.localServerNotStarted":
-    "このコンピューターのサーバーが起動しませんでした。もう一度お試しください。起動しない場合は、OpenBot を再起動してください。",
+    "このコンピューターのサーバーが起動しませんでした。もう一度お試しください。起動しない場合は、このコンピューターで OpenBot を再起動してください。",
   "error.remote.localServerAccountRemovalFailed":
     "サーバーはそのコンピュータで削除されましたが、アカウントにはまだ表示されています。アカウントから外すには、もう一度削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

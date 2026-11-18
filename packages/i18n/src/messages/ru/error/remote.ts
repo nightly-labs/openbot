@@ -207,7 +207,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
   "error.remote.serverNotLoaded": "Не удалось загрузить сервер. Повторите попытку.",
   "error.remote.localServerNotStarted":
-    "Сервер на этом компьютере не запустился. Повторите попытку. Если он не запустится, перезапустите OpenBot.",
+    "Сервер на этом компьютере не запустился. Повторите попытку. Если он не запустится, перезапустите OpenBot на этом компьютере.",
   "error.remote.localServerAccountRemovalFailed":
     "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

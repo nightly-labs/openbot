@@ -804,8 +804,9 @@ export class LocalServers {
     // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
     if (control instanceof Readable && control.readable) control.resume();
     // A spawn error names a path or an errno, which tells the user nothing they can fix. The log keeps it.
+    // After the start, an error (for example a failed kill) leaves `ready` as it is.
     child.once("error", (error: Error) => {
-      this.#options.log.warn("A server on this computer could not start.", error);
+      this.#options.log.warn("A server process on this computer reported an error.", error);
       Deferred.doneUnsafe(ready, Exit.fail(startFailure()));
     });
     child.once("exit", (code, signal) => {

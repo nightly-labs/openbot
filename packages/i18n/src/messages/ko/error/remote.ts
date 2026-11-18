@@ -204,7 +204,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "작업을 변경했지만 채팅 기록을 새로 고칠 수 없었어요.",
   "error.remote.serverNotLoaded": "OpenBot이 서버를 불러오지 못했어요. 다시 시도하세요.",
   "error.remote.localServerNotStarted":
-    "이 컴퓨터의 서버가 시작되지 않았어요. 다시 시도하세요. 시작되지 않으면 OpenBot을 다시 시작하세요.",
+    "이 컴퓨터의 서버가 시작되지 않았어요. 다시 시도하세요. 시작되지 않으면 이 컴퓨터에서 OpenBot을 다시 시작하세요.",
   "error.remote.localServerAccountRemovalFailed":
     "서버는 해당 컴퓨터에서 삭제되었지만 계정에는 아직 표시됩니다. 계정에서 제거하려면 다시 삭제하세요.",
 } as const satisfies PartialTranslation<typeof source>;

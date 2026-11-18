@@ -211,7 +211,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "De taak is gewijzigd, maar de chatgeschiedenis kon niet worden vernieuwd.",
   "error.remote.serverNotLoaded": "OpenBot kon de server niet laden. Probeer het opnieuw.",
   "error.remote.localServerNotStarted":
-    "De server op deze computer is niet gestart. Probeer het opnieuw. Start hij niet, start OpenBot dan opnieuw.",
+    "De server op deze computer is niet gestart. Probeer het opnieuw. Start hij niet, start OpenBot dan opnieuw op deze computer.",
   "error.remote.localServerAccountRemovalFailed":
     "De server is op zijn computer verwijderd, maar het account toont hem nog. Verwijder hem opnieuw om hem uit het account te halen.",
 } as const satisfies PartialTranslation<typeof source>;

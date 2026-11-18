@@ -216,7 +216,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.serverNotLoaded": "O OpenBot não conseguiu carregar o servidor. Tente novamente.",
   "error.remote.localServerNotStarted":
-    "O servidor neste computador não iniciou. Tente novamente. Se ele não iniciar, reinicie o OpenBot.",
+    "O servidor neste computador não iniciou. Tente novamente. Se ele não iniciar, reinicie o OpenBot neste computador.",
   "error.remote.localServerAccountRemovalFailed":
     "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

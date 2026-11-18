@@ -195,7 +195,8 @@ export const messages = {
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",
   "error.remote.taskHistoryRefreshFailed": "任务已更改，但无法刷新对话历史。",
   "error.remote.serverNotLoaded": "OpenBot 无法加载该服务器。请重试。",
-  "error.remote.localServerNotStarted": "这台电脑上的服务器没有启动。请重试。如果仍未启动，请重启 OpenBot。",
+  "error.remote.localServerNotStarted":
+    "这台电脑上的服务器没有启动。请重试。如果仍未启动，请在这台电脑上重启 OpenBot。",
   "error.remote.localServerAccountRemovalFailed":
     "服务器已在其电脑上删除，但账户中仍列出它。请再次删除以将其从账户中移除。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -117,7 +117,7 @@ export const messages = {
   "server.local.creating": "Server wird erstellt…",
   "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
   "server.local.createFailedRetry":
-    "Etwas ist schiefgelaufen. Versuchen Sie es erneut. Wenn es wieder fehlschlägt, starten Sie OpenBot neu.",
+    "Etwas ist schiefgelaufen. Versuche es erneut. Wenn es wieder fehlschlägt, starte OpenBot neu.",
   "server.local.limitReached":
     "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
   "server.local.deleteConfirmTitle": "{name} löschen?",

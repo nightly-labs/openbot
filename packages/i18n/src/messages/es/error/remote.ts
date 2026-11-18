@@ -209,7 +209,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "La tarea se cambió, pero no se pudo actualizar el historial del chat.",
   "error.remote.serverNotLoaded": "OpenBot no pudo cargar el servidor. Inténtalo de nuevo.",
   "error.remote.localServerNotStarted":
-    "El servidor de este equipo no se inició. Inténtalo de nuevo. Si no se inicia, reinicia OpenBot.",
+    "El servidor de este equipo no se inició. Inténtalo de nuevo. Si no se inicia, reinicia OpenBot en este equipo.",
   "error.remote.localServerAccountRemovalFailed":
     "El servidor está eliminado en su ordenador, pero la cuenta aún lo muestra. Elimínalo otra vez para quitarlo de la cuenta.",
 } as const satisfies PartialTranslation<typeof source>;

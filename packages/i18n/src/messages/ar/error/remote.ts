@@ -198,7 +198,7 @@ export const messages = {
   "error.remote.taskHistoryRefreshFailed": "تغيّرت المهمة، لكن تعذّر تحديث سجل الدردشة.",
   "error.remote.serverNotLoaded": "تعذّر على OpenBot تحميل الخادم. حاول مرة أخرى.",
   "error.remote.localServerNotStarted":
-    "لم يبدأ الخادم على هذا الحاسوب. حاول مرة أخرى. إذا لم يبدأ، فأعد تشغيل OpenBot.",
+    "لم يبدأ الخادم على هذا الحاسوب. حاول مرة أخرى. إذا لم يبدأ، فأعد تشغيل OpenBot على هذا الحاسوب.",
   "error.remote.localServerNotFound": "هذا الخادم ليس على هذا الحاسوب.",
   "error.remote.localServerAccountRemovalFailed":
     "حُذف الخادم على حاسوبه، لكن الحساب لا يزال يُدرجه. احذفه مرة أخرى لإزالته من الحساب.",

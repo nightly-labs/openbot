@@ -212,9 +212,9 @@ export const messages = {
     "Die Nachricht wurde gesendet, aber der Chatverlauf konnte nicht aktualisiert werden.",
   "error.remote.taskHistoryRefreshFailed":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",
-  "error.remote.serverNotLoaded": "OpenBot konnte den Server nicht laden. Versuchen Sie es erneut.",
+  "error.remote.serverNotLoaded": "OpenBot konnte den Server nicht laden. Versuche es erneut.",
   "error.remote.localServerNotStarted":
-    "Der Server auf diesem Computer wurde nicht gestartet. Versuchen Sie es erneut. Wenn er nicht startet, starten Sie OpenBot neu.",
+    "Der Server auf diesem Computer wurde nicht gestartet. Versuche es erneut. Wenn er nicht startet, starte OpenBot auf diesem Computer neu.",
   "error.remote.localServerAccountRemovalFailed":
     "Der Server ist auf seinem Computer gelöscht, aber das Konto führt ihn noch. Lösche ihn erneut, um ihn aus dem Konto zu entfernen.",
 } as const satisfies PartialTranslation<typeof source>;
