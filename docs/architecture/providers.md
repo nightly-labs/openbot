@@ -1102,6 +1102,11 @@ hover card lists the Cursor reading too, and the ring draws the reading with the
 `readCursorUsage` directly, as it does for OpenCode, so it does not start the CLI for a reading.
 `scripts/cursor-usage-e2e.ts` covers it.
 
+OpenBot ends an ACP turn that sends nothing for five minutes while no tool call is open (see
+[Model retries and the stall limit](#model-retries-and-the-stall-limit) for OpenCode). The Cursor CLI
+can go longer without a chunk while it works. The Cursor driver sets `turnStallMs` to thirty minutes
+(`CURSOR_TURN_STALL_MS` in `acp-client.ts`), the same silence limit as a custom OpenCode endpoint.
+
 Team API v1–v5 do not know `cursor`. The host hides Cursor agents, models, status, and sign-in
 state from peers on those versions, and the `providers-v1` to `providers-v3` routes omit it. A route
 that reads an agent ID from the body answers 404 for a hidden agent (`requireVisibleBodyAgent`). A
