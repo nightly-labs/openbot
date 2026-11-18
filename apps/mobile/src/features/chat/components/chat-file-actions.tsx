@@ -12,10 +12,14 @@ import { openFilePreview } from "./use-attachment-preview";
 import { messageFileCopy } from "./use-media-file";
 
 /**
- * The action that opens the file a chip names, as a click on the desktop chip does. Null when the
- * message cannot name that file, such as a workspace file in a message from no agent.
+ * The actions that open the file a chip names, as a click on the desktop chip does: `code` for the
+ * text of a code span, `link` for the target of a Markdown link to a path. Null when the message
+ * cannot name that file, such as a workspace file in a message from no agent.
  */
-export type OpenMessageFile = (text: string) => (() => void) | null;
+export interface OpenMessageFile {
+  code: (text: string) => (() => void) | null;
+  link: (href: string) => (() => void) | null;
+}
 
 export const ChatFileActionsContext = createContext<OpenMessageFile | undefined>(undefined);
 

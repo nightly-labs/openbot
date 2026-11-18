@@ -9,8 +9,6 @@ export interface CodePreviewEntry {
   kind: ChatPreviewKind | "markdown" | "text" | "pdf" | "spreadsheet";
   source: string;
   language?: string;
-  /** The source is the start of a longer file. */
-  truncated?: boolean;
   /** The header title of a block that is no file, such as the title of a confirm card draft. */
   title?: string;
   /** The file the source came from. The screen shows its name and can share it. */

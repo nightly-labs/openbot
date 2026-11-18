@@ -111,7 +111,13 @@ import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
-import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
+import {
+  type MessageFileTarget,
+  messageChipFileNames,
+  messageFileDirectory,
+  messageFileTarget,
+  messageLinkFileTarget,
+} from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
@@ -802,9 +808,15 @@ const MessageRow = memo(function MessageRow({
   const openFile = shared.openFile;
   const openMessageFile = useMemo<OpenMessageFile>(() => {
     const directory = messageFileDirectory(fileBody);
-    return (text) => {
-      const target = messageFileTarget(text, directory, fileAgentId);
-      return target ? () => void openFile(target.file, target.written) : null;
+    return {
+      code: (text) => {
+        const target = messageFileTarget(text, directory, fileAgentId);
+        return target ? () => void openFile(target.file, target.written) : null;
+      },
+      link: (href) => {
+        const target = messageLinkFileTarget(href, fileAgentId);
+        return target ? () => void openFile(target, null) : null;
+      },
     };
   }, [fileBody, fileAgentId, openFile]);
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
@@ -816,11 +828,22 @@ const MessageRow = memo(function MessageRow({
       ? shared.bubbleTone
       : undefined;
   const textColor = tone ? userForeground : foreground;
+  // A file of an agent's message that the text opens with a chip does not show again as a card, as on
+  // desktop. The text is finished, so a chip that streams in does not hide its card early.
+  const chipFiles = useMemo(
+    () =>
+      message.kind === "message" && message.author === "agent" && finishedBody && message.attachments?.length
+        ? messageChipFileNames(fileBody, fileAgentId)
+        : null,
+    [message, finishedBody, fileBody, fileAgentId],
+  );
   // A generation owns its first attachment, the image or the video; any further files follow in order.
   const files =
     message.kind === "message"
-      ? ((message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
-        [])
+      ? (
+          (message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
+          []
+        ).filter((attachment) => !chipFiles?.has(attachment.name))
       : [];
   // Two or more images in one message show together, as on desktop. A message that is still
   // sending shows the same stack at once, with the progress on each card, so it does not change
