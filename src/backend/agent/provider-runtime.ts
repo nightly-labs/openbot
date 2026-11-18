@@ -4250,7 +4250,8 @@ export class ProviderRuntime implements ProviderPort {
               }
               // Codex could not reach its service to check the account, for example before the network
               // is ready. A later check works, so OpenBot tries again and does not count it (#11632).
-              const unreachable = stage === "account" && isCodexServiceUnreachable(error);
+              const unreachable = provider === "codex" && stage === "account" && isCodexServiceUnreachable(error);
+              const retrying = unreachable && this.#scheduleStartRetry(provider, !disposed());
               // An expired sign-in fails the account check in the CLI's own words, such as Codex's
               // "workspace routing discovery unauthorized (401)". Ask for a new sign-in instead.
               const failed =
@@ -4261,11 +4262,10 @@ export class ProviderRuntime implements ProviderPort {
                   : unreachable
                     ? new Error(
                         sourceText(
-                          this.#scheduleStartRetry(provider, !disposed())
-                            ? "error.provider.serviceUnreachable"
-                            : "error.provider.serviceUnreachableRefresh",
+                          retrying ? "error.provider.serviceUnreachable" : "error.provider.serviceUnreachableRefresh",
                           { provider: providerLabel(provider) },
                         ),
+                        { cause: error },
                       )
                     : error;
               // The CLI's own words reach the status message and the joined start failure below, so
