@@ -72,6 +72,8 @@ export interface AgentDockAgent {
   avatarHue: AvatarHue | null;
   avatarColor: AvatarColor | null;
   avatarUrl: string | null;
+  /** The tint of the agent's chat bubbles, as in the main chat. Absent for no tint. */
+  chatColor?: AvatarColor;
 }
 
 export const AGENT_DOCK_MOODS = ["idle", "working", "waiting", "failed", "responded", "connecting", "asleep"] as const;
@@ -531,7 +533,8 @@ function isAgent(value: unknown): value is AgentDockAgent {
     isBoundedString(value.avatarSeed, INPUT_LIMITS.identifier) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
     (value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
-    isNullableBoundedString(value.avatarUrl, INPUT_LIMITS.avatarUrl)
+    isNullableBoundedString(value.avatarUrl, INPUT_LIMITS.avatarUrl) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor))
   );
 }
 
