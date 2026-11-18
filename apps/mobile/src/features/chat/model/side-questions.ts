@@ -33,7 +33,7 @@ export interface SideQuestion {
  */
 const useSideQuestions = create<{ questions: Readonly<Record<string, SideQuestion>> }>(() => ({ questions: {} }));
 
-export function sideQuestionKey(serverId: string, agentId: string): string {
+function sideQuestionKey(serverId: string, agentId: string): string {
   return `${serverId}\n${agentId}`;
 }
 
