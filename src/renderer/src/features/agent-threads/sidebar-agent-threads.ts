@@ -1,5 +1,5 @@
-import { agentTaskThreadStatus } from "@openbot/ui/features/conversation/threads/thread-items";
-import { MAIN_THREAD_ID, type ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
+import { sideThreadItem } from "@openbot/ui/features/conversation/threads/thread-items";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentThreads } from "@openbot/ui/features/sidebar/sidebar-types";
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type { AgentThreadTabsState } from "./agent-thread-tabs";
@@ -24,6 +24,8 @@ export interface SidebarAgentThreadsInput {
 export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAgentThreads | undefined {
   const { tasks, tabs } = input;
   if (!tasks.available()) return undefined;
+  // A hover, a focus and an open list can all ask for one agent before its first list comes back.
+  const reading = new Set<string>();
   return {
     threads: (agentId) => {
       const list = tasks.snapshot(agentId)?.tasks ?? [];
@@ -31,16 +33,7 @@ export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAge
       const waits = input.waits();
       return list
         .filter((task) => task.state !== "closed" && !hidden.has(task.id))
-        .map(
-          (task): ThreadItem => ({
-            id: task.id,
-            kind: "side",
-            title: task.title,
-            updatedAt: task.updatedAt,
-            status: agentTaskThreadStatus(task, taskWaitsFor(task, waits)),
-            unread: tasks.unreadCount(task),
-          }),
-        )
+        .map((task) => sideThreadItem(task, taskWaitsFor(task, waits), tasks.unreadCount(task)))
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     },
     openId: (agentId) => {
@@ -51,7 +44,9 @@ export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAge
     // Events keep a read list current, so a list is read once. An agent with running threads and the open
     // agent are read already.
     load: (agentId) => {
-      if (!tasks.snapshot(agentId)) void tasks.loadTasks(agentId);
+      if (tasks.snapshot(agentId) || reading.has(agentId)) return;
+      reading.add(agentId);
+      void tasks.loadTasks(agentId).finally(() => reading.delete(agentId));
     },
     onOpen: input.openThread,
     onNew: input.onNew,

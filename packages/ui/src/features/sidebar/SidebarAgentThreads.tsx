@@ -6,7 +6,7 @@
  */
 
 import { Button, ChevronDown, MessageCirclePlus, Popover } from "@openbot/ui";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { ThreadStatusText, ThreadTabIcon } from "../conversation/threads/ThreadStatusMark";
 import { ThreadTitle } from "../conversation/threads/ThreadTitle";
@@ -76,13 +76,13 @@ function InlineThreads(props: {
     <div class="sidebar-threads" data-open={props.open ? "" : undefined} inert={!props.open}>
       <div class="sidebar-threads-clip">
         <ul class="sidebar-threads-list" aria-label={t("sidebar.threads.label", { name: props.agentName })}>
-          <For each={shown()}>
+          <For each={shown()} keyed={(thread) => thread.id}>
             {(thread, index) => (
               <ThreadRow
-                thread={thread}
-                current={props.model.openId(props.agentId) === thread.id}
+                thread={thread()}
+                current={props.model.openId(props.agentId) === thread().id}
                 index={index()}
-                onOpen={() => props.model.onOpen(props.agentId, thread.id)}
+                onOpen={() => props.model.onOpen(props.agentId, thread().id)}
               />
             )}
           </For>
@@ -163,21 +163,21 @@ function ThreadCard(props: {
             )}
           </Show>
           <ul class="sidebar-threads-card-list">
-            <For each={props.threads}>
+            <For each={props.threads} keyed={(thread) => thread.id}>
               {(thread) => (
                 <li>
                   <Button
                     variant="ghost"
                     class="sidebar-threads-card-row"
-                    aria-current={props.model.openId(props.agentId) === thread.id ? "page" : undefined}
-                    onClick={() => pick(() => props.model.onOpen(props.agentId, thread.id))}
+                    aria-current={props.model.openId(props.agentId) === thread().id ? "page" : undefined}
+                    onClick={() => pick(() => props.model.onOpen(props.agentId, thread().id))}
                   >
                     <span class="sidebar-threads-card-icon" aria-hidden="true">
-                      <ThreadTabIcon status={thread.status} unread={thread.unread} />
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
                     </span>
-                    <ThreadTitle class="sidebar-threads-card-title" title={thread.title} />
-                    <ThreadStatusText status={thread.status} unread={thread.unread} />
-                    <span class="sidebar-threads-card-time">{sidebarMessageTime(thread.updatedAt, format)}</span>
+                    <ThreadTitle class="sidebar-threads-card-title" title={thread().title} />
+                    <ThreadStatusText status={thread().status} unread={thread().unread} />
+                    <span class="sidebar-threads-card-time">{sidebarMessageTime(thread().updatedAt, format)}</span>
                   </Button>
                 </li>
               )}
@@ -200,10 +200,13 @@ export function SidebarAgentThreads(threadProps: {
   row: HTMLElement | undefined;
   /** The row's context menu is open. The card does not open over it. */
   menuOpen: boolean;
+  /** Tells the row that the card opens or closes, so that the row's own tooltip does not show under it. */
+  onCardChange?: ((open: boolean) => void) | undefined;
 }) {
   const { t } = useText();
   const { agentThreadsOpen, toggleAgentThreads } = useSidebarScope();
-  const threads = () => threadProps.model.threads(threadProps.agentId);
+  // The list is read once for each change, not again by each part that shows it.
+  const threads = createMemo(() => threadProps.model.threads(threadProps.agentId));
   const expanded = () => agentThreadsOpen(threadProps.agentId);
   const [card, setCard] = createSignal(false);
   let openTimer: ReturnType<typeof setTimeout> | undefined;
@@ -230,9 +233,12 @@ export function SidebarAgentThreads(threadProps: {
     closeTimer = setTimeout(() => setCard(false), CARD_CLOSE_DELAY);
   };
 
-  // An open list reads its threads, also after a restart of the host.
+  // An open list reads its threads when they are not read yet.
   createEffect(expanded, (open) => {
     if (open) threadProps.model.load(threadProps.agentId);
+  });
+  createEffect(card, (open) => {
+    threadProps.onCardChange?.(open);
   });
   createEffect(
     () => threadProps.menuOpen,
@@ -244,14 +250,18 @@ export function SidebarAgentThreads(threadProps: {
     () => threadProps.row,
     (row) => {
       if (!row) return;
+      // A keyboard user gets the chevron too: focus reads the threads, as a hover does.
+      const load = () => threadProps.model.load(threadProps.agentId);
       row.addEventListener("pointerenter", arm);
       row.addEventListener("pointerleave", leave);
+      row.addEventListener("focus", load);
       // A click on the row opens the agent's chat; the card is not needed then.
       row.addEventListener("pointerdown", close);
       return () => {
         clear();
         row.removeEventListener("pointerenter", arm);
         row.removeEventListener("pointerleave", leave);
+        row.removeEventListener("focus", load);
         row.removeEventListener("pointerdown", close);
       };
     },

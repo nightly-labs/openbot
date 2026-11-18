@@ -70,6 +70,11 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [rowElement, setRowElement] = createSignal<HTMLElement>();
+  // The thread card covers the row's tooltip, so the tooltip does not open while the card shows.
+  const [threadCardOpen, setThreadCardOpen] = createSignal(false);
+  const coverOpen = () => menuOpen() || threadCardOpen();
+  // A drag starts on the item, also from a thread under the row. Only the agent row moves the agent.
+  let dragFromThreads = false;
   /** The side threads show in the full sidebar, and not for an agent that the host stops while hidden. */
   const threads = () => (props.compact || paused() ? undefined : props.agentThreads);
   const limit = () => {
@@ -187,7 +192,16 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       style={`--sidebar-drag-y: ${dragOffset(rowProps.agent.id).y}px;`}
       data-chat-id={rowProps.waiting || rowProps.userHidden ? undefined : rowProps.agent.id}
       draggable={draggable() ? "true" : "false"}
-      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.agent.id)}
+      onPointerDown={(event: PointerEvent) => {
+        dragFromThreads = event.target instanceof Element && event.target.closest(".sidebar-threads") !== null;
+      }}
+      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => {
+        if (dragFromThreads) {
+          event.preventDefault();
+          return;
+        }
+        startChatDragging(event, rowProps.agent.id);
+      }}
       onDragEnd={endChatDragging}
     >
       <Show
@@ -198,7 +212,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
             title={title()}
             preview={detail()}
             detail={routineLabel()}
-            menuOpen={menuOpen()}
+            menuOpen={coverOpen()}
           >
             {row()}
           </SidebarNameTooltip>
@@ -207,7 +221,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
         {(current) => (
           <SidebarWaitTooltip
             wait={current()}
-            menuOpen={menuOpen()}
+            menuOpen={coverOpen()}
             name={props.compact ? rowProps.agent.name : undefined}
           >
             {row()}
@@ -222,6 +236,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
             agentName={rowProps.agent.name}
             row={rowElement()}
             menuOpen={menuOpen()}
+            onCardChange={setThreadCardOpen}
           />
         )}
       </Show>
