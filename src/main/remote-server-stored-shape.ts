@@ -55,6 +55,8 @@ export interface StoredRemoteServer {
   transport?: "webrtc-v2";
   /** The active members that the host's plan allows, from the account server's host list. */
   memberLimit?: number;
+  /** One more user on the owner's license raises `memberLimit`, from the account server's host list. */
+  licenseRaisesMemberLimit?: boolean;
   /** A hosted server, from the account server's host list. */
   hosted?: boolean;
   /** False for a hosted server that the account service cannot restart, from the account server's host list. */
@@ -280,6 +282,7 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     ...(value.transport === undefined ? {} : { transport: value.transport }),
     // A bad limit drops only the limit: the next host list writes it again.
     ...(isPositiveInteger(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
+    ...(isBoolean(value.licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit: value.licenseRaisesMemberLimit } : {}),
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
     ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
     ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),

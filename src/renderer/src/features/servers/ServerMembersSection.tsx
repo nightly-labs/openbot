@@ -193,8 +193,14 @@ export function createServerMembersSection(
     const limit = memberLimit();
     return limit !== null && activeMembers().length >= limit;
   };
+  /**
+   * The owner's license sets the limit, so a full server still invites: the invite first asks the owner to
+   * add a license user (`LicenseUserDialog`).
+   */
+  const inviteBlocked = () =>
+    membersFull() && !(props.server.licenseRaisesMemberLimit === true && props.license !== undefined);
   createEffect(
-    () => membersFull() && canManage(),
+    () => inviteBlocked() && canManage(),
     (full) => {
       if (full) desktopAnalytics.track("limit_reached", { kind: "members", action: "shown" });
     },
@@ -236,7 +242,7 @@ export function createServerMembersSection(
     () =>
       canManage() &&
       published() &&
-      !membersFull() &&
+      !inviteBlocked() &&
       busy() === null &&
       (panels.invite.mode !== "email" || normalizeEmailAddress(panels.invite.email) !== null),
   );
@@ -305,7 +311,8 @@ export function createServerMembersSection(
    */
   async function fullLicense(email: string | null): Promise<{ license: License; used: number } | null> {
     const calls = props.license;
-    if (!calls || props.server.role !== "owner") return null;
+    // The local server has no role; the account service sets the flag only for its owner.
+    if (!calls || (props.server.role !== "owner" && props.server.licenseRaisesMemberLimit !== true)) return null;
     const state = await calls.getState().catch(() => null);
     const license = state?.license;
     if (!state || !license || !isOpenBillingStatus(license.status) || state.used < license.users) return null;
@@ -680,12 +687,12 @@ export function createServerMembersSection(
                 )}
               </Show>
             </div>
-            <Show when={panels.invite.mode === "perma" && !membersFull()}>
+            <Show when={panels.invite.mode === "perma" && !inviteBlocked()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
                 {t("server.invite.permaHint")}
               </Text>
             </Show>
-            <Show when={membersFull()}>
+            <Show when={inviteBlocked()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
                 {t("server.invite.full", { count: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
@@ -848,7 +855,7 @@ export function createServerMembersSection(
                     </span>,
                   )
                 }
-                disabled={!published() || membersFull()}
+                disabled={!published() || inviteBlocked()}
                 onInvite={startEmailInvite}
               />
             }

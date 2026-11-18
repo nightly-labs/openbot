@@ -978,7 +978,7 @@ export class RemoteControlPlane {
         (row) =>
           Effect.gen({ self: this }, function* () {
             const license = yield* this.#ownerLicense(row.host_id);
-            const { limit } = yield* this.#memberLimit(row.host_id, license);
+            const { limit, fromLicense } = yield* this.#memberLimit(row.host_id, license);
             return {
               hostId: row.host_id,
               name: row.name,
@@ -992,6 +992,11 @@ export class RemoteControlPlane {
               // The license counts the people of all the owner's servers, and any open license refuses a
               // join after its users. So no server takes more people than the license has users.
               memberLimit: license ? Math.min(limit, license.users) : limit,
+              // For the owner: one more user on their license raises this limit. A full server then asks the
+              // owner to add a license user, not to remove a member. False when a plan or a custom limit is
+              // as low as the license users.
+              licenseRaisesMemberLimit:
+                row.role === "owner" && license !== null && (fromLicense || license.users < limit),
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
               hosted: row.hosted_plan !== null,
               // The account service has no call that restarts the machine of an operator, so a client hides
