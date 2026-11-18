@@ -291,6 +291,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
+  "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":

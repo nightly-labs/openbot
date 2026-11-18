@@ -271,6 +271,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "서버가 시작되기 전에 {provider}가 기다리기를 멈췄어요. 그래서 {provider} 에이전트는 이 서버의 도구를 받지 못해요.",
+  "error.backend.mcpServerStoppedDuringCall": "MCP 서버가 이 호출에 응답하기 전에 멈췄어요.",
   "error.backend.mcpToolSchemaRefused":
     "이 서버의 도구 {tool}의 입력 형식을 이 제공자가 읽을 수 없어요. 다른 제공자의 에이전트는 계속 이 서버를 받아요.",
   "error.backend.mcpServerSignInForProvider":
