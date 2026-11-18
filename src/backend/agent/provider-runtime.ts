@@ -1339,6 +1339,8 @@ export class ProviderRuntime implements ProviderPort {
               const kept = released ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) return kept;
               if (released && this.#usageUnreported.has(provider)) return null;
+              // A poll is not a request: it must not start a provider after its failed starts in a row.
+              if (this.#startPaused(provider)) return null;
               if (!this.#clients.has(provider)) yield* this.ensureProvider(provider);
               const client = this.#clients.get(provider);
               if (!client) return null;
@@ -1579,6 +1581,8 @@ export class ProviderRuntime implements ProviderPort {
       });
     if (readWithin(CUSTOM_AGENT_USAGE_REUSE_MS)) return kept();
     if (this.#released.has("acp") && readWithin(CUSTOM_AGENT_USAGE_WAKE_MS)) return kept();
+    // A poll is not a request: it must not start a provider after its failed starts in a row.
+    if (this.#startPaused("acp")) return kept();
     if (!this.#clients.has("acp")) yield* this.ensureProvider("acp").pipe(this.#logUsageFailure("acp"));
     const client = this.#clients.get("acp");
     const readUsageText = client?.readUsageText?.bind(client);
@@ -3513,9 +3517,7 @@ export class ProviderRuntime implements ProviderPort {
     // starts in a row, that refresh must not start the provider: a start that fails with a 401 would
     // ask for the next refresh, and the starts would never end. A message or a routine still starts it.
     const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter(
-      (provider) =>
-        !this.#off.has(provider) &&
-        !(automatic && (this.#startFailures.get(provider) ?? 0) >= START_FAILURE_LIMIT && !this.#clients.has(provider)),
+      (provider) => !this.#off.has(provider) && !(automatic && this.#startPaused(provider)),
     );
     // Join earlier starts before claiming their provider slots.
     const pendingStarts = () => providers.flatMap((provider) => this.#providerStarts.get(provider) ?? []);
@@ -4740,6 +4742,14 @@ export class ProviderRuntime implements ProviderPort {
   #countSlowStart(provider: AgentProvider, timedOutAfterMs: number | undefined): void {
     const nextMs = Math.max(this.#longStartTimeoutMs, this.#slowStarts.get(provider) ?? 0, 2 * (timedOutAfterMs ?? 0));
     this.#slowStarts.set(provider, Math.min(nextMs, 4 * this.#longStartTimeoutMs));
+  }
+
+  /**
+   * Whether OpenBot must not start the provider by itself: its starts failed `START_FAILURE_LIMIT` times
+   * in a row and no process runs. A restart, an automatic refresh and a poll then wait for a request.
+   */
+  #startPaused(provider: AgentProvider): boolean {
+    return (this.#startFailures.get(provider) ?? 0) >= START_FAILURE_LIMIT && !this.#clients.has(provider);
   }
 
   /** Whether a request must not start the provider: only after a failure that only the user can fix. */
