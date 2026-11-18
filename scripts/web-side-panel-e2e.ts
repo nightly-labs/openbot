@@ -160,19 +160,16 @@ async function desktopStates(browser: Browser, client: Client, width: number) {
     states.resized = await measure(page);
     const after = await page.locator(".conversation-panel .settings-panel").evaluate((element) => element.clientWidth);
 
-    // Delete closes the focused tab, and the focus goes to the pane list that takes its place.
+    // Delete closes the focused tab. It is the last tab, so the panel closes and the composer takes the focus.
     await page.locator(".side-panel-tab-select").first().focus();
     await page.keyboard.press("Delete");
-    await page.locator(".side-panel-launcher").waitFor();
-    // The pane list takes the focus after it renders.
+    await page.locator(".side-panel-header").waitFor({ state: "detached" });
     const focusAfterDelete = await page
-      .waitForFunction(() => document.activeElement?.classList.contains("side-panel-launch"), undefined, {
+      .waitForFunction(() => document.activeElement?.getAttribute("aria-label")?.startsWith("Message "), undefined, {
         timeout: 10_000,
       })
       .then(() => true)
       .catch(() => false);
-    await toggle.click();
-    await page.locator(".side-panel-header").waitFor({ state: "detached" });
     const closedAgain = await toggle.getAttribute("aria-expanded");
 
     return { closed, launcher, states, panelWidth, resize: { before, after }, focusAfterDelete, closedAgain };
@@ -252,10 +249,10 @@ try {
         result.resize,
       );
       check(
-        `${client} ${width}: Delete on the last tab moves the focus to the pane list`,
+        `${client} ${width}: Delete on the last tab moves the focus to the composer`,
         result.focusAfterDelete === true,
       );
-      check(`${client} ${width}: the panel button closes the panel`, result.closedAgain === "false");
+      check(`${client} ${width}: Delete on the last tab closes the panel`, result.closedAgain === "false");
     }
     for (const state of ["closed", "settings", "maximized", "resized"] as const) {
       const found = differences(web.states[state] ?? {}, desktop.states[state] ?? {});

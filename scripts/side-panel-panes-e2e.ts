@@ -3,7 +3,8 @@
 // in registry order, each pane opens from them, a closed tab gives its place to the tab next to it,
 // collapse and reopen keep the tabs, Maximize and Restore, each agent keeps its own tabs, the panel
 // stays open or closed when another agent opens, the side question opens from the composer and its
-// question is deleted on close, and the pane list shows when the last tab closes.
+// question is deleted on close, the panel closes and the composer takes the focus when the last tab
+// closes, and the panel button then opens the empty panel at the pane list.
 //
 // `bun scripts/side-panel-panes-e2e.ts --storybook=<url> [--browser-executable=<path>]`
 // Writes .openbot-build/side-panel-panes-e2e/report.json and a screenshot of each state, and exits
@@ -260,13 +261,33 @@ try {
     check("side question: the composer lists it", false);
   }
 
-  // With no tab, the panel lists the panes.
+  // The last tab closes the panel, and the composer takes the focus. The panel button then opens the
+  // empty panel at the pane list.
   await closeTab(page, "Files");
   await tabsBecome(page, ["Agent settings*"]);
   await page.locator(".side-panel-tab-select").first().focus();
   await page.keyboard.press("Delete");
+  await page.locator(".side-panel-header").waitFor({ state: "detached", timeout: WAIT_MS });
+  const composerFocused = await page
+    .waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Message Chief", null, {
+      timeout: WAIT_MS,
+    })
+    .then(() => true)
+    .catch(() => false);
+  const closedState = {
+    launcher: await page.locator(".side-panel-launcher").count(),
+    expanded: await toggle.getAttribute("aria-expanded"),
+    composerFocused,
+  };
+  check(
+    "close: the last tab closes the panel and the composer takes the focus",
+    closedState.launcher === 0 && closedState.expanded === "false" && composerFocused,
+    closedState,
+  );
+  await shot(page, "closed");
+  await toggle.click();
   await page.locator(".side-panel-launcher").waitFor({ timeout: WAIT_MS });
-  check("close: the pane list shows when the last tab closes", (await paneTabs(page)).length === 0);
+  check("close: the panel button opens the empty panel at the pane list", (await paneTabs(page)).length === 0);
   await shot(page, "empty");
 
   check("no page errors", report.errors.length === 0, report.errors);

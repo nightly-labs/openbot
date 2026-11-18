@@ -69,13 +69,15 @@ these in the real app:
 
 - Open and select each pane from the launcher, the Add menu, and its own entry point.
 - Close the selected tab and a tab that is not selected. The next tab must show.
+- Close the last tab. The panel must close, and the composer must take the focus. The panel button then
+  opens the empty panel at the pane list.
 - Collapse and open the panel again. The same tab must show.
 - Maximize and restore the panel.
 - File tabs and side threads beside the panes.
 - Switch to another agent or server and back. An open panel stays open, and a closed panel stays closed.
 - The question pane deletes its question on close.
 
-`scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close, collapse,
+`scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close (the last tab closes the panel), collapse,
 maximize, an agent change with the panel open and closed, and the side question release in the
 `App/Playground` story.
 `scripts/web-side-panel-e2e.ts` compares the web and desktop panels in Storybook.
