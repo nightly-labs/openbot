@@ -113,8 +113,9 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
   return null;
 }
 
-/** Go's text for a connection to Google that dropped. */
-const GEMINI_NETWORK_FAILURE = /\bconnection reset by peer\b|\bunexpected EOF\b/u;
+/** Go's text for a connection to Google that dropped, on Unix and on Windows (`wsarecv`). */
+const GEMINI_NETWORK_FAILURE =
+  /\bconnection reset by peer\b|\bunexpected EOF\b|\bforcibly closed by the remote host\b/u;
 
 /**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
