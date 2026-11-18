@@ -115,7 +115,12 @@ export class HostedSiteService {
           .bind(userId, now)
           .first<{ count: number }>(),
       );
-      if ((concurrent?.count ?? 0) >= HOSTED_SITE_LIMITS.concurrentUploads) {
+      // Only a full account frees the idle uploads of the same site: with a free slot, they stay for a retry.
+      const freed =
+        (concurrent?.count ?? 0) >= HOSTED_SITE_LIMITS.concurrentUploads && request.siteId
+          ? yield* this.abandonSupersededUploadsEffect(userId, request.siteId, now)
+          : 0;
+      if ((concurrent?.count ?? 0) - freed >= HOSTED_SITE_LIMITS.concurrentUploads) {
         return yield* new HostedSiteInputError(
           429,
           "upload_session_limit",
@@ -1645,6 +1650,49 @@ export class HostedSiteService {
           .bind(userId)
           .run(),
       );
+    },
+  );
+
+  /**
+   * A new replace of a site supersedes the older replaces of that site: a newer deployment would refuse them at
+   * activation. A failed upload keeps its slot until it expires, so this frees the replaces that no file upload
+   * uses now. The first upload of a new site has no base deployment and stays. Returns the number of slots freed.
+   */
+  private readonly abandonSupersededUploadsEffect = Effect.fn("HostedSites.abandonSupersededUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteId: string,
+      now: number,
+    ): Effect.fn.Return<number, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idle = yield* siteCall(() =>
+        database
+          .prepare(
+            `SELECT id FROM site_deployments
+         WHERE user_id = ? AND site_id = ? AND status = 'uploading' AND upload_expires_at > ? AND in_flight_uploads = 0
+           AND base_deployment_id IS NOT NULL`,
+          )
+          .bind(userId, siteId, now)
+          .all<{ id: string }>(),
+      );
+      let freed = 0;
+      for (const upload of idle.results) {
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0`,
+            )
+            .bind(upload.id, userId)
+            .run(),
+        );
+        if (claim.meta.changes !== 1) continue;
+        freed += 1;
+        yield* this.deleteDeploymentEffect(siteId, upload.id);
+      }
+      return freed;
     },
   );
 
