@@ -399,6 +399,13 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.#endStream(streamId);
   }
 
+  /** Deletes the model files of an earlier pin, for each model whose current files are verified. */
+  readonly removeRetiredModelFiles = Effect.fn("VoiceTranscription.removeRetiredModelFiles")(function* (
+    this: VoiceTranscriptionService,
+  ) {
+    for (const modelId of LOCAL_VOICE_MODEL_IDS) yield* this.#models[modelId].removeRetiredFiles();
+  }).bind(this);
+
   readonly shutdown = Effect.fn("VoiceTranscription.shutdown")(function* (this: VoiceTranscriptionService) {
     this.#endStream();
     this.#stopHost();

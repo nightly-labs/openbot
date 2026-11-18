@@ -4406,6 +4406,10 @@ export async function createApplicationServices({
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
     );
   }
+  // A model file that this version replaced, such as the int8 Whisper turbo decoder.
+  void Effect.runPromise(voice.removeRetiredModelFiles()).catch((error) =>
+    logger.warn("Could not remove the old voice model files.", toLogValue(error)),
+  );
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
