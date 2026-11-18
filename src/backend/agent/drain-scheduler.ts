@@ -11,7 +11,12 @@ import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
-import { type AgentProvider, ProviderSessionBusyError, ProviderTurnActiveError } from "../agent-client";
+import {
+  type AgentProvider,
+  ProviderModelNotOfferedError,
+  ProviderSessionBusyError,
+  ProviderTurnActiveError,
+} from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { incomingAgentExchange } from "../conversation-snapshots";
@@ -128,6 +133,8 @@ export interface DrainHooks {
    * usage limit stopped after it started.
    */
   mayContinueOnBackup(agentId: string): boolean;
+  /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
+  mayFailOver(agentId: string): boolean;
   /**
    * Starts the move of this agent to another model for a usage limit, if one is due: back to its own
    * model, or to a backup model during a hold. True when a move started; the move schedules the drain
@@ -1339,6 +1346,27 @@ export class DrainScheduler {
               });
             if (error instanceof ProviderSessionBusyError || resumeTimedOut)
               yield* this.#retryBusySession(delivery.recipientAgentId);
+            return;
+          }
+          // The session does not offer the agent's model, so nothing ran. An agent that moves to a backup
+          // model on a provider error passes over this model, and the messages run on the backup (#11797).
+          if (
+            error instanceof ProviderModelNotOfferedError &&
+            !channelDelivery &&
+            !messagingDelivery &&
+            this.#hooks.mayFailOver(delivery.recipientAgentId)
+          ) {
+            logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
+              agentId: delivery.recipientAgentId,
+              model: requestedModel,
+            });
+            this.#usageLimits.failed(delivery.recipientAgentId, requestedModel);
+            for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            // The move drains the agent again when it ends. A turn of the agent that still runs holds the
+            // move, and the lane waits for the drain at that turn's end: a start now fails the same way.
+            if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
+              this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             return;
           }
           // The provider of a routine run did not start, such as with no internet connection. Nothing
