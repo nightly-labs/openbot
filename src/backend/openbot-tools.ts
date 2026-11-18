@@ -362,7 +362,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "set_backdrop",
-    description: `Put a full-screen HTML scene behind the user's whole OpenBot window. Use it only when the user asks to set or change the backdrop. Each call replaces your last page, so send the whole new page. It runs in the html_render sandbox with no clicks or keys: build no controls. Fill the frame and follow resize. Keep the center plain because the chat shows over it, and draw no text. Animate with requestAnimationFrame and stop for prefers-reduced-motion. The user can undo it. Do not repeat the page in your reply.`,
+    description: `Put a full-screen HTML scene behind the user's whole OpenBot window. The phone app shows it too, behind Home and the chats, calmed so that the messages stay easy to read. Use it only when the user asks to set or change the backdrop. Each call replaces your last page, so send the whole new page. It runs in the html_render sandbox with no clicks or keys: build no controls. Fill the frame and follow resize. Keep the center plain because the chat shows over it, and draw no text. Animate with requestAnimationFrame and stop for prefers-reduced-motion. The user can undo it. Do not repeat the page in your reply.`,
     shape: setBackdropToolSchema.shape,
   },
   {

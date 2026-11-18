@@ -137,6 +137,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "ファイル",
   "mobile.chat.attachment.tooLargeForMobile":
     "このファイルはモバイルの上限 {limit} を超えています。パソコンで開いてください。",
+  "mobile.chat.backdrop.agentSet": "{name} が背景を設定しました",
+  "mobile.chat.backdrop.undo": "元に戻す",
+  "mobile.chat.backdrop.dismiss": "閉じる",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",
   "mobile.chat.attachment.unavailable": "添付ファイルを利用できません。もう一度お試しください。",
   "mobile.chat.attachment.openFailed": "添付ファイルを開けませんでした",

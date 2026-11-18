@@ -9,12 +9,14 @@ import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { AppIconSection } from "@/features/settings/components/app-icon-row";
+import { ChatBackdropSection } from "@/features/settings/components/chat-backdrop-section";
 import { MessageColorPicker } from "@/features/settings/components/message-color-picker";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
 import { MessageColorPicture, ThemePicture } from "@/features/settings/components/settings-pictures";
 import { type Appearance, saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { saveChatBackground, useChatBackground } from "@/features/settings/model/chat-background";
 import {
   type ChatDetailPreference,
@@ -27,6 +29,7 @@ import {
 } from "@/features/settings/model/chat-details";
 import {
   type MessageColorMode,
+  type MessageColorStyle,
   type MessageColorValue,
   saveMessageColor,
   useMessageColor,
@@ -168,7 +171,29 @@ export function AppearanceSettingsScreen() {
             onChange={(customColor) => changeMessageColor({ customColor })}
           />
         ) : null}
+        {messageColor.mode === "none" ? null : (
+          <SettingsRow
+            trailing={
+              <SettingsPicker<MessageColorStyle>
+                value={messageColor.style}
+                options={[
+                  { value: "solid", label: t("mobile.settings.appearance.bubbleStyleSolid") },
+                  { value: "tint", label: t("mobile.settings.appearance.bubbleStyleTint") },
+                ]}
+                enabled={messageColor.ready}
+                dark={theme === "dark"}
+                label={t("mobile.settings.appearance.bubbleStyle")}
+                onChange={(style) => {
+                  if (style !== messageColor.style) changeMessageColor({ style });
+                }}
+              />
+            }
+          >
+            <Typography.Paragraph>{t("mobile.settings.appearance.bubbleStyle")}</Typography.Paragraph>
+          </SettingsRow>
+        )}
       </SettingsSection>
+      <ChatBackdropSection dark={theme === "dark"} />
       <ChatBackgroundSection dark={theme === "dark"} />
       <RoutineCollapseSection dark={theme === "dark"} />
       <ChatDetailsSection dark={theme === "dark"} />
@@ -185,7 +210,9 @@ function ChatBackgroundSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const scheme = dark ? "dark" : "light";
   const saved = useChatBackground((state) => state[scheme]);
-  const ready = useChatBackground((state) => state.ready);
+  // A backdrop replaces the chat background, as on the desktop, so the color waits until it is off.
+  const backdropShown = useChatBackdrop((state) => state.ready && state.choice !== "none");
+  const ready = useChatBackground((state) => state.ready) && !backdropShown;
   const themeBackground = String(useThemeColor("background"));
   const [error, setError] = useState<string | null>(null);
   const change = (color: AvatarColor | null) => {
@@ -213,7 +240,12 @@ function ChatBackgroundSection({ dark }: { dark: boolean }) {
   return (
     <SettingsSection
       title={t("mobile.settings.appearance.chatBackground")}
-      footer={error ?? t("mobile.settings.appearance.chatBackgroundFooter")}
+      footer={
+        error ??
+        (backdropShown
+          ? t("mobile.settings.appearance.chatBackgroundBackdropFooter")
+          : t("mobile.settings.appearance.chatBackgroundFooter"))
+      }
     >
       <View
         className="flex-row flex-wrap gap-3 px-4 py-3"

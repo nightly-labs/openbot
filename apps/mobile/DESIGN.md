@@ -389,6 +389,40 @@ respective media or identity roles. Do not replace these with foreground/backgro
 - Favor composition and shared variants over copying styled JSX between screens.
 - Keep status and instructional copy evidence-based. Do not introduce badges, alerts, or lifecycle requirements that cannot be derived from the actual session, connectivity, or persistence implementation.
 
+### Backdrop
+
+The backdrop of Settings › Appearance (`features/settings/model/chat-backdrop.ts`) is the desktop
+window backdrop in the Ambient look: a quiet layer, not a wallpaper.
+
+- The built-in scenes come from `@openbot/brand/chat-backdrop-scenes`, the same painters as the
+  desktop. `ChatBackdropSceneView` draws them with Skia in 6 pt cells at about 15 frames each second.
+  A scene stops on a hidden screen (also under a sheet), in the background and with reduced motion.
+  A stop keeps the frame that shows, and the scene goes on from that time; a new screen goes on from
+  the last time too, so the scene never starts again.
+- `ChatBackdropLayer` draws the choice, then the base color of the scene over it by the Calm–Vivid
+  strength: most where the messages are in a chat. The base color replaces the chat background
+  color, as on the desktop, and Settings disables that color while a backdrop shows.
+- With a backdrop, Home shows the backdrop behind the big header and the pinned agents, and the
+  list is a card with a 28 pt rounded top and no shadow (`home-backdrop-card.tsx`). The backdrop is a
+  fixed layer under the clear list (`HomeBackdropBand`, down to the top of the card at rest), so the
+  scroll moves nothing in it. The title, the pinned agents and the card scroll together, with no
+  parallax: a layer that moves back by the scroll each frame jumps when React renders during the
+  scroll, such as when rows mount. Each row of the card is opaque. With no backdrop, Home keeps its
+  plain list. On Android the bar has no blur or solid surface over the backdrop at rest: it comes in with
+  the scroll while the big title fades out under the bar (`androidSurfaceWithTitle` of
+  `LargeTitleBar`), so the small title always reads over it. The blur strength and the surface color
+  follow the scroll (`progress` of `AndroidHeaderBlur`): a fade of a parent snapped on a device,
+  most likely because the blur view does not follow the opacity of its parent.
+- An agent page (`set_backdrop`) shows in a web view with no touches. A build without the web view
+  module does not offer it. The phone keeps the newest page of the open chat's agent, and deletes it
+  at sign-out and when its server goes.
+- Bubbles are solid by default: the see-through fill of a bubble with no color (the control fill at
+  60%) and of another member (their color at 22%) is mixed onto the chat background or the backdrop
+  base, so nothing shows through it and a chat with no backdrop looks as before. The card of a table
+  out of a bubble does the same (`useSolidChatFill` in `chat-bubble-fill.tsx`). The See-through
+  bubbles switch in the Backdrop section of Settings › Appearance brings back the translucent fill,
+  only while a backdrop shows; the backdrop preview shows it. Do not add glass to bubbles.
+
 ## Development workflow
 
 Before implementing a mobile UI change:

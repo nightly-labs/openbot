@@ -5,6 +5,12 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { ReactNode, RefObject } from "react";
 import { StyleSheet, View, type ViewInstance } from "react-native";
+import Animated, {
+  type SharedValue,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
@@ -34,6 +40,8 @@ function maskStops(full: number) {
   });
   return [{ offset: 0, opacity: 1 }, ...fade];
 }
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 /** The Material 3 small top app bar. */
 const BAR_HEIGHT = 64;
@@ -74,13 +82,24 @@ export function AndroidHeaderBlur({
   height,
   surface = "sheet",
   shape,
+  progress,
 }: {
   target: RefObject<ViewInstance | null>;
   height?: number;
   surface?: "canvas" | "sheet";
   shape: keyof typeof BLUR_SHAPES;
+  /**
+   * From 0 (no bar surface) to 1 (the full blur and surface color). The blur strength and the surface
+   * color follow it, so the bar comes in step by step. A fade of a parent snapped on a device, most
+   * likely because the blur view does not follow the opacity of its parent. Unset, the bar is full.
+   */
+  progress?: SharedValue<number>;
 }) {
   const { theme } = useUniwind();
+  const fullBar = useSharedValue(1);
+  const shown = progress ?? fullBar;
+  const blurProps = useAnimatedProps(() => ({ intensity: BLUR_INTENSITY * shown.get() }));
+  const surfaceStyle = useAnimatedStyle(() => ({ opacity: SURFACE_OPACITY * shown.get() }));
   const { belowBar, full } = BLUR_SHAPES[shape];
   return (
     <MaskedView
@@ -104,16 +123,16 @@ export function AndroidHeaderBlur({
         </Svg>
       }
     >
-      <BlurView
+      <AnimatedBlurView
         blurTarget={target}
         blurMethod="dimezisBlurViewSdk31Plus"
-        intensity={BLUR_INTENSITY}
+        animatedProps={blurProps}
         tint={theme === "dark" ? "dark" : "light"}
         style={StyleSheet.absoluteFill}
       />
-      <View
+      <Animated.View
         className={surface === "sheet" ? "bg-sheet" : "bg-background"}
-        style={[StyleSheet.absoluteFill, { opacity: SURFACE_OPACITY }]}
+        style={[StyleSheet.absoluteFill, surfaceStyle]}
       />
     </MaskedView>
   );
