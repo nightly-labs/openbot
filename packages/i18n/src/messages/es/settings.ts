@@ -831,7 +831,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Este servidor no tiene agentes.",
   "settings.transfer.copy.new": "Nuevo",
   "settings.transfer.copy.notCopied":
-    "Sus canales y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
+    "Sus canales, flujos de rutinas, flujos de trabajo y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {
