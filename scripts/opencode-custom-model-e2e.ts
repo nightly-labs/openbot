@@ -295,9 +295,21 @@ try {
   // The real probe, against the fake server's `/api/show`. It must name the plain model only, and
   // must not ask about the model with saved efforts.
   const reasoning = createModelReasoningSupport(() => [endpoint]);
-  assert.equal(await Effect.runPromise(reasoning.refresh()), true, "The first answer must count as a change.");
+  assert.deepEqual(
+    await Effect.runPromise(reasoning.refresh()),
+    { changed: true, unreachable: false },
+    "The first answer must count as a change.",
+  );
   assert.deepEqual(reasoning.configs()[0]?.withoutReasoning, [PLAIN_MODEL]);
-  assert.equal(await Effect.runPromise(reasoning.refresh()), false, "The same answer must not count as a change.");
+  assert.deepEqual(
+    await Effect.runPromise(reasoning.refresh()),
+    { changed: false, unreachable: false },
+    "The same answer must not count as a change.",
+  );
+  // A server that is not up yet: the start asks it again, and the models keep their efforts.
+  const down = createModelReasoningSupport(() => [{ ...endpoint, baseUrl: "http://127.0.0.1:9/v1" }]);
+  assert.deepEqual(await Effect.runPromise(down.refresh()), { changed: false, unreachable: true });
+  assert.equal(down.configs()[0]?.withoutReasoning, undefined);
   assert.equal(
     report.ollamaRequests.filter((path) => path === "/api/show").length,
     2 * endpoint.models.filter((model) => model.reasoningEfforts === undefined).length,

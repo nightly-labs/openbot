@@ -330,7 +330,7 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
-import { createModelReasoningSupport } from "./model-reasoning-probe";
+import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -1706,10 +1706,13 @@ export async function createApplicationServices({
   });
   // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
   let updateCheckWait: Fiber.Fiber<void> | null = null;
+  // The start asks the model servers which models cannot reason, and asks again while one is not up.
+  let modelReasoningWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
     runCauseEffect(
       Effect.gen(function* () {
         if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        if (modelReasoningWait) yield* Fiber.interrupt(modelReasoningWait);
         yield* providerRuntimes.stop();
       }),
     ),
@@ -3009,15 +3012,20 @@ export async function createApplicationServices({
     service,
     customProviders,
     providerRuntimes,
-    refreshModelReasoning: () => modelReasoning.refresh(),
+    refreshModelReasoning: () => modelReasoning.refresh().pipe(Effect.map(({ changed }) => changed)),
   });
   // The endpoints saved before this start. The start does not wait for their servers: an OpenCode
-  // that started before the answer restarts with it, after a turn in progress.
-  Effect.runFork(
-    modelReasoning.refresh().pipe(
-      Effect.flatMap((changed) => (changed ? service.reloadCustomProviderConfig("opencode") : Effect.void)),
-      Effect.ignore,
-    ),
+  // that started before the answer restarts with it, after a turn in progress. A server that starts
+  // with the computer can come up after OpenBot, so the question is asked again a few times.
+  modelReasoningWait = Effect.runFork(
+    Effect.gen(function* () {
+      for (const wait of MODEL_REASONING_RETRY_WAITS_MS) {
+        yield* Effect.sleep(wait);
+        const { changed, unreachable } = yield* modelReasoning.refresh();
+        if (changed) yield* service.reloadCustomProviderConfig("opencode").pipe(Effect.ignore);
+        if (!unreachable) return;
+      }
+    }),
   );
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
