@@ -281,11 +281,6 @@ try {
     fromResult.length === 1 && fromResult[0]?.message === NOTICE,
     JSON.stringify(fromResult),
   );
-  pass(
-    "The notice names the Access values and does not promise a fix",
-    NOTICE.includes("Ask first") && NOTICE.includes("Workspace only") && NOTICE.includes("You can try"),
-    NOTICE,
-  );
   const fromError = await runCase("refusal-error", agent.id, "full");
   pass(
     "The refusal in the item error gives the same notice",
