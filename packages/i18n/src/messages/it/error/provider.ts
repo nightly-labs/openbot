@@ -178,6 +178,10 @@ export const messages = {
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. OpenBot riproverà.",
   "error.provider.cliTimedOutRefresh":
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. Aggiorna i provider per riprovare.",
+  "error.provider.serviceUnreachable":
+    "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet, poi aggiorna i provider.",
   "error.provider.acpStartTimedOut":
     "{provider} non ha finito di avviarsi entro {seconds} s. Il computer potrebbe essere occupato.",
   "error.provider.acpModelsTimedOut":

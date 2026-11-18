@@ -49,7 +49,7 @@ import {
   type AgentProvider,
   PROCESSOR_FEATURE_MISSING,
 } from "./../agent-client";
-import { CodexAppServerClient } from "./../app-server-client";
+import { AppServerError, CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
   type BundledProviderExecutables,
@@ -207,6 +207,18 @@ function signInFileVersion(paths: readonly string[]): string {
  */
 const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
+/**
+ * Codex's words when its account check could not reach the ChatGPT service: every failure but a 401,
+ * such as no network yet. Codex does not try again itself, and a later `account/read` does.
+ */
+const CODEX_SERVICE_UNREACHABLE = new Set([
+  "workspace routing discovery failed",
+  "workspace routing discovery timed out",
+]);
+
+function isCodexServiceUnreachable(error: unknown): boolean {
+  return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
+}
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
 /**
@@ -4236,6 +4248,9 @@ export class ProviderRuntime implements ProviderPort {
                 });
                 return message;
               }
+              // Codex could not reach its service to check the account, for example before the network
+              // is ready. A later check works, so OpenBot tries again and does not count it (#11632).
+              const unreachable = stage === "account" && isCodexServiceUnreachable(error);
               // An expired sign-in fails the account check in the CLI's own words, such as Codex's
               // "workspace routing discovery unauthorized (401)". Ask for a new sign-in instead.
               const failed =
@@ -4243,7 +4258,16 @@ export class ProviderRuntime implements ProviderPort {
                   ? new ProviderSignInError({
                       message: sourceText("error.provider.signInExpired", { provider: providerLabel(provider) }),
                     })
-                  : error;
+                  : unreachable
+                    ? new Error(
+                        sourceText(
+                          this.#scheduleStartRetry(provider, !disposed())
+                            ? "error.provider.serviceUnreachable"
+                            : "error.provider.serviceUnreachableRefresh",
+                          { provider: providerLabel(provider) },
+                        ),
+                      )
+                    : error;
               // The CLI's own words reach the status message and the joined start failure below, so
               // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
               const message = this.#redactMcp(failed instanceof Error ? failed.message : String(failed));
@@ -4257,7 +4281,11 @@ export class ProviderRuntime implements ProviderPort {
               if (!(failed instanceof CodexCliError || failed instanceof ProviderSignInError)) {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
-                if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
+                if (
+                  !(failed instanceof ProviderTempDiskSpaceError) &&
+                  !unreachable &&
+                  this.#countStartFailure(provider)
+                )
                   // Only a copy that fails its first request: an account check can fail on the network.
                   return stage === "initialize" && !disposed() && this.#fallBackToInstalledCli(provider, cli)
                     ? message
@@ -4764,15 +4792,19 @@ export class ProviderRuntime implements ProviderPort {
    * timeout: whether OpenBot tries again, or the user has to.
    */
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
+    return sourceText(
+      this.#scheduleStartRetry(provider, schedule) ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh",
+      { provider: providerLabel(provider) },
+    );
+  }
+
+  /** Starts a provider again after 5, 10 and 20 s, at most 3 times. Answers whether OpenBot will try again. */
+  #scheduleStartRetry(provider: AgentProvider, schedule: boolean): boolean {
     const attempts = this.#restartAttempts.get(provider) ?? 0;
-    const retry = schedule && attempts < 3;
-    if (retry) {
-      this.#restartAttempts.set(provider, attempts + 1);
-      this.#scheduleRestart(provider, 5_000 * 2 ** attempts, true);
-    }
-    return sourceText(retry ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh", {
-      provider: providerLabel(provider),
-    });
+    if (!schedule || attempts >= 3) return false;
+    this.#restartAttempts.set(provider, attempts + 1);
+    this.#scheduleRestart(provider, 5_000 * 2 ** attempts, true);
+    return true;
   }
 
   /**
