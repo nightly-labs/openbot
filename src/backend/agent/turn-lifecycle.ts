@@ -100,6 +100,7 @@ import {
 } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
+  endCodexChild,
   foldCodexChildItem,
   foldCodexSubagentItem,
   SUBAGENTS_UPDATED_METHOD,
@@ -555,6 +556,12 @@ export class TurnLifecycle {
    */
   readonly #codexChildren = new Map<string, CodexSubagentParent>();
   /**
+   * The running turn of each Codex thread that OpenBot knows no agent for, such as a subagent's own
+   * thread, with the client that runs it. A subagent can work on after the turn that started it, and
+   * only its own Stop ends it (#11871).
+   */
+  readonly #codexChildTurns = new Map<string, { turnId: string; client: AgentClient }>();
+  /**
    * The turns of each agent whose subagents still run. A background subagent keeps its turn here after
    * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
    */
@@ -703,6 +710,7 @@ export class TurnLifecycle {
     this.#sessionFailures.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
+    this.#codexChildTurns.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
@@ -727,6 +735,13 @@ export class TurnLifecycle {
     client: AgentClient,
     options: { keepRecoverable?: boolean } = {},
   ) {
+    // The process of these Codex subagent turns ended, so their subagents work no more.
+    const endedChildren: string[] = [];
+    for (const [threadId, live] of this.#codexChildTurns)
+      if (live.client === client) {
+        this.#codexChildTurns.delete(threadId);
+        endedChildren.push(threadId);
+      }
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
@@ -774,6 +789,7 @@ export class TurnLifecycle {
         ),
       );
     }
+    for (const threadId of endedChildren) this.#endCodexChild(threadId, "interrupted");
   }).bind(this);
 
   hasEnded(turnId: string): boolean {
@@ -967,8 +983,8 @@ export class TurnLifecycle {
    *
    * Codex can also write its last words as narration and then send an empty answer. Codex itself
    * takes that narration as the turn's result, so the narration after the last tool step becomes the
-   * answer (#8837). A turn that did a step and wrote no such narration ends as before: its output can
-   * be a file or an image, or teammates or subagents still work for it.
+   * answer (#8837). A turn that did a step and wrote no such narration stays completed: its output can
+   * be a file or an image, or teammates or subagents still work for it (`#noteNoAnswerAfterSteps`).
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
@@ -1013,7 +1029,10 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
-    if (running.acted) return false;
+    if (running.acted) {
+      this.#noteNoAnswerAfterSteps(agentId, threadId, turnId, source, deliveries, messages);
+      return false;
+    }
     // The first message that another agent gave a new agent can ask it to wait. The agent that made
     // it already has the new agent's id, so nobody waits for an answer (#10009).
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
@@ -1032,6 +1051,43 @@ export class TurnLifecycle {
     this.#turnErrors.set(turnId, message);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  /**
+   * Codex can end a turn after its steps with no answer, or with its text only as thinking. The user
+   * then saw a blank reply (#8810). The turn stays completed, so its memory changes are kept and its
+   * steps do not run again. In the agent's own chat, when the user wrote the turn's messages and the
+   * turn shows nothing, a notice says so. A teammate gets its own note (`noResultNote`).
+   */
+  #noteNoAnswerAfterSteps(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    source: AgentClient,
+    deliveries: readonly DeliveryContext[],
+    messages: readonly ConversationMessage[],
+  ): void {
+    if (
+      this.#conversation.isExecutionThread(this.#conversation.publicThreadId(agentId, threadId)) ||
+      !deliveries.every(({ delivery, channelId }) => delivery.sender.kind === "user" && channelId === undefined) ||
+      messages.some((message) => message.turnId === turnId && showsOutput(message))
+    )
+      return;
+    logger.info("A turn ended with no answer after its steps.", { agentId, turnId, provider: source.provider });
+    this.#hooks.emitError(
+      "agent_error",
+      sourceText("error.provider.noAnswerAfterSteps", {
+        provider: agentProviderDescriptor(source.provider).displayName,
+      }),
+      agentId,
+      {
+        causeCode: "empty_answer",
+        provider: source.provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "warning",
+      },
+    );
   }
 
   /**
@@ -1218,6 +1274,11 @@ export class TurnLifecycle {
         return;
       }
       case "turn/started": {
+        if (threadId && !agentId && source.provider === "codex") {
+          const childTurnId = getString(getRecord(params, "turn"), "id");
+          if (childTurnId) this.#codexChildTurns.set(threadId, { turnId: childTurnId, client: source });
+          return;
+        }
         if (!threadId || !agentId) return;
         const turn = getRecord(params, "turn");
         const turnId = getString(turn, "id");
@@ -1406,6 +1467,14 @@ export class TurnLifecycle {
         return;
       }
       case "turn/completed": {
+        if (threadId && !agentId) {
+          const turn = getRecord(params, "turn");
+          if (this.#codexChildTurns.get(threadId)?.turnId === getString(turn, "id")) {
+            this.#codexChildTurns.delete(threadId);
+            this.#endCodexChild(threadId, getString(turn, "status"));
+          }
+          return;
+        }
         if (!threadId || !agentId) return;
         const turn = getRecord(params, "turn");
         const turnId = getString(turn, "id");
@@ -2228,13 +2297,17 @@ export class TurnLifecycle {
           ),
         };
       });
-      // A foreground subagent ends with its turn. A background one works on and reports later.
+      // A foreground subagent ends with its turn. A background one works on and reports later, and so
+      // does a Codex subagent that still runs a turn of its own: Codex does not stop it (#11871). Only
+      // the agent's own chat keeps it, because only that chat's Stop reaches it.
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
-      stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
+      const ownChat = !routineSession && snapshot.threadId === this.#store.get(agentId)?.threadId;
+      const working = new Set(ownChat ? this.#workingCodexChildren(turnId).map(({ threadId: child }) => child) : []);
+      stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false, keep: working });
       if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
       if (routineSession && !this.#subagentsWork(agentId, turnId)) this.#archivableRoutineSessions.add(threadId);
       for (const [childId, parent] of this.#codexChildren)
-        if (parent.turnId === turnId) this.#codexChildren.delete(childId);
+        if (parent.turnId === turnId && !working.has(childId)) this.#codexChildren.delete(childId);
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(
@@ -2366,6 +2439,7 @@ export class TurnLifecycle {
               snapshot,
               turnId,
               noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
+              running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       if (quiet && quietTurn) {
@@ -3201,6 +3275,57 @@ export class TurnLifecycle {
     else this.#codexChildren.delete(childThreadId);
   }
 
+  /**
+   * The running turns of the Codex subagents that work on after the agent's ended turns, each with
+   * the client that runs it, when the ended turn `turnId` has one of them. A Stop of that turn sends
+   * them `turn/interrupt` (#11871). Stop shows for the newest such turn, so it stops them all.
+   */
+  workingCodexChildren(
+    agentId: string,
+    turnId: string,
+  ): Array<{ threadId: string; turnId: string; client: AgentClient }> {
+    const turnIds = new Set(
+      [...this.#codexChildren.values()]
+        .filter((parent) => parent.agentId === agentId && !this.#runningTurns.has(parent.turnId))
+        .map((parent) => parent.turnId),
+    );
+    if (!turnIds.has(turnId)) return [];
+    const children = [...turnIds].flatMap((ended) => this.#workingCodexChildren(ended));
+    return children.some((child) => this.#codexChildren.get(child.threadId)?.turnId === turnId) ? children : [];
+  }
+
+  #workingCodexChildren(turnId: string): Array<{ threadId: string; turnId: string; client: AgentClient }> {
+    return [...this.#codexChildren]
+      .filter(([, parent]) => parent.turnId === turnId)
+      .flatMap(([threadId]) => {
+        const live = this.#codexChildTurns.get(threadId);
+        return live ? [{ threadId, ...live }] : [];
+      });
+  }
+
+  /**
+   * A Codex subagent ended its own turn after the turn that shows it ended: no `wait` of that turn
+   * reports it. While that turn runs, its items report the subagent, as before.
+   */
+  #endCodexChild(childThreadId: string, turnStatus: string | null): void {
+    const parent = this.#codexChildren.get(childThreadId);
+    if (!parent || this.#runningTurns.has(parent.turnId)) return;
+    this.#codexChildren.delete(childThreadId);
+    const snapshot = this.#conversation.ensureSnapshot(parent.agentId, parent.threadId);
+    const id = `${parent.turnId}:subagents`;
+    const current =
+      snapshot.messages.find((candidate) => candidate.id === id)?.subagents ??
+      this.#store.database.readConversationMessages(parent.agentId, snapshot.threadId, [id])[0]?.subagents;
+    // A quiet routine run removes the list, but the subagent's end still ends the agent's work (#8156).
+    if (!current) {
+      const working = this.#workingCodexChildren(parent.turnId).length > 0;
+      if (!working && this.#trackSubagents(parent.agentId, parent.turnId, [])) this.#hooks.emitRuntimeSnapshot();
+      return;
+    }
+    const subagents = endCodexChild(current, childThreadId, turnStatus, new Date().toISOString());
+    if (subagents) this.#applySubagents(parent.agentId, parent.threadId, parent.turnId, subagents);
+  }
+
   /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
   codexSubagentParent(childThreadId: string): CodexSubagentParent | undefined {
     return this.#codexChildren.get(childThreadId);
@@ -3440,6 +3565,20 @@ function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }
 
 function hasText(item: { text?: unknown }): boolean {
   return isString(item.text) && item.text.trim() !== "";
+}
+
+/** Whether a message shows the user part of a turn: not the user's own message and not thinking. */
+function showsOutput(message: ConversationMessage): boolean {
+  return (
+    message.author !== "user" &&
+    message.itemType !== "commentary" &&
+    (message.text.trim() !== "" ||
+      (message.attachments?.length ?? 0) > 0 ||
+      message.imageGeneration !== undefined ||
+      message.videoGeneration !== undefined ||
+      message.questionPrompt !== undefined ||
+      message.uiBlock !== undefined)
+  );
 }
 
 /** Which subagents a list holds and the state of each, without their steps. */

@@ -362,6 +362,11 @@ export interface CreateHostedServerInput {
    * interval and currency of the server. Absent: the server only.
    */
   license?: LicenseOrder;
+  /**
+   * The buyer, a consumer in the EU, asks that the hosting service begin before the 14-day withdrawal period
+   * ends, and accepts what that means for a withdrawal. Absent: the buyer did not ask, or an older client.
+   */
+  earlyStart?: true;
 }
 
 /**
@@ -431,6 +436,7 @@ export function parseCreateHostedServerInput(value: unknown): CreateHostedServer
     if (!license) return null;
     input.license = license;
   }
+  if (value.earlyStart === true) input.earlyStart = true;
   return input;
 }
 

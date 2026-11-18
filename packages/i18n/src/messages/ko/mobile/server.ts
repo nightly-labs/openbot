@@ -949,7 +949,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "mobile.server.connectors.whatsapp.add": "추가",
   "mobile.server.connectors.whatsapp.groupTitle": "그룹 추가",
-  "mobile.server.connectors.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "mobile.server.connectors.whatsapp.groupSearch": "그룹 검색",
   "mobile.server.connectors.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
@@ -1583,7 +1584,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "받을 곳",
   "mobile.server.transfer.copyNoAgents": "이 서버에는 에이전트가 없어요.",
   "mobile.server.transfer.copyNotMoved":
-    "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+    "에이전트의 채널, 루틴 흐름, 워크플로, 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
   "mobile.server.transfer.copying": "복사하는 중…",
   "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",

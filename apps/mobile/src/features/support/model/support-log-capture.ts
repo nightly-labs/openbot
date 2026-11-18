@@ -1,9 +1,9 @@
 import { FEEDBACK_LIMITS, type FeedbackPhone } from "@openbot/contracts/feedback";
-import * as Application from "expo-application";
 import * as Device from "expo-device";
 import { File, Paths } from "expo-file-system";
 import * as Updates from "expo-updates";
 import { AppState, Platform } from "react-native";
+import { nativeApplicationVersion, nativeBuildVersion } from "@/shared/lib/native-application";
 import { installPhoneNetwork, phoneNetwork } from "./phone-network-capture";
 import {
   formatSupportLogEntry,
@@ -147,8 +147,9 @@ function schedulePersist(): void {
 }
 
 function appVersion(): string {
-  const version = Application.nativeApplicationVersion ?? "development";
-  return Application.nativeBuildVersion ? `${version} (${Application.nativeBuildVersion})` : version;
+  const version = nativeApplicationVersion() ?? "development";
+  const build = nativeBuildVersion();
+  return build ? `${version} (${build})` : version;
 }
 
 /**

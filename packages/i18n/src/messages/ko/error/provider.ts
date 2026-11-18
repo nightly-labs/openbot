@@ -174,6 +174,8 @@ export const messages = {
     "{provider}이(가) 제시간에 응답하지 않았어요. 컴퓨터가 바쁜 것 같아요. OpenBot이 다시 시도할게요.",
   "error.provider.cliTimedOutRefresh":
     "{provider}이(가) 제시간에 응답하지 않았어요. 컴퓨터가 바쁜 것 같아요. 제공자를 새로 고쳐 다시 시도해 주세요.",
+  "error.provider.stoppedBeforeStart":
+    "이 메시지가 시작되기 전에 {provider}이(가) 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.serviceUnreachable":
     "{provider}이(가) 서비스에 연결할 수 없어요. 인터넷 연결을 확인해 주세요. OpenBot이 다시 시도할게요.",
   "error.provider.serviceUnreachableRefresh":
@@ -184,6 +186,8 @@ export const messages = {
     "{provider}이(가) {seconds}초 안에 모델 목록을 가져오지 못했어요. 컴퓨터가 바쁜 것 같아요.",
   "error.provider.startStopped":
     "{provider}이(가) 연속으로 여러 번 시작되지 않아 OpenBot이 시도를 멈췄어요. 제공자를 새로 고쳐 다시 시도해 주세요.",
+  "error.provider.startPaused":
+    "{provider}이(가) 여러 번 연속으로 시작되지 않았습니다. OpenBot이 다음 메시지나 루틴에서 다시 시도합니다. 지금 시도하려면 제공자를 새로 고치세요.",
   "error.provider.tempDiskSpace":
     "{provider}을(를) 시작하려면 디스크 여유 공간이 1GB 이상 필요해요. 공간을 확보한 후 제공자를 새로 고치세요.",
   "error.provider.noCodeSignIn": "{provider}은(는) 코드로 로그인할 수 없어요.",
@@ -267,6 +271,8 @@ export const messages = {
     "OpenCode 모델이 추론만 하고 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider}이(가) 몇 가지 단계를 실행한 뒤 답변 없이 턴을 끝냈어요. 같은 요청을 다시 보내기 전에 에이전트에게 무엇을 했는지 물어보세요.",
   "error.provider.chatgptPageFailed": "OpenBot이 ChatGPT 연결 페이지를 열 수 없었어요.",
   "error.provider.noneReady": "준비된 에이전트 제공자가 없어요.",
   "error.provider.claudeTurnActive": "컨텍스트를 새로 고치기 전에 진행 중인 Claude 턴이 끝날 때까지 기다려 주세요.",
@@ -296,6 +302,7 @@ export const messages = {
     "Google이 이 요청의 Gemini 로그인을 받아들이지 않았어요. 메시지를 다시 보내 주세요. 오류가 계속되면 설정에서 Gemini를 다시 연결하세요.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini와 Google의 연결이 끊겼어요. 메시지를 다시 보내 주세요. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini가 원인을 알리지 않고 이 요청을 거부했어요. 에이전트가 연 이미지처럼 채팅 기록의 항목 때문일 수 있어요. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델을 선택하세요.",
   "error.provider.antigravityHistoryUnreadable":
@@ -491,6 +498,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
+  "error.provider.acpModelNotOffered":
+    "{provider}에서 지금 {model}을(를) 제공하지 않아요. 이 에이전트에 다른 모델을 선택한 후 다시 시도해 주세요.",
   "error.provider.piStopped": "Pi가 실행 중이 아니에요. Pi를 연결한 후 다시 시도해 주세요.",
   "error.provider.piSessionMissing": "이 컴퓨터에서 Pi 세션 파일을 사용할 수 없어요.",
   "error.provider.piResumeCancelled": "Pi가 세션 재개를 취소했어요. 다시 시도해 주세요.",

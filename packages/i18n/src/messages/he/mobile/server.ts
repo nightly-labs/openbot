@@ -1292,7 +1292,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, ברשימה יוצג מספר הטלפון.",
   "mobile.server.connectors.whatsapp.add": "הוספה",
   "mobile.server.connectors.whatsapp.groupTitle": "הוספת קבוצה",
-  "mobile.server.connectors.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "mobile.server.connectors.whatsapp.groupSearch": "חיפוש קבוצות",
   "mobile.server.connectors.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",
@@ -2106,7 +2107,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "אל",
   "mobile.server.transfer.copyNoAgents": "אין סוכנים בשרת הזה.",
   "mobile.server.transfer.copyNotMoved":
-    "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+    "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "mobile.server.transfer.copySubmit": {
     one: "העתקת סוכן אחד",
     two: "העתקת שני סוכנים",

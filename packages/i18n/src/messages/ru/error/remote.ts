@@ -84,7 +84,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "У удалённого хоста нет закреплённого ключа устройства.",
   "error.remote.hostDidNotConnect": "Хост WebRTC не подключился.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
-  "error.remote.hostDisconnected": "Хост WebRTC отключился.",
+  "error.remote.hostDisconnected":
+    "Соединение с сервером прервано. Проверьте, выполнено ли действие, и повторите попытку.",
   "error.remote.eventGap": "В последовательности событий хоста есть пропуск.",
   "error.remote.malformedKnownEvent": "Хост вернул искажённое известное событие.",
   "error.remote.fileTransportIsStopped": "Файловый транспорт WebRTC остановлен.",
@@ -204,6 +205,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
+  "error.remote.serverNotLoaded": "Не удалось загрузить сервер. Повторите попытку.",
+  "error.remote.localServerNotStarted":
+    "Сервер на этом компьютере не запустился. Повторите попытку. Если он не запустится, перезапустите OpenBot на этом компьютере.",
   "error.remote.localServerAccountRemovalFailed":
     "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

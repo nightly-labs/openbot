@@ -2,7 +2,11 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import {
+  decodeTeamProtocolSupportExpanded,
+  teamCapabilitiesForProtocol,
+  teamCapabilityLists,
+} from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
@@ -21,11 +25,10 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { decodeTeamProtocolV8CurrentEvent } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
-import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
-import {
-  decodeTeamProtocolV9WebRtcHttpResponse,
-  encodeTeamProtocolV9WebRtcHttpRequest,
-} from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
+import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
@@ -39,7 +42,7 @@ import type {
   RemoteMemberRecord,
 } from "./central-auth-records";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
-import { transportFailure } from "./remote-server-connection-status";
+import { LOCAL_TEAM_PROTOCOL, transportFailure } from "./remote-server-connection-status";
 import {
   type RemoteFileProgress,
   RemoteWorkflowError,
@@ -519,6 +522,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         }
         const binary = binaryBody(init.body);
         const sideRoute = teamSideRouteCodec(path);
+        const knownProtocol = this.#hostProtocols.get(hostId);
+        const capabilityProtocol =
+          path !== "/v1/compatibility" || (knownProtocol !== undefined && knownProtocol >= TEAM_PROTOCOL_V10)
+            ? knownProtocol
+            : undefined;
         const bodyTransferId = binary
           ? yield* this.#files.send(hostId, {
               name: "upload",
@@ -551,11 +559,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                         : { preserveSemanticTags: init.preserveSemanticTags }),
                       ...(init.agentCreateModel === undefined ? {} : { agentCreateModel: init.agentCreateModel }),
                     }),
-              capabilities: [
-                ...teamCapabilitiesForProtocol(
-                  path === "/v1/compatibility" ? undefined : this.#hostProtocols.get(hostId),
-                ),
-              ],
+              // The first compatibility read of a connection sends the bootstrap list. A later one of
+              // protocol 10 sends the protocol 10 lists, so the host answers with its full set.
+              ...teamCapabilityLists(capabilityProtocol, teamCapabilitiesForProtocol(capabilityProtocol)),
               ...(bodyTransferId ? { bodyTransferId } : {}),
               ...(init.contentType ? { contentType: init.contentType } : {}),
             },
@@ -618,7 +624,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelTaskWaits: true,
                     mcpManyServers: true,
                   })
-                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
+                : decodeTeamProtocolV10WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(
                 () =>
@@ -634,8 +640,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
         if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
-          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
-          this.#hostProtocols.set(hostId, support.protocol.maximum);
+          const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
+          // The highest protocol of both sides: a newer host must not get lists that this app cannot make.
+          this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
         }
         return { status: envelope.status, body, ...(file ? { file } : {}) };
       }).pipe(Effect.onExit((exit) => Effect.sync(() => profile?.end(exit)))),

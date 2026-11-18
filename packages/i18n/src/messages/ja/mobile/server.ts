@@ -970,7 +970,8 @@ export const messages = {
     "省略できます。空の場合、一覧には電話番号が表示されます。",
   "mobile.server.connectors.whatsapp.add": "追加",
   "mobile.server.connectors.whatsapp.groupTitle": "グループを追加",
-  "mobile.server.connectors.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "mobile.server.connectors.whatsapp.groupSearch": "グループを検索",
   "mobile.server.connectors.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",
@@ -1622,7 +1623,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "コピー先",
   "mobile.server.transfer.copyNoAgents": "このサーバーにはエージェントがありません。",
   "mobile.server.transfer.copyNotMoved":
-    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
   "mobile.server.transfer.copying": "コピー中…",
   "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",

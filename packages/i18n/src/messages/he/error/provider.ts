@@ -162,6 +162,7 @@ export const messages = {
   "error.provider.cliNotReady": "ה-CLI של {provider} אינו מוכן או שאינו מחובר.",
   "error.provider.cliTimedOut": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. OpenBot ינסה שוב.",
   "error.provider.cliTimedOutRefresh": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. יש לרענן את הספקים כדי לנסות שוב.",
+  "error.provider.stoppedBeforeStart": "{provider} נעצר לפני שההודעה הזו התחילה. יש לשלוח את ההודעה שוב.",
   "error.provider.serviceUnreachable":
     "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט. OpenBot ינסה שוב.",
   "error.provider.serviceUnreachableRefresh":
@@ -170,6 +171,8 @@ export const messages = {
   "error.provider.acpModelsTimedOut": "{provider} לא הציג את המודלים שלו תוך {seconds} שניות. ייתכן שהמחשב עמוס.",
   "error.provider.startStopped":
     "{provider} לא התחיל כמה פעמים ברצף, ולכן OpenBot הפסיק לנסות. יש לרענן את הספקים כדי לנסות שוב.",
+  "error.provider.startPaused":
+    "{provider} לא הופעל כמה פעמים ברציפות. OpenBot ינסה שוב בהודעה או בשגרה הבאה. כדי לנסות עכשיו, רענן את הספקים.",
   "error.provider.tempDiskSpace":
     "{provider} צריך לפחות 1 GB של שטח דיסק פנוי כדי להתחיל. יש לפנות מקום ואז לרענן את הספקים.",
   "error.provider.noCodeSignIn": "לא ניתן להתחבר אל {provider} באמצעות קוד.",
@@ -248,6 +251,8 @@ export const messages = {
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",
@@ -277,6 +282,7 @@ export const messages = {
     "Google לא קיבלה את ההתחברות ל-Gemini עבור הבקשה הזו. יש לשלוח את ההודעה שוב. אם השגיאה נמשכת, יש לחבר מחדש את Gemini בהגדרות.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini איבד את החיבור ל-Google. יש לשלוח שוב את ההודעה. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
   "error.provider.antigravityHistoryUnreadable":
@@ -462,6 +468,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",
   "error.provider.piSessionMissing": "קובץ הסשן של Pi אינו זמין במחשב הזה.",
   "error.provider.piResumeCancelled": "Pi ביטל את חידוש הסשן. יש לנסות שוב.",

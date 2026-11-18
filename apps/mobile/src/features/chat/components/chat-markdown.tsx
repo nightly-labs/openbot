@@ -42,6 +42,7 @@ import {
   StreamingTailText,
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
+import { PLAIN_BUBBLE_SHARE } from "@/features/settings/model/message-color";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useFontScale } from "@/shared/lib/font-scale";
 import { graphemes } from "@/shared/lib/graphemes";
@@ -63,8 +64,10 @@ import {
   parseStreamingChatMarkdown,
 } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
+import { isMessageFileLink, messageLinkFilePath, webLink } from "../model/message-file-target";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { tableCsv } from "../model/table-copy";
+import { useSolidChatFill } from "./chat-bubble-fill";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
 import { useOpenMessageFile } from "./chat-file-actions";
@@ -223,15 +226,6 @@ function inlineChipStyle(presentation: TextPresentation, height: number, inRow: 
 /** Joins the type badge of a file to the first characters of its name, so a line never ends between them. */
 const WORD_JOINER = "\u2060";
 
-function webLink(href: string): string | null {
-  try {
-    const url = new URL(href);
-    return ["https:", "http:", "mailto:"].includes(url.protocol) ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
 // Source positions remain stable as the last token grows during streaming.
 function sourceEntries<T>(values: T[], source: (value: T) => string) {
   let offset = 0;
@@ -254,11 +248,8 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
   default: ["--openbot-file-default", "--openbot-file-default-soft"],
 };
 
-/**
- * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
- * in the colour of its file family. In a chat message, a tap opens the file, as on desktop.
- */
-function FileReference({
+/** Inline code that names a file. In a chat message, a tap opens the file, as on desktop. */
+function CodeFileReference({
   text,
   presentation,
   inRow,
@@ -267,9 +258,78 @@ function FileReference({
   presentation: TextPresentation;
   inRow: boolean;
 }) {
-  const name = fileReferenceName(text.trim());
+  const label = text.trim();
+  const open = useOpenMessageFile()?.code(text) ?? null;
+  return (
+    <FileReference
+      name={fileReferenceName(label)}
+      label={label}
+      open={open}
+      presentation={presentation}
+      inRow={inRow}
+    />
+  );
+}
+
+/**
+ * A Markdown link to a file, such as `[report](/Users/me/report.md)`. It is the same chip as a code
+ * span that names a file, with the link text, as the desktop link chip is. Outside a chat message, or
+ * when the message cannot name the file, it is the link text with its formatting.
+ */
+function LinkFileReference({
+  href,
+  token,
+  presentation,
+  inRow = false,
+}: {
+  href: string;
+  token: Tokens.Link;
+  presentation: TextPresentation;
+  /** The chip is an item of a wrapping row, not a view inside text. */
+  inRow?: boolean;
+}) {
+  const open = useOpenMessageFile()?.link(href) ?? null;
+  if (!open) {
+    const text = inline(token.tokens, { ...presentation, agents: [] });
+    // An item of a row is no text, so its words need a text of their own.
+    return inRow ? (
+      <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
+        {text}
+      </Text>
+    ) : (
+      text
+    );
+  }
+  const label = markdownInlinePlainText(token.text) || token.href;
+  return (
+    <FileReference
+      name={fileReferenceName(messageLinkFilePath(href))}
+      label={label}
+      open={open}
+      presentation={presentation}
+      inRow={inRow}
+    />
+  );
+}
+
+/**
+ * A file chip, drawn as the desktop file reference: a type badge and the label in the colour of its
+ * file family. `name` is the file name, which sets the badge and the colour.
+ */
+function FileReference({
+  name,
+  label,
+  open,
+  presentation,
+  inRow,
+}: {
+  name: string;
+  label: string;
+  open: (() => void) | null;
+  presentation: TextPresentation;
+  inRow: boolean;
+}) {
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
-  const open = useOpenMessageFile()?.(text);
   const small = presentation.type === "body-sm";
   // A chip that opens nothing stays a view, so it does not take the touch from the message.
   const Chip = open ? Pressable : View;
@@ -297,7 +357,7 @@ function FileReference({
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
         </Chip>
         <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }} {...control}>
-          {`${WORD_JOINER}${text.trim()}`}
+          {`${WORD_JOINER}${label}`}
         </Text>
       </>
     );
@@ -320,7 +380,7 @@ function FileReference({
           { flexShrink: 1, color: String(color), fontWeight: "600" },
         ]}
       >
-        {text.trim()}
+        {label}
       </Text>
     </Chip>
   );
@@ -368,7 +428,7 @@ function CodeSpan({
   /** The chip is an item of a wrapping row, not a view inside text. */
   inRow?: boolean;
 }) {
-  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} inRow={inRow} />;
+  if (isFileReference(text.trim())) return <CodeFileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
   const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
   return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
@@ -603,7 +663,11 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
       const label = tokenIs(token, "image")
         ? token.text || presentation.t("mobile.chat.markdown.image")
         : inline(token.tokens, { ...presentation, agents: [] });
-      if (!url) return <Fragment key={offset}>{label}</Fragment>;
+      if (!url) {
+        if (isFileLink(token))
+          return <LinkFileReference key={offset} href={token.href} token={token} presentation={presentation} />;
+        return <Fragment key={offset}>{label}</Fragment>;
+      }
       const open = () => openMessageLink(url);
       return (
         <Text key={offset} style={presentation.style} accessibilityRole="link" accessibilityHint={url} onPress={open}>
@@ -629,6 +693,11 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
   });
 }
 
+/** A Markdown link to a file path, which the message draws as a file chip. */
+function isFileLink(token: Token): token is Tokens.Link {
+  return tokenIs(token, "link") && isMessageFileLink(token.href);
+}
+
 function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation: TextPresentation }) {
   let run: Token[] = [];
   let line: Token[][] = [run];
@@ -639,7 +708,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
       run = [];
       line = [run];
       lines.push(line);
-    } else if (tokenIs(token, "codespan")) {
+    } else if (tokenIs(token, "codespan") || isFileLink(token)) {
       run = [];
       line.push([token], run);
     } else if (tokenIs(token, "text") && !token.tokens) {
@@ -671,6 +740,11 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
               return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
+            }
+            if (isFileLink(token)) {
+              return (
+                <LinkFileReference key={offset} href={token.href} token={token} presentation={presentation} inRow />
+              );
             }
             return (
               <Text
@@ -730,6 +804,9 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
     "--openbot-data-table-text",
   ]).map((value) => (value === undefined ? "" : String(value)));
   const { tone } = presentation;
+  // With solid bubbles, the grey card out of a bubble is solid too, so a backdrop does not show
+  // through the header row.
+  const solidCard = useSolidChatFill(PLAIN_BUBBLE_SHARE);
   // The card has the background of a code block, and the lines between the rows have its color.
   // The rows are on the darker canvas. A message color gives its own surfaces; see `BubbleTone`.
   // Out of a bubble, the card is the bubble: the message color under it shows through, or else it has
@@ -737,7 +814,7 @@ function MarkdownTable({ token, presentation }: { token: Tokens.Table; presentat
   const card = presentation.outside
     ? tone
       ? "transparent"
-      : withAlpha(control, "99")
+      : (solidCard ?? withAlpha(control, "99"))
     : (tone?.panel ?? withAlpha(textColor, "0f"));
   const rowsBackground = tone?.deep ?? canvas;
   const rowLine = tone?.line ?? card;
@@ -963,7 +1040,11 @@ const MarkdownBlock = memo(function MarkdownBlock({
   if (tokenIs(token, "paragraph") || tokenIs(token, "text")) {
     // Android keeps code chips inside the paragraph's one text view. The wrapping row draws a
     // native text view for each word, which made long replies slow to scroll on Android.
-    if (inList && Platform.OS !== "android" && token.tokens?.some((child) => tokenIs(child, "codespan"))) {
+    if (
+      inList &&
+      Platform.OS !== "android" &&
+      token.tokens?.some((child) => tokenIs(child, "codespan") || isFileLink(child))
+    ) {
       return <ListParagraph tokens={token.tokens} presentation={presentation} />;
     }
     return (

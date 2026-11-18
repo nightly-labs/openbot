@@ -77,6 +77,8 @@ export interface SignInRelayHostDependencies {
   accounts: Pick<ProviderAccountsHost, "startRelay" | "relayStatus" | "cancelSignIn">;
   /** Gives an MCP grant to the sign-in on this host that waits for `state`, as the loopback listener does. */
   receiveMcpGrant: (state: string, code: string) => boolean;
+  /** Tells the MCP sign-in on this host that waits for `state` that its page refused, as the listener does. */
+  receiveMcpRefusal: (state: string) => boolean;
   /** Answers whether an agent message of `agentId` holds this exact address. */
   printedLink: (agentId: string, url: string) => boolean;
   /**
@@ -121,7 +123,7 @@ export class SignInRelayHost {
     input: TestMcpServerInput,
     deepLinkRedirectUrl?: string,
   ) {
-    const { mcp, receiveMcpGrant } = this.#dependencies;
+    const { mcp, receiveMcpGrant, receiveMcpRefusal } = this.#dependencies;
     yield* mcp.startRelay(input, deepLinkRedirectUrl);
     const url = input.config.url;
     return this.#open(memberId, {
@@ -134,6 +136,12 @@ export class SignInRelayHost {
           if (!state || !code) return false;
           registerSecretValue(code);
           return receiveMcpGrant(state, code);
+        }),
+      // The sign-in then ends with a sentence that says the page refused, not as a cancel that shows nothing.
+      refuse: (query) =>
+        Effect.sync(() => {
+          const state = query.get("state");
+          return state ? receiveMcpRefusal(state) : false;
         }),
       cancel: () => Effect.sync(() => mcp.cancel(url)),
     });

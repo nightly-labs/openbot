@@ -172,6 +172,7 @@ export const messages = {
   "error.provider.cliTimedOut": "{provider} не ответил вовремя. Возможно, компьютер занят. OpenBot повторит попытку.",
   "error.provider.cliTimedOutRefresh":
     "{provider} не ответил вовремя. Возможно, компьютер занят. Обновите провайдеров, чтобы повторить попытку.",
+  "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
   "error.provider.serviceUnreachable":
     "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
   "error.provider.serviceUnreachableRefresh":
@@ -180,6 +181,8 @@ export const messages = {
   "error.provider.acpModelsTimedOut": "{provider} не вывел список моделей за {seconds} с. Возможно, компьютер занят.",
   "error.provider.startStopped":
     "{provider} несколько раз подряд не запустился, поэтому OpenBot перестал пытаться. Обновите провайдеров, чтобы повторить попытку.",
+  "error.provider.startPaused":
+    "{provider} не запустился несколько раз подряд. OpenBot попробует снова при следующем сообщении или автозадаче. Чтобы попробовать сейчас, обновите провайдеров.",
   "error.provider.tempDiskSpace":
     "Для запуска {provider} нужно не меньше 1 ГБ свободного места на диске. Освободите место, затем обновите провайдеров.",
   "error.provider.noCodeSignIn": "В {provider} нельзя войти с помощью кода.",
@@ -264,6 +267,8 @@ export const messages = {
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.acpNoAnswer":
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} выполнил несколько шагов, а затем завершил ход без ответа. Прежде чем снова отправить тот же запрос, спросите агента, что он сделал.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -293,6 +298,7 @@ export const messages = {
     "Google не принял вход в Gemini для этого запроса. Отправьте сообщение ещё раз. Если ошибка повторяется, подключите Gemini заново в настройках.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini потерял соединение с Google. Отправьте сообщение ещё раз. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini отклонил этот запрос и не указал причину. Причиной может быть элемент истории чата, например изображение, которое открыл агент. OpenBot начал новый сеанс Gemini с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель.",
   "error.provider.antigravityHistoryUnreadable":
@@ -491,6 +497,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpModelNotOffered":
+    "{provider} сейчас не предлагает {model}. Выберите другую модель для этого агента и попробуйте снова.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",

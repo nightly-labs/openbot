@@ -28,6 +28,7 @@ import {
   type AgentThreadRecord,
   type AgentThreadStore,
   copyBranchMessages,
+  type ThreadListPosition,
 } from "../agent-threads/agent-thread-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
@@ -187,9 +188,12 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
-  /** The side threads of this agent, open and archived, with activity at or after `after`. The latest first. */
-  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
-    return this.#store.recent(agentId, after, limit);
+  /**
+   * The side threads of this agent, open and archived, with activity at or after `after`. The latest
+   * first. With `last`, the next page of a list that ended with `last`.
+   */
+  recent(agentId: string, after: string | null, limit: number, last?: ThreadListPosition | null): AgentThreadRecord[] {
+    return this.#store.recent(agentId, after, limit, last);
   }
 
   /** Whether this agent has the task, open or closed. */

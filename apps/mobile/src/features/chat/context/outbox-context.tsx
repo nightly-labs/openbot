@@ -13,7 +13,10 @@ import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
 import { donateShareTarget } from "@/features/share/model/share-extension";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
@@ -32,8 +35,8 @@ const NO_SERVERS: ReadonlySet<string> = new Set();
 
 interface AccountOutbox {
   store: OutboxStore;
-  /** The workspace that sends now. A send in flight keeps the one that started it. */
-  workspace: { current: MobileWorkspaceContextValue | null };
+  /** Reads the workspace that sends now. A send in flight keeps the one that started it. */
+  workspace: { current: (() => MobileWorkspaceContextValue) | null };
 }
 
 // One outbox per account for the whole run. A sign-out and a sign-in to the same account use it
@@ -46,7 +49,7 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
     storage: scope ? createOutboxFiles(scope) : null,
     deliver: async (message, delivery) => {
       if (!workspace.current) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return deliverOutboxMessage(workspace.current, message, delivery);
+      return deliverOutboxMessage(workspace.current(), message, delivery);
     },
     describeError: (error) => {
       const { t, errorMessage } = currentText();
@@ -74,17 +77,20 @@ function accountOutbox(scope: string | null): AccountOutbox {
  * screen, and the phone keeps them over a restart.
  */
 export function OutboxProvider({ children }: PropsWithChildren) {
-  const workspace = useMobileWorkspace();
+  // The provider reads the workspace when it sends, so a message for an agent does not render the app again.
+  const readWorkspace = useMobileWorkspaceReader();
   const { session } = useMobileSession();
   const [{ store, workspace: current }] = useState(() =>
     accountOutbox(session ? `${session.apiUrl}:${session.user.id}` : null),
   );
-  current.current = workspace;
-  const onlineKey = workspace.servers
-    .filter((server) => server.state === "online")
-    .map((server) => server.id)
-    .sort()
-    .join("\n");
+  current.current = readWorkspace;
+  const onlineKey = useMobileWorkspaceSelector((workspace) =>
+    workspace.servers
+      .filter((server) => server.state === "online")
+      .map((server) => server.id)
+      .sort()
+      .join("\n"),
+  );
   const online = useMemo(() => new Set(onlineKey ? onlineKey.split("\n") : []), [onlineKey]);
   useEffect(() => {
     void store.load();

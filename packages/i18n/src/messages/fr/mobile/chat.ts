@@ -93,7 +93,9 @@ export const messages = {
   "mobile.chat.preview.wrapLines": "Retour à la ligne",
   "mobile.chat.preview.selectHint": "Touchez longuement pour sélectionner une partie du code.",
   "mobile.chat.preview.share": "Partager",
-  "mobile.chat.preview.truncated": "Aperçu tronqué après {limit} caractères.",
+  "mobile.chat.preview.part": "Partie {part} sur {total}",
+  "mobile.chat.preview.previousPart": "Partie précédente",
+  "mobile.chat.preview.nextPart": "Partie suivante",
   "mobile.chat.preview.pdfFailed": "Impossible d’afficher ce PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossible de lire cette feuille de calcul.",
   "mobile.chat.preview.spreadsheetTruncated":
@@ -139,6 +141,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "FICHIER",
   "mobile.chat.attachment.tooLargeForMobile":
     "Ce fichier dépasse la limite mobile de {limit}. Ouvrez-le sur l’ordinateur.",
+  "mobile.chat.backdrop.agentSet": "{name} a défini l’arrière-plan",
+  "mobile.chat.backdrop.undo": "Annuler",
+  "mobile.chat.backdrop.dismiss": "Fermer",
   "mobile.chat.attachment.sharingUnavailable": "Le partage de fichiers n’est pas disponible sur cet appareil.",
   "mobile.chat.attachment.unavailable": "La pièce jointe n’est pas disponible. Réessayez.",
   "mobile.chat.attachment.openFailed": "Impossible d’ouvrir la pièce jointe",
@@ -493,7 +498,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Récent",
   "mobile.chat.history.loadingOlder": "Chargement des messages plus anciens…",
   "mobile.chat.history.retryOlder": "Réessayer de charger les messages plus anciens",
-  "mobile.chat.history.loadOlder": "Charger les messages plus anciens",
   "mobile.chat.history.connecting": "Connexion au serveur",
   "mobile.chat.history.loading": "Chargement de l’historique de la discussion",
   "mobile.chat.history.waiting": "En attente de connexion",

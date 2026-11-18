@@ -475,11 +475,14 @@ export function isBackgroundProcess(value: unknown): value is BackgroundProcess 
  * `driver-missing` says the build carries no driver, which every release does, and `error` says the
  * driver is there and answered with something else. Both are faults rather than steps, and they
  * stay apart because a report that only said "not ready" would hide which one happened.
+ * `restart-required` says that macOS reports both grants but still refuses Accessibility calls
+ * (#10658); a restart of OpenBot is the step the user takes, and the panel writes those steps.
  */
 export const COMPUTER_USE_STATUSES = [
   "unsupported",
   "driver-missing",
   "permissions-required",
+  "restart-required",
   "ready",
   "error",
 ] as const;

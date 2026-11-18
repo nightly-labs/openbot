@@ -44,6 +44,12 @@ export type AgentThreadOrigin = (typeof AGENT_THREAD_ORIGINS)[number];
 const AGENT_THREAD_TITLE_SOURCES = ["auto", "agent", "user"] as const;
 type AgentThreadTitleSource = (typeof AGENT_THREAD_TITLE_SOURCES)[number];
 
+/** A side thread in the list of `recent`, as its sort keys: the next page starts after it. */
+export interface ThreadListPosition {
+  updatedAt: string;
+  threadId: string;
+}
+
 /**
  * A side thread: a second conversation of one agent, with its own thread, next to the agent's own chat.
  *
@@ -157,15 +163,24 @@ export class AgentThreadStore {
 
   /**
    * The threads of this agent, open and archived, with activity (`updated_at`: a turn start, a close
-   * or a reopen) at or after `after`. The latest activity first.
+   * or a reopen) at or after `after`. The latest activity first. With `last`, the threads that come
+   * after it in this order: the next page of a list that ended with `last`.
    */
-  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+  recent(
+    agentId: string,
+    after: string | null,
+    limit: number,
+    last: ThreadListPosition | null = null,
+  ): AgentThreadRecord[] {
+    const lastUpdatedAt = last?.updatedAt ?? null;
     return databaseRows(
       this.#database.connection
         .prepare(
-          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?)
+           AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND thread_id > ?))
+           ORDER BY updated_at DESC, thread_id LIMIT ?`,
         )
-        .all(agentId, after, after, limit),
+        .all(agentId, after, after, lastUpdatedAt, lastUpdatedAt, lastUpdatedAt, last?.threadId ?? null, limit),
     ).map(decodeThread);
   }
 

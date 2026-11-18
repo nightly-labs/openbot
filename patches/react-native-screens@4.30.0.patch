@@ -166,10 +166,22 @@ index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacad
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
-index e217b2411d20c85db3ec84bb87765c1e9407fd3b..780a73a849434dce85a2be866824ab08ebb59c1c 100644
+index e217b2411d20c85db3ec84bb87765c1e9407fd3b..84b6467ec36b080eb2e30eea48682f4418e59d50 100644
 --- a/ios/RNSScreenStackHeaderConfig.mm
 +++ b/ios/RNSScreenStackHeaderConfig.mm
-@@ -563,12 +563,17 @@ RNS_IGNORE_SUPER_CALL_END
+@@ -96,7 +96,10 @@ RNS_IGNORE_SUPER_CALL_BEGIN
+ 
+ - (NSArray<UIView *> *)reactSubviews
+ {
+-  return _reactSubviews;
++  // OpenBot patch: return a copy. A shadow state update in a loop over these subviews can commit at once
++  // (`unstable_Immediate`) and mount or unmount a header subview, which changes `_reactSubviews`. The loop
++  // then throws "Collection was mutated while being enumerated" and the app stops.
++  return [_reactSubviews copy];
+ }
+ RNS_IGNORE_SUPER_CALL_END
+ 
+@@ -563,12 +566,17 @@ RNS_IGNORE_SUPER_CALL_END
        config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways : UINavigationItemLargeTitleDisplayModeNever;
  
  #if RNS_IPHONE_OS_VERSION_AVAILABLE(27_0)

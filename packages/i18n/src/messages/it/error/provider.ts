@@ -178,6 +178,8 @@ export const messages = {
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. OpenBot riproverà.",
   "error.provider.cliTimedOutRefresh":
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. Aggiorna i provider per riprovare.",
+  "error.provider.stoppedBeforeStart":
+    "{provider} si è fermato prima che questo messaggio iniziasse. Invia di nuovo il messaggio.",
   "error.provider.serviceUnreachable":
     "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
   "error.provider.serviceUnreachableRefresh":
@@ -188,6 +190,8 @@ export const messages = {
     "{provider} non ha elencato i suoi modelli entro {seconds} s. Il computer potrebbe essere occupato.",
   "error.provider.startStopped":
     "{provider} non si è avviato più volte di seguito, quindi OpenBot ha smesso di provare. Aggiorna i provider per riprovare.",
+  "error.provider.startPaused":
+    "{provider} non si è avviato più volte di seguito. OpenBot riproverà con il prossimo messaggio o la prossima routine. Per riprovare ora, aggiorna i provider.",
   "error.provider.tempDiskSpace":
     "{provider} ha bisogno di almeno 1 GB di spazio libero su disco per avviarsi. Libera spazio, poi aggiorna i provider.",
   "error.provider.noCodeSignIn": "Non si può accedere a {provider} con un codice.",
@@ -273,6 +277,8 @@ export const messages = {
     "Il modello OpenCode ha terminato il turno dopo il ragionamento, senza risposta. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.chatgptPageFailed": "OpenBot non è riuscito ad aprire la pagina di connessione di ChatGPT.",
   "error.provider.noneReady": "Nessun provider di agenti è pronto.",
   "error.provider.claudeTurnActive": "Attendi il turno attivo di Claude prima di aggiornare il suo contesto.",
@@ -303,6 +309,8 @@ export const messages = {
     "Google non ha accettato l'accesso a Gemini per questa richiesta. Invia di nuovo il messaggio. Se l'errore continua, riconnetti Gemini in Impostazioni.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini ha rifiutato questa richiesta. Scegli un altro modello, poi invia di nuovo il messaggio. Se non funziona ancora, inizia una nuova chat.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini ha perso la connessione con Google. Invia di nuovo il messaggio. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
   "error.provider.antigravityHistoryUnreadable":
@@ -501,6 +509,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
+  "error.provider.acpModelNotOffered":
+    "{provider} non offre {model} al momento. Scegli un altro modello per questo agente, poi riprova.",
   "error.provider.piStopped": "Pi non è in esecuzione. Connetti Pi e riprova.",
   "error.provider.piSessionMissing": "Il file della sessione di Pi non è disponibile su questo computer.",
   "error.provider.piResumeCancelled": "Pi ha annullato la ripresa della sessione. Riprova.",

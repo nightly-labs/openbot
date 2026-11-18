@@ -1,4 +1,5 @@
 import { fileReferenceName } from "@openbot/brand/file-reference";
+import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { removeAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
@@ -475,9 +476,12 @@ export function MessageBody(props: {
       generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
     // An image that a person's message names inline also shows as a thumbnail, as a picked image does.
     const showsReferencedImages = props.message.author === "you";
+    // Audio and video play only on their card, so a message that names them keeps the card (#11453).
     return shownAttachments().filter(
       (attachment) =>
-        (!referencedIds.has(attachment.id) || (showsReferencedImages && attachment.kind === "image")) &&
+        (!referencedIds.has(attachment.id) ||
+          (showsReferencedImages && attachment.kind === "image") ||
+          playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null) &&
         attachment.id !== generatedAttachmentId,
     );
   });

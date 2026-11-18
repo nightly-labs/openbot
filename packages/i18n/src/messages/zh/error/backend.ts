@@ -242,6 +242,8 @@ export const messages = {
     "此智能体只能使用有限数量的 MCP 服务器。要使用此服务器，请关闭智能体不需要的 MCP 服务器。",
   "error.backend.mcpRegistrationRefused":
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
+  "error.backend.mcpRegistrationUnavailable":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -252,6 +254,7 @@ export const messages = {
   "error.backend.mcpSignInNeedsHttps": "该服务器要求登录，而 OpenBot 仅通过 https 登录。请把地址改为 {url}。",
   "error.backend.mcpSignInCancelled": "登录已取消。",
   "error.backend.mcpSignInTimedOut": "未在浏览器中完成登录。",
+  "error.backend.mcpSignInRefused": "登录页面拒绝了访问。请重新登录。",
   "error.backend.mcpSignInResponseTimedOut": "登录响应未及时返回。",
   "error.backend.mcpSignInMetadataUnreadable": "OpenBot 无法读取该服务器的登录信息。请检查服务器地址后重试。",
   "error.backend.mcpSignInAnswerUnreadable":
@@ -260,6 +263,7 @@ export const messages = {
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
+  "error.backend.mcpServerStoppedDuringCall": "MCP 服务器在响应此次调用前停止了。",
   "error.backend.mcpToolSchemaRefused":
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":

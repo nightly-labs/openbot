@@ -165,6 +165,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     updateQueuedMessage,
     reorderQueue,
     stopActiveTurn,
+    stoppableSubagentTurn,
     usageLimits,
     usageLimitedModels,
     waitedUsageLimits,
@@ -656,6 +657,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         providerFailed={usageLimitsShown() ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
+        subagentTurnId={stoppableSubagentTurn(activeAgent())}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
         activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
         activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}

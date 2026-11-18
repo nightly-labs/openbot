@@ -68,6 +68,8 @@ export const messages = {
   "composer.voice.blocked": "الوصول إلى الميكروفون محظور. اسمح لـ OpenBot باستخدام الميكروفون في إعدادات النظام.",
   "composer.voice.noMicrophone": "لا يتوفر ميكروفون.",
   "composer.voice.startFailed": "تعذّر على OpenBot بدء التسجيل الصوتي.",
+  "composer.voice.microphoneUnavailable":
+    "تعذّر على OpenBot فتح الميكروفون. أغلق التطبيقات الأخرى التي تستخدمه، وتأكد من أنه متصل ومسموح به في إعدادات النظام، ثم حاول مرة أخرى.",
   "composer.voice.transcribeFailed": "تعذّر على OpenBot تحويل هذا التسجيل إلى نص.",
   "composer.reply.toYou": "رد على رسالتك",
   "composer.reply.toAgent": "رد على الوكيل",

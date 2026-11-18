@@ -6,7 +6,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
@@ -337,11 +337,20 @@ export class BootRecovery {
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
         : recovered;
+    // A teammate's result goes back to the queue once, so the agent that asked continues with it (#11857).
+    const requeued = new Set<string>();
     for (const id of deliveryIds) {
       // The drain starts the continuation with these deliveries, as for a plan.
       if (continuation && ownChat?.turnId)
         yield* this.#mailbox.requeueForPlan(id, ownChat.turnId).pipe(toBootRecoveryFailed);
-      // A failed provider read keeps the conservative interrupted result; never replay side effects.
+      else if (
+        terminal === "interrupted" &&
+        target !== null &&
+        (yield* this.#mailbox.requeueResultAfterRestart(id).pipe(toBootRecoveryFailed))
+      )
+        requeued.add(id);
+      // Any other delivery keeps the conservative result, also after a failed provider read; never replay
+      // its side effects. A result has none of its own, and its new turn gets a note to check what ran.
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
@@ -350,6 +359,7 @@ export class BootRecovery {
     // wait with no end (#11561). The drains after the recovery start it.
     if (!continuation) {
       for (const id of deliveryIds) {
+        if (requeued.has(id)) continue;
         const requesterId = yield* this.#mailbox
           .answerFailedRequest(
             id,
@@ -414,7 +424,8 @@ export class BootRecovery {
         this.#conversation.publishConversation(snapshot);
       }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      if (!continuation) for (const id of deliveryIds) this.#hooks.deliverySettled?.(id, terminal);
+      if (!continuation)
+        for (const id of deliveryIds) if (!requeued.has(id)) this.#hooks.deliverySettled?.(id, terminal);
     });
   });
 
@@ -527,6 +538,13 @@ export class BootRecovery {
                 this.#refreshBackfilledConversation(agent.id, publicThreadId);
               } catch (refreshFailure) {
                 this.#hooks.emitError("provider_history_backfill_pending", refreshFailure, agent.id);
+              }
+              // A provider that did not answer in time, such as Pi on a long chat (#11859), loses
+              // nothing: the chat comes from the database, and the import is not complete, so the
+              // next start reads it again. The user cannot act on it, so only the log keeps it.
+              if (containsCause(failure, (cause) => cause instanceof RequestTimeoutError)) {
+                logger.warn("A provider history read timed out.", { provider: session.provider, agentId: agent.id });
+                return;
               }
               // No rollout, or none saved yet, means no history to import, so it is not an error to show.
               if (!containsCause(failure, (cause) => isCodexMissingRollout(cause) || isCodexRolloutPending(cause)))

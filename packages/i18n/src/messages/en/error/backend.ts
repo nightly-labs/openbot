@@ -263,6 +263,8 @@ export const messages = defineMessages("error.backend", {
     "This agent can use only a limited number of MCP servers. To use this server, turn off an MCP server that the agent does not need.",
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
+  "error.backend.mcpRegistrationUnavailable":
+    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, save this server in Marketplace, Apps, then add a sign-in app to it.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
   "error.backend.mcpSignInForgotten": "The MCP sign-in was forgotten while it was running.",
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
@@ -274,6 +276,7 @@ export const messages = defineMessages("error.backend", {
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
+  "error.backend.mcpSignInRefused": "The sign-in page refused access. Sign in again.",
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot could not read the sign-in information of this server. Check the server address and try again.",
@@ -285,6 +288,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
+  "error.backend.mcpServerStoppedDuringCall": "The MCP server stopped before it answered this call.",
   "error.backend.mcpToolSchemaRefused":
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":

@@ -969,7 +969,8 @@ export const messages = {
     "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "mobile.server.connectors.whatsapp.add": "Toevoegen",
   "mobile.server.connectors.whatsapp.groupTitle": "Voeg een groep toe",
-  "mobile.server.connectors.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "mobile.server.connectors.whatsapp.groupSearch": "Zoek groepen",
   "mobile.server.connectors.whatsapp.groupsLoading": "Groepen lezen…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
@@ -1616,7 +1617,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Naar",
   "mobile.server.transfer.copyNoAgents": "Deze server heeft geen agents.",
   "mobile.server.transfer.copyNotMoved":
-    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+    "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
   "mobile.server.transfer.copying": "Kopiëren…",
   "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",

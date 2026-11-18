@@ -916,7 +916,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "mobile.server.connectors.whatsapp.add": "添加",
   "mobile.server.connectors.whatsapp.groupTitle": "添加群组",
-  "mobile.server.connectors.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "mobile.server.connectors.whatsapp.groupSearch": "搜索群组",
   "mobile.server.connectors.whatsapp.groupsLoading": "正在读取群组…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",
@@ -1524,7 +1525,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "到",
   "mobile.server.transfer.copyNoAgents": "此服务器没有助手。",
   "mobile.server.transfer.copyNotMoved":
-    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+    "助手所在的频道、自动化任务流程、工作流和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "mobile.server.transfer.copySubmit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
   "mobile.server.transfer.copying": "正在复制…",
   "mobile.server.transfer.copyFailed": "复制未完成。",

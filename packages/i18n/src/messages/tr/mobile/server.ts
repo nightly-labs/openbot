@@ -996,7 +996,8 @@ export const messages = {
     "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "mobile.server.connectors.whatsapp.add": "Ekle",
   "mobile.server.connectors.whatsapp.groupTitle": "Bir grup ekleyin",
-  "mobile.server.connectors.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "mobile.server.connectors.whatsapp.groupSearch": "Grup ara",
   "mobile.server.connectors.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
@@ -1638,7 +1639,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Hedef",
   "mobile.server.transfer.copyNoAgents": "Bu sunucuda ajan yok.",
   "mobile.server.transfer.copyNotMoved":
-    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+    "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
   "mobile.server.transfer.copying": "Kopyalanıyor…",
   "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",

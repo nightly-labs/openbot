@@ -72,6 +72,8 @@ export const messages = {
     "マイクへのアクセスがブロックされています。システム設定で OpenBot にマイクの使用を許可してください。",
   "composer.voice.noMicrophone": "使用できるマイクがありません。",
   "composer.voice.startFailed": "OpenBot は音声の録音を開始できませんでした。",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot はマイクを開けませんでした。マイクを使用している他のアプリを閉じ、マイクが接続され、システム設定で許可されていることを確認してから、もう一度お試しください。",
   "composer.voice.transcribeFailed": "OpenBot はこの録音を文字起こしできませんでした。",
   "composer.reply.toYou": "あなたのメッセージに返信しています",
   "composer.reply.toAgent": "エージェントに返信しています",

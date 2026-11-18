@@ -174,6 +174,7 @@ export const messages = {
     "{provider} reageerde niet op tijd. De computer is misschien bezet. OpenBot probeert het opnieuw.",
   "error.provider.cliTimedOutRefresh":
     "{provider} reageerde niet op tijd. De computer is misschien bezet. Vernieuw de aanbieders om het opnieuw te proberen.",
+  "error.provider.stoppedBeforeStart": "{provider} stopte voordat dit bericht begon. Stuur het bericht opnieuw.",
   "error.provider.serviceUnreachable":
     "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding. OpenBot probeert het opnieuw.",
   "error.provider.serviceUnreachableRefresh":
@@ -184,6 +185,8 @@ export const messages = {
     "{provider} gaf de modellen niet binnen {seconds} s. De computer is misschien bezet.",
   "error.provider.startStopped":
     "{provider} is meerdere keren achter elkaar niet gestart, dus OpenBot probeert het niet meer. Vernieuw de aanbieders om het opnieuw te proberen.",
+  "error.provider.startPaused":
+    "{provider} is meerdere keren achter elkaar niet gestart. OpenBot probeert het opnieuw bij het volgende bericht of de volgende routine. Vernieuw de providers om het nu te proberen.",
   "error.provider.tempDiskSpace":
     "{provider} heeft minstens 1 GB vrije schijfruimte nodig om te starten. Maak ruimte vrij en vernieuw daarna de aanbieders.",
   "error.provider.noCodeSignIn": "Bij {provider} kun je niet inloggen met een code.",
@@ -271,6 +274,8 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -301,6 +306,8 @@ export const messages = {
     "Google heeft de Gemini-aanmelding voor dit verzoek niet geaccepteerd. Stuur je bericht opnieuw. Blijft de fout, verbind Gemini dan opnieuw in Instellingen.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini heeft de verbinding met Google verloren. Stuur je bericht opnieuw. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
   "error.provider.antigravityHistoryUnreadable":
@@ -500,6 +507,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpModelNotOffered":
+    "{provider} biedt {model} nu niet aan. Kies een ander model voor deze agent en probeer het opnieuw.",
   "error.provider.piStopped": "Pi draait niet. Verbind Pi en probeer het opnieuw.",
   "error.provider.piSessionMissing": "Het Pi-sessiebestand is niet beschikbaar op deze computer.",
   "error.provider.piResumeCancelled": "Pi heeft het hervatten van de sessie geannuleerd. Probeer het opnieuw.",

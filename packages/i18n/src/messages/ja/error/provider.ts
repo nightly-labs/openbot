@@ -182,6 +182,8 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。OpenBot が再試行します。",
   "error.provider.cliTimedOutRefresh":
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
+  "error.provider.stoppedBeforeStart":
+    "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
   "error.provider.serviceUnreachable":
     "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
   "error.provider.serviceUnreachableRefresh":
@@ -192,6 +194,8 @@ export const messages = {
     "{provider} が {seconds} 秒以内にモデルを一覧表示しませんでした。コンピューターの負荷が高い可能性があります。",
   "error.provider.startStopped":
     "{provider} の起動に続けて何度も失敗したため、OpenBot は再試行を停止しました。プロバイダーを更新して再試行してください。",
+  "error.provider.startPaused":
+    "{provider} の起動に続けて何度も失敗しました。OpenBot は次のメッセージまたはルーティンで再試行します。今すぐ試すには、プロバイダーを更新してください。",
   "error.provider.tempDiskSpace":
     "{provider} の起動には 1 GB 以上の空きディスク容量が必要です。空き容量を確保してから、プロバイダーを更新してください。",
   "error.provider.noCodeSignIn": "{provider} にはコードでサインインできません。",
@@ -277,6 +281,8 @@ export const messages = {
     "OpenCode のモデルが、推論のあと回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
@@ -308,6 +314,8 @@ export const messages = {
     "Google はこのリクエストの Gemini サインインを受け付けませんでした。メッセージをもう一度送信してください。エラーが続く場合は、設定で Gemini を再接続してください。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini と Google の接続が切れました。メッセージをもう一度送信してください。({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini がこのリクエストを拒否しましたが、原因は示されていません。エージェントが開いた画像など、チャット履歴内の項目が原因の場合があります。OpenBot はチャット履歴を引き継いだ新しい Gemini セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選んでください。",
   "error.provider.antigravityHistoryUnreadable":
@@ -517,6 +525,8 @@ export const messages = {
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
   "error.provider.acpSessionBusy":
     "{provider} は停止したターンをまだ終了しています。少し待ってからもう一度お試しください。",
+  "error.provider.acpModelNotOffered":
+    "{provider} は現在 {model} を提供していません。このエージェントに別のモデルを選んでから、もう一度お試しください。",
   "error.provider.piStopped": "Pi が実行されていません。Pi を接続してもう一度お試しください。",
   "error.provider.piSessionMissing": "Pi のセッションファイルがこのコンピューターにありません。",
   "error.provider.piResumeCancelled": "Pi がセッションの再開をキャンセルしました。もう一度お試しください。",

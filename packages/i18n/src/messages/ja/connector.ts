@@ -467,7 +467,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "省略できます。空の場合、一覧には電話番号が表示されます。",
   "connector.whatsapp.add": "追加",
   "connector.whatsapp.groupTitle": "グループを追加",
-  "connector.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "connector.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "connector.whatsapp.groupSearch": "グループを検索",
   "connector.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",

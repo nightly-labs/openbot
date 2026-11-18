@@ -7,6 +7,7 @@ import {
   isNoUpdateToolCall,
   isTextAnswer,
   keptQuietAnswer,
+  quietNarration,
   quietTeammateTurnDelivery,
   teammateRequest,
 } from "./agent/routine-quiet-runs";
@@ -302,6 +303,8 @@ function importCompletedTurn(
       fragment.status === undefined || fragment.status === "completed"
         ? yield* routineTurnAnswers(input, fragment.turnId)
         : "none";
+    // One for the whole turn: a repeated note on a later page stays out, as at the turn completion.
+    const keep = routine === "none" ? null : keptRoutineMessage(routine, input.provider);
     let importedCount = 0;
     let afterIndex = -1;
     let complete = false;
@@ -350,8 +353,7 @@ function importCompletedTurn(
       };
       // The turn completion dropped these answers from the chat, or kept them as quiet answers, so the
       // import does the same.
-      const pageMessages =
-        routine === "none" ? partial.messages : partial.messages.flatMap(keptRoutineMessage(routine));
+      const pageMessages = keep === null ? partial.messages : partial.messages.flatMap(keep);
       const reconciled =
         input.provider === "claude"
           ? mergeProviderHistoryMessages(
@@ -479,11 +481,14 @@ function storedTurnReport(input: ProviderHistoryImportInput, turnId: string): bo
   return row !== undefined;
 }
 
-function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {
+function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">, provider: AgentProviderId) {
+  const narration = quietNarration(provider);
   return (message: ConversationMessage): ConversationMessage[] => {
     if (message.author !== "assistant") return [message];
     if (routine === "quiet") {
-      return keptQuietAnswer(message) ? [{ ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE }] : [];
+      return keptQuietAnswer(message) || narration(message)
+        ? [{ ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE }]
+        : [];
     }
     if (routine === "image") return isTextAnswer(message) ? [] : [message];
     return message.itemType === "commentary" || !isNoUpdateAnswer(message.text) ? [message] : [];

@@ -996,7 +996,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Aggiungi",
   "mobile.server.connectors.whatsapp.groupTitle": "Aggiungi un gruppo",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "Le persone in questo gruppo possono affidare lavoro ai tuoi agenti.",
+    "Le persone in questo gruppo possono affidare lavoro ai tuoi agenti quando menzionano il numero o rispondono ai suoi messaggi.",
   "mobile.server.connectors.whatsapp.groupSearch": "Cerca gruppi",
   "mobile.server.connectors.whatsapp.groupsLoading": "Lettura dei gruppi…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot non è riuscito a leggere i gruppi",
@@ -1644,7 +1644,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "A",
   "mobile.server.transfer.copyNoAgents": "Questo server non ha agenti.",
   "mobile.server.transfer.copyNotMoved":
-    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
   "mobile.server.transfer.copying": "Copia in corso…",
   "mobile.server.transfer.copyFailed": "La copia non è terminata.",

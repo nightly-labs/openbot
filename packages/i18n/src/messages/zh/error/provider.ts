@@ -154,11 +154,14 @@ export const messages = {
   "error.provider.cliNotReady": "{provider} CLI 尚未就绪或未登录。",
   "error.provider.cliTimedOut": "{provider} 未及时响应，电脑可能正忙。OpenBot 将重试。",
   "error.provider.cliTimedOutRefresh": "{provider} 未及时响应，电脑可能正忙。请刷新服务商以重试。",
+  "error.provider.stoppedBeforeStart": "{provider} 在此消息开始前停止了。请重新发送此消息。",
   "error.provider.serviceUnreachable": "{provider} 无法连接到其服务。请检查网络连接。OpenBot 将重试。",
   "error.provider.serviceUnreachableRefresh": "{provider} 无法连接到其服务。请检查网络连接，然后刷新服务商。",
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",
   "error.provider.acpModelsTimedOut": "{provider} 未在 {seconds} 秒内列出模型，电脑可能正忙。",
   "error.provider.startStopped": "{provider} 连续多次启动失败，OpenBot 已停止尝试。请刷新服务商以重试。",
+  "error.provider.startPaused":
+    "{provider} 连续多次启动失败。OpenBot 会在下一条消息或自动化任务时再试。要立即重试，请刷新服务商。",
   "error.provider.tempDiskSpace": "{provider} 启动至少需要 1 GB 可用磁盘空间。请清理空间后刷新服务商。",
   "error.provider.noCodeSignIn": "{provider} 不支持用验证码登录。",
   "error.provider.codeLoginNoLink": "服务商没有显示登录链接，请重试。",
@@ -234,6 +237,8 @@ export const messages = {
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
   "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} 执行了一些步骤后结束了本轮对话，但没有给出回答。再次发送相同请求之前，请先问问助手做了什么。",
   "error.provider.chatgptPageFailed": "OpenBot 无法打开 ChatGPT 连接页面。",
   "error.provider.noneReady": "没有可用的助手服务商。",
   "error.provider.claudeTurnActive": "请等待当前 Claude 对话结束，再刷新其上下文。",
@@ -261,6 +266,7 @@ export const messages = {
     "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini 与 Google 的连接已断开。请重新发送消息。({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini 拒绝了此请求，但没有给出原因。聊天记录中的某一项可能导致这种情况，例如智能体打开的图片。OpenBot 已带着聊天记录开启新的 Gemini 会话，请重试。如果仍然报错，请换一个模型。",
   "error.provider.antigravityHistoryUnreadable":
@@ -432,6 +438,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
+  "error.provider.acpModelNotOffered": "{provider} 目前不提供 {model}。请为此智能体选择其他模型，然后重试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",
   "error.provider.piSessionMissing": "该电脑上没有可用的 Pi 会话文件。",
   "error.provider.piResumeCancelled": "Pi 取消了会话恢复，请重试。",
