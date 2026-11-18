@@ -4,6 +4,7 @@
  */
 
 import type { UpdateStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { AccountUpdateIsland } from "@openbot/ui/features/account/AccountUpdateIsland";
 import { useText } from "@openbot/ui/text";
 import { fn } from "storybook/test";
@@ -60,6 +61,13 @@ export const Downloading: Story = {
 
 export const Ready: Story = {
   args: { updateStatus: status({ phase: "ready", progress: 100 }) },
+};
+
+/** macOS: the last restart did not install this update. The full sentence is the title. */
+export const NotInstalled: Story = {
+  args: {
+    updateStatus: status({ phase: "ready", progress: 100, message: sourceText("error.update.notInstalled") }),
+  },
 };
 
 export const Installing: Story = {

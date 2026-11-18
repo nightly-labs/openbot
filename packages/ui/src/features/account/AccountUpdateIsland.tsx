@@ -105,6 +105,8 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     if (downloading() && percent !== null) return t("account.update.downloadingLabel", { percent });
     if (phase() === "installing" || (actionPending() && ready())) return t("account.update.restartingLabel");
     if (failed()) return t("account.update.retryLabel", { reason: errorMessage() });
+    const notInstalled = notInstalledMessage();
+    if (notInstalled) return t("account.update.retryLabel", { reason: notInstalled });
     return ready() ? t("account.update.restartLabel") : t("account.update.downloadLabel");
   });
 
