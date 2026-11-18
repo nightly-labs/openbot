@@ -7,7 +7,9 @@ private let quickActionEvent = "onQuickAction"
 private let symbols = [
   "agent": "bubble.left",
   "routines": "calendar",
-  "search": "magnifyingglass"
+  "search": "magnifyingglass",
+  "share": "square.and.arrow.up",
+  "support": "heart"
 ]
 
 struct QuickActionItem: Record {
@@ -57,9 +59,9 @@ public class QuickActionsModule: Module {
     }
     .runOnQueue(.main)
 
-    OnStartObserving {
+    OnStartObserving { [weak self] in
       DispatchQueue.main.async {
-        QuickActionInbox.shared.listen { [weak self] id in
+        QuickActionInbox.shared.listen { id in
           self?.sendEvent(quickActionEvent, ["id": id])
         }
       }

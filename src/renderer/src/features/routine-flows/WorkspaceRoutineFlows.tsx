@@ -5,6 +5,7 @@
  */
 
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
+import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { useText } from "@openbot/ui/text";
@@ -73,6 +74,7 @@ export function WorkspaceRoutineFlows() {
     return server?.kind === "remote" && !server.compatibility?.hostAppVersion;
   };
   const webhooks = () => serverCanAdminister(activeServer(), EVENTS_CAPABILITY);
+  const stops = () => serverSupportsCapability(activeServer(), ROUTINE_FLOW_STOP_CAPABILITY);
   /** A routine is made in the agent's settings, so the agent's chat opens with a new routine in them. */
   function createRoutine(agentId: string): void {
     layout.setSidebarView("agents");
@@ -94,7 +96,7 @@ export function WorkspaceRoutineFlows() {
     >
       {(id) => (
         <RoutineFlowsCanvas
-          host={desktopRoutineFlowsHost(id, webhooks)}
+          host={desktopRoutineFlowsHost(id, webhooks, stops)}
           agent={activeAgent()}
           agents={agentList()}
           newAgentModels={newAgentModels()}

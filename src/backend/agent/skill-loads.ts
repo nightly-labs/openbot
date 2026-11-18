@@ -30,7 +30,7 @@ const READ_COMMAND = /(?:^|[\s;&|('"])(?:cat|sed|head|tail|nl|bat|less|more|awk|
 /** A `sed` that edits the file in place, which shows nothing. */
 const SED_IN_PLACE = /(?:^|[\s;&|('"])sed\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)/u;
 /** The separators of the commands in one shell line. */
-const COMMAND_SEPARATOR = /&&|\|\||[;|\n]/u;
+export const COMMAND_SEPARATOR = /&&|\|\||[;|\n]/u;
 /** About four bytes of English text make one token. */
 const BYTES_PER_TOKEN = 4;
 

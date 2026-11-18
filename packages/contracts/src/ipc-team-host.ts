@@ -1,9 +1,12 @@
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
+import type { HostAppearanceEvent, ServerAppearance } from "./team-protocol/host-appearance-v1";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
 import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
+
+export type { HostAppearanceEvent, ServerAppearance, ServerAppearanceShape } from "./team-protocol/host-appearance-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
@@ -29,6 +32,8 @@ export type ServerConnectionIssueCode =
   | "client_update_required"
   | "host_update_required"
   | "protocol_error"
+  /** The server stopped its start loop. The message is the reason that the host sent. */
+  | "server_safe_mode"
   | "authentication_required"
   | "network_unavailable";
 
@@ -87,6 +92,11 @@ export interface ServerSummary {
   apiUrl: string | null;
   remoteDesktopAvailable: boolean;
   logoUrl: string | null;
+  /**
+   * The shape and colour that the server shows with no logo (`host-appearance-v1`). Null for the
+   * automatic look. Absent when nothing said it: an older host or account server.
+   */
+  appearance?: ServerAppearance | null;
   role: TeamRole | null;
   active: boolean;
   /** The active members that the host allows. Absent when the account server did not give one. */
@@ -116,6 +126,11 @@ export interface ServerSummary {
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
+  /**
+   * A new connection whose capability read has not ended. The workspace load waits for it, so that one
+   * load reads all the data the host can give. Absent at all other times. Local IPC metadata.
+   */
+  capabilitiesPending?: true;
   /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
   hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
   /**
@@ -177,6 +192,8 @@ export interface HostStatus {
   serverName: string | null;
   apiUrl: string | null;
   logoUrl: string | null;
+  /** The shape and colour that this server shows with no logo. Null for the automatic look. */
+  appearance: ServerAppearance | null;
   apiOnline: boolean;
   remoteDesktopReady: boolean;
   // True once this host has refused a member because the operating system will not let OpenBot record
@@ -196,6 +213,8 @@ export interface ConfigureHostInput {
 export interface UpdateHostIdentityInput {
   serverName?: string;
   logo?: AvatarImageInput | null;
+  /** Null gives the server its automatic look again. On a joined server it needs `host-appearance-v1`. */
+  appearance?: ServerAppearance | null;
 }
 
 export interface TeamMemberSummary {
@@ -329,6 +348,7 @@ export type TeamRealtimeEvent =
       typing: boolean;
     }
   | HostRestartEvent
+  | HostAppearanceEvent
   | LiveVoiceEvent
   | MachineAlertEvent;
 

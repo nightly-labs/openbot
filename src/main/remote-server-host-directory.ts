@@ -50,6 +50,51 @@ export function watchRemoteHostDirectory(options: {
   return () => clearInterval(timer);
 }
 
+/** How often a server list is read again while an install command can still be used. */
+const SERVER_CLAIM_REFRESH_INTERVAL_MS = 5_000;
+/** A command works for 15 minutes. A clock that is behind the account service does not make the watch longer. */
+const SERVER_CLAIM_MAX_WATCH_MS = 15 * 60_000;
+
+/**
+ * A server that signs in with an install command reaches this computer's list through Signal only
+ * when this computer holds a Signal socket. Otherwise it waits for the next account check, and the
+ * install card and dialog stay at waiting (#8545). While a command can still be used, this reads
+ * the list again at short intervals, until a new server for each command shows or the last command
+ * expires.
+ */
+export function watchServerClaims(options: {
+  /** The ids of the remote servers in the list now. */
+  serverIds(): readonly string[];
+  refresh(): void;
+}): { add(expiresAt: number): void; stop(): void } {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let known = new Set<string>();
+  let claims = 0;
+  let deadline = 0;
+  const stop = () => {
+    clearInterval(timer);
+    timer = undefined;
+    claims = 0;
+  };
+  const tick = () => {
+    const fresh = options.serverIds().filter((id) => !known.has(id)).length;
+    if (fresh >= claims || Date.now() >= deadline) stop();
+    else options.refresh();
+  };
+  return {
+    add(expiresAt) {
+      if (!timer) {
+        known = new Set(options.serverIds());
+        timer = setInterval(tick, SERVER_CLAIM_REFRESH_INTERVAL_MS);
+        timer.unref();
+      }
+      claims += 1;
+      deadline = Math.max(deadline, Math.min(expiresAt, Date.now() + SERVER_CLAIM_MAX_WATCH_MS));
+    },
+    stop,
+  };
+}
+
 interface HostKeyPin {
   readonly hostId: string;
   readonly publicKey: string;
@@ -180,6 +225,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         encryptedToken: "",
         remoteDesktopAvailable: false,
         logoVersion: host.logoKey,
+        ...(host.appearance === undefined ? {} : { appearance: host.appearance }),
         role: host.role,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
@@ -212,6 +258,11 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
+    // A connected host sends its look at connect and after each change, so that look is current.
+    // The account copy can be older: a local server child does not copy it, and a copy can fail.
+    // An account server from before `host-appearance-v1` lists none.
+    if (server.appearance !== undefined && (refreshed.appearance === undefined || input.isConnected(server.id)))
+      refreshed.appearance = server.appearance;
     return [refreshed];
   });
   for (const server of listed) {

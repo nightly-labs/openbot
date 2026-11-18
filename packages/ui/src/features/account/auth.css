@@ -1297,21 +1297,16 @@ textarea:not(.ui-textarea):focus-visible {
   background: var(--openbot-accent-strong);
 }
 
-/* No vertical scroll bar: the wheel, the trackpad and the keyboard still scroll. Horizontal bars
- * stay, because a mouse wheel cannot scroll a code block or a table sideways. */
+/* No scroll bar on either axis: the wheel, the trackpad and the keyboard still scroll. Content
+ * that a mouse wheel cannot scroll sideways, such as a table or a code block, uses ScrollEdges,
+ * which shows arrows on the edge with more content. */
+* {
+  scrollbar-width: none;
+}
+
 ::-webkit-scrollbar {
   width: 0;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-border-strong);
-  background-clip: padding-box;
+  height: 0;
 }
 
 .scroll-fade-top:not(.scroll-fade-bottom) {

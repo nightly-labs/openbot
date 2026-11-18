@@ -190,6 +190,7 @@ async function start(): Promise<void> {
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
     getMainWindow: () => mainWindow,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     presentMainWindow: () => undefined,
     performHaptic: () => undefined,
     // A reply or an answer reaches no agent in this test. The handler records each action.
@@ -228,6 +229,8 @@ async function start(): Promise<void> {
         controller.setInputRegion(rendererId, rects);
       },
     },
+    // This test opens no chat window.
+    chatRendererIds: () => new Set(),
     setXWayland: () => Effect.void,
     keepXWayland: () => Effect.void,
   });

@@ -12,6 +12,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
+import type { ThreadItem } from "../conversation/threads/thread-types";
 import type { ServerMenuProps } from "../servers/ServerMenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
@@ -39,6 +40,8 @@ export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
  * How the list orders the chats in the sections. Pins and "Needs you" come first in each order, and
  * none of them changes the saved `agentOrder`.
  * - `manual`: the saved order of the layout.
+ * - `recent`: each section shows its chats by last activity, the most recent first. Chats do not
+ *   drag in this order, because the order is not manual.
  * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
  *   back to their place when they are read.
  * - `unread-first`: each section shows its unread chats first, then the others, both by last
@@ -46,10 +49,11 @@ export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
  *
  * Neither unread order moves a muted agent (`mutedAgentIds`): it stays in its place with its badge.
  */
-export type SidebarChatOrder = "manual" | "unread-group" | "unread-first";
+export type SidebarChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
 
 export const SIDEBAR_CHAT_ORDERS = [
   "manual",
+  "recent",
   "unread-group",
   "unread-first",
 ] as const satisfies readonly SidebarChatOrder[];
@@ -57,9 +61,15 @@ export const SIDEBAR_CHAT_ORDERS = [
 /** The name of each order, in the sidebar menu and in Settings. */
 export const SIDEBAR_CHAT_ORDER_LABEL = {
   manual: "sidebar.order.manual",
+  recent: "sidebar.order.recent",
   "unread-group": "sidebar.order.unreadGroup",
   "unread-first": "sidebar.order.unreadFirst",
 } as const satisfies Record<SidebarChatOrder, AppTextKey>;
+
+/** True when the order sorts the chats of each section itself, so a chat cannot keep a dropped place. */
+export function sidebarChatOrderSortsSections(order: SidebarChatOrder | undefined): boolean {
+  return order === "recent" || order === "unread-first";
+}
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */
@@ -92,6 +102,8 @@ export interface SidebarProps {
   chatHistory?: SidebarChatHistory | undefined;
   /** A new OpenBot version of the server. The header shows a button that opens its update. */
   serverUpdate?: { version: string; running: boolean; onOpen: () => void } | undefined;
+  /** Content at the end of the top bar, after its buttons. The desktop dev build puts the worktree branch here. */
+  topbarDetail?: JSX.Element | undefined;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean | undefined;
@@ -177,6 +189,8 @@ export interface SidebarProps {
   onRestoreAgent?: ((agentId: string) => void) | undefined;
   /** Opens the agent's chat with a new thread. Without it, such as on a host without threads, the agent menu shows no new thread item. */
   onNewAgentThread?: ((agentId: string) => void) | undefined;
+  /** The side threads of the agents, under their rows and in a card. Without it, such as on a host without threads, the rows show none. */
+  agentThreads?: SidebarAgentThreads | undefined;
   /** Opens the agent's chat in a window of its own. Without it, the agent menu shows no window item. */
   onOpenAgentWindow?: ((agentId: string) => void) | undefined;
   /** The agents whose chat is open in a window of its own. Their rows show a window mark. */
@@ -201,6 +215,23 @@ export interface SidebarProps {
         onSelect: () => void;
       }
     | undefined;
+}
+
+/**
+ * The side threads of the agents. A chevron on an agent row shows them under the row, and a longer
+ * hover on the row shows them in a card with a new thread item.
+ */
+export interface SidebarAgentThreads {
+  /** The side threads of an agent that are not archived, the latest first. Empty until `load` reads them. */
+  threads: (agentId: string) => readonly ThreadItem[];
+  /** The side thread that the open chat of this agent shows, if any. */
+  openId: (agentId: string) => string | undefined;
+  /** Reads the threads of an agent. The sidebar calls it when the pointer comes to the row and when the list opens. */
+  load: (agentId: string) => void;
+  /** Opens the agent's chat on a side thread. */
+  onOpen: (agentId: string, threadId: string) => void;
+  /** Opens the agent's chat with a new thread. Without it, the card has no new thread item. */
+  onNew?: ((agentId: string) => void) | undefined;
 }
 
 export interface SidebarChatHistory {

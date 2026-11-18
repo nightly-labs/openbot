@@ -7,10 +7,15 @@ export const messages = {
   "error.mcp.redirectRefused": "로그인이 거부되었어요. OpenBot으로 돌아가 다시 시도해 주세요.",
   "error.mcp.redirectNoSignIn": "대기 중인 로그인이 없어요. 이미 종료되었을 수 있어요.",
   "error.mcp.redirectSignedIn": "OpenBot에 로그인했어요. 이 창을 닫아도 돼요.",
+  "error.mcp.redirectNotSaved": "로그인이 완료되지 않았어요. OpenBot으로 돌아가 이유를 확인하세요.",
   "error.mcp.signInFileUnreadable": "MCP 로그인 파일을 읽을 수 없어요.",
   "error.mcp.signInFileTooLarge": "MCP 로그인 파일이 너무 커요.",
   "error.mcp.unsupported": "이 서버는 MCP 서버를 지원하지 않아요.",
   "error.mcp.signInOnHost": "MCP 서버 로그인은 호스트 컴퓨터의 OpenBot에서만 할 수 있어요.",
+  "error.mcp.signInPageOnServer":
+    "이 로그인 페이지는 서버에서만 열립니다. 서버의 소유자나 관리자에게 로그인을 요청하세요.",
+  "error.mcp.signInPageOnServerSwitch":
+    "이 로그인 페이지는 서버에서만 열립니다. 이 서버로 전환한 다음 '로그인'을 다시 선택하세요.",
   "error.mcp.signInAppUnsupported": "이 서버는 로그인 앱을 지원하지 않아요. 호스트에서 OpenBot을 업데이트해 주세요.",
   "error.mcp.redirectRelayed": "OpenBot이 로그인 정보를 서버로 보냈어요. 이 창을 닫아도 돼요.",
   "error.mcp.relayEnded": "이 로그인이 종료되었어요. 다시 시작해 주세요.",

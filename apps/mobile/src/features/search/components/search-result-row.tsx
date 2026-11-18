@@ -12,6 +12,7 @@ import FileText from "lucide-react-native/icons/file-text";
 import Info from "lucide-react-native/icons/info";
 import Languages from "lucide-react-native/icons/languages";
 import LifeBuoy from "lucide-react-native/icons/life-buoy";
+import MessagesSquare from "lucide-react-native/icons/messages-square";
 import MonitorSmartphone from "lucide-react-native/icons/monitor-smartphone";
 import Palette from "lucide-react-native/icons/palette";
 import Radio from "lucide-react-native/icons/radio";
@@ -143,6 +144,7 @@ const SETTING_ICON = {
   notifications: Bell,
   liveActivities: Radio,
   privacy: ShieldCheck,
+  conversations: MessagesSquare,
   hiddenChats: EyeOff,
   deletedChannels: Trash2,
   support: LifeBuoy,
@@ -174,6 +176,8 @@ function openSetting(id: MobileSearchSettingId, serverId: string) {
       return router.push("/settings/notifications");
     case "privacy":
       return router.push("/settings/privacy");
+    case "conversations":
+      return router.push("/settings/conversations");
     case "hiddenChats":
       return router.push("/settings/hidden-chats");
     case "deletedChannels":

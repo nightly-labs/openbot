@@ -12,7 +12,7 @@ import { useText } from "../text";
 import { toast } from "../toast";
 import { createCodeSignInFallback } from "./createCodeSignInFallback";
 import type { ProviderAlternativeSignIn, ProviderConnection, ProviderPickerOption } from "./ProviderPicker";
-import type { ProviderAccountActions } from "./provider-accounts";
+import { accountCodeSignInOffered, type ProviderAccountActions } from "./provider-accounts";
 
 /** The callbacks a provider row runs. The onboarding picker and the Providers settings page pass their own. */
 export interface ProviderRowHost {
@@ -195,6 +195,14 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
       setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
     );
   };
+  /** A new account can also sign in with a code, where a browser sign-in is not possible. */
+  const accountCodeOffered = () => accountsOffered() && accountCodeSignInOffered(option().id, host.accountActions);
+  const addAccountWithCode = () => {
+    setAccountError(null);
+    void Promise.resolve(host.accountActions?.connectWithCode?.(option().id, null)).catch((error: unknown) =>
+      setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
+    );
+  };
   const installOffered = () =>
     !runtimeStatus() &&
     agentProviderDescriptor(option().id).installGuideLink !== null &&
@@ -270,6 +278,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     accountsOffered,
     accountError,
     addAccount,
+    accountCodeOffered,
+    addAccountWithCode,
     installOffered,
     signInOffered,
     apiKeyOffered,
@@ -282,6 +292,20 @@ export type ProviderRow = ReturnType<typeof createProviderRow>;
 /** OpenCode runs user endpoints when its CLI is installed and answers; sign-in is irrelevant. */
 export function servesCustomProvider(openCode: ProviderPickerOption | undefined): boolean {
   return openCode?.state === "available" || openCode?.state === "sign-in-required";
+}
+
+/**
+ * The OpenCode download that makes Add of a custom endpoint usable, while it is not. The onboarding
+ * picker and the Custom provider page of settings show it in place of Add (#9191).
+ */
+export function customEngineDownloadAction(
+  openCode: ProviderPickerOption | undefined,
+): "download" | "cancel" | "retry" | undefined {
+  const phase = openCode?.runtimeStatus?.phase;
+  if (phase === "not-downloaded") return "download";
+  if (phase === "downloading") return "cancel";
+  if (phase === "download-error") return "retry";
+  return undefined;
 }
 
 export type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting" | "update-available";

@@ -216,7 +216,7 @@ export function AgentAppearancePicker({
 }
 
 /** A group of the editor: its name, actions at the end of the name, and a card, as settings groups show. */
-function AppearanceSection({
+export function AppearanceSection({
   title,
   actions,
   plain = false,
@@ -241,7 +241,7 @@ function AppearanceSection({
   );
 }
 
-function HeadingAction({
+export function HeadingAction({
   label,
   icon,
   disabled,
@@ -303,7 +303,7 @@ const AvatarStyleOptions = memo(function AvatarStyleOptions({
 });
 
 /** One choice of a grid. The selected one has a light fill that shows on the grouped card in both themes. */
-function ChoiceCell({
+export function ChoiceCell({
   columns,
   label,
   checked,

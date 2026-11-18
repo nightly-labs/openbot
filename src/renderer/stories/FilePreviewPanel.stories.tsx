@@ -31,7 +31,6 @@ const meta = {
   args: {
     preview: MARKDOWN_PREVIEW,
     agents: STORY_AGENTS,
-    defaultWidth: () => PANEL_DEFAULT,
     maxWidth: () => PANEL_MAX,
     onWidthChange: fn(),
     onOpenLink: fn(),

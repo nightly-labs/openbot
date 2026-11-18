@@ -109,6 +109,13 @@ async function whoami(session: LocalMcpSession, caller?: string): Promise<string
   }
 }
 
+/** The session's server with another of its directory's tokens. */
+function withToken(session: LocalMcpSession, token: string): LocalMcpSession {
+  const server = session.servers[0];
+  assert.ok(server);
+  return { ...session, servers: [{ ...server, headers: [{ name: "Authorization", value: token }] }] };
+}
+
 async function refused(session: LocalMcpSession): Promise<boolean> {
   try {
     await whoami(session);
@@ -170,6 +177,32 @@ try {
   assert.notEqual(authorization(left), authorization(right), "Each directory has its own token.");
   left.close();
   right.close();
+
+  // OpenCode 2.3.0 gave up the folder's server after 30 s, and does not connect again to the same
+  // token (#10749). A chat that joins it, or a renew, gets a new token; the earlier ones still work.
+  const slow = await open("thread-slow", "/agents/slow");
+  const firstToken = authorization(slow);
+  assert.equal(slow.dropped(Date.now(), 30_000), false, "A session request that just left has not given up.");
+  assert.equal(slow.dropped(Date.now() - 31_000, 30_000), true, "A server not listed by the limit is given up.");
+  const joiner = await open("thread-joiner", "/agents/slow");
+  const secondToken = authorization(joiner);
+  assert.notEqual(secondToken, firstToken, "A chat that joins a given-up server gets a new token.");
+  assert.equal(slow.dropped(Date.now() - 31_000, 30_000), false, "Only the session that sent a token judges it.");
+  assert.equal(joiner.dropped(Date.now() - 31_000, 30_000), true, "The joiner judges its own token.");
+  const renewed = joiner.renew();
+  const thirdToken = authorization(joiner);
+  assert.equal(renewed, joiner.servers, "A renew changes the session's servers in place.");
+  assert.notEqual(thirdToken, secondToken, "A renew of a given-up server makes a new token.");
+  slow.renew();
+  assert.equal(authorization(slow), thirdToken, "A renew gives each session of the folder the newest token.");
+  turns.set("thread-slow", "turn-slow");
+  for (const token of [firstToken, secondToken, thirdToken])
+    assert.equal(await whoami(withToken(slow, token)), "thread-slow", "Each token of the folder reaches its sessions.");
+  turns.set("thread-slow", null);
+  slow.close();
+  joiner.close();
+  for (const token of [firstToken, secondToken, thirdToken])
+    assert.ok(await refused(withToken(slow, token)), "All tokens end with the last session in the directory.");
 
   report.passed = true;
 } finally {

@@ -7,10 +7,15 @@ export const messages = {
   "error.mcp.redirectRefused": "رُفض تسجيل الدخول. ارجع إلى OpenBot وأعد المحاولة.",
   "error.mcp.redirectNoSignIn": "لا يوجد تسجيل دخول ينتظر هذا. ربما انتهى.",
   "error.mcp.redirectSignedIn": "تم تسجيل دخول OpenBot. يمكنك إغلاق هذه النافذة.",
+  "error.mcp.redirectNotSaved": "لم يكتمل تسجيل الدخول. ارجع إلى OpenBot لمعرفة السبب.",
   "error.mcp.signInFileUnreadable": "تتعذر قراءة ملف تسجيل الدخول إلى MCP.",
   "error.mcp.signInFileTooLarge": "ملف تسجيل الدخول إلى MCP كبير جدًا.",
   "error.mcp.unsupported": "هذا الخادم لا يدعم خوادم MCP.",
   "error.mcp.signInOnHost": "يعمل تسجيل الدخول إلى خادم MCP فقط في OpenBot على حاسوب المضيف.",
+  "error.mcp.signInPageOnServer":
+    "لا تفتح صفحة تسجيل الدخول هذه إلا على الخادم. اطلب من مالك الخادم أو مسؤوله تسجيل الدخول.",
+  "error.mcp.signInPageOnServerSwitch":
+    "لا تفتح صفحة تسجيل الدخول هذه إلا على الخادم. انتقل إلى هذا الخادم، ثم اختر تسجيل الدخول مرة أخرى.",
   "error.mcp.signInAppUnsupported": "هذا الخادم لا يدعم تطبيقات تسجيل الدخول. حدّث OpenBot على المضيف.",
   "error.mcp.redirectRelayed": "أرسل OpenBot تسجيل الدخول إلى الخادم. يمكنك إغلاق هذه النافذة.",
   "error.mcp.relayEnded": "انتهى تسجيل الدخول هذا. ابدأه من جديد.",

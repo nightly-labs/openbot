@@ -28,7 +28,14 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { type PickerChip, PickerMenu, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
+import {
+  createPickerFades,
+  type PickerChip,
+  PickerMenu,
+  type PickerOption,
+  PickerRow,
+  pickerMatches,
+} from "./WorkflowPicker";
 import { Hint, useBoard } from "./workflow-board";
 import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model";
 import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
@@ -98,6 +105,7 @@ export function ModelPill(props: {
   const placeholder = () => (props.value === "" ? props.placeholder : undefined);
   const label = () => placeholder() ?? current()?.name ?? props.value;
   let panel: HTMLDivElement | undefined;
+  const fades = createPickerFades();
   let opening = false;
   const rows = (provider: AgentProviderRef) => {
     const text = query().trim().toLowerCase();
@@ -209,6 +217,7 @@ export function ModelPill(props: {
                   >
                     <Listbox.Root<PickerOption<AgentModelId>>
                       ref={(element: HTMLUListElement) => {
+                        fades.bind(element);
                         // A letter typed on a row goes back to the field, so typing always searches.
                         element.addEventListener(
                           "keydown",
@@ -220,7 +229,8 @@ export function ModelPill(props: {
                           true,
                         );
                       }}
-                      class="wfn-picker-list wfn-model-list"
+                      class={["wfn-picker-list wfn-model-list", fades.classes()]}
+                      onScroll={fades.measure}
                       aria-label={t("workflow.model.providerModels", { name: name(provider) })}
                       options={[...rows(provider)]}
                       optionValue={(option) => option.value}

@@ -159,6 +159,14 @@ const withExtensionProject = (config) =>
       group.children.push({ value: fileRef, comment: file });
       into.phase.files.push({ value: buildFile, comment: `${file} in ${into.name}` });
     }
+    // Expo sets the team of `ios.appleTeamId` on the targets that exist when its own mod runs.
+    // expo-sharing adds this target after that, so in a new project the target would have no team,
+    // and `expo run:ios` would then select a team for all targets by itself.
+    if (mod.ios?.appleTeamId) {
+      const sections = project.pbxXCBuildConfigurationSection();
+      const configurations = objects.XCConfigurationList[target.buildConfigurationList].buildConfigurations;
+      for (const { value } of configurations) sections[value].buildSettings.DEVELOPMENT_TEAM = mod.ios.appleTeamId;
+    }
     return mod;
   });
 

@@ -10,7 +10,11 @@ import type {
   EventRoutineOwner,
   RoutineWebhookTrigger,
 } from "@openbot/contracts/ipc-events";
-import { RoutineWebhookCard, type RoutineWebhookCardState } from "@openbot/ui/features/conversation/RoutineWebhookCard";
+import {
+  RoutineWebhookCard,
+  type RoutineWebhookCardProps,
+  type RoutineWebhookCardState,
+} from "@openbot/ui/features/conversation/RoutineWebhookCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore } from "solid-js";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
@@ -88,6 +92,8 @@ export interface RoutineWebhookChatCardProps {
   action: "created" | "updated";
   routine: ChatWebhookRoutine;
   connected: boolean | null;
+  /** The name of the chat's agent, which owns the routine. */
+  agentName: string | undefined;
   /** The secret that the person made in this chat, until they press Done. */
   secret: string | null;
   onSecret: (secret: string | null) => void;
@@ -192,6 +198,21 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     };
   }
 
+  /** Gives a new secret to the agent. Undefined when the host cannot do this. */
+  function agentSecret(): RoutineWebhookCardProps["agentSecret"] {
+    const give = props.api.giveSecretToAgent;
+    const agentName = props.agentName;
+    if (!give || !agentName || routine().owner.kind !== "agent") return undefined;
+    return {
+      routineId: routine().id,
+      agentName,
+      give: async () => {
+        await give({ owner: plainOwner(routine()), id: routine().id });
+        props.onSecret(null);
+      },
+    };
+  }
+
   return (
     <RoutineWebhookCard
       action={props.action}
@@ -205,6 +226,7 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
         props.onSecret(result.secret);
       }}
       onUseSenderSecret={senderSecret()}
+      agentSecret={agentSecret()}
       eventType={card.eventType}
       filters={card.filters}
       onEventTypeChange={(eventType) =>

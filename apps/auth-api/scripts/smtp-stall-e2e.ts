@@ -231,6 +231,7 @@ async function runFallbackCase(
   behaviors: Behavior[],
   outcome: "accept" | "daily_limit",
   code = "ABCD-EFGH",
+  replyTo?: string,
 ): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
   const relay = await startRelay(behaviors);
   const handler = createEmailRelayHandler(relay.connector);
@@ -243,6 +244,7 @@ async function runFallbackCase(
       EMAIL_SMTP_USERNAME: CONFIG.username,
       EMAIL_SMTP_PASSWORD: CONFIG.password,
       EMAIL_FROM: CONFIG.from,
+      ...(replyTo ? { EMAIL_REPLY_TO: replyTo } : {}),
       EMAIL_RELAY: {
         fetch: (input, init) => handler.fetch(new Request(input, init)),
         connect: () => {
@@ -341,6 +343,15 @@ try {
   assert(fallbackMessage.text?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
   assert(fallbackMessage.html?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
   assert.equal(fallbackMessage.headers?.["Auto-Submitted"], "auto-generated");
+  assert.equal(fallbackMessage.replyTo, undefined, "with no EMAIL_REPLY_TO, a reply goes to the sender");
+
+  // A no-reply sender names the team's inbox in Reply-To, so a reply reaches a person.
+  const inbox = "inbox@example.com";
+  const withInbox = await runFallbackCase("fallback_reply_to_inbox", ["sender_limit"], "accept", "ABCD-EFGH", inbox);
+  const { sent: inboxMessages, ...withInboxReport } = withInbox;
+  report.cases.push(withInboxReport);
+  assert.equal(withInbox.result, "sent");
+  assert.equal(inboxMessages[0]?.replyTo, inbox);
 
   const bothLimited = await runFallbackCase("fallback_refused", ["sender_limit"], "daily_limit");
   report.cases.push(bothLimited);

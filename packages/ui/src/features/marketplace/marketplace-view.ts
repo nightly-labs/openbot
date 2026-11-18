@@ -29,7 +29,9 @@ export type MarketplaceView =
   /** "Your skills" or one catalog category, on its own page. */
   | { kind: "skillGroup"; group: SkillGroup }
   /** A skill made on this computer. It has no catalog listing. */
-  | { kind: "localSkill"; skillId: string };
+  | { kind: "localSkill"; skillId: string }
+  /** The form of a custom MCP server: a new one when `id` is null, else the server with this id. */
+  | { kind: "server"; id: string | null };
 
 /** "Your skills", or a catalog category. */
 export type SkillGroup = "yours" | SkillCategory;

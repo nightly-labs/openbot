@@ -1,7 +1,12 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { decodeAgentTask, decodeAgentTaskReadStates, decodeFilePreview } from "./conversation-decoding";
+import {
+  decodeAgentTask,
+  decodeAgentTaskReadStates,
+  decodeFilePreview,
+  decodeOptionalFilePreviewPageUrl,
+} from "./conversation-decoding";
 
 const preview = {
   name: "report.html",
@@ -30,6 +35,14 @@ describe("file preview page decoding", () => {
       1,
     ]) {
       expect(() => decodeFilePreview({ ...preview, pageUrl: address })).toThrow("Invalid file preview response.");
+    }
+  });
+
+  it("gives a backdrop page only an isolated preview address, or null when the page store is full", () => {
+    expect(decodeOptionalFilePreviewPageUrl(pageUrl)).toBe(pageUrl);
+    expect(decodeOptionalFilePreviewPageUrl(null)).toBeNull();
+    for (const address of ["openbot-app://app/index.html", `${pageUrl}#x`, "file:///private.html", undefined, 1]) {
+      expect(() => decodeOptionalFilePreviewPageUrl(address)).toThrow("Invalid file preview page URL response.");
     }
   });
 });

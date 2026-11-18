@@ -7,10 +7,16 @@ export const messages = {
   "error.mcp.redirectRefused": "Die Anmeldung wurde abgelehnt. Kehre zu OpenBot zurück und versuche es erneut.",
   "error.mcp.redirectNoSignIn": "Keine Anmeldung wartet darauf. Sie wurde möglicherweise bereits beendet.",
   "error.mcp.redirectSignedIn": "OpenBot ist angemeldet. Du kannst dieses Fenster schließen.",
+  "error.mcp.redirectNotSaved":
+    "Die Anmeldung wurde nicht abgeschlossen. Gehe zurück zu OpenBot, um den Grund zu sehen.",
   "error.mcp.signInFileUnreadable": "Die MCP-Anmeldedatei ist nicht lesbar.",
   "error.mcp.signInFileTooLarge": "Die MCP-Anmeldedatei ist zu groß.",
   "error.mcp.unsupported": "Dieser Server unterstützt keine MCP-Server.",
   "error.mcp.signInOnHost": "Die Anmeldung bei einem MCP-Server funktioniert nur in OpenBot auf dem Host-Computer.",
+  "error.mcp.signInPageOnServer":
+    "Diese Anmeldeseite öffnet sich nur auf dem Server. Bitte einen Eigentümer oder Admin des Servers, sich anzumelden.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Diese Anmeldeseite öffnet sich nur auf dem Server. Wechsle zu diesem Server und wähle dann erneut „Anmelden“.",
   "error.mcp.signInAppUnsupported": "Dieser Server unterstützt keine Anmelde-Apps. Aktualisiere OpenBot auf dem Host.",
   "error.mcp.redirectRelayed": "OpenBot hat die Anmeldung an den Server gesendet. Du kannst dieses Fenster schließen.",
   "error.mcp.relayEnded": "Diese Anmeldung ist beendet. Starte sie erneut.",

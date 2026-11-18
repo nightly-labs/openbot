@@ -185,6 +185,8 @@ export const messages = {
   "routine.card.open": "Открыть регулярную задачу {name}",
   "routine.card.webhookCreated": "Создана регулярная задача с вебхуком",
   "routine.card.webhookSecretNote": "Чтобы получить секрет подписи, создайте его заново. Агент не получает секрет.",
+  "routine.card.webhookSecretAgentNote":
+    "Чтобы получить секрет подписи, создайте его заново или передайте агенту {name}.",
   "routine.card.webhookUpdated": "Обновлена регулярная задача с вебхуком",
   "routine.card.webhookChanged": "Изменения не сохранены",
   "routine.card.webhookSaveFailed": "Не удалось сохранить события.",
@@ -271,6 +273,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "Открыть {name}",
   "routine.calendar.completed": "Завершено",
+  "routine.calendar.new": "Новая регулярная задача",
+  "routine.calendar.newOn": "Новая регулярная задача: {day}",
+  "routine.calendar.agent": "Агент",
+  "routine.calendar.agentChoice": "Агент: {name}",
 
   "routine.settings.loadFailed": "Не удалось загрузить регулярные задачи.",
   "routine.settings.loadRunsFailed": "Не удалось загрузить историю запусков.",
@@ -287,6 +293,7 @@ export const messages = {
   "routine.settings.loading": "Загрузка регулярных задач…",
   "routine.settings.empty": "Регулярных задач пока нет.",
   "routine.settings.paused": "Приостановлена",
+  "routine.settings.pausedByRun": "Приостановлена запуском в {time}",
   "routine.settings.completed": "Завершена · {schedule}",
   "routine.settings.active": "Активна",
   "routine.settings.pauseFailed": "Не удалось приостановить эту регулярную задачу.",
@@ -359,6 +366,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Секрет отправителя",
   "routine.webhook.senderSecretConfirm": "Использовать",
   "routine.webhook.senderSecretFailed": "Не удалось сохранить секрет отправителя.",
+  "routine.webhook.giveSecret": "Передать секрет подписи агенту {name}",
+  "routine.webhook.giveSecretTitle": "Передать новый секрет подписи агенту {name}?",
+  "routine.webhook.giveSecretDescription":
+    "Текущий секрет перестанет работать сразу. Агент {name} сохранит новый секрет как API-ключ и сможет добавить его у отправителя. Копировать его не нужно.",
+  "routine.webhook.giveSecretConfirm": "Передать",
+  "routine.webhook.giveSecretFailed": "Не удалось передать секрет подписи агенту {name}.",
+  "routine.webhook.secretGiven": "У агента {name} теперь новый секрет подписи.",
   "routine.webhook.statusFailed": "Не удалось проверить, подключён ли хост к ретранслятору.",
 
   "routine.settings.instruction": "Инструкция",
