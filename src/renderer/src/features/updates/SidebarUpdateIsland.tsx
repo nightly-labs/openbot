@@ -1,11 +1,16 @@
+import { classifyFailure } from "@openbot/telemetry";
+import { toast } from "@openbot/ui";
 import { AccountUpdateIsland } from "@openbot/ui/features/account/AccountUpdateIsland";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { beam } from "../../theme-sweep";
 import { useUpdates } from "./updates-context";
 
 /** How long "Restarting" stays after the Restart ring has left the window, before the app quits. */
 const RESTART_HOLD_MS = 600;
+
+const UPDATE_FAILED_TOAST_ID = "app-update-action-failed";
 
 /**
  * The update island of the old account box, at the end of the sidebar. It shows only while an update
@@ -24,6 +29,7 @@ export function SidebarUpdateIsland() {
     () => updates.status().phase,
     (phase) => {
       setUpdateError(null);
+      toast.dismiss(UPDATE_FAILED_TOAST_ID);
       if (phase !== "available" && phase !== "downloading") downloadRingShown = false;
     },
   );
@@ -69,7 +75,19 @@ export function SidebarUpdateIsland() {
     try {
       await updates.runAction();
     } catch (cause) {
-      setUpdateError(errorMessage(cause, t("account.menu.updateFailed")));
+      // The island is one line that it cuts, so it keeps the short title. The reason, such as the
+      // steps to move OpenBot out of a read-only location on macOS (#11289), shows in full in a toast.
+      const title = t("account.menu.updateFailed");
+      const reason = errorMessage(cause, title);
+      setUpdateError(title);
+      if (reason === title) return;
+      actionToast.error(title, {
+        id: UPDATE_FAILED_TOAST_ID,
+        error: cause,
+        fallback: title,
+        duration: Number.POSITIVE_INFINITY,
+        report: { operation: "update", source: "action", cause_code: classifyFailure(cause) },
+      });
     }
   }
 

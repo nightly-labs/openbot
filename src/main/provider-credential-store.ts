@@ -15,6 +15,9 @@ export class CredentialStoreFailure extends Schema.TaggedError<CredentialStoreFa
 
 const { io: credentialIO, sync: credentialSync } = causeHelpers(CredentialStoreFailure);
 
+/** The name of a key in the envelope that is not a provider's. */
+export type OpenBotSecretName = `openbot:${string}`;
+
 function accountKeyName(provider: AgentProviderId, accountId: string): string {
   return `${provider}:${accountId}`;
 }
@@ -33,6 +36,17 @@ const envelopeSchema = z.object({
 });
 
 const MAX_ENVELOPE_BYTES = 64 * 1024;
+
+/**
+ * A file that `#read` would refuse. The write stops before it, so the saved keys stay readable: a file
+ * over the limit would make every provider and account key unreadable at the next start.
+ */
+export class CredentialFileTooLarge extends Error {
+  constructor() {
+    super(sourceText("error.provider.credentialFileTooLarge"));
+    this.name = "CredentialFileTooLarge";
+  }
+}
 
 export interface SecretCipher {
   encrypt: (value: string) => Buffer;
@@ -122,6 +136,40 @@ export class ProviderCredentialStore {
     });
   }
 
+  /**
+   * A key that is not a provider's, such as the key of the CLI proxy. Its name starts with
+   * `openbot:`, so no provider and no account of a provider can have it, and a build that does not
+   * know it keeps it and never reads it.
+   */
+  secret(name: OpenBotSecretName): string | null {
+    if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
+    return this.#keys.get(name) ?? null;
+  }
+
+  /**
+   * Saves the keys of `secret`, or removes the ones whose value is null, as one write of the file, so a
+   * change of many keys encrypts and writes the envelope one time.
+   */
+  setSecrets(
+    changes: readonly (readonly [OpenBotSecretName, string | null])[],
+  ): Effect.Effect<void, CredentialStoreFailure> {
+    return this.#edit((keys) => {
+      let changed = false;
+      for (const [name, value] of changes) {
+        if (value === null) {
+          changed = keys.delete(name) || changed;
+          continue;
+        }
+        // As an account key: a save into a file that could not be read would replace every provider key.
+        if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
+        registerSecretValue(value);
+        keys.set(name, value);
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
   set(provider: AgentProviderId, key: string): Effect.Effect<void, CredentialStoreFailure> {
     return this.#edit((keys) => {
       registerSecretValue(key);
@@ -204,7 +252,10 @@ export class ProviderCredentialStore {
     const content = yield* credentialSync(() => {
       const credentials: Record<string, string> = {};
       for (const [provider, key] of keys) credentials[provider] = this.#cipher.encrypt(key).toString("base64");
-      return `${JSON.stringify({ version: 1, credentials })}\n`;
+      const text = `${JSON.stringify({ version: 1, credentials })}\n`;
+      // The same measure as `#read`.
+      if (text.length > MAX_ENVELOPE_BYTES) throw new CredentialFileTooLarge();
+      return text;
     });
     yield* writeFileAtomically(this.#path, content, { createDirectory: true }).pipe(
       Effect.mapError(({ cause }) => new CredentialStoreFailure({ cause })),

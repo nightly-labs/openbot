@@ -7,11 +7,14 @@ export const messages = {
   "status.agent.instructionsChanged": "עדכן את ההוראות שלו",
   "status.agent.modelSwitchedForLimit": "הגעת למכסת השימוש. עבר אל {model}.",
   "status.agent.modelReturnedAfterLimit": "מכסת השימוש התאפסה. חזר אל {model}.",
+  "status.agent.routineSkippedRunOpen": "דולגה ריצה: הריצה הקודמת עוד לא הסתיימה",
+  "status.agent.routineSkippedUsageLimit": "דולגה ריצה: הגעת למכסת השימוש",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
+  "status.agent.settingShown": "הציג הגדרה: {setting}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
   "status.agent.channelMemberRemoved": "{agent} הסיר את {member} מהערוץ. {person} ביקש זאת.",
   "status.agent.channelInstructionsChanged": "{agent} שינה את הוראות הערוץ. {person} ביקש זאת.",
@@ -28,15 +31,32 @@ export const messages = {
   "status.agent.vaultCardFill":
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
   "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
+  "status.agent.reportPhoneProblem":
+    "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך, ועם הגרסה, המערכת ויומן התמיכה של הטלפון שלך. השם שלך לא מוצג.",
   "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
   "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
   "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
   "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "הוסר מ-GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "הסרת הדיווח #{issue} מ-GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "אף אחד לא יוכל לראות את הדיווח הזה ב-GitHub. אי אפשר לבטל את הפעולה. כדי לתקן אותו, הסוכן יכול לשלוח דיווח מתוקן.",
+  "status.agent.feedbackWithdrawing": "מסיר את הדיווח שלך מ-GitHub…",
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
+  "status.agent.browserProfileNamed":
+    "העבר את {agents} לפרופיל הדפדפן {profile}. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.commitCoAuthorOff": "להפסיק להוסיף את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
+  "status.agent.commitCoAuthorOn": "להוסיף שוב את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
+  "status.agent.browserProfileNew":
+    "צור את פרופיל הדפדפן החדש {profile} והעבר אליו את {agents}. אין בו התחברויות. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileShared":
+    "העבר את {agents} לפרופיל הדפדפן המשותף. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileOwn": "תן לכל אחד מ-{agents} פרופיל דפדפן משלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
+  "status.agent.deleteAgents": "מחיקת {agents} יחד עם הצ'אטים והקבצים שלהם. לא ניתן לבטל פעולה זו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",
   "status.agent.linkCardFill": "מילוי כרטיס Link חד-פעמי {card} ב-{site}. אישרת את התשלום הזה ב-Link עבור {merchant}.",
   "status.agent.screenCaptureProgress": "מבקש לצלם את המסך…",
@@ -55,6 +75,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "מעדכן את הזיכרונות שלו…",
   "status.agent.skillUsing": "משתמש במיומנות {name}…",
+  "status.agent.backdropSetting": "משנה את הרקע…",
   "status.agent.skillReading": "קורא מיומנות…",
   "status.agent.toolStepFailed": "שלב בכלי נכשל; בודק את התוצאה ומחליט מה לנסות עכשיו…",
   "status.agent.toolResultReviewing": "בודק את התוצאה האחרונה של הכלי…",
@@ -93,7 +114,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
-  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
+  "status.agent.mcpToolCall": "הפעלת הכלי {tool} של שרת MCP {name}.",
+  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהחנות, אפליקציות, {name}.",
+  "status.agent.uiBlockClosedByMessage": "נסגר בגלל הודעה חדשה",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",
   "status.agent.vaultDeleted": "נמחק מהכספת: {name}",
@@ -122,5 +145,6 @@ export const messages = {
   "status.agent.nextStepContinues": "הסוכן נעצר לפני השלב הבא שלו. הוא ממשיך ({current} מתוך {limit}).",
   "status.agent.planContinues": "בתוכנית יש שלבים פתוחים. הסוכן ממשיך ({current} מתוך {limit}).",
   "status.agent.compactionContinues": "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו. הסוכן ממשיך.",
+  "status.agent.providerExitContinues": "הסוכן נעצר לפני שסיים את התשובה שלו. הסוכן ממשיך.",
   "status.agent.branchTitle": "צ'אט מסועף",
 } as const satisfies PartialTranslation<typeof source>;

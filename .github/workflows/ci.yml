@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 
+# A new PR push cancels the old run. On main, a run always completes, and only the newest commit
+# waits for it: GitHub cancels an older waiting run. Merges come faster than one run takes, so each
+# run tests all the commits merged since the last run, and runner use does not grow with each merge.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GIT_CONFIG_COUNT: 1
@@ -40,6 +43,7 @@ jobs:
       api: ${{ steps.lanes.outputs.api }}
       remote: ${{ steps.lanes.outputs.remote }}
       storybook: ${{ steps.lanes.outputs.storybook }}
+      schema: ${{ steps.lanes.outputs.schema }}
       surfaces: ${{ steps.lanes.outputs.surfaces }}
     steps:
       - name: Check out repository
@@ -95,6 +99,7 @@ jobs:
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
+          lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
@@ -137,6 +142,12 @@ jobs:
         if: env.CODE == 'true'
         run: bun run check:desktop:static
 
+      # Not in the parallel group: it fetches a release tag into the shallow clone, and a parallel
+      # `git fetch` (released database schemas) then fails on `.git/shallow.lock`.
+      - name: Check frozen migrations
+        if: env.CODE == 'true'
+        run: bun run check:migrations
+
       - parallel:
           - name: Check translation catalogs
             if: env.CODE == 'true'
@@ -153,6 +164,19 @@ jobs:
           - name: Check translated What's new notes
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
+
+          - name: Check minimum app versions
+            if: env.CODE == 'true'
+            run: bun run check:app-minimum-version
+
+          # Fails after a release that changed the database schema until `releases.json` has it. It
+          # takes about 50 s, so it runs only when the database code changes: a new migration must be
+          # tested from every released schema. `git archive` needs only the tag commits.
+          - name: Check released database schemas
+            if: needs.detect.result != 'success' || needs.detect.outputs.schema == 'true'
+            run: |
+              git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+              bun scripts/released-schema-fixtures.ts --check
 
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
@@ -302,12 +326,23 @@ jobs:
       - name: Run the Team API routes E2E test
         run: bun run test:team-api-routes
 
+      - name: Run the CRM Team API E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:crm-team-api
+
+      - name: Run the release version comparator E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/release-version-comparator-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: team-api-routes-e2e
-          path: .openbot-build/team-api-routes-e2e/
+          path: |
+            .openbot-build/team-api-routes-e2e/
+            .openbot-build/crm-team-api-e2e/
+            .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 
   reverse-actions-e2e:
@@ -332,6 +367,17 @@ jobs:
       - name: Run the Team API legacy clients E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-legacy-clients
+
+      - name: Run the Team API protocol 10 E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-protocol-v10
+
+      - name: Run the Team WebRTC wire parity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-webrtc-wire-parity
+      - name: Run the server safe mode E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:server-safe-mode
 
       - name: Run the Team session revoke and reconnect E2E test
         if: ${{ !cancelled() }}
@@ -392,6 +438,14 @@ jobs:
       - name: Run the agent hide and restore E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-hide-restore
+
+      - name: Run the agent create retry E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-create-retry
+
+      - name: Run the update host takeover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:update-host-takeover
 
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
@@ -537,6 +591,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:browser-profile-agents
 
+      - name: Run the agent browser profile tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-browser-profile-tool
+
+      - name: Run the agent delete tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-delete-tool
+
+      - name: Run the agent commit co-author tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-commit-co-author-tool
+
       - name: Run the Claude usage after a resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
@@ -621,6 +687,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-quota-failover
 
+      - name: Run the Gemini failing session E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-failing-session
+
       - name: Run the Gemini Windows zip E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-windows-zip
@@ -701,6 +771,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:memory-review
 
+      - name: Run the memory changes wire E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:memory-changes-wire
+
       - name: Run the local skill revision E2E test
         if: ${{ !cancelled() }}
         run: bun run test:skill-revision
@@ -712,6 +786,9 @@ jobs:
           name: reverse-actions-e2e
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
+            .openbot-build/team-protocol-v10-e2e/
+            .openbot-build/team-webrtc-wire-parity-e2e/
+            .openbot-build/server-safe-mode-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
@@ -727,6 +804,8 @@ jobs:
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
             .openbot-build/agent-hide-restore-e2e/
+            .openbot-build/agent-create-retry-e2e/
+            .openbot-build/update-host-takeover-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
@@ -740,6 +819,7 @@ jobs:
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
             .openbot-build/acp-subagents-e2e/
+            .openbot-build/memory-changes-e2e/
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
@@ -761,6 +841,9 @@ jobs:
             .openbot-build/messaging-owner-card-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
+            .openbot-build/agent-browser-profile-tool-e2e/
+            .openbot-build/agent-delete-tool-e2e/
+            .openbot-build/agent-commit-co-author-tool-e2e/
             .openbot-build/claude-usage-resume-e2e/
             .openbot-build/claude-background-hold-e2e/
             .openbot-build/claude-turn-context-e2e/
@@ -779,6 +862,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
+            .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
@@ -872,6 +956,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-database-host-start
 
+      - name: Run the versioned JSON stores E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:versioned-json-stores
+
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
@@ -884,9 +972,21 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-steer
 
+      - name: Run the Devin steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:devin-steer
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
+
+      - name: Run the OpenCode steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:opencode-steer
+
+      - name: Run the custom agent steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:custom-agent-steer
 
       - name: Run the Grok question E2E test
         if: ${{ !cancelled() }}
@@ -944,6 +1044,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cline-free-models
 
+      - name: Run the Cline plan limit failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cline-plan-limit-failover
+
       - name: Run the recorded provider transcripts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-transcript-replay
@@ -967,10 +1071,14 @@ jobs:
             .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
+            .openbot-build/versioned-json-stores-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/antigravity-steer-e2e/
+            .openbot-build/devin-steer-e2e/
             .openbot-build/grok-steer-e2e/
+            .openbot-build/opencode-steer-e2e/
+            .openbot-build/custom-agent-steer-e2e/
             .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/
@@ -985,6 +1093,7 @@ jobs:
             .openbot-build/cursor-stream-closed-e2e/
             .openbot-build/cursor-model-set-e2e/
             .openbot-build/cline-free-models-e2e/
+            .openbot-build/cline-plan-limit-failover-e2e/
             .openbot-build/provider-transcript-replay-e2e/
           if-no-files-found: ignore
 
@@ -1305,14 +1414,44 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      # Main runs can finish out of order. Do not replace a newer commit in production with an older
+      # one. Each deploy writes its commit in the message of the Worker version, so production tells
+      # which commit it runs. A version with no commit, from a manual deploy, does not stop a deploy.
+      # To roll back, merge a revert.
+      - name: Skip when production has a newer commit
+        id: order
+        shell: bash
+        working-directory: apps/auth-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          wrangler=../../node_modules/.bin/wrangler
+          versions="$("$wrangler" deployments status --config wrangler.jsonc --json | jq -r '.versions[].version_id')"
+          deploy=true
+          for version in $versions; do
+            deployed="$("$wrangler" versions view "$version" --config wrangler.jsonc --json | jq -r '.annotations["workers/message"] // ""')"
+            [[ "$deployed" =~ ^[0-9a-f]{40}$ && "$deployed" != "$GITHUB_SHA" ]] || continue
+            status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$deployed?per_page=1" --jq .status)"
+            if [ "$status" = ahead ]; then
+              echo "::notice title=Deploy skipped::Production runs $deployed, which is newer than $GITHUB_SHA."
+              deploy=false
+            fi
+          done
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
       - name: Build production Worker
+        if: steps.order.outputs.deploy == 'true'
         run: bun run api:build
 
       # A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
       - name: Keep the code files of earlier builds
+        if: steps.order.outputs.deploy == 'true'
         run: bun apps/auth-api/scripts/keep-previous-assets.ts
 
       - name: Prepare runtime secrets
+        if: steps.order.outputs.deploy == 'true'
         id: runtime-secrets
         shell: bash
         env:
@@ -1424,6 +1563,7 @@ jobs:
           echo "path=$secrets_path" >> "$GITHUB_OUTPUT"
 
       - name: Apply production D1 migrations
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
@@ -1431,6 +1571,7 @@ jobs:
         run: ../../node_modules/.bin/wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 
       - name: Deploy public site router
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/site-router
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_ROUTER_DEPLOY_TOKEN }}
@@ -1439,6 +1580,7 @@ jobs:
 
       # The production Worker sends email through this Worker, so it must exist first.
       - name: Deploy email relay Worker
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
@@ -1446,17 +1588,19 @@ jobs:
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
 
       - name: Deploy production Worker
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: ../../node_modules/.bin/wrangler deploy --config dist/server/wrangler.json --keep-vars --secrets-file "${{ steps.runtime-secrets.outputs.path }}"
+        run: ../../node_modules/.bin/wrangler deploy --config dist/server/wrangler.json --keep-vars --secrets-file "${{ steps.runtime-secrets.outputs.path }}" --message "$GITHUB_SHA"
 
       - name: Remove temporary runtime secrets
         if: always() && steps.runtime-secrets.outputs.path != ''
         run: rm -f "${{ steps.runtime-secrets.outputs.path }}"
 
       - name: Verify production deployment
+        if: steps.order.outputs.deploy == 'true'
         shell: bash
         env:
           SITE_HOSTING_EXPECTED_ENABLED: ${{ vars.SITE_HOSTING_EXPECTED_ENABLED }}

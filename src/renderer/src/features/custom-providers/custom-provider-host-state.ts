@@ -5,9 +5,14 @@ import type {
   UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { customAgentRestartKey } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
-import { customProviderUpdate } from "@openbot/ui/features/custom-providers/custom-provider-form";
+import {
+  type CustomProviderEndpoint,
+  customProviderUpdate,
+  type DiscoveredModel,
+  type ModelDiscovery,
+} from "@openbot/ui/features/custom-providers/custom-provider-form";
 import { currentText } from "@openbot/ui/text";
-import { createStore } from "solid-js";
+import { createSignal, createStore } from "solid-js";
 import { customProviderRestartMessage } from "./custom-provider-restart";
 
 interface CustomProviderHostState {
@@ -38,6 +43,8 @@ interface CustomProviderHostOptions {
   onRemoved?: (id: string) => void;
   /** Settings drops a default model that the edit took out. */
   onUpdated?: (input: UpdateCustomProviderInput) => void;
+  /** Asks the endpoint for its models. Without it the form has no "Find models". */
+  discoverModels?: () => ((endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>) | undefined;
 }
 
 /**
@@ -59,8 +66,42 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     note: null,
     removing: null,
   });
+  const [discovery, setDiscovery] = createSignal<ModelDiscovery>({ status: "idle" });
+  /** Counts the list requests, so the answer of a form that closed does not reach the next one. */
+  let discoveryRequest = 0;
+
+  function resetDiscovery(): void {
+    discoveryRequest += 1;
+    setDiscovery({ status: "idle" });
+  }
+
+  /** The "Find models" action of the open form, or undefined when this host cannot ask. */
+  function discover(): ((endpoint: CustomProviderEndpoint) => void) | undefined {
+    const discoverModels = options.discoverModels?.();
+    if (!discoverModels) return undefined;
+    return (endpoint) => void findModels(discoverModels, endpoint);
+  }
+
+  async function findModels(
+    discoverModels: (endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>,
+    endpoint: CustomProviderEndpoint,
+  ): Promise<void> {
+    const request = ++discoveryRequest;
+    setDiscovery({ status: "loading" });
+    // An edit of a saved endpoint lets main use the stored key, which the form does not hold.
+    const saved = state.editing;
+    try {
+      const models = await discoverModels(saved ? { ...endpoint, savedProviderId: saved.id } : endpoint);
+      if (request === discoveryRequest) setDiscovery({ status: "found", models });
+    } catch (error) {
+      if (request !== discoveryRequest) return;
+      const text = currentText();
+      setDiscovery({ status: "failed", message: text.errorMessage(error, text.t("customProvider.discovery.empty")) });
+    }
+  }
 
   function openForm(): void {
+    resetDiscovery();
     setState((current) => {
       current.open = true;
       current.editing = null;
@@ -70,6 +111,7 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
   }
 
   function openEdit(provider: CustomProviderSummary): void {
+    resetDiscovery();
     setState((current) => {
       current.open = true;
       current.editing = provider;
@@ -167,5 +209,5 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     });
   }
 
-  return { state, openForm, openEdit, closeForm, openList, closeList, submit, remove, showSaved };
+  return { state, discovery, discover, openForm, openEdit, closeForm, openList, closeList, submit, remove, showSaved };
 }

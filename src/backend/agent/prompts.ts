@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   COMPUTER_USE_MCP_SERVER_NAME,
+  isReservedMcpServerName,
   MCP_ELICITATION_DECISION_QUESTION_ID,
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,7 @@ import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values"
 import {
   normalizeUiBlockSpec,
   UI_API_KEY_SCOPE_FIELD_ID,
+  UI_CONFIRM_EDIT_ACTION_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -30,6 +32,9 @@ import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
+// The word of the MCP sign-in card, which tells the agent to continue after the sign-in.
+const MCP_SIGN_IN_PAGE_DONE = sourceText("status.provider.confirmContinue");
+const MCP_SIGN_IN_PAGE_DECLINE = sourceText("status.agent.mcpSignInPageDecline");
 /** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
 
@@ -158,11 +163,68 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
   });
 }
 
+/**
+ * The sign-in page of a URL request, or null when the card must not link to it. As Codex checks it:
+ * https, with a host and with no user name or password. `url` is the Markdown link destination, and
+ * `address` is what the card shows: the page without its query, as the MCP sign-in card shows a server.
+ */
+function mcpSignInPage(params: unknown): { url: string; address: string } | null {
+  const url = getString(params, "url");
+  if (!url || !URL.canParse(url)) return null;
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) return null;
+  return {
+    // A parenthesis ends a Markdown link destination. A backtick, which a host and a query can hold,
+    // starts a code span, which Markdown reads before a link and which would change what the card shows.
+    url: parsed.href.replaceAll("(", "%28").replaceAll(")", "%29").replaceAll("`", "%60"),
+    address: `${parsed.origin}${parsed.pathname}`.replaceAll("`", "%60"),
+  };
+}
+
+/**
+ * A server's request to open its sign-in page, for example after its tool answered -32042 (#10152).
+ * The card shows where the page is and links to it, with the words of the MCP sign-in card: Continue
+ * accepts the request, and the provider runs the tool call again. Codex's own server for ChatGPT apps keeps its reconnect notice.
+ */
+function mcpSignInPageQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
+  const page = mcpSignInPage(params);
+  const name = serverName?.trim();
+  if (!page || !name || name === CODEX_APPS_MCP_SERVER_NAME) return null;
+  const subject = name === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : name;
+  const message = getString(params, "message")?.trim();
+  return {
+    id: MCP_ELICITATION_DECISION_QUESTION_ID,
+    header: subject.slice(0, INPUT_LIMITS.promptHeader),
+    question: sourceText("status.agent.mcpSignInPage", { name: subject, ...page }),
+    ...(message ? { detail: message.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
+    isSecret: false,
+    options: [
+      { label: MCP_SIGN_IN_PAGE_DONE, description: sourceText("status.agent.mcpSignInPageDoneDetail") },
+      { label: MCP_SIGN_IN_PAGE_DECLINE, description: sourceText("status.agent.mcpSignInPageDeclineDetail") },
+    ],
+  };
+}
+
+/**
+ * The server that asks, with the name the user gave it. Codex names an OpenBot server by its key,
+ * which has `openbot_` in front (`codexMcpServerKey`). OpenBot's own browser server keeps its name,
+ * and so does a user's server that would then pass as Codex's own `codex_apps`.
+ */
+function elicitationServerName(params: unknown): string | null {
+  const name = getString(params, "serverName")?.trim() || null;
+  const shown = name?.startsWith("openbot_") ? name.slice("openbot_".length) : name;
+  return shown && name && !isReservedMcpServerName(name) && shown !== CODEX_APPS_MCP_SERVER_NAME ? shown : name;
+}
+
 export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {
-  const serverName = getString(params, "serverName");
+  const serverName = elicitationServerName(params);
   const mode = getString(params, "mode") ?? "form";
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
+  if (mode === "url") {
+    const question = mcpSignInPageQuestion(params, serverName);
+    return question && validPromptQuestions([question]) ? [question] : null;
+  }
   if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
 
   const questions =
@@ -181,7 +243,7 @@ const CODEX_APPS_MCP_SERVER_NAME = "codex_apps";
  * `_meta._codex_apps.connector_auth_failure.connector_name`.
  */
 export function declinedMcpElicitationText(params: unknown): string {
-  const serverName = getString(params, "serverName")?.trim() || null;
+  const serverName = elicitationServerName(params);
   const signIn = getString(params, "mode") === "url";
   if (serverName === CODEX_APPS_MCP_SERVER_NAME) {
     const authFailure = getRecord(getRecord(getRecord(params, "_meta"), "_codex_apps"), "connector_auth_failure");
@@ -228,6 +290,12 @@ export function mcpElicitationResult(
   params: unknown,
   answers: Record<string, string[]>,
 ): { action: "accept" | "cancel" | "decline"; content: DynamicRecord | null; _meta: DynamicRecord | null } {
+  if (getString(params, "mode") === "url") {
+    const selected = answers[MCP_ELICITATION_DECISION_QUESTION_ID]?.[0];
+    if (selected === MCP_SIGN_IN_PAGE_DONE) return { action: "accept", content: null, _meta: null };
+    if (selected === MCP_SIGN_IN_PAGE_DECLINE) return { action: "decline", content: null, _meta: null };
+    return { action: "cancel", content: null, _meta: null };
+  }
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties");
   if (properties && Object.keys(properties).length > 0) {
     return elicitationFieldResult(params, properties, answers);
@@ -360,13 +428,25 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
     .flatMap((question) => {
       const values = answers[question.id] ?? [];
       if (values.length === 0) return [];
-      const quote = question.question
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-      return [`${quote}\n\n${values.join(", ")}`];
+      return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
+}
+
+/**
+ * The message for a detached `request_vault_item` card: its title as a quote, and the name of the saved
+ * item below. No form value goes in it. Empty for a skip (null), which sends nothing, as a question does.
+ */
+export function vaultLateAnswerText(title: string, savedName: string | null): string {
+  if (savedName === null) return "";
+  return [title ? quoted(title) : "", savedName].filter(Boolean).join("\n\n");
+}
+
+function quoted(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
 }
 
 /** The answer for a question that expired before the user answered it. Only the model reads it. */
@@ -381,37 +461,55 @@ export function expiredPromptResult(
   };
 }
 
+const USER_MESSAGE_NOTE =
+  "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.";
+
 /**
  * The answer for a question or block that the user did not answer because they wrote a new message
  * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
+ * `userInputNote`: the client gives the `note` of a `user-input` result to the model (`AgentClient`).
  */
 export function userMessagePromptResult(
   responseKind: "dynamic-tool" | "user-input" | "ui-block",
   blockId: string | undefined,
-): DynamicToolResult | { answers: Record<string, never> } {
-  // `request_user_input` has no field for a note: empty answers are what a skip gives.
-  if (responseKind === "user-input") return { answers: {} };
+  userInputNote = false,
+): DynamicToolResult | { answers: Record<string, never>; note?: string } {
+  // Codex's `request_user_input` has no field for a note: empty answers are what a skip gives.
+  if (responseKind === "user-input") return userInputNote ? { answers: {}, note: USER_MESSAGE_NOTE } : { answers: {} };
   const value = {
     status: "skipped",
     ...(blockId ? { blockId } : {}),
-    next: "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.",
+    next: USER_MESSAGE_NOTE,
   };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 /** What a blocking UI block (`ask_ui`) ended with. */
 export type UiBlockPromptOutcome =
-  | { status: "answered"; blockId: string; response: UiBlockResponse }
+  | { status: "answered"; blockId: string; response: UiBlockResponse; preview?: string | undefined }
   | { status: "skipped" | "expired"; blockId: string };
 
 /**
  * The `ask_ui` result. Only the model reads it: the ids it gave, the values, and the user's words when
- * the user answered in text. An expired block is a failed call, as an expired question is.
+ * the user answered in text, or the preview that the user edited. An expired block is a failed call, as
+ * an expired question is.
  */
 export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolResult {
   const value =
     outcome.status === "answered"
-      ? { status: outcome.status, blockId: outcome.blockId, ...outcome.response }
+      ? {
+          status: outcome.status,
+          blockId: outcome.blockId,
+          ...outcome.response,
+          ...(outcome.preview
+            ? {
+                preview: outcome.preview,
+                next: "The user edited the preview. For the chosen action, use this text exactly, not your draft.",
+              }
+            : outcome.response.actionId === UI_CONFIRM_EDIT_ACTION_ID
+              ? { next: "The user wants changes to the preview. Ask what to change." }
+              : {}),
+        }
       : outcome.status === "expired"
         ? {
             status: outcome.status,
@@ -573,11 +671,30 @@ export function vaultPromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** `vault` says what happened to a password that the user asked to keep in the Vault. */
+/** Done on a phone or in a web browser: the card there cannot send a sign-in from the user's own device. */
+const TAKEOVER_SIGN_IN_MISSING_NEXT =
+  "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked once more so that they can answer the card there. If this result comes again, do not ask again: tell the user and end your turn.";
+
+/**
+ * The person selected Cancel on the card. A turn end or a closed tab also cancels, so only this result
+ * tells the agent that the user said no; without it the agent asked again (#10452).
+ */
+const TAKEOVER_USER_CANCELLED_NEXT =
+  "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
+
+/**
+ * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
+ * the person selected Done on a sign-in-blocked takeover, but no sign-in came from their device.
+ * `userCancelled`: the person selected Cancel, not a turn end or a closed tab. `secureInputFailed`: OpenBot
+ * could not finish the secure fill, so the user got the page; the fixed reason, or "" when it is unknown.
+ */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
   vaultSkipped?: string,
+  signInMissing = false,
+  userCancelled = false,
+  secureInputFailed?: string,
 ): DynamicToolResult {
   return {
     success: true,
@@ -588,11 +705,34 @@ export function browserTakeoverResult(
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
           ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
+          ...(signInMissing ? { signIn: "not-received" } : {}),
+          ...(secureInputFailed === undefined
+            ? {}
+            : {
+                secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
+              }),
+          ...(decision === "complete"
+            ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
+            : userCancelled
+              ? { next: TAKEOVER_USER_CANCELLED_NEXT }
+              : {}),
         }),
       },
     ],
   };
+}
+
+/**
+ * The answer for a takeover call that the provider cannot wait for: it stops each tool call after a
+ * fixed time (#9689). The card stays open, and the next call for the same tab waits on it again. Only
+ * the model reads it.
+ */
+export function browserTakeoverWaitingResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 /** The answer for a browser tool call that waited while the user controlled its tab. Only the model reads it. */

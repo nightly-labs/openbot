@@ -1,6 +1,5 @@
 import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
 import { isQueueEditRoute } from "./queue-edit-v1";
-import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV2CurrentHttpRequest,
   decodeTeamProtocolV2CurrentHttpResponse,
@@ -13,6 +12,7 @@ import {
   encodeTeamProtocolV3CurrentHttpRequest,
   encodeTeamProtocolV3CurrentHttpResponse,
 } from "./v3-adapter";
+import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./webrtc-framing";
 
 // The two directions call different halves of the v3 adapter. Both used to call the decoder, which was
 // harmless while encoding and decoding produced the same words -- and stopped being harmless the moment

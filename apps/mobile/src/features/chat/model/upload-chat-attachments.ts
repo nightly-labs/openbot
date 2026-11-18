@@ -34,6 +34,8 @@ export async function uploadChatAttachments<T extends RemoteFileUpload, R = stri
     return await actions.send(ids);
   } catch (error) {
     await Promise.allSettled(ids.map(actions.discard));
+    // Cancel stops a large file in the middle, and the upload then fails with its own error.
+    if (actions.cancelled?.()) throw new ChatUploadCancelledError();
     throw error;
   }
 }
@@ -49,7 +51,8 @@ export function retainConfirmedAttachments(
   if (!message || message.kind !== "message") return false;
   for (const [index, attachment] of (message.attachments ?? []).entries()) {
     const file = files[index];
-    if (file)
+    // A large file has no bytes in memory. Its message downloads it when the user taps it.
+    if (file && !file.file)
       retain(attachment.id, { name: file.name, mimeType: file.mimeType, base64: file.base64, localUri: file.uri });
   }
   return true;

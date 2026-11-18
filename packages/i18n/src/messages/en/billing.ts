@@ -31,10 +31,15 @@ export const messages = defineMessages("billing", {
   "billing.status.paused": "Paused",
   "billing.otherServers": "Other servers",
   "billing.action.menu": "Plan actions for {server}",
-  "billing.action.change": "Change plan",
+  "billing.action.addStorage": "Add storage",
   "billing.action.cancel": "Cancel plan",
   "billing.action.renew": "Renew plan",
   "billing.action.updatePayment": "Update payment method",
+  // "Add storage" in Billing. {server} is the server name.
+  "billing.storage.title": "More space for {server}",
+  // The button that buys the chosen storage. {size} is the added storage, for example "50 GB".
+  "billing.storage.add": "Add {size}",
+  "billing.storage.failed": "Could not add storage.",
   "billing.lifecycle.cancelRenewal": "Cancel renewal",
   "billing.lifecycle.cancelTitle": "Cancel renewal for {name}?",
   "billing.lifecycle.cancelDescription":
@@ -225,4 +230,11 @@ export const messages = defineMessages("billing", {
     other:
       "Your license has {count} users, the maximum. Contact us for a larger license. New people cannot join your servers.",
   },
+  // The billing country and the EU VAT ID before the payment page. They decide the VAT.
+  "billing.details.country": "Billing country",
+  "billing.details.countryPlaceholder": "Select a country",
+  "billing.details.vatId": "EU VAT ID (optional)",
+  "billing.details.vatIdInvalid": "This is not a VAT ID of the selected country.",
+  "billing.details.countryMissing": "Select your billing country.",
+  "billing.details.saveFailed": "Could not save the billing details",
 });

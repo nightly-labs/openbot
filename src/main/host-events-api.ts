@@ -1,4 +1,5 @@
 import type {
+  AgentWebhookSecret,
   EventActivity,
   EventRoutine,
   EventRoutineRef,
@@ -45,6 +46,7 @@ export interface HostEventsApi {
   testRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
   rotateSecret(input: EventRoutineRef): Effect.Effect<WebhookSecret, HostEventsFailure>;
   setSecret(input: SetWebhookSecretInput): Effect.Effect<void, HostEventsFailure>;
+  giveSecretToAgent(input: EventRoutineRef): Effect.Effect<AgentWebhookSecret, HostEventsFailure>;
   sendTestEvent(input: EventRoutineRef): Effect.Effect<WebhookTestResult, HostEventsFailure>;
   listActivity(input: ListEventActivityInput): Effect.Effect<EventActivity[], HostEventsFailure>;
   listRoutineRuns(input: ListEventRoutineRunsInput): Effect.Effect<EventRoutineRun[], HostEventsFailure>;

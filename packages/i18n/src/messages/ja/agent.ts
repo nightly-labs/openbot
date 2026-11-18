@@ -85,7 +85,7 @@ export const messages = {
   "agent.error.continueFailed": "エージェントは続行できませんでした。もう一度お試しください。",
   "agent.error.copyDetails": "詳細をコピー",
   "agent.error.mcpNotStarted": "MCP サーバーが起動していません",
-  "agent.error.openMcpSettings": "MCP 設定を開く",
+  "agent.error.openMarketplace": "マーケットプレイスを開く",
   "agent.error.provider": "プロバイダーのエラー",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} のエラー",

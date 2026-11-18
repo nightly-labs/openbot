@@ -9,6 +9,7 @@ import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { SidebarAgentIndicator } from "./SidebarAgentIndicator";
+import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarMessageTime } from "./sidebar-filtering";
@@ -18,11 +19,12 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const {
     directThreadByMember,
     dragOffset,
-    orderedPeople,
+    listFiltered,
     movePersonByKeyboard,
     props,
     sectionDragClasses,
     sectionIsCollapsed,
+    shownPeople,
     sidebarClickIsSuppressed,
     startPersonDragging,
     stopSidebarDragging,
@@ -31,7 +33,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const presence = (online: boolean) => (online ? t("sidebar.people.online") : t("sidebar.people.offline"));
   const sectionId = () => sectionProps.sectionId;
   return (
-    <Show when={props.showPeople !== false && orderedPeople().length > 0}>
+    <Show when={props.showPeople !== false && shownPeople().length > 0}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}
@@ -48,7 +50,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
           inert={sectionIsCollapsed(sectionId()) ? true : undefined}
         >
           <div id={`sidebar-section-body-${sectionId()}`} class="sidebar-section-body">
-            <For each={orderedPeople()}>
+            <For each={shownPeople()}>
               {(member) => {
                 const thread = () => directThreadByMember().get(member.id);
                 const unreadBadge = createMemo(() => sidebarUnreadBadge(thread()?.unreadCount ?? 0));
@@ -58,52 +60,62 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                     class={["sidebar-person-item", { "sidebar-drag-shifting": dragOffset(member.id).y !== 0 }]}
                     style={`--sidebar-drag-y: ${dragOffset(member.id).y}px;`}
                     data-person-id={member.id}
-                    draggable={props.compact ? "false" : "true"}
+                    draggable={props.compact || listFiltered() ? "false" : "true"}
                     onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) =>
                       startPersonDragging(event, member)
                     }
                     onDragEnd={stopSidebarDragging}
                   >
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class={["agent-row person-row", { "agent-row-active": props.activeDirectMemberId === member.id }]}
-                      aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? presence(member.online)}`}
-                      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                      aria-pressed={props.activeDirectMemberId === member.id ? "true" : "false"}
-                      data-cuelume-tap="navigate"
-                      data-cuelume-emphasis="normal"
-                      onClick={(event: MouseEvent) => {
-                        if (sidebarClickIsSuppressed(event)) return;
-                        props.onPreloadDirectConversation?.();
-                        props.onSelectPerson(member.id);
-                      }}
-                      onKeyDown={(event: KeyboardEvent) => {
-                        if (!event.altKey) return;
-                        if (event.key === "ArrowUp") {
-                          event.preventDefault();
-                          movePersonByKeyboard(member.id, -1);
-                        } else if (event.key === "ArrowDown") {
-                          event.preventDefault();
-                          movePersonByKeyboard(member.id, 1);
-                        }
-                      }}
+                    <SidebarNameTooltip
+                      name={teamMemberName(member)}
+                      preview={thread()?.lastMessage.text ?? presence(member.online)}
                     >
-                      <span class="agent-row-avatar">
-                        <TeamPersonAvatar member={member} motion="hover" />
-                        <SidebarAgentIndicator state={unreadBadge} />
-                      </span>
-                      <span class="agent-row-copy">
-                        <span class="agent-row-heading">
-                          <strong>{teamMemberName(member)}</strong>
-                          <span>{thread() ? sidebarMessageTime(thread()?.updatedAt ?? "", format) : ""}</span>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        class={[
+                          "agent-row person-row",
+                          { "agent-row-active": props.activeDirectMemberId === member.id },
+                        ]}
+                        aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? presence(member.online)}`}
+                        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                        aria-pressed={props.activeDirectMemberId === member.id ? "true" : "false"}
+                        data-cuelume-tap="navigate"
+                        data-cuelume-emphasis="normal"
+                        onClick={(event: MouseEvent) => {
+                          if (sidebarClickIsSuppressed(event)) return;
+                          props.onPreloadDirectConversation?.();
+                          props.onSelectPerson(member.id);
+                        }}
+                        onKeyDown={(event: KeyboardEvent) => {
+                          if (!event.altKey || listFiltered()) return;
+                          if (event.key === "ArrowUp") {
+                            event.preventDefault();
+                            movePersonByKeyboard(member.id, -1);
+                          } else if (event.key === "ArrowDown") {
+                            event.preventDefault();
+                            movePersonByKeyboard(member.id, 1);
+                          }
+                        }}
+                      >
+                        <span class="agent-row-avatar">
+                          <TeamPersonAvatar member={member} motion="hover" />
+                          <SidebarAgentIndicator state={unreadBadge} />
                         </span>
-                        <span class="agent-row-preview">{thread()?.lastMessage.text ?? presence(member.online)}</span>
-                      </span>
-                      <Show when={(thread()?.unreadCount ?? 0) > 0}>
-                        <span class="sr-only">{t("sidebar.people.unread", { count: thread()?.unreadCount ?? 0 })}</span>
-                      </Show>
-                    </Button>
+                        <span class="agent-row-copy">
+                          <span class="agent-row-heading">
+                            <strong>{teamMemberName(member)}</strong>
+                            <span>{thread() ? sidebarMessageTime(thread()?.updatedAt ?? "", format) : ""}</span>
+                          </span>
+                          <span class="agent-row-preview">{thread()?.lastMessage.text ?? presence(member.online)}</span>
+                        </span>
+                        <Show when={(thread()?.unreadCount ?? 0) > 0}>
+                          <span class="sr-only">
+                            {t("sidebar.people.unread", { count: thread()?.unreadCount ?? 0 })}
+                          </span>
+                        </Show>
+                      </Button>
+                    </SidebarNameTooltip>
                   </div>
                 );
               }}

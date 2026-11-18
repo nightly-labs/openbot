@@ -143,6 +143,17 @@ export interface ChannelState {
 }
 
 /**
+ * The state of a channel whose places are all paused, or null. Agents cannot post to a paused place, so
+ * the header and the chat card do not say Connected. As "attention", each Connect opens the page, where
+ * every row has Resume; it does not start a new connect.
+ */
+export function pausedChannelState(connections: readonly MessagingConnection[]): ChannelState | null {
+  if (connections.length === 0 || connections.some((connection) => channelRowKind(connection) !== "paused"))
+    return null;
+  return { status: "attention", label: "marketplace.app.paused", attention: 0 };
+}
+
+/**
  * The shell of a channel page. Not set up, the header has the only step: Connect. Set up, each section
  * has its own action, and the danger zone disconnects every place.
  */

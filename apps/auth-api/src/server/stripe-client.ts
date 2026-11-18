@@ -1,7 +1,14 @@
-import { BILLING_CURRENCIES, BILLING_METADATA, type BillingCurrency } from "@openbot/contracts/billing";
+import {
+  BILLING_CURRENCIES,
+  BILLING_METADATA,
+  type BillingCurrency,
+  type BillingStorageTier,
+  parseStorageTierPrice,
+} from "@openbot/contracts/billing";
 import { LICENSE_LOOKUP_KEYS, LICENSE_METADATA, LICENSE_METADATA_KIND } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Result, Schema } from "effect";
+import type { CheckoutTax } from "./billing-tax";
 import { constantTimeEqual, hexToBytes, importHmacSha256Key } from "./crypto";
 
 /** Stripe changes response shapes by API version, so every request names the version this code reads. */
@@ -20,19 +27,22 @@ export type StripeFetch = (input: string, init: RequestInit) => Promise<Response
 
 /**
  * A Stripe request failed. The message holds only Stripe's error `type` and `code`, never the key, the
- * request body or Stripe's own message, which can repeat customer data.
+ * request body or Stripe's own message, which can repeat customer data. `param` is the name of the
+ * refused request parameter, never its value.
  */
 export class StripeRequestError extends Schema.TaggedError<StripeRequestError>()("StripeRequestError", {
   status: Schema.Number,
   type: Schema.NullOr(Schema.String),
   code: Schema.NullOr(Schema.String),
+  param: Schema.NullOr(Schema.String),
   message: Schema.String,
 }) {
-  constructor(status: number, type: string | null, code: string | null) {
+  constructor(status: number, type: string | null, code: string | null, param: string | null = null) {
     super({
       status,
       type,
       code,
+      param,
       message: `Stripe request failed with ${status} (${type ?? "unknown"}${code ? `/${code}` : ""}).`,
     });
   }
@@ -44,10 +54,56 @@ const CurrencyOptions = Schema.optional(
   Schema.Record(Schema.String, Schema.Struct({ unit_amount: Schema.optional(Schema.NullOr(Schema.Int)) })),
 );
 const stripeErrorSchema = Schema.Struct({
-  error: Schema.Struct({ type: Schema.optional(Schema.String), code: Schema.optional(Schema.String) }),
+  error: Schema.Struct({
+    type: Schema.optional(Schema.String),
+    code: Schema.optional(Schema.String),
+    param: Schema.optional(Schema.String),
+  }),
 });
 const sessionSchema = Schema.Struct({ id: Schema.String, url: Schema.NullOr(Schema.String) });
 const customerSchema = Schema.Struct({ id: Schema.String, deleted: Schema.optional(Schema.Boolean) });
+const taxIdSchema = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  value: Schema.String,
+  /** Stripe's own check of an EU VAT ID with VIES, for an ID that Checkout collected. */
+  verification: Schema.optional(Schema.NullOr(Schema.Struct({ status: Schema.String }))),
+});
+type StripeTaxId = typeof taxIdSchema.Type;
+const customerTaxSchema = Schema.Struct({
+  id: Schema.String,
+  deleted: Schema.optional(Schema.Boolean),
+  address: Schema.optional(Schema.NullOr(Schema.Struct({ country: Schema.optional(Schema.NullOr(Schema.String)) }))),
+  tax_exempt: Schema.optional(Schema.NullOr(Schema.String)),
+  metadata: Metadata,
+  tax_ids: Schema.optional(Schema.NullOr(Schema.Struct({ data: Schema.Array(taxIdSchema) }))),
+});
+const taxRateListSchema = Schema.Struct({
+  data: Schema.Array(Schema.Struct({ id: Schema.String, metadata: Metadata })),
+});
+const promotionCodeListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) });
+
+/** The session metadata that records the VAT decision of a Checkout page (`billing-tax.ts`), for the webhook check. */
+export const VAT_METADATA = {
+  country: "openbot_vat_country",
+  treatment: "openbot_vat_treatment",
+} as const;
+
+/**
+ * The time (ISO 8601) when a consumer in the EU asked that the hosting service begin before the 14-day
+ * withdrawal period ends. It is on the Checkout session and on the subscription, as the record of the request.
+ */
+export const EARLY_START_METADATA = "openbot_early_start_at";
+
+/** The tax facts of a Stripe customer that decide the VAT of a new subscription. */
+export interface StripeCustomerTax {
+  /** A customer deleted in the Stripe Dashboard has no tax facts. */
+  deleted: boolean;
+  country: string | null;
+  taxExempt: "none" | "exempt" | "reverse";
+  metadata: Readonly<Record<string, string>>;
+  taxIds: readonly StripeTaxId[];
+}
 const deletedSchema = Schema.Struct({ id: Schema.String });
 const checkoutSessionSchema = Schema.Struct({
   id: Schema.String,
@@ -79,12 +135,21 @@ const subscriptionSchema = Schema.Struct({
   currency: Schema.String,
   cancel_at_period_end: Schema.Boolean,
   cancel_at: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** The time of the last cancel request. Stripe keeps it after a resume. */
+  canceled_at: Schema.optional(Schema.NullOr(Schema.Int)),
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
   /** The end of the trial. Stripe keeps it after the trial ends. */
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
+  /**
+   * Stripe Tax on the invoices. Only subscriptions from the days when Checkout used Stripe Tax have it on;
+   * `scripts/stripe-vat-migrate.ts` moves them to `default_tax_rates`.
+   */
+  automatic_tax: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
+  /** The VAT rate of each invoice. Empty for reverse charge and for a buyer outside the EU. */
+  default_tax_rates: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({ id: Schema.String })))),
   default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
     data: Schema.Array(
@@ -112,6 +177,8 @@ const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struc
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  total: Schema.optional(Schema.NullOr(Schema.Number)),
+  total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   parent: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -135,6 +202,9 @@ const eventSchema = Schema.Struct({
 });
 export type StripeEvent = typeof eventSchema.Type;
 
+/** The largest number of `lookup_keys[]` that Stripe takes in one Price list request. */
+const PRICE_LOOKUP_KEYS_PER_REQUEST = 10;
+
 export function isBillingCurrency(value: unknown): value is BillingCurrency {
   return isOneOf(BILLING_CURRENCIES, value);
 }
@@ -142,6 +212,28 @@ export function isBillingCurrency(value: unknown): value is BillingCurrency {
 /** True when the Price can be paid in `currency`: its base currency, or one of its currency options. */
 export function priceHasCurrency(price: StripePrice, currency: BillingCurrency): boolean {
   return price.currency.toLowerCase() === currency || price.currency_options?.[currency] !== undefined;
+}
+
+/** The Checkout form with this promotion code. Stripe refuses a page with both a discount and the code field. */
+function withPromotionCode(body: URLSearchParams, promotionCodeId: string): URLSearchParams {
+  const form = new URLSearchParams(body);
+  form.delete("allow_promotion_codes");
+  form.set("discounts[0][promotion_code]", promotionCodeId);
+  return form;
+}
+
+/**
+ * Stripe refused the promotion code for this order: another currency names the `discounts` parameter, and
+ * the other restrictions give a `coupon_` or `promotion_code_` error code, such as
+ * `promotion_code_amount_insufficient` or `coupon_applies_to_nothing`.
+ */
+function isRefusedPromotionCode(error: StripeRequestError | StripeTransportError): boolean {
+  if (error._tag !== "StripeRequestError" || error.status !== 400) return false;
+  return (
+    error.param?.startsWith("discounts") === true ||
+    error.code?.startsWith("coupon_") === true ||
+    error.code?.startsWith("promotion_code_") === true
+  );
 }
 
 export class StripeClient {
@@ -240,16 +332,59 @@ export class StripeClient {
     );
   }).bind(this);
 
-  /** The active Prices with these lookup keys, with the amount in each currency. */
+  /**
+   * Adds the storage add-on to a subscription, or moves its storage item to `priceId`. Stripe invoices the
+   * prorated amount now and refuses the change when that payment fails (402), so a server never gets a
+   * larger disk unpaid. The idempotency key makes a repeated request one change.
+   */
+
+  readonly setStorageItem = Effect.fn("StripeClient.setStorageItem")(function* (
+    this: StripeClient,
+    input: { subscriptionId: string; itemId: string | null; priceId: string },
+    idempotencyKey: string,
+  ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      "items[0][price]": input.priceId,
+      "items[0][quantity]": "1",
+      proration_behavior: "always_invoice",
+      payment_behavior: "error_if_incomplete",
+      "expand[]": "items.data.price.currency_options",
+    });
+    if (input.itemId) body.set("items[0][id]", input.itemId);
+    return yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(input.subscriptionId)}`,
+      body,
+      subscriptionSchema,
+      idempotencyKey,
+    );
+  }).bind(this);
+
+  /**
+   * The active Prices with these lookup keys, with the amount in each currency. Stripe takes at most 10
+   * lookup keys in one request, so a longer list is read in parts.
+   */
 
   readonly listPricesByLookupKeys = Effect.fn("StripeClient.listPricesByLookupKeys")(function* (
     this: StripeClient,
     lookupKeys: readonly string[],
   ): Effect.fn.Return<StripePrice[], StripeRequestError | StripeTransportError> {
-    const query = new URLSearchParams({ active: "true", limit: "100" });
-    for (const key of lookupKeys) query.append("lookup_keys[]", key);
-    query.append("expand[]", "data.currency_options");
-    return [...(yield* this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema)).data];
+    const chunks: (readonly string[])[] = [];
+    for (let start = 0; start < lookupKeys.length; start += PRICE_LOOKUP_KEYS_PER_REQUEST) {
+      chunks.push(lookupKeys.slice(start, start + PRICE_LOOKUP_KEYS_PER_REQUEST));
+    }
+    // The requests run at the same time, so a cold catalog waits for one Stripe call, not one per chunk.
+    const pages = yield* Effect.forEach(
+      chunks,
+      (keys) => {
+        const query = new URLSearchParams({ active: "true", limit: "100" });
+        for (const key of keys) query.append("lookup_keys[]", key);
+        query.append("expand[]", "data.currency_options");
+        return this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema);
+      },
+      { concurrency: "unbounded" },
+    );
+    return pages.flatMap((page) => page.data);
   }).bind(this);
 
   /** The same idempotency key gives the same customer, so two requests at once make one customer. */
@@ -281,6 +416,81 @@ export class StripeClient {
     return result.success.deleted === true;
   }).bind(this);
 
+  /** The country, the tax exemption and the tax IDs of a customer. */
+
+  readonly getCustomerTax = Effect.fn("StripeClient.getCustomerTax")(function* (
+    this: StripeClient,
+    customerId: string,
+  ): Effect.fn.Return<StripeCustomerTax, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ "expand[]": "tax_ids" });
+    const path = `/v1/customers/${encodeURIComponent(customerId)}?${query}`;
+    const customer = yield* this.#requestEffect("GET", path, null, customerTaxSchema);
+    const exempt = customer.tax_exempt;
+    return {
+      deleted: customer.deleted === true,
+      country: customer.address?.country || null,
+      taxExempt: exempt === "exempt" || exempt === "reverse" ? exempt : "none",
+      metadata: customer.metadata,
+      taxIds: customer.tax_ids?.data ?? [],
+    };
+  }).bind(this);
+
+  /**
+   * Sets the tax facts of a customer. A new `country` clears the rest of the old address, which belongs to
+   * the old country; the next Checkout asks for the full address again. Metadata keys with an empty value
+   * are removed.
+   */
+
+  readonly setCustomerTax = Effect.fn("StripeClient.setCustomerTax")(function* (
+    this: StripeClient,
+    customerId: string,
+    input: {
+      country?: string;
+      taxExempt: "none" | "reverse";
+      metadata: Readonly<Record<string, string>>;
+    },
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ tax_exempt: input.taxExempt });
+    if (input.country) {
+      body.set("address[country]", input.country);
+      for (const field of ["line1", "line2", "city", "state", "postal_code"]) body.set(`address[${field}]`, "");
+    }
+    for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
+    yield* this.#requestEffect("POST", `/v1/customers/${encodeURIComponent(customerId)}`, body, customerSchema);
+  }).bind(this);
+
+  /** Adds an EU VAT ID to a customer. Stripe shows it on each invoice. */
+
+  readonly addCustomerVatId = Effect.fn("StripeClient.addCustomerVatId")(function* (
+    this: StripeClient,
+    customerId: string,
+    vatId: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ type: "eu_vat", value: vatId });
+    yield* this.#requestEffect("POST", `/v1/customers/${encodeURIComponent(customerId)}/tax_ids`, body, taxIdSchema);
+  }).bind(this);
+
+  readonly deleteCustomerTaxId = Effect.fn("StripeClient.deleteCustomerTaxId")(function* (
+    this: StripeClient,
+    customerId: string,
+    taxId: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const path = `/v1/customers/${encodeURIComponent(customerId)}/tax_ids/${encodeURIComponent(taxId)}`;
+    yield* this.#requestEffect("DELETE", path, null, deletedSchema);
+  }).bind(this);
+
+  /** The ID of the active Tax Rate with `metadata[key] = value`, or null when the account has none. */
+
+  readonly findTaxRate = Effect.fn("StripeClient.findTaxRate")(function* (
+    this: StripeClient,
+    key: string,
+    value: string,
+  ): Effect.fn.Return<string | null, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ active: "true", limit: "100" });
+    const rates = yield* this.#requestEffect("GET", `/v1/tax_rates?${query}`, null, taxRateListSchema);
+    return rates.data.find((rate) => rate.metadata[key] === value)?.id ?? null;
+  }).bind(this);
+
   /**
    * A subscription Checkout for one server, or for the license when `serverId` is absent. The metadata goes
    * on the session and on the subscription, so the webhook links the subscription to the account and the
@@ -306,8 +516,15 @@ export class StripeClient {
       metadata?: Readonly<Record<string, string>>;
       /** Metadata for the session only, such as the order that a later page for the same server repeats. */
       sessionMetadata?: Readonly<Record<string, string>>;
+      /**
+       * The VAT of every invoice of the subscription (`checkoutTax`). `null` is a customer with no country
+       * while the country is not required: Stripe Tax sets the VAT, as before the billing details step.
+       */
+      tax: CheckoutTax | null;
       /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
       trialEndSeconds?: number;
+      /** The code of a discount link (`promotion-code.ts`). Absent: the buyer can type a code in Checkout. */
+      promotionCode?: string;
       successUrl: string;
       cancelUrl: string;
       nowSeconds: number;
@@ -326,12 +543,10 @@ export class StripeClient {
       origin_context: "web",
       submit_type: "auto",
       payment_method_collection: "always",
-      billing_address_collection: "auto",
+      // The country and the VAT ID come before Checkout (`billing-tax.ts`), which gives `taxRateId`. Checkout
+      // asks for the full address for the invoice and saves it on the customer, with the name.
+      billing_address_collection: "required",
       "phone_number_collection[enabled]": "false",
-      "automatic_tax[enabled]": "false",
-      "tax_id_collection[enabled]": "true",
-      "tax_id_collection[required]": "never",
-      // Stripe refuses tax ID collection for an existing customer without these two.
       "customer_update[name]": "auto",
       "customer_update[address]": "auto",
       "consent_collection[terms_of_service]": "required",
@@ -349,15 +564,53 @@ export class StripeClient {
     }
     if (input.serverId) body.set("client_reference_id", input.serverId);
     if (input.trialEndSeconds !== undefined) body.set("subscription_data[trial_end]", String(input.trialEndSeconds));
+    if (input.tax) {
+      // The rate goes on top of the Price. Reverse charge and a buyer outside the EU have no rate.
+      if (input.tax.rateId) body.set("subscription_data[default_tax_rates][0]", input.tax.rateId);
+      body.set(`metadata[${VAT_METADATA.country}]`, input.tax.country);
+      body.set(`metadata[${VAT_METADATA.treatment}]`, input.tax.treatment);
+      // The subscription keeps its VAT treatment, so that a change of the billing details changes only the
+      // subscriptions that got their VAT from OpenBot (`billing-tax.ts`).
+      body.set(`subscription_data[metadata][${VAT_METADATA.treatment}]`, input.tax.treatment);
+    } else {
+      // No country yet: Stripe Tax sets the VAT from the Checkout address and collects the VAT ID.
+      // `scripts/stripe-vat-migrate.ts` later moves the subscription to the rate.
+      body.set("automatic_tax[enabled]", "true");
+      body.set("tax_id_collection[enabled]", "true");
+      body.set("tax_id_collection[required]", "never");
+    }
     for (const prefix of ["metadata", "subscription_data[metadata]"]) {
       body.set(`${prefix}[${BILLING_METADATA.userId}]`, input.userId);
       if (input.serverId) body.set(`${prefix}[${BILLING_METADATA.serverId}]`, input.serverId);
       for (const [key, value] of Object.entries(input.metadata ?? {})) body.set(`${prefix}[${key}]`, value);
     }
     for (const [key, value] of Object.entries(input.sessionMetadata ?? {})) body.set(`metadata[${key}]`, value);
-    const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
+    const create = (form: URLSearchParams) =>
+      this.#requestEffect("POST", "/v1/checkout/sessions", form, checkoutSessionSchema);
+    // The code of a discount link is optional: when Stripe cannot find it, the page has the code field.
+    const promotionCodeId = input.promotionCode
+      ? yield* this.#activePromotionCodeId(input.promotionCode).pipe(Effect.orElseSucceed(() => null))
+      : null;
+    const session = yield* promotionCodeId
+      ? // A code whose restrictions this order does not meet (a first order only, a minimum amount, other
+        // products or another currency) gives the page with the code field instead.
+        create(withPromotionCode(body, promotionCodeId)).pipe(
+          Effect.catchIf(isRefusedPromotionCode, () => create(body)),
+        )
+      : create(body);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
+  }).bind(this);
+
+  /** The ID of the active promotion code with this code, or null when Stripe has none. */
+
+  readonly #activePromotionCodeId = Effect.fn("StripeClient.activePromotionCodeId")(function* (
+    this: StripeClient,
+    code: string,
+  ): Effect.fn.Return<string | null, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ code, active: "true", limit: "1" });
+    const codes = yield* this.#requestEffect("GET", `/v1/promotion_codes?${query}`, null, promotionCodeListSchema);
+    return codes.data[0]?.id ?? null;
   }).bind(this);
 
   /**
@@ -415,6 +668,16 @@ export class StripeClient {
       currency: BillingCurrency;
       anchorSeconds: number;
       trial?: boolean;
+      /**
+       * Stripe Tax on the invoices, as on the subscription that this one comes from. Sent only when true, so
+       * the retry of a split that started before Stripe Tax keeps the body of its idempotency key.
+       */
+      automaticTax: boolean;
+      /**
+       * The VAT rates of the invoices, as on the subscription that this one comes from. Sent only when there
+       * is one, so the retry of an older split keeps the body of its idempotency key.
+       */
+      taxRateIds: readonly string[];
       paymentMethodId: string | null;
       metadata: Readonly<Record<string, string>>;
     },
@@ -430,9 +693,30 @@ export class StripeClient {
         : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
       "expand[]": "items.data.price.currency_options",
     });
+    if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
+    for (const [index, id] of input.taxRateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
+  }).bind(this);
+
+  /** Sets the VAT rates of the next invoices of a subscription and its VAT treatment. No rate removes them. */
+
+  readonly setSubscriptionTaxRates = Effect.fn("StripeClient.setSubscriptionTaxRates")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    rateIds: readonly string[],
+    treatment: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ [`metadata[${VAT_METADATA.treatment}]`]: treatment });
+    if (rateIds.length === 0) body.set("default_tax_rates", "");
+    for (const [index, id] of rateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
+    yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionSchema,
+    );
   }).bind(this);
 
   /** Sets metadata on a subscription. An empty value removes the key. */
@@ -487,15 +771,22 @@ export class StripeClient {
   }).bind(this);
 
   /**
-   * The invoice that a PaymentIntent paid, the subscription of that invoice and why Stripe made it. Null for
-   * a payment of no subscription invoice. From API version 2025-03-31 a charge does not name its invoice.
+   * The invoice that a PaymentIntent paid, the subscription of that invoice, why Stripe made it, and its
+   * total with and without tax. Null for a payment of no subscription invoice. From API version
+   * 2025-03-31 a charge does not name its invoice.
    */
 
   readonly getPaymentInvoice = Effect.fn("StripeClient.getPaymentInvoice")(function* (
     this: StripeClient,
     paymentIntentId: string,
   ): Effect.fn.Return<
-    { invoiceId: string; subscriptionId: string; billingReason: string | null } | null,
+    {
+      invoiceId: string;
+      subscriptionId: string;
+      billingReason: string | null;
+      total: number | null;
+      totalExcludingTax: number | null;
+    } | null,
     StripeRequestError | StripeTransportError
   > {
     const query = new URLSearchParams({
@@ -515,6 +806,8 @@ export class StripeClient {
       invoiceId,
       subscriptionId: typeof subscription === "string" ? subscription : subscription.id,
       billingReason: invoiceRecord.billing_reason ?? null,
+      total: invoiceRecord.total ?? null,
+      totalExcludingTax: invoiceRecord.total_excluding_tax ?? null,
     };
   }).bind(this);
 
@@ -564,6 +857,7 @@ export class StripeClient {
         response.status,
         Option.isSome(parsed) ? (parsed.value.error.type ?? null) : null,
         Option.isSome(parsed) ? (parsed.value.error.code ?? null) : null,
+        Option.isSome(parsed) ? (parsed.value.error.param ?? null) : null,
       );
     }
     return yield* Schema.decodeUnknownEffect(schema)(value).pipe(
@@ -588,9 +882,25 @@ export function subscriptionLicenseItem(subscription: StripeSubscription): Strip
   return subscription.items.data.find((item) => isLicensePrice(item.price)) ?? null;
 }
 
-/** The item of a subscription that is not the license: the server plan. */
+/** True for a Price of the storage add-on of a hosted server. */
+function isStoragePrice(price: { lookup_key: string | null; metadata: Readonly<Record<string, string>> }) {
+  return parseStorageTierPrice(price) !== null;
+}
+
+/** The item of a subscription that is not the license or the storage add-on: the server plan. */
 export function subscriptionServerItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
-  return subscription.items.data.find((item) => !isLicensePrice(item.price)) ?? null;
+  return subscription.items.data.find((item) => !isLicensePrice(item.price) && !isStoragePrice(item.price)) ?? null;
+}
+
+/** The storage add-on item of a server plan, or null when the server has the plan storage only. */
+export function subscriptionStorageItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
+  return subscription.items.data.find((item) => isStoragePrice(item.price)) ?? null;
+}
+
+/** The storage tier that a subscription pays for: the tier of its storage item, or 0 with no such item. */
+export function subscriptionStorageTier(subscription: StripeSubscription): BillingStorageTier {
+  const item = subscriptionStorageItem(subscription);
+  return item ? (parseStorageTierPrice(item.price)?.tier ?? 0) : 0;
 }
 
 /** The item that names the product of a subscription: the server plan when there is one, else the license. */
@@ -605,14 +915,25 @@ export function subscriptionPeriodEnd(subscription: StripeSubscription): number 
 }
 
 /**
- * The list price of one period in the subscription's currency, in minor units. A multi-currency Price
- * holds its base currency amount in `unit_amount` and the other currencies in `currency_options`.
- * Null for a Price with no fixed amount, such as a tiered Price.
+ * The list price of one period in the subscription's currency, in minor units: the plan, and the storage
+ * add-on of a server plan. A multi-currency Price holds its base currency amount in `unit_amount` and the
+ * other currencies in `currency_options`. Null for a Price with no fixed amount, such as a tiered Price.
  */
 export function subscriptionAmount(subscription: StripeSubscription): number | null {
   const item = subscriptionMainItem(subscription);
   if (!item) return null;
   const currency = subscription.currency.toLowerCase();
+  const storage = subscriptionServerItem(subscription) ? subscriptionStorageItem(subscription) : null;
+  let amount = 0;
+  for (const part of storage ? [item, storage] : [item]) {
+    const partAmount = itemAmount(part, currency);
+    if (partAmount === null) return null;
+    amount += partAmount;
+  }
+  return Number.isSafeInteger(amount) ? amount : null;
+}
+
+function itemAmount(item: StripeSubscriptionItem, currency: string): number | null {
   const unitAmount =
     item.price.currency.toLowerCase() === currency
       ? item.price.unit_amount

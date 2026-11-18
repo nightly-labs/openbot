@@ -98,6 +98,16 @@ export const CustomServer = at((nav) => {
   nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[0]?.id ?? ""}` });
 });
 
+/** Apps › Add custom: the form of a new MCP server, in the page's own scroll. */
+export const CustomServerAdd = at((nav) => {
+  nav.go({ kind: "server", id: null });
+});
+
+/** Edit on a custom server's page: its stored settings in the same form. */
+export const CustomServerEdit = at((nav) => {
+  nav.go({ kind: "server", id: STORY_MCP_SERVERS[0]?.id ?? "" });
+});
+
 /** The Skills tab: "Your skills" on top, then 6 rows of each catalog group. */
 export const Skills = at(tab("skills"));
 
