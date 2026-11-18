@@ -14,6 +14,8 @@ export function createScrollFades(options: { stuck?: string } = {}) {
   let element: Element | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let contentObserver: ResizeObserver | undefined;
+  let frame: number | undefined;
+  let afterFrame: ReturnType<typeof setTimeout> | undefined;
 
   /** The fade lies over the scroller's border box, but a sticky offset starts at its content edge. */
   function measureStuck(scroller: Element, selector: string): number {
@@ -44,8 +46,20 @@ export function createScrollFades(options: { stuck?: string } = {}) {
     });
   }
 
+  /**
+   * One read after the next frame, for all requests in that frame. A read in the frame forced a
+   * layout each time, because other code still wrote to the page: with 100 working agents, the
+   * sidebar list changed many times in each frame. After the frame, the layout is usually clean.
+   */
   function remeasure(): void {
-    window.requestAnimationFrame(measure);
+    if (frame !== undefined || afterFrame !== undefined) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = undefined;
+      afterFrame = setTimeout(() => {
+        afterFrame = undefined;
+        measure();
+      });
+    });
   }
 
   function adopt(next: Element): void {
@@ -55,13 +69,13 @@ export function createScrollFades(options: { stuck?: string } = {}) {
   function bind(next: Element): void {
     adopt(next);
     resizeObserver?.disconnect();
-    resizeObserver = new ResizeObserver(measure);
+    resizeObserver = new ResizeObserver(remeasure);
     resizeObserver.observe(next);
     remeasure();
   }
 
   function watch(content: Element): void {
-    contentObserver ??= new ResizeObserver(measure);
+    contentObserver ??= new ResizeObserver(remeasure);
     contentObserver.observe(content);
   }
 
@@ -74,6 +88,10 @@ export function createScrollFades(options: { stuck?: string } = {}) {
     resizeObserver = undefined;
     contentObserver?.disconnect();
     contentObserver = undefined;
+    if (frame !== undefined) window.cancelAnimationFrame(frame);
+    clearTimeout(afterFrame);
+    frame = undefined;
+    afterFrame = undefined;
   }
 
   function stuckHeight(): number {
