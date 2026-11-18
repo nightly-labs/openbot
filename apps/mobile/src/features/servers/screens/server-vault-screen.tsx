@@ -3,6 +3,7 @@ import type {
   VaultCardSummary,
   VaultContactSummary,
   VaultHostImportResult,
+  VaultItemSummary,
   VaultLoginSummary,
 } from "@openbot/contracts/ipc";
 import { VAULT_IMPORT_CSV_LIMIT } from "@openbot/contracts/team-protocol/vault-import-v1";
@@ -10,10 +11,15 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TwoStepRowCode, useCopyTwoStepCode } from "@/features/servers/components/vault-two-step-code";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
-import { vaultCardTitle, vaultContactTitle, vaultLoginTitle } from "@/features/servers/model/vault-items";
+import {
+  vaultAgentsSummary,
+  vaultCardTitle,
+  vaultContactTitle,
+  vaultLoginTitle,
+} from "@/features/servers/model/vault-items";
 import { useSecondClock, useServerVaultCodes } from "@/features/servers/model/vault-two-step";
 import {
   SettingsContent,
@@ -21,7 +27,10 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 
 /** The file types that a password export can have. Some providers name a CSV file plain text. */
@@ -50,13 +59,16 @@ async function readPickedCsv(): Promise<string | null> {
 /**
  * Server settings › Vault of a joined server (`vault-v1`), for an owner or admin. It lists the logins,
  * cards and contact info that the host's agents fill, and with `vault-v2` the API keys that they read,
- * adds and opens items, and imports a CSV password export. The host never sends a password, a card
+ * adds and opens items, and imports a CSV password export. With `vault-v4` a row names the agents of an
+ * item that is for chosen agents. The host never sends a password, a card
  * number, a security code or an API key, so none shows here.
  */
 export function ServerVaultScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const vault = useServerVault(serverId);
+  const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
   const { importVaultCsv } = useMobileWorkspaceActions();
   const [importResult, setImportResult] = useState<VaultHostImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -113,6 +125,11 @@ export function ServerVaultScreen() {
   const open = (params: { itemId: string } | { kind: "login" | "card" | "contact" | "apiKey" }) =>
     router.push({ pathname: "/server-settings/vault-item", params: { serverId, ...params } });
   const addedBy = (name: string | undefined) => (name ? t("mobile.server.vault.addedBy", { name }) : undefined);
+  /** The row's detail, and the agents of an item that is for chosen agents (`vault-v4`). */
+  const detail = (item: VaultItemSummary, text: string | undefined) =>
+    [text, item.agents && t("mobile.server.vault.agentsListed", { agents: vaultAgentsSummary(item.agents, agents, t) })]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
   const importCsv = async () => {
     setImportResult(null);
@@ -159,7 +176,7 @@ export function ServerVaultScreen() {
           return (
             <SettingsRow
               key={login.id}
-              supportingText={login.username || addedBy(login.addedBy)}
+              supportingText={detail(login, login.username || addedBy(login.addedBy))}
               onPress={() => open({ itemId: login.id })}
               trailing={code ? <TwoStepRowCode code={code} now={now} site={site} /> : undefined}
               disclosure={!code}
@@ -183,10 +200,13 @@ export function ServerVaultScreen() {
         {cards.map((card) => (
           <SettingsRow
             key={card.id}
-            supportingText={t("mobile.server.vault.cardSummary", {
-              last4: card.last4,
-              date: `${String(card.expMonth).padStart(2, "0")}/${card.expYear}`,
-            })}
+            supportingText={detail(
+              card,
+              t("mobile.server.vault.cardSummary", {
+                last4: card.last4,
+                date: `${String(card.expMonth).padStart(2, "0")}/${card.expYear}`,
+              }),
+            )}
             onPress={() => open({ itemId: card.id })}
           >
             <Typography.Paragraph numberOfLines={1}>{vaultCardTitle(card, t)}</Typography.Paragraph>
@@ -201,7 +221,7 @@ export function ServerVaultScreen() {
         {contacts.map((contact) => (
           <SettingsRow
             key={contact.id}
-            supportingText={contact.email || contact.phone || addedBy(contact.addedBy)}
+            supportingText={detail(contact, contact.email || contact.phone || addedBy(contact.addedBy))}
             onPress={() => open({ itemId: contact.id })}
           >
             <Typography.Paragraph numberOfLines={1}>{vaultContactTitle(contact, t)}</Typography.Paragraph>
@@ -220,7 +240,7 @@ export function ServerVaultScreen() {
           {apiKeys.map((apiKey) => (
             <SettingsRow
               key={apiKey.id}
-              supportingText={apiKey.notes || undefined}
+              supportingText={detail(apiKey, apiKey.notes || undefined)}
               onPress={() => open({ itemId: apiKey.id })}
             >
               <Typography.Paragraph numberOfLines={1}>{apiKey.name}</Typography.Paragraph>

@@ -108,6 +108,12 @@ const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", 
 /** A personal Sunra account has no quota of its own. */
 const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
 
+/** Sunra and Higgsfield both signed in on the host: one button for each service. */
+const bothCredits: MediaCreditsRailRow[] = [
+  ...teamCredits,
+  { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
+];
+
 /** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
@@ -115,10 +121,21 @@ function RailPreview(props: {
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
+  /** Pins the CRM, whose button has a right-click menu. */
+  crm?: boolean;
 }) {
   const { t } = useText();
   const [current, setCurrent] = createSignal<PageRailPage | null>("agents");
-  const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(["usage"]);
+  const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(props.crm ? ["usage", "crm"] : ["usage"]);
+  /** Named functions, not ternary props. */
+  function crmAction(): (() => void) | undefined {
+    if (!props.crm) return undefined;
+    return () => setCurrent("crm");
+  }
+  function crmConnectorsAction(): (() => void) | undefined {
+    if (!props.crm) return undefined;
+    return () => setCurrent("crm");
+  }
   return (
     // The extra box keeps the rail out of the rule that hides it in a narrow window.
     <div class="app-window" style={{ height: "100vh" }}>
@@ -138,6 +155,8 @@ function RailPreview(props: {
           onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
           onUsage={() => setCurrent("usage")}
+          onCrm={crmAction()}
+          onCrmConnectors={crmConnectorsAction()}
           onMarketplace={fn()}
           onSettings={() => setCurrent("settings")}
           settingsNotice={props.updateReady ? t("account.update.ready") : undefined}
@@ -223,7 +242,17 @@ export const MediaCreditsQuota: Story = {
   args: { mediaCredits: teamCredits },
 };
 
-/** The Canvas page with a personal Sunra account: the logo with no ring. The card has the number. */
+/** The Canvas page with a personal Sunra account: the logo with the number of credits under it. */
 export const MediaCreditsPersonal: Story = {
   args: { mediaCredits: personalCredits },
+};
+
+/** The Canvas page with Sunra and Higgsfield: a button for each service. */
+export const MediaCreditsTwoServices: Story = {
+  args: { mediaCredits: bothCredits },
+};
+
+/** The CRM is pinned. Right-click its button for Connectors and Unpin; the other pinned buttons have Unpin. */
+export const CrmMenu: Story = {
+  args: { crm: true },
 };

@@ -8,13 +8,14 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { type EdgeInsets, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
-import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
+import { SPLASH_EASE_IN_OUT, SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { BloubEyes, EYES_HEIGHT, EYES_WIDTH } from "./bloub-eyes";
 import { BLOUB_MOVE, BLOUB_MOVE_MS, BLOUB_RADIUS, bloubEyesFrame, bloubGradient, useBloubColors } from "./bloub-look";
 import { useBloubStage } from "./bloub-stage-context";
@@ -25,6 +26,8 @@ import { StageBackButton } from "./stage-back-button";
 const CLEAR_DELAY_MS = 300;
 const VEIL = { duration: 360, easing: SPLASH_EASE_OUT };
 const STATUS_GAP = 32;
+// Joy on a header: the lower edge stretches down by this much and settles, like squeezed felt.
+const JELLY_STRETCH = 16;
 // Android 12 and later show the splash icon only inside a 192 dp circle in a 288 dp square. At full
 // size the tip of the left eye is 117.5 pt from the middle, so the Android splash draws the eyes at
 // this scale. Keep the Android `imageWidth` in app.json equal to 240 times this value.
@@ -198,6 +201,18 @@ export function BloubStage({
   useEffect(() => {
     edge.set(reduced ? target : withTiming(target, BLOUB_MOVE));
   }, [edge, reduced, target]);
+  const jelly = shape?.kind === "header" && mood === "joy" && !reduced;
+  useEffect(() => {
+    if (!jelly) return;
+    edge.set(
+      withSequence(
+        withTiming(target + JELLY_STRETCH, { duration: 200, easing: SPLASH_EASE_OUT }),
+        withTiming(target - JELLY_STRETCH * 0.4, { duration: 240, easing: SPLASH_EASE_IN_OUT }),
+        withTiming(target + JELLY_STRETCH * 0.25, { duration: 200, easing: SPLASH_EASE_IN_OUT }),
+        withTiming(target, { duration: 260, easing: SPLASH_EASE_OUT }),
+      ),
+    );
+  }, [edge, jelly, target]);
   useEffect(() => {
     veil.set(clear ? withDelay(reduced ? 0 : CLEAR_DELAY_MS, withTiming(0, VEIL)) : withTiming(1, VEIL));
   }, [clear, reduced, veil]);

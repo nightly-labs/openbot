@@ -246,6 +246,15 @@ export interface DiscordChannelSummary {
   kind: "channel" | "thread";
 }
 
+/**
+ * The answer of `listChannels`: the channels first, then the newest threads. `omitted` counts the
+ * places past `DISCORD_LIST_CHANNELS_LIMIT`. A Signal before this field sends none.
+ */
+export interface DiscordChannelList {
+  channels: DiscordChannelSummary[];
+  omitted: number;
+}
+
 /** One role of `listRoles`. */
 export interface DiscordRoleSummary {
   id: string;
@@ -441,14 +450,18 @@ export function decodeDiscordHistory(value: unknown): DiscordHistoryMessage[] {
   });
 }
 
-export function decodeDiscordChannels(value: unknown): DiscordChannelSummary[] {
-  const channels = record(value).channels;
+export function decodeDiscordChannels(value: unknown): DiscordChannelList {
+  const { channels, omitted = 0 } = record(value);
   if (!Array.isArray(channels) || channels.length > DISCORD_LIST_CHANNELS_LIMIT) invalid();
-  return channels.map((entry) => {
-    const item = record(entry);
-    if (item.kind !== "channel" && item.kind !== "thread") invalid();
-    return { id: snowflake(item.id), name: text(item.name), kind: item.kind };
-  });
+  if (!isNumber(omitted) || !Number.isSafeInteger(omitted) || omitted < 0) invalid();
+  return {
+    channels: channels.map((entry) => {
+      const item = record(entry);
+      if (item.kind !== "channel" && item.kind !== "thread") invalid();
+      return { id: snowflake(item.id), name: text(item.name), kind: item.kind };
+    }),
+    omitted,
+  };
 }
 
 export function decodeDiscordRoles(value: unknown): DiscordRoleSummary[] {

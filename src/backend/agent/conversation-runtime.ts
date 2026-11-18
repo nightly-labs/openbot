@@ -12,7 +12,8 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { withoutQueuePositions } from "../database/conversation-writer";
+import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-writer";
+import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -49,15 +50,13 @@ const logger = createOpenBotLogger("conversation-runtime");
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
 /**
- * Runs `work` inside a SQLite transaction, opening one only when the caller is not already inside
- * another. Nesting is load-bearing: `deleteRoutine` drives a routine mutation whose `beforeMutate`
- * hook appends a run transition in the same transaction, and an approval response can append a
- * hosted-site event inside an outer one. This is the only `BEGIN IMMEDIATE` under `src/backend/agent`.
+ * Runs `work` in `withTransaction`. Nesting is load-bearing: `deleteRoutine` drives a routine
+ * mutation whose `beforeMutate` hook appends a run transition in the same transaction, and an
+ * approval response can append a hosted-site event inside an outer one.
  *
- * `onCommit` exists because a nested caller must not publish in-memory state the owner can still
- * discard: there is no partial rollback here, so effects that make rows visible to the rest of the
- * app are queued on the owner and run once, after `COMMIT`. `onRollback` is queued the same way, so
- * an owner that fails *after* a nested call succeeded still undoes that call's in-memory slice.
+ * A nested call queues `onCommit` and `onRollback` on the owner, so in-memory state shows only
+ * committed rows. When a level fails, its savepoint is rolled back, so the effects queued inside it
+ * are removed: its rollbacks run at once, newest first, and its commits never run.
  */
 export function withDatabaseTransaction<T>(
   database: OpenBotDatabase,
@@ -65,65 +64,53 @@ export function withDatabaseTransaction<T>(
   onRollback?: () => void,
   onCommit?: () => void,
 ): T {
-  // `isTransaction`, not the map, decides who opens one: a transaction started anywhere else would
-  // otherwise make this call BEGIN IMMEDIATE inside it, which SQLite rejects.
-  if (database.connection.isTransaction) {
-    const owner = openTransactions.get(database);
-    let result: T;
-    try {
-      result = work();
-    } catch (error) {
-      // Our own work failed, so undo our in-memory slice now rather than queueing it: the owner's
-      // ROLLBACK will undo the rows, and a queued restorer would run a second time.
-      onRollback?.();
-      throw error;
-    }
-    if (owner) {
-      if (onRollback) owner.rollback.push(onRollback);
-      if (onCommit) owner.commit.push(onCommit);
-    } else {
-      // An ambient transaction this helper did not open has no queue to defer onto, so the
-      // effects run as they always did.
-      onCommit?.();
-    }
-    return result;
-  }
-  database.connection.exec("BEGIN IMMEDIATE");
-  const scope: TransactionScope = { rollback: [], commit: [] };
-  openTransactions.set(database, scope);
+  const connection = database.connection;
+  // `isTransaction`, not the map, decides who owns one: a transaction opened elsewhere has no
+  // scope in the map, and this call must still join it.
+  const nested = connection.isTransaction;
+  const owner = nested ? openTransactions.get(database) : undefined;
+  const scope: TransactionScope = owner ?? { rollback: [], commit: [] };
+  const rollbackMark = scope.rollback.length;
+  const commitMark = scope.commit.length;
+  let ran = false;
   let result: T;
   try {
-    result = work();
-    database.connection.exec("COMMIT");
+    result = withTransaction(connection, () => {
+      ran = true;
+      if (!nested) openTransactions.set(database, scope);
+      return work();
+    });
   } catch (error) {
-    if (database.connection.isTransaction) database.connection.exec("ROLLBACK");
-    openTransactions.delete(database);
-    // Innermost first, so each restorer sees the state the one after it has already put back.
-    for (const restore of [...scope.rollback].reverse()) restore();
+    if (!nested) openTransactions.delete(database);
+    // A failed `BEGIN` or `SAVEPOINT` ran no work.
+    if (!ran) throw error;
+    scope.commit.splice(commitMark);
+    for (const restore of scope.rollback.splice(rollbackMark).reverse()) restore();
     onRollback?.();
     throw error;
   }
-  // Past COMMIT the rows are durable, so the effects run outside the block above: a listener that
-  // throws while a conversation is published must not reach the restorers, which would put the
-  // in-memory projection back to a state SQLite no longer holds. Only `work` and `COMMIT` roll back.
-  //
-  // The scope is cleared first because publishing can re-enter this function, which must then open
-  // its own transaction instead of joining one that is already committed.
+  if (owner) {
+    if (onRollback) owner.rollback.push(onRollback);
+    if (onCommit) owner.commit.push(onCommit);
+    return result;
+  }
+  // A transaction opened elsewhere has no queue, so the effect runs now.
+  if (nested) {
+    onCommit?.();
+    return result;
+  }
+  // Past COMMIT the rows are durable, so a throwing effect must not reach the restorers. The scope
+  // is cleared first: an effect can re-enter this function and must open its own transaction.
   openTransactions.delete(database);
-  // Every effect runs, so a throw from one does not skip the rest. The rows are already durable,
-  // and an effect that keeps memory in step with them is the only thing left to put it back.
+  // Every effect runs, so a throw from one does not skip the rest.
   const failures: unknown[] = [];
-  const runEffect = (effect: (() => void) | undefined): void => {
+  for (const effect of [...scope.commit, onCommit]) {
     try {
       effect?.();
     } catch (error) {
       failures.push(error);
     }
-  };
-  for (const effect of scope.commit) runEffect(effect);
-  runEffect(onCommit);
-  // One failure keeps its own message, because a single failing listener already names the cause.
-  // Several report together, so no cause is lost.
+  }
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, sourceText("error.agent.commitEffectsFailed"));
   return result;
@@ -145,6 +132,8 @@ interface CachedSnapshot {
   bytes: number;
   usedAt: number;
   signature: string;
+  /** The text size of the messages that `signature` hashed (see `textSize`). */
+  textSize: number;
   activeTurnId: string | null;
   messageSignatures: Map<string, string>;
   omittedMessageIds: Set<string>;
@@ -190,6 +179,8 @@ export class ConversationRuntime {
   readonly #evictedSnapshots = new Map<string, EvictedSnapshot>();
   #evictionTimer: NodeJS.Timeout | null = null;
   readonly #conversationSignatures = new Map<string, string>();
+  /** Counts the publishes, so an emit knows when a listener published a chat while it ran. */
+  #publishes = 0;
   /**
    * The messages that a person deleted, by thread, read from SQLite at the first publish of the
    * thread. A provider read or a sync can bring such a message back into a snapshot; it never shows.
@@ -274,27 +265,35 @@ export class ConversationRuntime {
   }
 
   setSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
+    this.#setSnapshot(agentId, snapshot, messageDigests());
+  }
+
+  #setSnapshot(agentId: string, snapshot: ConversationSnapshot, digests: MessageDigests): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     const current = this.#snapshots.get(agentId);
     if (current?.activeTurnId && current.activeTurnId === snapshot.activeTurnId) {
-      const bounded = boundedConversationSnapshot(snapshot).snapshot;
+      const bounded = boundedConversationSnapshot(snapshot, digests).snapshot;
       copySnapshotContents(current, bounded);
-      this.#keepSnapshot(agentId, current);
+      this.#keepSnapshot(agentId, current, digests);
       this.#rememberRead(agentId);
       return;
     }
-    if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
-      this.#setExecutionSnapshot(snapshot.threadId, snapshot);
+    if (snapshot.threadId && snapshot.threadId !== this.#store.get(agentId)?.threadId)
+      this.#setExecutionSnapshot(snapshot.threadId, snapshot, digests);
     else {
-      this.#keepSnapshot(agentId, snapshot);
+      this.#keepSnapshot(agentId, snapshot, digests);
       this.#rememberRead(agentId);
     }
   }
 
-  #keepSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
+  /**
+   * `digests` and `signature` come from a caller that already made them for this snapshot: an emit
+   * makes the JSON of each message once and uses it for every check.
+   */
+  #keepSnapshot(agentId: string, snapshot: ConversationSnapshot, digests = messageDigests(), signature?: string): void {
     this.#evictedSnapshots.delete(agentId);
     this.#dropCachedSnapshot(agentId);
-    const cached = boundedConversationSnapshot(snapshot);
+    const cached = boundedConversationSnapshot(snapshot, digests, signature);
     const current = this.#snapshots.get(agentId);
     const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
     this.#snapshots.set(agentId, retained);
@@ -314,9 +313,14 @@ export class ConversationRuntime {
     this.#evictionTimer.unref?.();
   }
 
-  #setExecutionSnapshot(threadId: string, snapshot: ConversationSnapshot): void {
+  #setExecutionSnapshot(
+    threadId: string,
+    snapshot: ConversationSnapshot,
+    digests = messageDigests(),
+    signature?: string,
+  ): void {
     this.#dropCachedExecutionSnapshot(threadId);
-    const cached = boundedConversationSnapshot(snapshot);
+    const cached = boundedConversationSnapshot(snapshot, digests, signature);
     const current = this.#executionSnapshots.get(threadId);
     const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
     this.#executionSnapshots.set(threadId, retained);
@@ -387,12 +391,17 @@ export class ConversationRuntime {
         if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
           return false;
+        // An agent chat with no turn that waits for a teammate stays, as below, so its signature is not made.
+        if (kind === "agent" && !cached.snapshot.activeTurnId && cached.snapshot.messages.some(hasActiveDelivery))
+          return false;
         return isCommitted(cached);
       });
       if (!oldest) return;
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
         if (cached?.snapshot.activeTurnId) trim(cached);
+        // SQLite cannot rebuild a request that waits for a teammate, as the idle sweep says.
+        else if (cached?.snapshot.messages.some(hasActiveDelivery)) untrimmable.add(cached);
         else {
           // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
           // while the process budget evicts it; dropping the map entry without a marker would make
@@ -423,6 +432,9 @@ export class ConversationRuntime {
   }
 
   #cacheIsCommitted(cached: CachedSnapshot): boolean {
+    // Streamed text changes a chat in place. A different text size shows that with no JSON of the chat,
+    // which a full cache otherwise made for each chat that streams, on each write.
+    if (cached.textSize !== textSize(cached.snapshot)) return false;
     return cached.signature === conversationContentSignature(cached.snapshot);
   }
 
@@ -434,10 +446,12 @@ export class ConversationRuntime {
     const activeTurnId = cached.snapshot.activeTurnId;
     const completed = cached.snapshot.messages.filter((message) => !isActiveMessage(message, activeTurnId));
     const active = cached.snapshot.messages.filter((message) => isActiveMessage(message, activeTurnId));
+    const digests = messageDigests();
     const removed = oldestMessagesToRemove(
       completed,
       active,
       this.#cachedSnapshotBytes - CONVERSATION_CACHE_TOTAL_BYTES_LIMIT,
+      digests,
     );
     if (removed.size === 0) return false;
     // In place, because a caller can hold this array.
@@ -454,8 +468,9 @@ export class ConversationRuntime {
     }
     messages.length = kept;
     const previousBytes = cached.bytes;
-    cached.bytes = completedCacheBytes(cached.snapshot);
-    cached.signature = conversationContentSignature(cached.snapshot);
+    cached.bytes = completedCacheBytes(cached.snapshot, digests);
+    cached.signature = conversationContentSignature(cached.snapshot, digests.json);
+    cached.textSize = textSize(cached.snapshot);
     cached.activeTurnId = cached.snapshot.activeTurnId;
     this.#cachedSnapshotBytes += cached.bytes - previousBytes;
     return true;
@@ -463,7 +478,7 @@ export class ConversationRuntime {
 
   /**
    * Removes from memory each agent snapshot that is idle and that SQLite can rebuild with the same
-   * content. A snapshot stays when it has no thread, has a turn that runs, or is different from
+   * content. A snapshot stays when it has no thread, has a turn that runs, waits for a delivery, or is different from
    * SQLite: streamed text before its flush, and mailbox messages that a read merged, are in memory
    * only. `revision` is not compared: a rebuilt snapshot takes the thread's last event sequence from
    * SQLite, as after a restart.
@@ -476,6 +491,9 @@ export class ConversationRuntime {
       // A snapshot that must stay is read again only after one more idle period.
       this.#snapshotUsedAt.set(agentId, now);
       if (!snapshot.threadId || snapshot.activeTurnId) continue;
+      // A rebuild reads only the latest messages. An older request that a teammate still works on is
+      // in memory only, and when the teammate finishes, the chat must show that the request ended (#9885).
+      if (snapshot.messages.some(hasActiveDelivery)) continue;
       const cached = this.#cachedSnapshots.get(agentId);
       if (cached && cached.signature !== conversationContentSignature(snapshot)) continue;
       this.#dropCachedSnapshot(agentId);
@@ -628,7 +646,7 @@ export class ConversationRuntime {
     }
     const cached = this.#snapshots.get(agentId);
     if (cached && (!threadId || cached.threadId === threadId)) return cached;
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const agent = this.#store.get(agentId);
     const publicThreadId = agent?.threadId ?? threadId;
     const page = this.#store.database.readConversationPage(agentId, publicThreadId, { type: "latest" }, 100);
     const snapshot: ConversationSnapshot = {
@@ -649,16 +667,12 @@ export class ConversationRuntime {
   publicThreadId(agentId: string, fallback: string): string {
     return (
       this.#publicThreads.get(fallback) ??
-      (this.#executionSnapshots.has(fallback)
-        ? fallback
-        : (this.#store.list().find((candidate) => candidate.id === agentId)?.threadId ?? fallback))
+      (this.#executionSnapshots.has(fallback) ? fallback : (this.#store.get(agentId)?.threadId ?? fallback))
     );
   }
 
   hasPublishedConversation(agentId: string): boolean {
-    return this.#conversationSignatures.has(
-      this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? agentId,
-    );
+    return this.#conversationSignatures.has(this.#store.get(agentId)?.threadId ?? agentId);
   }
 
   emitConversation(
@@ -691,14 +705,20 @@ export class ConversationRuntime {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
-    const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
-      this.#retainPublishedSnapshot(snapshot);
+    // The JSON of each message is made once here, for the signatures, the changed messages and the cache.
+    const digests = messageDigests();
+    const signature = conversationContentSignature(snapshot, digests.json);
+    const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
+    // A turn end is stored also when an earlier write already saved this chat, such as the failure
+    // note to an agent that asked: only the turn-end write closes the stored turn (#10698).
+    const turnEnd = isTurnEndEvent(eventType);
+    if (unchanged && !turnEnd) {
+      this.#retainPublishedSnapshot(snapshot, digests, signature);
       return;
     }
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
-      const changedMessages = this.#changedMessages(snapshot, snapshot.threadId);
+      const changedMessages = this.#changedMessages(snapshot, snapshot.threadId, digests);
       const removedMessageIds = this.#removedMessageIds(snapshot);
       if (
         cached &&
@@ -719,7 +739,8 @@ export class ConversationRuntime {
         !cached ||
         changedMessages.length > 0 ||
         removedMessageIds.length > 0 ||
-        cached.activeTurnId !== snapshot.activeTurnId
+        cached.activeTurnId !== snapshot.activeTurnId ||
+        turnEnd
       ) {
         snapshot.revision = this.#store.database.persistConversationChanges({
           agentId: snapshot.agentId,
@@ -732,14 +753,17 @@ export class ConversationRuntime {
         });
       } else this.#countUnstoredSend(snapshot, snapshot.threadId);
     }
-    this.publishConversation(snapshot, signature);
-    this.#retainPublishedSnapshot(snapshot);
+    const publishes = this.#publishes;
+    const published = this.#publish(snapshot, signature);
+    // A listener of the event can change this chat and publish it again. Its JSON is then made again.
+    if (this.#publishes === publishes + 1) this.#retainPublishedSnapshot(snapshot, digests, published);
+    else this.#retainPublishedSnapshot(snapshot);
   }
 
-  #retainPublishedSnapshot(snapshot: ConversationSnapshot): void {
+  #retainPublishedSnapshot(snapshot: ConversationSnapshot, digests?: MessageDigests, signature?: string): void {
     if (snapshot.threadId && this.#executionSnapshots.has(snapshot.threadId))
-      this.#setExecutionSnapshot(snapshot.threadId, snapshot);
-    else this.#keepSnapshot(snapshot.agentId, snapshot);
+      this.#setExecutionSnapshot(snapshot.threadId, snapshot, digests, signature);
+    else this.#keepSnapshot(snapshot.agentId, snapshot, digests, signature);
   }
 
   #cachedSnapshot(snapshot: ConversationSnapshot): CachedSnapshot | undefined {
@@ -752,7 +776,7 @@ export class ConversationRuntime {
     return undefined;
   }
 
-  #changedMessages(snapshot: ConversationSnapshot, threadId: string): ConversationMessage[] {
+  #changedMessages(snapshot: ConversationSnapshot, threadId: string, digests: MessageDigests): ConversationMessage[] {
     const cached = this.#cachedSnapshot(snapshot);
     // A caller can keep a snapshot while a provider read, an eviction or another thread replaces the
     // cached one. Write only what stores differently: writing it whole put every unchanged message in
@@ -763,7 +787,7 @@ export class ConversationRuntime {
     for (const message of snapshot.messages) {
       const signature = cached.messageSignatures.get(message.id);
       if (signature === undefined) untracked.push(message);
-      else if (signature !== messageSignature(message)) changed.add(message);
+      else if (signature !== digests.signature(message)) changed.add(message);
     }
     if (untracked.length === 0) return [...changed];
     // A message the cache does not hold can be a stored row that a limit dropped and a sync added
@@ -799,11 +823,18 @@ export class ConversationRuntime {
   }
 
   publishConversation(snapshot: ConversationSnapshot, signature?: string): void {
-    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    this.#publish(snapshot, signature);
+  }
+
+  /** Returns the signature that it kept, or undefined when the thread is forgotten. */
+  #publish(snapshot: ConversationSnapshot, signature?: string): string | undefined {
+    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return undefined;
     if (this.#dropDeletedMessages(snapshot) || signature === undefined)
       signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
+    this.#publishes += 1;
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+    return signature;
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {
@@ -853,6 +884,13 @@ export class ConversationRuntime {
   unloadThread(externalThreadId: string): void {
     this.#loadedThreads.delete(externalThreadId);
     this.#unloadedThreads.delete(externalThreadId);
+  }
+
+  /** The provider threads that this client holds, loaded or not yet unloaded. */
+  clientThreads(client: AgentClient): string[] {
+    return [...this.#loadedThreads, ...this.#unloadedThreads]
+      .filter(([, owner]) => owner === client)
+      .map(([externalThreadId]) => externalThreadId);
   }
 
   /** Forgets the sessions one stopped process held, and leaves those of every other provider loaded. */
@@ -1077,8 +1115,9 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
-        this.#keepSnapshot(agentId, published);
-        this.publishConversation(published);
+        const digests = messageDigests();
+        this.#keepSnapshot(agentId, published, digests);
+        this.publishConversation(published, conversationContentSignature(published, digests.json));
       },
     );
   }
@@ -1104,8 +1143,9 @@ export class ConversationRuntime {
       undefined,
       () => {
         if (!published) return;
-        this.setSnapshot(agentId, published);
-        this.publishConversation(published);
+        const digests = messageDigests();
+        this.#setSnapshot(agentId, published, digests);
+        this.publishConversation(published, conversationContentSignature(published, digests.json));
       },
     );
   }
@@ -1117,25 +1157,32 @@ export class ConversationRuntime {
   }
 }
 
-function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnapshot {
+/** `signature` is the content signature of `snapshot` when the caller has it. */
+function boundedConversationSnapshot(
+  snapshot: ConversationSnapshot,
+  digests = messageDigests(),
+  signature?: string,
+): CachedSnapshot {
   const activeMessages = snapshot.activeTurnId
     ? snapshot.messages.filter((message) => isActiveMessage(message, snapshot.activeTurnId))
     : [];
-  const allCompletedMessages = snapshot.messages.filter((message) => !activeMessages.includes(message));
+  const active = new Set(activeMessages);
+  const allCompletedMessages = snapshot.messages.filter((message) => !active.has(message));
   let completedMessages = withMailboxMessages(
     allCompletedMessages,
     allCompletedMessages.slice(-CONVERSATION_SNAPSHOT_MESSAGE_LIMIT),
     activeMessages,
   );
-  let completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
+  let completedBytes = digests.snapshotBytes(snapshot, completedMessages);
   if (completedBytes > CONVERSATION_CACHE_BYTES_LIMIT) {
     const removed = oldestMessagesToRemove(
       completedMessages,
       activeMessages,
       completedBytes - CONVERSATION_CACHE_BYTES_LIMIT,
+      digests,
     );
     completedMessages = completedMessages.filter((message) => !removed.has(message));
-    completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
+    completedBytes = digests.snapshotBytes(snapshot, completedMessages);
   }
   const retainedAllMessages =
     completedMessages.length === allCompletedMessages.length &&
@@ -1155,9 +1202,11 @@ function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnap
     // only, so one large streamed response cannot evict every idle conversation.
     bytes: completedBytes,
     usedAt: Date.now(),
-    signature: conversationContentSignature(bounded),
+    signature:
+      signature !== undefined && bounded === snapshot ? signature : conversationContentSignature(bounded, digests.json),
+    textSize: textSize(bounded),
     activeTurnId: bounded.activeTurnId,
-    messageSignatures: new Map(messages.map((message) => [message.id, messageSignature(message)])),
+    messageSignatures: new Map(messages.map((message) => [message.id, digests.signature(message)])),
     omittedMessageIds: new Set(
       snapshot.messages.flatMap((message) => (retainedIds.has(message.id) ? [] : [message.id])),
     ),
@@ -1221,11 +1270,21 @@ function isActiveMessage(message: ConversationMessage, activeTurnId: string | nu
   return activeTurnId !== null && (message.turnId === activeTurnId || message.status === "streaming");
 }
 
-function completedCacheBytes(snapshot: ConversationSnapshot): number {
-  return conversationSnapshotBytes({
-    ...snapshot,
-    messages: snapshot.messages.filter((message) => !isActiveMessage(message, snapshot.activeTurnId)),
-  });
+function completedCacheBytes(snapshot: ConversationSnapshot, digests: MessageDigests): number {
+  return digests.snapshotBytes(
+    snapshot,
+    snapshot.messages.filter((message) => !isActiveMessage(message, snapshot.activeTurnId)),
+  );
+}
+
+/**
+ * The length of all message text and the number of messages. Equal content has an equal size, so a
+ * different size shows a change without the JSON of the chat; an equal size proves nothing.
+ */
+function textSize(snapshot: ConversationSnapshot): number {
+  let size = snapshot.messages.length;
+  for (const message of snapshot.messages) size += message.text.length;
+  return size;
 }
 
 function pageSnapshot(page: {
@@ -1252,10 +1311,6 @@ function copySnapshotContents(target: ConversationSnapshot, source: Conversation
   return target;
 }
 
-function conversationSnapshotBytes(snapshot: ConversationSnapshot): number {
-  return Buffer.byteLength(JSON.stringify(snapshot), "utf8");
-}
-
 /**
  * The oldest messages that free `excessBytes`. The removal is one prefix in display order, so no old
  * request stays without its answer. A message in the prefix that mailbox sync puts back stays (see
@@ -1265,23 +1320,73 @@ function oldestMessagesToRemove(
   messages: readonly ConversationMessage[],
   active: readonly ConversationMessage[],
   excessBytes: number,
+  digests: MessageDigests,
 ): Set<ConversationMessage> {
-  // With the comma between messages.
-  const sizes = new Map(messages.map((message) => [message, Buffer.byteLength(JSON.stringify(message), "utf8") + 1]));
   let removed = new Set<ConversationMessage>();
   for (let count = 1; count <= messages.length; count += 1) {
     const kept = new Set(withMailboxMessages(messages, messages.slice(count), active));
     removed = new Set(messages.slice(0, count).filter((message) => !kept.has(message)));
     let bytes = 0;
-    for (const message of removed) bytes += sizes.get(message) ?? 0;
+    for (const message of removed) bytes += digests.bytes(message);
     if (bytes >= excessBytes) break;
   }
   return removed;
 }
 
-/** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
-function messageSignature(message: ConversationMessage): string {
-  return createHash("sha256")
-    .update(JSON.stringify(withoutQueuePositions(message)))
-    .digest("hex");
+/**
+ * The JSON of each message, made at most once. A message changes in place, so the digests serve one
+ * write and its checks, and are not kept after it.
+ */
+interface MessageDigests {
+  readonly json: (message: ConversationMessage) => string;
+  /** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
+  readonly signature: (message: ConversationMessage) => string;
+  /** The UTF-8 size of a message, with the comma between messages. */
+  readonly bytes: (message: ConversationMessage) => number;
+  /** The UTF-8 size of `JSON.stringify` of the snapshot with only these messages. */
+  readonly snapshotBytes: (snapshot: ConversationSnapshot, messages: readonly ConversationMessage[]) => number;
+}
+
+function messageDigests(): MessageDigests {
+  const jsons = new Map<ConversationMessage, string>();
+  const signatures = new Map<ConversationMessage, string>();
+  const sizes = new Map<ConversationMessage, number>();
+  const json = (message: ConversationMessage): string => {
+    let text = jsons.get(message);
+    if (text === undefined) {
+      text = JSON.stringify(message);
+      jsons.set(message, text);
+    }
+    return text;
+  };
+  const bytes = (message: ConversationMessage): number => {
+    let size = sizes.get(message);
+    if (size === undefined) {
+      size = Buffer.byteLength(json(message), "utf8") + 1;
+      sizes.set(message, size);
+    }
+    return size;
+  };
+  return {
+    json,
+    signature: (message) => {
+      let signature = signatures.get(message);
+      if (signature === undefined) {
+        // A message with no queue position stores as it is, so its JSON serves.
+        const stored = withoutQueuePositions(message);
+        signature = createHash("sha256")
+          .update(stored === message ? json(message) : JSON.stringify(stored))
+          .digest("hex");
+        signatures.set(message, signature);
+      }
+      return signature;
+    },
+    bytes,
+    snapshotBytes: (snapshot, messages) => {
+      // The JSON with no messages, then each message and the commas between them.
+      let size = Buffer.byteLength(JSON.stringify({ ...snapshot, messages: [] }), "utf8");
+      for (const message of messages) size += bytes(message);
+      return messages.length > 0 ? size - 1 : size;
+    },
+  };
 }

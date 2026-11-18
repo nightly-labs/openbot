@@ -41,9 +41,14 @@
 
   .media-generation-actions,
   .media-generation-bar,
+  .media-stage-details,
   .ui-button.media-generation-play,
   .media-generation-seek-fill {
     transition: none;
+  }
+
+  .media-generation-wait {
+    animation-duration: 0s;
   }
 }
 

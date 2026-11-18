@@ -147,7 +147,7 @@ function triggerText(node: WorkflowNode, t: MobileTranslate): string {
     const github = githubTrigger(node);
     return github.repository
       ? t("mobile.workflow.github.summary", {
-          repository: github.repository,
+          repository: github.repositories.length > 0 ? github.repositories.join(", ") : github.repository,
           event: t(GITHUB_EVENT_LABEL[github.event]),
         })
       : t(TRIGGER_TEXT.github);
@@ -191,6 +191,8 @@ export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t:
     const model = text(node, "model");
     return model ? t("mobile.workflow.kind.llmNamed", { model }) : kindLabel(node.kind, t);
   }
+  // A video step is an image node with `media: "video"`, as on the desktop canvas.
+  if (node.kind === "image" && text(node, "media") === "video") return t("mobile.workflow.kind.video");
   return kindLabel(node.kind, t);
 }
 

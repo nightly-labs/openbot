@@ -50,7 +50,7 @@ const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
 
 /**
- * Server sheet > MCP servers > one server, or a new one without `mcpServerId`. The header action
+ * Marketplace > Apps > a custom MCP server, or Add custom without `mcpServerId`. The header action
  * saves it. A saved server turns on and off at once, and can be tested, signed out and removed.
  */
 export function ServerMcpServerScreen() {

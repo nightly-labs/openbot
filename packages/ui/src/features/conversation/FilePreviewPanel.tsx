@@ -1,5 +1,11 @@
 import type { ChatVisualKey } from "@openbot/contracts/chat-visual";
-import type { FilePreview, WorkspaceDirectory, WorkspaceDirectoryEntry } from "@openbot/contracts/ipc";
+import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
+import {
+  type FilePreview,
+  filePreviewKindForFile,
+  type WorkspaceDirectory,
+  type WorkspaceDirectoryEntry,
+} from "@openbot/contracts/ipc";
 import {
   ArrowLeft,
   Button,
@@ -118,6 +124,15 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const pageUrl = () => (previewKind() === "text" ? props.pageUrl : null) ?? null;
   const pageHtml = () => (previewKind() === "text" ? props.pageHtml : null) ?? null;
   const hasPage = () => pageHtml() !== null || pageUrl() !== null;
+  /** A file of a type the panel shows, over the size limit that `src/main/file-preview.ts` reads (#9272). */
+  const tooLarge = () => {
+    const preview = file();
+    return (
+      preview?.previewKind === "none" &&
+      preview.size > ATTACHMENT_LIMITS.fileBytes &&
+      filePreviewKindForFile(preview.name, preview.mimeType) !== "none"
+    );
+  };
   const showsSourceText = () =>
     (previewKind() === "text" && (rawSource() || !hasPage())) || (previewKind() === "markdown" && rawSource());
   const title = () => props.directory?.name ?? props.preview?.name ?? "";
@@ -410,7 +425,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={previewUrl()}>
           <MediaFilePreview
             kind={previewKind() === "audio" ? "audio" : previewKind() === "video" ? "video" : null}
-            src={previewUrl() ?? ""}
+            src={previewUrl() ?? undefined}
             name={title()}
             class={previewKind() === "audio" ? "file-preview-audio" : "file-preview-video"}
           />
@@ -421,9 +436,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={previewKind() === "none"}>
           <div class="file-preview-unsupported">
             <File />
-            <strong>{t("preview.unsupported.title")}</strong>
+            <strong>{tooLarge() ? t("preview.tooLarge.title") : t("preview.unsupported.title")}</strong>
             <Show when={props.allowExternalOpen !== false}>
-              <span>{t("preview.unsupported.description")}</span>
+              <span>{tooLarge() ? t("preview.tooLarge.description") : t("preview.unsupported.description")}</span>
               <Button variant="outline" type="button" onClick={props.onOpenExternally}>
                 {t("preview.unsupported.openExternally")}
               </Button>

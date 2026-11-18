@@ -92,6 +92,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Certaines de ses apps ou compétences ne sont pas installées. Reconnecter les installe.",
   "marketplace.app.notConnected": "Non connecté",
+  "marketplace.app.paused": "En pause",
   "marketplace.app.custom": "Serveur MCP",
   "marketplace.app.githubTagline": "Dépôts, tickets et pull requests",
   "marketplace.app.onePasswordTagline": "Connectez-vous aux sites avec les identifiants que vous partagez",
@@ -137,6 +138,7 @@ export const messages = {
     "{host} utilise une ancienne version d’OpenBot qui ne peut pas connecter d’apps. Mettez à jour OpenBot sur {host}, ou demandez à son propriétaire de le faire.",
   "marketplace.app.blocked.member":
     "Seul un propriétaire ou un admin de {host} peut y connecter des apps. Demandez-lui de connecter {name}, ou de mettre à jour OpenBot sur {host} pour que les membres puissent connecter des apps.",
+  "marketplace.app.blocked.mac": "{name} fonctionne uniquement sur un Mac qui exécute OpenBot.",
   "marketplace.app.connectAgain": "Reconnecter",
   "marketplace.app.automation.askOnInstall": "Demander l’accès à macOS à l’installation",
   "marketplace.app.automation.title": "Accès aux apps Apple",
@@ -410,8 +412,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "Que disent mes notes sur les décisions de ce projet ?",
   "marketplace.plugin.obsidian.prompt.save": "Enregistrez cette décision dans une nouvelle note de mon coffre.",
   "marketplace.plugin.obsidian.prompt.log": "Ajoutez un résumé du travail d'aujourd'hui à ma note Journal de travail.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'Dans Obsidian, ouvrez Settings > Local REST API. Copiez la clé API et activez "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "Dans Obsidian, ouvrez Settings > Local REST API et copiez la clé API.",
   "marketplace.plugin.resend.tagline": "E-mails transactionnels",
   "marketplace.plugin.resend.description":
     "Resend permet aux agents d’envoyer des e-mails transactionnels et de vérifier leur livraison via une seule API. Une clé API du tableau de bord Resend est transmise au serveur local dans une variable d’environnement.",
@@ -423,9 +424,9 @@ export const messages = {
     "Rédigez un e-mail de réinitialisation du mot de passe pour le nouveau parcours.",
   "marketplace.plugin.omnisend.tagline": "Marketing par e-mail et SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permet aux agents de lire les rapports des campagnes et des formulaires, de trouver des contacts et des segments, et de créer et modifier des campagnes, des automatisations, des modèles d'e-mail, des formulaires et des produits. Chaque utilisateur se connecte à son propre compte Omnisend dans le navigateur et choisit le niveau d'accès sur l'écran de consentement. Avec l'accès en écriture, les agents peuvent aussi envoyer des campagnes et supprimer des données. Choisissez l'accès en lecture seule si les agents n'ont besoin que des rapports.",
+    "Omnisend permet aux agents de lire les rapports des campagnes et des formulaires, de trouver des contacts et des segments, et de créer et modifier des campagnes, des automatisations, des modèles d'e-mail, des formulaires et des produits. Chaque utilisateur se connecte avec une clé API de son propre compte Omnisend. Les agents peuvent faire ce que la clé autorise, ce qui peut inclure l'envoi de campagnes et la suppression de données.",
   "marketplace.plugin.omnisend.app":
-    "Campagnes, automatisations, contacts, segments, formulaires et rapports, via le serveur MCP d'Omnisend avec connexion dans le navigateur.",
+    "Campagnes, automatisations, contacts, segments, formulaires et rapports, via le serveur MCP d'Omnisend avec une clé API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Quels résultats ont eu les campagnes de la semaine dernière par rapport à la semaine précédente ?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -433,6 +434,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prépare un brouillon de campagne pour la nouvelle collection, mais ne l'envoie pas.",
   "marketplace.plugin.postiz.tagline": "Planification des réseaux sociaux",
+  "marketplace.plugin.omnisend.hint.apiKey": "Dans Omnisend, ouvrez Store settings > API keys et créez une clé.",
   "marketplace.plugin.postiz.description":
     "Postiz permet aux agents de lister vos comptes de réseaux sociaux, et de rédiger, planifier et publier des posts sur plus de 30 réseaux, comme X, LinkedIn, Instagram et TikTok. Les agents peuvent aussi importer des médias et créer des images et des vidéos par IA. Connectez-vous à votre compte Postiz dans le navigateur, ou collez la clé API de Settings › Developers dans Postiz. Toutes les offres cloud de Postiz incluent l'accès à l'API. Les agents peuvent publier un post tout de suite : vérifiez chaque post avant de l'approuver.",
   "marketplace.plugin.postiz.app":

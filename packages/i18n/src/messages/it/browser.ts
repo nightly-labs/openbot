@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Chiudi {name}",
   "browser.tab.closeUnnamed": "Chiudi la scheda del browser",
   "browser.newTab": "Nuova scheda del browser",
-  "browser.hide": "Nascondi il browser",
+  "browser.backToChat": "Torna alla chat",
   "browser.goBack": "Indietro",
   "browser.goForward": "Avanti",
   "browser.reload": "Ricarica la pagina",
@@ -67,6 +67,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Questo testo è troppo lungo da incollare. Incolla meno di 100.000 caratteri.",
   "browser.liveView.copyTooLarge": "La selezione è troppo lunga da copiare. Seleziona meno testo.",
   "browser.liveView.copyFailed": "Impossibile copiare il testo. Fai clic sulla pagina e riprova.",
+  "browser.liveView.pageCopied": "La pagina ha copiato del testo. Scegli Copia per metterlo negli appunti.",
   "browser.previews.label": "Anteprime del browser",
   "browser.previews.resize": "Ridimensiona il pannello destro",
   "browser.previews.empty": "Nessuna scheda del browser",
@@ -91,6 +92,18 @@ export const messages = {
   "browser.secret.submitting": "Invio…",
   "browser.secret.takeOver": "Intervieni",
   "browser.secret.failed": "Non è stato possibile completare la richiesta. Controlla la connessione e riprova.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha eseguito uno script in questa pagina. Per usarle, chiedi all’agente di ricaricare la pagina e riprovare.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha scelto il campo sbagliato nella pagina.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot non ha usato credenziali salvate perché l’agente non ha scelto nessuna delle credenziali salvate per questo sito. Di’ all’agente quale account usare.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una password per questo sito.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una chiave dell’autenticatore.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot non ha usato credenziali salvate perché non è riuscito a leggere il tuo gestore di password.",
   "browser.error.openAddress": "Impossibile aprire l'indirizzo in questa scheda.",
   "browser.error.channelNoBrowserMember": "Nessun membro può aprire una nuova scheda in questo canale.",
   "browser.error.closeTab": "Impossibile chiudere la scheda del browser.",
