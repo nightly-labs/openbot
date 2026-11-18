@@ -204,6 +204,7 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
@@ -465,6 +466,7 @@ export {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -727,6 +729,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -993,7 +996,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
     capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-    capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+    capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
+    capability !== WEBHOOK_AGENT_SECRET_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1129,6 +1133,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1364,6 +1369,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
       capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-      capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+      capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
+      capability !== WEBHOOK_AGENT_SECRET_CAPABILITY,
   );
 }

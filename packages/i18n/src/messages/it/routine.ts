@@ -158,6 +158,7 @@ export const messages = {
   "routine.card.open": "Apri la routine {name}",
   "routine.card.webhookCreated": "Routine webhook creata",
   "routine.card.webhookSecretNote": "Per ottenere il segreto di firma, rigeneralo. L'agente non riceve il segreto.",
+  "routine.card.webhookSecretAgentNote": "Per ottenere il segreto di firma, rigeneralo o dallo a {name}.",
   "routine.card.webhookUpdated": "Routine webhook aggiornata",
   "routine.card.webhookChanged": "Modifiche non salvate",
   "routine.card.webhookSaveFailed": "Impossibile salvare gli eventi.",
@@ -318,6 +319,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Segreto del mittente",
   "routine.webhook.senderSecretConfirm": "Usa segreto",
   "routine.webhook.senderSecretFailed": "Impossibile salvare il segreto del mittente.",
+  "routine.webhook.giveSecret": "Dai il segreto di firma a {name}",
+  "routine.webhook.giveSecretTitle": "Dare un nuovo segreto di firma a {name}?",
+  "routine.webhook.giveSecretDescription":
+    "Il segreto attuale smette subito di funzionare. {name} salva il nuovo segreto come chiave API e può aggiungerlo al mittente. Non devi copiarlo.",
+  "routine.webhook.giveSecretConfirm": "Dai segreto",
+  "routine.webhook.giveSecretFailed": "Impossibile dare il segreto di firma a {name}.",
+  "routine.webhook.secretGiven": "{name} ha il nuovo segreto di firma.",
   "routine.webhook.statusFailed": "Impossibile verificare se l'host è connesso al relay.",
 
   "routine.settings.instruction": "Istruzione",

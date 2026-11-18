@@ -246,6 +246,15 @@ owner or admin changes a Slack node (`route-workflows.ts`).
   such as Composio and Svix, make their own secret. The host encrypts the value in the same column as
   a secret that it made, so no migration is necessary. The answer is empty. For a host without the
   capability, the editor and the chat card leave out the button.
+- Remote hosts with `webhook-agent-secret-v1` (`WEBHOOK_AGENT_SECRET_ROUTES`) also give a new secret
+  of an agent routine to that agent (`HostEventsService.giveSecretToAgent`). Under the write lock,
+  the host makes a secret, saves it first as an API key of the agent only
+  (`WEBHOOK_SECRET_<routine ID>`, `AgentApiKeys`), and then replaces the routine secret. A failed key
+  write keeps the old secret. The answer has only the key name; the secret does not leave the host.
+  While the agent has that key, `rotateSecret` and `setSecret` update it too, and `deleteRoutine`
+  removes it. A channel routine has no single agent, so the host refuses it and the channel views
+  leave out the button. For a host without the capability, the editor, the chat card and mobile
+  leave out the button.
 - Signal accepts the `X-OpenBot-*` headers, or the Standard Webhooks `webhook-*` or `svix-*`
   headers. It relays a Standard Webhooks request only to an ingress socket whose hello lists
   `standard-webhooks` in `webhookFormats`; for an older host it answers `401`. The host checks the

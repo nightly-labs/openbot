@@ -356,6 +356,7 @@ import type {
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
 import type {
+  AgentWebhookSecret,
   EventActivity,
   EventRoutine,
   EventRoutineRef,
@@ -2472,6 +2473,8 @@ export const IPC_ENDPOINTS = {
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
     setSecret: scopedRequest<SetWebhookSecretInput, void, "required">()("events:set-secret"),
+    /** Gives the agent of the routine a new signing secret as an API key. The result has only the key name. */
+    giveSecretToAgent: scopedRequest<EventRoutineRef, AgentWebhookSecret, "required">()("events:give-secret-to-agent"),
     sendTestEvent: scopedRequest<EventRoutineRef, WebhookTestResult, "required">()("events:send-test-event"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
     listRoutineRuns: scopedRequest<ListEventRoutineRunsInput, EventRoutineRun[], "required">()(

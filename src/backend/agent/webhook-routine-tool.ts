@@ -109,6 +109,15 @@ export function webhookToolTrigger(
   return { eventType: eventType === null ? null : eventType.trim(), filters };
 }
 
+/**
+ * The name of the API key that has the signing secret of an agent's webhook routine, after a person
+ * gives the secret to the agent. Routine IDs are UUIDs, so the name is unique and fits the key name
+ * pattern.
+ */
+export function webhookSecretKeyName(routineId: string): string {
+  return `WEBHOOK_SECRET_${routineId.replaceAll("-", "").toUpperCase()}`;
+}
+
 /** One webhook routine as `list_routines` shows it. */
 export function webhookRoutineSummary(routine: {
   id: string;
@@ -138,9 +147,10 @@ export function webhookRoutineToolResult(routine: EventRoutine, cardInChat: bool
     ...(trigger?.url ? {} : { urlPending: "The URL is not ready. The routine settings show it when it is." }),
     request: WEBHOOK_REQUEST_FORMAT,
     secret: updated
-      ? "The signing secret did not change. You do not have it."
+      ? "The signing secret did not change."
       : cardInChat
-        ? "You do not have the signing secret. In the desktop app, a person who manages this host's webhook routines sees a card in this chat with a button that makes it. Anyone else gets it from that person, who can also make it in the routine's settings."
-        : "You do not have the signing secret. A person who manages this host's webhook routines makes it in the routine's settings in the desktop app.",
+        ? "You do not have the signing secret. In the desktop app, a person who manages this host's webhook routines sees a card in this chat with buttons that make it, or give it to you. Anyone else gets it from that person, who can also do this in the routine's settings."
+        : "You do not have the signing secret. A person who manages this host's webhook routines makes it, or gives it to you, in the routine's settings in the desktop app.",
+    secretKey: `When a person gives you the secret, you have the API key ${webhookSecretKeyName(routine.id)}: list_api_keys gives the path of its file. Do not show the secret in the chat.`,
   };
 }
