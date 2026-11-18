@@ -1197,6 +1197,14 @@ All notable changes to OpenBot will be documented here. The project follows
 - An agent can now find all of its older chats. Before, its list of chats showed only the newest
   ones and could not go further back, so an agent with many chats could not recall work from the
   older ones.
+- A short drop in the connection to a joined server no longer adds "Could not mark the conversation as
+  read" with "The WebRTC host disconnected." to the open chat. The app marks the chat read again, and
+  loads its waiting list again, after it connects again. When an action that you started fails
+  because the connection dropped, the chat now says in plain words that the connection was lost and
+  that you can check the action and try again.
+- On a Mac with a Host Manager, OpenBot stops its own update check and download when the Host Manager
+  takes over the updates. Before, a download that was already running continued, and its progress
+  could replace the host's update state in Settings > Updates until the next status check.
 
 ## [0.72.0] - 2026-11-16
 

@@ -82,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "למארח המרוחק אין מפתח מכשיר מוצמד.",
   "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
-  "error.remote.hostDisconnected": "מארח ה-WebRTC התנתק.",
+  "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",
   "error.remote.eventGap": "ברצף האירועים של המארח יש פער.",
   "error.remote.malformedKnownEvent": "המארח החזיר אירוע מוכר שגוי.",
   "error.remote.fileTransportIsStopped": "שכבת העברת הקבצים של WebRTC נעצרה.",

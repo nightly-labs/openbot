@@ -85,7 +85,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",
   "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
-  "error.remote.hostDisconnected": "WebRTC ana makinesinin bağlantısı kesildi.",
+  "error.remote.hostDisconnected":
+    "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",
   "error.remote.eventGap": "Ana makine etkinlik dizisinde bir boşluk var.",
   "error.remote.malformedKnownEvent": "Ana makine bozuk biçimli bir bilinen etkinlik döndürdü.",
   "error.remote.fileTransportIsStopped": "WebRTC dosya iletimi durduruldu.",

@@ -89,7 +89,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",
   "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
-  "error.remote.hostDisconnected": "L’hôte WebRTC s’est déconnecté.",
+  "error.remote.hostDisconnected":
+    "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",
   "error.remote.eventGap": "La séquence d’événements de l’hôte présente un trou.",
   "error.remote.malformedKnownEvent": "L’hôte a renvoyé un événement connu mal formé.",
   "error.remote.fileTransportIsStopped": "Le transport de fichiers WebRTC est arrêté.",
