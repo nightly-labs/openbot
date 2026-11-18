@@ -8,6 +8,7 @@ import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
@@ -289,6 +290,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
@@ -724,6 +726,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -989,7 +992,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
     capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
-    capability !== AGENT_ACTIVE_QUEUES_CAPABILITY,
+    capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
+    capability !== AGENT_CREATE_OPERATION_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1124,6 +1128,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_CREATE_OPERATION_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1358,6 +1363,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
       capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
-      capability !== AGENT_ACTIVE_QUEUES_CAPABILITY,
+      capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
+      capability !== AGENT_CREATE_OPERATION_CAPABILITY,
   );
 }

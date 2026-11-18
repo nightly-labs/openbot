@@ -1,6 +1,7 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -88,6 +89,12 @@ const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 /** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
+/**
+ * The client ids of thread messages. A failed send can still have stored its message on the server
+ * (the answer got lost), so a send again of the same message, which the failure put back in the
+ * composer, sends the same id and the server stores no second copy.
+ */
+const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
 function onThreadDeleted(task: AgentTask) {
   router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
@@ -580,16 +587,15 @@ function AgentTaskChat({
     if (startsTurn && ready) motion.beginSend();
     else motion.scrollToLatest();
     setSending(true);
+    const message = taskMessageId([serverId, agentId, taskId, text, files.map((file) => file.id)]);
     try {
       await withFiles((attachmentDraftIds) =>
-        sendAgentTaskMessage(
-          { agentId, taskId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() },
-          serverId,
-        ),
+        sendAgentTaskMessage({ agentId, taskId, text, attachmentDraftIds, clientMessageId: message.id }, serverId),
       );
       attachments.clear();
       if (startsTurn) setAwaitingTurn(true);
     } catch (error) {
+      message.failed();
       motion.cancelSend();
       void haptics.notification("error");
       setDraft((current) => (current.trim() ? current : value));

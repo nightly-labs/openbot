@@ -39,6 +39,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
@@ -2818,6 +2819,8 @@ export class TeamApiServer {
           if (capability === AGENT_THREAD_REQUESTS_CAPABILITY) return this.#options.agentTasks !== undefined;
           // The queue list uses the agent operations, which every host has.
           if (capability === AGENT_ACTIVE_QUEUES_CAPABILITY) return true;
+          // The create route reads the id itself, and the mailbox keeps the key with the initial message.
+          if (capability === AGENT_CREATE_OPERATION_CAPABILITY) return true;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_READS_CAPABILITY) return this.#options.agentTasks !== undefined;
