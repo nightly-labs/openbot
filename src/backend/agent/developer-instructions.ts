@@ -557,8 +557,10 @@ export function developerInstructions(
         ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly. For a local photo, call openbot.read_image: view_image in exec drops a file over 6 MB."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
+          // Code Mode reads a ``` fence as a call on the empty string "", so each fenced program failed
+          // with "The called value is not a function" at line 1, col 1, and the model sent it again (#11641).
           agent.provider === "opencode"
-          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click.${
+          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again.${
               // A JavaScript string drops a single backslash, so `"C:\Users\…"` reached the
               // attachment check as `C:Users…` and was not found (#8635). OpenCode refuses a PowerShell
               // command with a curly quote or an en or em dash before it runs, as `invalid-structure`;
