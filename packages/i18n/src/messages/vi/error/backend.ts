@@ -261,6 +261,8 @@ export const messages = {
     "Agent này chỉ dùng được một số lượng máy chủ MCP có hạn. Để dùng máy chủ này, hãy tắt một máy chủ MCP mà agent không cần.",
   "error.backend.mcpRegistrationRefused":
     "Máy chủ đăng nhập chưa chấp nhận OpenBot như một ứng dụng. Nguyên nhân không phải do tài khoản của bạn. Hãy dùng cách kết nối khác, chẳng hạn máy chủ MCP cục bộ.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Máy chủ đăng nhập không thể đăng ký OpenBot như một ứng dụng. Nguyên nhân không phải do tài khoản của bạn. Để kết nối, hãy lưu máy chủ này trong Cửa hàng, Ứng dụng, rồi thêm một ứng dụng đăng nhập cho nó.",
   "error.backend.mcpSignInAbandonedGeneric": "Đăng nhập đã bị bỏ dở.",
   "error.backend.mcpSignInForgotten": "Đăng nhập MCP đã bị xóa trong lúc đang chạy.",
   "error.backend.mcpSignInAbandoned": "Đăng nhập MCP đã bị bỏ dở.",
@@ -273,6 +275,7 @@ export const messages = {
     "Máy chủ này yêu cầu đăng nhập, và OpenBot chỉ đăng nhập qua https. Hãy đổi URL thành {url}.",
   "error.backend.mcpSignInCancelled": "Đăng nhập đã bị hủy.",
   "error.backend.mcpSignInTimedOut": "Đăng nhập chưa được hoàn tất trong trình duyệt.",
+  "error.backend.mcpSignInRefused": "Trang đăng nhập đã từ chối truy cập. Hãy đăng nhập lại.",
   "error.backend.mcpSignInResponseTimedOut": "Phản hồi đăng nhập không đến kịp.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot không thể đọc thông tin đăng nhập của máy chủ này. Hãy kiểm tra địa chỉ máy chủ và thử lại.",

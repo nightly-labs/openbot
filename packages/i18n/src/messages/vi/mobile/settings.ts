@@ -577,7 +577,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot đang bị khóa",
   "mobile.settings.shortcuts.card.locked.action": "Mở OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Gửi tin nhắn trong ứng dụng Phím tắt sẽ gửi đến agent này. Ứng dụng OpenBot không mở ra.",
+    "Hành động “Send Message” trong ứng dụng Phím tắt gửi tin nhắn đến agent này mà không mở ứng dụng. “Open Agent” mở cuộc trò chuyện của agent.",
   "mobile.settings.shortcuts.send.sent": "Đã gửi",
   "mobile.settings.shortcuts.send.failed": "OpenBot không thể gửi nội dung này.",
   "mobile.settings.shortcuts.send.unconfirmed": "Máy chủ không phản hồi. Tin nhắn có thể đã có trong cuộc trò chuyện.",

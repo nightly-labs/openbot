@@ -181,6 +181,8 @@ export const messages = {
     "{provider} không liệt kê mô hình trong vòng {seconds} giây. Máy tính có thể đang bận.",
   "error.provider.startStopped":
     "{provider} không khởi động được nhiều lần liên tiếp, nên OpenBot đã ngừng thử. Hãy làm mới danh sách nhà cung cấp để thử lại.",
+  "error.provider.startPaused":
+    "{provider} không khởi động được nhiều lần liên tiếp. OpenBot sẽ thử lại khi có tin nhắn hoặc tác vụ định kỳ tiếp theo. Để thử ngay, hãy làm mới danh sách nhà cung cấp.",
   "error.provider.tempDiskSpace":
     "{provider} cần ít nhất 1 GB dung lượng đĩa trống để khởi động. Hãy giải phóng dung lượng, rồi làm mới danh sách nhà cung cấp.",
   "error.provider.noCodeSignIn": "Không thể đăng nhập {provider} bằng mã.",

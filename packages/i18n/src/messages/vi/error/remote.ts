@@ -82,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Host từ xa không có khóa thiết bị đã ghim.",
   "error.remote.hostDidNotConnect": "Host WebRTC không kết nối.",
   "error.remote.connectionCancelled": "Kết nối từ xa đã bị hủy.",
-  "error.remote.hostDisconnected": "Host WebRTC đã ngắt kết nối.",
+  "error.remote.hostDisconnected": "Mất kết nối tới máy chủ. Hãy kiểm tra xem thao tác đã hoàn tất chưa, rồi thử lại.",
   "error.remote.eventGap": "Chuỗi sự kiện của host bị đứt quãng.",
   "error.remote.malformedKnownEvent": "Host trả về một sự kiện đã biết sai định dạng.",
   "error.remote.fileTransportIsStopped": "Kênh truyền tệp WebRTC đang dừng.",
