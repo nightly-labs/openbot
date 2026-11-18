@@ -401,8 +401,12 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
  */
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
-/** A count of images in one clause, such as "at most 8 images". */
-const IMAGE_COUNT_LIMIT = /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])/iu;
+/**
+ * A count of images in one clause, such as "at most 8 images", or Azure's "Exceeded maximum number of
+ * images (50) allowed in the request" (#11628).
+ */
+const IMAGE_COUNT_LIMIT =
+  /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])|\bmaximum number of images\b/iu;
 
 /** A limit over time, such as "at most 50 images per day", which a new session does not change. */
 const IMAGE_QUOTA_PERIOD =
@@ -417,7 +421,7 @@ const IMAGE_QUOTA_PERIOD =
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
  * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
  * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
- * "maximum of", a number, and "images". A daily quota of images is not a count in one request, so a
+ * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not a count in one request, so a
  * clause that names a period does not match. A period in a different clause, such as "try again in a
  * minute", does not stop the match.
  */
