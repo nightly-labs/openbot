@@ -8,6 +8,7 @@ import type {
   AttachmentSummary,
   ChannelMessage,
   ChannelRoutingConversationEvent,
+  ChannelTask,
   ConversationMemoryChange,
   ConversationMessage,
   ConversationMessageSender,
@@ -24,6 +25,7 @@ import {
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  channelRoutineRequest,
   channelRoutingConversationEvent,
   isAgentAnswer,
   isContextResetMarker,
@@ -951,7 +953,14 @@ export function latestReadBoundaryMessage(messages: ConversationMessage[]) {
 
 const projectedChannelMessages = new WeakMap<
   ChannelMessage,
-  { self: boolean; latest: boolean; progress: boolean; replaced: boolean; rows: readonly ChatMessage[] }
+  {
+    self: boolean;
+    latest: boolean;
+    progress: boolean;
+    replaced: boolean;
+    run: RoutineRunStatus | null;
+    rows: readonly ChatMessage[];
+  }
 >();
 
 function projectChannelMessage(
@@ -960,7 +969,18 @@ function projectChannelMessage(
   latestRuns: ReadonlySet<string>,
   progress: boolean,
   replaced: boolean,
+  request: ReturnType<typeof channelRoutineRequest>,
 ): ChatMessage | null {
+  // A routine's request is its instruction, with the event data of a webhook: it shows as its marker (#11686).
+  if (request)
+    return {
+      id: entry.id,
+      kind: "routine",
+      event: request.status,
+      label: ROUTINE_RUN_LABELS[request.status],
+      routineId: request.routineId,
+      routineName: request.routineName,
+    };
   const routine = routineMarker(entry.message);
   if (routine) {
     if (routine.runId && !latestRuns.has(entry.message.id)) return null;
@@ -1044,6 +1064,7 @@ function projectChannelMessage(
 /** Keep channel authors explicit: another human member is not the current user. */
 export function projectChannelMessages(
   messages: ChannelMessage[],
+  tasks: readonly ChannelTask[],
   memberId: string | null,
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
@@ -1084,15 +1105,18 @@ export function projectChannelMessages(
       const latest = latestRuns.has(entry.message.id);
       const progress = showsUpdate(entry);
       const replaced = replacedIds.has(entry.id);
+      const request = channelRoutineRequest(entry, tasks);
+      const run = request?.status ?? null;
       if (
         cached &&
         cached.self === self &&
         cached.latest === latest &&
         cached.progress === progress &&
-        cached.replaced === replaced
+        cached.replaced === replaced &&
+        cached.run === run
       )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request);
       // A progress update keeps a steps row of its own, so the activity row knows that the member's
       // latest step is this update and does not show an older thought.
       const rows: readonly ChatMessage[] = !message
@@ -1108,7 +1132,7 @@ export function projectChannelMessages(
               },
             ]
           : [message];
-      projectedChannelMessages.set(entry, { self, latest, progress, replaced, rows });
+      projectedChannelMessages.set(entry, { self, latest, progress, replaced, run, rows });
       return rows;
     });
 }
