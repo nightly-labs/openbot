@@ -20,6 +20,7 @@ import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { type AgentHostFieldsProps, AgentSpeedField } from "@/features/agents/components/agent-host-fields";
 import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
+import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   PLAN_LIMIT_RESET_FORMAT,
@@ -155,8 +156,14 @@ export function AgentRuntimeFields({
   });
   const accountModels = accounts.find((account) => account.id === accountId)?.models ?? [];
   const options = withAccountModels(models.data?.filter((option) => option.provider === provider) ?? [], accountModels);
-  const selected = options.find((option) => option.id === model);
+  // A saved Cursor id can carry reasoning, and the listed row does not, so they match by the base id.
+  const selected =
+    provider === "cursor"
+      ? options.find((option) => cursorModelSelected(option.id, model ?? ""))
+      : options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;
+  const modelLabel = (id: string, name: string) =>
+    provider === "cursor" ? cursorModelSpeedLabel(name, id, t("mobile.agent.runtime.fast")) : name;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
   // The host refuses to save such a provider for a Workspace only agent, so the form says why first.
@@ -250,7 +257,13 @@ export function AgentRuntimeFields({
           // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
             disabled={!enabled}
-            value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
+            value={shortLabel(
+              selected
+                ? modelLabel(selected.id, selected.name)
+                : model
+                  ? pickerLabel(model, true)
+                  : t("mobile.agent.runtime.unavailable"),
+            )}
             onPress={() => {
               if (!provider) return;
               openModelPicker({ serverId, provider, model, accountModels, choose: chooseModel });
@@ -279,7 +292,11 @@ export function AgentRuntimeFields({
                     label: t(EFFORT_LABELS[effort]),
                   })) ?? []),
                 ]}
-                enabled={enabled && Boolean(selected?.supportedReasoningEfforts.length)}
+                enabled={
+                  enabled &&
+                  selected?.reasoningEffortConfigurable !== false &&
+                  Boolean(selected?.supportedReasoningEfforts.length)
+                }
                 dark={theme === "dark"}
                 label={t("mobile.agent.runtime.reasoning")}
                 onChange={(effort) => {
