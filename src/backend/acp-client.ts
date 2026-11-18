@@ -1943,16 +1943,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
     // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
     // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
-    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
-      this.#stopThreadSubagents(requestedThreadId);
-      yield* providerCall(() =>
-        this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
-      ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
-    }
     // Devin CLI 3000.14.30821 runs its sessions in a background process that outlives OpenBot for
     // about 10 minutes, and a load joins a session that it still holds, with the MCP servers of the
-    // OpenBot that opened it. After a restart, each OpenBot tool call failed (#12082).
-    else if (!held && this.#forcedClose._meta) {
+    // OpenBot that opened it. After a restart, each OpenBot tool call failed (#12082). An idle
+    // release already closed its session.
+    else if (
+      (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) ||
+      (!held && this.#loadsSessions && this.#forcedClose._meta && !this.#threads.isReleased(requestedThreadId))
+    ) {
+      this.#stopThreadSubagents(requestedThreadId);
       yield* providerCall(() =>
         this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
       ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
