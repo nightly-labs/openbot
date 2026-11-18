@@ -2513,6 +2513,7 @@ export async function createApplicationServices({
     crm: () => crmHandle,
     // `host` is built later, after the agent service; a CRM tool reads it when it runs.
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
+    personCanAdminister: (personId) => host.personCanAdminister(personId),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,

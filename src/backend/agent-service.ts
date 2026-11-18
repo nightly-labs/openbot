@@ -450,6 +450,8 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   /** Whether a member who is not an owner or admin can see the agent; the `crm_*` tools then refuse it. */
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
+  /** Whether a person who sent a message can change the server settings: an owner or admin. */
+  personCanAdminister?: ((personId: string) => boolean) | undefined;
   sidebarLayout?: AgentSidebar | null;
   /** The Library folders of this host, for the `folder` of an attach call, `list_library_folders` and `organize_library`. */
   libraryFolders?: AgentLibraryFolders | null;
@@ -2173,6 +2175,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.crmAgentVisibleToMembers === undefined
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
+      ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
