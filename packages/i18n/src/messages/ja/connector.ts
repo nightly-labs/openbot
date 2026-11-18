@@ -467,7 +467,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "省略できます。空の場合、一覧には電話番号が表示されます。",
   "connector.whatsapp.add": "追加",
   "connector.whatsapp.groupTitle": "グループを追加",
-  "connector.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "connector.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "connector.whatsapp.groupSearch": "グループを検索",
   "connector.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",
@@ -625,9 +626,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "もう一度サインインするまで、エージェントは共有ログイン情報でサインインできません。",
   "connector.protonPass.reconnect": "再接続",
-  "connector.protonPass.planTitle": "Proton Pass には有料プランが必要です",
+  "connector.protonPass.planTitle": "Proton Pass には Pass Plus を含むプランが必要です",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI は有料の Proton プランでのみ使えます。プランを変更してから、もう一度接続してください。",
+    "Proton Pass CLI には、Pass Plus を含む Proton プランが必要です。Mail Plus などのほかの有料プランには含まれません。プランを変更してから、もう一度接続してください。",
   "connector.protonPass.vaultTitle": "共有保管庫",
   "connector.protonPass.vaultDescription":
     "エージェントはこの保管庫のログイン情報でサインインできます。共有するログイン情報をここに移動してください。",

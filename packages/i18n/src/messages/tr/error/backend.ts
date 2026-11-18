@@ -253,6 +253,8 @@ export const messages = {
     "Bu ajan yalnızca sınırlı sayıda MCP sunucusu kullanabilir. Bu sunucuyu kullanmak için ajanın ihtiyaç duymadığı bir MCP sunucusunu kapatın.",
   "error.backend.mcpRegistrationRefused":
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde kaydedin, ardından ona bir oturum açma uygulaması ekleyin.",
   "error.backend.mcpSignInAbandonedGeneric": "Oturum açma yarıda bırakıldı.",
   "error.backend.mcpSignInForgotten": "MCP oturum açma işlemi çalışırken unutuldu.",
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi yarıda bırakıldı.",
@@ -265,6 +267,7 @@ export const messages = {
     "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
   "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
   "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
+  "error.backend.mcpSignInRefused": "Oturum açma sayfası erişimi reddetti. Yeniden oturum açın.",
   "error.backend.mcpSignInResponseTimedOut": "Oturum açma yanıtı zamanında gelmedi.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot bu sunucunun oturum açma bilgilerini okuyamadı. Sunucu adresini denetleyin ve yeniden deneyin.",

@@ -13,6 +13,10 @@
  *
  * A destination only applies to the runs that end after it was set, so choosing a place never sends
  * the answers of earlier runs.
+ *
+ * A run that asked a teammate ends before the answer comes: the answer starts a later turn that
+ * continues the task. Its result is the newest answer of those turns, so the delivery waits while a
+ * teammate still owes an answer, for a day at most, then sends the newest answer it has (#11928).
  */
 
 import type {
@@ -38,6 +42,8 @@ const logger = createOpenBotLogger("routine-results");
 const SWEEP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const FIRST_RETRY_MS = 60 * 1000;
 const LONGEST_RETRY_MS = 15 * 60 * 1000;
+/** How long a run's result waits for the teammates' answers that its task needs. */
+const TEAMMATE_ANSWER_WAIT_MS = 24 * 60 * 60 * 1000;
 
 class RoutineResultFailed extends Schema.TaggedError<RoutineResultFailed>()("RoutineResultFailed", {
   cause: Schema.Defect(),
@@ -48,8 +54,11 @@ export class RoutineResultError extends Error {}
 
 export interface RoutineResultsDependencies {
   store: RoutineResultStore;
-  /** The turn that answered a run's delivery, or null when the delivery is gone. */
-  delivery(deliveryId: string): { turnId: string | null } | null;
+  /**
+   * The turns of a run's delivery, newest first, with the turns that read its teammates' answers, and
+   * whether an answer is still to come. Null when the delivery is gone or started no turn.
+   */
+  runTurns(deliveryId: string): { turnIds: string[]; waiting: boolean } | null;
   /** The answer an agent gave in one turn, or null when it gave none. */
   turnAnswer(agentId: string, turnId: string): string | null;
   /** An enabled messaging connection of this host, or null when it is off or removed. */
@@ -100,6 +109,8 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         let again = false;
         /** The wait for the next pending attempt. */
         let timer: Fiber.Fiber<void> | null = null;
+        /** When the first run that waits for a teammate's answer stops waiting, from the last sweep. */
+        let waitEndsAt: string | null = null;
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineResultFailed({ cause }) });
@@ -162,9 +173,20 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         /** Keeps the answer of each run that ended since the last sweep. Answers the agents it touched. */
         const recordAnswers = (since: string, at: string): Set<string> => {
           const changed = new Set<string>();
+          const waitedSince = new Date(Date.parse(at) - TEAMMATE_ANSWER_WAIT_MS).toISOString();
+          waitEndsAt = null;
           for (const run of store.runsWithoutDelivery(since)) {
-            const delivery = run.deliveryId ? dependencies.delivery(run.deliveryId) : null;
-            const output = delivery?.turnId ? dependencies.turnAnswer(run.agentId, delivery.turnId) : null;
+            const turns = run.deliveryId ? dependencies.runTurns(run.deliveryId) : null;
+            if (turns?.waiting && run.endedAt > waitedSince) {
+              const endsAt = new Date(Date.parse(run.endedAt) + TEAMMATE_ANSWER_WAIT_MS).toISOString();
+              if (!waitEndsAt || endsAt < waitEndsAt) waitEndsAt = endsAt;
+              continue;
+            }
+            let output: string | null = null;
+            for (const turnId of turns?.turnIds ?? []) {
+              output = dependencies.turnAnswer(run.agentId, turnId);
+              if (output) break;
+            }
             // A Test run keeps the no-update marker in its chat; the place gets nothing for it.
             const answer = output && !isNoUpdateAnswer(output) ? output : null;
             store.createDelivery(run, answer ? resultText(run.routineName, answer) : null, at);
@@ -231,7 +253,10 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
          */
         const schedule = Effect.fn("RoutineResults.schedule")(function* (shortest: number) {
           const previous = timer;
-          const next = store.nextAttemptAt();
+          const attemptAt = store.nextAttemptAt();
+          // A run that waits for a teammate's answer is sent when its wait ends, also with no other event.
+          const next =
+            attemptAt && waitEndsAt ? (attemptAt < waitEndsAt ? attemptAt : waitEndsAt) : (attemptAt ?? waitEndsAt);
           const delay = next ? Math.max(shortest, Date.parse(next) - now().getTime()) : null;
           // The wait lets go of itself before it sweeps, so the sweep's own `schedule` does not stop it.
           timer =

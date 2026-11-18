@@ -36,7 +36,7 @@ import {
   variant,
 } from "./admin-wire";
 import { decodeTeamProtocolV1HttpRequest } from "./v1";
-import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
+import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./webrtc-framing";
 
 export const ROUTINES_ONCE_CAPABILITY = "routines-once-v1";
 

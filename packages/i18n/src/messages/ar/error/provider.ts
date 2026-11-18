@@ -169,6 +169,8 @@ export const messages = {
   "error.provider.acpModelsTimedOut": "لم يعرض {provider} نماذجه خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.startStopped":
     "فشل تشغيل {provider} عدة مرات متتالية، لذا توقف OpenBot عن المحاولة. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.startPaused":
+    "فشل تشغيل {provider} عدة مرات متتالية. سيحاول OpenBot مرة أخرى مع الرسالة أو المهمة الدورية التالية. للمحاولة الآن، حدّث المزوّدين.",
   "error.provider.tempDiskSpace":
     "يحتاج {provider} إلى 1 GB على الأقل من مساحة القرص الفارغة ليعمل. حرّر مساحة، ثم حدّث المزوّدين.",
   "error.provider.noCodeSignIn": "لا يمكن تسجيل الدخول إلى {provider} برمز.",
@@ -206,6 +208,8 @@ export const messages = {
     "رفض OpenCode هذا النموذج المجاني. بعض النماذج المجانية غير متاحة في كل البلدان. اختر نموذجًا آخر يحمل التسمية Free، أو الصق مفتاح OpenCode Go في إعدادات OpenCode واختر نموذج OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "رفضت نقطة النهاية «{provider}» مفتاح API أو الترويسات. أدخلها مرة أخرى في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
+  "error.provider.customEndpointAccessRefused":
+    "رفضت نقطة النهاية «{provider}» الطلب. قد يكون مفتاح API أو الترويسات غير صحيحة، أو لا يمكن لحسابها استخدام هذا النموذج. تحقّق منها في إعدادات الخادم ← المزوّدون، أو اختر نموذجًا آخر. ثم أعد المحاولة.",
   "error.provider.customEndpointKeyMissing":
     "تحتاج نقطة النهاية «{provider}» إلى مفتاح API. أضف المفتاح في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
   "error.provider.opencodeKeyExpired":
@@ -222,6 +226,8 @@ export const messages = {
     "أبلغ مزوّد نموذج OpenCode عن طلب رفع غير صالح. اختر نموذجًا آخر وتابع. تحقق من المهام الدورية المحفوظة قبل إنشائها مرة أخرى.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "لا يستطيع هذا النموذج قراءة ملف أو صورة في هذه الدردشة. بدأ OpenBot جلسة OpenCode جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى بدون الملف، أو اختر نموذجًا يمكنه قراءة الملفات. إذا أضفت هذا النموذج إلى مزوّد مخصص، فألغِ تحديد «الصور» في «يقبل» في إعداداته.",
+  "error.provider.opencodeOutOfMemory":
+    "نفدت ذاكرة خادم النموذج لهذه المحادثة. ابدأ محادثة جديدة، أو حمّل النموذج بطول سياق أصغر وأدخل النافذة نفسها في إعدادات مزوده في OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "هذه المحادثة لا تتسع في نافذة سياق النموذج. في Ollama أو LM Studio، حمّل النموذج بطول سياق أكبر، وأدخل النافذة نفسها في إعدادات مزوده في OpenBot. أو اختر نموذجًا أكبر.",
   "error.provider.opencodeFreeLimit":
@@ -233,6 +239,8 @@ export const messages = {
     "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeModelNotServed":
+    "لا يوفّر مزوّد النموذج هذا النموذج لحسابك الآن. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
@@ -249,6 +257,7 @@ export const messages = {
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
+  "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -278,6 +287,7 @@ export const messages = {
     "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
+  "error.provider.antigravityNetwork": "فقد Gemini الاتصال بـ Google. أرسل رسالتك مرة أخرى. ({cause})",
   "error.provider.antigravitySessionRejected":
     "رفض Gemini هذا الطلب ولم يذكر السبب. قد يسبب هذا عنصر في سجل الدردشة، مثل صورة فتحها الوكيل. بدأ OpenBot جلسة Gemini جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا آخر.",
   "error.provider.antigravityHistoryUnreadable":
@@ -297,6 +307,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "عُثر على وكيل Cursor، لكن تتعذّر قراءة إصداره.",
   "error.provider.cursorVersionUnreadable": "تتعذّر قراءة إصدار وكيل Cursor.",
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",
@@ -335,6 +347,8 @@ export const messages = {
     "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
+  "error.provider.claudeAccountNoCredit":
+    "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
   "error.provider.claudeServiceBlocked":
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":

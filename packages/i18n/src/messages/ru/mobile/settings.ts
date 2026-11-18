@@ -600,7 +600,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
   "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается.",
+    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается. Open Agent открывает его чат.",
   "mobile.settings.shortcuts.send.sent": "Отправлено",
   "mobile.settings.shortcuts.send.failed": "OpenBot не смог это отправить.",
   "mobile.settings.shortcuts.send.unconfirmed": "Сервер не ответил. Сообщение может быть в чате.",

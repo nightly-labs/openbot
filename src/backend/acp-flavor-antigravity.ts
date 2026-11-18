@@ -113,6 +113,10 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
   return null;
 }
 
+/** Go's text for a connection to Google that dropped, on Unix and on Windows (`wsarecv`). */
+const GEMINI_NETWORK_FAILURE =
+  /\bconnection reset by peer\b|\bunexpected EOF\b|\bforcibly closed by the remote host\b/u;
+
 /**
  * The kind of a Gemini request failure, first match wins. Gemini reports usage only for a Google
  * sign-in on 1.4.1 or later, so a limit often has no usage notice to explain it, and the raw Google
@@ -165,6 +169,10 @@ const GEMINI_REQUEST_FAILURES = [
   // `antigravitySessionRejected` instead, and OpenBot opens a new session (#9593). This text shows
   // only when that recovery does not run.
   ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
+  // Go's text when the connection to Google drops during a request, after the CLI's own retries. The
+  // chat showed the Google URL and the IP addresses, and the user did not know that a new try helps
+  // (#7374, #8042). Last, so that a status that Google sent keeps its own kind.
+  ["error.provider.antigravityNetwork", GEMINI_NETWORK_FAILURE],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
@@ -174,6 +182,16 @@ const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>>
   "error.provider.antigravityQuotaReached": "usage_limit",
   "error.provider.antigravityRateLimited": "rate_limit",
 };
+
+/**
+ * The message for a failure of `GEMINI_REQUEST_FAILURES`. A network failure names only its cause,
+ * such as "connection reset by peer": the rest of Go's text is a URL and IP addresses.
+ */
+function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string): string {
+  if (key === "error.provider.antigravityNetwork")
+    return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
+  return sourceText(key, { detail: shownFailureDetail(text) });
+}
 
 /**
  * The message of a Gemini turn that the server failed but reported as answer text, and the request
@@ -191,7 +209,7 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
-  return { message: key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text), key };
+  return { message: key ? geminiRequestFailureText(key, text) : shownFailureDetail(text), key };
 }
 
 /**
@@ -237,7 +255,7 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
+  return key ? geminiRequestFailureText(key, reason) : detail;
 }
 
 /** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */

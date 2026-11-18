@@ -54,6 +54,8 @@ export const messages = {
   "agent.dock.add": "הוספה למעגן",
   "agent.dock.allAdded": "כל הסוכנים והערוצים שלך כבר במעגן",
   "agent.dock.more": "עוד",
+  "agent.dock.keepOpen": "להשאיר פתוח",
+  "agent.dock.closeOnLeave": "לסגור בלחיצה בחוץ",
   "agent.dock.openInMain": "פתיחה בחלון הראשי",
   "agent.dock.openWindow": "פתיחה בחלון חדש",
   "agent.dock.remove": "הסרה מהמעגן",

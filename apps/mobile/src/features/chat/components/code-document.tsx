@@ -32,7 +32,7 @@ export function CodeDocument({
   wrap,
   topInset,
   bottomInset,
-  note,
+  firstLine = 1,
 }: {
   text: string;
   language?: string;
@@ -40,8 +40,8 @@ export function CodeDocument({
   wrap: boolean;
   topInset: number;
   bottomInset: number;
-  /** A line under the code, such as that the file goes on past what it shows. */
-  note?: string | null;
+  /** The number of the first line, when the text is a later part of a long file. */
+  firstLine?: number;
 }) {
   const { foreground, muted, colors } = useCodeTokenColors();
   // The code keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
@@ -113,11 +113,11 @@ export function CodeDocument({
               ...codeStyle,
               color: muted,
               opacity: 0.6,
-              width: String(lineCount).length * DIGIT_WIDTH,
+              width: String(firstLine + lineCount - 1).length * DIGIT_WIDTH,
               textAlign: "right",
             }}
           >
-            {Array.from({ length: lineCount }, (_, row) => row + 1).join("\n")}
+            {Array.from({ length: lineCount }, (_, row) => row + firstLine).join("\n")}
           </Typography.Code>
           <ScrollView
             horizontal
@@ -128,11 +128,6 @@ export function CodeDocument({
           </ScrollView>
         </View>
       )}
-      {note ? (
-        <Typography.Paragraph type="body-sm" className="text-muted" style={{ ...sides, paddingTop: 12 }}>
-          {note}
-        </Typography.Paragraph>
-      ) : null}
     </ScrollView>
   );
 }

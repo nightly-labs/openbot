@@ -47,6 +47,8 @@ export const messages = {
   "error.connector.protonPassFailed": "无法连接 Proton Pass。请重新连接。",
   "error.connector.protonPassCliInstallFailed": "无法安装 Proton Pass CLI。请检查网络连接，然后重新连接。",
   "error.connector.protonPassPlan": "你的 Proton 套餐不允许使用 Proton Pass CLI。请更改套餐，然后重新连接。",
+  "error.connector.protonPassPlanMissing":
+    "你的 Proton 套餐不包含 Proton Pass CLI。需要包含 Pass Plus 的 Proton 套餐。请更改套餐，然后重新连接。",
   "error.connector.protonPassExpired": "Proton Pass 访问已结束。请重新连接。",
   "error.connector.protonPassKeyInvalid": "请输入以 pst_ 开头的 Proton Pass 访问密钥。",
   "error.connector.protonPassExtraPassword": "额外密码不正确。请重新输入。",

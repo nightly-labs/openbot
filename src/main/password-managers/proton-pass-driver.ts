@@ -150,7 +150,7 @@ function fail(message: string, code: PasswordManagerErrorCode | null = null): Pa
 function cliFailure(result: ProtonPassCliResult): PasswordManagerError {
   const text = `${result.stdout}\n${result.stderr}`;
   if (text.includes("not yet allowed to use our CLI"))
-    return fail(sourceText("error.connector.protonPassPlan"), "plan");
+    return fail(sourceText("error.connector.protonPassPlanMissing"), "plan");
   if (/invalid or expired personal access token|invalid, expired or has been deleted/iu.test(text))
     return fail(sourceText("error.connector.protonPassExpired"), "expired");
   if (/incorrect extra password/iu.test(text))

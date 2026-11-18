@@ -75,7 +75,7 @@ type RoutineSnapshot = { routines: RoutineFields[]; current: boolean };
 const Turns = createSimpleContext({
   name: "Turns",
   init: () => {
-    const { activeServerId } = useServers();
+    const { activeServerId, activeServer } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
     const { activeAgent, activeAgentId, agentList, agentListSettled, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
@@ -236,13 +236,20 @@ const Turns = createSimpleContext({
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
         // As in `loadQueue`: this background read can time out on a joined server while the agent
-        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
-        // `waits-changed` event updates them. A failed cancel still reports an error.
+        // works. Keep the last waits; the next load (a new phase, agent, server or connection) or a
+        // local `waits-changed` event updates them. A failed cancel still reports an error.
         .catch(() => undefined);
     }
 
+    // Changes only when a connection to the server comes up, so a reconnect reads the waits again.
+    const connectionSequence = createMemo(() => activeServer()?.connectionSequence);
     createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
+      () => ({
+        agentId: activeAgentId(),
+        agentPhase: agentStatus().phase,
+        serverId: activeServerId(),
+        connectionSequence: connectionSequence(),
+      }),
       ({ agentId }) => {
         if (agentId) loadWaits(agentId);
       },
@@ -620,9 +627,19 @@ const Turns = createSimpleContext({
         });
     }
 
+    /**
+     * The ended turn whose Codex subagents still work, which Stop stops. Main can stop only Codex
+     * subagents after their turn; a background subagent of another provider has no Stop (#11871).
+     * Only the local host's runtime snapshot carries `subagentTurns`, so a joined server shows no
+     * such Stop until the Team API sends it.
+     */
+    function stoppableSubagentTurn(agent: { id: string; provider: string } | undefined): string | null {
+      return agent?.provider === "codex" ? (subagentTurns()[agent.id] ?? null) : null;
+    }
+
     function stopActiveTurn() {
       const agent = activeAgent();
-      const turnId = agent ? activeTurns()[agent.id] : null;
+      const turnId = agent ? (activeTurns()[agent.id] ?? stoppableSubagentTurn(agent)) : null;
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
@@ -723,6 +740,7 @@ const Turns = createSimpleContext({
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,
+      stoppableSubagentTurn,
     };
   },
 });

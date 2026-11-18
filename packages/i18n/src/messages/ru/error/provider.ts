@@ -181,6 +181,8 @@ export const messages = {
   "error.provider.acpModelsTimedOut": "{provider} не вывел список моделей за {seconds} с. Возможно, компьютер занят.",
   "error.provider.startStopped":
     "{provider} несколько раз подряд не запустился, поэтому OpenBot перестал пытаться. Обновите провайдеров, чтобы повторить попытку.",
+  "error.provider.startPaused":
+    "{provider} не запустился несколько раз подряд. OpenBot попробует снова при следующем сообщении или автозадаче. Чтобы попробовать сейчас, обновите провайдеров.",
   "error.provider.tempDiskSpace":
     "Для запуска {provider} нужно не меньше 1 ГБ свободного места на диске. Освободите место, затем обновите провайдеров.",
   "error.provider.noCodeSignIn": "В {provider} нельзя войти с помощью кода.",
@@ -219,6 +221,8 @@ export const messages = {
     "OpenCode отклонил эту бесплатную модель. Некоторые бесплатные модели доступны не во всех странах. Выберите другую модель с меткой «Бесплатно» или вставьте ключ OpenCode Go в настройках OpenCode и выберите модель OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Эндпоинт «{provider}» отклонил свой API-ключ или заголовки. Введите их снова в разделе «Настройки сервера → Провайдеры», затем повторите попытку.",
+  "error.provider.customEndpointAccessRefused":
+    "Эндпоинт «{provider}» отклонил запрос. Возможно, его API-ключ или заголовки неверны или его аккаунт не может использовать эту модель. Проверьте их в разделе «Настройки сервера → Провайдеры» или выберите другую модель. Затем повторите попытку.",
   "error.provider.customEndpointKeyMissing":
     "Эндпоинту «{provider}» нужен API-ключ. Добавьте ключ в разделе «Настройки сервера → Провайдеры», затем повторите попытку.",
   "error.provider.opencodeKeyExpired":
@@ -235,6 +239,8 @@ export const messages = {
     "Провайдер моделей OpenCode сообщил о некорректном запросе на загрузку. Выберите другую модель и продолжайте. Проверьте сохранённые регулярные задачи, прежде чем создавать их заново.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Эта модель не может прочитать файл или изображение в этом чате. OpenBot начал новый сеанс OpenCode с историей чата. Отправьте сообщение ещё раз без файла или выберите модель, которая читает файлы. Если вы добавили эту модель в своего провайдера, снимите отметку «Изображения» в разделе «Принимает» в его настройках.",
+  "error.provider.opencodeOutOfMemory":
+    "Серверу модели не хватило памяти для этого чата. Начните новый чат или загрузите модель с меньшей длиной контекста и укажите такое же окно в настройках её провайдера в OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "Этот чат не помещается в контекстное окно модели. В Ollama или LM Studio загрузите модель с большей длиной контекста и укажите такое же окно в настройках её провайдера в OpenBot. Или выберите модель побольше.",
   "error.provider.opencodeFreeLimit":
@@ -247,6 +253,8 @@ export const messages = {
     "Ответ модели оборвался или был некорректным. Отправьте сообщение ещё раз или выберите другую модель.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode не смог прочитать рассуждения этой модели при этом уровне усилий. Выберите меньший уровень усилий или другую модель, затем отправьте сообщение снова.",
+  "error.provider.opencodeModelNotServed":
+    "Провайдер модели сейчас не предоставляет эту модель вашему аккаунту. Выберите другую модель и отправьте сообщение ещё раз.",
   "error.provider.opencodeNetwork":
     "OpenCode не смог подключиться к провайдеру моделей. Проверьте сетевое подключение компьютера, где работает OpenBot, и повторите попытку.\n{detail}",
   "error.provider.codexStateBusy":
@@ -267,6 +275,7 @@ export const messages = {
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
   "error.provider.noAnswerAfterSteps":
     "{provider} выполнил несколько шагов, а затем завершил ход без ответа. Прежде чем снова отправить тот же запрос, спросите агента, что он сделал.",
+  "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -296,6 +305,7 @@ export const messages = {
     "Google не принял вход в Gemini для этого запроса. Отправьте сообщение ещё раз. Если ошибка повторяется, подключите Gemini заново в настройках.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini потерял соединение с Google. Отправьте сообщение ещё раз. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini отклонил этот запрос и не указал причину. Причиной может быть элемент истории чата, например изображение, которое открыл агент. OpenBot начал новый сеанс Gemini с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель.",
   "error.provider.antigravityHistoryUnreadable":
@@ -317,6 +327,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Агент Cursor найден, но его версию прочитать не удаётся.",
   "error.provider.cursorVersionUnreadable": "Не удалось прочитать версию агента Cursor.",
   "error.provider.cursorSignIn": "Войдите через Cursor или задайте CURSOR_API_KEY, чтобы использовать Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor не смог подключиться к своему серверу с вашим входом. Проверьте подключение к интернету, затем снова войдите в Cursor.",
   "error.provider.clineArchivePath": "В архиве Cline неожиданный путь.",
   "error.provider.clinePackageMismatch": "Пакет Cline не соответствует каталогу сред выполнения.",
   "error.provider.clineChecksum": "Контрольная сумма среды выполнения Cline не совпадает.",
@@ -356,6 +368,8 @@ export const messages = {
     "Этот чат стал слишком длинным для Claude. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.claudeApiKeyNoCredit":
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
+  "error.provider.claudeAccountNoCredit":
+    "На аккаунте Claude слишком мало кредитов. Некоторые запросы, например в быстром режиме, расходуют кредиты использования, даже когда в тарифе Claude ещё есть лимит. Пополните кредиты использования в аккаунте Claude или выберите другую модель в меню моделей агента.",
   "error.provider.claudeServiceBlocked":
     "Сервис Claude заблокировал этот запрос. Обычно это короткий сбой на стороне Claude, а не проблема с вашим аккаунтом. Отправьте сообщение снова через несколько минут.",
   "error.provider.foreignReasoning":

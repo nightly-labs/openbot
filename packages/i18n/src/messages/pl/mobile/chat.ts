@@ -147,7 +147,9 @@ export const messages = {
   "mobile.chat.preview.wrapLines": "Zawijaj wiersze",
   "mobile.chat.preview.selectHint": "Dotknij i przytrzymaj, aby zaznaczyć część kodu.",
   "mobile.chat.preview.share": "Udostępnij",
-  "mobile.chat.preview.truncated": "Podgląd ucięty po {limit} znakach.",
+  "mobile.chat.preview.part": "Część {part} z {total}",
+  "mobile.chat.preview.previousPart": "Poprzednia część",
+  "mobile.chat.preview.nextPart": "Następna część",
   "mobile.chat.preview.pdfFailed": "Nie udało się wyświetlić tego pliku PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
   "mobile.chat.preview.spreadsheetTruncated":

@@ -25,12 +25,17 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/**
+ * Why a model request failed: the agent could not connect to the model provider, the model server ran
+ * out of memory for the request, or the provider answered with another error or stopped answering.
+ */
+export type AcpRetryCause = "unreachable" | "outOfMemory" | "serverError";
+
 /** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
 interface AcpRetryUpdate {
   /** The number of the retry: 1 for the first request after the failed one. */
   readonly attempt: number;
-  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
-  readonly unreachable: boolean;
+  readonly cause: AcpRetryCause;
 }
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
@@ -92,7 +97,7 @@ export interface AcpFlavor {
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
    * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
-   * agent's own store has a key for a provider.
+   * agent's own store has a key for a provider. `label` is the agent's name for the user.
    */
   turnFailure?(
     error: unknown,
@@ -103,6 +108,7 @@ export interface AcpFlavor {
     endpoint: AcpCustomEndpoint | null,
     savedKey: boolean,
     providerKeyStored: (provider: string) => boolean,
+    label: string,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -199,6 +205,11 @@ export interface AcpFlavor {
   closeKeepsSession?: true;
   /** How long a model discovery session stays open after discovery read it. Absent: it closes at once. */
   probeCloseDelayMs?: number;
+  /**
+   * The categories of the select option that holds the reasoning effort. Absent: the protocol's
+   * `thought_level` only. The option then goes to the Effort menu, not to the provider settings.
+   */
+  effortCategories?: readonly string[];
   /**
    * Each session gets a process of its own, and an idle session is closed by ending that process.
    * For an agent with `closeKeepsSession`, or one that shares MCP servers between its sessions.
@@ -425,6 +436,12 @@ export interface AcpFlavor {
    * turn and ends the process, so the next turn starts a process that reads the sign-in again.
    */
   signInLostChunk?: RegExp;
+  /**
+   * The text for a session that the agent could not open because its server refused the saved
+   * sign-in or did not answer, or null for another error. The start asks once more, because the
+   * failure can be short, and then asks the user to sign in again.
+   */
+  signInUnusable?(error: RequestError): string | null;
   /**
    * A whole answer chunk that tells that the plan is used up, sent as answer text in a turn that
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
@@ -815,6 +832,12 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
+  // Cursor 2026.09.28-64d2043 and 2026.11.05-86047df open a session only when their server accepts the
+  // saved sign-in or key. A refused one and no connection give the same error (#7644).
+  signInUnusable: (error) =>
+    error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
+      ? sourceText("error.provider.cursorSignInUnusable")
+      : null,
   // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
   // (#5668), and a plan that needs a payment method too (#4556). Only the full chunk matches, so an
   // answer that quotes the text stays an answer.
@@ -892,6 +915,10 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   // `config.toml`. In a confined process that file is protected, and the save fails with "Invalid
   // params" and "Layer 'user-toml': cannot write config file at <path>".
   configSetUnsaved: (error) => error.code === -32602 && error.message.includes("cannot write config file"),
+  // Vibe 3.1.0 to 3.1.2 sends the thinking level of the model as the option `thinking` with the
+  // category `thinking`, not the protocol's `thought_level` (#8056, mistralai/mistral-vibe#989).
+  // Its levels `off` to `max` are OpenBot's effort names. `thought_level` stays for a later Vibe.
+  effortCategories: ["thought_level", "thinking"],
   // Vibe 3.1.0 asks Mistral for the account's model catalogue when a session opens, and waits up to
   // 5 s for it. A close stops that request, and then nothing saves the catalogue for later sessions.
   probeCloseDelayMs: 5_000,
@@ -920,8 +947,38 @@ function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: st
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
 
+/**
+ * A custom agent's `refusal` stop reason names no cause, and agents use it for other things than
+ * blocked content: WorkBuddy sends it when its sign-in is missing (#8876). The chat showed only the
+ * word "refusal", and analytics counted blocked content.
+ */
+function customRefusal(error: unknown, detail: string, label: string): string {
+  return error === "refusal" ? sourceText("error.provider.acpRefusedNoReason", { provider: label }) : detail;
+}
+
+const customTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  _redact,
+  _log,
+  _model,
+  _endpoint,
+  _savedKey,
+  _providerKeyStored,
+  label,
+) => customRefusal(error, detail, label);
+
+function customFailureCause(error: unknown): CauseCode | null {
+  return error === "refusal" ? "unknown" : null;
+}
+
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAnswerFailure: customEmptyAnswerFailure };
+const OMP_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
+};
 
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
@@ -930,6 +987,8 @@ const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAn
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
 };
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
@@ -949,8 +1008,9 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
-    turnFailure: hermesTurnFailure,
-    failureCause: hermesFailureCause,
+    turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
+      customRefusal(error, hermesTurnFailure(error, detail), label),
+    failureCause: (error, answer) => customFailureCause(error) ?? hermesFailureCause(error, answer),
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },

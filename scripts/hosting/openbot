@@ -78,6 +78,11 @@ wait_for_socket() {
   for ((second = 0; second < 30; second++)); do
     [ -S "$SOCKET" ] && return 0
     in_container || systemctl is-active --quiet "$UNIT" || not_running
+    # The safe mode has no control socket (src/main/server-safe-mode.ts).
+    if ! in_container && safe_mode_running; then
+      fail "OpenBot does not start, so it runs its safe mode: members see why. Read the log with: openbot logs
+Install a new release with: sudo openbot update. Or try again with: sudo openbot restart"
+    fi
     if [ -d /run/openbot ] && [ ! -x /run/openbot ]; then
       fail "Run this with sudo, or as the user $(service_user)."
     fi

@@ -96,7 +96,9 @@ export const messages = {
   "mobile.chat.preview.wrapLines": "גלישת שורות",
   "mobile.chat.preview.selectHint": "יש ללחוץ לחיצה ארוכה כדי לבחור חלק מהקוד.",
   "mobile.chat.preview.share": "שיתוף",
-  "mobile.chat.preview.truncated": "התצוגה המקדימה נחתכה אחרי {limit} תווים.",
+  "mobile.chat.preview.part": "חלק {part} מתוך {total}",
+  "mobile.chat.preview.previousPart": "החלק הקודם",
+  "mobile.chat.preview.nextPart": "החלק הבא",
   "mobile.chat.preview.pdfFailed": "לא ניתן להציג את ה-PDF הזה.",
   "mobile.chat.preview.spreadsheetFailed": "לא ניתן לקרוא את הגיליון הזה.",
   "mobile.chat.preview.spreadsheetTruncated":

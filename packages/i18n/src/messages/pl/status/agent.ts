@@ -114,6 +114,7 @@ export const messages = {
   "status.agent.uiBlockClosedByMessage": "Zamknięto po nowej wiadomości",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
+  "status.agent.planStopped": "Agent zatrzymał się z otwartymi krokami w planie. Wyślij wiadomość, aby kontynuować.",
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",
   "status.agent.providerExitContinues": "Agent zatrzymał się, zanim skończył odpowiedź. Agent kontynuuje.",
   "status.agent.branchTitle": "Odgałęziony czat",

@@ -184,6 +184,30 @@ function accountSlotCountSql(userId: string, excludeSiteId: string | null, now: 
 }
 
 /**
+ * The SQL that selects the first uploads of new sites in the bucket that are idle: no file upload runs now, and the
+ * last file upload, or the start, is not after `idleBefore`. Such an upload holds a slot, but the list does not show
+ * it, so the user cannot delete it. Returns `id` and `site_id`, the oldest first, at most `count` rows.
+ */
+export function idleNewSiteUploadsSql(
+  bucket: HostedSiteBucket,
+  userId: string,
+  now: number,
+  idleBefore: number,
+  count: number,
+): SqlPart {
+  const member = bucketMemberSql(bucket, "x", now);
+  return {
+    sql: `SELECT d.id, d.site_id FROM site_deployments d JOIN hosted_sites x ON x.id = d.site_id
+      WHERE d.user_id = ? AND d.status = 'uploading' AND d.base_deployment_id IS NULL AND d.in_flight_uploads = 0
+        AND d.upload_expires_at > ? AND x.user_id = ? AND x.status = 'uploading' AND ${member.sql}
+        AND MAX(d.created_at, COALESCE(
+          (SELECT MAX(f.uploaded_at) FROM site_upload_files f WHERE f.deployment_id = d.id), 0)) <= ?
+      ORDER BY d.created_at LIMIT ?`,
+    binds: [userId, now, userId, ...member.binds, idleBefore, count],
+  };
+}
+
+/**
  * The SQL condition that the bucket has a free slot for one more site of the account. Put it in the statement
  * that adds or activates the site, so that two requests at the same time cannot both take the last slot.
  */

@@ -11,9 +11,9 @@
 //       Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes
 //       back a cancel, or pays a past-due plan, comes back on this list.
 //   bun scripts/hosting/leaseweb-pool.ts free
-//       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
+//       Read only. Each VPS with no reference on the five Leaseweb accounts, such as a VPS just bought.
 //   bun scripts/hosting/leaseweb-pool.ts traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>]
-//       Read only. The public traffic in and out of each VPS on the four accounts, from the first day of
+//       Read only. The public traffic in and out of each VPS on the five accounts, from the first day of
 //       this month (UTC) to today, the most first. Also the traffic pack of the contract, and the part of
 //       it that the outgoing traffic used: Leaseweb counts only that against the pack of a VPS. Then the
 //       sum of each account.
@@ -127,7 +127,7 @@ const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 // boat restores the disk of an archived sandbox after the resume. Seen on 2026-11-12: some minutes.
 const RESTORE_WAIT_MS = 30 * 60_000;
 /** Each Leaseweb account. `custom` reads all of them, so that a `custom-<NN>` number is never used again. */
-const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU"];
+const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
 const CUSTOM_NUMBER_PATTERN = /^custom-(\d{2,}) /u;
 const CUSTOMER_PATTERN = /^[a-z0-9]{1,32}$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -1224,7 +1224,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
   /** Read only. Each VPS with no reference on all accounts: a new VPS that an operator can take. */
   async free() {
     const free = (await this.#allReferences()).filter(({ reference }) => reference === "");
-    if (free.length === 0) logger.info("No VPS on the four Leaseweb accounts is without a reference.");
+    if (free.length === 0) logger.info("No VPS on the five Leaseweb accounts is without a reference.");
     for (const vps of free)
       logger.info(
         `VPS ${vps.id} has no reference: account ${vps.account}, ${vps.location}, ${vps.product}, ${vps.state}, address ${vps.address || "none"}.`,
