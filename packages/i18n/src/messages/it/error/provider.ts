@@ -271,6 +271,8 @@ export const messages = {
     "Linux ha fermato il provider perché OpenBot ha un limite di CPU in tempo reale pari a 0. Il limite viene dal tuo sistema. Installa e avvia rtkit (`rtkit-daemon`), esegui `systemctl --user restart xdg-desktop-portal`, poi riavvia OpenBot. Riavviare solo xdg-desktop-portal non basta finché manca rtkit.",
   "error.provider.cpuUnsupported":
     "Il processore di questo computer non può eseguire questo provider. Usa un altro provider.",
+  "error.provider.windowsBlocked":
+    "Windows ha bloccato questo provider perché non può confermarne l'editore. Usa un altro provider oppure disattiva Smart App Control in Sicurezza di Windows.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
   "error.provider.opencodeNoAnswer":

@@ -1887,7 +1887,11 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
           env: { ...process.env, ...descriptor.versionEnvironment },
           windowsHide: true,
         }),
-      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
+      ).pipe(
+        Effect.mapError((failure) =>
+          windowsBlockedFailure(spec.runtime, unsupportedProcessorFailure(spec.runtime, failure)),
+        ),
+      )).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1916,6 +1920,28 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * Windows Smart App Control, or a company application control policy, stops a CLI that has no
+ * publisher signature before it starts, such as Pi's `pi.exe` (#12235). Windows reports error 4551,
+ * which Node gives as `spawn UNKNOWN`. Another try of the same copy is blocked in the same way, so the
+ * row names the cause instead of "Try again". Only provider runtimes get this text, because it names
+ * a provider. The log keeps the original failure.
+ */
+function windowsBlockedFailure(runtime: ManagedRuntimeId, failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    process.platform !== "win32" ||
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    errorCode(cause) !== "UNKNOWN" ||
+    !("syscall" in cause) ||
+    typeof cause.syscall !== "string" ||
+    !cause.syscall.startsWith("spawn")
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.windowsBlocked"), { cause }) });
 }
 
 /**
