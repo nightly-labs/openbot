@@ -98,6 +98,11 @@ export interface AgentClient {
    */
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   /**
+   * Whether the provider starts a turn by itself when the background work of this session ends, so
+   * the agent continues then. Optional, because most providers start no turn of their own.
+   */
+  wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  /**
    * Hides a thread that a replacement session took over, or that a deleted agent leaves, from the
    * provider's own thread list, and keeps its history readable. Optional, because only a provider
    * that shows its threads to the user in another app has a list to keep clean.

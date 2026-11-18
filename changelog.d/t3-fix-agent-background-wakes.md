@@ -8,6 +8,8 @@
   says that it has nothing new. Before, after a quiet update, such a report could be hidden.
 - After a restart, a thread no longer shows a second copy of the answers that a Claude agent gave
   when its background work ended, or a loose steps row.
+- A Claude agent that waits for its background work no longer gets "The agent stopped before its next
+  step. It continues". The agent continues when the work ends.
 
 ### Changed
 

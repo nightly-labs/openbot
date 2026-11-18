@@ -2499,7 +2499,12 @@ export class TurnLifecycle {
         !channelTurn &&
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
-        this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text);
+        this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text) &&
+        // The provider wakes the agent when its background work ends. A continuation before that only
+        // gets "it still runs" (#11090). A failed check continues as before.
+        !(yield* (running.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+          Effect.orElseSucceed(() => false),
+        ));
       const continuation =
         compactionContinuation ??
         (planContinues
