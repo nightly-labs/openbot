@@ -351,6 +351,8 @@ const GRID = 20;
 const DUPLICATE_OFFSET = 32;
 /** The room that a new node takes before it renders and has a measured size. */
 const NEW_NODE = { width: 300, height: 240 };
+/** The distance in screen pixels between the places that a new node can take in the view. */
+const PLACE_STEP = 40;
 /** The fields of each kind that hold text that the user wrote, in the order that the card shows them. */
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
@@ -1483,25 +1485,54 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   /**
-   * Adds a node with its top-left corner at a world point, or centred in the view. A node centred in the
-   * view moves to the right past each card that it would cover, so it does not hide them.
+   * The place in the view nearest to its centre where a new node covers no card, on the grid. The size
+   * of the new node is the rendered size of a node of the same kind, or NEW_NODE. The margin of a fit
+   * stays free at the edges, so the bars over the canvas do not hide the node.
+   */
+  const freePlace = (kind: WorkflowNodeKind): WfnPoint => {
+    const { width, height } = view();
+    const { x, y, scale } = target();
+    const cards = untrack(() =>
+      boxesOf(live().flatMap((node) => (node.kind === "text" || node.kind === "shape" ? [] : [node.id]))),
+    );
+    const size = untrack(() => {
+      const same = live().find((node) => node.kind === kind && !sizes[node.id] && slotSizes[node.id]);
+      const rendered = same && slotSizes[same.id];
+      return rendered ? { width: rendered.width, height: rendered.height } : NEW_NODE;
+    });
+    const margin = FIT_MARGIN / scale;
+    const left = -x / scale + margin;
+    const top = -y / scale + margin;
+    const right = left + width / scale - 2 * margin - size.width;
+    const bottom = top + height / scale - 2 * margin - size.height;
+    const center = snapPoint({ x: (left + right) / 2, y: (top + bottom) / 2 });
+    const free = (at: WfnPoint) => !cards.some((box) => overlaps({ ...at, ...size }, box));
+    if (free(center) || right < left || bottom < top) return center;
+    // The places are some screen pixels apart, so their count does not change with the zoom.
+    const step = Math.max(SNAP, Math.round(PLACE_STEP / scale / SNAP) * SNAP);
+    const places: WfnPoint[] = [];
+    for (let dx = 0; center.x - dx >= left || center.x + dx <= right; dx += step)
+      for (let dy = 0; center.y - dy >= top || center.y + dy <= bottom; dy += step)
+        for (const at of [
+          { x: center.x - dx, y: center.y - dy },
+          { x: center.x + dx, y: center.y - dy },
+          { x: center.x - dx, y: center.y + dy },
+          { x: center.x + dx, y: center.y + dy },
+        ])
+          if (at.x >= left && at.x <= right && at.y >= top && at.y <= bottom) places.push(at);
+    const distance = (at: WfnPoint) => Math.hypot(at.x - center.x, at.y - center.y);
+    return places.filter(free).sort((a, b) => distance(a) - distance(b))[0] ?? center;
+  };
+
+  /**
+   * Adds a node with its top-left corner at a world point, or in the view. A node without a point goes
+   * to the free place in the view that is nearest to its centre, so it does not hide a card. When the
+   * view has no free place, it goes to the centre. The view is where the camera stops after a glide.
    */
   const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
-    const { width, height } = view();
-    const center = toWorld({ x: width / 2, y: height / 2 });
     const id = `${kind}-${crypto.randomUUID()}`;
-    let at = snapPoint(point ?? { x: center.x - NEW_NODE.width / 2, y: center.y - NEW_NODE.height / 2 });
-    if (!point) {
-      const cards = untrack(() =>
-        boxesOf(live().flatMap((node) => (node.kind === "text" || node.kind === "shape" ? [] : [node.id]))),
-      );
-      // Each move passes one card, so the loop ends after one move for each card at most.
-      for (let hit = cards.find((box) => overlaps({ ...at, ...NEW_NODE }, box)); hit; ) {
-        at = snapPoint({ x: hit.x + hit.width + GRID * 2, y: at.y });
-        hit = cards.find((box) => overlaps({ ...at, ...NEW_NODE }, box));
-      }
-    }
+    const at = point ? snapPoint(point) : freePlace(kind);
     setPositions((draft) => {
       draft[id] = at;
     });
