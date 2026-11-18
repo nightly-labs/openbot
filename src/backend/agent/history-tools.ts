@@ -127,10 +127,12 @@ const readShape = {
 /**
  * A cursor of the chat list: the side thread that the earlier page ended with, or null when that page
  * held only the main chat. The list continues after it, so a size cut leaves no thread out (#11877).
+ * It keeps the time window of the first page: the next call sends only the cursor.
  */
 const listCursorSchema = z.strictObject({
   version: z.literal(1),
   list: z.literal("threads"),
+  after: z.string().nullable(),
   last: z.strictObject({ updatedAt: id, threadId: id }).nullable(),
 });
 
@@ -143,16 +145,20 @@ function readListCursor(text: string) {
   }
 }
 
-function listCursor(last: ThreadListPosition | null): string {
-  return Buffer.from(JSON.stringify({ version: 1, list: "threads", last }), "utf8").toString("base64url");
+function listCursor(after: string | null, last: ThreadListPosition | null): string {
+  return Buffer.from(JSON.stringify({ version: 1, list: "threads", after, last }), "utf8").toString("base64url");
 }
 
-// A search cursor continues one query, and a chat list cursor continues the list with no query. Another
-// cursor fits no call of this tool (#6995).
+// A search cursor continues one query, and a chat list cursor continues the list with no query and no
+// taskId. Another cursor fits no call of this tool (#6995).
 const searchSchema = z
   .strictObject(searchShape)
   .refine(
-    (value) => value.cursor === undefined || (value.query === undefined) === (readListCursor(value.cursor) !== null),
+    (value) =>
+      value.cursor === undefined ||
+      (readListCursor(value.cursor) === null
+        ? value.query !== undefined
+        : value.query === undefined && value.taskId === undefined),
     {
       path: ["cursor"],
       message:
@@ -335,7 +341,7 @@ export class HistoryTools {
     // The schema accepts only a chat list cursor here.
     const cursor = input.cursor === undefined ? null : readListCursor(input.cursor);
     const now = Date.now();
-    const after = input.after === undefined ? null : windowBound(input.after, now);
+    const after = cursor ? cursor.after : input.after === undefined ? null : windowBound(input.after, now);
     const limit = input.limit ?? 8;
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
@@ -397,7 +403,7 @@ export class HistoryTools {
         ),
         more,
         ...(more
-          ? { nextCursor: listCursor(last ? { updatedAt: last.updatedAt, threadId: last.threadId } : null) }
+          ? { nextCursor: listCursor(after, last ? { updatedAt: last.updatedAt, threadId: last.threadId } : null) }
           : {}),
         next: more
           ? "Send nextCursor as cursor, with no query, for older chats. history_read with a taskId reads one."
