@@ -21,10 +21,11 @@ ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
 # Source, not just the manifest: workspace packages here ship as raw TypeScript, so the symlink
-# `node_modules/@openbot/contracts` carries over from the install stage resolves into a directory
+# `node_modules/@openbot/contracts` (and `@openbot/i18n`) carries over from the install stage resolves into a directory
 # with nothing in it to import. The image would build and the container would die on first
 # import, and no CI job builds this image.
 COPY packages/contracts ./packages/contracts
+COPY packages/i18n ./packages/i18n
 COPY remote/api ./remote/api
 USER bun
 WORKDIR /app/remote/api

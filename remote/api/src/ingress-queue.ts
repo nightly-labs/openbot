@@ -33,9 +33,13 @@ export type RouteWaker = (route: IngressRoute, wake: boolean) => Effect.Effect<R
 
 /**
  * `queued`: kept for the host. `hosted`: a hosted server has the route, but the event is not kept.
- * `unavailable`: no host can take the event now.
+ * `unavailable`: no host can take the event now. `unlinked`: the account service answered that no
+ * host has the route, such as a Telegram chat that added the bot without a link code.
  */
-type OfflineOutcome = "queued" | "hosted" | "unavailable";
+type OfflineOutcome = "queued" | "hosted" | "unavailable" | "unlinked";
+
+/** The answer of a lookup that failed. It is not `unlinked`: the route can have a host. */
+const NO_ANSWER: RouteWake = { hostId: null, state: "not_hosted" };
 
 export interface IngressQueueLimits {
   /** How long an event waits for its host. A hosted server starts in a few minutes. */
@@ -169,6 +173,7 @@ export class IngressQueue {
     const order = ++this.#order;
     if (!this.#waker) return "unavailable";
     const wake = yield* this.#check(route, routeKey, wakes);
+    if (wake.hostId === null && wake !== NO_ANSWER) return "unlinked";
     if (!wakes) return wake.state === "sleeping" || wake.state === "starting" ? "hosted" : "unavailable";
     if (wake.state !== "starting" || !wake.hostId) return "unavailable";
     return yield* this.#add(order, wake.hostId, route, routeKey, message, telegramCallback);
@@ -326,7 +331,7 @@ export class IngressQueue {
     this.#pending.set(routeKey, { answer: result, wake });
     const waker = this.#waker;
     const asked = waker ? yield* waker(route, wake) : null;
-    const answer: RouteWake = asked ?? { hostId: null, state: "not_hosted" };
+    const answer: RouteWake = asked ?? NO_ANSWER;
     if (asked) {
       this.#routes.delete(routeKey);
       dropOldest(this.#routes, MAXIMUM_ROUTES);

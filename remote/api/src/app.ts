@@ -428,7 +428,15 @@ export function createRemoteApiApp(
         const linked = update.linkCode
           ? await runtime.runPromise(signal.linkTelegramChat(botId, update.chatId, update.linkCode))
           : false;
-        signal.deliverTelegram(botId, update.chatId, body, update.callbackQueryId, linked, update.wakes);
+        signal.deliverTelegram(
+          botId,
+          update.chatId,
+          body,
+          update.callbackQueryId,
+          linked,
+          update.wakes,
+          update.addresses,
+        );
         return emptyResponse(200);
       },
       { parse: "none" },
@@ -748,9 +756,13 @@ function limitStream(body: ReadableStream<Uint8Array>, limit: number): ReadableS
   );
 }
 
-function telegramUpdate(
-  body: Uint8Array,
-): { chatId: string; callbackQueryId: string | null; linkCode: string | null; wakes: boolean } | null {
+function telegramUpdate(body: Uint8Array): {
+  chatId: string;
+  callbackQueryId: string | null;
+  linkCode: string | null;
+  wakes: boolean;
+  addresses: boolean;
+} | null {
   let value: unknown;
   try {
     value = JSON.parse(new TextDecoder().decode(body));
@@ -774,6 +786,7 @@ function telegramUpdate(
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
     wakes:
       update.callback_query !== undefined || (update.message !== undefined && telegramMessageWakes(update.message)),
+    addresses: update.message !== undefined && telegramMessageAddresses(update.message),
   };
 }
 
@@ -788,19 +801,31 @@ const TELEGRAM_ADDRESSING_ENTITIES = new Set(["mention", "text_mention", "bot_co
  * removal that the host must see. The bot gets every group message, and the host answers none of the
  * others.
  */
-function telegramMessageWakes(message: NonNullable<z.output<typeof telegramUpdateSchema>["message"]>): boolean {
+function telegramMessageWakes(message: TelegramMessage): boolean {
   return (
-    message.chat.type === "private" ||
+    telegramMessageAddresses(message) ||
     message.reply_to_message !== undefined ||
     message.message_thread_id !== undefined ||
     message.new_chat_title !== undefined ||
     message.left_chat_member !== undefined ||
-    message.migrate_to_chat_id !== undefined ||
+    message.migrate_to_chat_id !== undefined
+  );
+}
+
+/**
+ * True when a message asks for OpenBot itself: a direct message, or a message with a mention or a
+ * command. In a chat with no link, only such a message gets the notice that the chat is not linked.
+ */
+function telegramMessageAddresses(message: TelegramMessage): boolean {
+  return (
+    message.chat.type === "private" ||
     [...(message.entities ?? []), ...(message.caption_entities ?? [])].some((entity) =>
       TELEGRAM_ADDRESSING_ENTITIES.has(entity.type),
     )
   );
 }
+
+type TelegramMessage = NonNullable<z.output<typeof telegramUpdateSchema>["message"]>;
 
 function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   try {
