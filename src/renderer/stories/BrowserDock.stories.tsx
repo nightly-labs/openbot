@@ -92,6 +92,14 @@ export const UserControl: Story = {
   args: { working: true, island: { kind: "activity", control: "user" }, onHandoff: fn() },
 };
 
+/**
+ * The agent asks the user to do a step on the page, such as a CAPTCHA. The box starts as the tab, so the
+ * page under it gets the clicks (#12206). The tab opens the box with Done.
+ */
+export const PageRequest: Story = {
+  args: { working: true, island: { kind: "activity", control: "request" }, onHandoff: fn() },
+};
+
 /** The agent asks for a code that only the user has. */
 export const SecretRequest: Story = {
   args: { working: true, island: { kind: "secret", request: secretRequest } },

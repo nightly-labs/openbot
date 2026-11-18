@@ -58,6 +58,16 @@ function needsAnswer(island: BrowserIslandContent | null | undefined): boolean {
   return island.kind === "secret" || island.kind === "prompt" || island.kind === "approval";
 }
 
+/** The agent asks the user to do a step on the page, such as a sign-in or a CAPTCHA. */
+function asksForPage(island: BrowserIslandContent | null | undefined): boolean {
+  return island?.kind === "activity" && island.control === "request";
+}
+
+/** The agent waits for the user on the page: the step, or the code or password of the step. */
+function inTakeover(island: BrowserIslandContent | null | undefined): boolean {
+  return asksForPage(island) || island?.kind === "secret";
+}
+
 function px(value: number): string {
   return `${value}px`;
 }
@@ -167,8 +177,11 @@ export function BrowserDock(props: BrowserDockProps) {
    * The user hid the box to reach the page under it. The glass of the field shrinks into a tab at the
    * bottom centre, in the middle of the box, and grows back out of it. The tab tells what the agent does. A
    * question, a code or an approval shows the box again, and the user can hide it again.
+   * A step that the agent asks for on the page hides the box by itself, because the box is over the page
+   * and a button of the page can be under it (#12206). The box shows again when the step ends.
    */
-  const [phase, setPhase] = createSignal<DockPhase>("open");
+  let foldedForStep = untrack(() => asksForPage(props.island));
+  const [phase, setPhase] = createSignal<DockPhase>(foldedForStep ? "hidden" : "open");
   const tucked = () => phase() === "hidden";
   let tab: HTMLButtonElement | undefined;
   /** A question arrived while the box was shrinking, so the box grows back when it is a tab. */
@@ -192,6 +205,31 @@ export function BrowserDock(props: BrowserDockProps) {
     },
     (key) => {
       if (key) requestShow();
+    },
+  );
+  /**
+   * Once for each step: the box hides when the step starts, and shows again when it ends, only when it
+   * hid by itself. A box that the user opens or hides during the step stays as the user left it.
+   */
+  let stepHandled = foldedForStep;
+  createEffect(
+    () => (asksForPage(props.island) ? "page" : inTakeover(props.island) ? "code" : ""),
+    (step) => {
+      if (!step) {
+        stepHandled = false;
+        if (foldedForStep) {
+          foldedForStep = false;
+          requestShow();
+        }
+        return;
+      }
+      if (step !== "page" || stepHandled) return;
+      stepHandled = true;
+      queueMicrotask(() => {
+        if (untrack(phase) !== "open") return;
+        foldedForStep = true;
+        void tuck(false);
+      });
     },
   );
   let focusSeen = untrack(() => props.focusRequest);
@@ -256,8 +294,10 @@ export function BrowserDock(props: BrowserDockProps) {
     });
   }
 
-  async function tuck() {
+  /** The tab gets the focus when the user hid the box, or when the focus was in the box. */
+  async function tuck(byUser = true) {
     if (untrack(phase) !== "open") return;
+    const focusTab = byUser || Boolean(dock?.contains(document.activeElement));
     // A reply waits while the box is a tab, so its close timer stops here.
     clearTimeout(closeTimer);
     if (dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
@@ -265,7 +305,7 @@ export function BrowserDock(props: BrowserDockProps) {
     if (!from || !tab || prefersReducedMotion()) {
       setPhase("hidden");
       flush();
-      tab?.focus({ preventScroll: true });
+      if (focusTab) tab?.focus({ preventScroll: true });
       return;
     }
     setPhase("hiding");
@@ -286,7 +326,7 @@ export function BrowserDock(props: BrowserDockProps) {
     done();
     for (const fade of fades) fade.cancel();
     fadeIn(tabParts(), REVEAL_STAGGER_MS);
-    tab.focus({ preventScroll: true });
+    if (focusTab) tab.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
       void show();
@@ -296,6 +336,7 @@ export function BrowserDock(props: BrowserDockProps) {
   async function show() {
     if (untrack(phase) !== "hidden" || showing) return;
     showing = true;
+    foldedForStep = false;
     try {
       await grow();
     } finally {
@@ -360,7 +401,7 @@ export function BrowserDock(props: BrowserDockProps) {
     }
   };
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
-  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
+  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island) || asksForPage(props.island);
 
   // The tab changes its width with a spring when its text changes. It stays at the bottom centre.
   let tabWidth = 0;
