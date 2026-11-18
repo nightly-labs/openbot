@@ -1117,7 +1117,7 @@ export class ThreadLifecycle {
           return Effect.fail(
             new ThreadOperationFailed({
               cause: new ProviderStoppedError(
-                providerLabel(client.provider),
+                "Codex",
                 sourceText("error.provider.cliTimedOut", { provider: providerLabel(client.provider) }),
               ),
             }),

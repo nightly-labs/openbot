@@ -96,12 +96,14 @@ const SESSION_RESUME_TIMEOUT_RETRIES = 3;
 
 /**
  * The retries of an agent whose provider could not open a session: the busy refusals in a row, whether
- * a retry waits, and the sessions in a row that did not open in time (#11607).
+ * a retry waits, and, for each lane, the starts in a row that did not open in time (#11607) or that the
+ * stopped provider did not get (#11843). The lanes of one agent fail together when the provider stops,
+ * so each lane counts its own tries.
  */
 interface SessionRetry {
   refusals: number;
   waiting: boolean;
-  resumeTimeouts: number;
+  resumeTimeouts: Map<string, number>;
 }
 
 export interface DrainHooks {
@@ -611,21 +613,24 @@ export class DrainScheduler {
   }
 
   /**
-   * Counts one session that did not open in time. False after the last try: that message fails, and
-   * the next message gets all its tries and the shortest wait again, as after a turn that starts.
+   * Counts one start of this lane that did not open in time, or that the stopped provider did not get.
+   * False after the last try: that message fails, and the next message gets all its tries and, when no
+   * other lane waits, the shortest wait again, as after a turn that starts.
    */
-  #mayRetryResume(agentId: string): boolean {
+  #mayRetryResume(agentId: string, lane: string): boolean {
     const entry = this.#busyRetryEntry(agentId);
-    if (entry.resumeTimeouts >= SESSION_RESUME_TIMEOUT_RETRIES) {
-      this.#busyRetries.delete(agentId);
+    const tries = entry.resumeTimeouts.get(lane) ?? 0;
+    if (tries >= SESSION_RESUME_TIMEOUT_RETRIES) {
+      entry.resumeTimeouts.delete(lane);
+      if (entry.resumeTimeouts.size === 0 && !entry.waiting) this.#busyRetries.delete(agentId);
       return false;
     }
-    entry.resumeTimeouts += 1;
+    entry.resumeTimeouts.set(lane, tries + 1);
     return true;
   }
 
   #busyRetryEntry(agentId: string): SessionRetry {
-    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: 0 };
+    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: new Map() };
     this.#busyRetries.set(agentId, entry);
     return entry;
   }
@@ -1330,7 +1335,10 @@ export class DrainScheduler {
           const providerStopped = error instanceof ProviderStoppedError;
           const resumeTimedOut =
             (providerStopped || isRequestTimeout(error, "thread/resume")) &&
-            this.#mayRetryResume(delivery.recipientAgentId);
+            this.#mayRetryResume(
+              delivery.recipientAgentId,
+              laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }),
+            );
           if (
             error instanceof ProviderTurnActiveError ||
             resumeTimedOut ||

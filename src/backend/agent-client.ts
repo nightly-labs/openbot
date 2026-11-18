@@ -193,8 +193,9 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
 }
 
 /**
- * The provider process stopped, or did not answer, before the turn was sent. Nothing ran, so the
- * caller can queue the message again for the next process (#11843).
+ * The provider process stopped, or did not answer, so it did not get this request. A request before
+ * `turn/start`, or a `turn/start` that was not written, ran nothing: the drain queues the message again
+ * for the next process (#11843). Other callers handle it as any failed request.
  */
 export class ProviderStoppedError extends Error {
   constructor(
