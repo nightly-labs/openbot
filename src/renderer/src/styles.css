@@ -26,6 +26,7 @@
 @import "@openbot/ui/features/sidebar/sidebar-felt-badges.css";
 @import "@openbot/ui/features/sidebar/sidebar-filter.css";
 @import "@openbot/ui/features/sidebar/sidebar-tooltips.css";
+@import "@openbot/ui/features/sidebar/sidebar-threads.css";
 @import "@openbot/ui/features/agent-dock/agent-dock.css";
 @import "./features/agent-dock/agent-dock.css";
 @import "./features/account/account-update-island.css";
