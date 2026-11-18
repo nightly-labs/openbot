@@ -33,7 +33,13 @@ const product = mobile ? "OpenBot mobile" : "OpenBot";
 
 const show = (object: string): string | undefined => {
   try {
-    return execFileSync("git", ["show", object], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    // CHANGELOG.md is larger than the 1 MiB default buffer. A smaller buffer fails, and the check
+    // then reads an empty file.
+    return execFileSync("git", ["show", object], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
   } catch {
     return undefined;
   }

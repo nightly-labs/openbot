@@ -1,0 +1,9 @@
+{
+  "appVersion": "0.74.0",
+  "protocol": {
+    "minimum": 1,
+    "maximum": 10
+  },
+  "capabilities": ["long-capability-lists-v1", "capability-baseline-v1"],
+  "absent": ["mac-apps-limit-v1"]
+}

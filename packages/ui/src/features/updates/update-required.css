@@ -1,0 +1,61 @@
+/* "Update required" uses the sign-in layout (`auth.css`). These rules add only its failure line,
+   its progress and its secondary action. */
+
+.update-required-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.update-required-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
+.update-required-progress-value {
+  color: var(--openbot-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.update-required .ui-progress-fill {
+  background: var(--openbot-text-primary);
+}
+
+.update-required-note {
+  margin: 24px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
+/* A failure uses the place and the size of the note. Only the icon has the danger colour. */
+.update-required-error {
+  color: var(--openbot-text-primary);
+  text-wrap: balance;
+}
+
+.update-required-error-icon {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-inline-end: 6px;
+  color: var(--openbot-danger);
+  vertical-align: -2px;
+}
+
+.update-required-note + .account-login-primary {
+  margin-top: 14px;
+}
+
+.update-required-secondary {
+  align-self: center;
+  width: auto;
+  margin-top: 12px;
+  color: var(--openbot-text-muted);
+}

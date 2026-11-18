@@ -2,8 +2,10 @@
  * background, and sets `data-openbot-window-glass` on the root. The frame, the content card and the
  * pages that fill the card are clear tints. In the window, the surface tokens are translucent too,
  * so the bubbles, tables, code blocks, cards, controls and the composer show the blur. Dialogs, menus,
- * tooltips and toasts open outside `.app-window`, or in a popper inside it, and stay solid. A browser
- * tab, an iframe or a canvas stays opaque: CSS cannot make a native view clear. */
+ * tooltips and toasts open outside `.app-window`, or in a popper inside it, and stay solid. The full
+ * browser view also opens outside it and stays solid: it covers the app, whose top row would show
+ * through a clear frame. A browser tab, an iframe or a canvas stays opaque: CSS cannot make a native
+ * view clear. */
 :root[data-openbot-window-glass] {
   --window-glass-frame: color-mix(in srgb, var(--openbot-bg-frame) 20%, transparent);
   --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 30%, transparent);
@@ -270,11 +272,6 @@
   --wfn-field: var(--window-solid-control-hover);
 }
 
-/* The full-bleed browser covers the window with its own frame and card. */
-:root[data-openbot-window-glass] .browser-full-view {
-  background: var(--window-glass-frame);
-}
-
 /* The surfaces in a bubble with a chat colour are clear here, so the tint of the bubble shows through them
  * already. They keep the clear values; a mix with the chat colour would tint them twice. */
 :root[data-openbot-window-glass] .app-window .ui-bubble.message-bubble-colored > .ui-bubble-content {
@@ -302,6 +299,10 @@
   .app-window
   .message-entry-agent
   .ui-bubble-variant-muted.message-bubble-colored
+  > .ui-bubble-content,
+:root[data-openbot-window-glass]
+  .app-window
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored
   > .ui-bubble-content {
   background: color-mix(
     in srgb,
@@ -321,4 +322,26 @@
       40%,
     transparent
   );
+}
+
+/* A solid bubble is the agent's color, so it stays opaque on the glass as it is on a solid window. Its
+ * blocks lift from that color as on a solid window; a clear surface would show the glass through it. */
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-solid-surface: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    var(--message-chat-color)
+  );
+  --openbot-bg-canvas: var(--message-solid-surface);
+  --openbot-bg-sidebar: var(--message-solid-surface);
+  --openbot-bg-surface: var(--message-solid-surface);
+  --openbot-bg-surface-raised: var(--message-solid-surface);
+  --openbot-bg-control: var(--message-solid-surface);
+  --openbot-bg-control-hover: var(--message-solid-surface);
+  --openbot-bg-control-active: var(--message-solid-surface);
+  background: var(--message-chat-color);
 }

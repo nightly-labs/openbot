@@ -20,7 +20,7 @@ import type {
   SidebarDropTarget,
 } from "../sidebar-drag-model";
 import { type SidebarPinnedItem, sidebarPinnedItemKey } from "../sidebar-pins";
-import type { SidebarChatItem, SidebarProps } from "../sidebar-types";
+import { type SidebarChatItem, type SidebarProps, sidebarChatOrderSortsSections } from "../sidebar-types";
 
 export function createSidebarLayoutActions(deps: {
   chatPinnedItems: () => SidebarPinnedItem[];
@@ -229,9 +229,10 @@ export function createSidebarLayoutActions(deps: {
   }
 
   function moveChatAction(chatId: string, target: ChatDropTarget): SidebarLayoutAction | null {
-    // The "unread first" order shows the rows by activity, not in the saved order. A drop next to a
-    // row there must not write a position that the user cannot see: the chat goes to the end.
-    if (props.chatOrder === "unread-first") return appendChatAction(chatId, target.sectionId);
+    // The "recent activity" and "unread first" orders show the rows by activity, not in the saved
+    // order. A drop next to a row there must not write a position that the user cannot see: the chat
+    // goes to the end.
+    if (sidebarChatOrderSortsSections(props.chatOrder)) return appendChatAction(chatId, target.sectionId);
     const idsWithoutSource = sectionChatIdsWithout(target.sectionId, chatId);
     const targetIndex = idsWithoutSource.indexOf(target.chatId);
     if (targetIndex < 0) return null;

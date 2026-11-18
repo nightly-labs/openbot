@@ -1,4 +1,4 @@
-import { Button, Maximize2, Minimize2, Pause, Play, SeekSlider, Volume2, VolumeX } from "@openbot/ui";
+import { Button, Maximize2, Minimize2, Pause, Play, SeekSlider, Spinner, Volume2, VolumeX } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
@@ -13,11 +13,15 @@ export interface VideoPlayerProps {
   /** The length to show until the video gives its own. */
   durationSeconds?: number | undefined;
   autoplay?: boolean | undefined;
+  /** "none" gets nothing before Play, for a file that arrives whole. The default is "metadata". */
+  preload?: "none" | "metadata" | undefined;
   /** True while `onLoad` gets the file. */
   loading?: boolean | undefined;
   /** Gets the file when the user presses Play before there is a `src`, as in the web client. */
   onLoad?: (() => void) | undefined;
   onMetadata?: ((video: HTMLVideoElement) => void) | undefined;
+  /** The video starts, from Play or from `autoplay`. */
+  onPlay?: (() => void) | undefined;
   onError?: (() => void) | undefined;
   ref?: ((video: HTMLVideoElement) => void) | undefined;
   /**
@@ -38,6 +42,8 @@ interface VideoPlayerState {
   dragged: number | null;
   muted: boolean;
   fullScreen: boolean;
+  /** True while the video has no data to show at its position: it plays, but the picture stays. */
+  buffering: boolean;
 }
 
 /** A video with a play button over the frame, and a bar with the position and the actions at the bottom. */
@@ -50,6 +56,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
     dragged: null,
     muted: false,
     fullScreen: false,
+    buffering: false,
   });
   let video: HTMLVideoElement | undefined;
   let frame: HTMLDivElement | undefined;
@@ -63,7 +70,15 @@ export function VideoPlayer(props: VideoPlayerProps) {
   const setPlaying = (playing: boolean) =>
     setPlayer((state) => {
       state.playing = playing;
+      if (!playing) state.buffering = false;
     });
+  const setBuffering = (buffering: boolean) =>
+    setPlayer((state) => {
+      state.buffering = buffering;
+    });
+  // A video from a joined server arrives as a whole file, so Play can wait for many seconds. Without
+  // a sign, the player looks frozen.
+  const waiting = () => player.playing && player.buffering;
 
   const toggle = () => {
     if (!props.src) {
@@ -96,6 +111,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
       ref={frame}
       class="media-generation-player"
       data-playing={player.playing ? "" : undefined}
+      aria-busy={waiting() || props.loading ? "true" : undefined}
       popover={props.fullControls ? "manual" : undefined}
       onToggle={(event) => {
         const open = event.newState === "open";
@@ -115,12 +131,18 @@ export function VideoPlayer(props: VideoPlayerProps) {
             }}
             src={url()}
             playsinline
-            preload="metadata"
+            preload={props.preload ?? "metadata"}
             autoplay={props.autoplay}
             aria-label={props.label}
-            onPlay={() => setPlaying(true)}
+            onPlay={() => {
+              setPlaying(true);
+              props.onPlay?.();
+            }}
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => setBuffering(false)}
+            onCanPlay={() => setBuffering(false)}
             onVolumeChange={(event) => {
               const { muted } = event.currentTarget;
               setPlayer((state) => {
@@ -140,7 +162,10 @@ export function VideoPlayer(props: VideoPlayerProps) {
               });
               props.onMetadata?.(event.currentTarget);
             }}
-            onError={() => props.onError?.()}
+            onError={() => {
+              setBuffering(false);
+              props.onError?.();
+            }}
           >
             {/* A generated video has no caption track. */}
             <track kind="captions" />
@@ -157,8 +182,15 @@ export function VideoPlayer(props: VideoPlayerProps) {
           disabled={props.loading}
           onClick={toggle}
         >
-          <Play aria-hidden="true" />
+          <Show when={props.loading} fallback={<Play aria-hidden="true" />}>
+            <Spinner />
+          </Show>
         </Button>
+      </Show>
+      <Show when={waiting()}>
+        <span class="media-generation-wait">
+          <Spinner label={t("common.loading")} />
+        </span>
       </Show>
       <div class="media-generation-bar">
         <Button

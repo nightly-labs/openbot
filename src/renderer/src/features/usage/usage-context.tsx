@@ -1,12 +1,16 @@
-import { createEffect, createSignal, createStore, untrack } from "solid-js";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
+import { createEffect, createMemo, createSignal, createStore, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
+import { createCrmEnabled } from "../crm/crm-enabled";
+import { desktopCrmHost } from "../crm/crm-port";
+import { serverCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 
 /**
  * The host pane over the middle of the workspace: the usage report, the routine schedule, the
- * tasks, the workflows or the Library. One state holds them, so each path that uncovers the conversation closes any of them.
+ * tasks, the workflows, the Library or the CRM. One state holds them, so each path that uncovers the conversation closes any of them.
  */
-type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "library";
+type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "library" | "crm";
 
 const context = createSimpleContext({
   name: "UsageProvider",
@@ -24,7 +28,21 @@ const context = createSimpleContext({
      * notification. The page takes it once, so a later mount opens its first workflow again.
      */
     const [workflowRequest, setWorkflowRequest] = createSignal<{ serverId: string; workflowId: string }>();
-    const { activeServerId } = useServers();
+    /** The server whose CRM page opens its connectors. The page takes it once. */
+    const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
+    const { activeServer, activeServerId } = useServers();
+    /** The active server when this person may read its CRM: an owner or admin, on a host with `crm-v1`. */
+    const crmServerId = createMemo(() => {
+      const server = activeServer();
+      return serverCanAdminister(server, CRM_CAPABILITY) ? server.id : undefined;
+    });
+    /** The Server Settings > Experimental switch of that server. The CRM shows only while it is on. */
+    const crm = createCrmEnabled(
+      createMemo(() => {
+        const serverId = crmServerId();
+        return serverId === undefined ? undefined : desktopCrmHost(serverId);
+      }),
+    );
     let trigger: HTMLElement | null = null;
 
     function open(view: HostPaneView, serverId: string, source: HTMLElement | null, agentId?: string) {
@@ -58,6 +76,11 @@ const context = createSimpleContext({
       open("library", serverId, source);
     }
 
+    function openCrm(serverId: string, source: HTMLElement | null, connectors = false) {
+      setCrmConnectorsRequest(connectors ? serverId : undefined);
+      open("crm", serverId, source);
+    }
+
     /**
      * An open report follows the host the user switches to.
      *
@@ -84,6 +107,7 @@ const context = createSimpleContext({
 
     function clear() {
       setWorkflowRequest(undefined);
+      setCrmConnectorsRequest(undefined);
       setState((draft) => {
         draft.serverId = null;
         delete draft.agentId;
@@ -99,6 +123,11 @@ const context = createSimpleContext({
       workflowRequest,
       takeWorkflowRequest: () => setWorkflowRequest(undefined),
       openLibrary,
+      openCrm,
+      /** True when the active server shows its CRM, false when not, and undefined while it is not known. */
+      crmEnabled: crm.enabled,
+      crmConnectorsRequest,
+      takeCrmConnectorsRequest: () => setCrmConnectorsRequest(undefined),
       closeUsage() {
         clear();
         queueMicrotask(() => {

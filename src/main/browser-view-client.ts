@@ -8,14 +8,18 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
+  BROWSER_VIEW_PAGE_COPY_QUERY,
   type BrowserViewInput,
   browserViewInputForHost,
-  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
+  decodeBrowserViewHostMessage,
   encodeBrowserViewInput,
+  isBrowserViewUserAction,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Fiber } from "effect";
@@ -29,6 +33,8 @@ export interface BrowserViewClientOptions {
   >;
   /** `owner` is the id that `start` got, so the event goes to the window that started the view. */
   onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
+  /** Puts the text that the host's page copied on this computer's clipboard. */
+  writeClipboard: (text: string) => void;
 }
 
 interface ActiveView {
@@ -37,6 +43,8 @@ interface ActiveView {
   tabId: string;
   owner: number;
   socket: WebSocket;
+  /** When the user last clicked or pressed a key in this view, as `Date.now()`. */
+  lastActionAt: number;
 }
 
 export class BrowserViewClient {
@@ -66,16 +74,26 @@ export class BrowserViewClient {
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
       }
+      if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
+      }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
-      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket };
+      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket, lastActionAt: 0 };
       this.#view = view;
       socket.addEventListener("message", (message) => {
         if (this.#view !== view) return;
-        // Text is the answer to a copy. A host that sends something else is not answering one.
+        // Text is the answer to a copy, or a copy the page made. Any other text is not an answer.
         if (typeof message.data === "string") {
           try {
-            this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId }, owner);
+            const hostMessage = decodeBrowserViewHostMessage(message.data);
+            if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge")
+              this.#options.onEvent({ ...hostMessage, tabId }, owner);
+            // The host also checks this. A host must not fill the clipboard when the user did nothing.
+            else if (hostMessage?.type === "pageCopied") {
+              if (Date.now() - view.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)
+                this.#options.writeClipboard(hostMessage.text);
+            } else throw new Error("Invalid browser view message.");
           } catch {
             socket.close(1000, "Invalid browser view message");
           }
@@ -132,6 +150,7 @@ export class BrowserViewClient {
     const clipboard = this.#options.servers.supportsCapability(view.serverId, TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
     const wire = browserViewInputForHost(input, namesFrames, clipboard);
     if (!wire) return;
+    if (isBrowserViewUserAction(wire)) view.lastActionAt = Date.now();
     view.socket.send(encodeBrowserViewInput(wire));
   }
 

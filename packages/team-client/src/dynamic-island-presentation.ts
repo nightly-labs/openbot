@@ -59,6 +59,7 @@ export interface DynamicIslandAgentSource {
   name: string;
   avatarSeed: string;
   avatarHue: DynamicIslandAgentIdentity["avatarHue"];
+  avatarColor?: DynamicIslandAgentIdentity["avatarColor"];
   avatarUrl: string | null;
   notifications: boolean;
   preview?: string;
@@ -352,6 +353,7 @@ function agentIdentity(agent: DynamicIslandAgentSource): DynamicIslandAgentIdent
     name: agent.name,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
+    avatarColor: agent.avatarColor ?? null,
     avatarUrl: agent.avatarUrl,
   };
 }

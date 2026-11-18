@@ -3,7 +3,7 @@
 // to an IPC limit cannot move a shipped wire contract. A change to a primitive below changes every
 // admin contract at once: add a new primitive instead of loosening one.
 import { isDynamicRecord, isString } from "../runtime-values";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export type AdminDecoder = (value: unknown) => TeamProtocolV2Json;
 type Fields = Record<string, AdminDecoder>;

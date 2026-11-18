@@ -19,15 +19,25 @@ const FORM_POLICY = `<meta http-equiv="Content-Security-Policy" content="form-ac
 const PAGE_ADDRESS = "about:blank";
 const ANDROID = Platform.OS === "android";
 
+/**
+ * Reports the height of the page root, as the desktop bootstrap measures it, each time it changes.
+ * One report goes in each animation frame at most, so a growing page does not lay out the chat on each change.
+ */
+const HEIGHT_REPORT = `(()=>{const root=document.documentElement;let last=-1,queued=false;const report=()=>{queued=false;const height=Math.ceil(root.getBoundingClientRect().height);if(height===last)return;last=height;window.ReactNativeWebView.postMessage(String(height));};const queue=()=>{if(queued)return;queued=true;requestAnimationFrame(report);};new ResizeObserver(queue).observe(root);report();})();true;`;
+
 function openWebLink(url: string): void {
   if (/^https?:/iu.test(url)) void Linking.openURL(url);
 }
 
 /**
  * The page in a native web view, with the base styles and app theme of a desktop visual page. The
- * canvas is transparent, so a page that sets no colours shows on the app background. The view has
- * no `onMessage` and injects no script, so react-native-webview adds no message handler or
- * JavaScript interface, and the page cannot call the app: do not add either. It loads from a
+ * canvas is transparent, so a page that sets no colours shows on the app background. Without
+ * `onHeight`, the view has no `onMessage` and injects no script, so react-native-webview adds no
+ * message handler or JavaScript interface, and the page cannot call the app. With `onHeight`, only
+ * in a chat, a script reports the height of the page root as desktop measures it, and the handler
+ * takes nothing but a finite number. On Android a frame in the page can send one too. So the page
+ * and its frames can change only the height of this chat frame, inside the limits of a desktop
+ * frame. Do not take other messages from a page. It loads from a
  * string at `about:blank`, so it cannot read app files. On iOS, `incognito` keeps its storage in
  * memory. On Android, `incognito` clears the cookies and the cache of every web view of the app, so
  * the page gets no DOM storage and no cookies instead.
@@ -35,7 +45,7 @@ function openWebLink(url: string): void {
  * On the screen, the margin and the header space are padding of the page root: the page's own
  * background fills the space under the glass header and the home indicator.
  */
-export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0 } }: HtmlPageProps) {
+export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0 }, onHeight }: HtmlPageProps) {
   const { theme } = useUniwind();
   const appearance = theme === "dark" ? "dark" : "light";
   const screen = mode === "screen";
@@ -52,6 +62,7 @@ export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0
   // Android gives no cause for a load, and WebKit calls a script `click()` on a link a click too. So
   // the touch time decides, and a page script cannot open the browser by itself.
   const tapped = () => screen && Date.now() - lastTouch.current < TAP_WINDOW_MS;
+  const measured = !screen && onHeight ? onHeight : undefined;
   return (
     <View
       style={{ flex: 1 }}
@@ -60,6 +71,8 @@ export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0
       }}
     >
       <WebView
+        // The report script runs only when the page loads, so a change of the setting loads it again.
+        key={measured ? "measured" : "fixed"}
         source={{ html, baseUrl: PAGE_ADDRESS }}
         // This handler decides every load: the default list opens any other link, of any scheme, itself.
         originWhitelist={["*"]}
@@ -69,6 +82,15 @@ export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0
         allowsLinkPreview={false}
         contentInsetAdjustmentBehavior="never"
         scrollEnabled={screen}
+        injectedJavaScript={measured ? HEIGHT_REPORT : undefined}
+        onMessage={
+          measured
+            ? (event: { nativeEvent: { data: string } }) => {
+                const height = Number(event.nativeEvent.data);
+                if (Number.isFinite(height) && height > 0) measured(height);
+              }
+            : undefined
+        }
         onShouldStartLoadWithRequest={(request) => {
           // The page itself and a link to a place in it.
           if (request.url === PAGE_ADDRESS || request.url.startsWith(`${PAGE_ADDRESS}#`)) return true;

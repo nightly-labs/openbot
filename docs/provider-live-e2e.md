@@ -27,6 +27,30 @@ bun run test:provider-live                      # all providers
 bun run test:provider-live --target=claude      # one provider; Gemini is `antigravity`
 ```
 
+## The bench
+
+`bun run test:provider-live --bench` runs `own-tools-first.e2e.ts` on Codex, Claude and Grok, not
+the answer test. It does not run in CI: the runner has no Grok sign-in, and the result is a
+comparison, not a gate. It asks each agent for data from a service that has no connected app, and
+records whether the agent uses its own tools, such as the shell or the browser, or shows a connect
+card:
+
+- the tag of the latest release of a public GitHub repository;
+- the Bitcoin price from CoinGecko;
+- the subject of the newest email in Gmail. This task runs only when
+  `~/.config/openbot/test-google-account.storage.json` exists. The test sets that session of the
+  team's test Google account in the OpenBot browser first. On a Mac where the Mail app is set up, an
+  agent can also read the developer's own mail, and the report then holds it.
+
+Each task writes `.openbot-build/provider-live-bench/<provider>-<task>.json` with the steps of the
+turn, the answer, the connect cards and the expected value. A turn that waits for the user, such as
+for a sign-in card, stops after 90 seconds with no change.
+
+```sh
+bun run test:provider-live --bench
+bun run test:provider-live --bench --target=grok
+```
+
 ## What the computer must have
 
 - A sign-in to each provider, made one time by the user who runs the test: Codex, Claude, Gemini.
