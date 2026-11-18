@@ -6,13 +6,13 @@ import { isDynamicRecord } from "../runtime-values";
 import { TEAM_API_ROUTES } from "../team-api-routes";
 import { decodeAgentCreateOperation } from "./agent-create-operation-v1";
 import { isAgentCreateRoute } from "./current";
-import { decodeTeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV8WebRtcHttpRequest,
   decodeTeamProtocolV8WebRtcHttpResponse,
   encodeTeamProtocolV8WebRtcHttpRequest,
 } from "./v8-webrtc-adapter";
 import { decodeTeamProtocolSupportV9 } from "./v9";
+import { decodeTeamProtocolV2Json } from "./webrtc-framing";
 
 export function decodeTeamProtocolV9WebRtcHttpResponse(method: string, path: string, status: number, value: unknown) {
   if (method === "GET" && path === TEAM_API_ROUTES.compatibility && status === 200)

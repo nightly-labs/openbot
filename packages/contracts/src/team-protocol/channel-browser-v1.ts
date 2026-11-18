@@ -1,6 +1,6 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional channel-browser-v1 contract: the Browser setting of a channel (#4135), which says
