@@ -23,18 +23,15 @@ import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcon
 import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
-import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, For, flush, onSettled, Show } from "solid-js";
+import { createTabRow } from "../../components/createTabRow";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
 import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threads/thread-tab-drag";
 
 /** A tab starts to move after the pointer moves this far, so a click stays a click. */
 const DRAG_START = 4;
-/** A held tab this near an end of the row scrolls the row; at the end it scrolls this many pixels a frame. */
-const EDGE_ZONE = 40;
-const EDGE_SPEED = 14;
 /** The prefix of a thread tab's value, so a thread id cannot be taken for a pane. */
 const THREAD_VALUE = "thread:";
 /** The prefix of a file tab's value. */
@@ -237,15 +234,6 @@ const TAB_GROUPS = {
 } as const;
 type TabGroup = keyof typeof TAB_GROUPS;
 
-/** What the tab row shows besides the tabs: the tabs out of view, the faded edges, and a kept tab width. */
-interface TabRow {
-  /** The values of the tabs that are out of view, also in part. */
-  hidden: string[];
-  fadeStart: boolean;
-  fadeEnd: boolean;
-  frozen: number;
-}
-
 /** A tab, as the menu of the tabs out of view lists it. */
 interface TabEntry {
   value: string;
@@ -307,62 +295,22 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const next = values[Math.min(index, values.length - 1)];
     if (next) tabList?.querySelector<HTMLElement>(`[data-key="${CSS.escape(next)}"]`)?.focus();
   };
-  const [row, setRow] = createStore<TabRow>({ hidden: [], fadeStart: false, fadeEnd: false, frozen: 0 });
-  let measureFrame = 0;
-  const tabElement = (value: string) =>
-    [...(tabList?.querySelectorAll<HTMLElement>(":scope > .side-panel-tab") ?? [])].find(
-      (tab) => tab.dataset.value === value,
-    );
-  /** Scrolls only the row, not the window, until the tab shows whole. */
-  const reveal = (value: string) => {
-    const tab = tabElement(value);
-    if (!tabList || !tab) return;
-    const inset = Number.parseFloat(getComputedStyle(tabList).paddingInlineStart) || 0;
-    const left = tab.offsetLeft - inset;
-    const right = tab.offsetLeft + tab.offsetWidth + inset;
-    const behavior = prefersReducedMotion() ? "auto" : "smooth";
-    if (left < tabList.scrollLeft) tabList.scrollTo({ left, behavior });
-    else if (right > tabList.scrollLeft + tabList.clientWidth)
-      tabList.scrollTo({ left: right - tabList.clientWidth, behavior });
-  };
-  /** Finds the tabs out of view. Offsets ignore a drag shift, so a moving tab counts at its place. */
-  const measureRow = () => {
-    measureFrame = 0;
-    const list = tabList;
-    if (!list) return;
-    const start = list.scrollLeft;
-    const end = start + list.clientWidth;
-    const hidden = [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")]
-      .filter((tab) => tab.offsetLeft < start - 1 || tab.offsetLeft + tab.offsetWidth > end + 1)
-      .map((tab) => tab.dataset.value ?? "");
-    setRow((state) => {
-      if (state.hidden.length !== hidden.length || hidden.some((value, i) => value !== state.hidden[i]))
-        state.hidden = hidden;
-      state.fadeStart = start > 1;
-      state.fadeEnd = end < list.scrollWidth - 1;
-    });
-  };
-  const scheduleMeasure = () => {
-    if (!measureFrame) measureFrame = requestAnimationFrame(measureRow);
-  };
+  const tabRow = createTabRow({
+    list: () => tabList,
+    tabs: (list) => [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")],
+    key: (tab) => tab.dataset.value ?? "",
+  });
+  const row = tabRow.row;
   // A memo, so a change to the tabs that keeps the selection does not scroll the row.
-  createEffect(createMemo(selectedValue), (value) => reveal(value));
+  createEffect(createMemo(selectedValue), (value) => tabRow.reveal(value));
   createEffect(
     () => tabValues().join(),
-    () => scheduleMeasure(),
-  );
-  createEffect(
-    () => row.frozen,
-    () => scheduleMeasure(),
+    () => tabRow.measure(),
   );
   /** Keeps the focus where it is. A focus in the list goes to the selected tab, and the row scrolls to it. */
   const keepFocus = (event: MouseEvent) => event.preventDefault();
   const closeWithPointer = (value: string, close: () => void) => {
-    const width = tabElement(value)?.offsetWidth;
-    if (width)
-      setRow((state) => {
-        state.frozen = width;
-      });
+    tabRow.freeze(value);
     close();
   };
   /** Each tab, in tab order, for the menu of the tabs out of view. */
@@ -479,14 +427,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       const current = hold;
       if (!current?.moving) return;
       if (!current.away) {
-        const bounds = element.getBoundingClientRect();
-        const speed =
-          current.x < bounds.left + EDGE_ZONE
-            ? -(1 - Math.max(0, current.x - bounds.left) / EDGE_ZONE)
-            : current.x > bounds.right - EDGE_ZONE
-              ? 1 - Math.max(0, bounds.right - current.x) / EDGE_ZONE
-              : 0;
-        if (speed) element.scrollLeft += speed * EDGE_SPEED;
+        tabRow.scrollAtEdge(current.x);
         follow(current);
       }
       current.frame = requestAnimationFrame(edgeScroll);
@@ -570,26 +511,11 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       window.addEventListener("pointerup", onEnd);
       window.addEventListener("pointercancel", onEnd);
     };
-    // A vertical wheel scrolls the row, as in the browser tab row. A pinch (Ctrl+wheel) zooms the page.
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey) return;
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || element.scrollWidth <= element.clientWidth) return;
-      event.preventDefault();
-      element.scrollLeft += event.deltaY;
-    };
-    const sizes = new ResizeObserver(scheduleMeasure);
-    sizes.observe(element);
+    const unbind = tabRow.bind(element);
     element.addEventListener("pointerdown", onStart);
-    element.addEventListener("wheel", onWheel, { passive: false });
-    element.addEventListener("scroll", scheduleMeasure, { passive: true });
-    element.addEventListener("transitionend", scheduleMeasure);
     return () => {
-      sizes.disconnect();
-      cancelAnimationFrame(measureFrame);
+      unbind();
       element.removeEventListener("pointerdown", onStart);
-      element.removeEventListener("wheel", onWheel);
-      element.removeEventListener("scroll", scheduleMeasure);
-      element.removeEventListener("transitionend", scheduleMeasure);
       stop();
       if (hold) cancelAnimationFrame(hold.frame);
       if (hold?.moving && hold.thread) setCarriedThreadTab(null);
@@ -607,12 +533,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
           data-fade-start={row.fadeStart ? "" : undefined}
           data-fade-end={row.fadeEnd ? "" : undefined}
           style={row.frozen ? { "--side-panel-tab-frozen": `${row.frozen}px` } : undefined}
-          onPointerLeave={() => {
-            if (row.frozen)
-              setRow((state) => {
-                state.frozen = 0;
-              });
-          }}
+          onPointerLeave={tabRow.unfreeze}
         >
           <For each={props.panes}>
             {(pane) => {
@@ -787,7 +708,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                         aria-current={selectedValue() === entry().value ? "true" : undefined}
                         onSelect={() => {
                           entry().select();
-                          reveal(entry().value);
+                          tabRow.reveal(entry().value);
                         }}
                       >
                         <span class="side-panel-hidden-tab-icon">{entry().icon()}</span>
