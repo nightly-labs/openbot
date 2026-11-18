@@ -62,8 +62,8 @@ function FormDialog(props: {
   return (
     <Dialog.Root open onOpenChange={(open: boolean) => !open && props.crm.closeForm()}>
       <Dialog.Portal>
-        <Dialog.Overlay class="ui-confirm-dialog-overlay" ref={setLayer}>
-          <Dialog.Content as="section" class="ui-confirm-dialog crm-form">
+        <Dialog.Overlay class="ui-confirm-dialog-overlay">
+          <Dialog.Content as="section" class="ui-confirm-dialog crm-form" ref={setLayer}>
             <CrmPopupLayer value={layer}>
               <form
                 class="crm-form-body"
@@ -287,11 +287,14 @@ function CustomerSelect(props: {
   labelledBy: string;
 }) {
   const mount = usePopupMount();
+  // A ternary in the prop compiles to a getter that makes a memo on each read. The list reads the value
+  // in a tracked effect, where Solid does not permit a new memo, and then all updates stop.
+  const value = () => (props.value === "" ? null : props.value);
   return (
     <SearchSelect<string>
       mount={mount()}
       options={props.options}
-      value={props.value === "" ? null : props.value}
+      value={value()}
       onChange={props.onChange}
       label={(id) => props.crm.customer(id)?.name ?? id}
       size="sm"

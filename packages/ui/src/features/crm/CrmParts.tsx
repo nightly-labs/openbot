@@ -41,8 +41,8 @@ import type { CrmViewModel } from "./crm-state";
 import { useCrmText } from "./crm-text";
 
 /**
- * The layer of the open form dialog. A list that opens in the dialog mounts there, so it shows above
- * the dialog: at the body, it stays on the popover layer, under the dialog.
+ * The open form dialog. A list that opens in the dialog mounts in it: at the body, the list is on the
+ * popover layer, under the dialog, and the modal dialog hides it from assistive technology.
  */
 export const CrmPopupLayer = createContext<() => HTMLElement | undefined>(() => undefined);
 
