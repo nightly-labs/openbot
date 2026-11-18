@@ -1352,16 +1352,30 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
   return contexts.size === 1 ? (contexts.values().next().value ?? null) : null;
 }
 
+const ABSOLUTE_PATH = /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u;
+
+/**
+ * A full path to a file of any type, such as `/Users/me/Documents/Informe final.docx` (#12380). A bare
+ * name needs a known type, because `config.version` is often not a file. A command line is not a file,
+ * such as `/usr/bin/python3 -m venv .venv` or `/bin/cp a.txt b.bak`.
+ */
+function absoluteFilePath(path: string): boolean {
+  if (!ABSOLUTE_PATH.test(path) || /[\0\r\n]/u.test(path)) return false;
+  if (!/^[^.].*\.[\p{L}\p{N}_-]*\p{L}[\p{L}\p{N}_-]*$/u.test(fileReferenceName(path))) return false;
+  if (!/\s/u.test(path)) return true;
+  return !/\s-/u.test(path) && !/[/\\]s?bin[/\\]/u.test(path.split(/\s/u)[0] ?? "");
+}
+
 /** The file that a code span names. `asWritten` is the span text when the path joins it to `directory`. */
 function mentionedFileTarget(
   value: string,
   directory: FileDirectoryContext | null,
 ): (FileDirectoryContext & { asWritten?: string }) | null {
   const path = value.trim();
-  if (!isFileReference(path)) return null;
+  if (!isFileReference(path) && !absoluteFilePath(path)) return null;
   const shared = sharedFileTarget(path);
   if (shared) return { path: shared, kind: "shared" };
-  if (/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
+  if (ABSOLUTE_PATH.test(path)) {
     const workspace = workspaceFileTarget(path);
     return workspace ? { path: workspace, kind: "workspace" } : null;
   }
