@@ -96,7 +96,6 @@ export class ThreadEventCompaction {
       completedThread: false,
       failedThread: null,
     };
-    if (!hasCompactionTable(db)) return { ...empty, done: true };
     const current = this.#current ?? this.#startNextThread(db);
     if (!current) {
       // The next run starts again from the first thread. It skips the threads that are done and
@@ -335,16 +334,6 @@ function isPlainObject(value: unknown): value is DynamicRecord {
   if (typeof value !== "object" || value === null) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-}
-
-function hasCompactionTable(db: DatabaseSync): boolean {
-  return (
-    databaseRow(
-      db
-        .prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = 'thread_event_compaction'")
-        .get(),
-    ) !== null
-  );
 }
 
 function threadLastSequence(db: DatabaseSync, threadId: string): number {
