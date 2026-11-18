@@ -14,9 +14,10 @@ import { messages as pl } from "./messages/pl/format";
 import { messages as pt } from "./messages/pt/format";
 import { messages as ru } from "./messages/ru/format";
 import { messages as tr } from "./messages/tr/format";
+import { messages as vi } from "./messages/vi/format";
 import { messages as zh } from "./messages/zh/format";
 
-const catalogs = { en, ar, de, es, fr, he, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
+const catalogs = { en, ar, de, es, fr, he, it, ja, ko, nl, pl, pt, ru, tr, vi, zh } as const;
 
 /** The format catalog of `locale`, or `undefined` while it is not loaded. See `app-catalogs.ts`. */
 export function formatTranslation(locale: TranslatedLocale): PartialTranslation<typeof en> | undefined {

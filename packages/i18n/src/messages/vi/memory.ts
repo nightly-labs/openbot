@@ -1,0 +1,53 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/memory";
+
+export const messages = {
+  "memory.title": "Trí nhớ",
+  "memory.single": "Trí nhớ",
+  "memory.backToSettings": "Quay lại cài đặt",
+  "memory.backToList": "Quay lại danh sách trí nhớ",
+  "memory.closePane": "Đóng chi tiết",
+  "memory.add": "Thêm trí nhớ",
+  "memory.new": "Trí nhớ mới",
+  "memory.newPlaceholder": "Thêm một sự thật hoặc một sở thích lâu dài",
+  "memory.save": "Lưu trí nhớ",
+  "memory.group.always": "Luôn dùng",
+  "memory.group.relevant": "Dùng khi phù hợp",
+  "memory.everyChat": "Dùng trong mọi cuộc trò chuyện",
+  "memory.inclusion.automatic": "Để trợ lý tự quyết",
+  "memory.limitAgent":
+    "Trợ lý này đã đạt giới hạn {limit} mục trí nhớ. Hãy sửa, gộp hoặc xóa một mục trước khi thêm mục khác.",
+  "memory.limitChannel":
+    "Kênh này đã đạt giới hạn {limit} mục trí nhớ. Hãy sửa, gộp hoặc xóa một mục trước khi thêm mục khác.",
+  "memory.loading": "Đang tải trí nhớ…",
+  "memory.search": "Tìm trong trí nhớ",
+  "memory.noMatches": "Không có mục trí nhớ nào khớp với tìm kiếm này.",
+  "memory.emptyLead": "Hãy nói một lần.",
+  "memory.emptyTitle": "Nó sẽ {remember}.",
+  "memory.emptyRemember": "ghi nhớ",
+  "memory.emptyLearnsAgent": "{name} lưu những gì nó học trong các cuộc trò chuyện của bạn.",
+  "memory.emptyLearnsChannel": "Các trợ lý trong {name} lưu những gì chúng học ở đây.",
+  "memory.emptyAddOwn": "Bạn cũng có thể tự thêm một mục trí nhớ.",
+  "memory.sample.updates": "Người dùng thích cập nhật tiến độ ngắn và đặt kết quả trước.",
+  "memory.sample.scripts": "Dùng Bun cho các script của package.",
+  "memory.sample.brief": "Gửi bản tóm tắt buổi sáng lúc 7:00 vào các ngày trong tuần.",
+  "memory.sample.confirm": "Hỏi trước khi xóa tệp ngoài không gian làm việc.",
+  "memory.edit": "Sửa trí nhớ",
+  "memory.editAction": "Sửa",
+  "memory.deleteAction": "Xóa",
+  "memory.learned": "Tự động học được",
+  "memory.manual": "Thêm thủ công",
+  "memory.unknownDate": "Ngày không xác định",
+  "memory.clearAll": "Xóa toàn bộ trí nhớ",
+  "memory.clearTitle": "Xóa toàn bộ trí nhớ?",
+  "memory.clearDescription":
+    "OpenBot sẽ xóa vĩnh viễn toàn bộ {total} mục trí nhớ đã lưu của {name}. Tin nhắn gốc vẫn còn trong lịch sử cuộc trò chuyện.",
+
+  "memory.loadFailed": "Không thể tải trí nhớ.",
+  "memory.saveFailed": "Không thể lưu mục trí nhớ.",
+  "memory.updateFailed": "Không thể cập nhật mục trí nhớ.",
+  "memory.deleteFailed": "Không thể xóa mục trí nhớ.",
+  "memory.deleteUndo.title": "Đã xóa trí nhớ",
+  "memory.deleteUndo.action": "Hoàn tác",
+  "memory.clearFailed": "Không thể xóa toàn bộ trí nhớ.",
+} as const satisfies PartialTranslation<typeof source>;
