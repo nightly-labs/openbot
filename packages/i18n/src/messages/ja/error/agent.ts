@@ -14,6 +14,8 @@ export const messages = {
     "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
   "error.agent.toolCallEnvelopeKeys":
     "ツールは実行されませんでした。tool_call が受け付けるのは name と arguments だけです。ツールの引数をオブジェクトとして arguments に入れ、もう一度呼び出してください。",
+  "error.agent.toolCallMissingName":
+    "ツールは実行されませんでした。tool_call に name がありません。tool_search が返す完全修飾名（例: openbot.history_read）を name に入れて、もう一度呼び出してください。",
   "error.agent.toolCallUnknownTool":
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
   "error.agent.toolCallUnknownToolSuggest":

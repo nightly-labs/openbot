@@ -530,6 +530,9 @@ function refusedCallError(params: DynamicToolCallParams, provider: AgentProvider
   if (!parsed.success) {
     const { issues } = parsed.error;
     if (issues.some(({ code }) => code === "unrecognized_keys")) return sourceText("error.agent.toolCallEnvelopeKeys");
+    // The `callSchema` refinement: the call has neither `name` nor `tool`. The general error did not
+    // say which field to add, and a Pi agent sent the same call without a name for minutes (#11725).
+    if (issues.some(({ code }) => code === "custom")) return sourceText("error.agent.toolCallMissingName");
     return issues.some(({ path }) => path[0] === "arguments")
       ? sourceText("error.agent.toolCallArgumentsNotObject")
       : null;

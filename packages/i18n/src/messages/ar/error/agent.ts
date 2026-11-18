@@ -13,6 +13,8 @@ export const messages = {
     "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
   "error.agent.toolCallEnvelopeKeys":
     "لم تعمل الأداة. لا يقبل tool_call إلا name وarguments. ضع وسائط الأداة في arguments ككائن، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallMissingName":
+    "لم تعمل الأداة. لا يحتوي tool_call على name. ضع في name الاسم المؤهل الذي يعطيه tool_search، مثل openbot.history_read، ثم أرسل الاستدعاء مرة أخرى.",
   "error.agent.toolCallUnknownTool":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
