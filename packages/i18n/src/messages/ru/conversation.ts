@@ -58,6 +58,13 @@ export const messages = {
   "conversation.sidePanel.maximize": "Развернуть боковую панель",
   "conversation.sidePanel.restore": "Восстановить боковую панель",
   "conversation.sidePanel.closePane": "Закрыть: {name}",
+  "conversation.sidePanel.moreTabs": {
+    one: "Ещё {count} вкладка",
+    few: "Ещё {count} вкладки",
+    many: "Ещё {count} вкладок",
+    other: "Ещё {count} вкладки",
+  },
+  "conversation.sidePanel.showHiddenTabs": "Показать скрытые вкладки",
   "conversation.sidePanel.openPane": "Открыть: {name}",
   "conversation.sidePanel.launcher": "Открыть вкладку",
   "conversation.sidePanel.resize": "Изменить размер правой панели",

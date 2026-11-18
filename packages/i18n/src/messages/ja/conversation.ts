@@ -58,6 +58,10 @@ export const messages = {
   "conversation.sidePanel.maximize": "サイドパネルを最大化",
   "conversation.sidePanel.restore": "サイドパネルを元に戻す",
   "conversation.sidePanel.closePane": "{name} を閉じる",
+  "conversation.sidePanel.moreTabs": {
+    other: "他 {count} 個のタブ",
+  },
+  "conversation.sidePanel.showHiddenTabs": "非表示のタブを表示",
   "conversation.sidePanel.openPane": "{name} を開く",
   "conversation.sidePanel.launcher": "ペインを開く",
   "conversation.sidePanel.resize": "右パネルのサイズを変更",

@@ -58,6 +58,11 @@ export const messages = {
   "conversation.sidePanel.maximize": "Maximizar panel lateral",
   "conversation.sidePanel.restore": "Restaurar panel lateral",
   "conversation.sidePanel.closePane": "Cerrar {name}",
+  "conversation.sidePanel.moreTabs": {
+    one: "{count} pestaña más",
+    other: "{count} pestañas más",
+  },
+  "conversation.sidePanel.showHiddenTabs": "Mostrar pestañas ocultas",
   "conversation.sidePanel.openPane": "Abrir {name}",
   "conversation.sidePanel.launcher": "Abrir un panel",
   "conversation.sidePanel.resize": "Cambiar el tamaño del panel derecho",

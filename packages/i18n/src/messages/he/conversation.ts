@@ -58,6 +58,12 @@ export const messages = {
   "conversation.sidePanel.maximize": "הגדלת פאנל הצד",
   "conversation.sidePanel.restore": "שחזור פאנל הצד",
   "conversation.sidePanel.closePane": "סגירת {name}",
+  "conversation.sidePanel.moreTabs": {
+    one: "לשונית נוספת אחת",
+    two: "שתי לשוניות נוספות",
+    other: "{count} לשוניות נוספות",
+  },
+  "conversation.sidePanel.showHiddenTabs": "הצגת לשוניות מוסתרות",
   "conversation.sidePanel.openPane": "פתיחת {name}",
   "conversation.sidePanel.launcher": "פתיחת חלונית",
   "conversation.sidePanel.resize": "שינוי גודל הלוח הימני",

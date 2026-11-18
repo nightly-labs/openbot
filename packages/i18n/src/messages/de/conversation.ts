@@ -58,6 +58,11 @@ export const messages = {
   "conversation.sidePanel.maximize": "Seitenleiste maximieren",
   "conversation.sidePanel.restore": "Seitenleiste wiederherstellen",
   "conversation.sidePanel.closePane": "{name} schließen",
+  "conversation.sidePanel.moreTabs": {
+    one: "{count} weiterer Tab",
+    other: "{count} weitere Tabs",
+  },
+  "conversation.sidePanel.showHiddenTabs": "Ausgeblendete Tabs zeigen",
   "conversation.sidePanel.openPane": "{name} öffnen",
   "conversation.sidePanel.launcher": "Bereich öffnen",
   "conversation.sidePanel.resize": "Größe des rechten Bereichs ändern",

@@ -2,6 +2,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   buttonVariants,
+  ChevronDown,
   DropdownMenu,
   Folder,
   Maximize2,
@@ -22,8 +23,9 @@ import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcon
 import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, flush, onSettled, Show } from "solid-js";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
 import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threads/thread-tab-drag";
@@ -79,6 +81,22 @@ function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
 
 function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
   return SIDE_PANEL_PANES[props.pane].icon();
+}
+
+/** A file tab shows the file-type badge of a file link, and a folder tab a folder. */
+function FileTabIcon(props: { file: SidePanelFileTab }): JSX.Element {
+  return (
+    <Show
+      when={props.file.folder}
+      fallback={
+        <span class="side-panel-file-badge" data-file-tone={attachmentReferenceTone(props.file.name)}>
+          <AttachmentReferenceVisual name={props.file.name} />
+        </span>
+      }
+    >
+      <Folder aria-hidden="true" />
+    </Show>
+  );
 }
 
 /** The tab and launcher name of a pane. An agent or a channel can give the settings pane its own name. */
@@ -211,10 +229,31 @@ const TAB_GROUPS = {
 } as const;
 type TabGroup = keyof typeof TAB_GROUPS;
 
+/** What the tab row shows besides the tabs: the tabs out of view, the faded edges, and a kept tab width. */
+interface TabRow {
+  /** The values of the tabs that are out of view, also in part. */
+  hidden: string[];
+  fadeStart: boolean;
+  fadeEnd: boolean;
+  frozen: number;
+}
+
+/** A tab, as the menu of the tabs out of view lists it. */
+interface TabEntry {
+  value: string;
+  label: string;
+  icon: () => JSX.Element;
+  select: () => void;
+}
+
 /**
  * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
- * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link. The tab
- * icon is also the close button of the tab; hover or focus shows its X.
+ * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link.
+ * The X at the end of a tab closes it. It shows on the selected tab, and on another tab under the
+ * pointer or with the focus. A middle click also closes a thread or file tab.
+ * All tabs have one width. When they do not fit, the row scrolls (also with a vertical wheel), its
+ * edges fade, and a menu lists the tabs out of view. After a close with the pointer, the tabs keep their
+ * width until the pointer leaves the row, so the next X is under the pointer.
  * Add lists the panes that are not open. While the Browser pane is open, Add lists New tab first, so the
  * pane needs no row of its own. Add goes away when it has nothing to list.
  *
@@ -260,6 +299,85 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const next = values[Math.min(index, values.length - 1)];
     if (next) tabList?.querySelector<HTMLElement>(`[data-key="${CSS.escape(next)}"]`)?.focus();
   };
+  const [row, setRow] = createStore<TabRow>({ hidden: [], fadeStart: false, fadeEnd: false, frozen: 0 });
+  let measureFrame = 0;
+  const tabElement = (value: string) =>
+    [...(tabList?.querySelectorAll<HTMLElement>(":scope > .side-panel-tab") ?? [])].find(
+      (tab) => tab.dataset.value === value,
+    );
+  /** Scrolls only the row, not the window, until the tab shows whole. */
+  const reveal = (value: string) => {
+    const tab = tabElement(value);
+    if (!tabList || !tab) return;
+    const inset = Number.parseFloat(getComputedStyle(tabList).paddingInlineStart) || 0;
+    const left = tab.offsetLeft - inset;
+    const right = tab.offsetLeft + tab.offsetWidth + inset;
+    const behavior = prefersReducedMotion() ? "auto" : "smooth";
+    if (left < tabList.scrollLeft) tabList.scrollTo({ left, behavior });
+    else if (right > tabList.scrollLeft + tabList.clientWidth)
+      tabList.scrollTo({ left: right - tabList.clientWidth, behavior });
+  };
+  /** Finds the tabs out of view. Offsets ignore a drag shift, so a moving tab counts at its place. */
+  const measureRow = () => {
+    measureFrame = 0;
+    const list = tabList;
+    if (!list) return;
+    const start = list.scrollLeft;
+    const end = start + list.clientWidth;
+    const hidden = [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")]
+      .filter((tab) => tab.offsetLeft < start - 1 || tab.offsetLeft + tab.offsetWidth > end + 1)
+      .map((tab) => tab.dataset.value ?? "");
+    setRow((state) => {
+      if (state.hidden.join() !== hidden.join()) state.hidden = hidden;
+      state.fadeStart = start > 1;
+      state.fadeEnd = end < list.scrollWidth - 1;
+    });
+  };
+  const scheduleMeasure = () => {
+    if (!measureFrame) measureFrame = requestAnimationFrame(measureRow);
+  };
+  // A memo, so a change to the tabs that keeps the selection does not scroll the row.
+  createEffect(createMemo(selectedValue), (value) => reveal(value));
+  createEffect(
+    () => tabValues().join(),
+    () => scheduleMeasure(),
+  );
+  createEffect(
+    () => row.frozen,
+    () => scheduleMeasure(),
+  );
+  /** Keeps the focus where it is. A focus in the list goes to the selected tab, and the row scrolls to it. */
+  const keepFocus = (event: MouseEvent) => event.preventDefault();
+  const closeWithPointer = (value: string, close: () => void) => {
+    const width = tabElement(value)?.offsetWidth;
+    if (width)
+      setRow((state) => {
+        state.frozen = width;
+      });
+    close();
+  };
+  /** Each tab, in tab order, for the menu of the tabs out of view. */
+  const entries = (): TabEntry[] => [
+    ...props.panes.map((pane) => ({
+      value: pane,
+      label: labelOf(pane),
+      icon: () => <PaneIcon pane={pane} />,
+      select: () => props.onSelect(pane),
+    })),
+    ...threads().map((thread) => ({
+      value: `${THREAD_VALUE}${thread.id}`,
+      label: thread.title,
+      icon: () => <ThreadTabIcon status={thread.status} unread={thread.unread} />,
+      select: () => props.threads?.onSelect(thread.id),
+    })),
+    ...files().map((file) => ({
+      value: fileValue(file.key),
+      label: file.name,
+      icon: () => <FileTabIcon file={file} />,
+      select: () => props.files?.onSelect(file.key),
+    })),
+  ];
+  const hiddenEntries = () => entries().filter((entry) => row.hidden.includes(entry.value));
   const carriedHere = () => carriedThreadTab()?.from === "chat";
   /**
    * Focus from the arrow keys selects the tab. Focus from a pointer waits for the click, so a drag does
@@ -391,7 +509,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     };
     const onStart = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary || hold || !(event.target instanceof Element)) return;
-      // The icon slot is the close button.
+      // A press on the X closes the tab.
       if (event.target.closest(".side-panel-tab-close")) return;
       const threadId = event.target.closest<HTMLElement>(".side-panel-thread-tab")?.dataset.threadId;
       const fileKey = event.target.closest<HTMLElement>(".side-panel-file-tab")?.dataset.fileKey;
@@ -417,9 +535,26 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
       window.addEventListener("pointerup", onEnd);
       window.addEventListener("pointercancel", onEnd);
     };
+    // A vertical wheel scrolls the row, as in the browser tab row. A pinch (Ctrl+wheel) zooms the page.
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || element.scrollWidth <= element.clientWidth) return;
+      event.preventDefault();
+      element.scrollLeft += event.deltaY;
+    };
+    const sizes = new ResizeObserver(scheduleMeasure);
+    sizes.observe(element);
     element.addEventListener("pointerdown", onStart);
+    element.addEventListener("wheel", onWheel, { passive: false });
+    element.addEventListener("scroll", scheduleMeasure, { passive: true });
+    element.addEventListener("transitionend", scheduleMeasure);
     return () => {
+      sizes.disconnect();
+      cancelAnimationFrame(measureFrame);
       element.removeEventListener("pointerdown", onStart);
+      element.removeEventListener("wheel", onWheel);
+      element.removeEventListener("scroll", scheduleMeasure);
+      element.removeEventListener("transitionend", scheduleMeasure);
       stop();
       if (hold?.moving && hold.thread) setCarriedThreadTab(null);
     };
@@ -428,28 +563,34 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   return (
     <>
       <Tabs.Root ref={root} class="window-drag side-panel-header" value={selectedValue()} activationMode="automatic">
-        <Tabs.List ref={tabList} class="side-panel-tabs" aria-label={t("conversation.sidePanel.label")}>
+        <Tabs.List
+          ref={tabList}
+          class="side-panel-tabs"
+          aria-label={t("conversation.sidePanel.label")}
+          data-frozen={row.frozen ? "" : undefined}
+          data-fade-start={row.fadeStart ? "" : undefined}
+          data-fade-end={row.fadeEnd ? "" : undefined}
+          style={row.frozen ? { "--side-panel-tab-frozen": `${row.frozen}px` } : undefined}
+          onPointerLeave={() => {
+            if (row.frozen)
+              setRow((state) => {
+                state.frozen = 0;
+              });
+          }}
+        >
           <For each={props.panes}>
             {(pane) => {
               const label = () => labelOf(pane);
               const selected = () =>
                 props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
+              const close = () => props.onClose(pane);
               return (
-                <div role="presentation" class="side-panel-tab no-drag" data-selected={selected() ? "true" : undefined}>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="side-panel-tab-close"
-                    tabindex={-1}
-                    aria-hidden="true"
-                    title={t("conversation.sidePanel.closePane", { name: label() })}
-                    onClick={() => props.onClose(pane)}
-                  >
-                    <span class="side-panel-tab-icon">
-                      <PaneIcon pane={pane} />
-                    </span>
-                    <X class="side-panel-tab-x" aria-hidden="true" />
-                  </Button>
+                <div
+                  role="presentation"
+                  class="side-panel-tab no-drag"
+                  data-value={pane}
+                  data-selected={selected() ? "true" : undefined}
+                >
                   <Tabs.Trigger
                     as="button"
                     type="button"
@@ -460,12 +601,30 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     // As in the browser panel, only the user selects a pane: while the tabs register,
                     // the controlled selection can be absent and suggest the first tab.
                     onClick={() => props.onSelect(pane)}
+                    onAuxClick={(event: MouseEvent) => {
+                      if (event.button === 1) closeWithPointer(pane, close);
+                    }}
                     // The arrow keys, Home and End move the focus and select the pane.
                     onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
-                    onKeyDown={(event) => onTabKeyDown(event, pane, () => props.onClose(pane))}
+                    onKeyDown={(event) => onTabKeyDown(event, pane, close)}
                   >
+                    <span class="side-panel-tab-glyph">
+                      <PaneIcon pane={pane} />
+                    </span>
                     <span class="side-panel-tab-label">{label()}</span>
                   </Tabs.Trigger>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="side-panel-tab-close"
+                    tabindex={-1}
+                    aria-hidden="true"
+                    onMouseDown={keepFocus}
+                    title={t("conversation.sidePanel.closePane", { name: label() })}
+                    onClick={() => closeWithPointer(pane, close)}
+                  >
+                    <X class="side-panel-tab-x" aria-hidden="true" />
+                  </Button>
                 </div>
               );
             }}
@@ -481,24 +640,11 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                 <div
                   role="presentation"
                   class="side-panel-tab side-panel-thread-tab no-drag"
+                  data-value={value()}
                   data-thread-id={thread().id}
                   data-attention={threadAttention(thread().status)}
                   data-selected={selected() ? "true" : undefined}
                 >
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="side-panel-tab-close"
-                    tabindex={-1}
-                    aria-hidden="true"
-                    title={t("conversation.threads.closeTab")}
-                    onClick={close}
-                  >
-                    <span class="side-panel-tab-icon">
-                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
-                    </span>
-                    <X class="side-panel-tab-x" aria-hidden="true" />
-                  </Button>
                   <Tabs.Trigger
                     as="button"
                     type="button"
@@ -508,14 +654,29 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     title={thread().title}
                     onClick={select}
                     onAuxClick={(event: MouseEvent) => {
-                      if (event.button === 1) close();
+                      if (event.button === 1) closeWithPointer(value(), close);
                     }}
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
+                    <span class="side-panel-tab-glyph">
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
+                    </span>
                     <span class="side-panel-tab-label">{thread().title}</span>
                     <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="side-panel-tab-close"
+                    tabindex={-1}
+                    aria-hidden="true"
+                    onMouseDown={keepFocus}
+                    title={t("conversation.threads.closeTab")}
+                    onClick={() => closeWithPointer(value(), close)}
+                  >
+                    <X class="side-panel-tab-x" aria-hidden="true" />
+                  </Button>
                 </div>
               );
             }}
@@ -530,33 +691,11 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                 <div
                   role="presentation"
                   class="side-panel-tab side-panel-file-tab no-drag"
+                  data-value={value()}
                   data-file-key={file().key}
                   data-selected={selected() ? "true" : undefined}
                   data-unavailable={file().unavailable ? "true" : undefined}
                 >
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="side-panel-tab-close"
-                    tabindex={-1}
-                    aria-hidden="true"
-                    title={t("conversation.sidePanel.closePane", { name: file().name })}
-                    onClick={close}
-                  >
-                    <span class="side-panel-tab-icon">
-                      <Show
-                        when={file().folder}
-                        fallback={
-                          <span class="side-panel-file-badge" data-file-tone={attachmentReferenceTone(file().name)}>
-                            <AttachmentReferenceVisual name={file().name} />
-                          </span>
-                        }
-                      >
-                        <Folder aria-hidden="true" />
-                      </Show>
-                    </span>
-                    <X class="side-panel-tab-x" aria-hidden="true" />
-                  </Button>
                   <Tabs.Trigger
                     as="button"
                     type="button"
@@ -566,19 +705,64 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                     title={file().name}
                     onClick={select}
                     onAuxClick={(event: MouseEvent) => {
-                      if (event.button === 1) close();
+                      if (event.button === 1) closeWithPointer(value(), close);
                     }}
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
+                    <span class="side-panel-tab-glyph">
+                      <FileTabIcon file={file()} />
+                    </span>
                     <span class="side-panel-tab-label">{file().name}</span>
                   </Tabs.Trigger>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="side-panel-tab-close"
+                    tabindex={-1}
+                    aria-hidden="true"
+                    onMouseDown={keepFocus}
+                    title={t("conversation.sidePanel.closePane", { name: file().name })}
+                    onClick={() => closeWithPointer(value(), close)}
+                  >
+                    <X class="side-panel-tab-x" aria-hidden="true" />
+                  </Button>
                 </div>
               );
             }}
           </For>
         </Tabs.List>
         <div class="side-panel-actions no-drag">
+          <Show when={row.hidden.length > 0}>
+            <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4}>
+              <DropdownMenu.Trigger
+                class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                aria-label={t("conversation.sidePanel.moreTabs", { count: row.hidden.length })}
+                title={t("conversation.sidePanel.showHiddenTabs")}
+              >
+                <ChevronDown aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content class="side-panel-hidden-tabs">
+                  <For each={hiddenEntries()} keyed={(entry) => entry.value}>
+                    {(entry) => (
+                      <DropdownMenu.Item
+                        class="side-panel-menu-item"
+                        aria-current={selectedValue() === entry().value ? "true" : undefined}
+                        onSelect={() => {
+                          entry().select();
+                          reveal(entry().value);
+                        }}
+                      >
+                        {entry().icon()}
+                        <span>{entry().label}</span>
+                      </DropdownMenu.Item>
+                    )}
+                  </For>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
           <Show when={hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0)}>
             <DropdownMenu.Root placement="bottom-end" gutter={4}>
               <DropdownMenu.Trigger
@@ -639,7 +823,11 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
           </Show>
         </div>
         <Show when={hasTabs()}>
-          <TabShape selected=".side-panel-tab[data-selected]" sized=".side-panel-tabs, .side-panel-tab" />
+          <TabShape
+            selected=".side-panel-tab[data-selected]"
+            sized=".side-panel-tabs, .side-panel-tab"
+            scroller=".side-panel-tabs"
+          />
         </Show>
       </Tabs.Root>
       <Show when={carriedHere()}>

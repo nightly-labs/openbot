@@ -58,6 +58,11 @@ export const messages = {
   "conversation.sidePanel.maximize": "Agrandir le panneau latéral",
   "conversation.sidePanel.restore": "Restaurer le panneau latéral",
   "conversation.sidePanel.closePane": "Fermer {name}",
+  "conversation.sidePanel.moreTabs": {
+    one: "{count} autre onglet",
+    other: "{count} autres onglets",
+  },
+  "conversation.sidePanel.showHiddenTabs": "Afficher les onglets masqués",
   "conversation.sidePanel.openPane": "Ouvrir {name}",
   "conversation.sidePanel.launcher": "Ouvrir un volet",
   "conversation.sidePanel.resize": "Redimensionner le panneau de droite",

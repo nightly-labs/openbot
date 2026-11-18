@@ -58,6 +58,8 @@ export const messages = {
   "conversation.sidePanel.maximize": "最大化侧边面板",
   "conversation.sidePanel.restore": "还原侧边面板",
   "conversation.sidePanel.closePane": "关闭 {name}",
+  "conversation.sidePanel.moreTabs": { other: "另外 {count} 个标签页" },
+  "conversation.sidePanel.showHiddenTabs": "显示隐藏的标签页",
   "conversation.sidePanel.openPane": "打开 {name}",
   "conversation.sidePanel.launcher": "打开一个分栏",
   "conversation.sidePanel.resize": "调整右侧面板宽度",

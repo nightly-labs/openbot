@@ -58,6 +58,11 @@ export const messages = {
   "conversation.sidePanel.maximize": "Yan paneli büyüt",
   "conversation.sidePanel.restore": "Yan paneli geri yükle",
   "conversation.sidePanel.closePane": "{name} kapat",
+  "conversation.sidePanel.moreTabs": {
+    one: "{count} sekme daha",
+    other: "{count} sekme daha",
+  },
+  "conversation.sidePanel.showHiddenTabs": "Gizli sekmeleri göster",
   "conversation.sidePanel.openPane": "{name} aç",
   "conversation.sidePanel.launcher": "Bir bölme aç",
   "conversation.sidePanel.resize": "Sağ paneli yeniden boyutlandır",
