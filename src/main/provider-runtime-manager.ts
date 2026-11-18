@@ -1225,7 +1225,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         }),
       );
       if (Result.isFailure(result)) {
-        if (installed) yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
+        // An install that verified stays when the app stops while the update waits for the provider's
+        // turns: the next start runs it, as it runs one that a sibling installed, and nothing downloads again.
+        if (installed && !this.#stopping)
+          yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
         return yield* result.failure;
       }
       // This instance runs the version now. Its stamp is also what lets `removeDownload` remove an
