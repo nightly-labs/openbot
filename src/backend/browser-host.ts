@@ -266,6 +266,12 @@ const OPEN_REDIRECT_READS = 2;
  * cannot finish, such as a command that a page dialog holds.
  */
 const TOOL_QUEUE_WAIT_MS = 120_000;
+/**
+ * How long a close waits for the earlier operations of its tab. A timed-out operation frees the tab in
+ * about 2 s after its deadline. An operation that a page that does not answer holds can wait for ever,
+ * and the close then removes the page under it (#11918).
+ */
+const CLOSE_QUEUE_WAIT_MS = 10_000;
 /** The `keyCode` of `sendInputEvent` for a key whose `Input.key` name is different. */
 const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left", ArrowRight: "Right" };
 /**
@@ -1494,11 +1500,24 @@ export class BrowserHost {
     tab.engine.releaseDialogs();
     const destroy = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
-        yield* Deferred.await(tab.queue);
+        const drained = Option.isSome(yield* Deferred.await(tab.queue).pipe(Effect.timeoutOption(CLOSE_QUEUE_WAIT_MS)));
+        if (!drained) {
+          logger.warn("A browser tab closed before an earlier operation on it finished.", {
+            tabId,
+            host: logUrlHost(tab.requestedUrl),
+            pendingOperations: tab.pendingOperations,
+          });
+          // The commands that wait for the page end with it, and the operations still queued see a closed tab.
+          yield* browserSync(() => {
+            if (!tab.contents.isDestroyed()) tab.contents.close();
+          });
+        }
         yield* Effect.all(childDrains, { concurrency: "unbounded", discard: true });
         const discarded = yield* Effect.exit(this.#recorder.discard(tabId, "tab-closed"));
         yield* tab.engine.destroy();
-        yield* Scope.close(tab.scope, Exit.void);
+        // The scope waits for the queued operations, so the close does not wait for one that never ends.
+        if (drained) yield* Scope.close(tab.scope, Exit.void);
+        else yield* Effect.forkIn(Scope.close(tab.scope, Exit.void), this.#scope, { startImmediately: true });
         yield* browserSync(() => {
           if (!tab.contents.isDestroyed()) tab.contents.close();
         });
