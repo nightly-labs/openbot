@@ -351,7 +351,7 @@ export const ChatHeader = memo(function ChatHeader({
       liquidGlassAvailable={liquidGlassAvailable}
       onPress={deleteAction.onPress}
     >
-      <Trash color={iconColor} size={22} strokeWidth={2} style={{ opacity: deleteAction.disabled ? 0.4 : 1 }} />
+      <Trash color={iconColor} size={22} strokeWidth={2} />
     </ChatGlassIconButton>
   ) : null;
   const trailingButtons =

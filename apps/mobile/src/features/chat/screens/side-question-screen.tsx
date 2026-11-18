@@ -4,7 +4,7 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { useIsFocused, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AppState, Keyboard, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated from "react-native-reanimated";
@@ -30,7 +30,11 @@ import {
 } from "@/features/chat/model/side-questions";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
+import { sameAgentApartFromMessage, sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -74,9 +78,14 @@ function exchangeMessages(exchanges: readonly SideQuestionExchange[]): Conversat
 export function SideQuestionScreen() {
   const { t } = useText();
   const { serverId, agentId } = useLocalSearchParams<{ serverId: string; agentId: string }>();
-  const { agents } = useMobileWorkspace();
-  const agent = agents.find((item) => item.id === agentId && item.serverId === serverId);
-  if (agent) return <SideQuestionChat key={`${serverId}:${agentId}`} target={{ ...agent, kind: "agent" }} />;
+  // Only this agent: a change elsewhere in the workspace, such as a streamed reply, does not render the
+  // screen again.
+  const agent = useMobileWorkspaceSelector(
+    (current) => current.agents.find((item) => item.id === agentId && item.serverId === serverId),
+    sameAgent,
+  );
+  const target = useMemo<AgentChatTarget | undefined>(() => (agent ? { ...agent, kind: "agent" } : undefined), [agent]);
+  if (target) return <SideQuestionChat key={`${serverId}:${agentId}`} target={target} />;
   return <SideQuestionNote note={t("mobile.chat.sideQuestion.notFound")} />;
 }
 
@@ -98,14 +107,18 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
   const { t, errorMessage } = useText();
   const leave = useLeaveChat();
   const { serverId, id: agentId } = target;
-  const { servers, agents, canAskSideQuestion, askSideQuestion: askHost } = useMobileWorkspace();
-  const server = servers.find((item) => item.id === serverId);
+  const { askSideQuestion: askHost } = useMobileWorkspaceActions();
+  const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
+  const supported = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(serverId));
   const online = showsOnline(server);
-  const canAsk = online && server?.state === "online" && canAskSideQuestion(serverId);
+  // As in the agent's chat: while the connection resumes, a question waits for it.
+  const canAsk = online && supported;
   const serverAgents = useMemo(() => agents.filter((item) => item.serverId === serverId), [agents, serverId]);
   const sideQuestion = useSideQuestion(serverId, agentId);
   const exchanges = sideQuestion?.exchanges ?? NO_EXCHANGES;
   const draft = sideQuestion?.draft ?? "";
+  const failures = sideQuestion?.failures ?? 0;
   const asking = exchanges.at(-1)?.answer === null;
   const messages = useMemo(() => projectChatMessages(exchangeMessages(exchanges)), [exchanges]);
   const setDraft = useCallback((value: string) => setSideQuestionDraft(serverId, agentId, value), [serverId, agentId]);
@@ -152,6 +165,15 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     () => voiceAccent(voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark)),
     [target.avatarSeed, target.avatarHue, target.avatarColor, dark],
   );
+
+  // A failed question removes its row, so the list stops waiting to show it at the top.
+  const cancelSend = useRef(motion.cancelSend);
+  useEffect(() => {
+    cancelSend.current = motion.cancelSend;
+  });
+  useEffect(() => {
+    if (failures > 0) cancelSend.current();
+  }, [failures]);
 
   const ask = (value: string) => {
     const question = value.trim();
@@ -262,7 +284,7 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
             </Typography.Paragraph>
           ) : null}
           <ChatComposer
-            sendRetryVersion={0}
+            sendRetryVersion={failures}
             replyTarget={null}
             replyFocusVersion={0}
             onCancelReply={() => {}}
@@ -290,4 +312,8 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
       </KeyboardGestureArea>
     </View>
   );
+}
+
+function sameAgent(previous: MobileAgent | undefined, next: MobileAgent | undefined): boolean {
+  return previous !== undefined && next !== undefined && sameAgentApartFromMessage(previous, next);
 }

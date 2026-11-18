@@ -20,6 +20,8 @@ export interface SideQuestion {
   exchanges: readonly SideQuestionExchange[];
   /** Why the last question got no answer. The question is back in the draft. */
   error: string | null;
+  /** The questions that got no answer. Each one lets the composer send the returned draft again. */
+  failures: number;
 }
 
 /**
@@ -38,7 +40,7 @@ export function sideQuestionKey(serverId: string, agentId: string): string {
 function write(serverId: string, agentId: string, change: (current: SideQuestion) => SideQuestion | null): void {
   const key = sideQuestionKey(serverId, agentId);
   useSideQuestions.setState(({ questions }) => {
-    const current = questions[key] ?? { serverId, agentId, draft: "", exchanges: [], error: null };
+    const current = questions[key] ?? { serverId, agentId, draft: "", exchanges: [], error: null, failures: 0 };
     const next = change(current);
     const { [key]: _previous, ...rest } = questions;
     // An empty side question is not kept, so it does not show as one that waits.
@@ -109,6 +111,7 @@ export function askSideQuestion(
         ...current,
         exchanges: current.exchanges.filter((exchange) => exchange.id !== id),
         error: failureText(error),
+        failures: current.failures + 1,
         draft: current.draft.trim() ? `${question}\n${current.draft.trim()}` : question,
       })),
   );
