@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Después de instalar esta versión, no podrás volver a una versión anterior de OpenBot en este equipo o servidor. Esta versión hace la base de datos más pequeña, y una versión anterior no puede abrirla.",
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, los tamaños de imagen personalizados, los modelos y precios de Sunra y Higgsfield, y la carga más rápida de muchos agentes solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Mira los hilos laterales de cada agente en la barra lateral. Selecciona la flecha al final de una fila de agente, o deja el puntero sobre la fila para ver todos sus hilos.",
+          "Filtra la barra lateral con el botón de filtro al final del campo de búsqueda. Muestra solo agentes o canales, solo chats no leídos o agentes que están trabajando, o solo los chats de las carpetas que selecciones.",
+          "Da a un paso de imagen del lienzo de flujos de trabajo un tamaño personalizado en píxeles, o usa la relación de aspecto 4:5 o 5:4.",
+          "El lienzo de flujos de trabajo muestra todos los modelos de imagen y vídeo de Sunra y Higgsfield, y el botón Ejecutar muestra el precio en créditos.",
+          "Desactiva el Desenfoque de fondo y las Caras de agentes en movimiento en Ajustes > Apariencia > Movimiento para que OpenBot vaya más rápido en un equipo lento."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Varias personas pueden editar un mismo flujo de trabajo al mismo tiempo. El lienzo añade los cambios de las otras personas a medida que se guardan.",
+          "OpenBot usa mucha menos CPU mientras trabajan muchos agentes, y puedes escribir sin retrasos.",
+          "Los agentes terminan una compra cuando el banco pide un código 3-D Secure. Cuando el código está en un correo o un SMS que el agente puede leer, el agente lo escribe.",
+          "Ajustes del servidor > Transferir > Copiar a otro servidor ahora también copia los flujos de trabajo y los flujos de rutina de los agentes."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La base de datos de OpenBot ocupa mucho menos espacio. Después de la actualización, OpenBot elimina copias antiguas de los mensajes del chat en pasos pequeños.",
+          "En Windows, una actualización vuelve a mostrar su progreso.",
+          "Un servidor al que te has unido con muchos agentes, y un canal grande, se abren más rápido.",
+          "Los chats de Gemini con muchas imágenes o un historial largo dejan de fallar, y Gemini ya no pide iniciar sesión otra vez cuando empieza un chat nuevo.",
+          "La aplicación de escritorio vuelve a conectarse a un servidor con OpenBot v0.34.1 o anterior."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [
