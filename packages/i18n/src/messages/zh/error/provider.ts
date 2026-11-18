@@ -154,6 +154,7 @@ export const messages = {
   "error.provider.cliNotReady": "{provider} CLI 尚未就绪或未登录。",
   "error.provider.cliTimedOut": "{provider} 未及时响应，电脑可能正忙。OpenBot 将重试。",
   "error.provider.cliTimedOutRefresh": "{provider} 未及时响应，电脑可能正忙。请刷新服务商以重试。",
+  "error.provider.stoppedBeforeStart": "{provider} 在此消息开始前停止了。请重新发送此消息。",
   "error.provider.serviceUnreachable": "{provider} 无法连接到其服务。请检查网络连接。OpenBot 将重试。",
   "error.provider.serviceUnreachableRefresh": "{provider} 无法连接到其服务。请检查网络连接，然后刷新服务商。",
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",

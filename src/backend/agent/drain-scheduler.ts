@@ -15,6 +15,7 @@ import {
   type AgentProvider,
   ProviderModelNotOfferedError,
   ProviderSessionBusyError,
+  ProviderStoppedError,
   ProviderTurnActiveError,
 } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -95,12 +96,14 @@ const SESSION_RESUME_TIMEOUT_RETRIES = 3;
 
 /**
  * The retries of an agent whose provider could not open a session: the busy refusals in a row, whether
- * a retry waits, and the sessions in a row that did not open in time (#11607).
+ * a retry waits, and, for each lane, the starts in a row that did not open in time (#11607) or that the
+ * stopped provider did not get (#11843). The lanes of one agent fail together when the provider stops,
+ * so each lane counts its own tries.
  */
 interface SessionRetry {
   refusals: number;
   waiting: boolean;
-  resumeTimeouts: number;
+  resumeTimeouts: Map<string, number>;
 }
 
 export interface DrainHooks {
@@ -610,21 +613,24 @@ export class DrainScheduler {
   }
 
   /**
-   * Counts one session that did not open in time. False after the last try: that message fails, and
-   * the next message gets all its tries and the shortest wait again, as after a turn that starts.
+   * Counts one start of this lane that did not open in time, or that the stopped provider did not get.
+   * False after the last try: that message fails, and the next message gets all its tries and, when no
+   * other lane waits, the shortest wait again, as after a turn that starts.
    */
-  #mayRetryResume(agentId: string): boolean {
+  #mayRetryResume(agentId: string, lane: string): boolean {
     const entry = this.#busyRetryEntry(agentId);
-    if (entry.resumeTimeouts >= SESSION_RESUME_TIMEOUT_RETRIES) {
-      this.#busyRetries.delete(agentId);
+    const tries = entry.resumeTimeouts.get(lane) ?? 0;
+    if (tries >= SESSION_RESUME_TIMEOUT_RETRIES) {
+      entry.resumeTimeouts.delete(lane);
+      if (entry.resumeTimeouts.size === 0 && !entry.waiting) this.#busyRetries.delete(agentId);
       return false;
     }
-    entry.resumeTimeouts += 1;
+    entry.resumeTimeouts.set(lane, tries + 1);
     return true;
   }
 
   #busyRetryEntry(agentId: string): SessionRetry {
-    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: 0 };
+    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: new Map() };
     this.#busyRetries.set(agentId, entry);
     return entry;
   }
@@ -1324,9 +1330,15 @@ export class DrainScheduler {
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
           // The session did not open in time. Codex opens the sessions of all its agents one at a time,
           // so when many agents start together, the last ones wait behind the others past the request
-          // timeout (#11607). Nothing ran, so the messages wait and try again, a limited number of times.
+          // timeout (#11607). The provider can also stop, or not answer, before the turn is sent, as when
+          // it restarts (#11843). Nothing ran, so the messages wait and try again, a limited number of times.
+          const providerStopped = error instanceof ProviderStoppedError;
           const resumeTimedOut =
-            isRequestTimeout(error, "thread/resume") && this.#mayRetryResume(delivery.recipientAgentId);
+            (providerStopped || isRequestTimeout(error, "thread/resume")) &&
+            this.#mayRetryResume(
+              delivery.recipientAgentId,
+              laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }),
+            );
           if (
             error instanceof ProviderTurnActiveError ||
             resumeTimedOut ||
@@ -1340,10 +1352,12 @@ export class DrainScheduler {
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             if (resumeTimedOut)
-              logger.warn("A session did not open in time. Its messages try again.", {
-                agentId: delivery.recipientAgentId,
-                provider: error.providerName,
-              });
+              logger.warn(
+                providerStopped
+                  ? "The provider stopped before the turn was sent. Its messages try again."
+                  : "A session did not open in time. Its messages try again.",
+                { agentId: delivery.recipientAgentId, provider: error.providerName },
+              );
             if (error instanceof ProviderSessionBusyError || resumeTimedOut)
               yield* this.#retryBusySession(delivery.recipientAgentId);
             return;
@@ -1408,7 +1422,14 @@ export class DrainScheduler {
           const detail = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
           // Another Codex app holds the thread. The user reads what to do, and the log keeps the detail.
           const threadInUse = isCodexThreadInUse(error);
-          const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : detail;
+          // After its last try, a message that the stopped provider did not start says what to do.
+          const stoppedReason =
+            providerStopped && recipient
+              ? sourceText("error.provider.stoppedBeforeStart", {
+                  provider: providerLabel(providerForAgent(recipient)),
+                })
+              : null;
+          const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : (stoppedReason ?? detail);
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.
           if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
@@ -1461,7 +1482,11 @@ export class DrainScheduler {
             model: requestedModel,
             reason: detail,
           });
-          this.#hooks.emitError("delivery_start_failed", threadInUse ? reason : error, delivery.recipientAgentId);
+          this.#hooks.emitError(
+            "delivery_start_failed",
+            threadInUse || stoppedReason ? reason : error,
+            delivery.recipientAgentId,
+          );
           this.scheduleDrain(delivery.recipientAgentId);
           // The requester may hold the other answers until this request ends.
           if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);

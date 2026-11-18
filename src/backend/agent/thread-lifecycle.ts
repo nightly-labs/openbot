@@ -18,7 +18,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
-import type { AgentClient, AgentProvider } from "../agent-client";
+import { type AgentClient, type AgentProvider, ProviderStoppedError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
 import { causeHelpers } from "../effect-boundary";
@@ -1116,7 +1116,10 @@ export class ThreadLifecycle {
         if (isProviderTimeout(failure.cause) || !client.running) {
           return Effect.fail(
             new ThreadOperationFailed({
-              cause: new Error(sourceText("error.provider.cliTimedOut", { provider: providerLabel(client.provider) })),
+              cause: new ProviderStoppedError(
+                "Codex",
+                sourceText("error.provider.cliTimedOut", { provider: providerLabel(client.provider) }),
+              ),
             }),
           );
         }
