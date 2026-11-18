@@ -34,6 +34,10 @@ import {
   isOneOf,
   isString,
 } from "@openbot/contracts/runtime-values";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 export interface StoredRemoteServer {
   id: string;
@@ -45,12 +49,16 @@ export interface StoredRemoteServer {
   encryptedToken: string;
   remoteDesktopAvailable: boolean;
   logoVersion?: string | null;
+  /** The shape and colour that the host shows with no logo (`host-appearance-v1`). Null for the automatic look. */
+  appearance?: ServerAppearance | null;
   role: TeamRole;
   transport?: "webrtc-v2";
   /** The active members that the host's plan allows, from the account server's host list. */
   memberLimit?: number;
   /** A hosted server, from the account server's host list. */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart, from the account server's host list. */
+  restartAvailable?: boolean;
   /** The plan storage in GB of a hosted server, from the account server's host list. */
   storageGb?: number;
 }
@@ -273,7 +281,10 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     // A bad limit drops only the limit: the next host list writes it again.
     ...(isPositiveInteger(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
+    ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
     ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),
+    // A bad appearance drops only the appearance: the next host list or event writes it again.
+    ...optionalServerAppearanceField(value.appearance),
   };
 }
 

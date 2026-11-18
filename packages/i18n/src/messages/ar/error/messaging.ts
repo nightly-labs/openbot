@@ -19,6 +19,7 @@ export const messages = {
   "error.messaging.whatsappNotConnected": "رقم WhatsApp هذا غير متصل.",
   "error.messaging.whatsappUnsupported": "لا يمكن لهذا الحاسوب الاتصال بـ WhatsApp.",
   "error.messaging.whatsappTooManySenders": "يمكن لرقم WhatsApp أن يسمح بما يصل إلى 200 من جهات الاتصال والمجموعات.",
+  "error.messaging.whatsappNumberNotFound": "لا يوجد حساب واتساب لهذا الرقم. اكتبه مع رمز الدولة، مثل +44 7700 900123.",
   "error.messaging.whatsappRequestEnded": "انتهى هذا الطلب. اطلب من الشخص أن يكتب مرة أخرى للحصول على رمز جديد.",
   "error.messaging.memoryLimit": "يمكن أن تحتوي مساحة العمل المتصلة على {limit} ذكريات كحد أقصى. احذف واحدة أولًا.",
 } as const satisfies PartialTranslation<typeof source>;

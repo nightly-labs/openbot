@@ -1,5 +1,7 @@
 import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
@@ -14,14 +16,16 @@ import { createAgentTasks } from "./agent-tasks-state";
 const AgentTasks = createSimpleContext({
   name: "AgentTasks",
   init: () => {
-    const { activeServer, activeServerSupportsCapability } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { activeAgentId, agentStatus } = useAgents();
+    // The server scope makes this state again for each server, so the server is fixed here.
+    const scopeServerId = untrack(activeServerId);
     const local = () => {
       const server = activeServer();
       return !server || server.kind === "local";
     };
     return createAgentTasks({
-      port: agentTasksPort,
+      port: () => agentTasksPort(scopeServerId),
       activeAgentId,
       queuedMessageMovable: () => local() || activeServerSupportsCapability("agent-queue-task-v1"),
       available: () => local() || activeServerSupportsCapability("agent-tasks-v1"),
@@ -32,6 +36,7 @@ const AgentTasks = createSimpleContext({
       repliable: () => local() || activeServerSupportsCapability("agent-thread-replies-v1"),
       messageDeletable: () => local() || activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
       pageable: () => local() || activeServerSupportsCapability(AGENT_THREAD_PAGES_CAPABILITY),
+      aroundReadable: () => local() || activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY),
       // A server switch or reconnect reads the lists again, and so does a start of the agent.
       reloadKey: () => {
         const server = activeServer();

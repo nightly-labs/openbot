@@ -40,6 +40,7 @@ import {
   channelWorkers,
   channelWorkingTurns,
   firstUnreadChannelMessageId,
+  liveChannelPrompt,
   sentChannelMessageId,
   waitingChannelPrompt,
 } from "./channel-conversation-rows";
@@ -56,8 +57,10 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
-  /** The agents that a user hid on the host. */
-  hiddenAgentIds: () => ReadonlySet<string>;
+  /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
+  prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
+  /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
+  pausedAgentIds: () => ReadonlySet<string>;
 }
 
 /** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
@@ -73,15 +76,15 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
   const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
-  /** A hidden agent gets no tab here, as it gets no work. A member with no thread here cannot use a tab yet. */
+  /** An agent that the host stops gets no tab here, as it gets no work. A member with no thread here cannot use a tab yet. */
   const browserOwner = createMemo(() => {
     const channel = page()?.channel;
     const allowed = channel ? channelBrowserAgent(channel) : false;
     if (!channel || allowed === false) return null;
-    const hidden = env.hiddenAgentIds();
+    const paused = env.pausedAgentIds();
     const owners = channel.members.flatMap((member) => {
       const threadId = threads()?.find((thread) => thread.agentId === member.agentId)?.threadId;
-      return threadId && !hidden.has(member.agentId) ? [{ agentId: member.agentId, threadId }] : [];
+      return threadId && !paused.has(member.agentId) ? [{ agentId: member.agentId, threadId }] : [];
     });
     if (typeof allowed === "string") return owners.find((owner) => owner.agentId === allowed) ?? null;
     return owners.find((owner) => owner.agentId === channel.leadAgentId) ?? owners[0] ?? null;
@@ -134,11 +137,14 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const waiting = createMemo(() => {
     const current = page();
-    return current ? waitingChannelPrompt(current) : null;
+    return current ? waitingChannelPrompt(current, threads(), env.prompts()) : null;
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();
-    if (!found) return undefined;
+    if (!found) {
+      const current = page();
+      return current ? liveChannelPrompt(current, threads(), env.prompts()) : undefined;
+    }
     const agentId = found.entry.author.id;
     return {
       type: "prompt",
@@ -267,7 +273,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     workers: () => {
       const current = page();
       return current
-        ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.hiddenAgentIds())
+        ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.pausedAgentIds())
         : [];
     },
     memberThreadIds,
@@ -351,7 +357,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
     onLoadOlder: () => void channels.loadOlder(),
     onAnswerPrompt: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => {
-      const requestId = waiting()?.prompt.requestId;
+      const requestId = prompt()?.requestId;
       if (requestId === undefined) return Promise.resolve(false);
       return respond(() => channels.port().agent.respondToPrompt({ requestId, answers }), options);
     },

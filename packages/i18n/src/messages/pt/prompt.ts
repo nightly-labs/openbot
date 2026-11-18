@@ -25,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "Permitir",
   "prompt.approval.alwaysAllow": "Sempre permitir",
   "prompt.approval.deny": "Negar",
+  "prompt.approval.cut":
+    "Este cartão mostra só o início da solicitação, então oferece apenas Negar. Se Permitir não aparecer logo, atualize o OpenBot no servidor.",
   "prompt.approval.report.bugHeadline": "Encontrou um erro? Vamos corrigi-lo.",
   "prompt.approval.report.ideaHeadline": "Tem uma ideia? Vamos torná-la real.",
   "prompt.approval.report.dontSend": "Agora não",
   "prompt.approval.report.send": "Enviar para a equipe do OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Abra este chat no app do OpenBot no celular e envie o relato por lá. O celular adiciona a versão, o sistema e o registro de suporte dele. Se o celular não conseguir se conectar, abra Configurações > Suporte no app do celular e relate o problema no GitHub.",
   "prompt.approval.title.command": "Executar um comando",
   "prompt.approval.title.fileChange": "Alterar arquivos",
   "prompt.approval.title.permissions": "Conceder permissões",
@@ -41,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Conclua a etapa ({host})",
   "prompt.browser.cancelled": "Cancelado",
   "prompt.browser.reload":
-    "Conclua o login e recarregue a página do navegador antes de escolher “Terminei”. A inspeção da página continua bloqueada até que a página seja recarregada.",
+    "O OpenBot não conseguiu terminar de inserir a senha ou o código. Confira a página e insira o que falta. Conclua o login e recarregue a página do navegador antes de escolher “Terminei”. A inspeção da página continua bloqueada até que a página seja recarregada.",
   "prompt.browser.continuing": "{name} está continuando.",
   "prompt.browser.cancelledBody": "A etapa no navegador foi cancelada.",
   "prompt.browser.pendingBody":
     "Abra a página para concluir o login, a verificação ou o consentimento. Depois, deixe {name} continuar.",
   "prompt.browser.openPage": "Abrir {title}",
+  "prompt.browser.openFailed": "Não foi possível abrir a página na janela principal. Tente novamente.",
   "prompt.browser.done": "Terminei",
   "prompt.browser.pageFallback": "Página do navegador",
   "prompt.browser.hostFallback": "o navegador",
@@ -54,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Login em {host} cancelado",
   "prompt.browser.signInBlocked.body":
     "Entre neste computador. O OpenBot envia apenas o login de {host} para {server}, e {name} continua.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} não aceita um login a partir do servidor. Abra este chat no app OpenBot para computador e entre por lá. Depois, {name} continua.",
   "prompt.browser.signInBlocked.cancelledBody": "O login foi cancelado.",
   "prompt.browser.signInBlocked.waiting": "Aguardando o login",
   "prompt.browser.signInBlocked.waitingButton": "Aguardando o login…",

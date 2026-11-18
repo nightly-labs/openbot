@@ -13,11 +13,14 @@ import {
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   isProviderAccountId,
+  MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type RemoveProviderAccountInput,
   type RenameProviderAccountInput,
   type ResetProviderUsageInput,
+  type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -92,6 +95,9 @@ export function providerIpcHandlers({
       cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
         service.cancelProviderRestart(provider),
       ),
+      chooseInstalledCli: payloadHandler(parseInstalledCliChoice, ({ provider, installed }) =>
+        runCauseEffect(service.chooseInstalledCli(provider, installed)),
+      ),
       // The code and the page it is typed on come back; nothing the code is later traded for does.
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.startProviderCodeLogin(provider)),
@@ -140,6 +146,9 @@ export function providerIpcHandlers({
           }),
         ),
       ),
+      connectProviderAccountKey: payloadHandler(parseConnectProviderAccountKeyInput, ({ provider, accountId, key }) =>
+        runCauseEffect(service.connectProviderAccountKey(provider, accountId, key)),
+      ),
       cancelProviderAccountSignIn: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId)),
       ),
@@ -148,6 +157,9 @@ export function providerIpcHandlers({
       ),
       removeProviderAccount: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.removeProviderAccount(provider, accountId)),
+      ),
+      setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
+        runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
       ),
       signOutProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.signOutProvider(provider))),
       providerUsageResets: payloadHandler(parseProviderId, (provider) =>
@@ -227,6 +239,11 @@ export function parseProviderUseInput(value: unknown): { provider: AgentProvider
   return { provider, on: value.on };
 }
 
+function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
+  if (!isDynamicRecord(value) || typeof value.installed !== "boolean") throw new Error("Invalid provider CLI choice.");
+  return { provider: parseManagedProviderId(value.provider), installed: value.installed };
+}
+
 export function parseConnectProviderAccountInput(value: unknown): ConnectProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return {
@@ -235,9 +252,26 @@ export function parseConnectProviderAccountInput(value: unknown): ConnectProvide
   };
 }
 
+export function parseConnectProviderAccountKeyInput(value: unknown): ConnectProviderAccountKeyInput {
+  return { ...parseConnectProviderAccountInput(value), key: parseProviderApiKeyInput(value).key };
+}
+
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return { provider: parseProviderId(value.provider), accountId: requireString(value.accountId, "accountId") };
+}
+
+/** The pool switch of a provider and the accounts that the pool leaves out. */
+export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAccountPoolInput {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.enabled !== "boolean" ||
+    !Array.isArray(value.leftOut) ||
+    value.leftOut.length > MAX_PROVIDER_ACCOUNTS ||
+    !value.leftOut.every(isProviderAccountId)
+  )
+    throw new Error("Invalid provider account pool.");
+  return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
 }
 
 /** The provider's own sign-in (`default`) or an account after the first. */

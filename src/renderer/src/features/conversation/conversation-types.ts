@@ -17,6 +17,7 @@ import type {
   ClientAgentModelOption,
   ConversationSnapshot,
   CustomAgentSummary,
+  CustomProviderRestart,
   CustomProviderSummary,
   DraftAttachment,
   FilePreview,
@@ -28,10 +29,11 @@ import type {
   TeamPresenceSnapshot,
   UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
+  UpdateCustomProviderInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
-import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
@@ -44,6 +46,7 @@ import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/convers
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
+import type { AppSettingLinkId } from "../settings/setting-link-targets";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
@@ -156,15 +159,26 @@ export interface ConversationProps {
    * pressed Connect or Install on the card: the page then starts the connect step.
    */
   onOpenMarketplaceApp?: ((request: { appId: string; connect: boolean }) => void) | undefined;
+  /**
+   * The action that opens Settings of this computer at the row of an app setting card, or undefined where
+   * this window does not show the row's tab. Absent in the web client: the card then says where it is.
+   */
+  appSettingOpener?: ((settingId: AppSettingLinkId) => (() => void) | undefined) | undefined;
   /** The connectors of the server on screen, which a suggestion card for a connector reads. */
   connectors?: ConnectorRegistry | undefined;
   /**
-   * Opens Server settings, MCP, and signs in to the row that an agent's sign-in card names. Absent
+   * Opens the Marketplace page of the row that an agent's sign-in card names, which signs in to it. Absent
    * where this client cannot sign in for the server on screen; the card then says where to sign in.
    */
   onOpenMcpSignIn?: ((mcpServerId: string, trigger: HTMLElement | null) => void) | undefined;
-  /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
+  /** Whether the server on screen holds a sign-in for an MCP row, as the Marketplace last read it. */
   mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
+  /**
+   * Reads `mcpSignedIn` again from the server on screen. Called for each new Sign in card: the card
+   * shows Sign in or Continue from it, and a read from before the agent's test can still say that a
+   * sign-in the server has since refused is current (#6661).
+   */
+  refreshMcpSignIns?: (() => void) | undefined;
   /**
    * The server list that an install command card watches until its new server is online. Absent where
    * this client cannot open a server; the card then stays a marker.
@@ -188,6 +202,12 @@ export interface ConversationProps {
    * path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[] | undefined;
+  /**
+   * Saves an edit of one of `customProviders`. Only for this computer: a Team API list and edit keep
+   * the released model fields, id and name, so a joined server's host does not show or take what a
+   * model accepts.
+   */
+  onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
@@ -236,6 +256,8 @@ export interface ConversationProps {
   loadingOlder?: boolean | undefined;
   olderError?: string | null | undefined;
   activeTurnId: string | null | undefined;
+  /** An ended turn whose subagents still work. Stop shows for it, as for a running turn. */
+  subagentTurnId?: string | null | undefined;
   activityDetail?: string | undefined;
   /** A tool step of the running turn still runs, so a long silence is work, not a wait for the provider. */
   activityRunning?: boolean | undefined;
@@ -338,6 +360,11 @@ export interface ConversationProps {
   /** Whether the reader can delete a message. Without it, every finished message can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /**
+   * The pinned messages of the agent's chats on the host. Absent where the host cannot pin: the header
+   * then has no pin button, and the message menu has no Pin item.
+   */
+  messagePins?: ConversationMessagePins | undefined;
+  /**
    * The open channels that a message of this agent chat can go to. Each one opens with the text in its
    * composer. Without it, the message menu has no such item.
    */
@@ -347,6 +374,8 @@ export interface ConversationProps {
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
+  /** Finds side thread messages for the `@` list. Absent when the host cannot name the thread of a message. */
+  onSearchThreads?: ((query: string) => Promise<ComposerThreadMessageMatch[]>) | undefined;
   onOpenSearchMessage?: ((messageId: string) => Promise<void>) | undefined;
   onTypingChange: (agentId: string, typing: boolean) => void;
   onAnswerPrompt: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
@@ -364,8 +393,6 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's backup models: owners and admins only. */
   remoteBackupModelsLoaded?: boolean | undefined;
-  /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
-  remoteTaskLimitLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
   remotePlanCardLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */
@@ -469,6 +496,19 @@ export type RightPanelMode =
 export type { SidePanelPane };
 
 /**
+ * Reads and changes the pins of an agent: the pins of all its chats in one list. Each call resolves
+ * with the new list. `subscribe` calls `changed` when a pin of the agent changes on the host, also a
+ * pin of the agent itself, and returns the stop.
+ */
+export interface ConversationMessagePins {
+  list: (agentId: string) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  set: (
+    input: import("@openbot/contracts/ipc").SetMessagePinnedInput,
+  ) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  subscribe: (agentId: string, changed: () => void) => () => void;
+}
+
+/**
  * The threads of the active agent. A side thread is a task of the host; the agent's own chat is the
  * main thread. Each action applies to the open thread.
  */
@@ -488,6 +528,8 @@ export interface ConversationThreads {
   conversation: ConversationSnapshot | undefined;
   /** The open side thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The open side thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
   /** The approval that the open side thread's turn waits for. */
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
@@ -539,6 +581,14 @@ export interface ConversationThreads {
   onOpenRoutineRun: (routineId: string, messageId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+  /**
+   * Opens a chat of the agent at a message and marks it: the agent's own chat when `taskId` is null,
+   * else a side thread, also an archived one. A side thread that does not hold the message reads the
+   * part of the thread around it in one read, before its tab opens. A thread in the side panel stays
+   * there. Resolves false, with no tab change, when the chat does not have the message, the thread is
+   * deleted, or its delete waits for the end of the Undo time.
+   */
+  onOpenMessage: (taskId: string | null, messageId: string) => Promise<boolean>;
 }
 
 /** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
@@ -580,6 +630,10 @@ export interface SideThread {
   conversation: ConversationSnapshot | undefined;
   /** The thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
+  /** The message that the thread scrolls to once, after a pin opened it. */
+  focusMessage: { messageId: string; nonce: number } | undefined;
   approval: AgentApproval | undefined;
   onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;

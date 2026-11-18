@@ -37,7 +37,7 @@ interface DetectedProviderSetupProps {
  * so the user sees and can change every value before OpenBot saves it.
  */
 export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   const [saving, setSaving] = createSignal(false);
   const [submitError, setSubmitError] = createSignal<string | null>(null);
   const [discovery, setDiscovery] = createSignal<ModelDiscovery>({ status: "idle" });
@@ -47,7 +47,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
   const agent = () => (props.provider?.kind === "agent" ? props.provider : undefined);
   const modelsDraft = () => {
     const provider = models();
-    return provider ? detectedModelsDraft(provider) : undefined;
+    return provider ? detectedModelsDraft(provider, format) : undefined;
   };
   const agentDraft = () => {
     const provider = agent();
@@ -126,7 +126,8 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         takenProviderIds={taken(props.takenProviderIds)}
         providerIdLocked={Boolean(models()?.added)}
         apiKeyKept={Boolean(models()?.added && models()?.keyStored)}
-        contextWindows
+        // The model limits are of this computer: the Team API has none.
+        contextWindows={!props.host}
         harnesses={props.harnesses}
         onDownloadHarness={props.onDownloadHarness}
         harnessError={props.harnessError}

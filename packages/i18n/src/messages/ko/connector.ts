@@ -241,6 +241,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버에 이름을 지정한 뒤 OpenBot을 열어 두세요.",
   "connector.telegram.helpError": "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제해 주세요.",
+  "connector.telegram.helpNotLinked": "이 채팅은 이 서버에 연결되어 있지 않습니다. 연결하려면 다시 연결을 선택하세요.",
   "connector.telegram.retryAt": "Telegram이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "connector.telegram.pause": "일시 정지",
   "connector.telegram.resume": "재개",
@@ -313,6 +314,7 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot이 이 번호에 저장된 키를 읽을 수 없어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "connector.whatsapp.pause": "일시 정지",
   "connector.whatsapp.resume": "재개",
@@ -327,7 +329,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "개인 번호",
   "connector.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
+  "connector.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
+  "connector.whatsapp.workingMessageDescription":
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 답변만 보내려면 끄세요.",
+  "connector.whatsapp.statusReactions": "상태 반응",
+  "connector.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "connector.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -343,9 +351,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 서버를 연결하세요.",
   "connector.whatsapp.kindLabel": "번호",
   "connector.whatsapp.kindPersonal": "내 개인 번호",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "connector.whatsapp.kindDedicated": "OpenBot 전용 번호",
-  "connector.whatsapp.kindDedicatedDescription": "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "connector.whatsapp.methodLabel": "연결 방법",
   "connector.whatsapp.methodQr": "QR 코드",
   "connector.whatsapp.methodCode": "페어링 코드",

@@ -125,7 +125,8 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   if (short && frame(/_Incapsula_Resource/)) return found("imperva", "interactive", "incapsula-frame");
   if (/^access denied/i.test(title) && /reference #\s*\d+\.[0-9a-f]+/i.test(text))
     return found("akamai", "block", "akamai-reference");
-  if (has("#sec-if-cpt-container, #sec-cpt-if") || (short && has("#sec-container")))
+  // Akamai can leave its check elements, hidden, on the normal page after the check passed.
+  if (short && has("#sec-if-cpt-container, #sec-cpt-if, #sec-container"))
     return found("akamai", "non-interactive", "akamai-sec-cpt");
   // Sites that use the AWS WAF integration SDK load its scripts on each page. Only the interstitial
   // counts: the script in the head and its container as a direct child of the body.
@@ -271,6 +272,8 @@ export function describeChallenge(
   checking = false,
   /** The checkbox that the agent may click once. Only the first read of a document offers it. */
   clickOnce: DetectedChallenge["checkbox"] = null,
+  /** A person completed a takeover of the tab, and the check is still there. */
+  afterTakeover = false,
 ): BrowserChallenge | undefined {
   if (detected?.kind === "block")
     return {
@@ -285,6 +288,13 @@ export function describeChallenge(
       status: "checking",
       waitedMs,
       next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
+    };
+  if (detected && afterTakeover)
+    return {
+      vendor: detected.vendor,
+      status: "blocked",
+      waitedMs,
+      next: "The user took over this tab, and the security check is still here: the site refuses this browser, often because of its network address. Do not reload, retry, or call request_takeover for it again unless the user asks. In one plain sentence, tell the user that the site blocks this browser.",
     };
   if (detected && clickOnce)
     return {

@@ -1,4 +1,5 @@
-import { isFileReference } from "@openbot/brand/file-reference";
+import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
+import { parseFinishedChatMarkdown, walkChatMarkdown } from "./chat-markdown-parser";
 
 /** A file that a message names: in the shared folder, or in the workspace of the agent that wrote it. */
 export type MessageFileTarget = { kind: "shared"; path: string } | { kind: "workspace"; agentId: string; path: string };
@@ -7,6 +8,16 @@ export type MessageFileTarget = { kind: "shared"; path: string } | { kind: "work
 export interface MessageFileDirectory {
   kind: "shared" | "workspace";
   path: string;
+}
+
+/** The URL of a web or mail link that a message opens in the browser or the mail app. Null for a path. */
+export function webLink(href: string): string | null {
+  try {
+    const url = new URL(href);
+    return ["https:", "http:", "mailto:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A path in the host's shared folder, as desktop `sharedFileTarget` reads it. */
@@ -58,4 +69,83 @@ export function messageFileTarget(
   const fallback: MessageFileTarget | null = agentId ? { kind: "workspace", agentId, path: written } : null;
   if (directory.kind === "shared") return { file: { kind: "shared", path }, written: fallback };
   return agentId ? { file: { kind: "workspace", agentId, path }, written: fallback } : null;
+}
+
+/**
+ * The path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`, as
+ * desktop `fileUrlPath` reads it. It stays percent-encoded for the workspace path.
+ */
+function fileUrlPath(value: string): string | null {
+  const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
+  if (!match?.[1]) return null;
+  return /^\/[A-Za-z]:\//u.test(match[1]) ? match[1].slice(1) : match[1];
+}
+
+function decodedFileUrlPath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    // A literal percent sign can be part of a file name.
+    return path;
+  }
+}
+
+/** A link target that is a path and not a URL, as desktop `workspaceFileTarget` reads it. */
+function workspaceLinkPath(value: string): string | null {
+  const path = value.trim();
+  if (!path || /[\0\r\n]/u.test(path) || path.startsWith("#")) return null;
+  if (/^[A-Za-z]:[/\\]/u.test(path)) return path;
+  if (/^[A-Za-z][A-Za-z\d+.-]*:/u.test(path)) return null;
+  return path;
+}
+
+/**
+ * The file that a Markdown link to a path opens, such as `[file](/Users/me/report.md)`, as desktop
+ * `linkFileTargets` resolves it. A web link is not a file. A workspace file needs the agent that
+ * wrote the message: null without one.
+ */
+export function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
+  if (webLink(href)) return null;
+  const fileUrl = fileUrlPath(href);
+  const shared = (fileUrl === null ? href : decodedFileUrlPath(fileUrl)).trim();
+  if (shared && !/[\0\r\n]/u.test(shared) && isSharedPath(shared)) return { kind: "shared", path: shared };
+  const workspace = workspaceLinkPath(fileUrl ?? href);
+  return workspace && agentId ? { kind: "workspace", agentId, path: workspace } : null;
+}
+
+/** True when a link target is a file path, so the message draws the link as a file chip. */
+export function isMessageFileLink(href: string): boolean {
+  return !webLink(href) && workspaceLinkPath(fileUrlPath(href) ?? href) !== null;
+}
+
+/** The path of a file link as the reader sees it, decoded, for the name and the type of the file. */
+export function messageLinkFilePath(href: string): string {
+  return decodedFileUrlPath(fileUrlPath(href) ?? href);
+}
+
+/** The name of the file at a target, as a chip and an attachment of the message name it. */
+export function messageTargetFileName(file: MessageFileTarget): string {
+  return fileReferenceName(decodedFileUrlPath(file.path));
+}
+
+/**
+ * The names of the files that a message opens with a chip: a Markdown link to a path, or a code span
+ * that names a file. An attachment of an agent's message with one of these names does not show again
+ * as a card, as desktop hides an attachment that the text names.
+ */
+export function messageChipFileNames(body: string, agentId: string | undefined): Set<string> {
+  const names = new Set<string>();
+  // A chip comes from a code span, a link or an autolink. A message with none of them has no chip.
+  if (!body.includes("`") && !body.includes("[") && !body.includes("<")) return names;
+  const directory = messageFileDirectory(body);
+  walkChatMarkdown(parseFinishedChatMarkdown(body), (token) => {
+    const file =
+      token.type === "link" && typeof token.href === "string"
+        ? messageLinkFileTarget(token.href, agentId)
+        : token.type === "codespan" && typeof token.text === "string"
+          ? (messageFileTarget(token.text, directory, agentId)?.file ?? null)
+          : null;
+    if (file) names.add(messageTargetFileName(file));
+  });
+  return names;
 }

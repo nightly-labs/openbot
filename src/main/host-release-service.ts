@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import type { HostReleaseStatus, UpdateStatus } from "@openbot/contracts/ipc";
+import { isNewerRelease, isValidSemver } from "@openbot/contracts/release-version";
 import { Deferred, Effect, Exit, Schema } from "effect";
 import { parse } from "yaml";
-import { isValidSemver } from "./update-service";
 
 class ReleaseCheckFailed extends Schema.TaggedError<ReleaseCheckFailed>()("ReleaseCheckFailed", {}) {}
 
@@ -107,7 +107,7 @@ export class HostReleaseService {
         catch: () => new ReleaseCheckFailed(),
       });
       this.#latestVersion = version;
-      this.#phase = newerRelease(version, this.#options.currentVersion) ? "available" : "up-to-date";
+      this.#phase = isNewerRelease(version, this.#options.currentVersion) ? "available" : "up-to-date";
     }).pipe(
       Effect.catch(() =>
         Effect.sync(() => {
@@ -161,14 +161,4 @@ export function fetchLatestLinuxRelease(arch: string, request: typeof fetch, sig
   const target = releaseTarget("linux", arch);
   if (!target) return Promise.reject(new Error("No release for this machine"));
   return fetchLatestRelease(target, request, signal);
-}
-
-export function newerRelease(candidate: string, current: string): boolean {
-  const left = candidate.split(".").map(Number);
-  const right = current.split(/[.+-]/u).slice(0, 3).map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return current.split("+", 1)[0]?.includes("-") ?? false;
 }

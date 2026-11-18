@@ -16,6 +16,9 @@ const config: KnipConfig = {
     "packages/contracts/src/team-protocol/v*.ts": ["exports", "types"],
     "packages/contracts/src/team-protocol/*-v*.ts": ["exports", "types"],
     "packages/contracts/src/team-protocol/provider-aware-codec.ts": ["exports", "types"],
+    // A released database migration does not change, also when no other code reads its exports
+    // (src/backend/AGENTS.md).
+    "src/backend/migrations/[0-9]*.ts": ["exports"],
     // A generator writes this file.
     "apps/auth-api/src/lib/plugin-catalog.generated.ts": ["exports", "types"],
   },
@@ -23,6 +26,11 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Opens the interactive provider sign-in CLI on Linux.
     "xterm",
+    // Read and forget the SSH host keys of a reinstalled pool machine, and read the operator keys of the
+    // SSH agent, in `leaseweb-pool.ts`.
+    "ssh-keygen",
+    "ssh-keyscan",
+    "ssh-add",
     // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.

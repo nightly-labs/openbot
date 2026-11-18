@@ -1,5 +1,5 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
-import { isGeneratedAgentId } from "@openbot/contracts/validation";
+import { isGeneratedAgentId, isUuidV4 } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 
 /** A model that copies a long agent id can drop, add or change a character or two. */
@@ -9,12 +9,14 @@ const NEAR_ID_EDITS = 2;
  * The tool error for an id that no agent has. When one of `candidates`, the agents that the tool
  * accepts, has an id that is almost the same, the error names it so that the caller can check it and
  * call again. Only generated ids count: two random UUIDs are never this close, but short ids such as
- * `qa` and `ux` are. The tool never sends to that agent itself: work that goes to the wrong agent is
- * worse than an error.
+ * `qa` and `ux` are. A bare UUID is also near the `agent-` id that it ends: a model can drop that
+ * prefix from every id that it copies (#9658). The tool never sends to that agent itself: work that
+ * goes to the wrong agent is worse than an error.
  */
 export function unknownAgentMessage(id: string, candidates: readonly AgentSummary[]): string {
+  const prefixed = isUuidV4(id) ? `agent-${id}` : null;
   const [near, ...others] = candidates.filter(
-    (agent) => isGeneratedAgentId(agent.id) && withinEdits(id, agent.id, NEAR_ID_EDITS),
+    (agent) => isGeneratedAgentId(agent.id) && (agent.id === prefixed || withinEdits(id, agent.id, NEAR_ID_EDITS)),
   );
   if (!near || others.length > 0) return sourceText("error.backend.agentIdUnknown", { id });
   return sourceText("error.backend.agentIdNear", { id, name: JSON.stringify(near.name), nearId: near.id });

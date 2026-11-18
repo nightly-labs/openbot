@@ -103,7 +103,7 @@ export const messages = {
   "onboarding.action.connect": "Bağlan",
   "onboarding.action.open": "OpenBot'u aç",
   "onboarding.action.next": "İleri",
-  "onboarding.server.title": "{server} sunucusunu ayarlayın",
+  "onboarding.server.title": "{server} sunucusuna hoş geldiniz",
   "onboarding.server.description":
     "OpenBot bir yapay zeka aboneliği içermez. Bir ajan oluşturmadan önce kendi sağlayıcınızı bu sunucuya bağlayın.",
   "onboarding.server.label": "Bu sunucunun yapay zeka sağlayıcısını seçin",

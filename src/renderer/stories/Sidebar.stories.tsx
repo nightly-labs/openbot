@@ -1,13 +1,18 @@
 import type { ChannelSummary, HiddenAgent, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
+import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
-import { SIDEBAR_HIDDEN_GROUP_OPEN_ID, type SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
+import {
+  SIDEBAR_HIDDEN_GROUP_OPEN_ID,
+  type SidebarAgentState,
+  type SidebarAgentThreads,
+} from "@openbot/ui/features/sidebar/sidebar-types";
 import { createSignal, For, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -279,6 +284,12 @@ export const Populated: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
+/** "Recent activity": each section shows its chats by last activity, the most recent first. */
+export const RecentActivity: Story = {
+  args: { chatOrder: "recent", pinnedItems: pinnedOne },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 /** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
@@ -455,6 +466,55 @@ export const UsageLimit: Story = {
     },
     pinnedItems: [],
   },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/** A thread that changed `minutes` ago. */
+function storyThread(id: string, title: string, minutes: number, status: ThreadItem["status"], unread = 0): ThreadItem {
+  return {
+    id,
+    kind: "side",
+    title,
+    updatedAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    status,
+    unread,
+  };
+}
+
+const storyThreads: Record<string, ThreadItem[]> = {
+  chief: [
+    storyThread("chief-launch", "Launch plan for the spring release", 2, { kind: "working" }),
+    storyThread("chief-budget", "Q3 budget review", 18, { kind: "waiting", reason: "approval" }),
+    storyThread("chief-hiring", "Hiring pipeline for two designers", 45, { kind: "idle" }, 2),
+    storyThread("chief-board", "Board deck outline", 3 * 60, { kind: "idle" }),
+    storyThread("chief-pricing", "Pricing page copy, second pass with the new plan names", 26 * 60, { kind: "idle" }),
+    storyThread("chief-offsite", "Team offsite agenda", 3 * 24 * 60, { kind: "idle" }),
+    storyThread("chief-vendors", "Vendor contracts that renew this year", 6 * 24 * 60, { kind: "failed" }),
+    storyThread("chief-okr", "OKR draft", 9 * 24 * 60, { kind: "idle" }),
+  ],
+  research: [
+    storyThread("research-market", "Market size of agent tools", 30, { kind: "idle" }),
+    storyThread("research-survey", "User survey summary", 2 * 24 * 60, { kind: "idle" }),
+  ],
+};
+
+/** The side threads of the story agents. The open agent shows its first earlier thread as open. */
+function storyAgentThreads(): SidebarAgentThreads {
+  return {
+    threads: (agentId) => storyThreads[agentId] ?? [],
+    openId: (agentId) => (agentId === "chief" ? "chief-board" : undefined),
+    load: fn(),
+    onOpen: fn(),
+    onNew: fn(),
+  };
+}
+
+/**
+ * Agents with side threads. The arrow at the end of a row shows them under it: the threads that need a
+ * look first, then three earlier ones. A longer hover on the row shows all of them in a card.
+ */
+export const AgentThreads: Story = {
+  args: { agentThreads: storyAgentThreads(), pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 

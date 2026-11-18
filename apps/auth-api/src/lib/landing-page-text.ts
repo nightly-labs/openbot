@@ -307,6 +307,9 @@ export function landingPageText(t: AppTranslate) {
       } satisfies Record<DownloadPlatform, string>,
       phone,
       pages: t("sitePage.landing.download.pages"),
+      apk: t("sitePage.landing.download.apk"),
+      // "Intel Mac" is a name, so it has no translation.
+      intelMac: t("sitePage.marketplace.downloadFor", { platform: "Intel Mac" }),
     },
   };
 }

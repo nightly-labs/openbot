@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { isBrowserEgressTargetHost } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { Effect } from "effect";
-import type { RelayExit } from "../backend/browser-profiles/browser-proxy-relay";
+import { RelayAddressRefused, type RelayExit } from "../backend/browser-profiles/browser-proxy-relay";
 import { BrowserEgressMux, BrowserEgressRefusedError } from "./browser-egress-mux";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 
@@ -13,6 +13,8 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 interface BrowserEgressHostEvents {
   /** A member's computer came online or went offline. */
   changed: [];
+  /** A member's computer opened a new connection, so it can answer again. It comes before `changed`. */
+  connected: [membershipId: string];
 }
 
 interface EgressPeer {
@@ -68,7 +70,13 @@ export class BrowserEgressHost extends EventEmitter<BrowserEgressHostEvents> {
       // The computer closes the whole channel on a frame it cannot read, so a site name that the
       // protocol refuses fails here, alone.
       if (!isBrowserEgressTargetHost(target.host)) throw new BrowserEgressRefusedError("address");
-      return { stream: await mux.open(target.host, target.port, signal), early: Buffer.alloc(0) };
+      const stream = await mux.open(target.host, target.port, signal).catch((error: unknown) => {
+        // The computer answered: the site has no public address, and it opens only public ones.
+        throw error instanceof BrowserEgressRefusedError && error.reason === "address"
+          ? new RelayAddressRefused()
+          : error;
+      });
+      return { stream, early: Buffer.alloc(0) };
     };
   }
 
@@ -134,6 +142,7 @@ export class BrowserEgressHost extends EventEmitter<BrowserEgressHostEvents> {
         },
       });
       peer.mux = mux;
+      if (peer.membershipId !== null) this.emit("connected", peer.membershipId);
       this.emit("changed");
     } else if (!usable && peer.mux) {
       this.#closeMux(peer);

@@ -53,6 +53,7 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.runtimeChecksum": "checksum_failed",
   "error.provider.installRecordMismatch": "checksum_failed",
   "error.provider.unexpectedVersion": "version_mismatch",
+  "error.provider.cpuUnsupported": "cpu_unsupported",
   "error.provider.cliUpdateFailed": "cli_update_failed",
   // The text of hosts before #4375, which named the copy's start failure this way.
   "error.provider.cliActivateFailed": "cli_activate_failed",

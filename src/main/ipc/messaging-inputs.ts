@@ -16,6 +16,8 @@ import type {
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
+  SetWhatsAppWorkingMessageInput,
   StartWhatsAppLinkInput,
   WhatsAppSenderInput,
 } from "@openbot/contracts/ipc";
@@ -155,4 +157,14 @@ export function parseAnswerWhatsAppRequestInput(value: unknown): AnswerWhatsAppR
 export function parseSetWhatsAppOwnNumberInput(value: unknown): SetWhatsAppOwnNumberInput {
   if (!isObject(value) || !isBoolean(value.ownNumber)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id"), ownNumber: value.ownNumber };
+}
+
+export function parseSetWhatsAppWorkingMessageInput(value: unknown): SetWhatsAppWorkingMessageInput {
+  if (!isObject(value) || !isBoolean(value.workingMessage)) throw new Error("A messaging request is invalid.");
+  return { workspaceId: requireString(value.workspaceId, "Workspace id"), workingMessage: value.workingMessage };
+}
+
+export function parseSetWhatsAppStatusReactionsInput(value: unknown): SetWhatsAppStatusReactionsInput {
+  if (!isObject(value) || !isBoolean(value.statusReactions)) throw new Error("A messaging request is invalid.");
+  return { workspaceId: requireString(value.workspaceId, "Workspace id"), statusReactions: value.statusReactions };
 }

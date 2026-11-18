@@ -2,18 +2,21 @@
 // real `TeamApiServer` runs on loopback with the real team, agent, mailbox and sidebar stores on a
 // temporary profile. The owner and a member send what a current desktop client sends, and the
 // frozen agent-hidden-v1 codec reads each reply. A member's event socket must receive each change.
-// The agent service is not initialized, so no provider CLI starts and its routine timer never arms;
-// the clock moves with `setSystemTime` to make a routine occurrence come due while the agent is hidden.
+// A hidden agent keeps working: it answers a message and the routine timer runs its routine, each
+// through a fake Codex app-server, so no real provider CLI starts. The first host does not initialize
+// the agent service. It leaves what an earlier version leaves: a hidden agent, and no receipt of the
+// one-time step that turns off the routines of such an agent. Each later host initializes the service
+// as the app does. The clock moves with `setSystemTime` to make a routine occurrence come due.
 // Run: `bun scripts/agent-hide-restore-e2e.ts`.
 // Writes .openbot-build/agent-hide-restore-e2e/report.json.
 
 import { setSystemTime } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentEvent, HiddenAgentsSnapshot } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, type HiddenAgentsSnapshot } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -33,12 +36,9 @@ import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
-import { AgentService } from "../src/backend/agent-service";
-import { AgentStore } from "../src/backend/agent-store";
-import { runCauseEffect } from "../src/backend/effect-boundary";
-import { MailboxStore } from "../src/backend/mailbox-store";
-import { OpenBotDatabase } from "../src/backend/openbot-database";
-import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import type { AgentService as AgentServiceType } from "../src/backend/agent-service";
+import type { MailboxStore as MailboxStoreType } from "../src/backend/mailbox-store";
+import type { OpenBotDatabase as OpenBotDatabaseType } from "../src/backend/openbot-database";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-hide-restore-e2e");
@@ -48,6 +48,96 @@ const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
 const DAY = "2031-05-05";
 const at = (time: string) => new Date(`${DAY}T${time}:00.000Z`);
+
+const root = await mkdtemp(join(tmpdir(), "openbot-agent-hide-"));
+const userData = join(root, "user-data");
+const home = join(root, "home");
+const fakeCodex = join(root, "codex");
+const fakeLog = join(root, "codex.jsonl");
+
+// Before the service modules load: the Codex process and the stores read the home folder.
+process.env.HOME = home;
+process.env.CODEX_HOME = join(home, ".codex");
+process.env.OPENBOT_CODEX_PATH = fakeCodex;
+mkdirSync(home, { recursive: true });
+
+/** A Codex app-server with the methods that the service calls. Each turn is logged and answers "Done.". */
+const FAKE_CODEX = `#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
+if (process.argv.includes("--version")) {
+  process.stdout.write("codex-cli 0.160.1\\n");
+  process.exit(0);
+}
+const LOG = ${JSON.stringify(fakeLog)};
+const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
+let buffer = "";
+let threads = 0;
+let turns = 0;
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
+const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+const answer = (message) => {
+  const params = message.params || {};
+  switch (message.method) {
+    case "initialize": return write({ id: message.id, result: {} });
+    case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+    case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }] } });
+    case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
+    case "config/read": return write({ id: message.id, result: config });
+    case "config/batchWrite": return write({ id: message.id, result: {} });
+    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
+    case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
+    case "thread/turns/list":
+    case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
+    case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "turn/start": {
+      // The process id tells the turns of one host from those of the host before a restart.
+      const turnId = "turn-" + process.pid + "-" + (++turns);
+      const text = (params.input || []).map((item) => item.text || "").join("\\n");
+      appendFileSync(LOG, JSON.stringify({ turnId, text }) + "\\n");
+      write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
+      write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      return setTimeout(() => {
+        const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
+        write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
+      }, 20);
+    }
+    case "turn/interrupt": {
+      write({ id: message.id, result: {} });
+      return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
+    }
+    default:
+      return write({ id: message.id, error: { code: -32601, message: "Method not found: " + message.method } });
+  }
+};
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let newline = buffer.indexOf("\\n");
+  while (newline >= 0) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    if (line) {
+      const message = JSON.parse(line);
+      if (message.method && message.id !== undefined) answer(message);
+    }
+    newline = buffer.indexOf("\\n");
+  }
+});
+`;
+await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+
+const { AgentService } = await import("../src/backend/agent-service");
+const { AgentStore } = await import("../src/backend/agent-store");
+const { runCauseEffect } = await import("../src/backend/effect-boundary");
+const { MailboxStore } = await import("../src/backend/mailbox-store");
+const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { SidebarLayoutStore } = await import("../src/backend/sidebar-layout-store");
 
 // The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
@@ -92,7 +182,8 @@ const report: { passed: boolean; findings: string[]; unverified: string[]; steps
   passed: false,
   findings: [],
   unverified: [
-    "Delivery of a message after restore. It starts a provider CLI, which this check does not run; the step checks that the hidden refusal is gone from the queue state instead.",
+    "A real provider. A fake Codex app-server answers each turn.",
+    "A profile that a released version wrote. The first host of this check makes the hidden agent and writes no receipt of the one-time routine step.",
   ],
   steps: [],
 };
@@ -186,13 +277,10 @@ const teamBrowser: TeamApiBrowser = {
   importSignIn: unused,
 };
 
-const root = await mkdtemp(join(tmpdir(), "openbot-agent-hide-"));
-const userData = join(root, "user-data");
-const home = join(root, "home");
-
 interface Host {
-  database: OpenBotDatabase;
-  agents: AgentService;
+  database: OpenBotDatabaseType;
+  agents: AgentServiceType;
+  mailbox: MailboxStoreType;
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   port: number;
@@ -203,22 +291,35 @@ interface Host {
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 
-/** Starts the host on the profile, as the app does at each launch. The stores keep their files. */
-async function startHost(): Promise<Host> {
+/**
+ * Starts the host on the profile. The stores keep their files. `stores-only` does not initialize the
+ * agent service, so the one-time routine step does not run and no routine timer arms.
+ */
+async function startHost(mode: "app" | "stores-only" = "app"): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
   const mailbox = new MailboxStore(userData, agentStore.sharedRoot, agentStore.database);
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
-  await runCauseEffect(agentStore.initialize());
-  await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
-  const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
+  const agents = new AgentService({
+    store: agentStore,
+    mailbox,
+    browser: agentBrowser,
+    sidebarLayout: sidebar,
+    preferredProvider: "codex",
+    offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+    timezone: () => "UTC",
+  });
   const events: AgentEvent[] = [];
   agents.on("event", (event) => events.push(event));
+  if (mode === "app") await runCauseEffect(agents.initialize());
+  else {
+    await runCauseEffect(agentStore.initialize());
+    await runCauseEffect(mailbox.initialize());
+  }
   const server = new TeamApiServer({
     store: team,
     agents,
@@ -229,7 +330,7 @@ async function startHost(): Promise<Host> {
     hiddenAgents: agents,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, port, events };
+  return { database, agents, mailbox, server, team, port, events };
 }
 
 async function stopHost(): Promise<void> {
@@ -339,9 +440,32 @@ function snapshotIds(snapshot: HiddenAgentsSnapshot): string[] {
   return snapshot.agents.map((agent) => agent.agentId);
 }
 
+/** The turns that the fake provider started. */
+function turns(): { turnId: string; text: string }[] {
+  let log = "";
+  try {
+    log = readFileSync(fakeLog, "utf8");
+  } catch {
+    return [];
+  }
+  return log
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+/** Waits for a state of the service. The step deadline bounds a state that never comes. */
+async function waitFor<T>(read: () => T | null | undefined | false): Promise<T> {
+  for (;;) {
+    const value = read();
+    if (value) return value;
+    await new Promise((done) => setTimeout(done, 25));
+  }
+}
+
 try {
   setSystemTime(at("09:00"));
-  host = await startHost();
+  host = await startHost("stores-only");
   const ownerToken = await login(OWNER);
 
   const setup = await step(
@@ -383,6 +507,8 @@ try {
     ({ agentId, routineId }) => ({ agentId, routineId }),
   );
   let socket = await openEvents(setup.memberToken);
+  const routineOf = () => current().agents.listRoutines(setup.agentId)[0];
+  const runsOf = () => current().agents.listRoutineRuns({ agentId: setup.agentId, routineId: setup.routineId }, true);
 
   await step("member: cannot hide an agent, and the request changes nothing", async () => {
     const refused = await hidden(AGENT_HIDDEN_ROUTES.set, setup.memberToken, { agentId: setup.agentId, hidden: true });
@@ -412,10 +538,6 @@ try {
     assert.ok(types.includes("hidden-agents-changed") && types.includes("agents-changed"));
     const read = await hidden(AGENT_HIDDEN_ROUTES.read, setup.memberToken, {});
     assert.deepEqual(hiddenIds(read.body), [setup.agentId], "The member does not read the hidden agent.");
-    return { hiddenAt: received.agents[0]?.hiddenAt, hostEvents: types };
-  });
-
-  await step("hidden: the agent keeps its data and refuses new messages", async () => {
     const listed = await call("GET", TEAM_API_ROUTES.agents.all, { token: setup.memberToken });
     assert.equal(listed.status, 200);
     assert.ok(Array.isArray(listed.body));
@@ -423,23 +545,8 @@ try {
       listed.body.some((agent) => record(agent, "agent").id === setup.agentId),
       "A hidden agent left /v1/agents.",
     );
-    assert.equal(current().agents.listRoutines(setup.agentId).length, 1, "A hidden agent lost its routine.");
-    const sent = await call("POST", TEAM_API_ROUTES.agent.messages(setup.agentId), {
-      token: setup.memberToken,
-      body: { text: "Are you there?" },
-    });
-    assert.ok(sent.status >= 400, `A hidden agent accepted a message: ${sent.status}.`);
-    // The refusal is not an `HttpError`, so the dispatcher answers 500 and logs it as unexpected.
-    if (sent.status >= 500)
-      report.findings.push(
-        `POST /v1/agents/:id/messages to a hidden agent answers ${sent.status}, not 4xx, and the host logs it as an unexpected error.`,
-      );
-    assert.ok(
-      JSON.stringify(sent.body).includes(sourceText("error.backend.recipientHidden")),
-      `The refusal does not name the hidden agent: ${JSON.stringify(sent.body)}.`,
-    );
-    assert.equal(current().agents.listQueue(setup.agentId).deliveries.length, 0, "A refused message was queued.");
-    return { messageStatus: sent.status };
+    assert.equal(routineOf()?.active, true, "The hide turned the routine off.");
+    return { hiddenAt: received.agents[0]?.hiddenAt, hostEvents: types };
   });
 
   await step("owner: hiding again answers the same list and sends no event", async () => {
@@ -451,7 +558,7 @@ try {
     return { unchanged: true };
   });
 
-  await step("restart: the agent stays hidden while its routine comes due", async () => {
+  await step("update: the routines of an agent hidden by an earlier version go off, and none runs", async () => {
     socket.close();
     await stopHost();
     // Two occurrences come due while the app is closed and the agent is hidden.
@@ -462,31 +569,74 @@ try {
     const read = await hidden(AGENT_HIDDEN_ROUTES.read, setup.memberToken, {});
     assert.equal(read.status, 200, "The member's session did not survive the restart.");
     assert.deepEqual(hiddenIds(read.body), [setup.agentId]);
-    assert.equal(agents.listRoutines(setup.agentId)[0]?.trigger.nextRunAt, at("10:00").toISOString());
+    assert.equal(routineOf()?.active, false, "The update left the routine on.");
+    assert.equal(agents.nextRoutineDueAt(), null, "The timer plans a routine that is off.");
+    assert.equal(runsOf().length, 0, "The update made a routine run.");
+    assert.equal(turns().length, 0, "The update started a turn.");
     socket = await openEvents(setup.memberToken);
-    return { hidden: hiddenIds(read.body) };
+    return { hidden: hiddenIds(read.body), routineActive: routineOf()?.active };
   });
 
-  await step("owner: restore skips the occurrences missed while hidden, and accepts work again", async () => {
+  await step("hidden: the agent answers a message", async () => {
+    const { agents, mailbox } = current();
+    const sent = await call("POST", TEAM_API_ROUTES.agent.messages(setup.agentId), {
+      token: setup.memberToken,
+      body: { text: "Are you there?" },
+    });
+    assert.ok(sent.status < 300, `A hidden agent refused a message: ${sent.status} ${JSON.stringify(sent.body)}.`);
+    const turn = await waitFor(() => turns().find((entry) => entry.text.includes("Are you there?")));
+    const deliveryId = await waitFor(() => agents.listQueue(setup.agentId).deliveries[0]?.id);
+    const status = await waitFor(() => {
+      const delivery = mailbox.getDelivery(deliveryId)?.delivery;
+      return delivery && !["queued", "starting", "running"].includes(delivery.status) ? delivery.status : null;
+    });
+    assert.equal(status, "completed", "The turn of the hidden agent did not complete.");
+    assert.deepEqual(snapshotIds(agents.listHiddenAgents()), [setup.agentId], "The message put the agent back.");
+    return { messageStatus: sent.status, turnId: turn.turnId, delivery: status };
+  });
+
+  await step("hidden: the routine that the user turns on again runs at its time", async () => {
+    current().agents.updateRoutine(
+      { agentId: setup.agentId, routineId: setup.routineId, active: true },
+      { recordConversationEvent: false },
+    );
+    assert.equal(routineOf()?.trigger.nextRunAt, at("12:00").toISOString());
+    assert.equal(current().agents.nextRoutineDueAt(), at("12:00").toISOString(), "The timer does not plan it.");
+    socket.close();
+    await stopHost();
+    // The occurrence comes due while the app is closed. The start runs it, as for a visible agent.
+    setSystemTime(at("12:30"));
+    const before = turns().length;
+    host = await startHost();
+    assert.equal(routineOf()?.active, true, "The one-time step ran a second time.");
+    const run = await waitFor(() => runsOf().find((entry) => entry.status === "succeeded"));
+    assert.equal(run.scheduledFor, at("12:00").toISOString());
+    const turn = turns().slice(before).at(-1);
+    assert.ok(turn?.text.includes("Check the logs."), "The provider did not get the routine.");
+    assert.deepEqual(snapshotIds(current().agents.listHiddenAgents()), [setup.agentId]);
+    assert.equal(routineOf()?.trigger.nextRunAt, at("13:00").toISOString());
+    socket = await openEvents(setup.memberToken);
+    return { run: run.status, scheduledFor: run.scheduledFor, turnId: turn?.turnId };
+  });
+
+  await step("owner: restore puts the agent back in the list and changes no routine", async () => {
     const { agents } = current();
+    const before = routineOf();
+    const runs = runsOf().length;
+    const started = turns().length;
     const event = nextHiddenEvent(socket);
     const response = await hidden(AGENT_HIDDEN_ROUTES.set, ownerToken, { agentId: setup.agentId, hidden: false });
     assert.equal(response.status, 200);
     assert.deepEqual(hiddenIds(response.body), []);
     assert.deepEqual((await event).agents, []);
-    const [routine] = agents.listRoutines(setup.agentId);
-    assert.ok(routine);
+    const routine = routineOf();
+    assert.ok(routine && before);
     assert.equal(routine.active, true);
-    assert.equal(routine.missedPolicy, "run-once", "The routine asks to replay one missed run.");
-    assert.equal(routine.trigger.nextRunAt, at("12:00").toISOString(), "Restore did not skip the hidden time.");
-    // The 10:00 and 11:00 occurrences are recorded as one missed record. Neither is queued as work.
-    const runs = agents.listRoutineRuns({ agentId: setup.agentId, routineId: setup.routineId }, true);
-    assert.equal(runs.length, 1, `Restore made more than one run: ${JSON.stringify(runs.map((run) => run.status))}.`);
-    const [missed] = runs;
-    assert.equal(missed?.deliveryId, null, "Restore replayed an occurrence from the hidden time.");
-    assert.equal(missed?.missed?.count, 2, "The record does not count the two hidden occurrences.");
-    assert.equal(agents.listQueue(setup.agentId).deliveries.length, 0, "Restore queued work from the hidden time.");
-    return { nextRunAt: routine.trigger.nextRunAt, missed: missed?.missed, status: missed?.status };
+    assert.equal(routine.trigger.nextRunAt, before.trigger.nextRunAt, "Restore moved the routine.");
+    assert.equal(runsOf().length, runs, "Restore made a routine run.");
+    assert.equal(turns().length, started, "Restore started a turn.");
+    assert.equal(agents.nextRoutineDueAt(), at("13:00").toISOString());
+    return { nextRunAt: routine.trigger.nextRunAt, runs };
   });
 
   await step("restart: the restore persists", async () => {

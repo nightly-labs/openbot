@@ -26,6 +26,85 @@
   letter-spacing: 0;
 }
 
+/* With a title, the name button gets narrower before any other part of the header, but not narrower
+   than the avatar and the name. */
+.conversation-title:has(> h1 > .conversation-agent-title-room),
+.conversation-heading-group:not(:has(> .agent-threads-header)):has(.conversation-agent-title-room) {
+  min-width: auto;
+  flex-shrink: 1000;
+}
+
+/* The name keeps its width. The title column takes only the room that is left, down to none. A
+   channel heading is not in this grid: its name has its own ellipsis (channels.css). */
+.conversation-agent-heading {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, max-content);
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* The header hides a title that has less room than its minimum width (see ConversationHeader.tsx). */
+.conversation-agent-title-room {
+  display: flex;
+  min-width: 0;
+}
+
+.conversation-agent-title-room[data-hidden] {
+  display: none;
+}
+
+.conversation-agent-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+}
+
+.conversation-agent-title::before {
+  content: "·" / "";
+  margin-inline: 0.4em;
+}
+
+/* With no thread row, the header has no narrow modes of its own (agent-threads.css has them for the
+   row). While the model picker is only its icon, the header is narrow: the agent title hides, as it
+   does in the narrow modes of the row, and the agent name shortens with an ellipsis when the header
+   is still too narrow, down to the avatar. Then "+" goes past the end of the group, which cuts it, so
+   no part of the group goes under the header actions. */
+.conversation-header[data-model-fit="icon"] .conversation-heading-group:not(:has(> .agent-threads-header)) {
+  min-width: 0;
+  flex-shrink: 1000;
+  overflow-x: clip;
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-title {
+  min-width: auto;
+  flex-shrink: 1;
+}
+
+/* The name column can close fully, so the name button is never narrower than the avatar. */
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-heading {
+  grid-template-columns: minmax(0, auto) minmax(0, max-content);
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-title-room {
+  display: none;
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .conversation-access-lock {
   display: inline-flex;
   flex: none;

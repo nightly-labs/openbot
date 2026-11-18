@@ -1,0 +1,45 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/crm";
+
+export const messages = {
+  "error.crm.serverTooOld": "השרת הזה אינו תומך ב-CRM. יש לעדכן את OpenBot במחשב שמפעיל אותו.",
+  "error.crm.tooLargeToSend": "דף ה-CRM הזה גדול מדי לשליחה לאפליקציה הזו.",
+  "error.crm.customerMissing": "הלקוח הזה כבר לא קיים.",
+  "error.crm.planMissing": "התוכנית הזו כבר לא קיימת.",
+  "error.crm.paymentMissing": "התשלום הזה כבר לא קיים.",
+  "error.crm.tagMissing": "התגית הזו כבר לא קיימת.",
+  "error.crm.statusMissing": "הסטטוס הזה כבר לא קיים.",
+  "error.crm.proposalMissing": "ההצעה הזו כבר לא קיימת, או שכבר התקבלה בה החלטה.",
+  "error.crm.tagExists": "כבר קיימת תגית בשם הזה.",
+  "error.crm.statusExists": "כבר קיים סטטוס בשם הזה.",
+  "error.crm.builtinStatus": "אי אפשר לשנות את השם של סטטוס מובנה או למחוק אותו.",
+  "error.crm.tooManyStatuses": "ב-CRM יש כבר המספר המרבי של סטטוסים. יש למחוק קודם סטטוס.",
+  "error.crm.tooManyTags": "ב-CRM יש כבר המספר המרבי של תגיות. יש למחוק קודם תגית.",
+  "error.crm.tooManyPlans": "ללקוח הזה יש כבר המספר המרבי של תוכניות. יש למחוק קודם תוכנית.",
+  "error.crm.paymentPaid": "התשלום הזה שולם. יש לסמן אותו קודם כלא שולם.",
+  "error.crm.splitTotal": "סכום החלקים חייב להיות שווה לסכום התשלום.",
+  "error.crm.planEndsBeforeStart": "תוכנית לא יכולה להסתיים לפני שהיא מתחילה.",
+  "error.crm.currencyInUse": "אי אפשר לשנות את המטבע של לקוח שיש לו תוכניות או תשלומים.",
+  "error.crm.badCursor": "הדף הזה כבר לא תקף. יש לטעון את הרשימה מחדש.",
+  "error.crm.invalidChange": "השינוי הזה אינו תקף.",
+  "error.crm.agentNotAllowed":
+    "הסוכן הזה לא יכול להשתמש ב-CRM. בעלים או מנהל יכולים לתת לו גישה: יש לפתוח את דף ה-CRM, ללחוץ על הצעות, ללחוץ על הכפתור עם מספר הסוכנים ולהפעיל את הסוכן הזה.",
+  "error.crm.tooManyProposals": "יותר מדי הצעות ממתינות להחלטה. יש להמתין עד שמישהו יחליט עליהן.",
+  "error.crm.amountInvalid": "יש לכתוב את הסכום כמספר, למשל 129.00.",
+  "error.crm.amountDecimals": "לסכום יש יותר מדי ספרות אחרי הנקודה העשרונית עבור {currency}.",
+  "error.crm.fieldPrivate": "השדה הזה פרטי. סוכנים לא יכולים לקרוא אותו או לסנן לפיו.",
+  "error.crm.sourceOwned": "Stripe מנהל את השורה הזו. יש לשנות אותה ב-Stripe; ה-CRM יקבל את השינוי בסנכרון הבא.",
+  "error.crm.sourceConnected": "Stripe כבר מחובר ל-CRM הזה.",
+  "error.crm.sourceMissing": "החיבור הזה ל-Stripe כבר לא קיים.",
+  "error.crm.sourceSecretKey":
+    "זהו מפתח סודי שיכול לשנות את חשבון ה-Stripe שלך. יש ליצור מפתח מוגבל עם הרשאת קריאה בלבד.",
+  "error.crm.sourceInvalidKey": "Stripe לא מקבל את המפתח הזה. יש להעתיק שוב את המפתח המוגבל.",
+  "error.crm.sourcePermission":
+    "המפתח הזה לא יכול לקרוא לקוחות, חשבוניות, מנויים, אירועים ומוצרים. יש לתת לו הרשאת קריאה אליהם.",
+  "error.crm.sourceRateLimited": "Stripe קיבל יותר מדי בקשות. יש לנסות שוב בעוד דקה.",
+  "error.crm.sourceNetwork": "OpenBot לא מצליח להתחבר ל-Stripe. יש לבדוק את החיבור לאינטרנט.",
+  "error.crm.sourceFailed": "Stripe שלח תשובה ש-OpenBot לא מצליח לקרוא. יש לנסות שוב מאוחר יותר.",
+  "error.crm.sourceKeySaveFailed": "OpenBot לא מצליח לשמור את מפתח ה-Stripe במחשב הזה.",
+  "error.crm.off": "ה-CRM כבוי. בעלים או מנהל יכולים להפעיל אותו בהגדרות השרת > ניסיוני.",
+  "error.crm.settingsSaveFailed": "OpenBot לא יכול לשמור את הגדרת ה-CRM בשרת הזה.",
+} as const satisfies PartialTranslation<typeof source>;

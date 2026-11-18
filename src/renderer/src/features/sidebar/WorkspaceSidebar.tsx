@@ -18,6 +18,8 @@ import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
+import type { ThreadWaits } from "../agent-threads/conversation-threads";
+import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { useAgentActions } from "../agents/agent-actions";
 import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
@@ -34,6 +36,7 @@ import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
 import { createCommunityCardVisibility } from "./community-card";
+import { DevWorktreeLabel } from "./DevWorktreeLabel";
 import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
 import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
@@ -84,7 +87,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
-    userHiddenAgentIds,
+    userPausedAgentIds,
+    userHiddenAgentsWork,
     mutedAgentIds,
   } = useAgents();
   const {
@@ -98,7 +102,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   } = useAgentActions();
   // A server that keeps no levels has no mute item: the item must not fail.
   const muteSupported = () => activeServerSupportsCapability(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  // The host refuses a member: an agent is hidden for every member.
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { pendingPrompts, approvals } = useTurns();
@@ -188,15 +192,29 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
 
   /* A wait in a channel thread goes to the channel instead. Selecting the channel opens the view
    * that answers it. */
-  const channelWaits = createMemo(() => {
+  const waits = createMemo((): ThreadWaits => {
     const prompts = Object.values(pendingPrompts());
-    return sidebarChannelWaits({
-      channels: visibleChannels(),
+    return {
       prompts: prompts.flatMap((event) => (event?.type === "prompt" ? [event] : [])),
       takeovers: prompts.flatMap((event) => (event?.type === "browser-takeover-requested" ? [event.request] : [])),
       approvals: approvals(),
-    });
+    };
   });
+  const channelWaits = createMemo(() => sidebarChannelWaits({ channels: visibleChannels(), ...waits() }));
+  const activeAgentId = () => (activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? ""));
+  /** The side threads under each agent row. A chat window shows one agent, so it has none. */
+  const sideThreads = createMemo(() =>
+    platform.chatWindow
+      ? undefined
+      : sidebarAgentThreads({
+          tasks: agentTasks,
+          tabs: agentThreads,
+          activeAgentId,
+          waits,
+          openThread: (agentId, threadId) => void selectAgent(agentId, threadId),
+          onNew: newAgentThread(),
+        }),
+  );
 
   return (
     <>
@@ -217,7 +235,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         }}
         hasUnread={
           agentList().some(
-            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
         view={layout.sidebarView()}
@@ -238,6 +256,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           const badge = server ? serverUpdateBadge(server.id) : null;
           return server && badge ? { ...badge, onOpen: () => void showServerUpdate(server.id) } : undefined;
         })()}
+        topbarDetail={<DevWorktreeLabel />}
         serverMenu={
           platform.appInfo()
             ? {
@@ -255,7 +274,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             : undefined
         }
         agents={agentList()}
-        activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
+        activeAgentId={activeAgentId()}
         showPeople={props.peopleEnabled}
         people={directPeople()}
         directThreads={directThreads()}
@@ -296,6 +315,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        userHiddenAgentsWork={userHiddenAgentsWork()}
         unreadAgentIds={unreadAgentIds()}
         onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
         onMarkAgentUnread={
@@ -308,6 +328,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
+        agentThreads={sideThreads()}
         onOpenAgentWindow={
           platform.landingPreview
             ? undefined
@@ -316,6 +337,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         windowAgentIds={windowAgentIds()}
         compact={layout.leftPanelCompact()}
         onExpand={layout.expandSidebar}
+        onCollapse={() => layout.setSidebarClosed(true)}
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>
@@ -369,6 +391,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       />
       {/* A compact sidebar hides the footer card, so the offer is outside the footer. */}
       <ServerUpgradeOffer
+        billing={appPort().billing}
         card={alertCards.storageCard.card()}
         server={activeServer()}
         blocked={serverSettingsOpen()}

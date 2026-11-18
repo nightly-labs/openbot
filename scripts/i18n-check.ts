@@ -35,6 +35,8 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".e
 const RELEASED_SOURCE_KEYS = new Set([
   "error.agent.noStartingModel",
   "error.provider.cliBusyUpdate",
+  // Hosts before #8071 send it for a provider that stopped starting.
+  "error.provider.startStopped",
   // Hosts before side threads send these for the agent-tasks-v1 routes.
   "error.backend.taskNotFound",
   "error.backend.taskStillRunning",
@@ -49,6 +51,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelHistoryLeadRequired",
   // A channel task from v0.66.0 or earlier can keep this text as its stored error, and an older host sends it.
   "error.backend.channelRoutingUnreadable",
+  // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
+  "error.backend.recipientHidden",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

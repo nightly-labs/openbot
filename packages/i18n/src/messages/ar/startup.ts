@@ -9,6 +9,8 @@ export const messages = {
   "startup.archiveChangedBody":
     "غيّر برنامج آخر ملف OpenBot المسمى app.asar. يعمل OpenBot الآن، لكنه لن يفتح بعد إنهائه.\n\nلإصلاح OpenBot، ثبّته من جديد. تبقى بياناتك المحلية.",
   "startup.archiveChangedDownload": "تنزيل OpenBot",
+  "startup.filesDamagedBody":
+    "بعض ملفات OpenBot تالفة أو مفقودة.\n\nلإصلاح OpenBot، ثبّته من جديد. تبقى بياناتك المحلية.",
   "startup.newerDataUpdatingTitle": "جارٍ تحديث OpenBot",
   "startup.newerDataUpdatingBody":
     "حفظ إصدار أحدث من OpenBot بياناتك. يثبّت OpenBot أحدث إصدار ثم يفتح مرة أخرى.\n\nلم تتم إعادة تعيين بياناتك المحلية أو الكتابة فوقها.",
@@ -18,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "تنزيل OpenBot",
   "startup.newerDataGuide": "فتح الدليل",
   "startup.newerDataQuit": "إنهاء",
+  "startup.newerDataLoopTitle": "لم يُفتح أحدث إصدار من OpenBot",
+  "startup.newerDataLoopBody":
+    "حفظ إصدار أحدث من OpenBot بياناتك، ولا يستطيع هذا الإصدار ({version}) فتحها. توقف OpenBot {loopVersion} قبل أن يُفتح عدة مرات متتالية، لذلك لن يُثبَّت مرة أخرى.\n\nثبّت إصدارًا أحدث من {loopVersion} عندما يتوفر. للحصول على المساعدة، افتح الدليل.\n\nلم تتم إعادة تعيين بياناتك المحلية أو الكتابة فوقها.",
+  "startup.newerDataReleases": "عرض الإصدارات",
   "startup.recoveryWindowTitle": "استرداد OpenBot",
   "startup.recoveryTitle": "لم يُفتح OpenBot",
   "startup.recoveryBody": {
@@ -31,8 +37,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "أعد المحاولة، أو ثبّت آخر إصدار فُتح. للحصول على المساعدة، صدّر بيانات التشخيص وأرسل الملف مع بلاغك.",
+  "startup.recoveryHintLatest":
+    "لم يجد OpenBot إصدارًا سابقًا يستطيع فتح بياناتك. أعد المحاولة، أو ثبّت أحدث إصدار. للحصول على المساعدة، صدّر بيانات التشخيص وأرسل الملف مع بلاغك.",
   "startup.recoveryRetry": "إعادة المحاولة",
   "startup.recoveryPreviousVersion": "تنزيل الإصدار السابق",
+  "startup.recoveryLatestVersion": "تنزيل أحدث إصدار",
   "startup.recoveryExportDiagnostics": "تصدير التشخيص",
   "startup.recoveryOpenDataFolder": "فتح مجلد البيانات",
   "startup.recoveryQuit": "إنهاء",

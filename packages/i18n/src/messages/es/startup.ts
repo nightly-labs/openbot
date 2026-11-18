@@ -9,6 +9,8 @@ export const messages = {
   "startup.archiveChangedBody":
     "Otro programa cambió el archivo app.asar de OpenBot. OpenBot funciona ahora, pero no se abrirá después de cerrarlo.\n\nPara repararlo, vuelve a instalar OpenBot. Tus datos locales se conservan.",
   "startup.archiveChangedDownload": "Descargar OpenBot",
+  "startup.filesDamagedBody":
+    "Algunos archivos de OpenBot están dañados o faltan.\n\nPara repararlo, vuelve a instalar OpenBot. Tus datos locales se conservan.",
   "startup.newerDataUpdatingTitle": "Actualizando OpenBot",
   "startup.newerDataUpdatingBody":
     "Una versión más reciente de OpenBot guardó tus datos. OpenBot instala la última versión y luego se abre de nuevo.\n\nTus datos locales no se restablecieron ni se sobrescribieron.",
@@ -18,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "Descargar OpenBot",
   "startup.newerDataGuide": "Abrir guía",
   "startup.newerDataQuit": "Salir",
+  "startup.newerDataLoopTitle": "La última versión de OpenBot no se abrió",
+  "startup.newerDataLoopBody":
+    "Una versión más reciente de OpenBot guardó tus datos y esta versión ({version}) no puede abrirlos. OpenBot {loopVersion} se detuvo antes de abrirse varias veces seguidas, así que no se vuelve a instalar.\n\nInstala una versión más reciente que {loopVersion} cuando esté disponible. Para obtener ayuda, abre la guía.\n\nTus datos locales no se restablecieron ni se sobrescribieron.",
+  "startup.newerDataReleases": "Ver versiones",
   "startup.recoveryWindowTitle": "Recuperación de OpenBot",
   "startup.recoveryTitle": "OpenBot no se abrió",
   "startup.recoveryBody": {
@@ -27,8 +33,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "Vuelve a intentarlo o instala la última versión que se abrió. Para obtener ayuda, exporta el diagnóstico y envía el archivo con tu informe.",
+  "startup.recoveryHintLatest":
+    "OpenBot no encontró una versión anterior que pueda abrir tus datos. Vuelve a intentarlo o instala la última versión. Para obtener ayuda, exporta el diagnóstico y envía el archivo con tu informe.",
   "startup.recoveryRetry": "Reintentar",
   "startup.recoveryPreviousVersion": "Descargar versión anterior",
+  "startup.recoveryLatestVersion": "Descargar última versión",
   "startup.recoveryExportDiagnostics": "Exportar diagnóstico",
   "startup.recoveryOpenDataFolder": "Abrir carpeta de datos",
   "startup.recoveryQuit": "Salir",

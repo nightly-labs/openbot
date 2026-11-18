@@ -163,6 +163,10 @@ try {
   const transferAgents: InstanceTransferOptions["agents"] = {
     listAgents: () => agents,
     listRoutines: () => [],
+    listRoutineRuns: () => [],
+    importRoutineRuns: () => [],
+    listChannelRoutineRuns: () => [],
+    importChannelRoutineRuns: () => [],
     listMemories: () => [],
     getMemorySelection: () => ({ selections: [] }),
     setMemoryInclusion: () => undefined,
@@ -201,6 +205,12 @@ try {
         get: () => assert.fail("The instance has no channels."),
         messages: () => [],
         update: () => assert.fail("The instance has no channels."),
+        context: () => assert.fail("The instance has no channels."),
+      },
+      mailbox: {
+        stageGeneratedCopy: () => Effect.die("The instance has no channels."),
+        persistGeneratedAttachmentsWith: () => assert.fail("The instance has no channels."),
+        discardStagedGeneratedAttachments: () => Effect.void,
       },
       images: { resolve: () => null },
       command: () => Effect.die("The instance has no channels."),

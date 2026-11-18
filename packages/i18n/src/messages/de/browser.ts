@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} schließen",
   "browser.tab.closeUnnamed": "Browser-Tab schließen",
   "browser.newTab": "Neuer Browser-Tab",
-  "browser.hide": "Browser ausblenden",
+  "browser.backToChat": "Zurück zum Chat",
   "browser.goBack": "Zurück",
   "browser.goForward": "Vorwärts",
   "browser.reload": "Seite neu laden",
@@ -68,6 +68,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Dieser Text ist zu lang zum Einfügen. Füge weniger als 100.000 Zeichen ein.",
   "browser.liveView.copyTooLarge": "Die Auswahl ist zu lang zum Kopieren. Wähle weniger Text aus.",
   "browser.liveView.copyFailed": "Der Text konnte nicht kopiert werden. Klicke auf die Seite und versuche es erneut.",
+  "browser.liveView.pageCopied":
+    "Die Seite hat Text kopiert. Wähle „Kopieren“, um ihn in deine Zwischenablage zu legen.",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
   "browser.previews.empty": "Keine Browser-Tabs",
@@ -93,6 +95,18 @@ export const messages = {
   "browser.secret.takeOver": "Übernehmen",
   "browser.secret.failed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent das falsche Feld auf der Seite gewählt hat.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil der Agent keine der für diese Website gespeicherten Zugangsdaten gewählt hat. Sag dem Agenten, welches Konto er verwenden soll.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie kein Passwort für diese Website enthalten.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie keinen Authenticator-Schlüssel enthalten.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil dein Passwort-Manager nicht gelesen werden konnte.",
   "browser.error.openAddress": "Die Adresse konnte in diesem Tab nicht geöffnet werden.",
   "browser.error.channelNoBrowserMember": "Kein Mitglied kann in diesem Kanal einen neuen Tab öffnen.",
   "browser.error.closeTab": "Der Browser-Tab konnte nicht geschlossen werden.",

@@ -218,7 +218,7 @@ export function renderContactMessageEmail(input: ContactMessageEmailInput): Rend
 }
 
 // Sent once to an account, when its first plan starts. Kamil signs it, and a reply goes to the
-// sending mailbox.
+// team's inbox (`EMAIL_REPLY_TO`).
 export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   const serverName = input.serverName.trim();
   const planName = PLAN_NAMES[input.plan];
@@ -272,7 +272,7 @@ export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   };
 }
 
-/** Each license email goes from the license sender, and a reply goes to that mailbox. */
+/** Each license email goes from the license sender, and a reply goes to the license inbox. */
 export function renderLicenseEmail(input: LicenseEmailInput): RenderedEmail {
   switch (input.kind) {
     case "welcome":

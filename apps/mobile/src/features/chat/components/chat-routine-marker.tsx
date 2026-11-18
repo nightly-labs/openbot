@@ -1,17 +1,17 @@
 import { Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
+import CalendarCheck from "lucide-react-native/icons/calendar-check";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import CalendarPlus from "lucide-react-native/icons/calendar-plus";
 import CalendarX2 from "lucide-react-native/icons/calendar-x-2";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
-import CircleCheck from "lucide-react-native/icons/circle-check";
 import CirclePause from "lucide-react-native/icons/circle-pause";
 import CircleX from "lucide-react-native/icons/circle-x";
 import Clock3 from "lucide-react-native/icons/clock-3";
 import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Pressable, View, type ViewStyle } from "react-native";
+import { View } from "react-native";
 import Animated, {
   cubicBezier,
   Easing,
@@ -22,11 +22,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useCSSVariable } from "uniwind";
 import type { RoutineMarker, RoutineMarkerEvent, RoutineRunGroup } from "@/features/chat/model/chat-messages";
-import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { ACTIVITY_ICON_SIZE, type ActivityColors, ChatActivityLine, useActivityColors } from "./chat-activity-line";
+import { Spinner } from "./chat-subagents";
 
 const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   created: CalendarPlus,
@@ -35,7 +35,7 @@ const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   queued: Clock3,
   running: LoaderCircle,
   "needs-attention": TriangleAlert,
-  succeeded: CircleCheck,
+  succeeded: CalendarCheck,
   failed: CircleX,
   interrupted: CirclePause,
   cancelled: CirclePause,
@@ -78,31 +78,30 @@ export function routineGroupKind(state: RoutineGroupsState, group: RoutineRunGro
   return routineGroupOpen(state, group.id) ? `routine-run-group:${group.runs.length}` : "routine-run-group";
 }
 
-function useMarkerColor(event: RoutineMarkerEvent, muted: ViewStyle["backgroundColor"]) {
-  const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
-  if (event === "succeeded") return String(success);
-  if (event === "failed" || event === "needs-attention") return String(danger);
-  return String(muted);
+/** The kind color, or the state color while a routine runs or after it fails. */
+function markerColor(event: RoutineMarkerEvent, colors: ActivityColors) {
+  if (event === "running") return colors.running;
+  if (event === "failed" || event === "needs-attention") return colors.danger;
+  return colors.muted;
 }
 
-export function RoutineMarkerRow({ message, muted }: { message: RoutineMarker; muted: ViewStyle["backgroundColor"] }) {
+/** The marker icon. A running routine turns, as running subagents do. */
+function MarkerIcon({ event, colors }: { event: RoutineMarkerEvent; colors: ActivityColors }) {
+  if (event === "running") return <Spinner color={colors.running} size={ACTIVITY_ICON_SIZE} />;
+  const Icon = ROUTINE_MARKER_ICONS[event];
+  return <Icon size={ACTIVITY_ICON_SIZE} color={markerColor(event, colors)} />;
+}
+
+export function RoutineMarkerRow({ message }: { message: RoutineMarker }) {
   const { t } = useText();
-  const Icon = ROUTINE_MARKER_ICONS[message.event];
-  const color = useMarkerColor(message.event, muted);
+  const colors = useActivityColors();
   return (
-    <View
-      accessible
+    <ChatActivityLine
+      icon={<MarkerIcon event={message.event} colors={colors} />}
+      label={t(message.label)}
+      name={message.routineName}
       accessibilityLabel={`${t(message.label)}, ${message.routineName}`}
-      className="flex-row flex-wrap items-center justify-center gap-1.5 py-2"
-    >
-      <Icon size={16} color={color} strokeWidth={1.75} />
-      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {t(message.label)}
-      </Typography.Paragraph>
-      <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
-        {message.routineName}
-      </Typography.Paragraph>
-    </View>
+    />
   );
 }
 
@@ -112,13 +111,11 @@ function GroupedMarker({
   index,
   openness,
   opening,
-  muted,
 }: {
   message: RoutineMarker;
   index: number;
   openness: SharedValue<number>;
   opening: SharedValue<boolean>;
-  muted: ViewStyle["backgroundColor"];
 }) {
   const start = (Math.min(index, STAGGER_ROWS) * STAGGER_MS) / OPEN_MS;
   const style = useAnimatedStyle(() => {
@@ -128,7 +125,7 @@ function GroupedMarker({
   });
   return (
     <Animated.View style={style}>
-      <RoutineMarkerRow message={message} muted={muted} />
+      <RoutineMarkerRow message={message} />
     </Animated.View>
   );
 }
@@ -144,8 +141,9 @@ function GroupedMarker({
  * height while the panel is still closed. A panel that starts open keeps its markers in flow until
  * they are measured. So a chat opens with each group at its final size.
  */
-export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; muted: ViewStyle["backgroundColor"] }) {
+export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
   const { t, format } = useText();
+  const colors = useActivityColors();
   const reducedMotion = useReducedMotion();
   const groupsState = useContext(RoutineGroupsContext);
   const { groups } = groupsState;
@@ -174,14 +172,13 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
     return height < 0 ? {} : { height: height * openness.get() };
   });
   const lead = group.runs.find((run) => run.event === "failed") ?? group.runs.at(-1);
-  const Icon = lead ? ROUTINE_MARKER_ICONS[lead.event] : CalendarClock;
-  const color = useMarkerColor(lead?.event ?? "updated", muted);
   const title = group.routineName ?? t("mobile.chat.routine.group.title");
   const count = group.runs.length;
   return (
-    <View className="items-center">
-      <Pressable
-        accessibilityRole="button"
+    <View>
+      <ChatActivityLine
+        icon={<MarkerIcon event={lead?.event ?? "updated"} colors={colors} />}
+        name={title}
         accessibilityState={{ expanded: open }}
         accessibilityLabel={[
           title,
@@ -190,9 +187,7 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
         ]
           .filter(Boolean)
           .join(", ")}
-        hitSlop={8}
         onPress={() => {
-          void haptics.selection();
           // The first open waits for the markers to measure, so the panel grows to their height.
           if (!mounted) {
             openOnLayout.current = true;
@@ -202,34 +197,31 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
           groups.set(group.id, { open: !open, height: contentHeight.get(), toggled: true });
           setOpen(!open);
         }}
-        className="flex-row flex-wrap items-center justify-center gap-1.5 py-2"
-        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-      >
-        <Icon size={16} color={color} strokeWidth={1.75} />
-        <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
-          {title}
-        </Typography.Paragraph>
-        <View className="min-w-5 items-center rounded-full bg-control px-1.5">
-          <Typography.Paragraph
-            type="body-xs"
-            className="font-medium"
-            maxFontSizeMultiplier={1.4}
-            style={{ color: muted, fontVariant: ["tabular-nums"] }}
-          >
-            {format.number(count)}
-          </Typography.Paragraph>
-        </View>
-        <Animated.View
-          style={{
-            transform: [{ rotate: open ? "180deg" : "0deg" }],
-            transitionProperty: "transform",
-            transitionDuration: reducedMotion ? 0 : 160,
-            transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
-          }}
-        >
-          <ChevronDown size={14} color={String(muted)} strokeWidth={2} />
-        </Animated.View>
-      </Pressable>
+        trailing={
+          <>
+            <View className="min-w-5 items-center rounded-full bg-control px-1.5">
+              <Typography.Paragraph
+                type="body-xs"
+                className="font-medium"
+                maxFontSizeMultiplier={1.4}
+                style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}
+              >
+                {format.number(count)}
+              </Typography.Paragraph>
+            </View>
+            <Animated.View
+              style={{
+                transform: [{ rotate: open ? "180deg" : "0deg" }],
+                transitionProperty: "transform",
+                transitionDuration: reducedMotion ? 0 : 160,
+                transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
+              }}
+            >
+              <ChevronDown size={12} color={colors.dim} strokeWidth={2} />
+            </Animated.View>
+          </>
+        }
+      />
       <Animated.View
         style={[{ overflow: "hidden", alignSelf: "stretch" }, panelStyle]}
         pointerEvents={open ? "auto" : "none"}
@@ -238,7 +230,8 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
       >
         {mounted ? (
           <View
-            className={floating ? "absolute inset-x-0 top-0" : undefined}
+            // The runs sit under the group text, so the group reads as one block.
+            className={floating ? "absolute inset-x-0 top-0 ps-5" : "ps-5"}
             onLayout={(event) => {
               const { height } = event.nativeEvent.layout;
               contentHeight.set(height);
@@ -251,14 +244,7 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
             }}
           >
             {group.runs.map((run, index) => (
-              <GroupedMarker
-                key={run.id}
-                message={run}
-                index={index}
-                openness={openness}
-                opening={opening}
-                muted={muted}
-              />
+              <GroupedMarker key={run.id} message={run} index={index} openness={openness} opening={opening} />
             ))}
           </View>
         ) : null}

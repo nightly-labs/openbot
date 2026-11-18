@@ -12,7 +12,8 @@ import {
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
-import { hasVisibleToasts } from "@openbot/ui";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -41,6 +42,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
+import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useServerActions } from "../servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
@@ -49,7 +51,9 @@ import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { serversPort } from "../servers/servers-port";
+import { appSettingLinkTarget } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
+import { settingsTabShown } from "../settings/settings-tabs";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
@@ -86,17 +90,20 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const connectors = useConnectors();
   const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
-  const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
-    useServerSettings();
+  const { serverSettingsOpen, openServerSettings } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
     setSkillsMarketplaceOpen,
+    setPendingMcpSignIn,
+    mcpSignIns,
+    refreshMcpSignIns,
     setPendingPluginSlug,
     setPendingPluginConnect,
     agentAutoApproves,
     generalSettings,
     openNotificationLevels,
+    openAppSettingRow,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -121,13 +128,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
   const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   const { customAgents } = useCustomAgents();
+  const localEndpoints = useCustomProviders();
   const {
     agentStatus,
     hostAccountLimits,
     agentList,
     agentListConnecting,
     activeAgent,
-    userHiddenAgentIds,
+    userPausedAgentIds,
     modelOptions,
     settingsRequest,
     updateAgent,
@@ -157,6 +165,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     updateQueuedMessage,
     reorderQueue,
     stopActiveTurn,
+    stoppableSubagentTurn,
     usageLimits,
     usageLimitedModels,
     waitedUsageLimits,
@@ -171,9 +180,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     markAgentMessagesRead,
     markAgentMessagesUnread,
     deleteAgentMessage,
+    messagePins,
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
+    searchAgentThreadMessages,
     setTeamTyping,
     presentPromptResolution,
   } = useConversation();
@@ -200,7 +211,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   // active agent's provider and model and cleared on a switch, because a second request would hit
   // the provider's rate-limit endpoint for a card the user may never see.
   const auth = useAuth();
-  const { teamPresence, currentTeamMember } = usePresence();
+  const { teamPresence, readerMemberId } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
   const channels = useChannels();
   const conversationController = useConversationController();
@@ -295,9 +306,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const busyMessageMode = remoteAgentAdmin.busyMessageMode();
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
-    const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     const fastMode = remoteAgentAdmin.fastMode();
+    const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
     const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
@@ -308,9 +319,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && busyMessageMode ? { busyMessageMode } : {}),
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
-          ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
-          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
           ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
         }
@@ -412,7 +422,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });
@@ -431,6 +441,15 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   };
   /** The Delete action of the active agent's chat. A host without `message-delete-v1` has none. */
   const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
+  /** Pin and Unpin of the active server. A host without `message-pins-v1` has none; this computer always has. */
+  const messagePinsAction = () => (activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY) ? messagePins : undefined);
+  /** An older host does not name the thread of a search result, so its `@` list finds thread titles only. */
+  const searchThreadsAction = () =>
+    activeServerSupportsCapability(THREAD_MESSAGE_SEARCH_CAPABILITY) ? searchActiveAgentThreads : undefined;
+  function searchActiveAgentThreads(query: string) {
+    const agentId = activeAgent()?.id;
+    return agentId ? searchAgentThreadMessages(agentId, query) : Promise.resolve([]);
+  }
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -452,7 +471,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
       contextStates: threadContextStates,
       onCompactContext: compactTaskContext(),
-      onOpenMainMessage: (messageId) => void openAgentMessage(agent.id, messageId),
+      onOpenMainMessage: (messageId) => openAgentMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
@@ -532,16 +551,31 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        // The server settings sign in as their MCP panel does: on this computer, or through a host that
-        // relays its sign-in page.
+        // A setting card opens Settings of this computer, also in the chat of a joined server: app settings
+        // belong to this computer. A tab that this window does not show has no Open.
+        appSettingOpener={(settingId) => {
+          const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
+          const shown = settingsTabShown(target.tab, {
+            platform: platform.appInfo()?.platform,
+            chatWindow: platform.chatWindow !== null,
+          });
+          return shown ? () => openAppSettingRow(target.tab, target.row) : undefined;
+        }}
+        // Sign in opens the server's Marketplace page, which signs in as its own button does: on this
+        // computer, or through a host that relays its sign-in page.
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
-          return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
+          return (mcpServerId: string) => {
+            setPendingMcpSignIn(mcpServerId);
+            setSkillsMarketplaceOpen(true);
+          };
         })()}
-        mcpSignedIn={(mcpServerId) =>
-          serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
-        }
+        mcpSignedIn={(mcpServerId) => {
+          const known = mcpSignIns();
+          return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
+        }}
+        refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
         serverInstall={{
           get servers() {
             return servers();
@@ -558,6 +592,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
         customProviders={activeCustomProviders()}
+        // Only this computer's list has what each model accepts. See `onUpdateCustomProvider`.
+        onUpdateCustomProvider={activeServer()?.kind === "local" ? localEndpoints.updateCustomProvider : undefined}
         // The custom agents are this computer's. A joined host's picker counts its own from its models.
         customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
         onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}
@@ -571,7 +607,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onOpenNotificationSettings={openNotificationLevels}
         agent={conversationAgent()}
         agents={agentList()}
-        mentionAgents={agentList().filter((agent) => !userHiddenAgentIds().has(agent.id))}
+        mentionAgents={agentList().filter((agent) => !userPausedAgentIds().has(agent.id))}
         availableRoutineIds={activeRoutineIds()}
         routines={activeRoutines()}
         modelOptions={modelOptions()}
@@ -621,19 +657,19 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         providerFailed={usageLimitsShown() ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
+        subagentTurnId={stoppableSubagentTurn(activeAgent())}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
         activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
         activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
-        mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
+        mcpSettingsOpen={skillsMarketplaceOpen()}
         globalOverlayOpen={
           globalSearchOpen() ||
           joinServerOpen() ||
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts() ||
           quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
@@ -655,6 +691,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         }
         onDeleteMessage={deleteMessageAction()}
         canDeleteMessage={canDeleteAgentMessage}
+        messagePins={messagePinsAction()}
         sendToChannel={sendToChannel()}
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
@@ -663,9 +700,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
             ? searchAgentMessages(activeAgent()?.id ?? "", query)
             : Promise.resolve({ messageIds: [], total: 0 })
         }
-        onOpenSearchMessage={(messageId) =>
-          activeAgent() ? openAgentMessage(activeAgent()?.id ?? "", messageId) : Promise.resolve()
-        }
+        onSearchThreads={searchThreadsAction()}
+        onOpenSearchMessage={async (messageId) => {
+          const agentId = activeAgent()?.id;
+          if (agentId) await openAgentMessage(agentId, messageId);
+        }}
         onTypingChange={setTeamTyping}
         onAnswerPrompt={(answers, options) => answerPrompt(answers, options, openThreadId())}
         onPromptResolutionPresented={presentPromptResolution}
@@ -673,7 +712,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onAlwaysAllowApproval={alwaysAllowApproval()}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
-        remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
         remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
         remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}

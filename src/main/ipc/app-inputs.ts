@@ -13,6 +13,7 @@ import type {
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
+  BrowserTakeoverPage,
   BusyMessageModePreference,
   ChatBackgroundColor,
   ChatWindowTarget,
@@ -56,6 +57,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   decodeExternalLinkTarget,
+  GITHUB_SKILL_ID_MAX_LENGTH,
   IDLE_RESTART_TARGETS,
   isAgentDefaults,
   isAgentDockAction,
@@ -77,6 +79,7 @@ import {
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
+  isBrowserTakeoverPage,
   isBusyMessageMode,
   isChatBackgroundColor,
   isDynamicIslandAction,
@@ -329,6 +332,11 @@ export function parseDynamicIslandAction(input: unknown): DynamicIslandAction {
   throw new Error("Dynamic Island action is invalid.");
 }
 
+export function parseBrowserTakeoverPage(input: unknown): BrowserTakeoverPage {
+  if (isBrowserTakeoverPage(input)) return input;
+  throw new Error("Browser takeover page is invalid.");
+}
+
 export function parseBrowserDockPresentation(input: unknown): BrowserDockPresentation | null {
   if (input === null || isBrowserDockPresentation(input)) return input;
   throw new Error("Browser dock presentation is invalid.");
@@ -437,6 +445,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     !isSocialDestination(input) &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
+    input !== "download" &&
     input !== "mac-screen-recording"
   ) {
     throw new Error("Unknown external destination.");
@@ -525,11 +534,16 @@ export function parseSubmitSkill(input: unknown): SubmitSkillInput {
   };
 }
 
+/** A skill id: a Marketplace id, or a GitHub id, which names a repository folder and can be long. */
+export function requireSkillId(value: unknown): string {
+  return requireString(value, "skillId", GITHUB_SKILL_ID_MAX_LENGTH);
+}
+
 export function parseInstallSkill(input: unknown): InstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill installation.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.versionId === undefined ? {} : { versionId: requireString(input.versionId, "versionId") }),
     ...(input.replaceModified === true ? { replaceModified: true } : {}),
   };
@@ -539,7 +553,7 @@ export function parseUninstallSkill(input: unknown): UninstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill removal.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.removeModified === true ? { removeModified: true } : {}),
   };
 }
@@ -550,7 +564,7 @@ export function parseSetEnabledSkill(input: unknown): SetEnabledSkillInput {
   if (enabled === undefined) throw new Error("Invalid skill enablement.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     enabled,
   };
 }

@@ -165,14 +165,15 @@ export function firstUnreadChannelMessageId(
  * The lead's routing turn moves no task out of `queued` and writes no message of its own. Without
  * it the transcript stands still while the coordinator thinks, which reads as a dropped request.
  * Only `queued` and `waiting`: routing that ends without an owner leaves the task `paused` with the
- * coordinator's reason above the composer, and that notice is the indicator from then on. A lead that
- * the user hid routes nothing until the restore, so it is not shown as working.
+ * coordinator's reason above the composer, and that notice is the indicator from then on. A hidden
+ * lead on a host without `agent-hidden-work` routes nothing until the restore, so it is not shown as
+ * working.
  */
 export function channelWorkers(
   page: ChannelPage,
   agents: readonly AgentProfile[],
   fallbackName: string,
-  hiddenAgentIds: ReadonlySet<string>,
+  pausedAgentIds: ReadonlySet<string>,
 ): ChannelWorker[] {
   const ids = new Set<string>();
   const active = new Set<string>();
@@ -193,7 +194,7 @@ export function channelWorkers(
   const lead = page.channel.leadAgentId;
   if (
     lead &&
-    !hiddenAgentIds.has(lead) &&
+    !pausedAgentIds.has(lead) &&
     page.tasks.some((task) => !task.ownerAgentId && (task.state === "queued" || task.state === "waiting"))
   )
     ids.add(lead);
@@ -258,17 +259,53 @@ export function activeChannelRuns(page: ChannelPage): string[] {
   return [...runs];
 }
 
-/** The newest question of an agent that nobody answered yet. An archived channel takes no answer. */
+/**
+ * The newest question of an agent that the host still waits on. An archived channel takes no answer.
+ * The saved row can miss the end of its question, so only a question in the host's list is open, as
+ * an approval is. Before, a stale row stayed open and its answer failed (#8142). The request must
+ * also come from the channel's thread: a custom agent counts its request ids again after a restart.
+ */
 export function waitingChannelPrompt(
   page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly { agentId: string; threadId: string; requestId: string | number }[],
 ): { entry: ChannelMessage; prompt: ConversationQuestionPrompt } | null {
   if (page.channel.archived) return null;
   for (let index = page.messages.length - 1; index >= 0; index -= 1) {
     const entry = page.messages[index];
     const prompt = entry?.message.questionPrompt;
-    if (entry && prompt && entry.author.kind !== "member" && !prompt.resolution) return { entry, prompt };
+    if (
+      entry &&
+      prompt &&
+      entry.author.kind !== "member" &&
+      !prompt.resolution &&
+      waiting.some(
+        (request) =>
+          request.agentId === entry.author.id &&
+          String(request.requestId) === String(prompt.requestId) &&
+          channelOwnsRequest(page, threads, request),
+      )
+    )
+      return { entry, prompt };
   }
   return null;
+}
+
+/**
+ * The last question in the host's list that a member's thread in this channel waits on.
+ * The view shows it when the page has no row for it: a turn that the provider started with no task
+ * copies no rows to the channel, and the channel showed "Needs you" with no question (#10178). An
+ * older host does not name the threads, so the view shows the saved rows only.
+ */
+export function liveChannelPrompt<Request extends { agentId: string; threadId: string }>(
+  page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly Request[],
+): Request | undefined {
+  if (page.channel.archived || !threads) return undefined;
+  return waiting.findLast((request) =>
+    threads.some((thread) => thread.agentId === request.agentId && thread.threadId === request.threadId),
+  );
 }
 
 /**
