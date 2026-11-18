@@ -43,8 +43,10 @@ export function HomeCardBackdrop({
     const pull = Math.max(0, -scrolled.get());
     return { transform: [{ scale: height > 0 ? (height + pull) / height : 1 }] };
   });
+  // Until the list header has a height, the band shows only the scene, under the bar.
   const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: top + edge.get() + Math.max(0, -scrolled.get()) }],
+    opacity: edge.get() < 0 ? 0 : 1,
+    transform: [{ translateY: top + Math.max(0, edge.get()) + Math.max(0, -scrolled.get()) }],
   }));
   if (height <= 0) return null;
   return (
@@ -58,19 +60,34 @@ export function HomeCardBackdrop({
   );
 }
 
+interface CardFill {
+  card: boolean;
+  background: string;
+  /** The server of the list. */
+  serverId: string;
+  /** The server whose card is in place. Until it is `serverId`, the part is clear. */
+  cardServer: SharedValue<string>;
+}
+
+function useCardFill({ background, serverId, cardServer }: CardFill) {
+  return useAnimatedStyle(() => ({ backgroundColor: cardServer.get() === serverId ? background : "transparent" }));
+}
+
 /**
  * The rounded top edge of the list card. It is the last part of the list header, under the pinned
- * agents. `background` is clear while the backdrop draws the card top for a new list.
+ * agents. It is clear while the backdrop draws the card top for a new list.
  */
-export function HomeCardTop({ card, background }: { card: boolean; background: string }) {
-  if (!card) return null;
-  return <View pointerEvents="none" style={[styles.top, { backgroundColor: background }]} />;
+export function HomeCardTop(props: CardFill) {
+  const fill = useCardFill(props);
+  if (!props.card) return null;
+  return <Animated.View pointerEvents="none" style={[styles.top, fill]} />;
 }
 
 /** One row of the list card: an opaque row, so the fixed backdrop under the clear list does not show through it. */
-export function HomeCardRow({ card, background, children }: PropsWithChildren<{ card: boolean; background: string }>) {
-  if (!card) return children;
-  return <View style={{ backgroundColor: background }}>{children}</View>;
+export function HomeCardRow({ children, ...props }: PropsWithChildren<CardFill>) {
+  const fill = useCardFill(props);
+  if (!props.card) return children;
+  return <Animated.View style={fill}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

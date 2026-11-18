@@ -110,8 +110,9 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     if (!open) setDrawerSettled(false);
   }, []);
   const settleDrawer = useCallback(() => setDrawerSettled(true), []);
-  // A server chosen in the drawer becomes active when the closing motion ends. The new list mounts
-  // many native views, and a mount during the motion drops its frames.
+  // A server chosen in the drawer becomes active when the drawer comes to rest. The new list mounts
+  // many native views, and a mount during the motion drops its frames. A motion that another motion
+  // stops (a second tap, a drag) leaves the choice to the motion that ends: closed or open again.
   const pendingServerId = useRef<string | null>(null);
   const selectPendingServer = useCallback(() => {
     const serverId = pendingServerId.current;
@@ -121,18 +122,16 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const finishOpening = useCallback(
     (finished?: boolean) => {
       "worklet";
-      if (finished) scheduleOnRN(settleDrawer);
+      if (!finished) return;
+      scheduleOnRN(settleDrawer);
+      scheduleOnRN(selectPendingServer);
     },
-    [settleDrawer],
+    [selectPendingServer, settleDrawer],
   );
   const finishClosing = useCallback(
     (finished?: boolean) => {
       "worklet";
-      // A stopped motion still applies the chosen server, so a tap is never lost.
-      if (!finished) {
-        scheduleOnRN(selectPendingServer);
-        return;
-      }
+      if (!finished) return;
       drawerOpenOnUI.set(false);
       scheduleOnRN(commitDrawerState, false);
       scheduleOnRN(selectPendingServer);

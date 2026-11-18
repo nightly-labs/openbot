@@ -104,7 +104,6 @@ import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/compone
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
-import { useReducedMotion } from "@/shared/lib/motion";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
@@ -567,36 +566,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const [stageHeight, setStageHeight] = useState(0);
   // The backdrop draws the card top at `cardEdge`. After a change of server it moves there from the
   // header of the last server. Until it arrives, the card top and the rows of the list are clear, so
-  // the moving card top shows through them; then they are opaque again for the scroll.
+  // the moving card top shows through them; then they are opaque again for the scroll. Both values
+  // change on the UI thread, so the list does not render again for them.
   const cardEdge = useSharedValue(-1);
-  const [settledServerId, setSettledServerId] = useState<string | null>(null);
-  const cardSettled = settledServerId === activeServer.id;
-  const cardMotionOff = useReducedMotion();
-  const settleCard = useCallback((serverId: string, height: number) => {
-    setSettledServerId(serverId);
-    setStageHeight(height);
-  }, []);
-  const layoutStage = useCallback(
-    (height: number) => {
-      const edge = height - HOME_CARD_RADIUS;
-      const serverId = activeServer.id;
-      if (cardSettled || cardEdge.get() < 0 || cardMotionOff) {
-        cancelAnimation(cardEdge);
-        cardEdge.set(edge);
-        settleCard(serverId, height);
-        return;
-      }
-      // The band keeps the taller of the two heights while the card top moves.
-      setStageHeight((current) => Math.max(current, height));
-      cardEdge.set(
-        withTiming(edge, CARD_MOVE, (finished) => {
-          if (finished) scheduleOnRN(settleCard, serverId, height);
-        }),
-      );
-    },
-    [activeServer.id, cardEdge, cardMotionOff, cardSettled, settleCard],
-  );
-  const cardFill = cardSettled ? cardBackground : "transparent";
+  /** The server whose card is in place. Its rows and card top are opaque. */
+  const cardServer = useSharedValue("");
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
@@ -653,6 +627,30 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [finishGate],
   );
   const listReveal = useAgentListReveal(listReady, activeServer.id);
+  const cardMotionOff = listReveal.reducedMotion;
+  const layoutStage = useCallback(
+    (height: number) => {
+      const edge = height - HOME_CARD_RADIUS;
+      const serverId = activeServer.id;
+      if (cardServer.get() === serverId || cardEdge.get() < 0 || cardMotionOff) {
+        cancelAnimation(cardEdge);
+        cardEdge.set(edge);
+        cardServer.set(serverId);
+        setStageHeight(height);
+        return;
+      }
+      // The band keeps the taller of the two heights while the card top moves.
+      setStageHeight((current) => Math.max(current, height));
+      cardEdge.set(
+        withTiming(edge, CARD_MOVE, (finished) => {
+          if (!finished) return;
+          cardServer.set(serverId);
+          scheduleOnRN(setStageHeight, height);
+        }),
+      );
+    },
+    [activeServer.id, cardEdge, cardMotionOff, cardServer],
+  );
   // Collapse keeps stable list cells and changes their heights on the UI thread.
   // Enable cell reflow again when a host layout update moves agents or sections.
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
@@ -774,11 +772,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // In card mode each row is opaque, so the fixed backdrop under the clear list does not show through.
   const renderItem = useCallback(
     (info: { item: MobileSidebarItem; index: number }) => (
-      <HomeCardRow card={homeCard} background={cardFill}>
+      <HomeCardRow card={homeCard} background={cardBackground} serverId={serverId} cardServer={cardServer}>
         {renderRow(info)}
       </HomeCardRow>
     ),
-    [renderRow, homeCard, cardFill],
+    [renderRow, homeCard, cardBackground, serverId, cardServer],
   );
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
@@ -983,7 +981,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         {/* The backdrop is fixed under the list, so the scroll moves nothing in it. */}
         {homeCard && !onboarding.active && !sceneShows ? (
           <HomeCardBackdrop
-            height={stageHeight > 0 ? headerHeight + stageHeight : 0}
+            height={headerHeight + stageHeight}
             top={headerHeight}
             edge={cardEdge}
             scrolled={scroll.scrolled}
@@ -1092,7 +1090,12 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                           ))
                         : null}
                     </PinnedAgentsGrid>
-                    <HomeCardTop card={homeCard} background={cardFill} />
+                    <HomeCardTop
+                      card={homeCard}
+                      background={cardBackground}
+                      serverId={activeServer.id}
+                      cardServer={cardServer}
+                    />
                   </View>
                 }
                 ListEmptyComponent={
