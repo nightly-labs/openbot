@@ -69,6 +69,8 @@ const PROVIDER_ID_PLACEHOLDER = "my-provider";
 const BASE_URL_PLACEHOLDER = "http://127.0.0.1:11434/v1";
 const MODEL_ID_PLACEHOLDER = "model-id";
 const HEADER_NAME_PLACEHOLDER = "Header-Name";
+/** The model IDs that the line about unlisted models names before it gives a count of the others. */
+const UNLISTED_NAMES_SHOWN = 3;
 
 const INPUT_KIND_LABEL = {
   image: "customProvider.model.inputImage",
@@ -119,6 +121,8 @@ interface CustomProviderDialogProps {
   draft?: CustomProviderDraft | undefined;
   /** Set by a story to show the messages without typing into every field first. */
   showErrors?: boolean | undefined;
+  /** Set by a story to show the found list as the answer of a Find click, without the click. */
+  showFindResult?: boolean | undefined;
   busy?: boolean | undefined;
   submitError?: string | null | undefined;
   /**
@@ -172,6 +176,15 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   // Set by a Find click: the list that it gets fills the empty fields of the rows (#3946).
   let fillNextList = false;
 
+  const endpointKey = (): string => JSON.stringify(customProviderEndpoint(draft));
+  /**
+   * The endpoint that the last Find click asked. Only its answer marks the rows that it does not list:
+   * not a list that the dialog opens with, and not one for an address or a key that changed after (#12067).
+   */
+  const [askedEndpoint, setAskedEndpoint] = createSignal<string | undefined>(
+    untrack(() => (props.showFindResult ? endpointKey() : undefined)),
+  );
+
   /**
    * Both hosts keep this dialog mounted after a close, and the draft above is a snapshot, so without
    * this a second "Add provider" reopens the form still holding the last endpoint - including its API
@@ -186,6 +199,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       setDraft(() => (next ? cloneDraft(next) : emptyCustomProviderDraft()));
       setSubmitted(untrack(() => Boolean(props.showErrors)));
       fillNextList = false;
+      setAskedEndpoint(untrack(() => (props.showFindResult ? endpointKey() : undefined)));
     },
   );
 
@@ -415,6 +429,32 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     return state.status === "found" ? state.models : undefined;
   };
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
+
+  /** The IDs of the rows that the asked endpoint does not list. A failed or an empty list marks none. */
+  const unlisted = (): string[] => {
+    const models = discovered();
+    if (!models?.length || askedEndpoint() !== endpointKey()) return [];
+    const found = new Set(models.map((model) => model.id));
+    return [...new Set(draft.models.map((row) => row.id.trim()))].filter((id) => id && !found.has(id));
+  };
+  /** The first IDs and a count of the others, so that a long list stays one line. */
+  const unlistedNames = (ids: readonly string[]): string => {
+    const shown = ids.slice(0, UNLISTED_NAMES_SHOWN);
+    const rest = ids.length - shown.length;
+    return format.list(rest > 0 ? [...shown, t("customProvider.discovery.unlistedMore", { count: rest })] : shown);
+  };
+  /**
+   * Removes the rows that the endpoint does not list, only on a click: an endpoint can list a part of
+   * the models that it serves. Cancel still keeps the saved list.
+   */
+  function removeUnlisted(ids: readonly string[]): void {
+    setDraft((state) => {
+      for (let index = state.models.length - 1; index >= 0; index -= 1) {
+        if (ids.includes(state.models[index]?.id.trim() ?? "")) state.models.splice(index, 1);
+      }
+      if (state.models.length === 0) state.models.push({ id: "", name: "" });
+    });
+  }
 
   /**
    * The list that a Find click gets fills the empty fields of the rows that it names, such as the rows
@@ -747,6 +787,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           disabled={busy() || !draft.baseUrl.trim() || discovery().status === "loading"}
                           onClick={() => {
                             fillNextList = true;
+                            setAskedEndpoint(endpointKey());
                             discover()(customProviderEndpoint(draft));
                           }}
                         >
@@ -788,6 +829,27 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                           <Text tone="muted" variant="caption" role="status">
                             {t("customProvider.discovery.found", { count: models().length })}
                           </Text>
+                          <Show when={unlisted().length > 0 ? unlisted() : undefined}>
+                            {(ids) => (
+                              <div class="custom-provider-discovery-status">
+                                <Text tone="muted" variant="caption" role="status">
+                                  {t("customProvider.discovery.unlisted", {
+                                    count: ids().length,
+                                    names: unlistedNames(ids()),
+                                  })}
+                                </Text>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="xs"
+                                  disabled={busy()}
+                                  onClick={() => removeUnlisted(ids())}
+                                >
+                                  {t("customProvider.discovery.removeUnlisted", { count: ids().length })}
+                                </Button>
+                              </div>
+                            )}
+                          </Show>
                           <Show
                             when={
                               props.contextWindows &&

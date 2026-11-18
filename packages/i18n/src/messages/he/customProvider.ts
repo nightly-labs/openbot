@@ -114,6 +114,17 @@ export const messages = {
   "customProvider.discovery.selectAll": "בחירת הכול",
   "customProvider.discovery.deselectAll": "ביטול הבחירה",
   "customProvider.discovery.noMatch": "אין מודלים שתואמים לחיפוש.",
+  "customProvider.discovery.unlisted": {
+    one: "מודל אחד לא נמצא ברשימה הזו: {names}.",
+    two: "שני מודלים לא נמצאים ברשימה הזו: {names}.",
+    other: "{count} מודלים לא נמצאים ברשימה הזו: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "עוד {count}", two: "עוד {count}", other: "עוד {count}" },
+  "customProvider.discovery.removeUnlisted": {
+    one: "הסרת מודל אחד",
+    two: "הסרת שני מודלים",
+    other: "הסרת {count} מודלים",
+  },
   "customProvider.preset.title": "הוספת ספק או סוכן",
   "customProvider.preset.description": "יש לבחור שרת מודלים מקומי, נקודת קצה או סוכן ACP.",
   "customProvider.preset.heading": "הוספה מותאמת אישית",
