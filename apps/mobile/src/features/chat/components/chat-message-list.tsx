@@ -2148,6 +2148,13 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
   };
   const onStartReached = useCallback(() => startReached.current(), []);
+  // No button loads older pages. The list reports the top again only when its data changes, so a top
+  // that it reported while the history was hidden or the phone was offline loads the next page here.
+  const historyVisible = motion.historyVisible;
+  const startListRef = motion.listRef;
+  useEffect(() => {
+    if (historyVisible && online && startListRef.current?.getState().isNearStart) startReached.current();
+  }, [historyVisible, online, startListRef]);
   const contentContainerStyle = useMemo(
     () => ({
       paddingLeft: insets.left + LIST_PADDING,
