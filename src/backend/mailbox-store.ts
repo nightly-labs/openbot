@@ -2647,6 +2647,82 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /**
+   * The turns of a routine run, newest first: the turn of its delivery, then each turn that read a
+   * teammate's answer to a request that the run sent, also from such a later turn. `waiting` is true
+   * while a teammate still owes an answer, or while an answer waits for its turn, so the run's result
+   * is not ready yet (#11928). Null when the delivery is gone or never started a turn.
+   */
+  routineRunTurns(deliveryId: string): { turnIds: string[]; waiting: boolean } | null {
+    const start = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!start?.turnId) return null;
+    const agentId = start.recipientAgentId;
+    const sourceTurnIds = this.#sourceTurnIds();
+    const add = <T>(map: Map<string, T[]>, key: string, value: T) => {
+      const list = map.get(key);
+      if (list) list.push(value);
+      else map.set(key, [value]);
+    };
+    const deliveriesOf = new Map<string, StoredDelivery[]>();
+    for (const delivery of this.#state.deliveries) add(deliveriesOf, delivery.messageId, delivery);
+    const answersTo = new Map<string, StoredMessage[]>();
+    // An agent's messages that want no answer, by the turn that sent them.
+    const updatesFrom = new Map<string, StoredMessage[]>();
+    for (const message of this.#state.messages) {
+      if (isAnswer(message)) add(answersTo, message.replyToMessageId, message);
+      const turnId = sourceTurnIds.get(message.id);
+      if (message.sender.kind === "agent" && message.expectsReply === false && turnId)
+        add(updatesFrom, `${message.sender.agentId}:${turnId}`, message);
+    }
+    const read: { turnId: string; createdAt: string }[] = [];
+    // A run that resumed after a usage limit has a new turn id. Its earlier turns can have sent a request.
+    const turns = new Set([start.turnId, ...(start.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
+    const checked = new Set<string>();
+    let waiting = false;
+    let found = true;
+    while (found) {
+      found = false;
+      for (const request of this.#state.messages) {
+        if (checked.has(request.id) || request.sender.kind !== "agent" || request.sender.agentId !== agentId) continue;
+        if (request.expectsReply === false || !turns.has(sourceTurnIds.get(request.id) ?? "")) continue;
+        checked.add(request.id);
+        found = true;
+        for (const sent of deliveriesOf.get(request.id) ?? []) {
+          if (sent.recipientAgentId === agentId) continue;
+          const teammate = sent.recipientAgentId;
+          // A message to this agent from the teammate's turn for the request answers it too: OpenBot then
+          // sends the teammate's answer no more (`TurnLifecycle.#sendsResult`).
+          const teammateTurns = sent.turnId
+            ? [sent.turnId, ...(sent.resumeAfterUsageLimit?.previousTurnIds ?? [])]
+            : [];
+          const answers = new Set([
+            ...(answersTo.get(request.id) ?? []).filter(
+              (answer) => answer.sender.kind === "agent" && answer.sender.agentId === teammate,
+            ),
+            ...teammateTurns
+              .flatMap((turnId) => updatesFrom.get(`${teammate}:${turnId}`) ?? [])
+              .filter((update) => deliveriesOf.get(update.id)?.some((read) => read.recipientAgentId === agentId)),
+          ]);
+          // A teammate whose turn failed or stopped sends no answer; one that completed sends it as its turn ends.
+          if (answers.size === 0 && (isActiveDelivery(sent) || sent.status === "completed")) waiting = true;
+          for (const answer of answers)
+            for (const delivery of deliveriesOf.get(answer.id) ?? []) {
+              if (delivery.recipientAgentId !== agentId) continue;
+              if (isActiveDelivery(delivery)) waiting = true;
+              if (delivery.status !== "completed" || !delivery.turnId || turns.has(delivery.turnId)) continue;
+              // An answer that joined a running turn of other work: that turn's answer is for the other work.
+              if (delivery.steeredAt !== undefined) continue;
+              turns.add(delivery.turnId);
+              for (const turnId of delivery.resumeAfterUsageLimit?.previousTurnIds ?? []) turns.add(turnId);
+              read.push({ turnId: delivery.turnId, createdAt: delivery.createdAt });
+            }
+        }
+      }
+    }
+    read.sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+    return { turnIds: [...read.map((entry) => entry.turnId), start.turnId], waiting };
+  }
+
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
     this: MailboxStore,
     deliveryId: string,
