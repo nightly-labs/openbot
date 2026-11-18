@@ -56,7 +56,7 @@ const SOURCE_MARK = "src";
  * clear pixels. Null when the file is of another type, too large to decode, or already small, or when
  * the copy is not smaller than the file.
  */
-export function previewImage(bytes: Uint8Array, edge: number): Encoded | null {
+function previewImage(bytes: Uint8Array, edge: number): Encoded | null {
   const file = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const jpeg = file[0] === 0xff && file[1] === 0xd8;
   const png = file.length >= 24 && file.subarray(0, 8).equals(PNG_SIGNATURE);
