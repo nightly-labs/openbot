@@ -337,10 +337,18 @@ export class BootRecovery {
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
         : recovered;
+    // A teammate's result goes back to the queue once, so the agent that asked continues with it (#11857).
+    const requeued = new Set<string>();
     for (const id of deliveryIds) {
       // The drain starts the continuation with these deliveries, as for a plan.
       if (continuation && ownChat?.turnId)
         yield* this.#mailbox.requeueForPlan(id, ownChat.turnId).pipe(toBootRecoveryFailed);
+      else if (
+        terminal === "interrupted" &&
+        target !== null &&
+        (yield* this.#mailbox.requeueResultAfterRestart(id).pipe(toBootRecoveryFailed))
+      )
+        requeued.add(id);
       // A failed provider read keeps the conservative interrupted result; never replay side effects.
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
@@ -350,6 +358,7 @@ export class BootRecovery {
     // wait with no end (#11561). The drains after the recovery start it.
     if (!continuation) {
       for (const id of deliveryIds) {
+        if (requeued.has(id)) continue;
         const requesterId = yield* this.#mailbox
           .answerFailedRequest(
             id,
@@ -414,7 +423,8 @@ export class BootRecovery {
         this.#conversation.publishConversation(snapshot);
       }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      if (!continuation) for (const id of deliveryIds) this.#hooks.deliverySettled?.(id, terminal);
+      if (!continuation)
+        for (const id of deliveryIds) if (!requeued.has(id)) this.#hooks.deliverySettled?.(id, terminal);
     });
   });
 

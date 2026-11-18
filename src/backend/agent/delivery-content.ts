@@ -223,6 +223,9 @@ export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
 /** Between a provider handoff and the prompt of the turn that takes it. */
 export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
+
+const RESTARTED_RESULT_NOTE =
+  "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
 const TEAMMATE_PROMPT = new RegExp(
   `^${TEAMMATE_HEADER} [^\\n]* \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)\\n(?:This replies to message: (\\S+)\\n)?`,
   "gm",
@@ -503,6 +506,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
   }
+  // The turn that read this result stopped before it ended, so part of the work for it can be done (#11857).
+  if (context.restartedResult) text = `${RESTARTED_RESULT_NOTE}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   if (context.resumeAfterUsageLimit) {
     const continuationState = context.resumeAfterUsageLimit;
     const progress = redactSecrets(
