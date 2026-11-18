@@ -40,7 +40,7 @@ export class AppBehaviorService {
     this.#loginItem = input.loginItem;
     this.#offersBackground = input.offersBackground;
     this.#menuBar = input.menuBar;
-    this.#keepRunningInBackground = input.menuBar;
+    this.#keepRunningInBackground = true;
     this.#offersKeepAwake = input.offersKeepAwake;
     this.#offersQuitGuard = input.offersQuitGuard;
   }
@@ -53,7 +53,7 @@ export class AppBehaviorService {
             ? {
                 keepRunningInBackground: this.#menuBar
                   ? parsed.menuBar !== false
-                  : parsed.keepRunningInBackground === true,
+                  : parsed.keepRunningInBackground !== false,
                 keepAwake: parsed.keepAwake === true,
                 keepAwakeOnBattery: parsed.keepAwakeOnBattery === true,
                 quitGuard: isOneOf(QUIT_GUARDS, parsed.quitGuard) ? parsed.quitGuard : DEFAULT_QUIT_GUARD,
