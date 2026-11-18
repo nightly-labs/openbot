@@ -20,6 +20,8 @@ export const messages = {
   "mobile.workspace.error.agentNotOnHost": "エージェントはこのホストにありません。",
   "mobile.workspace.error.filesUnsupported":
     "このホストはファイル管理に対応していません。ホストの OpenBot を更新してください。",
+  "mobile.workspace.error.previewsUnsupported":
+    "このホストは縮小画像を送信しません。ホストの OpenBot を更新してください。",
   "mobile.workspace.error.agentUnavailableOnHost": "このホストではエージェントを利用できません。",
   "mobile.workspace.error.agentUnavailable": "エージェントを利用できません。",
   "mobile.workspace.error.formUnavailable": "このフォームは利用できなくなりました。",

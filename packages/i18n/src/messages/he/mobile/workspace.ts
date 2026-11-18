@@ -19,6 +19,8 @@ export const messages = {
   "mobile.workspace.error.removeOwnedServerOnly": "רק הבעלים יכול להסיר את השרת הזה.",
   "mobile.workspace.error.agentNotOnHost": "הסוכן אינו נמצא במארח הזה.",
   "mobile.workspace.error.filesUnsupported": "המארח הזה לא תומך בניהול קבצים. יש לעדכן את OpenBot במארח.",
+  "mobile.workspace.error.previewsUnsupported":
+    "המארח הזה לא שולח עותקים מוקטנים של תמונות. יש לעדכן את OpenBot במארח.",
   "mobile.workspace.error.agentUnavailableOnHost": "הסוכן אינו זמין במארח הזה.",
   "mobile.workspace.error.agentUnavailable": "הסוכן אינו זמין.",
   "mobile.workspace.error.formUnavailable": "הטופס הזה כבר לא זמין.",

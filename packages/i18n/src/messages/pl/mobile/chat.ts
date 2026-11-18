@@ -397,6 +397,9 @@ export const messages = {
   "mobile.chat.imageViewer.copy": "Kopiuj: {name}",
   "mobile.chat.imageViewer.copied": "Skopiowano obraz",
   "mobile.chat.imageViewer.position": "{current} z {total}",
+  "mobile.chat.imageViewer.fullQuality": "Pobierz {name} w pełnej jakości",
+  "mobile.chat.imageViewer.fullQualityLoading": "Pobieranie pełnej jakości",
+  "mobile.chat.imageViewer.fullQualityFailed": "Nie udało się pobrać obrazu w pełnej jakości",
   "mobile.chat.imageGallery.count": {
     one: "{count} obraz",
     few: "{count} obrazy",

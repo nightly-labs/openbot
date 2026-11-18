@@ -47,8 +47,12 @@ adding a module or moving ownership between workspaces.
 - Workspaces, conversations, attachments, browser data, and team data stay on the computer that
   runs OpenBot. Providers, visited pages, and plugins can use the network. Exception: a signed-in
   phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
-  values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
-  on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  values of its servers, and the last Library file list of each server
+  (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The phone also keeps the attachments
+  that it showed, and the smaller picture copies that a host sends, in its system cache, at most 1 GB
+  (`apps/mobile/src/features/chat/model/media-store.ts`), so they open without a connection. The copies
+  stay on that phone, the host stays the source of truth, and sign-out, session expiry and server
+  removal delete them.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent

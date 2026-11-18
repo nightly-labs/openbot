@@ -13,6 +13,7 @@ export const TEAM_PROTOCOL_CAPABILITY_LIMITS = {
   7: 128,
   8: 128,
   9: 256,
+  10: 512,
 } as const;
 
 /**

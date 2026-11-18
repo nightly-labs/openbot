@@ -63,6 +63,7 @@ import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
+import { ATTACHMENT_PREVIEWS_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
@@ -277,7 +278,7 @@ import { TEAM_PI_MUSE_CAPABILITY } from "@openbot/contracts/team-protocol/v7";
 import { encodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-protocol/v7-base-adapter";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v8";
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
-import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -360,6 +361,7 @@ import {
 import { routeAgentUsageLimit } from "./team-api/route-agent-usage-limit";
 import { routeAgentWaits } from "./team-api/route-agent-waits";
 import { routeAgents } from "./team-api/route-agents";
+import { routeAttachmentPreviews } from "./team-api/route-attachment-previews";
 import { routeBackgroundProcesses } from "./team-api/route-background-processes";
 import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
@@ -1200,6 +1202,13 @@ export class TeamApiServer {
       if ((await this.#routeDirect(context)) === "handled") return;
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
+      if (
+        (await routeAttachmentPreviews(context, {
+          mailbox: this.#options.mailbox,
+          previews: this.#options.attachmentPreviews,
+        })) === "handled"
+      )
+        return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
       const { mcpServers } = this.#options;
       const mcpServerOwners = this.#mcpServerOwners();
@@ -2718,14 +2727,15 @@ export class TeamApiServer {
 
   /**
    * What this host serves, as a peer of `protocol` reads it. Protocol 7 and newer get the full list,
-   * older peers the legacy one. Below protocol 9 the list leaves out the protocol 9 capabilities, so it
-   * stays within the 128 that protocols 7 and 8 read.
+   * older peers the legacy one. Below protocol 10 the list leaves out the protocol 10 capabilities, so
+   * it stays within the 256 that protocol 9 reads; below protocol 9 it also leaves out the protocol 9
+   * capabilities, so it stays within the 128 that protocols 7 and 8 read.
    */
   #protocolSupport(protocol: number | null = null): TeamProtocolSupportV1 {
     const expanded = protocol !== null && protocol >= 7;
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
-      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 },
+      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 },
       capabilities: teamCapabilitiesVisibleToProtocol(TEAM_CURRENT_CAPABILITIES, protocol ?? TEAM_PROTOCOL_V1).filter(
         (capability) => {
           if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
@@ -2800,6 +2810,7 @@ export class TeamApiServer {
           // The routes use the agent operations, which every host has. A channel owner also needs `channel-chats-v1`.
           if (capability === ROUTINES_ONCE_CAPABILITY) return true;
           if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
+          if (capability === ATTACHMENT_PREVIEWS_CAPABILITY) return this.#options.attachmentPreviews !== undefined;
           if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
           if (capability === ACP_REGISTRY_CAPABILITY) return this.#options.admin?.acpRegistry !== undefined;
           if (capability === CUSTOM_AGENTS_CAPABILITY) return this.#options.admin?.customAgents !== undefined;
@@ -2981,7 +2992,7 @@ export class TeamApiServer {
         body: { error: "Invalid Team API protocol headers.", code: "protocol_error", host },
       };
     }
-    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V9) return null;
+    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V10) return null;
     const clientIsOlder = protocol < TEAM_PROTOCOL_V1;
     return {
       status: 426,

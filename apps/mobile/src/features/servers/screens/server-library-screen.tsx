@@ -101,7 +101,7 @@ export function ServerLibraryScreen() {
   const { servers, agents } = useMobileWorkspace();
   const server = servers.find((item) => item.id === serverId);
   const { storage, folders, canOrganize } = useLibrary(serverId);
-  const { available, query, rescan } = storage;
+  const { available, query, usage, rescan } = storage;
   const snapshot = folders.snapshot;
   const living = folders.livingAgentIds;
   const capsuleRoom = useLibraryCapsuleRoom();
@@ -114,8 +114,9 @@ export function ServerLibraryScreen() {
   const [type, setType] = useState<FileTypeFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  // As on desktop, a file that is gone from the disk does not show.
-  const files = useMemo(() => (query.data?.files ?? []).filter((file) => file.status !== "missing"), [query.data]);
+  // As on desktop, a file that is gone from the disk does not show. Until the host answers, the list
+  // is the one this phone kept from the last open.
+  const files = useMemo(() => (usage?.files ?? []).filter((file) => file.status !== "missing"), [usage]);
   const removedFilesExist = useMemo(() => files.some((file) => fromRemovedAgent(file, living)), [files, living]);
   const storedPlace = useLibraryPlace(serverId);
   const place = useMemo(
@@ -191,7 +192,7 @@ export function ServerLibraryScreen() {
     <LibraryNote title={t("mobile.server.unavailable")} />
   ) : !available ? (
     <LibraryNote title={t("mobile.workspace.error.filesUnsupported")} />
-  ) : !query.data ? (
+  ) : !usage ? (
     query.isError ? (
       <LibraryNote
         title={errorMessage(query.error, t("mobile.server.storage.loadFailed"))}
@@ -240,9 +241,15 @@ export function ServerLibraryScreen() {
             // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
             // crash with "The specified child already has a parent". iOS does not clip by default.
             removeClippedSubviews={false}
+            // Each tile downloads its picture when it mounts. The default window mounts about ten
+            // screens below the one on screen, so a large Library downloaded hundreds of pictures at
+            // once. This window mounts two screens to each side.
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={5}
             onScroll={scroll.onScroll}
             refreshControl={
-              available && query.data ? (
+              available && usage ? (
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={refresh}
@@ -291,7 +298,7 @@ export function ServerLibraryScreen() {
               </>
             }
             ListFooterComponent={
-              query.data?.truncated ? (
+              usage?.truncated ? (
                 <Typography.Paragraph className="px-5 pt-3 text-muted" style={typeScale.caption}>
                   {t("mobile.agent.files.truncated")}
                 </Typography.Paragraph>
@@ -300,7 +307,7 @@ export function ServerLibraryScreen() {
           />
         </AndroidBlurTarget>
         <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
-        {snapshot && query.data ? (
+        {snapshot && usage ? (
           <LibraryPathCapsule
             segments={segments}
             onOpen={() => router.push({ pathname: "/library-folders", params: { serverId } })}

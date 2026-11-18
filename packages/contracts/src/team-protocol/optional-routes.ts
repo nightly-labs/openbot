@@ -40,6 +40,7 @@ import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CODECS } from "./agent-waits-v1";
+import { ATTACHMENT_PREVIEWS_CODECS } from "./attachment-previews-v1";
 import { BACKGROUND_PROCESSES_CODECS } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
@@ -336,6 +337,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...VAULT_V4_CODECS,
   ...INSTANCE_TRANSFER_CHUNKS_CODECS,
   ...INSTANCE_TRANSFER_FULL_COPY_CODECS,
+  ...ATTACHMENT_PREVIEWS_CODECS,
 ]);
 
 export function optionalRouteCodec(path: string): OptionalRouteCodec | undefined {

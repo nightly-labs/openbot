@@ -82,7 +82,7 @@ import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skil
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -152,6 +152,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteServerMedia } from "@/features/chat/model/media-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
@@ -591,6 +592,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         clearTimeout(firstConnectionTimers.current.get(serverId));
         firstConnectionTimers.current.delete(serverId);
         deleteServerAvatars(serverId);
+        deleteServerMedia(serverId);
         connectionWaits.drop(serverId, new Error(currentText().t("mobile.workspace.error.transportNotReady")));
         readRefresh.invalidate(serverId);
         for (const id of serverAgentIds.current.get(serverId) ?? []) removedAgentIds.add(id);
@@ -1243,7 +1245,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
-      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
+      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV10);
       // At a return, the connection from before the background stays, and its event stream
       // delivered every event or reset, which asks for a full load. The compatibility read checks
       // the path; a dead path fails it, and the next attempt loads all.
@@ -2159,6 +2161,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return host.hostId;
       },
       ...hostRequests.actions,
+      readKeptLibrary: async (serverId) => (workspaceCache ? workspaceCache.readLibrary(serverId) : null),
+      keepLibrary: (serverId, usage) => {
+        if (removedServers.current.has(serverId)) return;
+        void workspaceCache?.writeLibrary(serverId, usage).catch(() => undefined);
+      },
       loadAgentAnalytics: async (input, serverId) => {
         if (!agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentNotOnHost"));
@@ -2543,6 +2550,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     applyHostColors,
     pushSidebarPins,
     preferenceStore,
+    workspaceCache,
   ]);
 
   const activeServer = useMemo(

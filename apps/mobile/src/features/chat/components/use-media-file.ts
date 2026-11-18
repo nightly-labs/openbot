@@ -1,4 +1,3 @@
-import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
@@ -8,27 +7,20 @@ import { supportLog } from "@/features/support/model/support-log";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { largeDownloadOf } from "../model/large-files";
-
-/** The extension of a file whose name has none, for the types a player cannot read without one. */
-const MIME_EXTENSIONS: Record<string, string> = {
-  "video/quicktime": "mov",
-  "video/mp4": "mp4",
-  "audio/mpeg": "mp3",
-  "audio/mp4": "m4a",
-  "text/markdown": "md",
-};
+import { mediaWritten, originalMediaFile } from "../model/media-store";
 
 let folderCleared = false;
 
 /**
- * The folder of downloaded files. A file stays on this phone only for the launch that showed it:
- * the first file of a launch removes the files of the launch before.
+ * The folder of the files that a message names. Such a file can change on the host under the same
+ * path, so it stays on this phone only for the launch that showed it: the first file of a launch
+ * removes the files of the launch before. Attachments are kept between launches in the media store.
  */
 function mediaFolder() {
   const folder = new Directory(Paths.cache, "chat-media");
   if (!folderCleared) {
     folderCleared = true;
-    // Earlier versions kept videos in their own folder.
+    // Earlier versions kept attachments here, and videos in a folder of their own.
     for (const old of [folder, new Directory(Paths.cache, "chat-videos")]) {
       try {
         if (old.exists) old.delete();
@@ -40,22 +32,13 @@ function mediaFolder() {
   return folder;
 }
 
-/** A folder name from a server or attachment id. */
+/** A folder name from a server id. */
 const segment = (value: string) => value.replace(/[^\w.-]/gu, "_").replace(/^\.+/u, "_");
 /** A file name with no folder separators, control characters or leading dots. */
 const fileName = (name: string) => name.replace(/[/\\\p{Cc}]/gu, "_").replace(/^\.+/u, "_") || "file";
 
-/**
- * Where a host file is kept on this phone. A player reads a file, not the Base64 that the host
- * sends, and the file keeps the attachment's name so the share sheet shows it.
- */
-export function mediaFile(serverId: string, attachment: AttachmentSummary) {
-  let name = fileName(attachment.name);
-  // A player and the photo library read the type from the extension.
-  if (!attachmentFileExtension(name))
-    name = `${name}.${MIME_EXTENSIONS[attachment.mimeType] ?? attachment.mimeType.split("/")[1] ?? "bin"}`;
-  return new File(mediaFolder(), segment(serverId), segment(attachment.id), name);
-}
+/** Where a host attachment is kept on this phone, between launches. */
+export const mediaFile = originalMediaFile;
 
 /**
  * The place of a file that a message names, in the folder of downloaded files. `key` names the file
@@ -81,7 +64,10 @@ const mediaWrites = new Map<string, Promise<void>>();
 export function writeMediaFile(file: File, base64: string): Promise<void> {
   const running = mediaWrites.get(file.uri);
   if (running) return running;
-  const write = file.write(base64, { encoding: "base64" }).finally(() => mediaWrites.delete(file.uri));
+  const write = file
+    .write(base64, { encoding: "base64" })
+    .then(mediaWritten)
+    .finally(() => mediaWrites.delete(file.uri));
   mediaWrites.set(file.uri, write);
   return write;
 }
@@ -118,7 +104,8 @@ export function useMediaDownloads(serverId: string, attachments: readonly Attach
 }
 
 /**
- * A host file as a local file. A file from an earlier download is used again when it is whole.
+ * A host file as a local file. A file from an earlier download, also of an earlier launch, is used
+ * again when it is whole, so it plays without a connection.
  * `enabled` is false while the card passes in a fast fling, or until the user asks for the file.
  */
 export function useMediaFile(serverId: string, attachment: AttachmentSummary, enabled: boolean) {

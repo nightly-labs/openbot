@@ -17,6 +17,7 @@
 // a bug report about the phone app, sent with the phone's data (`phone-feedback-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
+// the smaller copies of picture attachments (`attachment-previews-v1`) over the real host cache,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
@@ -178,6 +179,11 @@ import {
   AGENT_WAITS_REQUEST_TEXT_LIMIT,
   AGENT_WAITS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import {
+  ATTACHMENT_PREVIEW_EDGES,
+  ATTACHMENT_PREVIEW_ROUTE,
+  ATTACHMENT_PREVIEWS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import {
   BACKGROUND_PROCESS_COMMAND_LIMIT,
   BACKGROUND_PROCESSES_CAPABILITY,
@@ -416,6 +422,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
@@ -472,6 +479,7 @@ import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
+import { AttachmentPreviews } from "../src/main/attachment-previews";
 import {
   type BitwardenCliRunner,
   BitwardenConnectorService,
@@ -734,6 +742,12 @@ const attachmentBytes = "attachment bytes for the download check\n";
 writeFileSync(attachmentPath, attachmentBytes);
 const sharedPath = join(files, "shared.txt");
 writeFileSync(sharedPath, "shared file bytes\n");
+// A file that starts as a JPEG. This run has no Electron decoder, so a stand-in makes each copy:
+// `bun run test:attachment-previews` checks the real decode in Electron.
+const photoPath = join(files, "photo one.jpeg");
+const photoBytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from("x".repeat(4096))]);
+writeFileSync(photoPath, photoBytes);
+const attachmentPreviewsRoot = join(root, "user-data", "attachment-previews");
 const workspacePath = join(files, "notes.md");
 writeFileSync(workspacePath, "# workspace notes\n");
 
@@ -1809,8 +1823,28 @@ const fakeAgentTasks: TeamApiAgentTasks = {
 
 const mailbox: TeamApiMailbox = {
   resolveAttachment: (id) =>
-    Effect.succeed(id === "att-1" ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" } : null),
+    Effect.succeed(
+      id === "att-1"
+        ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" }
+        : id === "att-photo"
+          ? { path: photoPath, mimeType: "image/jpeg", name: "photo one.jpeg" }
+          : null,
+    ),
 };
+
+/** The copy that the stand-in maker gives for one long edge: smaller than the file, and different for each size. */
+function standInPreview(maxEdge: number): Uint8Array {
+  return new TextEncoder().encode(`preview of the photo at ${maxEdge} px`);
+}
+
+// The real cache and decode limit, over a stand-in maker that records each decode.
+const attachmentPreviews = new AttachmentPreviews({
+  root: attachmentPreviewsRoot,
+  make: (bytes, maxEdge) => {
+    record("makeAttachmentPreview", bytes.byteLength, maxEdge);
+    return { bytes: standInPreview(maxEdge), mimeType: "image/jpeg" };
+  },
+});
 
 // What a member did in the tab while the host recorded: a page, then a click. No step has typed text.
 const TEACH_STEPS: ReturnType<TeamApiBrowser["stopTeach"]> = [
@@ -2424,6 +2458,7 @@ try {
     agentTasks: fakeAgentTasks,
     agentAccess,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
@@ -3073,7 +3108,7 @@ try {
       "compatibility answers without protocol headers and names the supported range",
       compatibility.status === 200 &&
         field(compatibility.body, "protocol", "minimum") === 1 &&
-        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V9,
+        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V10,
       summary(compatibility),
     );
     const noHeaders = await call("GET", TEAM_API_ROUTES.identity, { protocol: null });
@@ -3090,12 +3125,12 @@ try {
       badHeader.status === 400 && field(badHeader.body, "code") === "protocol_error",
       summary(badHeader),
     );
-    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V9 + 1 });
+    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V10 + 1 });
     check(
       "a newer protocol gets 426 host_update_required with the client version",
       newer.status === 426 &&
         field(newer.body, "code") === "host_update_required" &&
-        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V9 + 1,
+        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V10 + 1,
       summary(newer),
     );
     const zero = await call("GET", TEAM_API_ROUTES.identity, { protocol: 0 });
@@ -11937,6 +11972,104 @@ try {
         callsOf("resolveLocalWorkspaceFile").length === localReads + 1 &&
         isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
       [summary(memberOutside), summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
+    );
+  }
+
+  // ---- Smaller copies of picture attachments (attachment-previews-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY];
+    const decodes = () => callsOf("makeAttachmentPreview");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    // Protocol 9 reads at most 256 capabilities, so its list leaves out the protocol 10 ones.
+    check(
+      "the host advertises attachment-previews-v1 to a protocol 10 peer and not to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(ATTACHMENT_PREVIEWS_CAPABILITY) &&
+        list(field(compatibility.body, "capabilities")).includes(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ATTACHMENT_PREVIEWS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY) &&
+        list(field(older.body, "capabilities")).length <= 256,
+      [summary(compatibility), summary(older)],
+    );
+    /** One preview request, with the body as bytes: the copy is binary. */
+    const preview = async (json: unknown, token: string | null = bobToken) => {
+      const response = await fetch(`${base}${ATTACHMENT_PREVIEW_ROUTE}`, {
+        method: "POST",
+        headers: {
+          ...protocolHeaders({ capabilities, protocol: TEAM_PROTOCOL_V10, ...(token === null ? {} : { token }) }),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(json),
+      });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const text = new TextDecoder().decode(bytes);
+      const isJson = response.headers.get("content-type")?.startsWith("application/json") ?? false;
+      const reply: Reply = {
+        status: response.status,
+        body: isJson ? parseJson(text) : null,
+        text,
+        headers: response.headers,
+      };
+      return { reply, bytes };
+    };
+    const small = await preview({ attachmentId: "att-photo", size: "small" });
+    const smallHeaders = Object.fromEntries(small.reply.headers);
+    check(
+      "a member gets the small copy of a photo as an attachment: JPEG, its length, an encoded name, nosniff, and a 768 px decode",
+      small.reply.status === 200 &&
+        Buffer.from(small.bytes).equals(Buffer.from(standInPreview(ATTACHMENT_PREVIEW_EDGES.small))) &&
+        small.bytes.byteLength < photoBytes.byteLength &&
+        smallHeaders["content-type"] === "image/jpeg" &&
+        smallHeaders["content-length"] === String(small.bytes.byteLength) &&
+        smallHeaders["content-disposition"] === "attachment; filename*=UTF-8''photo%20one.jpg" &&
+        smallHeaders["x-content-type-options"] === "nosniff" &&
+        isDeepStrictEqual(decodes(), [[photoBytes.byteLength, ATTACHMENT_PREVIEW_EDGES.small]]),
+      { status: small.reply.status, headers: smallHeaders, decodes: decodes() },
+    );
+    const again = await preview({ attachmentId: "att-photo", size: "small" });
+    const cachedFiles = readdirSync(attachmentPreviewsRoot);
+    check(
+      "the same copy again comes from the host cache on disk, with no second decode",
+      again.reply.status === 200 &&
+        Buffer.from(again.bytes).equals(Buffer.from(small.bytes)) &&
+        decodes().length === 1 &&
+        cachedFiles.length === 1 &&
+        cachedFiles[0]?.endsWith(".jpg") === true,
+      { status: again.reply.status, decodes: decodes(), cachedFiles },
+    );
+    const parallel = await Promise.all([
+      preview({ attachmentId: "att-photo", size: "large" }),
+      preview({ attachmentId: "att-photo", size: "large" }),
+    ]);
+    check(
+      "two requests for the large copy at the same time give the same 2048 px copy with one decode",
+      parallel.every(
+        ({ reply, bytes }) =>
+          reply.status === 200 &&
+          Buffer.from(bytes).equals(Buffer.from(standInPreview(ATTACHMENT_PREVIEW_EDGES.large))),
+      ) && isDeepStrictEqual(decodes().slice(1), [[photoBytes.byteLength, ATTACHMENT_PREVIEW_EDGES.large]]),
+      { statuses: parallel.map(({ reply }) => reply.status), decodes: decodes() },
+    );
+    const decodesBefore = decodes().length;
+    const missing = await preview({ attachmentId: "att-missing", size: "small" });
+    const text = await preview({ attachmentId: "att-1", size: "small" });
+    check(
+      "an unknown attachment gets 404 attachmentNotFound, and a text attachment 415 attachmentPreviewUnsupported with no decode",
+      errorIs(missing.reply, 404, sourceText("error.team.attachmentNotFound")) &&
+        errorIs(text.reply, 415, sourceText("error.team.attachmentPreviewUnsupported")) &&
+        decodes().length === decodesBefore,
+      [summary(missing.reply), summary(text.reply)],
+    );
+    const badSize = await preview({ attachmentId: "att-photo", size: "huge" });
+    const noId = await preview({ size: "small" });
+    const noToken = await preview({ attachmentId: "att-photo", size: "small" }, null);
+    check(
+      "a size that is not small or large and a missing id get 400 from the codec, and no token 401",
+      badSize.reply.status === 400 &&
+        noId.reply.status === 400 &&
+        noToken.reply.status === 401 &&
+        decodes().length === decodesBefore,
+      [summary(badSize.reply), summary(noId.reply), summary(noToken.reply)],
     );
   }
 

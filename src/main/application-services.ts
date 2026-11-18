@@ -48,7 +48,7 @@ import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
-import { fitImageForAgent } from "./agent-image-fit";
+import { attachmentPreviewImage, fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import {
   type BrowserProfileService,
@@ -209,6 +209,7 @@ import { providerAuthKind } from "./analytics-provider-auth";
 import { AppBehaviorService } from "./app-behavior-service";
 import { AppearanceService } from "./appearance-service";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
+import { AttachmentPreviews } from "./attachment-previews";
 import { AutomationServer } from "./automation-server";
 import { listBackgroundProcesses, stopBackgroundProcess } from "./background-processes";
 import { BillingDesktopService } from "./billing-service";
@@ -493,6 +494,8 @@ import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
+/** The smaller copies of picture attachments that this host sends to phones (`attachment-previews-v1`). */
+const ATTACHMENT_PREVIEWS_DIRECTORY = "attachment-previews";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
 const ANALYTICS_INSTALL_ID_FILE = "openbot-analytics-install-id-v1.json";
@@ -3619,6 +3622,12 @@ export async function createApplicationServices({
     },
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
     hostedSites,
+    // Present, so the host advertises `attachment-previews-v1`. The copies stay in the user data
+    // folder of this computer, beside the attachments that they come from.
+    attachmentPreviews: new AttachmentPreviews({
+      root: join(app.getPath("userData"), ATTACHMENT_PREVIEWS_DIRECTORY),
+      make: attachmentPreviewImage,
+    }),
     // Present, so the host advertises `agent-import-v1`. Any member can import.
     agentImport,
     // Present, so the host advertises `hermes-import-v1`. Only owners and admins. The host reads its own

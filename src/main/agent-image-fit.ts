@@ -14,6 +14,8 @@ const MAX_KEPT_BYTES = 3 * 1024 * 1024;
  * pixels is about 480 MB decoded, more than a 108-megapixel phone photo.
  */
 const MAX_PIXELS = 120_000_000;
+/** The JPEG quality of an attachment preview: a phone screen does not show the loss, and the file is small. */
+const PREVIEW_JPEG_QUALITY = 80;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** For each EXIF orientation, the stored pixel that an upright pixel shows. 5 to 8 swap the sides. */
@@ -35,17 +37,10 @@ const STORED_PIXEL: Record<number, (x: number, y: number, width: number, height:
  */
 export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
   const file = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const jpeg = file[0] === 0xff && file[1] === 0xd8;
-  const png = file.length >= 24 && file.subarray(0, 8).equals(PNG_SIGNATURE);
-  if (!jpeg && !png) return "unsupported";
-  const facts = jpeg ? jpegFacts(file) : { orientation: 1, pixels: file.readUInt32BE(16) * file.readUInt32BE(20) };
-  if (facts.pixels > MAX_PIXELS) return "tooLarge";
-  // A JPEG with no frame header that the scan finds is damaged, or could hide any size from the check.
-  if (facts.pixels === 0) return "unsupported";
-  const source = nativeImage.createFromBuffer(file);
-  if (source.isEmpty()) return "unsupported";
+  const picture = decodePicture(file);
+  if (typeof picture === "string") return picture;
+  const { source, jpeg, orientation } = picture;
   const { width, height } = source.getSize();
-  const { orientation } = facts;
   const turned = orientation >= 5 && orientation <= 8;
   const sourceWidth = turned ? height : width;
   const sourceHeight = turned ? width : height;
@@ -53,18 +48,9 @@ export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
     const dataUrl = `data:image/${jpeg ? "jpeg" : "png"};base64,${file.toString("base64")}`;
     return { dataUrl, width, height, sourceWidth, sourceHeight };
   }
-  const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
-  const resized =
-    scale < 1
-      ? source.resize({
-          width: Math.max(1, Math.round(width * scale)),
-          height: Math.max(1, Math.round(height * scale)),
-          quality: "good",
-        })
-      : source;
-  const fitted = upright(resized, orientation);
+  const fitted = upright(shrink(source, MAX_EDGE), orientation);
   // A PNG keeps its transparency when it fits; a photo saved as PNG becomes a JPEG.
-  const encodedPng = png ? fitted.toPNG() : null;
+  const encodedPng = jpeg ? null : fitted.toPNG();
   const encoded = encodedPng && encodedPng.length <= MAX_KEPT_BYTES ? encodedPng : fitted.toJPEG(85);
   const size = fitted.getSize();
   return {
@@ -74,6 +60,65 @@ export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
     sourceWidth,
     sourceHeight,
   };
+}
+
+/** A smaller copy of a picture attachment (`attachment-previews-v1`). */
+export interface AttachmentPreviewImage {
+  bytes: Uint8Array;
+  mimeType: "image/jpeg" | "image/png";
+}
+
+/**
+ * The copy of a PNG or JPEG file that `attachment-previews-v1` sends: no larger than `maxEdge` on its
+ * long side, upright, and with no EXIF data. The copy is always a new file, also when the picture is
+ * already small. It is a JPEG, or a PNG when a pixel of the copy is not opaque. The decode is synchronous,
+ * as for `fitImageForAgent`, so the caller runs one at a time.
+ */
+export function attachmentPreviewImage(
+  bytes: Uint8Array,
+  maxEdge: number,
+): AttachmentPreviewImage | "unsupported" | "tooLarge" {
+  const picture = decodePicture(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  if (typeof picture === "string") return picture;
+  const preview = upright(shrink(picture.source, maxEdge), picture.orientation);
+  // A JPEG has no transparency, so only a PNG needs the read of its pixels.
+  if (!picture.jpeg && hasTransparency(preview)) return { bytes: preview.toPNG(), mimeType: "image/png" };
+  return { bytes: preview.toJPEG(PREVIEW_JPEG_QUALITY), mimeType: "image/jpeg" };
+}
+
+/** The decoded picture of a PNG or JPEG file, after the checks that keep a decode within `MAX_PIXELS`. */
+function decodePicture(
+  file: Buffer,
+): { source: NativeImage; jpeg: boolean; orientation: number } | "unsupported" | "tooLarge" {
+  const jpeg = file[0] === 0xff && file[1] === 0xd8;
+  const png = file.length >= 24 && file.subarray(0, 8).equals(PNG_SIGNATURE);
+  if (!jpeg && !png) return "unsupported";
+  const facts = jpeg ? jpegFacts(file) : { orientation: 1, pixels: file.readUInt32BE(16) * file.readUInt32BE(20) };
+  if (facts.pixels > MAX_PIXELS) return "tooLarge";
+  // A JPEG with no frame header that the scan finds is damaged, or could hide any size from the check.
+  if (facts.pixels === 0) return "unsupported";
+  const source = nativeImage.createFromBuffer(file);
+  if (source.isEmpty()) return "unsupported";
+  return { source, jpeg, orientation: facts.orientation };
+}
+
+/** The image made no larger than `maxEdge` on its long side. A smaller image stays as it is. */
+function shrink(image: NativeImage, maxEdge: number): NativeImage {
+  const { width, height } = image.getSize();
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  if (scale >= 1) return image;
+  return image.resize({
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    quality: "good",
+  });
+}
+
+/** True when a pixel is not fully opaque. The bitmap has 4 bytes per pixel, and alpha is the last one. */
+function hasTransparency(image: NativeImage): boolean {
+  const bitmap = image.toBitmap();
+  for (let alpha = 3; alpha < bitmap.length; alpha += 4) if (bitmap[alpha] !== 0xff) return true;
+  return false;
 }
 
 function upright(image: NativeImage, orientation: number): NativeImage {

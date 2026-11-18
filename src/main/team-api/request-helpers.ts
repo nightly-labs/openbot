@@ -59,6 +59,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -137,11 +138,17 @@ export function requestCapabilities(request: IncomingMessage): Set<string> {
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
   const value = Array.isArray(header) ? header.join(",") : header;
   const protocol = requestProtocol(request);
-  // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
-  if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
+  // Protocol 9 lists up to 256 capabilities, which can pass 4 KB, and protocol 10 up to 512, which can
+  // pass 8 KB. Node refuses a request whose headers pass 16 KB in total before this reads it.
+  if (!value || value.length > capabilityHeaderLimit(protocol)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
   if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
+}
+
+function capabilityHeaderLimit(protocol: number) {
+  if (protocol >= TEAM_PROTOCOL_V10) return 16_384;
+  return protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096;
 }
 
 export function conversationSnapshotForCapabilities(

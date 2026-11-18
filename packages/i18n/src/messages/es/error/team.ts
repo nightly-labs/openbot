@@ -142,6 +142,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
   "error.team.attachmentNameRequired": "Se requiere un nombre seguro para el archivo adjunto.",
   "error.team.attachmentNotFound": "No se encontró el archivo adjunto.",
+  "error.team.attachmentPreviewUnsupported": "El servidor no puede crear una copia más pequeña de este archivo.",
   "error.team.sharedFileTooLarge": "El archivo compartido supera el límite de 100 MB.",
   "error.team.workspaceFileTooLarge": "El archivo del espacio de trabajo supera el límite de 100 MB.",
   "error.team.browserViewUnavailable": "La vista del navegador en directo no está disponible.",

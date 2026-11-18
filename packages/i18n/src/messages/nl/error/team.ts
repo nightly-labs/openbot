@@ -146,6 +146,7 @@ export const messages = {
   "error.team.agentManageDenied": "Je kunt deze agent niet wijzigen.",
   "error.team.attachmentNameRequired": "Een veilige naam voor de bijlage is verplicht.",
   "error.team.attachmentNotFound": "Bijlage niet gevonden.",
+  "error.team.attachmentPreviewUnsupported": "De server kan geen kleinere kopie van dit bestand maken.",
   "error.team.sharedFileTooLarge": "Het gedeelde bestand is groter dan de limiet van 100 MB.",
   "error.team.workspaceFileTooLarge": "Het werkruimtebestand is groter dan de limiet van 100 MB.",
   "error.team.browserViewUnavailable": "De live browserweergave is niet beschikbaar.",

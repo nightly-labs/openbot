@@ -1,7 +1,9 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import type { AttachmentPreviewSize } from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { errorReference } from "@openbot/user-errors";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
@@ -11,8 +13,12 @@ import { useThemeColor } from "heroui-native/hooks";
 import FileText from "lucide-react-native/icons/file-text";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
+import { create } from "zustand";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
@@ -25,6 +31,7 @@ import {
   requestLargeFile,
   useAttachmentDownload,
 } from "../model/large-files";
+import { keepPreview, keptPreview } from "../model/media-store";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile, writeMediaFile } from "./use-media-file";
@@ -126,7 +133,10 @@ async function keepFile(
  * knows its shape, or a file above the attachment limit. It is used again without a new download.
  * Its data has no Base64.
  */
-function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
+function keptFile(
+  serverId: string,
+  attachment: Pick<AttachmentSummary, "id" | "name" | "mimeType" | "size">,
+): (RemoteFileUpload & { fileUri: string }) | null {
   const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
   if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
   try {
@@ -293,11 +303,52 @@ function imageExtension(attachment: AttachmentSummary, mimeType: string) {
 }
 
 /**
+ * An original at or below this size shows as it is: a smaller copy would save little, and the
+ * original is then on the phone for Share and Save too.
+ */
+const PREVIEW_MIN_BYTES = 300 * 1024;
+
+/**
+ * The answers that say that the host has no copy of a file: 415 for a type or a picture it cannot
+ * make one of, 404 for a file that it does not have as an attachment. Then the original shows.
+ */
+const NO_PREVIEW = /^(?:host|http)\/(?:404|415)(?:\/|$)/u;
+
+/** A picture that the host can make a smaller copy of (`attachment-previews-v1`). */
+function takesPreview(attachment: AttachmentSummary): boolean {
+  return (
+    (attachment.mimeType === "image/jpeg" || attachment.mimeType === "image/png") && attachment.size > PREVIEW_MIN_BYTES
+  );
+}
+
+/** The pictures whose original the user asked for, in this launch. A kept original shows in later launches. */
+const useFullQualityRequests = create<{ keys: ReadonlySet<string> }>(() => ({ keys: new Set() }));
+
+const fullQualityKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
+
+function requestFullQuality(serverId: string, attachmentId: string) {
+  const key = fullQualityKey(serverId, attachmentId);
+  if (useFullQualityRequests.getState().keys.has(key)) return;
+  useFullQualityRequests.setState(({ keys }) => ({ keys: new Set(keys).add(key) }));
+}
+
+/**
  * One host file: its image for a preview, and the share sheet for opening it. The query key is the
  * one the chat uses, so a file read in a message is not downloaded a second time for a queue row.
+ *
+ * With `previewSize`, a large JPEG or PNG shows as the smaller copy of the host, when the host makes
+ * one and the original is not on this phone. `requestFullQuality` then downloads the original, and
+ * the copy stays on screen until the original is there. Share, Save and Copy always use the original.
  */
-export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
-  const { downloadAttachment } = useMobileWorkspaceActions();
+export function useAttachmentFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+  preview: boolean,
+  previewSize?: AttachmentPreviewSize,
+) {
+  const { downloadAttachment, downloadAttachmentPreview } = useMobileWorkspaceActions();
+  const hostPreviews = useMobileWorkspaceSelector((workspace) => workspace.canLoadAttachmentPreviews(serverId));
+  const fullQuality = useFullQualityRequests((state) => state.keys.has(fullQualityKey(serverId, attachment.id)));
   const text = useText();
   const { t, sourceText } = text;
   // A large file shows only after the user asks for it, or with the setting on.
@@ -308,6 +359,45 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     attachment.previewUrl?.startsWith("data:image/") || (pending && attachment.previewUrl?.startsWith("file://"))
       ? attachment.previewUrl
       : null;
+  // The original on this phone, also from an earlier launch, is the picture to show: it needs no request.
+  const { id: attachmentId, name: attachmentName, mimeType: attachmentType, size: attachmentSize } = attachment;
+  const originalKept = useMemo(
+    () =>
+      keptFile(serverId, { id: attachmentId, name: attachmentName, mimeType: attachmentType, size: attachmentSize }) !==
+      null,
+    [serverId, attachmentId, attachmentName, attachmentType, attachmentSize],
+  );
+  const wantsPreview =
+    previewSize !== undefined &&
+    hostPreviews &&
+    !local &&
+    !pending &&
+    !originalKept &&
+    download === "download" &&
+    takesPreview(attachment);
+  const previewQuery = useQuery({
+    queryKey: queryKeys.chatAttachmentPreview(serverId, attachment.id, previewSize ?? "small"),
+    enabled: preview && wantsPreview,
+    // Null: the host has no copy of this file, so the original shows.
+    queryFn: async (): Promise<string | null> => {
+      const copySize = previewSize ?? "small";
+      const kept = keptPreview(serverId, attachment.id, copySize);
+      if (kept) return kept;
+      try {
+        const data = await downloadAttachmentPreview(serverId, attachment.id, copySize);
+        return await keepPreview(serverId, attachment.id, copySize, data);
+      } catch (error) {
+        if (NO_PREVIEW.test(errorReference(error) ?? "")) return null;
+        throw error;
+      }
+    },
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 5 * 60 * 1000,
+  });
+  // A host that cannot make the copy, such as for a damaged file, gives the original instead. Another
+  // failure, such as a lost connection, keeps the copy: a retry asks for the copy again.
+  const showsPreview = wantsPreview && previewQuery.data !== null;
   const query = useQuery({
     ...attachmentFileQuery(
       serverId,
@@ -315,7 +405,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       downloadAttachment,
       t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
     ),
-    enabled: preview && download === "download" && !local && !pending,
+    enabled: preview && download === "download" && !local && !pending && (!showsPreview || fullQuality),
   });
   const data = query.data;
   const dimensions = useMemo(() => {
@@ -326,8 +416,10 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     return read;
   }, [attachment.id, data]);
   const localUri = local ?? query.data?.localUri;
-  const uri =
+  const originalUri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
+  const previewUri = (showsPreview && previewQuery.data) || null;
+  const uri = originalUri ?? previewUri;
   async function share() {
     // The user asks for this file, so a large file downloads.
     requestLargeFile(serverId, attachment.id);
@@ -423,9 +515,21 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     dimensions,
     saveToPhotos,
     copyImage,
-    query,
+    /** The download of the picture on screen: the smaller copy while it shows, else the original. */
+    query: showsPreview && !originalUri ? previewQuery : query,
     sharing,
     busy: sharing || query.isFetching,
+    /** The picture on screen is the smaller copy of the host, not the original. */
+    showsPreview: showsPreview && !originalUri,
+    /** The original downloads after the user asked for it; the copy stays on screen until then. */
+    loadingFullQuality: fullQuality && !originalUri && query.isFetching,
+    /** Why the original did not download after the user asked for it, or null. */
+    fullQualityError: fullQuality && !originalUri ? query.error : null,
+    // A second tap after a failed download tries again.
+    requestFullQuality: () => {
+      if (fullQuality) void query.refetch();
+      else requestFullQuality(serverId, attachment.id);
+    },
     share: () => void share(),
   };
 }

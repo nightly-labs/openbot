@@ -6,8 +6,10 @@ import {
   type ConversationPage,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeStorageUsage,
   isAvatarColor,
   type SidebarLayoutSnapshot,
+  type StorageUsage,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { optionalServerAppearanceField } from "@openbot/contracts/team-protocol/host-appearance-v1";
@@ -54,6 +56,12 @@ export interface WorkspaceCache {
   /** The last server list of the account service, so the connections start before it answers again. */
   readHosts(): Promise<RemoteTeamHost[] | null>;
   writeHosts(hosts: readonly RemoteTeamHost[]): Promise<void>;
+  /**
+   * The last file list of the server's Library (`storage-v1`), so the Library shows at once, also
+   * without a connection. A list over the size limit is not kept.
+   */
+  readLibrary(serverId: string): Promise<StorageUsage | null>;
+  writeLibrary(serverId: string, usage: StorageUsage): Promise<void>;
 }
 
 const FORMAT = 1;
@@ -61,6 +69,8 @@ const ROOT = "workspace-cache-v1/";
 const KEY_NAME = "openbot.mobile.workspace-cache-key.v1";
 /** `segment` never makes a `~`, so no server file has this name. */
 const HOSTS_NAME = "~hosts";
+/** The start of the name of a Library file. A `~`, so no server file has this name. */
+const LIBRARY_PREFIX = "~library-";
 /**
  * The escaped JSON of a server file. Base64 adds a third, so the file stays under 4 MB. A server with
  * more keeps its agents and the chats that fit, newest first.
@@ -206,6 +216,11 @@ function decodeCachedHosts(value: unknown): RemoteTeamHost[] {
   return value.hosts.map(decodeCachedHost);
 }
 
+function decodeCachedLibrary(value: unknown): StorageUsage {
+  if (!isDynamicRecord(value) || value.format !== FORMAT) throw new Error("The cached Library is invalid.");
+  return decodeStorageUsage(value.usage);
+}
+
 /**
  * The server list, and the agents, sections, recent chats and channels of each server of one account, so the
  * app shows them at once after a start, before the account service and the connection answer. The
@@ -217,13 +232,15 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
   const root = rootDirectory();
   if (!root) return null;
   const account = Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, scope);
-  /** `serverId` null is the server list. */
-  const paths = async (serverId: string | null) => {
+  /** `serverId` null is the server list. `library` is the Library file of the server. */
+  const paths = async (serverId: string | null, library = false) => {
     const folder = `${root}${await account}/`;
-    const name = serverId === null ? HOSTS_NAME : segment(serverId);
+    const name = serverId === null ? HOSTS_NAME : `${library ? LIBRARY_PREFIX : ""}${segment(serverId)}`;
     return { folder, file: `${folder}${name}.bin`, next: `${folder}${name}.next.bin` };
   };
-  const binding = async (serverId: string | null) => asciiBytes(asciiJson([FORMAT, await account, serverId]));
+  // A Library file has its own binding, so it never opens as a server file. The server binding stays as released.
+  const binding = async (serverId: string | null, library = false) =>
+    asciiBytes(asciiJson(library ? [FORMAT, await account, serverId, "library"] : [FORMAT, await account, serverId]));
   // A remove that follows a write of the same server runs after it, so the file does not come back.
   const queues = new Map<string | null, Promise<unknown>>();
   const inOrder = <T>(serverId: string | null, operation: () => Promise<T>): Promise<T> => {
@@ -235,17 +252,17 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     });
     return result;
   };
-  const open = <T>(serverId: string | null, decode: (value: unknown) => T) =>
+  const open = <T>(serverId: string | null, decode: (value: unknown) => T, library = false) =>
     inOrder(serverId, async () => {
       const key = await cacheKey();
       if (!key) return null;
-      const { file } = await paths(serverId);
+      const { file } = await paths(serverId, library);
       if (!(await FileSystem.getInfoAsync(file)).exists) return null;
       try {
         const sealed = Crypto.AESSealedData.fromCombined(await FileSystem.readAsStringAsync(file));
         const plain = await Crypto.aesDecryptAsync(sealed, key, {
           output: "bytes",
-          additionalData: await binding(serverId),
+          additionalData: await binding(serverId, library),
         });
         return decode(JSON.parse(asciiText(plain)));
       } catch {
@@ -254,9 +271,11 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         return null;
       }
     });
-  const seal = async (serverId: string | null, key: Crypto.AESEncryptionKey, json: string) => {
-    const sealed = await Crypto.aesEncryptAsync(asciiBytes(json), key, { additionalData: await binding(serverId) });
-    const { folder, file, next } = await paths(serverId);
+  const seal = async (serverId: string | null, key: Crypto.AESEncryptionKey, json: string, library = false) => {
+    const sealed = await Crypto.aesEncryptAsync(asciiBytes(json), key, {
+      additionalData: await binding(serverId, library),
+    });
+    const { folder, file, next } = await paths(serverId, library);
     await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
     await FileSystem.writeAsStringAsync(next, await sealed.combined("base64"));
     await FileSystem.deleteAsync(file, { idempotent: true });
@@ -266,6 +285,13 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
   return {
     read: (serverId) => open(serverId, decodeCachedServer),
     readHosts: () => open(null, decodeCachedHosts),
+    readLibrary: (serverId) => open(serverId, decodeCachedLibrary, true),
+    writeLibrary: (serverId, usage) =>
+      inOrder(serverId, async () => {
+        const key = await cacheKey();
+        const json = asciiJson({ format: FORMAT, usage });
+        if (key && json.length <= MAX_JSON_LENGTH) await seal(serverId, key, json, true);
+      }),
     writeHosts: (hosts) =>
       inOrder(null, async () => {
         const key = await cacheKey();
@@ -308,15 +334,19 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
       }),
     remove: (serverId) =>
       inOrder(serverId, async () => {
-        const { file, next } = await paths(serverId);
-        await FileSystem.deleteAsync(file, { idempotent: true });
-        await FileSystem.deleteAsync(next, { idempotent: true });
+        for (const library of [false, true]) {
+          const { file, next } = await paths(serverId, library);
+          await FileSystem.deleteAsync(file, { idempotent: true });
+          await FileSystem.deleteAsync(next, { idempotent: true });
+        }
       }),
     retain: async (serverIds) => {
       const folder = `${root}${await account}/`;
       if (!(await FileSystem.getInfoAsync(folder)).exists) return;
       const kept = new Set(
-        [HOSTS_NAME, ...serverIds.map(segment)].flatMap((name) => [`${name}.bin`, `${name}.next.bin`]),
+        [HOSTS_NAME, ...serverIds.map(segment), ...serverIds.map((id) => `${LIBRARY_PREFIX}${segment(id)}`)].flatMap(
+          (name) => [`${name}.bin`, `${name}.next.bin`],
+        ),
       );
       for (const name of await FileSystem.readDirectoryAsync(folder))
         if (!kept.has(name)) await FileSystem.deleteAsync(`${folder}${name}`, { idempotent: true });

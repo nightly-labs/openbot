@@ -19,6 +19,7 @@ export const messages = {
   "mobile.workspace.error.removeOwnedServerOnly": "只有所有者可以移除该服务器。",
   "mobile.workspace.error.agentNotOnHost": "该助手不在这台主机上。",
   "mobile.workspace.error.filesUnsupported": "这台主机不支持文件管理，请更新主机上的 OpenBot。",
+  "mobile.workspace.error.previewsUnsupported": "此主机不发送缩小的图片副本。请在主机上更新 OpenBot。",
   "mobile.workspace.error.agentUnavailableOnHost": "该助手在这台主机上不可用。",
   "mobile.workspace.error.agentUnavailable": "该助手不可用。",
   "mobile.workspace.error.formUnavailable": "该表单已不可用。",

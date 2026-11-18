@@ -21,11 +21,12 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { decodeTeamProtocolV8CurrentEvent } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
-import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import {
-  decodeTeamProtocolV9WebRtcHttpResponse,
-  encodeTeamProtocolV9WebRtcHttpRequest,
-} from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+  decodeTeamProtocolV10WebRtcHttpResponse,
+  encodeTeamProtocolV10WebRtcHttpRequest,
+} from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
@@ -545,7 +546,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                       channelPicture: true,
                       channelBrowser: true,
                     })
-                  : encodeTeamProtocolV9WebRtcHttpRequest(method, path, init.body, {
+                  : encodeTeamProtocolV10WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
                         ? {}
                         : { preserveSemanticTags: init.preserveSemanticTags }),
@@ -618,7 +619,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelTaskWaits: true,
                     mcpManyServers: true,
                   })
-                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
+                : decodeTeamProtocolV10WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(
                 () =>
@@ -634,7 +635,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
         if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
-          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
+          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV10(body));
           this.#hostProtocols.set(hostId, support.protocol.maximum);
         }
         return { status: envelope.status, body, ...(file ? { file } : {}) };

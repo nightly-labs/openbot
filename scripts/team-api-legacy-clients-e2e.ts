@@ -9,6 +9,9 @@
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
 // - v9: the v9 decoder reads the v9 fixtures, which have more than 128 capabilities; the v8 decoder
 //   refuses them.
+// - v10: the v10 decoder reads the v10 fixtures, which have more than 256 capabilities; the v9 decoder
+//   refuses them. A protocol 9 peer, on HTTP and on WebRTC, gets at most 256 capabilities and none of
+//   the protocol 10 ones; a protocol 10 peer gets the full list.
 // - Capability limits: each list that a client can send, and each client fixture, fits the limit of its
 //   protocol. A protocol 6 request with the bootstrap list keeps its capabilities; one over 64 keeps none.
 // - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent, and a secure
@@ -71,6 +74,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { ATTACHMENT_PREVIEWS_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
@@ -92,6 +96,12 @@ import {
   TEAM_PROTOCOL_V9,
   TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
+import {
+  decodeTeamProtocolSupportV10,
+  TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY,
+  TEAM_PROTOCOL_V10,
+  TEAM_PROTOCOL_V10_CAPABILITY_LIMIT,
+} from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -150,6 +160,7 @@ const { TeamWebRtcBridge } = await import("../src/main/team-webrtc-bridge");
 const { TeamWebRtcHostPeer } = await import("../src/main/team-webrtc-host-peer");
 const { RemoteWorkflowError } = await import("../src/main/remote-service-effects");
 const { AGENT_ACCESS_FILE, AgentAccessStore } = await import("../src/main/agent-access-store");
+const { AttachmentPreviews } = await import("../src/main/attachment-previews");
 
 interface Step {
   name: string;
@@ -426,6 +437,9 @@ try {
     browser: teamBrowser,
     sidebarLayout: sidebar,
     agentAccess: access,
+    // Only so that the host advertises attachment-previews-v1, a protocol 10 capability. No step reads
+    // a preview.
+    attachmentPreviews: new AttachmentPreviews({ root: join(root, "attachment-previews"), make: () => "unsupported" }),
     appVersion: HOST_VERSION,
   });
   const port = await Effect.runPromise(server.start());
@@ -666,6 +680,28 @@ try {
     return { client: client.length, host: host.capabilities.length };
   });
 
+  await step("v10 decoder: reads the v10 fixtures; the v9 decoder refuses more than 256 capabilities", async () => {
+    const client = fixture("v10/client-capabilities.json");
+    assert.ok(Array.isArray(client), "v10/client-capabilities.json is not a list.");
+    assert.ok(
+      client.length > TEAM_PROTOCOL_V9_CAPABILITY_LIMIT && client.length <= TEAM_PROTOCOL_V10_CAPABILITY_LIMIT,
+      `v10/client-capabilities.json has ${client.length} capabilities.`,
+    );
+    assert.ok(client.includes(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY), "The v10 client list has no marker.");
+    const host = decodeTeamProtocolSupportV10(fixture("v10/host-compatibility.json"));
+    assert.equal(host.protocol.maximum, TEAM_PROTOCOL_V10);
+    assert.ok(
+      host.capabilities.length > TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+      `v10/host-compatibility.json has ${host.capabilities.length} capabilities.`,
+    );
+    assert.ok(host.capabilities.includes(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY), "The v10 host list has no marker.");
+    assert.throws(
+      () => decodeTeamProtocolSupportV9(fixture("v10/host-compatibility.json")),
+      "The v9 decoder read v10/host-compatibility.json.",
+    );
+    return { client: client.length, host: host.capabilities.length };
+  });
+
   // --- Capability list limits ---
 
   await step("capability limits: each list that a client can send fits the limit of its protocol", async () => {
@@ -677,13 +713,14 @@ try {
     // A client sends the bootstrap list before it knows the protocol, and to each host of protocol 6
     // or older. Hosts v0.20 to v0.34 refuse a longer WebRTC request and read a longer header as none.
     fits("bootstrap", TEAM_BOOTSTRAP_CAPABILITIES, teamProtocolCapabilityLimit(null));
-    for (let protocol = TEAM_PROTOCOL_V1; protocol <= TEAM_PROTOCOL_V9; protocol += 1) {
+    for (let protocol = TEAM_PROTOCOL_V1; protocol <= TEAM_PROTOCOL_V10; protocol += 1) {
       fits(`protocol ${protocol}`, teamCapabilitiesForProtocol(protocol), teamProtocolCapabilityLimit(protocol));
     }
     for (const [path, protocol] of [
       ["v1/client-scope.json", TEAM_PROTOCOL_V1],
       ["v2/client-scope.json", 2],
       ["v9/client-capabilities.json", TEAM_PROTOCOL_V9],
+      ["v10/client-capabilities.json", TEAM_PROTOCOL_V10],
     ] as const) {
       const value = fixture(path);
       const list = Array.isArray(value) ? value : record(value, path).capabilities;
@@ -694,6 +731,14 @@ try {
     const bootstrap = new Set<string>(TEAM_BOOTSTRAP_CAPABILITIES);
     assert.ok(bootstrap.has(TEAM_PI_MUSE_CAPABILITY), "The bootstrap list lost the protocol 7 marker.");
     assert.ok(bootstrap.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The bootstrap list lost the protocol 9 marker.");
+    assert.ok(
+      bootstrap.has(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY),
+      "The bootstrap list lost the protocol 10 marker.",
+    );
+    // The protocol 9 list is the one that protocol 9 clients already send: no protocol 10 capability.
+    const protocol9 = new Set<string>(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+    for (const capability of [TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY])
+      assert.ok(!protocol9.has(capability), `The protocol 9 list has ${capability}.`);
     return sizes;
   });
 
@@ -726,6 +771,44 @@ try {
     const refused = await markUnread(tooLong);
     assert.equal(refused, 400, `A protocol 6 request with ${tooLong.length} capabilities got ${refused}.`);
     return { sent: sent.length, kept, tooLong: tooLong.length, refused };
+  });
+
+  await step("v10 HTTP: a protocol 9 header gets at most 256 capabilities; a protocol 10 header gets all", async () => {
+    // The first compatibility read of a desktop client that a protocol 9 or 10 release made.
+    const compatibility = async (protocol: number) => {
+      const response = await fetch(`http://127.0.0.1:${port}/v1/compatibility`, {
+        headers: {
+          Accept: "application/json",
+          [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
+          [TEAM_APP_VERSION_HEADER]: CLIENT_VERSION,
+          [TEAM_CAPABILITIES_HEADER]: teamCapabilitiesForProtocol(protocol).join(","),
+        },
+      });
+      assert.equal(response.status, 200, `A protocol ${protocol} compatibility read got ${response.status}.`);
+      return response.json();
+    };
+    const v9 = decodeTeamProtocolSupportV9(await compatibility(TEAM_PROTOCOL_V9));
+    assert.ok(
+      v9.capabilities.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+      `A protocol 9 peer got ${v9.capabilities.length} capabilities.`,
+    );
+    assert.ok(v9.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "A protocol 9 peer lost its marker.");
+    for (const capability of [TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY])
+      assert.ok(!v9.capabilities.includes(capability), `A protocol 9 peer got ${capability}.`);
+    const v10 = decodeTeamProtocolSupportV10(await compatibility(TEAM_PROTOCOL_V10));
+    assert.equal(v10.protocol.maximum, TEAM_PROTOCOL_V10);
+    // This host serves only some features, so its lists are shorter than the limits. The protocol 10
+    // list is the protocol 9 list and the protocol 10 capabilities.
+    assert.deepEqual(
+      v10.capabilities.filter(
+        (capability) =>
+          capability !== TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY && capability !== ATTACHMENT_PREVIEWS_CAPABILITY,
+      ),
+      v9.capabilities,
+    );
+    for (const capability of [TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY])
+      assert.ok(v10.capabilities.includes(capability), `A protocol 10 peer did not get ${capability}.`);
+    return { protocol9: v9.capabilities.length, protocol10: v10.capabilities.length };
   });
 
   await step("v7 client: this host serves protocol 7 without the v8 `displayName`", async () => {
@@ -1470,10 +1553,10 @@ try {
     return { status };
   });
 
-  await step("v9 RPC: a protocol 9 peer gets the full list; a protocol 8 peer gets at most 128", async () => {
+  await step("v10 RPC: a protocol 10 peer gets the full list; protocol 9 at most 256; 8 at most 128", async () => {
     // A WebRTC request has no protocol header: the host reads the protocol from the marker
-    // capabilities. Protocols 7 and 8 read at most 128 capabilities, so their list leaves out the
-    // protocol 9 ones.
+    // capabilities. Protocol 9 reads at most 256 capabilities, so its list leaves out the protocol 10
+    // ones. Protocols 7 and 8 read at most 128, so their list also leaves out the protocol 9 ones.
     const compatibility = async (capabilities: readonly string[]) => {
       const requestId = randomUUID();
       const from = v2.bridge.sent.length;
@@ -1494,13 +1577,31 @@ try {
       assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
       return record(frame.result, "RPC result").body;
     };
-    // The bootstrap list of a protocol 9 client has the marker, so its first read is complete.
-    const first = decodeTeamProtocolSupportV9(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
-    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V9);
-    assert.ok(first.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
-    // A protocol 9 request may carry more than 128 capabilities.
-    const full = decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)));
+    // The bootstrap list of a protocol 10 client has the marker, so its first read is complete.
+    const first = decodeTeamProtocolSupportV10(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
+    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V10);
+    for (const capability of [TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY])
+      assert.ok(first.capabilities.includes(capability), `A protocol 10 peer did not get ${capability}.`);
+    // A protocol 10 request may carry more than 256 capabilities.
+    const full = decodeTeamProtocolSupportV10(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10)));
     assert.deepEqual(full.capabilities, first.capabilities);
+    // A protocol 9 client sends only the v9 marker, in its bootstrap list and in its full list. The
+    // released protocol 9 decoder reads what it gets, and the list has no protocol 10 capability.
+    const v9Bootstrap = TEAM_BOOTSTRAP_CAPABILITIES.filter(
+      (capability) => capability !== TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY,
+    );
+    const v9 = decodeTeamProtocolSupportV9(await compatibility(v9Bootstrap));
+    assert.deepEqual(
+      decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9))).capabilities,
+      v9.capabilities,
+    );
+    assert.ok(
+      v9.capabilities.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+      `A protocol 9 peer got ${v9.capabilities.length} capabilities.`,
+    );
+    assert.ok(v9.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
+    for (const capability of [TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, ATTACHMENT_PREVIEWS_CAPABILITY])
+      assert.ok(!v9.capabilities.includes(capability), `A protocol 9 peer got ${capability}.`);
     // The released protocol 8 decoder still reads what a protocol 8 peer gets.
     const v8 = decodeTeamProtocolSupportV8Base(await compatibility(teamCapabilitiesForProtocol(8)));
     assert.ok(v8.capabilities.length <= 128, `A protocol 8 peer got ${v8.capabilities.length} capabilities.`);
@@ -1509,7 +1610,11 @@ try {
       !v8.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY),
       "A protocol 8 peer got a protocol 9 capability.",
     );
-    return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+    return {
+      protocol10: first.capabilities.length,
+      protocol9: v9.capabilities.length,
+      protocol8: v8.capabilities.length,
+    };
   });
 
   await step("WebRTC client range: the highest common protocol, or the side that must update", async () => {
@@ -1531,10 +1636,18 @@ try {
     );
     const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
     assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
-    const host = decodeTeamProtocolSupportV9(record(frame.result, "RPC result").body).protocol;
-    // This host is in the support window and advertises 1-9: it works as before, on protocol 9.
-    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 });
-    assert.deepEqual(teamWebRtcClientProtocol(host), { protocol: TEAM_PROTOCOL_V9, update: null });
+    const host = decodeTeamProtocolSupportV10(record(frame.result, "RPC result").body).protocol;
+    // This host advertises 1-10: a current client works with it on protocol 10.
+    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 });
+    assert.deepEqual(teamWebRtcClientProtocol(host), { protocol: TEAM_PROTOCOL_V10, update: null });
+    // A protocol 9 client, released before protocol 10, still works with this host on protocol 9.
+    assert.deepEqual(teamWebRtcClientProtocol(host, { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V9 }), {
+      protocol: TEAM_PROTOCOL_V9,
+      update: null,
+    });
+    // A protocol 9 host, released before protocol 10, still serves a current client on protocol 9.
+    const v9Host = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 };
+    assert.deepEqual(teamWebRtcClientProtocol(v9Host), { protocol: TEAM_PROTOCOL_V9, update: null });
     // A host that raised its minimum to 9 still serves a client that speaks 9.
     const raised = { minimum: TEAM_PROTOCOL_V9, maximum: TEAM_PROTOCOL_V9 };
     assert.deepEqual(teamWebRtcClientProtocol(raised), { protocol: TEAM_PROTOCOL_V9, update: null });
@@ -1542,7 +1655,7 @@ try {
     const oldest = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 };
     assert.deepEqual(teamWebRtcClientProtocol(oldest), { protocol: TEAM_PROTOCOL_V3, update: null });
     // A client whose minimum is above 3 names the host as the side to update.
-    const laterClient = { minimum: TEAM_PROTOCOL_V3 + 1, maximum: TEAM_PROTOCOL_V9 };
+    const laterClient = { minimum: TEAM_PROTOCOL_V3 + 1, maximum: TEAM_PROTOCOL_V10 };
     assert.deepEqual(teamWebRtcClientProtocol(oldest, laterClient), {
       protocol: null,
       update: "host_update_required",
@@ -1758,4 +1871,4 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 
-process.stdout.write(`Team API v1-v3, v7, v8 and v9 clients passed. Report: ${join(OUT, "report.json")}\n`);
+process.stdout.write(`Team API v1-v3, v7, v8, v9 and v10 clients passed. Report: ${join(OUT, "report.json")}\n`);

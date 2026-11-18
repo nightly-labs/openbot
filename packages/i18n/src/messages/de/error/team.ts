@@ -147,6 +147,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
   "error.team.attachmentNotFound": "Anhang nicht gefunden.",
+  "error.team.attachmentPreviewUnsupported": "Der Server kann keine kleinere Kopie dieser Datei erstellen.",
   "error.team.sharedFileTooLarge": "Die geteilte Datei überschreitet die Grenze von 100 MB.",
   "error.team.workspaceFileTooLarge": "Die Arbeitsbereichsdatei überschreitet die Grenze von 100 MB.",
   "error.team.browserViewUnavailable": "Die Live-Browseransicht ist nicht verfügbar.",

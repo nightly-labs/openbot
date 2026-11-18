@@ -136,6 +136,7 @@ export const messages = {
   "error.team.agentManageDenied": "你无权更改该助手。",
   "error.team.attachmentNameRequired": "需要提供安全的附件名称。",
   "error.team.attachmentNotFound": "未找到该附件。",
+  "error.team.attachmentPreviewUnsupported": "服务器无法为此文件生成较小的副本。",
   "error.team.sharedFileTooLarge": "共享文件超过了 100 MB 上限。",
   "error.team.workspaceFileTooLarge": "工作区文件超过了 100 MB 上限。",
   "error.team.browserViewUnavailable": "浏览器实时视图不可用。",

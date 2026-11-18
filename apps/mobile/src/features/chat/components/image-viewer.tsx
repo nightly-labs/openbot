@@ -7,10 +7,19 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
 import Download from "lucide-react-native/icons/download";
+import Hd from "lucide-react-native/icons/hd";
 import Share from "lucide-react-native/icons/share";
 import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useState } from "react";
-import { AccessibilityInfo, Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Modal,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   type AnimatedRef,
@@ -165,6 +174,7 @@ export function ImageViewer({
   onShare,
   onCopy,
   onSave,
+  fullQuality,
   onIndexChange,
   onDismissed,
 }: {
@@ -184,6 +194,11 @@ export function ImageViewer({
   onCopy?: (() => Promise<boolean>) | undefined;
   /** Absent for a picture that the photo library does not take, such as an SVG. */
   onSave?: (() => Promise<boolean>) | undefined;
+  /**
+   * The picture on screen is the smaller copy of the host. The button downloads the original, which
+   * then replaces the copy. Absent when the original is on screen.
+   */
+  fullQuality?: { loading: boolean; onPress: () => void } | undefined;
   onIndexChange?: (index: number) => void;
   /** Called once the picture is back in its place. */
   onDismissed: () => void;
@@ -745,6 +760,28 @@ export function ImageViewer({
               ) : null}
             </View>
             <View className="flex-row gap-2">
+              {fullQuality ? (
+                <ChatGlassIconButton
+                  accessibilityLabel={text.t("mobile.chat.imageViewer.fullQuality", { name })}
+                  accessibilityValue={
+                    fullQuality.loading ? { text: text.t("mobile.chat.imageViewer.fullQualityLoading") } : undefined
+                  }
+                  hidden={!chromeVisible}
+                  disabled={fullQuality.loading}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    void haptics.impact("soft");
+                    fullQuality.onPress();
+                  }}
+                >
+                  {fullQuality.loading ? (
+                    <ActivityIndicator size="small" color={String(foreground)} />
+                  ) : (
+                    <Hd size={22} color={String(foreground)} />
+                  )}
+                </ChatGlassIconButton>
+              ) : null}
               <ChatGlassIconButton
                 accessibilityLabel={text.t("mobile.chat.imageViewer.share", { name })}
                 hidden={!chromeVisible}
@@ -871,7 +908,7 @@ function ViewerThumbnail({
   slot: number;
   position: SharedValue<number>;
 }) {
-  const file = useAttachmentFile(serverId, attachment, true);
+  const file = useAttachmentFile(serverId, attachment, true, "small");
   const style = useAnimatedStyle(() => {
     const closeness = clamp(1 - Math.abs(position.get() - slot), 0, 1);
     return { opacity: lerp(0.5, 1, closeness), transform: [{ scale: lerp(0.82, 1, closeness) }] };
@@ -933,8 +970,8 @@ function ViewerPicture({
   motion: ViewerMotion;
   onSize: (key: string, size: ImageDimensions) => void;
 }) {
-  // The query the chat uses, so a picture the chat has shown is not downloaded again.
-  const file = useAttachmentFile(serverId, attachment, true);
+  // The larger copy of the host, or the original when it is on the phone or the user asked for it.
+  const file = useAttachmentFile(serverId, attachment, true, "large");
   const [loaded, setLoaded] = useState(false);
   const knownWidth = file.dimensions?.width;
   const knownHeight = file.dimensions?.height;

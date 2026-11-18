@@ -21,6 +21,8 @@ export const messages = {
   "mobile.workspace.error.agentNotOnHost": "L’agent n’est pas sur cet hôte.",
   "mobile.workspace.error.filesUnsupported":
     "Cet hôte ne prend pas en charge la gestion des fichiers. Mettez à jour OpenBot sur l’hôte.",
+  "mobile.workspace.error.previewsUnsupported":
+    "Cet hôte n’envoie pas de copies réduites des images. Mettez à jour OpenBot sur l’hôte.",
   "mobile.workspace.error.agentUnavailableOnHost": "L’agent est indisponible sur cet hôte.",
   "mobile.workspace.error.agentUnavailable": "L’agent est indisponible.",
   "mobile.workspace.error.formUnavailable": "Ce formulaire n’est plus disponible.",

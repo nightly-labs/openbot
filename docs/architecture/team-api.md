@@ -305,6 +305,14 @@ of a peer below 9, and a client sends it only to a host that negotiated 9. On We
 protocol header is sent, the marker `long-capability-lists-v1` says that a peer reads 256. It is in
 the bootstrap list, so the first compatibility read of a protocol 9 host is already complete.
 
+Protocol 10 is the protocol 9 wire with capability lists of up to 512 names (`v10.ts`). Protocol 9
+reads at most 256 capabilities, and its list is full. A capability added after it is in
+`TEAM_PROTOCOL_V10_ONLY_CAPABILITIES` (`current.ts`): a host leaves it out of the compatibility list
+of a peer below 10, and a client sends it only to a host that negotiated 10. On WebRTC, the marker
+`capability-lists-512-v1` says that a peer reads 512. It is in the bootstrap list too, which now has
+64 names, the most that a peer of protocol 6 or older reads: a new marker must replace a name there.
+On HTTP, a protocol 10 capability header can have up to 16 KB.
+
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
 The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
@@ -637,6 +645,25 @@ member. A present value that a client cannot read reads as `none`. The host adds
 for a request that advertises the capability, so released peers see the same `channels-v1` wire, and a
 save from such a peer keeps the setting. Without the capability a client hides the Browser select for
 that host.
+
+The optional `attachment-previews-v1` capability (protocol 10 only) adds
+`POST /v1/attachment-previews` (`attachmentId`, `size`). `size` is `small` (at most 768 px on the long
+side, for a grid tile or a chat card) or `large` (at most 2048 px, for a full-screen view). The answer
+is the copy itself, sent as an attachment (`Content-Disposition: attachment`), so the WebRTC host peer
+sends it as a file, as it sends `GET /v1/attachments/:id`. The copy is upright (the EXIF orientation is
+applied), has no EXIF data, and is a JPEG, or a PNG when it has transparency. A member gets the copy of
+each attachment that `GET /v1/attachments/:id` gives them, with the same lookup: an unknown id gets 404
+`error.team.attachmentNotFound`, and a file that is not a JPEG or PNG, or that cannot be decoded within
+120 million pixels, gets 415 `error.team.attachmentPreviewUnsupported`; the client then loads the file
+itself. `src/main/team-api/route-attachment-previews.ts` owns the route, and
+`src/main/attachment-previews.ts` makes the copies with `attachmentPreviewImage`
+(`src/main/agent-image-fit.ts`). The decode is synchronous in the main process, so one decode runs at
+a time. Each copy is saved in `attachment-previews/` of the user data folder, named by the attachment
+id, the size, and the path, length and change time of the file, so a copy is never sent for a different
+file. The folder keeps at most 500 MB and deletes the oldest copies first; a failure of the folder does
+not fail a request. The phone app uses the route; the desktop app and the web client still load the
+originals. A request to the route does not keep a hosted server running. `scripts/team-api-routes-e2e.ts`
+checks the route, and `bun run test:attachment-previews` checks the decode in Electron.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

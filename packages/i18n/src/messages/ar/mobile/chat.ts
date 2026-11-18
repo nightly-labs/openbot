@@ -413,6 +413,9 @@ export const messages = {
   "mobile.chat.imageViewer.copy": "نسخ {name}",
   "mobile.chat.imageViewer.copied": "تم نسخ الصورة",
   "mobile.chat.imageViewer.position": "{current} من {total}",
+  "mobile.chat.imageViewer.fullQuality": "تنزيل {name} بالجودة الكاملة",
+  "mobile.chat.imageViewer.fullQualityLoading": "جارٍ تنزيل الجودة الكاملة",
+  "mobile.chat.imageViewer.fullQualityFailed": "تعذّر تنزيل الصورة بالجودة الكاملة",
   "mobile.chat.imageGallery.count": {
     zero: "لا صور",
     one: "صورة واحدة",

@@ -146,6 +146,7 @@ interface HostServiceOptions {
   backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
+  attachmentPreviews?: ForwardedApiOptions["attachmentPreviews"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
   hermesImport?: ForwardedApiOptions["hermesImport"];
@@ -519,6 +520,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
+      ...(options.attachmentPreviews === undefined ? {} : { attachmentPreviews: options.attachmentPreviews }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),
       ...(options.hermesImport === undefined ? {} : { hermesImport: options.hermesImport }),

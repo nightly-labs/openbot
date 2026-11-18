@@ -103,6 +103,10 @@ import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
+  ATTACHMENT_PREVIEW_ROUTE,
+  ATTACHMENT_PREVIEWS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/attachment-previews-v1";
+import {
   BACKGROUND_PROCESSES_CAPABILITY,
   BACKGROUND_PROCESSES_ROUTES,
   decodeBackgroundProcessesResponse,
@@ -613,6 +617,7 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "downloadAttachmentPreview"
   | "downloadMessageFile"
 >;
 
@@ -701,6 +706,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    canLoadAttachmentPreviews: (serverId) => has(serverId, ATTACHMENT_PREVIEWS_CAPABILITY),
     // The folders lay out the files of the storage scan, so the Library needs both.
     canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
     canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
@@ -730,6 +736,27 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   };
 }
 
+/** The previews that download at the same time. Each is small, so a grid fills a few tiles at once. */
+const PREVIEW_DOWNLOAD_SLOTS = 3;
+
+/** Runs at most `slots` downloads at the same time; the others wait in order. */
+function downloadSlots(slots: number) {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async <T>(download: () => Promise<T>): Promise<T> => {
+    // A slot that ends goes straight to the next waiter, so a new call cannot take it first.
+    if (running >= slots) await new Promise<void>((resolve) => waiting.push(resolve));
+    else running += 1;
+    try {
+      return await download();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running -= 1;
+    }
+  };
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -751,6 +778,7 @@ export function createHostRequestActions({
   largeAttachmentDownloads: { current: Promise<void> };
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
+  const previewDownloads = downloadSlots(PREVIEW_DOWNLOAD_SLOTS);
   /** The Team API of a server that serves `capability`, for an optional admin route set. */
   function capabilityApi(
     serverId: string,
@@ -1739,6 +1767,17 @@ export function createHostRequestActions({
       );
       return result;
     },
+    // Previews are small, so a few go at once, and they do not wait behind the originals.
+    downloadAttachmentPreview: (serverId, attachmentId, size) =>
+      previewDownloads(() => {
+        requireCapability(
+          capabilities,
+          serverId,
+          ATTACHMENT_PREVIEWS_CAPABILITY,
+          "mobile.workspace.error.previewsUnsupported",
+        );
+        return request("POST", ATTACHMENT_PREVIEW_ROUTE, decodeHostFile, { attachmentId, size }, serverId);
+      }),
     // The user waits for this one file, so it does not wait behind the images of the chat.
     downloadMessageFile: (serverId, file) =>
       request(

@@ -140,6 +140,7 @@ export const messages = {
   "error.team.agentManageDenied": "이 에이전트를 변경할 수 없어요.",
   "error.team.attachmentNameRequired": "안전한 첨부 파일 이름이 필요해요.",
   "error.team.attachmentNotFound": "첨부 파일을 찾을 수 없어요.",
+  "error.team.attachmentPreviewUnsupported": "서버에서 이 파일의 작은 사본을 만들 수 없어요.",
   "error.team.sharedFileTooLarge": "공유 파일이 100 MB 제한을 넘어요.",
   "error.team.workspaceFileTooLarge": "워크스페이스 파일이 100 MB 제한을 넘어요.",
   "error.team.browserViewUnavailable": "실시간 브라우저 화면을 사용할 수 없어요.",

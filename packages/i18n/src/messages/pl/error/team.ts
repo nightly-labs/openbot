@@ -136,6 +136,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
   "error.team.attachmentNameRequired": "Wymagana jest bezpieczna nazwa załącznika.",
   "error.team.attachmentNotFound": "Nie znaleziono załącznika.",
+  "error.team.attachmentPreviewUnsupported": "Serwer nie może utworzyć mniejszej kopii tego pliku.",
   "error.team.sharedFileTooLarge": "Udostępniony plik przekracza limit 100 MB.",
   "error.team.workspaceFileTooLarge": "Plik obszaru roboczego przekracza limit 100 MB.",
   "error.team.browserViewUnavailable": "Podgląd przeglądarki na żywo jest niedostępny.",

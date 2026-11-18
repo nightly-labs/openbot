@@ -43,6 +43,7 @@ import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { ATTACHMENT_PREVIEWS_CAPABILITY } from "./attachment-previews-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
@@ -197,7 +198,8 @@ import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import { highestCommonTeamProtocol, type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "./v1";
 import { TEAM_PROTOCOL_V3 } from "./v3";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
-import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY } from "./v9";
+import { TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V10, TEAM_PROTOCOL_V10_CAPABILITIES } from "./v10";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
@@ -324,6 +326,7 @@ export {
   AGENT_WAITS_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  ATTACHMENT_PREVIEWS_CAPABILITY,
   BACKGROUND_PROCESSES_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
@@ -487,7 +490,7 @@ export {
 
 export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SECRET_CAPABILITY,
-  ...TEAM_PROTOCOL_V9_CAPABILITIES,
+  ...TEAM_PROTOCOL_V10_CAPABILITIES,
   "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
@@ -727,6 +730,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
+  ATTACHMENT_PREVIEWS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -794,9 +798,10 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
 // Keep the first request readable by every released peer. A client also sends this list to a host
 // of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
 // over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
-// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
+// So each new capability is v7 only. The v7, v9 and v10 markers stay in: a current host reads the
 // protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
-// stays out: a client sends it only after the host reports protocol 8.
+// stays out: a client sends it only after the host reports protocol 8. The list now has 64 names, so
+// a new marker must replace a name here, not add one.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
     // No host of protocol 6 or older knows these three. They came after v0.34.1, the last protocol 6
@@ -993,11 +998,22 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
     capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-    capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+    capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
+    capability !== ATTACHMENT_PREVIEWS_CAPABILITY,
 );
 /**
- * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
- * capabilities, and their lists are full, so each capability that comes after them is here. A host
+ * The capabilities that only a protocol 10 peer sends and gets. Protocol 9 reads at most 256
+ * capabilities, and its list is full, so each capability that comes after it is here. A host leaves
+ * these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
+ */
+export const TEAM_PROTOCOL_V10_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY,
+  ATTACHMENT_PREVIEWS_CAPABILITY,
+]);
+/**
+ * The capabilities that only a protocol 9 or newer peer sends and gets. Protocols 7 and 8 read at most
+ * 128 capabilities, and their lists are full, so each capability that came after them, up to the
+ * protocol 9 limit, is here. A new capability goes in `TEAM_PROTOCOL_V10_ONLY_CAPABILITIES`. A host
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
@@ -1130,9 +1146,14 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
 ]);
+// A v9 host reads at most 256 capabilities, so a client sends the protocol 10 ones only after it
+// negotiates protocol 10.
+const TEAM_PROTOCOL_V9_CURRENT_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
+  (capability) => !TEAM_PROTOCOL_V10_ONLY_CAPABILITIES.has(capability),
+);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
-const TEAM_PROTOCOL_V8_CURRENT_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
+const TEAM_PROTOCOL_V8_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V9_CURRENT_CAPABILITIES.filter(
   (capability) => !TEAM_PROTOCOL_V9_ONLY_CAPABILITIES.has(capability),
 );
 // A v7 host does not know the v8 markers, so a client sends them only after it negotiates protocol 8.
@@ -1143,12 +1164,12 @@ const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V8_CURRENT_CAPABILIT
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY,
 );
 /**
- * The protocols that mobile and the web client speak through `packages/team-client`. They send protocol 9
+ * The protocols that mobile and the web client speak through `packages/team-client`. They send protocol 10
  * requests; an older host reads them with its own codec. Protocol 3 is the oldest host that they accepted.
  */
 export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   minimum: TEAM_PROTOCOL_V3,
-  maximum: TEAM_PROTOCOL_V9,
+  maximum: TEAM_PROTOCOL_V10,
 };
 
 /** The highest protocol that a WebRTC client and a host both speak, or which side must update. */
@@ -1161,14 +1182,21 @@ export function teamWebRtcClientProtocol(
 
 export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
   if (protocol === null || protocol === undefined || protocol < 7) return TEAM_BOOTSTRAP_CAPABILITIES;
-  if (protocol >= 9) return TEAM_CURRENT_CAPABILITIES;
+  if (protocol >= 10) return TEAM_CURRENT_CAPABILITIES;
+  if (protocol === 9) return TEAM_PROTOCOL_V9_CURRENT_CAPABILITIES;
   return protocol === 8 ? TEAM_PROTOCOL_V8_CURRENT_CAPABILITIES : TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES;
 }
-/** The capabilities that a peer of `protocol` reads: below protocol 9, without the protocol 9 ones. */
+/**
+ * The capabilities that a peer of `protocol` reads: below protocol 10, without the protocol 10 ones,
+ * and below protocol 9, also without the protocol 9 ones.
+ */
 export function teamCapabilitiesVisibleToProtocol<T extends string>(capabilities: readonly T[], protocol: number): T[] {
-  return protocol >= 9
-    ? [...capabilities]
-    : capabilities.filter((capability) => !TEAM_PROTOCOL_V9_ONLY_CAPABILITIES.has(capability));
+  if (protocol >= 10) return [...capabilities];
+  return capabilities.filter(
+    (capability) =>
+      !TEAM_PROTOCOL_V10_ONLY_CAPABILITIES.has(capability) &&
+      (protocol >= 9 || !TEAM_PROTOCOL_V9_ONLY_CAPABILITIES.has(capability)),
+  );
 }
 export function legacyTeamCapabilities(capabilities: readonly string[]): string[] {
   return capabilities.filter(
@@ -1245,6 +1273,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_FOLDERS_CAPABILITY &&
       capability !== HOST_KEY_ROTATION_CAPABILITY &&
       capability !== TEAM_LONG_CAPABILITY_LISTS_CAPABILITY &&
+      capability !== TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY &&
       capability !== AGENT_THREAD_BRANCHES_CAPABILITY &&
       capability !== CUSTOM_AGENTS_CAPABILITY &&
       capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
@@ -1364,6 +1393,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
       capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-      capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+      capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
+      capability !== ATTACHMENT_PREVIEWS_CAPABILITY,
   );
 }

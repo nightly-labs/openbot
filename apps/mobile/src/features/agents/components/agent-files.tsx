@@ -106,7 +106,7 @@ export function StoredFile({
   const { deleting, confirmDelete } = useStoredFileDelete(serverId, file, onChanged);
   const image = showsAsImage(file);
   const missing = file.status === "missing";
-  const attachment = useAttachmentFile(serverId, file, image && !missing);
+  const attachment = useAttachmentFile(serverId, file, image && !missing, "small");
   const preview = useAttachmentPreview(serverId, file);
   const details = [
     format.fileSize(file.size),

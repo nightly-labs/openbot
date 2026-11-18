@@ -9,7 +9,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
  */
 export function useServerStorage(serverId: string) {
   const { canReadServerStorage } = useMobileWorkspace();
-  const { loadServerStorage } = useMobileWorkspaceActions();
+  const { loadServerStorage, readKeptLibrary, keepLibrary } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverStorage(queryScope, serverId);
@@ -19,14 +19,36 @@ export function useServerStorage(serverId: string) {
     enabled: available,
     retry: false,
     staleTime: 0,
-    queryFn: () => loadServerStorage(serverId),
+    queryFn: async () => {
+      const usage = await loadServerStorage(serverId);
+      keepLibrary(serverId, usage);
+      return usage;
+    },
+  });
+  // The list of the last open, from this phone. It shows while the host measures, or when it cannot answer.
+  const kept = useQuery({
+    queryKey: queryKeys.serverKeptLibrary(queryScope, serverId),
+    enabled: available,
+    retry: false,
+    staleTime: Infinity,
+    queryFn: () => readKeptLibrary(serverId),
   });
   return {
     available,
     query,
+    /** The host's answer, or the list that this phone kept from the last answer. */
+    usage: query.data ?? kept.data ?? undefined,
     /** The host caches a scan. A retry, a deletion or a clear measures again, as on desktop. */
     async rescan(): Promise<void> {
-      await queryClient.fetchQuery({ queryKey, staleTime: 0, queryFn: () => loadServerStorage(serverId, true) });
+      await queryClient.fetchQuery({
+        queryKey,
+        staleTime: 0,
+        queryFn: async () => {
+          const usage = await loadServerStorage(serverId, true);
+          keepLibrary(serverId, usage);
+          return usage;
+        },
+      });
       await queryClient.invalidateQueries({ queryKey: queryKeys.serverDisk(queryScope, serverId) });
     },
   };

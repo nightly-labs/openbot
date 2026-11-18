@@ -20,6 +20,8 @@ export const messages = {
   "mobile.workspace.error.agentNotOnHost": "이 호스트에 없는 에이전트예요.",
   "mobile.workspace.error.filesUnsupported":
     "이 호스트는 파일 관리를 지원하지 않아요. 호스트의 OpenBot을 업데이트해 주세요.",
+  "mobile.workspace.error.previewsUnsupported":
+    "이 호스트는 축소된 이미지를 보내지 않습니다. 호스트의 OpenBot을 업데이트하세요.",
   "mobile.workspace.error.agentUnavailableOnHost": "이 호스트에서 에이전트를 사용할 수 없어요.",
   "mobile.workspace.error.agentUnavailable": "에이전트를 사용할 수 없어요.",
   "mobile.workspace.error.formUnavailable": "이 양식은 더 이상 사용할 수 없어요.",

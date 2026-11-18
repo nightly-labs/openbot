@@ -20,6 +20,8 @@ export const messages = {
   "mobile.workspace.error.agentNotOnHost": "O agente não está neste computador anfitrião.",
   "mobile.workspace.error.filesUnsupported":
     "Este computador anfitrião não permite gerenciar arquivos. Atualize o OpenBot nele.",
+  "mobile.workspace.error.previewsUnsupported":
+    "Este host não envia cópias menores das imagens. Atualize o OpenBot no host.",
   "mobile.workspace.error.agentUnavailableOnHost": "O agente está indisponível neste computador anfitrião.",
   "mobile.workspace.error.agentUnavailable": "O agente está indisponível.",
   "mobile.workspace.error.formUnavailable": "Este formulário não está mais disponível.",

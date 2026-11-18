@@ -138,6 +138,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",
   "error.team.attachmentNotFound": "Вложение не найдено.",
+  "error.team.attachmentPreviewUnsupported": "Сервер не может создать уменьшенную копию этого файла.",
   "error.team.sharedFileTooLarge": "Общий файл превышает лимит 100 МБ.",
   "error.team.workspaceFileTooLarge": "Файл рабочего пространства превышает лимит 100 МБ.",
   "error.team.browserViewUnavailable": "Просмотр браузера в реальном времени недоступен.",

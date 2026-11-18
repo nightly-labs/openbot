@@ -20,6 +20,8 @@ export const messages = {
   "mobile.workspace.error.agentNotOnHost": "Ajan bu ana makinede değil.",
   "mobile.workspace.error.filesUnsupported":
     "Bu ana makine dosya yönetimini desteklemiyor. Ana makinedeki OpenBot'u güncelleyin.",
+  "mobile.workspace.error.previewsUnsupported":
+    "Bu ana bilgisayar küçültülmüş görsel kopyaları göndermiyor. Ana bilgisayardaki OpenBot'u güncelleyin.",
   "mobile.workspace.error.agentUnavailableOnHost": "Ajan bu ana makinede kullanılamıyor.",
   "mobile.workspace.error.agentUnavailable": "Ajan kullanılamıyor.",
   "mobile.workspace.error.formUnavailable": "Bu form artık kullanılamıyor.",

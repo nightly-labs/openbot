@@ -394,6 +394,9 @@ export const messages = {
   "mobile.chat.imageViewer.copy": "Скопировать «{name}»",
   "mobile.chat.imageViewer.copied": "Изображение скопировано",
   "mobile.chat.imageViewer.position": "{current} из {total}",
+  "mobile.chat.imageViewer.fullQuality": "Скачать {name} в полном качестве",
+  "mobile.chat.imageViewer.fullQualityLoading": "Загрузка в полном качестве",
+  "mobile.chat.imageViewer.fullQualityFailed": "Не удалось скачать изображение в полном качестве",
   "mobile.chat.imageGallery.count": {
     one: "{count} изображение",
     few: "{count} изображения",

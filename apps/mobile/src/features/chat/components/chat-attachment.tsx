@@ -215,7 +215,12 @@ function ChatFileAttachment({
   const ask = download === "ask";
   // A large image is a card until the user taps it. An image above the host's limit opens on desktop.
   const image = showsAsImage(attachment) && download === "download";
-  const { pending, localUri, uri, dimensions, query, sharing, share } = useAttachmentFile(serverId, attachment, image);
+  const { pending, localUri, uri, dimensions, query, sharing, share } = useAttachmentFile(
+    serverId,
+    attachment,
+    image,
+    "small",
+  );
   // The conversation's viewer measures this copy and hides it on the UI thread while it holds the picture.
   // A large image that the user downloaded opens in the viewer too, as its only page.
   const viewable = image && !attachment.id.startsWith("mobile-draft-attachment-");

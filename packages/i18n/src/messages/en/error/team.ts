@@ -141,6 +141,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentManageDenied": "You cannot change this agent.",
   "error.team.attachmentNameRequired": "A safe attachment name is required.",
   "error.team.attachmentNotFound": "Attachment not found.",
+  "error.team.attachmentPreviewUnsupported": "The server cannot make a smaller copy of this file.",
   "error.team.sharedFileTooLarge": "The shared file exceeds the 100 MB limit.",
   "error.team.workspaceFileTooLarge": "The workspace file exceeds the 100 MB limit.",
   "error.team.browserViewUnavailable": "The live browser view is unavailable.",

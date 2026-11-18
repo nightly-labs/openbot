@@ -19,6 +19,7 @@ import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-pub
 import { AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_ROUTE } from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -104,6 +105,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RUN_PLACE_ROUTES.list,
   ROUTINE_PAUSE_REASONS_ROUTES.list,
   AGENT_ACTIVE_QUEUES_ROUTES.list,
+  // A phone loads the copies of the pictures in a chat or the library as they come into view.
+  ATTACHMENT_PREVIEW_ROUTE,
   ROUTINES_ONCE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,
   HOST_RELEASE_ROUTES.status,

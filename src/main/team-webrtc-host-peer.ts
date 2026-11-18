@@ -101,6 +101,11 @@ import {
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/v9";
 import { decodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import {
+  decodeTeamProtocolSupportV10,
+  TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/v10";
+import { decodeTeamProtocolV10WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
@@ -699,37 +704,41 @@ export class TeamWebRtcHostPeer {
     uploaded: ReceivedWebRtcFile | null,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, HostPeerTransport> {
     const sideRoute = teamSideRouteCodec(input.path);
-    // Protocol 9 is the protocol 8 wire. Its marker is in the bootstrap list too, so the first
-    // compatibility read of a protocol 9 peer gets the full capability list.
-    const protocol = peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-      ? 9
-      : peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-        ? 8
-        : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-          ? 7
-          : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-            ? 6
-            : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-              ? 5
-              : peerCapabilities.has("opencode")
-                ? 4
-                : isTeamProtocolV3OnlyRoute(input.method, input.path)
-                  ? 3
-                  : 1;
+    // Protocol 9 is the protocol 8 wire, and protocol 10 the protocol 9 wire. Their markers are in the
+    // bootstrap list too, so the first compatibility read of such a peer gets its full capability list.
+    const protocol = peerCapabilities.has(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY)
+      ? 10
+      : peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+        ? 9
+        : peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
+          ? 8
+          : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
+            ? 7
+            : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
+              ? 6
+              : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+                ? 5
+                : peerCapabilities.has("opencode")
+                  ? 4
+                  : isTeamProtocolV3OnlyRoute(input.method, input.path)
+                    ? 3
+                    : 1;
     const decodeRequest =
-      protocol >= 9
-        ? decodeTeamProtocolV9WebRtcHttpRequest
-        : protocol === 8
-          ? decodeTeamProtocolV8WebRtcHttpRequest
-          : protocol === 7
-            ? decodeTeamProtocolV7WebRtcHttpRequest
-            : protocol === 6
-              ? decodeTeamProtocolV6WebRtcHttpRequest
-              : protocol === 5
-                ? decodeTeamProtocolV5WebRtcHttpRequest
-                : protocol === 4
-                  ? decodeTeamProtocolV4WebRtcHttpRequest
-                  : decodeTeamProtocolV3WebRtcHttpRequest;
+      protocol >= 10
+        ? decodeTeamProtocolV10WebRtcHttpRequest
+        : protocol === 9
+          ? decodeTeamProtocolV9WebRtcHttpRequest
+          : protocol === 8
+            ? decodeTeamProtocolV8WebRtcHttpRequest
+            : protocol === 7
+              ? decodeTeamProtocolV7WebRtcHttpRequest
+              : protocol === 6
+                ? decodeTeamProtocolV6WebRtcHttpRequest
+                : protocol === 5
+                  ? decodeTeamProtocolV5WebRtcHttpRequest
+                  : protocol === 4
+                    ? decodeTeamProtocolV4WebRtcHttpRequest
+                    : decodeTeamProtocolV3WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined
@@ -841,12 +850,12 @@ export class TeamWebRtcHostPeer {
               body,
               sideRoute
                 ? sideRoute.response(input.path, response.status, body, responseOptions)
-                : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
-                  peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
+                : // A protocol 9 or 10 peer reads more capabilities than the protocol 7 and 8 encoders allow.
+                  protocol >= 9 &&
                     input.method === "GET" &&
                     input.path === TEAM_API_ROUTES.compatibility &&
                     response.status === 200
-                  ? { ...decodeTeamProtocolSupportV9(body) }
+                  ? { ...(protocol >= 10 ? decodeTeamProtocolSupportV10(body) : decodeTeamProtocolSupportV9(body)) }
                   : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
                       ? encodeTeamProtocolV8WebRtcHttpResponse
                       : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
@@ -1228,12 +1237,14 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
       (Array.isArray(value.capabilities) &&
         value.capabilities.length <=
           TEAM_PROTOCOL_CAPABILITY_LIMITS[
-            value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-              ? 9
-              : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
-                  value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                ? 7
-                : 1
+            value.capabilities.includes(TEAM_LONGER_CAPABILITY_LISTS_CAPABILITY)
+              ? 10
+              : value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+                ? 9
+                : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
+                    value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                  ? 7
+                  : 1
           ] &&
         value.capabilities.every(isString))) &&
     (value.bodyTransferId === undefined || isString(value.bodyTransferId)) &&

@@ -603,6 +603,19 @@ server list. The key is in the phone's keychain, and it does not leave this devi
 never sent anywhere. The app replaces it with what the server and the account service send, and
 deletes a server's copy when the account no longer has that server. Sign-out and an expired or
 disconnected session delete all copies and the key. Attachments and files are not in the copy.
+The app also keeps the last Library file list of each server (the name, type, size, chat and
+folder of each file, not its contents) in this copy, up to 4 MB for each server, so the Library opens
+at once and without a connection.
+
+The mobile app also keeps the attachments that it showed, so they open again at once and without a
+connection: pictures, videos, audio and other files of chats and the Library, and the smaller copies
+of pictures that a server sends. They are in the phone's system cache (`Library/Caches` on iOS),
+which is not in a device backup, which the operating system encrypts with the device, and which the
+system can delete when the phone is low on storage. They are not encrypted again by the app. They
+use at most 1 GB; the oldest go first. They are never sent anywhere. Sign-out, an expired or
+disconnected session and a sign-in to another account delete all of them, and the app deletes the
+files of a server when the account no longer has that server. Files that a message names from an
+agent's workspace or the shared folder stay on the phone only until the next start of the app.
 
 The mobile app keeps a support log of up to 5,000 events in the phone's system cache: app version,
 system and device model, app state changes, the route name of each screen that opens (such as

@@ -8,7 +8,9 @@ import {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import { savesToPhotos, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ImageViewer, type ImageViewerPage } from "./image-viewer";
 
@@ -116,7 +118,20 @@ function ConversationImageViewer({
   const [index, setIndex] = useState(initialIndex);
   const page = pages[index] ?? pages[initialIndex];
   // The same query as the image in the chat, so the image on screen is not downloaded again.
-  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page));
+  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page), "large");
+  const { t, sourceText } = useText();
+  const fullQualityError = file.fullQualityError;
+  // The copy stays on screen; the alert says why the original did not come.
+  useEffect(() => {
+    if (!fullQualityError) return;
+    void haptics.notification("error");
+    showFailureAlert(
+      fullQualityError,
+      "turn",
+      t("mobile.chat.imageViewer.fullQualityFailed"),
+      fullQualityError instanceof Error ? sourceText(fullQualityError.message) : t("mobile.chat.tryAgain"),
+    );
+  }, [fullQualityError, t, sourceText]);
   return (
     <ImageViewer
       serverId={serverId}
@@ -128,6 +143,9 @@ function ConversationImageViewer({
       // The clipboard and the photo library take the same pictures: raster images, not an SVG.
       onCopy={page && savesToPhotos(page.attachment) ? file.copyImage : undefined}
       onSave={page && savesToPhotos(page.attachment) ? file.saveToPhotos : undefined}
+      fullQuality={
+        file.showsPreview ? { loading: file.loadingFullQuality, onPress: file.requestFullQuality } : undefined
+      }
       onIndexChange={setIndex}
       onDismissed={onDismissed}
     />

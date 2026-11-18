@@ -165,6 +165,8 @@ export const queryKeys = {
   ],
   serverUpdate: (scope: QueryScope, serverId: string) => ["server-update", ...scope, serverId],
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
+  /** The Library list that this phone kept from the last answer of the host. */
+  serverKeptLibrary: (scope: QueryScope, serverId: string) => ["server-kept-library", ...scope, serverId],
   /** The Library folders of a host. `library-folders-changed` reads them again. */
   serverLibraryFolders: (scope: QueryScope, serverId: string) => ["server-library-folders", ...scope, serverId],
   serverDisk: (scope: QueryScope, serverId: string) => ["server-disk", ...scope, serverId],
@@ -328,4 +330,10 @@ export const queryKeys = {
   chatQueue: (...target: [] | [serverId: string] | [serverId: string, agentId: string]) => ["chat-queue", ...target],
   chatAttachment: (serverId: string, attachmentId: string) => ["chat-attachment", serverId, attachmentId],
   chatMediaFile: (serverId: string, attachmentId: string) => ["chat-media-file", serverId, attachmentId],
+  chatAttachmentPreview: (serverId: string, attachmentId: string, size: string) => [
+    "chat-attachment-preview",
+    serverId,
+    attachmentId,
+    size,
+  ],
 };

@@ -17,9 +17,9 @@ import {
   decodeTeamProtocolV2Json,
   decodeTeamProtocolV2RpcFrame,
   decodeTeamProtocolV8CurrentEvent,
-  decodeTeamProtocolV9WebRtcHttpResponse,
+  decodeTeamProtocolV10WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV9WebRtcHttpRequest,
+  encodeTeamProtocolV10WebRtcHttpRequest,
   TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
@@ -39,7 +39,8 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -1862,7 +1863,7 @@ export function createRemoteTeamPeer(
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
             // The highest protocol that both sides speak. A host that this client refuses keeps its maximum.
-            const host = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol;
+            const host = (yield* peerDecode(() => decodeTeamProtocolSupportV10(body))).protocol;
             state.hostProtocol = teamWebRtcClientProtocol(host).protocol ?? host.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
@@ -1885,7 +1886,7 @@ export function createRemoteTeamPeer(
               : yield* peerDecode(() =>
                   withWireBlockExtensions(
                     state,
-                    decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
+                    decodeTeamProtocolV10WebRtcHttpResponse(pending.method, pending.path, status, body),
                     body,
                   ),
                 ),
@@ -2051,7 +2052,7 @@ export function createRemoteTeamPeer(
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV9WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV10WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),
@@ -2680,7 +2681,7 @@ function signalErrorCode(data: string): string | null {
 
 /**
  * Whether the host can send `ui-block-auto-answer-v1`, `ui-block-vault-v1` and `skill-learning-v1`:
- * the client advertises them only on protocol 9, so the walk is skipped for every older host.
+ * the client advertises them only from protocol 9, so the walk is skipped for every older host.
  */
 function sendsBlockExtensions(state: PeerState): boolean {
   return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;

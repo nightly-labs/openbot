@@ -207,7 +207,7 @@ import {
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -1220,7 +1220,7 @@ export function createWebWorkspaceRuntime(
         );
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
-      const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
+      const support = decodeTeamProtocolSupportV10(await request("GET", TEAM_API_ROUTES.compatibility));
       const negotiated = teamWebRtcClientProtocol(support.protocol);
       if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
       if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);

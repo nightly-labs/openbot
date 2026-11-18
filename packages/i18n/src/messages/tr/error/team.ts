@@ -138,6 +138,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
   "error.team.attachmentNameRequired": "Güvenli bir ek adı gereklidir.",
   "error.team.attachmentNotFound": "Ek bulunamadı.",
+  "error.team.attachmentPreviewUnsupported": "Sunucu bu dosyanın daha küçük bir kopyasını oluşturamıyor.",
   "error.team.sharedFileTooLarge": "Paylaşılan dosya 100 MB sınırını aşıyor.",
   "error.team.workspaceFileTooLarge": "Çalışma alanı dosyası 100 MB sınırını aşıyor.",
   "error.team.browserViewUnavailable": "Canlı tarayıcı görünümü kullanılamıyor.",

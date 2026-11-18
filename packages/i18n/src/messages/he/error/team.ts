@@ -138,6 +138,7 @@ export const messages = {
   "error.team.agentManageDenied": "אי אפשר לשנות את הסוכן הזה.",
   "error.team.attachmentNameRequired": "נדרש שם בטוח לקובץ המצורף.",
   "error.team.attachmentNotFound": "הקובץ המצורף לא נמצא.",
+  "error.team.attachmentPreviewUnsupported": "השרת לא יכול ליצור עותק קטן יותר של הקובץ הזה.",
   "error.team.sharedFileTooLarge": "הקובץ המשותף חורג ממגבלת 100 MB.",
   "error.team.workspaceFileTooLarge": "קובץ סביבת העבודה חורג ממגבלת 100 MB.",
   "error.team.browserViewUnavailable": "תצוגת הדפדפן החיה אינה זמינה.",

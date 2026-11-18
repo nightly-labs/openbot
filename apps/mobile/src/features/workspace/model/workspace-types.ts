@@ -195,6 +195,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { AttachmentPreviewSize } from "@openbot/contracts/team-protocol/attachment-previews-v1";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -899,6 +900,11 @@ export interface MobileWorkspaceContextValue {
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
   /**
+   * True when the host advertises `attachment-previews-v1`: it sends a smaller copy of a JPEG or PNG
+   * attachment, so a grid or a chat card does not download the original.
+   */
+  canLoadAttachmentPreviews: (serverId: string) => boolean;
+  /**
    * True when the host advertises `library-folders-v1` and `storage-v1`. Every member reads the
    * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
    */
@@ -913,6 +919,10 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /** The last Library file list that this phone kept for the server, or null. It needs no connection. */
+  readKeptLibrary: (serverId: string) => Promise<StorageUsage | null>;
+  /** Keeps the Library file list for the next open, sealed in the workspace cache. */
+  keepLibrary: (serverId: string, usage: StorageUsage) => void;
   /** The Library folders of the host that this member can see (`library-folders-v1`). */
   loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
   /** Applies one folder change. The host answers with all folders that this member can see. */
@@ -1239,6 +1249,15 @@ export interface MobileWorkspaceContextValue {
     progress?: RemoteDownloadWatch,
   ) => Promise<RemoteFileUpload>;
   /**
+   * A smaller copy of a JPEG or PNG attachment (`attachment-previews-v1`). It does not wait behind the
+   * originals. The host answers 415 for a file that it cannot make a copy of.
+   */
+  downloadAttachmentPreview: (
+    serverId: string,
+    attachmentId: string,
+    size: AttachmentPreviewSize,
+  ) => Promise<RemoteFileUpload>;
+  /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member
    * reads it; the host keeps the path inside the folder.
    */
@@ -1312,6 +1331,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canLoadAttachmentPreviews"
   | "canOrganizeLibrary"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";

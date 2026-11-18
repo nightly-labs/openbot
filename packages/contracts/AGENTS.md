@@ -16,9 +16,10 @@ so the cost of a change is paid by code you cannot edit, for as long as the supp
 - Use capabilities for additive, optional behaviour; a missing capability disables only its own
   feature. `TEAM_PROTOCOL_CAPABILITY_LIMITS` (`src/team-protocol/capability-limits.ts`) holds the
   most capabilities that each protocol reads. Protocol 6 and older read 64, and the bootstrap list
-  goes to them too. Protocols 7 and 8 read 128, and their lists are full: a new one goes in
-  `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`. `bun run test:team-legacy-clients` fails when a list is over
-  its limit.
+  goes to them too. Protocols 7 and 8 read 128, and protocol 9 reads 256. Their lists are full: a new
+  one goes in `TEAM_PROTOCOL_V10_ONLY_CAPABILITIES` (protocol 10 reads 512). The bootstrap list has 64
+  names, so a new protocol marker must replace a name in it. `bun run test:team-legacy-clients` fails
+  when a list is over its limit.
 - A required field, a removed field, or a semantic change needs a new protocol version. Never change
   the meaning of a protocol that a release in the support window speaks.
 - A new value in an open field is not a protocol change. From protocol 8, provider ids and auth

@@ -152,6 +152,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
   "error.team.attachmentNotFound": "Allegato non trovato.",
+  "error.team.attachmentPreviewUnsupported": "Il server non può creare una copia più piccola di questo file.",
   "error.team.sharedFileTooLarge": "Il file condiviso supera il limite di 100 MB.",
   "error.team.workspaceFileTooLarge": "Il file del workspace supera il limite di 100 MB.",
   "error.team.browserViewUnavailable": "La vista in diretta del browser non è disponibile.",

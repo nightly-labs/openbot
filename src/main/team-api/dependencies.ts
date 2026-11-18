@@ -10,6 +10,7 @@ import type { AgentInstructionsFiles } from "../agent-instructions-files";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
+import type { AttachmentPreviews } from "../attachment-previews";
 import type { listBackgroundProcesses, stopBackgroundProcess } from "../background-processes";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
@@ -754,6 +755,8 @@ export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVo
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
+/** `attachment-previews-v1`: the smaller copies of picture attachments, made one at a time and kept on disk. */
+export type TeamApiAttachmentPreviews = Pick<AttachmentPreviews, "preview">;
 
 export interface TeamApiOptions {
   /** `events-v1`: admin-only event source and routine management. */
@@ -781,6 +784,7 @@ export interface TeamApiOptions {
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;
   hostedSites?: TeamApiHostedSites;
+  attachmentPreviews?: TeamApiAttachmentPreviews;
   agentImport?: TeamApiAgentImport;
   hermesImport?: TeamApiHermesImport;
   instanceTransfer?: TeamApiInstanceTransfer;

@@ -160,6 +160,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
   "error.team.attachmentNameRequired": "Un nom de pièce jointe sûr est requis.",
   "error.team.attachmentNotFound": "Pièce jointe introuvable.",
+  "error.team.attachmentPreviewUnsupported": "Le serveur ne peut pas créer une copie plus petite de ce fichier.",
   "error.team.sharedFileTooLarge": "Le fichier partagé dépasse la limite de 100 Mo.",
   "error.team.workspaceFileTooLarge": "Le fichier de l’espace de travail dépasse la limite de 100 Mo.",
   "error.team.browserViewUnavailable": "La vue du navigateur en direct n’est pas disponible.",

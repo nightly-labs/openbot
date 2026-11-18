@@ -296,6 +296,7 @@
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
     "./team-protocol/agent-active-queues-v1": "./src/team-protocol/agent-active-queues-v1.ts",
     "./team-protocol/agent-create-operation-v1": "./src/team-protocol/agent-create-operation-v1.ts",
+    "./team-protocol/attachment-previews-v1": "./src/team-protocol/attachment-previews-v1.ts",
     "./team-protocol/agent-thread-requests-v1": "./src/team-protocol/agent-thread-requests-v1.ts",
     "./team-protocol/agent-usage-limit-v1": "./src/team-protocol/agent-usage-limit-v1.ts",
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",
@@ -321,7 +322,9 @@
     "./team-protocol/v8-webrtc-adapter": "./src/team-protocol/v8-webrtc-adapter.ts",
     "./team-protocol/v9": "./src/team-protocol/v9.ts",
     "./team-protocol/capability-limits": "./src/team-protocol/capability-limits.ts",
-    "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts"
+    "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts",
+    "./team-protocol/v10": "./src/team-protocol/v10.ts",
+    "./team-protocol/v10-webrtc-adapter": "./src/team-protocol/v10-webrtc-adapter.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

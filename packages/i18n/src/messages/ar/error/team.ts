@@ -139,6 +139,7 @@ export const messages = {
   "error.team.agentManageDenied": "لا يمكنك تغيير هذا الوكيل.",
   "error.team.attachmentNameRequired": "يلزم اسم آمن للمرفق.",
   "error.team.attachmentNotFound": "لم يُعثر على المرفق.",
+  "error.team.attachmentPreviewUnsupported": "لا يستطيع الخادم إنشاء نسخة أصغر من هذا الملف.",
   "error.team.sharedFileTooLarge": "يتجاوز الملف المشترك حد 100 MB.",
   "error.team.workspaceFileTooLarge": "يتجاوز ملف مساحة العمل حد 100 MB.",
   "error.team.browserViewUnavailable": "العرض المباشر للمتصفح غير متاح.",

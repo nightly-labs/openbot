@@ -19,6 +19,8 @@ export const messages = {
   "mobile.workspace.error.removeOwnedServerOnly": "Alleen de eigenaar kan deze server verwijderen.",
   "mobile.workspace.error.agentNotOnHost": "Agent staat niet op deze host.",
   "mobile.workspace.error.filesUnsupported": "Deze host ondersteunt geen bestandsbeheer. Werk OpenBot bij op de host.",
+  "mobile.workspace.error.previewsUnsupported":
+    "Deze host stuurt geen verkleinde afbeeldingen. Werk OpenBot bij op de host.",
   "mobile.workspace.error.agentUnavailableOnHost": "De agent is niet beschikbaar op deze host.",
   "mobile.workspace.error.agentUnavailable": "De agent is niet beschikbaar.",
   "mobile.workspace.error.formUnavailable": "Dit formulier is niet meer beschikbaar.",

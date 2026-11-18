@@ -136,6 +136,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
   "error.team.attachmentNotFound": "添付ファイルが見つかりません。",
+  "error.team.attachmentPreviewUnsupported": "サーバーはこのファイルの縮小コピーを作成できません。",
   "error.team.sharedFileTooLarge": "共有ファイルが 100 MB の上限を超えています。",
   "error.team.workspaceFileTooLarge": "ワークスペースのファイルが 100 MB の上限を超えています。",
   "error.team.browserViewUnavailable": "ライブブラウザービューを利用できません。",

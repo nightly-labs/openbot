@@ -292,7 +292,7 @@ function StackCard({
   retries: Map<number, () => boolean>;
 }) {
   const muted = useThemeColor("muted");
-  const { localUri, uri, dimensions, query } = useAttachmentFile(serverId, attachment, true);
+  const { localUri, uri, dimensions, query } = useAttachmentFile(serverId, attachment, true, "small");
   const [loaded, setLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const source = useChatImageSource(isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);
@@ -413,7 +413,7 @@ export function ChatGalleryTile({
 }) {
   const { t } = useText();
   const muted = useThemeColor("muted");
-  const { pending, localUri, uri, dimensions, query } = useAttachmentFile(serverId, attachment, true);
+  const { pending, localUri, uri, dimensions, query } = useAttachmentFile(serverId, attachment, true, "small");
   const [loaded, setLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const source = useChatImageSource(attachment.id, TILE_RADIUS);
