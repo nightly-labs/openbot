@@ -40,6 +40,7 @@ import type { JSX } from "@solidjs/web";
 import { children, createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 import { PickerMenu } from "./WorkflowPicker";
 import {
   Hint,
@@ -699,7 +700,9 @@ export function resultTime(format: AppFormat, at: string): string {
 /**
  * The results of a step, oldest first, under the selected node, as on the Higgsfield canvas. An
  * image step shows each image; a text step shows the number of each result. The arrows move to the
- * result before or after the one on view. A step with one result shows nothing.
+ * result before or after the one on view. A step with one result shows nothing. When there are more
+ * results than fit, the list scrolls so that the result on view is in the middle, clear of the faded
+ * edges.
  */
 function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string | undefined) | undefined }) {
   const board = useBoard();
@@ -713,6 +716,18 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
     const next = list()[index() + step];
     if (next) board.pick(props.id, next.id);
   };
+  let items: HTMLSpanElement | undefined;
+  createEffect(
+    () => (list().length > 1 ? board.shown(props.id)?.id : undefined),
+    (id, before) => {
+      const item = id ? items?.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
+      if (!items || !item) return;
+      items.scrollTo({
+        left: item.offsetLeft + item.offsetWidth / 2 - items.clientWidth / 2,
+        behavior: before === undefined || prefersReducedMotion() ? "instant" : "smooth",
+      });
+    },
+  );
   return (
     <Show when={list().length > 1}>
       <fieldset class="wfn-strip" aria-label={t("workflow.node.result.list")}>
@@ -725,7 +740,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
         >
           <ChevronLeft />
         </Button>
-        <span class="wfn-strip-list">
+        <span ref={items} class="wfn-strip-list">
           <For each={list()}>
             {(result, at) => (
               <Hint

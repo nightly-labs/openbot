@@ -13,6 +13,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "メンバーがこのタスクを何度も受け渡しました。ループを防ぐために停止しました。",
   "channel.conversation.noMembers": "作業を始めるには、チャンネル設定でエージェントを追加してください。",
+  "channel.conversation.waitFull": "待機中 - 実行中のタスクが終わると {name} が開始します",
   "channel.conversation.archivedNotice": "削除済みのチャンネルです。プレビューのみです。",
   "channel.composer.label": "チャンネルへのメッセージ",
   "channel.composer.placeholder": "{name} へのメッセージ",

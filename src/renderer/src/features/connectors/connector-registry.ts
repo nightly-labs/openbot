@@ -1,6 +1,7 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { CONNECTOR_IDS, type ConnectorId } from "@openbot/ui/features/connectors/connectors";
 import { createEffect, createMemo, untrack } from "solid-js";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { createBitwardenConnector } from "./bitwarden-connector";
 import { type BitwardenConnectorPort, bitwardenConnectorPort } from "./bitwarden-connector-port";
 import { connectorAccess } from "./connector-access";
@@ -74,6 +75,8 @@ export interface ConnectorRegistry {
   available: () => readonly ConnectorController[];
   /** Reads the available connectors again, for a view that opens. */
   reload: () => void;
+  /** False for a member of a joined server: only its owner or an admin connects apps there. */
+  canManage: () => boolean;
 }
 
 /**
@@ -133,5 +136,9 @@ export function createConnectorRegistry(
     get: (id) => entries().find((entry) => entry.id === id) ?? { id, access: "hidden" },
     available,
     reload,
+    canManage: () => {
+      const current = server();
+      return current?.kind !== "remote" || serverRoleCanAdminister(current);
+    },
   };
 }

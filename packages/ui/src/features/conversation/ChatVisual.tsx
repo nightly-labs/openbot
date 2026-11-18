@@ -13,7 +13,7 @@ import {
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, Maximize2, PanelRight } from "@openbot/ui";
+import { Button, Maximize2, PanelRight, Wallpaper } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
@@ -106,6 +106,11 @@ interface ChatVisualProps {
    * to full screen. Without it, the page has no such button.
    */
   onOpenInSidePanel?: (() => void) | undefined;
+  /**
+   * Puts the page behind the window. Inline only: the page shows a button for it next to full screen.
+   * The page row has no message menu, so this is where "Use as backdrop" of a visual page goes.
+   */
+  onUseAsBackdrop?: (() => void) | undefined;
   /** The modifier of the quote shortcut on this device. */
   quoteShortcut?: QuoteShortcutModifier | undefined;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -385,6 +390,20 @@ function VisualFrame(props: ChatVisualProps) {
                 onClick={() => open()()}
               >
                 <PanelRight aria-hidden="true" />
+              </Button>
+            )}
+          </Show>
+          <Show when={props.onUseAsBackdrop}>
+            {(setBackdrop) => (
+              <Button
+                variant="secondary"
+                size="icon-sm"
+                type="button"
+                aria-label={t("chat.menu.useAsBackdrop")}
+                title={t("chat.menu.useAsBackdrop")}
+                onClick={() => setBackdrop()()}
+              >
+                <Wallpaper aria-hidden="true" />
               </Button>
             )}
           </Show>

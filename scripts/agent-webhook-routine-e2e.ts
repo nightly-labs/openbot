@@ -9,6 +9,10 @@
 // Routines settings, and that delete_routine deletes it. It also checks Standard Webhooks requests, as
 // Composio sends them: the sender's own secret (raw, and `whsec_` base64), the `v1,` signature, and
 // a filter on `/metadata/trigger_slug`, which matches because the whole body is the event data.
+// It also checks that a person can give a new secret to the agent (#11895): the host saves it in the
+// Vault as an API key of that agent only, the key file signs a delivery, the answer and the chat have
+// no secret, a regenerated or pasted secret updates the key, a channel routine is refused, and
+// delete_routine removes the key.
 // `bun scripts/agent-webhook-routine-e2e.ts`. Writes .openbot-build/agent-webhook-routine-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
@@ -45,7 +49,12 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
-const { agentWebhookRoutineWriter, HostEventsService } = await import("../src/main/host-events-service");
+const { agentWebhookRoutineWriter, HostEventsService, hostAgentWebhookKeys } = await import(
+  "../src/main/host-events-service"
+);
+const { AgentApiKeys } = await import("../src/backend/agent-api-keys");
+const { VaultService } = await import("../src/main/vault-service");
+const { VaultStore } = await import("../src/main/vault-store");
 
 const RELAY_ORIGIN = "https://signal.example.test";
 const CALL_MARK = "WEBHOOK-CALL";
@@ -178,6 +187,7 @@ interface WebhookToolBody {
   url?: string | null;
   urlPending?: string;
   secret?: string;
+  secretKey?: string;
   request?: { headers: Record<string, string>; standardWebhooks?: string };
 }
 
@@ -195,6 +205,15 @@ const report: {
     refusals: { shortSecret: string | null; scheduleRoutine: string | null };
     statuses: Record<string, number>;
     activity: EventActivity[];
+  };
+  agentKey?: {
+    name: string;
+    answer: unknown;
+    statuses: Record<string, number>;
+    channelRefusal: string | null;
+    keyAfterDelete: boolean;
+    pendingKeyGiven: boolean;
+    pendingKeyAfterSchedule: boolean;
   };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -252,6 +271,16 @@ function pass(name: string, condition: boolean, detail?: string) {
 }
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+// As in the app, the Vault keeps the keys; it reverses the bytes so its file never has the plain text.
+const vault = new VaultService({
+  store: new VaultStore(join(root, "openbot-vault.json"), {
+    encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
+    decrypt: (value: Buffer) => Buffer.from(value).reverse().toString("utf8"),
+  }),
+  canPersist: () => true,
+});
+await Effect.runPromise(vault.load());
+const apiKeys = new AgentApiKeys(join(root, "agent-api-keys"), vault.items);
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -262,11 +291,14 @@ const agents = new AgentService({
   browser,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  // As in the app: a routine delete removes the agent's key of the routine secret.
+  agentApiKeys: apiKeys,
   // As in the app: the events service is built after the agent service.
   webhookRoutines: () => agentWebhookRoutineWriter(events),
 });
 const events = new HostEventsService({
   routines: agents.routineRecords,
+  agentKeys: hostAgentWebhookKeys(apiKeys, (agentId) => store.list().find((agent) => agent.id === agentId)?.name),
   // Reversible and visible, so the check can see that the stored value is not the secret.
   cipher: {
     encrypt: (value) => Buffer.from(`sealed:${Buffer.from(value).toString("base64")}`),
@@ -350,6 +382,8 @@ try {
   );
   pass("The result has no signing secret", !created.text.includes("whsec_"));
   pass("The result sends the user to the chat card", result.secret.includes("card in this chat"));
+  const keyName = `WEBHOOK_SECRET_${result.routineId.replaceAll("-", "").toUpperCase()}`;
+  pass("The result names the API key that a given secret goes to", result.secretKey?.includes(keyName) === true);
   pass(
     "The result names Standard Webhooks senders and the sender's secret",
     result.request.standardWebhooks?.includes("Composio") === true &&
@@ -615,6 +649,75 @@ try {
     !JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages).includes(rawSecret),
   );
 
+  // 7c. A person gives a new secret to the agent (#11895). The host saves it as an API key of the agent
+  // only, then replaces the routine secret. The answer has only the key name.
+  const ownKey = async () =>
+    (await Effect.runPromise(apiKeys.list(agent.id))).find((key) => key.name === keyName && key.source === undefined);
+  const keyValue = async () => {
+    const key = await ownKey();
+    return key ? readFileSync(key.path, "utf8") : null;
+  };
+  const pendingKey = `WEBHOOK_SECRET_${(pending.body?.routineId ?? "").replaceAll("-", "").toUpperCase()}`;
+  await Effect.runPromise(events.rotateSecret({ owner, id: pending.body?.routineId ?? "" }));
+  pass(
+    "A regenerated secret does not make a key for an agent that was not given one",
+    !(await Effect.runPromise(apiKeys.list(agent.id))).some((key) => key.name === pendingKey),
+  );
+  const answer = await Effect.runPromise(events.giveSecretToAgent({ owner, id: result.routineId }));
+  const givenSecret = await keyValue();
+  const keyStatuses: Record<string, number> = {};
+  keyStatuses.givenKey = givenSecret ? (await deliver(givenSecret)).status : 0;
+  keyStatuses.secretBefore = (await deliver(secret)).status;
+  pass("The answer has only the key name", JSON.stringify(answer) === JSON.stringify({ name: keyName }));
+  pass("The agent has the key for it only", givenSecret?.startsWith("whsec_") === true);
+  pass("A request signed with the key file's value starts the routine", keyStatuses.givenKey === 202);
+  pass("The secret from before stops working", keyStatuses.secretBefore === 401);
+  const regenerated = await Effect.runPromise(events.rotateSecret({ owner, id: result.routineId }));
+  pass("A regenerated secret updates the agent's key", (await keyValue()) === regenerated.secret);
+  const pasted = randomBytes(24).toString("hex");
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: pasted }));
+  pass("A sender's secret updates the agent's key", (await keyValue()) === pasted);
+  keyStatuses.pastedKey = (await deliverStandard(pasted, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  pass("The updated key signs as the sender's secret", keyStatuses.pastedKey === 202);
+  const channelRefusal = await Effect.runPromise(
+    events.giveSecretToAgent({ owner: { kind: "channel", id: "channel-1" }, id: result.routineId }),
+  ).then(
+    () => null,
+    (error: unknown) => String(error),
+  );
+  pass("A channel routine has no single agent to give the secret to", channelRefusal !== null);
+  // A save that changes the trigger to a schedule removes the route, so the key is old.
+  const pendingId = pending.body?.routineId ?? "";
+  const hasPendingKey = async () =>
+    (await Effect.runPromise(apiKeys.list(agent.id))).some((key) => key.name === pendingKey);
+  await Effect.runPromise(events.giveSecretToAgent({ owner, id: pendingId }));
+  const pendingKeyGiven = await hasPendingKey();
+  const pendingRoutine = (await Effect.runPromise(events.listRoutines({ owner }))).find(
+    (item) => item.id === pendingId,
+  );
+  assert.ok(pendingRoutine, "the routine from the relay-down step is gone");
+  await Effect.runPromise(
+    events.saveRoutine({
+      id: pendingId,
+      owner,
+      name: pendingRoutine.name,
+      instruction: pendingRoutine.instruction,
+      active: pendingRoutine.active,
+      timezone: pendingRoutine.timezone,
+      trigger: { kind: "schedule", schedule: { kind: "hourly", minute: 0 } },
+    }),
+  );
+  const pendingKeyAfterSchedule = await hasPendingKey();
+  pass(
+    "A trigger change to a schedule removes the agent's key of the routine",
+    pendingKeyGiven && !pendingKeyAfterSchedule,
+  );
+  const chatAfterKey = JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages);
+  pass(
+    "No given secret is in the chat",
+    givenSecret !== null && !chatAfterKey.includes(givenSecret) && !chatAfterKey.includes(regenerated.secret),
+  );
+
   // 8. test_routine does not test a webhook routine and names Routines settings. delete_routine
   // deletes it as Routines settings do (#4509).
   const refused = await callTool("test_routine", agent.id, { __tool: "test_routine", routineId: result.routineId });
@@ -634,6 +737,17 @@ try {
       !afterDelete.some((item) => item.id === result.routineId),
     deleted.text,
   );
+  const keyAfterDelete = (await ownKey()) !== undefined;
+  pass("delete_routine removes the agent's key of the routine", !keyAfterDelete);
+  report.agentKey = {
+    name: keyName,
+    answer,
+    statuses: keyStatuses,
+    channelRefusal,
+    keyAfterDelete,
+    pendingKeyGiven,
+    pendingKeyAfterSchedule,
+  };
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

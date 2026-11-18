@@ -1,6 +1,5 @@
-import { createEffect, createRoot, getOwner, runWithOwner, type Store } from "solid-js";
+import { createEffect, createRoot, createSignal, getOwner, runWithOwner } from "solid-js";
 import type { createCodexLiveConversation } from "./codex-live-conversation-store";
-import type { SidePanelsState } from "./panels-store";
 import type { createVoiceConversation } from "./voice-conversation-store";
 
 export type VoiceConversationKind = "transcribed" | "codex-live";
@@ -14,13 +13,15 @@ interface VoiceSession {
 }
 
 /**
- * The voice conversation of this server. It lives as long as the Voice tab of its agent, not as long
- * as the pane on screen: another tab, a closed side panel, another chat or another page keeps it.
+ * The voice conversation of this server. It starts from the message box and stops with End: the pill
+ * at the top of the agent's chat shows it, and another chat or another page keeps it.
  * One runs at a time, because it holds the microphone.
  */
-export function createVoiceSessions(sidePanels: Store<SidePanelsState>) {
+export function createVoiceSessions() {
   const owner = getOwner();
   let session: VoiceSession | undefined;
+  /** The agent whose voice conversation is on, also before the conversation starts. */
+  const [activeAgentId, setActiveAgentId] = createSignal<string | null>(null);
 
   function end(ended: VoiceSession | undefined = session): void {
     if (!ended || ended !== session) return;
@@ -29,6 +30,22 @@ export function createVoiceSessions(sidePanels: Store<SidePanelsState>) {
   }
 
   return {
+    /** True while the voice conversation with this agent is on. */
+    active(agentId: string): boolean {
+      return activeAgentId() === agentId;
+    },
+    /** Turns on the voice conversation with this agent. Another one ends first. */
+    start(agentId: string): void {
+      if (activeAgentId() === agentId) return;
+      if (session?.agentId !== agentId) end();
+      setActiveAgentId(agentId);
+    },
+    /** Ends the voice conversation with this agent. */
+    stop(agentId: string): void {
+      if (activeAgentId() !== agentId) return;
+      setActiveAgentId(null);
+      if (session?.agentId === agentId) end();
+    },
     /** The kind of the conversation that runs with this agent, or null. */
     running(agentId: string): VoiceConversationKind | null {
       return session?.agentId === agentId ? session.kind : null;
@@ -39,13 +56,12 @@ export function createVoiceSessions(sidePanels: Store<SidePanelsState>) {
       end();
       const next = runWithOwner(owner, () =>
         createRoot((dispose): VoiceSession => {
-          const conversation = create();
-          const opened: VoiceSession = { agentId, kind, conversation, dispose };
+          const opened: VoiceSession = { agentId, kind, conversation: create(), dispose };
+          // A conversation that is turned off, also one that opened after End, must not keep the microphone.
           createEffect(
-            () => sidePanels.side[agentId]?.panes.includes("voice") ?? false,
-            (tab) => {
-              // The root cannot end in its own effect.
-              if (!tab) queueMicrotask(() => end(opened));
+            () => activeAgentId() === agentId,
+            (on) => {
+              if (!on) queueMicrotask(() => end(opened));
             },
           );
           return opened;
@@ -54,7 +70,7 @@ export function createVoiceSessions(sidePanels: Store<SidePanelsState>) {
       session = next;
       return next.conversation;
     },
-    /** Ends the conversation of this kind. */
+    /** Ends the conversation of this kind. It stays on, so it starts again when its chat opens again. */
     end(kind: VoiceConversationKind): void {
       if (session?.kind === kind) end();
     },

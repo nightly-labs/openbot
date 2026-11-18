@@ -1,6 +1,7 @@
 import {
   type ClientAgentSummary,
   INSTANCE_TRANSFER_LIMITS,
+  type InstanceTransferUploadProgress,
   resolveRemoteInstanceTransferResult,
 } from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
@@ -44,7 +45,12 @@ export function createWebInstanceTransferCalls(options: {
   /** The host serves `instance-transfer-chunks-v1`: a file goes to it in parts. */
   sendsParts: (serverId: string) => boolean;
 }): ServerTransferCalls {
+  const progressListeners = new Set<(progress: InstanceTransferUploadProgress) => void>();
   return {
+    onUploadProgress(listener) {
+      progressListeners.add(listener);
+      return () => progressListeners.delete(listener);
+    },
     summary: (serverId) =>
       runTeamEffect(
         loadInstanceTransferSummary(options.request(serverId)).pipe(Effect.mapError((error) => error.cause)),
@@ -70,12 +76,18 @@ export function createWebInstanceTransferCalls(options: {
         if (file.size > INSTANCE_TRANSFER_LIMITS.archiveBytes)
           throw new Error(currentText().t("error.import.transferTooLarge"));
         return runTeamEffect(
-          stageInstanceTransferInParts(request, {
-            name: file.name,
-            size: file.size,
-            readBytes: async (offset, length) =>
-              new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()),
-          }).pipe(Effect.mapError((error) => error.cause)),
+          stageInstanceTransferInParts(
+            request,
+            {
+              name: file.name,
+              size: file.size,
+              readBytes: async (offset, length) =>
+                new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()),
+            },
+            (sent, total) => {
+              for (const listener of progressListeners) listener({ serverId, sent, total });
+            },
+          ).pipe(Effect.mapError((error) => error.cause)),
         );
       }
       if (file.size > INSTANCE_TRANSFER_REMOTE_BYTES)

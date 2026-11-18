@@ -27,27 +27,85 @@ export interface TurnSlotsOptions {
  */
 export class TurnSlots {
   readonly #options: TurnSlotsOptions;
+  #round: RoundReads | null = null;
 
   constructor(options: TurnSlotsOptions) {
     this.#options = options;
   }
 
+  /**
+   * Runs `check` with one read of each lane. Use it only for synchronous work that starts no turn:
+   * a drain starts in a later microtask and asks `mayStart` again outside the round, so a read of
+   * the round never uses too many slots. A hook in the round, such as a usage-limit move, can change
+   * a lane after the round read it. Then the lane waits for a slot until the next drain ends or the
+   * next memory sample. Without a round, each `mayStart` of a retry reads all lanes of all agents
+   * again, and a server with many agents and threads holds its main thread for minutes (#11710).
+   */
+  round<T>(check: () => T): T {
+    if (this.#round) return check();
+    this.#round = { lanes: null, running: new Map(), waiting: new Map(), heads: new Map() };
+    try {
+      return check();
+    } finally {
+      this.#round = null;
+    }
+  }
+
   mayStart(lane: string): boolean {
     const limit = this.#options.limit();
     if (limit === null) return true;
-    const lanes = this.#options.lanes();
-    const free = limit - lanes.filter((id) => this.#options.isRunning(id)).length;
+    const lanes = this.#lanes();
+    const free = limit - lanes.filter((id) => this.#isRunning(id)).length;
     if (free <= 0) return false;
-    const head = this.#options.head(lane);
+    const head = this.#head(lane);
     if (!head) return true;
     let ahead = 0;
     for (const other of lanes) {
-      if (other === lane || this.#options.isRunning(other) || !this.#options.isWaiting(other)) continue;
-      const otherHead = this.#options.head(other);
+      if (other === lane || this.#isRunning(other) || !this.#isWaiting(other)) continue;
+      const otherHead = this.#head(other);
       if (otherHead && startsBefore(otherHead, other, head, lane)) ahead += 1;
     }
     return ahead < free;
   }
+
+  #lanes(): readonly string[] {
+    if (!this.#round) return this.#options.lanes();
+    this.#round.lanes ??= this.#options.lanes();
+    return this.#round.lanes;
+  }
+
+  #isRunning(lane: string): boolean {
+    return readOnce(this.#round?.running, lane, (key) => this.#options.isRunning(key));
+  }
+
+  #isWaiting(lane: string): boolean {
+    return readOnce(this.#round?.waiting, lane, (key) => this.#options.isWaiting(key));
+  }
+
+  #head(lane: string): QueueDelivery | null {
+    return readOnce(this.#round?.heads, lane, (key) => this.#options.head(key));
+  }
+}
+
+interface RoundReads {
+  lanes: readonly string[] | null;
+  running: Map<string, boolean>;
+  waiting: Map<string, boolean>;
+  heads: Map<string, QueueDelivery | null>;
+}
+
+/** No value of a round is undefined, so a missing key is a lane that the round has not read. */
+function readOnce<T extends boolean | QueueDelivery | null>(
+  reads: Map<string, T> | undefined,
+  lane: string,
+  read: (lane: string) => T,
+): T {
+  if (!reads) return read(lane);
+  const known = reads.get(lane);
+  if (known !== undefined) return known;
+  const value = read(lane);
+  reads.set(lane, value);
+  return value;
 }
 
 function startsBefore(left: QueueDelivery, leftLane: string, right: QueueDelivery, rightLane: string): boolean {

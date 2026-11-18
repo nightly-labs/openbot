@@ -3,8 +3,16 @@ import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { lazyLanguageCatalogs } from "./packages/i18n/src/vite-plugin";
+import { devWorktree } from "./scripts/dev-worktree-vite-plugin";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
+
+// `bun run dev` rebuilds the main process and preload scripts when a file changes (`--watch`); a
+// production build ignores this. Do not watch installed packages: Bun links them to one shared
+// cache, so an install in another worktree changes their link count. The watcher then rebuilds and
+// restarts the app, and the restart fails while the old app holds the single-instance lock. After
+// you install or update a package, restart `bun run dev`.
+const devWatch = { exclude: ["**/node_modules/**"] };
 
 export default defineConfig({
   main: {
@@ -25,6 +33,7 @@ export default defineConfig({
       }),
     ],
     build: {
+      watch: devWatch,
       rollupOptions: {
         // Optional peers of the vendored Baileys that OpenBot does not install: Baileys imports them
         // when it runs and goes on without them (no thumbnails, link previews or audio waveforms).
@@ -47,6 +56,7 @@ export default defineConfig({
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts"] })],
     build: {
+      watch: devWatch,
       rollupOptions: {
         input: {
           index: resolve("src/preload/index.ts"),
@@ -63,7 +73,13 @@ export default defineConfig({
   renderer: {
     // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
     // in a chat drop frames that the built app does not drop. Set this to true for a trace.
-    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false }), lazyLanguageCatalogs()],
+    plugins: [
+      solidPlugin({ performanceTracks: false }),
+      tailwindcss({ optimize: false }),
+      lazyLanguageCatalogs(),
+      // The branch and color of this worktree in a dev renderer (`src/renderer/src/dev-worktree.ts`).
+      devWorktree(resolve(".")),
+    ],
     optimizeDeps: {
       // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
       // code away from the images, so Vite serves the package as it is.
@@ -81,6 +97,8 @@ export default defineConfig({
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),
+          // The setup page of a server in a container. src/main/server-setup-page.ts serves it.
+          serverSetup: resolve("src/renderer/server-setup.html"),
         },
       },
     },

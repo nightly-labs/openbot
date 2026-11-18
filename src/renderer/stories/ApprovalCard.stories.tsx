@@ -120,6 +120,7 @@ const bugReport: BugReport = {
   description:
     "After a long reply, the chat stops moving down with new text. I expected to see the newest message without scrolling.",
   reproduction: "1. Ask for a long answer.\n2. Send a second message while the answer is still coming.",
+  phone: null,
 };
 const featureRequest: FeatureRequest = {
   kind: "idea",
@@ -163,6 +164,27 @@ export const ReportProblemWithErrors: Story = {
         recentErrors: "openbot.history_search: The query is too long.\nThe provider stopped: 529 Overloaded",
         sameAs: 6812,
       }),
+    ),
+  },
+};
+/**
+ * A bug in the phone app: only the phone has its version, system and support log, so the card has no
+ * Send here and tells the user to send the report from the phone app.
+ */
+export const ReportPhoneProblem: Story = {
+  args: {
+    agentName: "Chief",
+    approval: feedbackApproval(
+      preview({
+        ...bugReport,
+        title: "The phone app stays on Reconnecting with a VPN on",
+        surface: "Phone app",
+        area: "Phone app and pairing",
+        description:
+          "The phone app shows Reconnecting and never connects while my VPN is on. I expected it to connect.",
+        reproduction: "1. Turn on the VPN on the phone.\n2. Open the OpenBot app.",
+      }),
+      sourceText("status.agent.reportPhoneProblem"),
     ),
   },
 };

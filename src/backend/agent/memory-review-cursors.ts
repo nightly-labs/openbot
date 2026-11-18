@@ -1,15 +1,9 @@
-import { readFile } from "node:fs/promises";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Result, Schema, Semaphore } from "effect";
-import { isEmptyStoredFile, parseStoredJson, setAsideDamagedFile, writeJsonFileAtomically } from "../atomic-json-file";
-import { isMissingFileError } from "../file-errors";
+import { Effect, Schema, Semaphore } from "effect";
+import { writeJsonFileAtomically } from "../atomic-json-file";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "../versioned-json-store";
 
 const logger = createOpenBotLogger("memory-review");
-
-class MemoryReviewCursorsReadFailed extends Schema.TaggedError<MemoryReviewCursorsReadFailed>()(
-  "MemoryReviewCursorsReadFailed",
-  { cause: Schema.Defect() },
-) {}
 
 const StoredMemoryReviewCursors = Schema.Struct({
   version: Schema.Literal(1),
@@ -18,7 +12,10 @@ const StoredMemoryReviewCursors = Schema.Struct({
   ),
 });
 type StoredMemoryReviewCursors = typeof StoredMemoryReviewCursors.Type;
-const decodeStored = Schema.decodeUnknownSync(StoredMemoryReviewCursors);
+const MEMORY_REVIEW_CURSORS_FORMAT: VersionedJsonFormat<StoredMemoryReviewCursors> = {
+  current: 1,
+  releases: { 1: Schema.decodeUnknownSync(StoredMemoryReviewCursors) },
+};
 
 interface Cursor {
   readonly agentId: string;
@@ -36,12 +33,15 @@ interface Cursor {
  */
 export class MemoryReviewCursors {
   readonly #path: string;
+  /** The path, or the fallback file while the path holds the file of a newer release. */
+  #writePath: string;
   readonly #cursors = new Map<string, Cursor>();
   readonly #writes = Semaphore.makeUnsafe(1);
   #loaded = false;
 
   constructor(path: string) {
     this.#path = path;
+    this.#writePath = path;
   }
 
   /**
@@ -55,32 +55,14 @@ export class MemoryReviewCursors {
   readonly #read = Effect.fn("MemoryReviewCursors.read")(function* (this: MemoryReviewCursors) {
     if (this.#loaded) return;
     this.#loaded = true;
-    const read = yield* Effect.result(
-      Effect.tryPromise({
-        try: () => readFile(this.#path, "utf8"),
-        catch: (cause) => new MemoryReviewCursorsReadFailed({ cause }),
-      }),
-    );
-    if (Result.isFailure(read)) {
-      if (!isMissingFileError(read.failure.cause))
-        logger.warn("Could not read the memory review cursors.", { error: read.failure.cause });
-      return;
-    }
-    if (isEmptyStoredFile(read.success)) return;
-    const stored = yield* Effect.result(
-      Effect.try({
-        try: () => parseStoredJson(this.#path, read.success, decodeStored),
-        catch: (cause) => new MemoryReviewCursorsReadFailed({ cause }),
-      }),
-    );
-    if (Result.isFailure(stored)) {
-      logger.warn("The memory review cursors are damaged. The reviews read the latest messages.", {
-        error: stored.failure.cause,
-      });
-      yield* setAsideDamagedFile(this.#path);
-      return;
-    }
-    for (const cursor of stored.success.cursors)
+    const loaded = yield* readVersionedJsonFile(this.#path, MEMORY_REVIEW_CURSORS_FORMAT);
+    this.#writePath = loaded.writePath;
+    if (loaded.state === "damaged")
+      logger.warn("The memory review cursors are damaged. The reviews read the latest messages.");
+    else if (loaded.state === "unreadable") logger.warn("Could not read the memory review cursors.");
+    else if (loaded.state === "kept")
+      logger.warn("A newer version wrote the memory review cursors file. It stays unchanged.");
+    for (const cursor of loaded.value?.cursors ?? [])
       this.#cursors.set(conversationKey(cursor.agentId, cursor.threadId), cursor);
   }).bind(this);
 
@@ -134,7 +116,7 @@ export class MemoryReviewCursors {
         Effect.uninterruptible(
           Effect.suspend(() => {
             const stored: StoredMemoryReviewCursors = { version: 1, cursors: [...this.#cursors.values()] };
-            return writeJsonFileAtomically(this.#path, stored, { createDirectory: true });
+            return writeJsonFileAtomically(this.#writePath, stored, { createDirectory: true });
           }),
         ),
       )

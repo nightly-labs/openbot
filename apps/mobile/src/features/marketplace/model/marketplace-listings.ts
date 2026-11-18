@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
+import { mcpServerDetail } from "@/features/servers/model/mcp-server-draft";
 import type { ConnectorRow } from "@/features/servers/model/use-connector-rows";
 import { catalogImageUrl, pluginIconUrl } from "../api/marketplace-catalog";
 import { MOBILE_PLUGINS, type MobilePlugin } from "./plugin-catalog.generated";
@@ -147,7 +148,7 @@ export function customListing(server: McpServerConfig): MarketplaceListing {
     source: "custom",
     id: `custom:${server.id}`,
     name: server.name,
-    description: server.transport === "http" ? server.url : [server.command, ...server.args].join(" "),
+    description: mcpServerDetail(server),
     category: null,
     creatorName: "",
     imageUrl: null,

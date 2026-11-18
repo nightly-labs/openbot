@@ -9,6 +9,9 @@ export const messages = {
     "Tego serwera nie można uruchomić ponownie z tego miejsca. Skontaktuj się z pomocą techniczną.",
   "error.billing.planRequired": "Plan tego serwera się skończył. Odnów go, aby uruchomić serwer.",
   "error.billing.planSoldOut": "Ten plan jest wyprzedany. Wybierz inny plan.",
+  "error.billing.storageUnavailable": "Ta pamięć nie jest dostępna dla tego serwera.",
+  "error.billing.storagePaymentFailed":
+    "Płatność za pamięć nie powiodła się. Zaktualizuj metodę płatności i spróbuj ponownie.",
   "error.billing.licenseExists": "To konto ma już licencję. Zamiast tego zmień liczbę jej użytkowników.",
   "error.billing.licenseCurrency": "Licencja musi używać waluty Twoich innych planów.",
   "error.billing.planCurrency": "Nowy plan musi używać waluty Twoich innych planów.",
@@ -20,6 +23,13 @@ export const messages = {
   "error.billing.licenseOneUser": "Ta licencja obejmuje 1 użytkownika. Zmień ją na Team, aby dodać użytkowników.",
   "error.billing.licensePlanChange": "Tej licencji nie można zmienić na ten plan. Anuluj ją i kup nowy plan.",
   "error.billing.noLicense": "To konto nie ma licencji.",
+  "error.billing.countryRequired":
+    "Podaj kraj rozliczenia przed płatnością. Zaktualizuj OpenBot, aby to zrobić, i spróbuj ponownie.",
+  "error.billing.detailsInvalid": "Sprawdź kraj i numer VAT. Numer VAT musi należeć do wybranego kraju.",
+  "error.billing.vatIdInvalid": "System VAT UE nie zna tego numeru VAT. Sprawdź numer lub kontynuuj bez numeru VAT.",
+  "error.billing.vatIdUnverified":
+    "System VAT UE nie może teraz sprawdzić numeru VAT. Spróbuj później lub kontynuuj bez numeru VAT.",
+  "error.billing.vatUnavailable": "Płatność jest teraz niedostępna. Spróbuj później.",
   "error.billing.invalidRequest": "Żądanie rozliczeniowe jest nieprawidłowe.",
   "error.billing.invalidResponse": "Odpowiedź rozliczeniowa jest nieprawidłowa.",
   "error.billing.notStripePage": "Strona rozliczeń nie jest stroną Stripe.",

@@ -13,6 +13,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
+import type { JSX } from "@solidjs/web";
 import type { ConnectorDetail } from "../connectors/ConnectorDetailPanel";
 import type { ConnectorId } from "../connectors/connectors";
 import type {
@@ -147,6 +148,24 @@ export function pluginAppSetup(app: MarketplacePluginApp): AppSetup {
   return flow ? FLOW_SETUP[flow.kind] : "open";
 }
 
+/** The plugin drives Apple apps, which run only on a Mac, and the host of its apps is not one. */
+export function pluginNeedsMac(
+  model: Pick<MarketplaceModel, "macAppsUnavailable">,
+  plugin: { apps: readonly MarketplacePluginApp[] },
+): boolean {
+  return model.macAppsUnavailable === true && plugin.apps.some((app) => (app.macAutomation?.length ?? 0) > 0);
+}
+
+/**
+ * The status text of a server that the user added. It says what the user set: OpenBot connects to
+ * the server only for a test, so it cannot say that the server answers.
+ */
+export function customServerStatus(
+  app: Extract<MarketplaceApp, { kind: "custom" }>,
+): "mcp.status.enabled" | "mcp.status.disabled" {
+  return app.server.enabled ? "mcp.status.enabled" : "mcp.status.disabled";
+}
+
 export function appSetup(app: MarketplaceApp): AppSetup {
   switch (app.kind) {
     case "connector":
@@ -190,6 +209,20 @@ export interface MarketplaceMcpAccess {
   busy: () => boolean;
   /** A full replace for each row. False when the host refused one; the error shows in the window. */
   set: (changes: readonly McpAccessChange[]) => Promise<boolean>;
+}
+
+/**
+ * The custom MCP server parts that the client draws in a Marketplace page. The page owns the place
+ * and the scroll; a part adds no scroll of its own.
+ */
+export interface MarketplaceServerSlots {
+  /**
+   * The form that adds a server (`id` null) or changes the server with this id. `onClose` gets the
+   * saved row, or null when the user cancelled.
+   */
+  form: (props: { id: string | null; onClose: (saved: McpServerConfig | null) => void }) => JSX.Element;
+  /** The switch, the test and the sign-in of one custom server, on its page. */
+  controls: (props: { id: string }) => JSX.Element;
 }
 
 export interface MarketplaceModel {
@@ -280,6 +313,8 @@ export interface MarketplaceModel {
   appHostName?: string | undefined;
   /** Absent when this client cannot ask macOS, or when a joined server runs the apps. */
   macAutomation?: MarketplaceMacAutomation | undefined;
+  /** The host of the apps is not a Mac, so an app that drives Apple apps does not run there. */
+  macAppsUnavailable?: boolean | undefined;
   /** Asks for a confirmation, then removes what the catalog app installed. */
   disconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => void;
   /** Removes a custom MCP server. */
@@ -289,8 +324,11 @@ export interface MarketplaceModel {
    * user is not an owner or admin, or the answer did not arrive.
    */
   mcpAccess?: MarketplaceMcpAccess | undefined;
-  /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
-  addServer?: (() => void) | undefined;
+  /**
+   * The parts of a custom MCP server that the client draws: its form and its controls. Absent when
+   * the user cannot add or change a server.
+   */
+  servers?: MarketplaceServerSlots | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;
   copyLink: (slug: string) => void;
   /** Copies the shared link of an agent or a skill. */

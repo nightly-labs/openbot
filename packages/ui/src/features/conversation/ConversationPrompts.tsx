@@ -174,6 +174,8 @@ export function ApprovalCard(props: {
 /**
  * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
  * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
+ * A bug report about the phone app has no Send here: only the phone has its version, its system and
+ * its support log, so the card tells the user to send the report from the phone app.
  */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
@@ -211,6 +213,9 @@ function FeedbackOffer(props: {
       <Show when={props.cut}>
         <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
       </Show>
+      <Show when={props.report.phone}>
+        <p class="approval-cut-note">{t("prompt.approval.report.phoneOnly")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -223,7 +228,7 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Show when={!props.cut}>
+        <Show when={!props.cut && !props.report.phone}>
           <Button
             variant="default"
             type="button"
@@ -248,8 +253,9 @@ interface BrowserTakeoverCardProps {
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
-  onOpen?: () => void;
-  onComplete: () => Promise<boolean>;
+  onOpen?: (() => void) | undefined;
+  /** Done. A view that cannot finish the step gives none, so the card offers no Done. */
+  onComplete?: (() => Promise<boolean>) | undefined;
   onCancel: () => Promise<boolean>;
   /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */
   onSignInLocally?: (() => void) | undefined;
@@ -258,6 +264,8 @@ interface BrowserTakeoverCardProps {
    * sign-in on this computer; `signingIn` is true while that sign-in is open.
    */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
+  /** The page refused the sign-in from the server, and only the desktop app can send one from the user's device. */
+  signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
     /** Offer "Save to Vault" for a password. */
@@ -291,6 +299,24 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
+  // The page does not open by itself, so opening it is the main action until the user has done it.
+  // The card can stay mounted for the request of another agent, so it keeps the request it opened.
+  const [openedRequest, setOpenedRequest] = createSignal<BrowserTakeoverRequest>();
+  const opened = () => {
+    const done = openedRequest();
+    const request = props.request;
+    return (
+      done !== undefined &&
+      request !== undefined &&
+      done.requestId === request.requestId &&
+      done.agentId === request.agentId &&
+      done.threadId === request.threadId
+    );
+  };
+  const openPage = () => {
+    setOpenedRequest(props.request);
+    props.onOpen?.();
+  };
   const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
@@ -314,12 +340,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     const blocked = props.signInBlocked;
     if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
     if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
-    return blocked
-      ? t("prompt.browser.signInBlocked.body", {
-          host: pageDetails().host,
-          server: blocked.server,
-          name: props.agentName,
-        })
+    if (blocked)
+      return t("prompt.browser.signInBlocked.body", {
+        host: pageDetails().host,
+        server: blocked.server,
+        name: props.agentName,
+      });
+    return props.signInOnDesktop
+      ? t("prompt.browser.signInBlocked.desktopBody", { host: pageDetails().host, name: props.agentName })
       : t("prompt.browser.pendingBody", { name: props.agentName });
   };
   const pageHost = () => {
@@ -329,9 +357,10 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
       : pageDetails().host;
   };
   const submit = async (decision: "complete" | "cancel") => {
-    if (submitting() || props.decision) return;
+    const respond = decision === "complete" ? props.onComplete : props.onCancel;
+    if (submitting() || props.decision || !respond) return;
     setSubmitting(decision);
-    const completed = await (decision === "complete" ? props.onComplete() : props.onCancel());
+    const completed = await respond();
     if (!completed) setSubmitting(null);
   };
 
@@ -375,15 +404,29 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
                     </Button>
                   )}
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={Boolean(submitting())}
-                  onClick={() => void submit("complete")}
-                >
-                  {t("prompt.browser.done")}
-                </Button>
+                <Show when={props.onOpen}>
+                  <Button
+                    variant={opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={openPage}
+                  >
+                    <Maximize2 data-icon="inline-start" aria-hidden="true" />
+                    {t("common.open")}
+                  </Button>
+                </Show>
+                <Show when={props.onComplete}>
+                  <Button
+                    variant={props.onOpen && !opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={() => void submit("complete")}
+                  >
+                    {t("prompt.browser.done")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -431,7 +474,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="browser-takeover-preview-viewport browser-takeover-preview-open"
             aria-label={t("prompt.browser.openPage", { title: pageDetails().title })}
-            onClick={() => props.onOpen?.()}
+            onClick={openPage}
           >
             <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
             <span class="browser-takeover-preview-open-label" aria-hidden="true">

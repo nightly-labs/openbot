@@ -449,8 +449,8 @@ try {
     "issue #4468: the request declares no MCP schema, and exec finds the tool in ALL_TOOLS and calls it",
     { name: "deferred", rows: [row("composio")] },
     (o) => {
-      assert.deepEqual(o.keys, ["composio"]);
-      assert.ok(!o.directOnly.includes("mcp__composio"), `direct-only ${o.directOnly.join(", ")}`);
+      assert.deepEqual(o.keys, ["openbot_composio"]);
+      assert.ok(!o.directOnly.includes("mcp__openbot_composio"), `direct-only ${o.directOnly.join(", ")}`);
       assert.deepEqual(o.offered, []);
       assert.equal(o.mentionsTool, false, "the request named the MCP tool");
       assert.deepEqual(o.calls, [TOOL]);
@@ -470,7 +470,7 @@ try {
     "a thread started with every MCP namespace direct keeps them on resume",
     { name: "resumed", rows: [row("composio")], resume: true },
     // The call is in the first turn; the history holds it, so the fake model does not call again.
-    (o) => assert.deepEqual(o.offered, ["mcp__composio"]),
+    (o) => assert.deepEqual(o.offered, ["mcp__openbot_composio"]),
   );
   await step(
     "a user stdio composio renames the row: exec reaches the renamed tool",

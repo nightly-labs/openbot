@@ -82,6 +82,8 @@ export const messages = {
   "diagram.run.succeeded": "成功",
   "diagram.run.failed": "失敗",
   "diagram.run.cancelled": "キャンセル済み",
+  "diagram.run.stop": "停止",
+  "diagram.run.stopping": "停止中…",
   "diagram.run.last": "前回の実行 {time}",
   "diagram.run.manual": "手動で開始",
   "diagram.run.scheduled": "{routine} が開始",
@@ -127,6 +129,7 @@ export const messages = {
   "diagram.flows.loadFailed": "このエージェントのルーティンを読み込めませんでした。",
   "diagram.flows.saveFailed": "ルーティンへのこの変更を保存できませんでした。",
   "diagram.flows.runFailed": "このルーティンを開始できませんでした。",
+  "diagram.flows.stopFailed": "この実行を停止できませんでした。",
   "diagram.flows.connectFromAgent":
     "エージェントから接続してください。ルーティンが開始するのは自分のエージェントだけです。",
   "diagram.chat.label": "ダイアグラムアシスタント",

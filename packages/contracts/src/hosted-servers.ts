@@ -8,12 +8,15 @@ import {
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
+  type BillingStorageTier,
+  hostedPlanStorageGb,
   isBillingAmount,
   isStorageGb,
   isStripeCheckoutUrl,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
 import type { ConversationMessage } from "./ipc-conversation-messages";
+import type { MachineMetrics } from "./ipc-machine-resources";
 import type { StorageDisk } from "./ipc-storage";
 import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
@@ -38,6 +41,33 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
 };
 
 /**
+ * The boat sandbox of each plan. Starter runs on a VPS 1 of the operator. When no VPS 1 is free, it starts
+ * on `default`, because `small` has less disk than the Starter storage. A move to a VPS 1 sets
+ * `HOSTED_PLAN_SIZE` again.
+ */
+export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>> = {
+  ...HOSTED_PLAN_SIZE,
+  starter: "default",
+};
+
+/**
+ * The storage in GB of a hosted server: the plan storage with its storage tier on a VPS of the operator,
+ * and in a boat sandbox not more than its disk. A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is
+ * `small` and keeps 12 GB. `size` is the machine after a resize that waits (`pending_size`), else the
+ * current one, and null when the server has no row or no boat sandbox yet.
+ */
+export function hostedServerStorageGb(
+  plan: BillingPlanId,
+  onOperatorHost: boolean,
+  size: HostedServerSize | null,
+  storageTier: BillingStorageTier,
+): number {
+  const storageGb = hostedPlanStorageGb(plan, onOperatorHost, storageTier);
+  if (onOperatorHost || size === null) return storageGb;
+  return Math.min(storageGb, HOSTED_SERVER_SIZES[size].diskGb);
+}
+
+/**
  * The disk of a hosted server that the system and the preinstalled tools use, in GB (measured on the
  * running servers on 2026-11-09: 19 to 22 GB). The plan storage does not count it: it is on top of the plan.
  */
@@ -59,6 +89,24 @@ export function hostedPlanDisk(disk: StorageDisk, storageGb: number): StorageDis
   const planBytes = storageGb * GB;
   const userBytes = disk.userBytes ?? Math.max(0, totalBytes - freeBytes - HOSTED_SERVER_BASE_IMAGE_GB * GB);
   return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
+}
+
+/**
+ * The machine reading of a hosted server with its disk against the plan, as `hostedPlanDisk` counts
+ * it, so the Usage meter shows the same storage as Server settings > Storage and not the whole VPS disk.
+ * `userBytes` is the `storage-disk-v1` value; null counts the files of the users from the free space.
+ */
+export function hostedPlanMachineMetrics(
+  metrics: MachineMetrics,
+  storageGb: number,
+  userBytes: number | null,
+): MachineMetrics {
+  const { freeBytes, totalBytes } = hostedPlanDisk(
+    { freeBytes: metrics.diskFreeBytes, totalBytes: metrics.diskTotalBytes, userBytes },
+    storageGb,
+  );
+  if (freeBytes === null || totalBytes === null) return metrics;
+  return { ...metrics, diskUsedBytes: totalBytes - freeBytes, diskFreeBytes: freeBytes, diskTotalBytes: totalBytes };
 }
 
 export const HOSTED_SERVER_STATES = [
@@ -314,6 +362,11 @@ export interface CreateHostedServerInput {
    * interval and currency of the server. Absent: the server only.
    */
   license?: LicenseOrder;
+  /**
+   * The buyer, a consumer in the EU, asks that the hosting service begin before the 14-day withdrawal period
+   * ends, and accepts what that means for a withdrawal. Absent: the buyer did not ask, or an older client.
+   */
+  earlyStart?: true;
 }
 
 /**
@@ -383,6 +436,7 @@ export function parseCreateHostedServerInput(value: unknown): CreateHostedServer
     if (!license) return null;
     input.license = license;
   }
+  if (value.earlyStart === true) input.earlyStart = true;
   return input;
 }
 

@@ -302,6 +302,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot на {host} не может получать сообщения Telegram. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
   "connector.telegram.helpError": "OpenBot не может связаться с этим чатом. Подключите его заново или отключите чат.",
+  "connector.telegram.helpNotLinked":
+    "Этот чат не связан с этим сервером. Выберите «Переподключить», чтобы связать его.",
   "connector.telegram.retryAt": "Telegram попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.telegram.pause": "Приостановить",
   "connector.telegram.resume": "Возобновить",
@@ -391,6 +393,8 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot не может прочитать сохранённые ключи этого номера. Привяжите номер заново.",
   "connector.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.whatsapp.pause": "Приостановить",
   "connector.whatsapp.resume": "Возобновить",
@@ -405,10 +409,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Личный номер",
   "connector.whatsapp.ownNumberDescription":
-    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "connector.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
+  "connector.whatsapp.statusReactions": "Реакции статуса",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
   "connector.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
@@ -424,10 +431,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Номер",
   "connector.whatsapp.kindPersonal": "Мой личный номер",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили. Другие люди не получают ответа.",
   "connector.whatsapp.kindDedicated": "Номер только для OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+    "OpenBot отвечает с этого номера каждому незнакомому человеку кодом, который нужно передать вам. Вы одобряете их здесь.",
   "connector.whatsapp.methodLabel": "Способ привязки",
   "connector.whatsapp.methodQr": "QR-код",
   "connector.whatsapp.methodCode": "Код привязки",
@@ -489,7 +496,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Необязательно. Если пусто, в списке будет номер телефона.",
   "connector.whatsapp.add": "Добавить",
   "connector.whatsapp.groupTitle": "Добавить группу",
-  "connector.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "connector.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "connector.whatsapp.groupSearch": "Поиск групп",
   "connector.whatsapp.groupsLoading": "Загрузка групп…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
@@ -646,9 +654,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Агенты не могут входить с общими учётными данными, пока вы не войдёте снова.",
   "connector.protonPass.reconnect": "Переподключить",
-  "connector.protonPass.planTitle": "Proton Pass требует платный план",
+  "connector.protonPass.planTitle": "Для Proton Pass нужен план с Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI работает только с платным планом Proton. Смените план и подключитесь снова.",
+    "Для Proton Pass CLI нужен план Proton, который включает Pass Plus. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
   "connector.protonPass.vaultTitle": "Общее хранилище",
   "connector.protonPass.vaultDescription":
     "Агенты могут входить с учётными данными из этого хранилища. Переместите в него учётные данные, чтобы поделиться ими.",
