@@ -3,7 +3,8 @@
 // alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
 // guard against another OpenBot on the same number and against a loop in the owner's own chat,
 // numbered approval answers, the saved history and its search, held messages after a wake, the
-// journal replay after a restart, each close code, the send queue while the socket is down, and the
+// journal replay after a restart, each close code, the send queue while the socket is down, a post
+// sent again when its socket closed before the ack, a file with its text as the caption, and the
 // disconnect. Runs the real agent service, messaging service, WhatsApp driver, runtime, session and
 // store on a temporary profile. Only the Baileys socket is fake: no message leaves this computer.
 // `bun scripts/messaging-whatsapp-e2e.ts`.
@@ -201,6 +202,13 @@ class FakeSocket implements WhatsAppSocket {
   async sendMessage(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions) {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
+    if (this.#phone.dropNext === jid) {
+      // The socket took the bytes, and then the network went down: WhatsApp never got the message.
+      this.#phone.dropNext = null;
+      this.#phone.lost.push({ jid, content, id, quotedId: null });
+      setTimeout(() => this.close(428), 0);
+      return { key: { remoteJid: jid, id, fromMe: true }, message: {} } satisfies WAMessage;
+    }
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
     // WhatsApp's server answers each message with an ack, after the send returns.
     const error = this.#phone.refused.get(jid);
@@ -263,6 +271,9 @@ class FakePhone {
   readonly sent: Sent[] = [];
   /** The chats whose posts the server refuses in its ack, with the error code. */
   readonly refused = new Map<string, string>();
+  /** The chat whose next message is lost with its socket, which then closes. */
+  dropNext: string | null = null;
+  readonly lost: Sent[] = [];
   logouts = 0;
   /** WhatsApp cannot be reached: each socket closes before it shows a code. */
   offline = false;
@@ -998,6 +1009,79 @@ try {
           "A group that is not allowed started work.",
         );
         return { threadKey: link.threadKey };
+      },
+    );
+
+    await step(
+      "posts: one file takes the text as its caption, and a post lost with its socket goes again (#12211)",
+      async () => {
+        const folder = await mkdtemp(join(tmpdir(), "openbot-wa-post-"));
+        const png = join(folder, "offer.png");
+        // A 1×1 PNG.
+        writeFileSync(
+          png,
+          Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            "base64",
+          ),
+        );
+        const post = (args: { text: string; files?: string[] }) =>
+          runCauseEffect(
+            agents.messaging.outboundTool(
+              "agent-whatsapp-e2e",
+              { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+              "messaging_post",
+              { connection: connectionId(agents), place: GROUP, ...args },
+              (paths) => Effect.succeed(paths.map(() => ({ name: "offer.png", path: png, mimeType: "image/png" }))),
+            ),
+          );
+        const toGroup = (from: number) => phone.sent.slice(from).filter((sent) => sent.jid === GROUP);
+        try {
+          let from = phone.sent.length;
+          const captioned = await post({ text: "**Offer**: 1.299 TL", files: ["offer.png"] });
+          assert.ok(captioned.success, captioned.contentItems[0]?.text);
+          const media = toGroup(from).filter((sent) => "image" in sent.content);
+          assert.equal(media.length, 1, "The file was not sent once.");
+          const content = media[0]?.content;
+          assert.ok(
+            content && "caption" in content && content.caption === "*Offer*: 1.299 TL",
+            "The text is not the caption.",
+          );
+          assert.ok(!phone.textsTo(GROUP).includes("*Offer*: 1.299 TL"), "The text went apart from the file.");
+          assert.ok(
+            captioned.contentItems[0]?.text?.includes(media[0]?.id ?? "-"),
+            "The result names another message.",
+          );
+
+          // A text that is too long for a caption goes before the file, as before.
+          from = phone.sent.length;
+          const long = "Long ".repeat(300).trim();
+          const apart = await post({ text: long, files: ["offer.png"] });
+          assert.ok(apart.success, apart.contentItems[0]?.text);
+          const order = toGroup(from).filter(
+            (sent) => "image" in sent.content || ("text" in sent.content && sent.content.text === long),
+          );
+          assert.deepEqual(
+            order.map((sent) => ("image" in sent.content ? "file" : "text")),
+            ["text", "file"],
+          );
+
+          // The socket closes after it took the text, before WhatsApp's ack: the text goes again with its id.
+          const sockets = phone.sockets.length;
+          phone.dropNext = GROUP;
+          const resent = await post({ text: "Lost once" });
+          assert.ok(resent.success, resent.contentItems[0]?.text);
+          const lostId = phone.lost.at(-1)?.id;
+          assert.ok(lostId, "No message was lost.");
+          const again = phone.sent.filter((sent) => sent.jid === GROUP && sent.id === lostId);
+          assert.equal(again.length, 1, "The lost text was not sent again with its id.");
+          assert.ok(phone.sockets.length > sockets, "The socket did not close.");
+          await until(() => connection(messaging)?.state === "connected", "connected after the lost post");
+          return { captionId: media[0]?.id, resentId: lostId };
+        } finally {
+          phone.dropNext = null;
+          await rm(folder, { recursive: true, force: true });
+        }
       },
     );
 

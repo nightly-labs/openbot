@@ -46,6 +46,8 @@ import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
 const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
+/** The longest caption that WhatsApp's own API takes; a longer text goes before the file, apart. */
+const WHATSAPP_CAPTION_LIMIT = 1_024;
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
@@ -273,21 +275,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
-          const size = yield* Effect.tryPromise({
-            try: () => stat(file.path).then((info) => info.size),
-            catch: (cause) => new MessagingAdapterError({ cause }),
-          });
-          if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return false;
-          const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
-          // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
-          const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
-          const content: AnyMessageContent = image
-            ? { image: { url: file.path }, mimetype: image, ...dimensions }
-            : {
-                document: { url: file.path },
-                fileName: file.name.slice(0, 255) || "file",
-                mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
-              };
+          const content = yield* this.#fileContent(file);
+          if (!content) return false;
           const messageId = yield* this.#send(target, content);
           if (messageId) firstId ??= messageId;
           return true;
@@ -296,6 +285,45 @@ class WhatsAppAdapter implements MessagingAdapter {
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
     return { skipped, firstId };
+  });
+
+  /**
+   * One message: the file with the text as its caption, so that the text cannot go missing while the
+   * file arrives. Null when they must go apart: the text is too long, or the file cannot be sent.
+   */
+  readonly postFileWithText = Effect.fnUntraced(function* (
+    this: WhatsAppAdapter,
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ) {
+    yield* this.#checkPlace(target.platformChannelId);
+    const chunks = whatsAppChunks(markdown);
+    const caption = chunks.length === 1 ? (chunks[0] ?? "") : "";
+    if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
+    const content = yield* this.#fileContent(file);
+    if (!content) return null;
+    return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) });
+  });
+
+  /** The message of a file: an image shows in the chat, any other file is a document. Null when it cannot go. */
+  readonly #fileContent = Effect.fnUntraced(function* (this: WhatsAppAdapter, file: MessagingAnswerFile) {
+    const size = yield* Effect.tryPromise({
+      try: () => stat(file.path).then((info) => info.size),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
+    if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return null;
+    const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
+    // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
+    const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
+    const content: AnyMessageContent = image
+      ? { image: { url: file.path }, mimetype: image, ...dimensions }
+      : {
+          document: { url: file.path },
+          fileName: file.name.slice(0, 255) || "file",
+          mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
+        };
+    return content;
   });
 
   history(

@@ -230,6 +230,15 @@ export interface MessagingAdapter {
     target: MessageTarget,
     files: MessagingAnswerFile[],
   ): Effect.Effect<{ skipped: string[]; firstId: string | null }, MessagingAdapterError>;
+  /**
+   * Posts one file with the text as its caption, in one message, for a platform that sends text and
+   * files apart otherwise (WhatsApp). Null when they must go apart, such as for a long text.
+   */
+  postFileWithText?(
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ): Effect.Effect<string | null, MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,

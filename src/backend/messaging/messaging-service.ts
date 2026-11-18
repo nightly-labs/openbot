@@ -1901,6 +1901,20 @@ export class MessagingService {
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
       };
     }
+    // One file takes the text as its caption: apart, the text can go missing while the file arrives.
+    const single = files.length === 1 && !embeds.length ? files[0] : undefined;
+    if (single && live.adapter.postFileWithText) {
+      const captioned = yield* Effect.result(live.adapter.postFileWithText(target, text, single));
+      if (Result.isFailure(captioned))
+        return {
+          error: `${refusal(captioned.failure)} The post can be in the place already. Do not post it again only because of this error.`,
+          failure: "unknown" as const,
+        };
+      if (captioned.success) {
+        live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
+        return { posted: true as const, messageId: captioned.success };
+      }
+    }
     const posted = yield* (
       postEmbeds && embeds.length
         ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
