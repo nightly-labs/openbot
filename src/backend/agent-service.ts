@@ -2110,8 +2110,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               try: () => this.#sharedProcessesToRelease(agentId),
               catch: (cause) => new AgentRemovalFailed({ cause }),
             });
+            return providers.includes("opencode") ? yield* this.#providers.releaseSharedProcess("opencode") : false;
+          }),
+        releaseFolderHolders: (agentId) =>
+          Effect.gen({ self: this }, function* () {
+            if (process.platform !== "win32") return false;
+            const providers = yield* Effect.try({
+              try: () => this.#sharedProcessesToRelease(agentId),
+              catch: (cause) => new AgentRemovalFailed({ cause }),
+            });
             let kept = false;
-            for (const provider of providers) if (yield* this.#providers.releaseSharedProcess(provider)) kept = true;
+            // `stopAgentProcess` already released OpenCode. The delete archives each Codex thread, and the
+            // archive ends the processes of that thread (#6266), while a release of Codex would end the
+            // background terminals of the other agents.
+            for (const provider of providers)
+              if (
+                provider !== "opencode" &&
+                provider !== "codex" &&
+                (yield* this.#providers.releaseSharedProcess(provider))
+              )
+                kept = true;
             return kept;
           }),
         currentClient: (provider) => this.#providers.currentClient(provider),
@@ -6076,10 +6094,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The providers whose shared process the delete stops, because it can have worked in this agent's folder: the agent is
-   * set to the provider or has a session on it. OpenCode keeps watchers there (#7029), and a command or a tool process
-   * that another CLI, such as Grok, started there keeps the folder too (#12294). A provider is left out while another of
-   * its agents' session settings are read: that read uses the process.
+   * The providers whose shared process can have worked in this agent's folder: the agent is set to the provider or has
+   * a session on it. OpenCode keeps watchers there (#7029), and a command that another CLI, such as Grok, started there
+   * can keep the folder too (#12294). A provider is left out while another of its agents' session settings are read:
+   * that read uses the process.
    */
   #sharedProcessesToRelease(agentId: string): AgentProvider[] {
     const agents = this.#store.list();
