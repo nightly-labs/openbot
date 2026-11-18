@@ -1357,6 +1357,18 @@ button.chat-action-target:active,
   color: var(--openbot-text-primary);
 }
 
+/* Why a routine run failed, under its centred marker, in the marker's muted text. A provider error
+   has no length limit, so the chat shows 3 lines; the title and the run history have all of it. */
+.chat-action-marker-reason {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 /* The open text of an agent message reads as a chat message under its centred marker. */
 .chat-action-message-text {
   align-self: stretch;
