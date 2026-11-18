@@ -401,11 +401,19 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (this.#threads.get(thread.id) !== thread) return;
     if (thread.configured) this.#released.set(thread.id, thread.params);
     this.#threads.delete(thread.id);
-    const message =
-      error instanceof PiProcessClosedError ? sourceText("error.provider.piThreadStopped") : error.message;
-    if (thread.turn) yield* this.#finish(thread, "failed", message, "provider_exited");
+    if (thread.turn)
+      yield* error instanceof PiProcessClosedError
+        ? this.#endAfterExit(thread)
+        : this.#finish(thread, "failed", error.message, "provider_exited");
     yield* this.#close(thread);
   });
+
+  /** Ends the turn of a thread whose Pi process closed: as stopped when the user stopped it, else as failed. */
+  #endAfterExit(thread: PiThread) {
+    return thread.turn?.stopped
+      ? this.#finish(thread, "interrupted")
+      : this.#finish(thread, "failed", sourceText("error.provider.piThreadStopped"), "provider_exited");
+  }
 
   /** Marks a thread whose turn ended as idle, and closes the longest idle threads over the limit. */
   readonly #markIdle = Effect.fn("PiAgentClient.markIdle")(function* (this: PiAgentClient, thread: PiThread) {
@@ -939,7 +947,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       thread.turn !== turn
         ? Effect.void
         : failure.cause instanceof PiProcessClosedError
-          ? this.#finish(thread, "failed", sourceText("error.provider.piThreadStopped"), "provider_exited")
+          ? this.#endAfterExit(thread)
           : this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause));
     let answered = false;
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
