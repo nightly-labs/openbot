@@ -33,6 +33,11 @@ export interface CustomProviderChangeDependencies {
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
   providerRuntimes: Pick<ProviderRuntimeManager, "startCustomProviderHarness">;
+  /**
+   * Asks the endpoints which models cannot reason, before the restart that reads the answer
+   * (#8381). True: the answer changed. Absent: nothing is asked.
+   */
+  refreshModelReasoning?: () => Effect.Effect<boolean>;
 }
 
 export interface CustomProviderChanges {
@@ -61,6 +66,7 @@ export function createCustomProviderChanges({
   service,
   customProviders,
   providerRuntimes,
+  refreshModelReasoning,
 }: CustomProviderChangeDependencies): CustomProviderChanges {
   /**
    * One endpoint change at a time, from the first read to the last write.
@@ -101,7 +107,12 @@ export function createCustomProviderChanges({
     previous: CustomProviderHarness | undefined,
   ) {
     const current = harnessOf(id);
+    const reasoningChanged = refreshModelReasoning ? yield* refreshModelReasoning() : false;
     const outcome = yield* restart(current, previous);
+    // Only OpenCode reads that answer. When this change did not restart it, the answer of another
+    // endpoint can still be new, for example after its server started.
+    if (reasoningChanged && (current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) !== "opencode" && previous !== "opencode")
+      yield* service.reloadCustomProviderConfig("opencode");
     yield* providerRuntimes.startCustomProviderHarness(current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     return outcome;
   });

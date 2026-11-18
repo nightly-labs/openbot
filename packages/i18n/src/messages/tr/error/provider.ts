@@ -307,6 +307,8 @@ export const messages = {
     "Google bu istek için Gemini oturum açma bilgisini kabul etmedi. Mesajınızı yeniden gönderin. Hata devam ederse Ayarlar'dan Gemini'ye yeniden bağlanın.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini'nin Google ile bağlantısı kesildi. Mesajınızı yeniden gönderin. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
   "error.provider.antigravityHistoryUnreadable":

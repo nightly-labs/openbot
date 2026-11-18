@@ -147,6 +147,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
   isReservedMcpServerName,
@@ -1668,7 +1669,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.get(agentId);
         return (
           agent !== undefined &&
-          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
+          this.#usageLimits.passesOver(agentId) &&
           (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
         );
       },
@@ -2142,9 +2143,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
-      // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
-      // stdio server of a Workspace only agent.
+      // The saved rows that the agent gets, and the GitHub connection, whose bearer the gateway gets
+      // from the main process (#12035). Computer Use is left out: OpenBot gives its tools another way.
+      // `mcpFallbackRunsServer` leaves out a stdio server of a Workspace only agent.
       mcpServers: mcpServersFromGateway(
         this.#mcp,
         options.prepareMcpTest,
@@ -2154,7 +2155,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const saved = new Set(this.#mcp.list().map((config) => config.id));
           return this.enabledMcpServers(agentId).filter(
             (config) =>
-              saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
+              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
+                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
+              mcpFallbackRunsServer(config, agent),
           );
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
@@ -3848,10 +3851,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     queueWhileBusy = true,
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
-      .runExclusive(() =>
-        this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
-      )
+      .runExclusive(() => {
+        const before = this.#store.get(input.agentId);
+        return this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy).pipe(
+          Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))),
+        );
+      })
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
+  }
+
+  /**
+   * A requested change moved the agent to another model, now or when it is next idle, so a provider
+   * error that holds that model gets one try. Automatic moves do not come through here.
+   */
+  #modelChosen(before: AgentSummary | undefined, after: AgentSummary): void {
+    const chosen = (agent: AgentSummary): AgentModelChoice => agent.pendingRuntime ?? agentModelChoice(agent);
+    if (before && !sameAgentModelChoice(chosen(before), chosen(after)))
+      this.#usageLimits.chosen(after.id, usageLimitOf(chosen(after)));
   }
 
   /**
@@ -4365,7 +4381,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // A message from the user tries the held model first: the limit can have ended outside OpenBot.
     // A refused try holds the agent again, and the drain after it moves (#7068).
     if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
-    const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
+    // A model that a person or an agent chose gets one turn before the agent leaves it again (#11992).
+    const failed = !limited && this.#usageLimits.passesOver(agentId);
     if (!limited && !failed) return null;
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#hasWaitingWork(agentId)) return null;

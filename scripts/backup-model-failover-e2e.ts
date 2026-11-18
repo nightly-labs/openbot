@@ -21,6 +21,7 @@
 // the request that started the subagent continues on the backup with that report. A report that a
 // completed turn read does not make its request run again (#9493). When the plan refuses only the
 // subagent's requests and Claude's own turn then ends with no answer, the request continues on the backup too (#11141).
+// A model that is chosen again while a provider error holds it gets one turn before the agent moves to a backup (#11992).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -1476,6 +1477,44 @@ try {
         .map((turn) => turn.model),
       notes,
     };
+  });
+
+  await check("a model chosen again during a provider error hold gets one try", async () => {
+    await restart();
+    const chooser = await withBackup("Chooser");
+    failing([PRIMARY]);
+    const moved = await send(chooser.id, "work");
+    assert.equal(moved.status, "completed", `The message completes: ${moved.error}`);
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The provider error moved the agent to its backup.");
+    const choose = () =>
+      runCauseEffect(service.updateAgent({ agentId: chooser.id, provider: "claude", model: PRIMARY }));
+
+    // The chosen model still fails: it gets one turn, and the agent moves to the backup again.
+    await choose();
+    let before = turns().length;
+    const failedTry = await send(chooser.id, "try the chosen model");
+    assert.equal(failedTry.status, "completed", `The message completes: ${failedTry.error}`);
+    const failedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(failedModels, [PRIMARY, BACKUP], "The chosen model gets one try, then the backup answers.");
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The agent is on its backup again.");
+    assert.equal(agentOf(chooser.id).usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+
+    // The chosen model works again before the hold ends: the message runs on it and the agent stays (#11992).
+    failing([]);
+    await choose();
+    before = turns().length;
+    const worked = await send(chooser.id, "use the chosen model");
+    assert.equal(worked.status, "completed", `The message completes: ${worked.error}`);
+    const workedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(workedModels, [PRIMARY], "The message runs on the chosen model.");
+    const agent = agentOf(chooser.id);
+    assert.equal(agent.model, PRIMARY, "The agent stays on the chosen model.");
+    assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
+    return { failedModels, workedModels };
   });
 
   report.passed = true;

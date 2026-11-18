@@ -6,10 +6,10 @@ import {
   parseMobileFeatureFlags,
   parseMobileLatestVersion,
 } from "@openbot/contracts/mobile-features";
-import * as Application from "expo-application";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { create } from "zustand";
 import { devFeatureOverride, devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
+import { nativeApplicationVersion } from "@/shared/lib/native-application";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 /**
@@ -91,7 +91,7 @@ export async function refreshMobileFeatures(apiUrl: string, force = false): Prom
  */
 export function currentAppVersion(): string | null {
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return Constants.expoConfig?.version ?? null;
-  return Application.nativeApplicationVersion;
+  return nativeApplicationVersion();
 }
 
 /** One flag for the account server of this session. It is off for another account server. */

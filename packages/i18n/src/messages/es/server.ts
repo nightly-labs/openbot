@@ -116,6 +116,7 @@ export const messages = {
   "server.local.create": "Crear servidor",
   "server.local.creating": "Creando servidor…",
   "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.createFailedRetry": "Algo salió mal. Inténtalo de nuevo. Si vuelve a fallar, reinicia OpenBot.",
   "server.local.limitReached":
     "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
   "server.local.deleteConfirmTitle": "¿Eliminar {name}?",

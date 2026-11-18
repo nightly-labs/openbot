@@ -116,6 +116,7 @@ export const messages = {
   "server.local.create": "创建服务器",
   "server.local.creating": "正在创建服务器…",
   "server.local.createFailed": "无法创建该服务器。",
+  "server.local.createFailedRetry": "出了点问题。请重试。如果再次失败，请重启 OpenBot。",
   "server.local.limitReached": "这台电脑上最多可以有 {limit} 个服务器。请删除一个后再创建。",
   "server.local.deleteConfirmTitle": "删除 {name}？",
   "server.local.deleteConfirmDescription": "OpenBot 会停止该服务器，并将其助手、对话和文件移到回收站。",

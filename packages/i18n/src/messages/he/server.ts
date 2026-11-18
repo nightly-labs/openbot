@@ -112,6 +112,7 @@ export const messages = {
   "server.local.create": "יצירת שרת",
   "server.local.creating": "יוצר שרת…",
   "server.local.createFailed": "לא ניתן ליצור את השרת.",
+  "server.local.createFailedRetry": "משהו השתבש. יש לנסות שוב. אם זה נכשל שוב, יש להפעיל מחדש את OpenBot.",
   "server.local.limitReached": "אפשר להחזיק לכל היותר {limit} שרתים במחשב הזה. יש למחוק אחד כדי ליצור אחר.",
   "server.local.deleteConfirmTitle": "למחוק את {name}?",
   "server.local.deleteConfirmDescription": "OpenBot עוצר את השרת ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח.",

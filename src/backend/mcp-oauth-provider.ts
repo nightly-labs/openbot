@@ -77,6 +77,64 @@ const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 const MCP_CLIENT_NAME = "OpenBot";
 
 /**
+ * The HTTPS page on openbot.run that sends the browser on to the loopback listener of the computer
+ * it runs on, on `MCP_OAUTH_REDIRECT_PORT` (`apps/auth-api/src/routes/oauth/mcp-callback.ts`). Only
+ * a built-in client sends it: an authorization server that refuses every `http` address takes it.
+ */
+export const MCP_OAUTH_RELAY_URL = "https://openbot.run/oauth/mcp-callback";
+
+/** A public OAuth client that OpenBot registered with one authorization server itself. */
+interface BuiltInMcpClient {
+  /**
+   * The MCP server that this client signs in to. Any server can name this issuer in its
+   * protected-resource metadata, and the token goes to the server that asked for it.
+   */
+  resource: string;
+  /** The authorization server URL that discovery finds, which the SDK binds the tokens to. */
+  issuer: string;
+  clientId: string;
+  redirectUrl: string;
+}
+
+/**
+ * The authorization servers that register only the MCP clients they approved, and that approved
+ * OpenBot's own app. Such a server needs no sign-in app from the user.
+ *
+ * Meta's ads MCP server answers its registration endpoint with "Dynamic registration is not available
+ * for this client", and refuses every `http` redirect, loopback too: the app settings save none, and
+ * the sign-in page says "isn't using a secure connection" for `127.0.0.1`. So the OpenBot app
+ * (1479376854168579) registers the openbot.run relay. The app ID is public; the client has no secret,
+ * and PKCE protects the grant.
+ */
+const BUILT_IN_MCP_CLIENTS: readonly BuiltInMcpClient[] = [
+  {
+    resource: "https://mcp.facebook.com/ads",
+    issuer: "https://www.facebook.com/ads",
+    clientId: "1479376854168579",
+    redirectUrl: MCP_OAUTH_RELAY_URL,
+  },
+];
+
+/** The origin and path of an MCP server address, without a final "/", or `null`. */
+function builtInResourceKey(url: string): string | null {
+  const resource = normalizeResource(url);
+  if (!resource) return null;
+  const parsed = new URL(resource);
+  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+}
+
+/** The built-in client for this MCP server and authorization server, or `undefined`. */
+function builtInMcpClient(resource: string, issuer: string | undefined): BuiltInMcpClient | undefined {
+  if (!issuer) return undefined;
+  const key = builtInResourceKey(resource);
+  return key === null
+    ? undefined
+    : BUILT_IN_MCP_CLIENTS.find(
+        (client) => builtInResourceKey(client.resource) === key && issuersMatch(client.issuer, issuer),
+      );
+}
+
+/**
  * The second path of the loopback grant listener. Dropbox registers only the loopback paths of the
  * MCP clients that it knows, `/callback` among them, and refuses `/mcp-auth` with a 403 (#8025).
  */
@@ -1045,12 +1103,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * A loopback name also matches when the registration names it with no port. Magnific's Keycloak
    * saves `http://localhost/mcp-auth` for `http://localhost:<port>/mcp-auth`, and refuses the
    * `127.0.0.1` form on the authorization page (#10877).
+   *
+   * The address of the built-in client for this authorization server, when there is one and no
+   * sign-in app: that server refuses every loopback address.
    */
   get redirectUrl(): string {
     const record = this.#record();
     const own = this.#options.redirectUrl;
+    if (record.app) return own;
+    const builtIn = builtInMcpClient(this.#options.resource, this.#activeIssuer);
+    if (builtIn) return builtIn.redirectUrl;
     const client = this.#registeredClient ?? record.client;
-    if (record.app || !client) return own;
+    if (!client) return own;
     const deepLink = this.#deepLinkRedirectUrl;
     if (deepLink && client.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
@@ -1162,6 +1226,17 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         ...(issuer ? { issuer } : {}),
       };
     }
+    // A built-in client is the client of its authorization server, which registers no other. The
+    // SDK reads this after discovery, so the issuer is known. A server that refuses it gets it back
+    // once more from the SDK's retry, and the sign-in then ends with the server's own refusal.
+    const builtIn = builtInMcpClient(this.#options.resource, this.#activeIssuer);
+    if (builtIn)
+      return {
+        client_id: builtIn.clientId,
+        redirect_uris: [builtIn.redirectUrl],
+        token_endpoint_auth_method: "none",
+        issuer: builtIn.issuer,
+      };
     const client = this.#registeredClient ?? this.#credential(record.client);
     this.recordSecret(record.client?.client_secret);
     if (!client) {

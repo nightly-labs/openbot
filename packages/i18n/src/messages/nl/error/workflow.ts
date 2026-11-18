@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentMissing": "Kies een agent voor deze stap.",
   "error.workflow.handoffFailed": "OpenBot kon deze stap niet naar de agent sturen.",
   "error.workflow.agentStepEnded": "Het bericht van de agent voor deze stap is verwijderd voordat de agent antwoordde.",
+  "error.workflow.agentStepStopped":
+    "De agent is gestopt voordat hij deze stap beantwoordde. Voer de stap opnieuw uit.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":
