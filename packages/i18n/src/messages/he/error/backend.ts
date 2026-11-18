@@ -262,6 +262,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
+  "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",
   "error.backend.mcpToolSchemaRefused":
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
