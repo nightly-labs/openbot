@@ -1902,6 +1902,20 @@ export class MessagingService {
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
       };
     }
+    // One file takes the text as its caption: apart, the text can go missing while the file arrives.
+    const single = files.length === 1 && !embeds.length ? files[0] : undefined;
+    if (single && live.adapter.postFileWithText) {
+      const captioned = yield* Effect.result(live.adapter.postFileWithText(target, text, single));
+      if (Result.isFailure(captioned))
+        return {
+          error: refusal(captioned.failure),
+          failure: "unknown" as const,
+        };
+      if (captioned.success) {
+        live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
+        return { posted: true as const, messageId: captioned.success };
+      }
+    }
     const posted = yield* (
       postEmbeds && embeds.length
         ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
@@ -2617,6 +2631,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
+  [
+    "not_confirmed",
+    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+  ],
 ]);
 
 const DISCORD_NOT_LINKED =
