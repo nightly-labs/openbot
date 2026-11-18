@@ -131,6 +131,8 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
     "A teammate's work can change after its answer, for example when the OpenBot user continues it in the app. To give the status of work that a teammate did, ask that teammate again for its current status, also when you know its earlier answer or your instructions say that you can answer the status of work you know. Do not give its earlier answer as the current status.",
     "To send files, call openbot.attach_files_to_response. When you ask an OpenBot teammate, ask one teammate and end this turn: its reply comes back to this conversation, and your answer to it is posted here.",
     `Through openbot.tool_call: openbot.messaging_history reads more of this place; openbot.messaging_remember saves a fact that every conversation of this ${words.workspace} sees; openbot.messaging_forget_memory deletes one by its id; openbot.messaging_post posts to another place. Keep facts about this ${words.workspace} there, not in openbot.remember: your own memories are private to the OpenBot user.`,
+    // Nobody here can answer a tool's approval card, so OpenBot cancels it (#12200).
+    "Nobody can approve a tool in this chat. When a tool stops because its approval is not available here, do not try the same action another way: say which action needs approval, and that the OpenBot user can approve it when they ask you in the OpenBot app.",
   ];
   const mention = MENTION_GUIDANCE[input.platform];
   if (mention) lines.push(mention);
