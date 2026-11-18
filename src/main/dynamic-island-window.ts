@@ -270,20 +270,24 @@ export class DynamicIslandWindowController {
   }
 
   #applyShape(displayId: number, window: BrowserWindow): void {
+    const scaleFactor = this.#options.getDisplays().find((candidate) => candidate.id === displayId)?.scaleFactor;
     if (this.#interactiveDisplays.has(displayId) || this.#collapseTimers.has(displayId)) {
       const { width, height } = window.getBounds();
-      this.#setShape(window, [{ x: 0, y: 0, width, height }]);
+      this.#setShape(window, [{ x: 0, y: 0, width, height }], scaleFactor);
       return;
     }
-    this.#setShape(window, this.#inputRegions.get(displayId) ?? []);
+    this.#setShape(window, this.#inputRegions.get(displayId) ?? [], scaleFactor);
   }
 
-  /** Only a change goes to X11: each shape request also wakes the main thread (#11666). */
-  #setShape(window: BrowserWindow, shape: Rectangle[]): void {
-    const key = JSON.stringify(shape);
+  /**
+   * Only a change goes to X11: each shape request also wakes the main thread (#11666). Chromium keeps the
+   * shape in pixels, so a new display scale applies the same shape again.
+   */
+  #setShape(window: BrowserWindow, shape: Rectangle[], scaleFactor: number | undefined): void {
+    const key = `${scaleFactor ?? ""}:${JSON.stringify(shape)}`;
     if (this.#appliedShapes.get(window) === key) return;
-    this.#appliedShapes.set(window, key);
     window.setShape(shape);
+    this.#appliedShapes.set(window, key);
   }
 
   /** On X11 the island stays below the top panel of the desktop, as the clock and the tray do. */
@@ -480,7 +484,7 @@ export class DynamicIslandWindowController {
     }
     if (this.#options.windowKind === "x11") {
       // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
-      this.#setShape(window, []);
+      this.#setShape(window, [], display.scaleFactor);
     } else {
       letPointerThrough(this.#options.pointerForwarding, window, true);
     }
