@@ -13,6 +13,8 @@ export const messages = {
     "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
   "error.agent.toolCallEnvelopeKeys":
     "工具未运行。tool_call 只接受 name 和 arguments。请将工具的参数作为对象放入 arguments，再次发送调用。",
+  "error.agent.toolCallMissingName":
+    "工具未运行。tool_call 没有 name。请在 name 中填写 tool_search 给出的完整名称，例如 openbot.history_read，然后再次发送调用。",
   "error.agent.toolCallUnknownTool":
     "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
   "error.agent.toolCallUnknownToolSuggest":

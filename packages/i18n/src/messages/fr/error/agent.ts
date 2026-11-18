@@ -14,6 +14,8 @@ export const messages = {
     "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
   "error.agent.toolCallEnvelopeKeys":
     "L’outil ne s’est pas exécuté. tool_call accepte seulement name et arguments. Mettez les arguments de l’outil dans arguments, sous forme d’objet, puis renvoyez l’appel.",
+  "error.agent.toolCallMissingName":
+    "L’outil ne s’est pas exécuté. Le tool_call n’a pas de name. Mettez dans name le nom qualifié que donne tool_search, par exemple openbot.history_read, et envoyez l’appel à nouveau.",
   "error.agent.toolCallUnknownTool":
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":

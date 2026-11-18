@@ -14,6 +14,8 @@ export const messages = {
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
   "error.agent.toolCallEnvelopeKeys":
     "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallMissingName":
+    "Инструмент не запущен. В tool_call нет name. Укажите в name полное имя из tool_search, например openbot.history_read, и отправьте вызов снова.",
   "error.agent.toolCallUnknownTool":
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":

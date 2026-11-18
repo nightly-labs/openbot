@@ -13,6 +13,8 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
   "error.agent.toolCallEnvelopeKeys":
     "The tool did not run. tool_call takes only name and arguments. Put the arguments of the tool in arguments, as an object, and send the call again.",
+  "error.agent.toolCallMissingName":
+    "The tool did not run. The tool_call has no name. Put the qualified name that tool_search gives in name, such as openbot.history_read, and send the call again.",
   "error.agent.toolCallUnknownTool":
     "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":

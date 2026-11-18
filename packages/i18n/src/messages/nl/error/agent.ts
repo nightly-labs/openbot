@@ -14,6 +14,8 @@ export const messages = {
     "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
   "error.agent.toolCallEnvelopeKeys":
     "De tool is niet uitgevoerd. tool_call accepteert alleen name en arguments. Zet de argumenten van de tool in arguments, als object, en stuur de aanroep opnieuw.",
+  "error.agent.toolCallMissingName":
+    "De tool is niet uitgevoerd. De tool_call heeft geen name. Zet in name de gekwalificeerde naam die tool_search geeft, zoals openbot.history_read, en stuur de aanroep opnieuw.",
   "error.agent.toolCallUnknownTool":
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
