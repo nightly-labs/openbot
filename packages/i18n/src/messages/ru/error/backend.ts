@@ -124,6 +124,8 @@ export const messages = {
   "error.backend.memoryGone": "Этой записи памяти больше нет.",
   "error.backend.routineGone": "Этой регулярной задачи больше нет.",
   "error.backend.routineRunGone": "Этого запуска регулярной задачи больше нет.",
+  "error.backend.routineRunFailedNoReason":
+    "Запуск остановился с ошибкой, но причина не пришла. Откройте запуск, чтобы увидеть, что сделал агент.",
   "error.backend.turnNotStarted": "Провайдер не начал этот ход.",
   "error.backend.routineResultConnectionOff":
     "Это подключение к мессенджеру выключено или удалено. Выберите другое место.",

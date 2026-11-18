@@ -121,6 +121,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
   "error.backend.routineRunGone": "This routine run no longer exists.",
+  "error.backend.routineRunFailedNoReason":
+    "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",

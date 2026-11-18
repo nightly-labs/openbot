@@ -114,6 +114,8 @@ export const messages = {
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
   "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunFailedNoReason":
+    "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",

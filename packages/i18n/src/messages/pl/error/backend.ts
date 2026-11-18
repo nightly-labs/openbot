@@ -126,6 +126,8 @@ export const messages = {
   "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
   "error.backend.routineGone": "Ta rutyna już nie istnieje.",
   "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
+  "error.backend.routineRunFailedNoReason":
+    "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
