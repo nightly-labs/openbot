@@ -29,6 +29,7 @@ import {
 } from "@/features/auth/api/mobile-auth";
 import { deleteComposerDrafts } from "@/features/chat/model/composer-drafts";
 import { deleteAllMedia } from "@/features/chat/model/media-store";
+import { deleteAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
 import { deleteWorkspaceCaches } from "@/features/workspace/model/workspace-cache";
@@ -75,7 +76,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       deleteComposerDrafts();
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
-    if (sessionRef.current && !session) void deleteWorkspaceCaches();
+    if (sessionRef.current && !session) {
+      void deleteWorkspaceCaches();
+      deleteAgentBackdrops();
+    }
     // The kept pictures and files of the hosts belong to the account too, so they go at the same time.
     if (sessionRef.current && (!session || session.user.id !== sessionRef.current.user.id)) deleteAllMedia();
     mobileAnalytics.setUser(session?.user ?? null);

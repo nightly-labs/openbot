@@ -158,6 +158,7 @@ import { NotificationAvatarSync } from "@/features/push-notifications/notificati
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { forgetAgentBackdrops, retainAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
@@ -612,6 +613,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryClient.removeQueries({ queryKey });
       }
       forgetDrawerSnapshots(serverIds);
+      forgetAgentBackdrops(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       hostColors.current = withoutKeys(hostColors.current, serverIds);
@@ -646,6 +648,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
         // Also the copies of servers that the account left while the app was closed.
         void workspaceCache?.retain([...available]).catch(() => undefined);
+        retainAgentBackdrops([...available]);
         for (const host of hosts) removedServers.current.delete(host.hostId);
         keepHosts(hosts);
       }

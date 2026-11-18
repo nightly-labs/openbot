@@ -53,6 +53,9 @@ adding a module or moving ownership between workspaces.
   (`apps/mobile/src/features/chat/model/media-store.ts`), so they open without a connection. The copies
   stay on that phone, the host stays the source of truth, and sign-out, session expiry and server
   removal delete them.
+  The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
+  (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
+  removal delete it too.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent

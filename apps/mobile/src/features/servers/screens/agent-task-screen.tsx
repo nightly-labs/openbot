@@ -693,6 +693,7 @@ function AgentTaskChat({
           onBack={leaveTask}
         />
         <ChatMessageList
+          bubbleSurface={String(background)}
           pullGesture={endPull.gesture}
           pullShift={endPull.shift}
           agents={serverAgents}

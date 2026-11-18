@@ -162,6 +162,9 @@ Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by
 new capabilities go in the list. When no release in the window speaks protocol 9, delete those
 capabilities from the lists.
 
+The protocol 9 list is full since #11930 (2026-11-18): 256 of the 256 capabilities that it can
+have. A new optional capability needs protocol 10 first.
+
 ### 3. Server start-loop guard and safe mode
 
 Evidence: `src/main/index.ts` `recoverFromStartLoop` only logs for a server;
@@ -231,7 +234,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 
 | # | Item | State |
 |---|---|---|
-| 13 | Durable idempotency keys for commands that clients retry | TODO |
+| 13 | Durable idempotency keys for commands that clients retry | DONE (#11906, `2279f4aa56`: task start; #11930, `8aa900004a`: agent create, protocol 9 capability `agent-create-operation-v1`, and a resent thread message keeps its client id. Message sends were already durable. The share extension has no resend after a failure, so it needs no change.) |
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | RE-SCOPED: developer decision, 2026-11-18 (see below) |
 | 16 | Typed update state machine and one runtime state file | TODO |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |

@@ -17,11 +17,13 @@ import { documentFocused } from "../../document-focus";
 import { documentSoftwareRendering } from "../../document-rendering";
 import { observeOnScreen } from "../../on-screen";
 
-// Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
-// for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
-// The bloub patch in `patches/` waits between capped frames instead of asking for every display
-// frame. Each of those frames also restyled every running CSS animation in the window.
-const AVATAR_FPS = 30;
+// Cap avatar animation so that it draws at least 60 times per second. Uncapped bloub clocks asked
+// for every display frame and measured 30% renderer / 24% GPU for two visible avatars. The bloub
+// patch in `patches/` waits between capped frames instead. bloub skips a display frame that comes
+// sooner than 1/fps, so a cap equal to the display rate skips about half of them: a cap of 60
+// measured 38 draws per second on a 75 Hz display. With 80, a model of the loop gives 60, 75, 60
+// and 72 draws per second on a 60, 75, 120 and 144 Hz display.
+const AVATAR_FPS = 80;
 
 interface PlushMood {
   state: PlushState;

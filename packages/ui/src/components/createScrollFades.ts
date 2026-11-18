@@ -14,6 +14,7 @@ export function createScrollFades(options: { stuck?: string } = {}) {
   let element: Element | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let contentObserver: ResizeObserver | undefined;
+  let frame: number | undefined;
 
   /** The fade lies over the scroller's border box, but a sticky offset starts at its content edge. */
   function measureStuck(scroller: Element, selector: string): number {
@@ -44,8 +45,16 @@ export function createScrollFades(options: { stuck?: string } = {}) {
     });
   }
 
+  /**
+   * One read in the next frame for all calls before it. Each call added its own frame callback, and
+   * each read forced a layout: with 100 working agents, the sidebar list changed many times in each
+   * frame.
+   */
   function remeasure(): void {
-    window.requestAnimationFrame(measure);
+    frame ??= window.requestAnimationFrame(() => {
+      frame = undefined;
+      measure();
+    });
   }
 
   function adopt(next: Element): void {
@@ -74,6 +83,8 @@ export function createScrollFades(options: { stuck?: string } = {}) {
     resizeObserver = undefined;
     contentObserver?.disconnect();
     contentObserver = undefined;
+    if (frame !== undefined) window.cancelAnimationFrame(frame);
+    frame = undefined;
   }
 
   function stuckHeight(): number {

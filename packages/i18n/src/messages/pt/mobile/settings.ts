@@ -125,10 +125,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.bubbleStyle": "Estilo dos balões",
+  "mobile.settings.appearance.bubbleStyleSolid": "Sólido",
+  "mobile.settings.appearance.bubbleStyleTint": "Suave",
+  "mobile.settings.appearance.seeThroughBubbles": "Balões transparentes",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Os balões do agente e os balões sem cor deixam ver o fundo. Sem fundo, os balões são sempre opacos.",
+  "mobile.settings.appearance.tab.colors": "Cores",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 execuções de rotina",
+  "mobile.settings.appearance.preview.thinking": "Pensou por 4 segundos",
+  "mobile.settings.appearance.preview.memory": "1 memória salva",
+  "mobile.settings.appearance.backdrop.title": "Fundo",
+  "mobile.settings.appearance.backdrop.footer":
+    "Aparece atrás do Início e dos seus chats neste celular. Um agente pode definir um para você; Desfazer no chat traz o anterior de volta.",
+  "mobile.settings.appearance.backdrop.none": "Nenhum",
+  "mobile.settings.appearance.backdrop.pond": "Lago de carpas",
+  "mobile.settings.appearance.backdrop.jellyfish": "Águas-vivas",
+  "mobile.settings.appearance.backdrop.sunset": "Pôr do sol retrô",
+  "mobile.settings.appearance.backdrop.snowfall": "Neve caindo",
+  "mobile.settings.appearance.backdrop.fireflies": "Vaga-lumes",
+  "mobile.settings.appearance.backdrop.agentPage": "Página do agente",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Definido por um agente",
+  "mobile.settings.appearance.backdrop.photo": "Foto",
+  "mobile.settings.appearance.backdrop.photoChoose": "Escolher nas suas fotos",
+  "mobile.settings.appearance.backdrop.photoChange": "Toque de novo para escolher outra foto",
+  "mobile.settings.appearance.backdrop.strength": "Intensidade do fundo",
+  "mobile.settings.appearance.backdrop.calm": "Suave",
+  "mobile.settings.appearance.backdrop.vivid": "Vívido",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Um fundo suave deixa as respostas longas fáceis de ler. O topo do Início é onde ele mais aparece.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Você pode escrever a nota de versão?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Aqui está um rascunho: o fundo que um agente define agora aparece no seu celular também.",
   "mobile.settings.appearance.chatBackground": "Fundo do chat",
   "mobile.settings.appearance.chatBackgroundDefault": "Padrão",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Cada tema mantém a sua própria cor. Uma cor que dificulta a leitura do texto fica mais escura ou mais clara.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "O fundo substitui o fundo do chat. Selecione Nenhum como fundo para usar uma cor.",
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",

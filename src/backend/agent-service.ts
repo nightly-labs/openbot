@@ -971,7 +971,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
-        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+        // A ready backup model or pool account takes the run: the drain moves the agent to it, as it
+        // does for a chat message. Only an agent with no ready backup skips the run (#11785).
+        usageLimited: (agentId) =>
+          !this.#usageLimits.mayDrain(agentId) &&
+          this.#usageLimitBackup(agentId) === undefined &&
+          !this.#poolBackup(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
           const thread = this.#tasks.threadOfRoutine(agentId, routineId);
@@ -1886,6 +1891,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
+        mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
@@ -2015,7 +2021,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
-        mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
+        mayFailOver: (agentId) => this.#mayFailOver(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -4395,6 +4401,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       model: choice.model,
       ...(pick === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: pick }),
     };
+  }
+
+  /** Whether a provider error moves this agent to a backup model or to another account of its pool. */
+  #mayFailOver(agentId: string): boolean {
+    return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
   }
 
   /** Whether the agent's pooled provider has another account to move to now. */

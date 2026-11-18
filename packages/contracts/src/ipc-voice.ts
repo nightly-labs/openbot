@@ -144,7 +144,7 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
     kind: "local",
     id: "whisper-turbo",
     name: "Whisper large-v3 turbo",
-    bytes: 1_036_613_791,
+    bytes: 1_311_742_559,
     supportsLanguage: true,
     livePreview: false,
   },

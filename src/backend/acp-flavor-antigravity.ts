@@ -543,6 +543,14 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity keeps session/prompt open while background tasks run. Its text must not wait for
   // that response.
   streamAnswerBeforePromptReturns: true,
+  // When the model's stream drops, the 1.5.10 CLI sends it "The stream was interrupted. Please
+  // continue the task you were working on." as an error step, and the model writes the rest of the
+  // answer in a new step that starts with a thought. The answer before the thought showed only in the
+  // steps, and the answer only had its end (#11805). The CLI sends a failure as "\n⚠ <text>\n".
+  resumesAnswerAfterThought: {
+    report:
+      /^\s*(?:⚠️?\s*)?(?:Error: )?The stream was interrupted\. Please continue the task you were working on\.\s*$/u,
+  },
   // A silent prompt can be a background task that still runs, so the turn is not ended as stalled.
   promptOpenForBackgroundTasks: true,
   // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the

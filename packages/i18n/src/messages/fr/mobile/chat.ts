@@ -139,6 +139,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "FICHIER",
   "mobile.chat.attachment.tooLargeForMobile":
     "Ce fichier dépasse la limite mobile de {limit}. Ouvrez-le sur l’ordinateur.",
+  "mobile.chat.backdrop.agentSet": "{name} a défini l’arrière-plan",
+  "mobile.chat.backdrop.undo": "Annuler",
+  "mobile.chat.backdrop.dismiss": "Fermer",
   "mobile.chat.attachment.sharingUnavailable": "Le partage de fichiers n’est pas disponible sur cet appareil.",
   "mobile.chat.attachment.unavailable": "La pièce jointe n’est pas disponible. Réessayez.",
   "mobile.chat.attachment.openFailed": "Impossible d’ouvrir la pièce jointe",

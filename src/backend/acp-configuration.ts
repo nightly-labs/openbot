@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -351,6 +351,8 @@ export class AcpConfiguration {
     model: string | null,
     effort: string | null,
     models: AcpModel[],
+    /** A turn's prompt follows, so a model that the session does not offer fails it (#11797). */
+    requireModel = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     for (const [category, value] of [
       ["model", model],
@@ -425,7 +427,27 @@ export class AcpConfiguration {
       const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
-      if (!selected) continue;
+      if (!selected) {
+        // Antigravity resumed a session with a list that left out the agent's model, and the turn ran
+        // on the model the session opened on, while the agent showed its own (#11797). A listed model with
+        // an effort suffix, as older Antigravity versions named its efforts, is left as before.
+        if (
+          category === "model" &&
+          requireModel &&
+          !values.some(
+            (candidate) =>
+              value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
+          )
+        ) {
+          logger.warn("An agent session does not offer the model of the turn.", {
+            provider: this.options.provider,
+            model: value,
+          });
+          const name = models.find((candidate) => candidate.id === value)?.name ?? value;
+          return yield* providerFailure(new ProviderModelNotOfferedError(this.options.label(), name));
+        }
+        continue;
+      }
       // The session's options follow the agent's `config_option_update`, so they hold its value.
       if (
         this.options.setsConfigOnlyOnChange &&
