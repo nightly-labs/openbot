@@ -984,7 +984,8 @@ export const messages = {
     "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "mobile.server.connectors.whatsapp.add": "Ekle",
   "mobile.server.connectors.whatsapp.groupTitle": "Bir grup ekleyin",
-  "mobile.server.connectors.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "mobile.server.connectors.whatsapp.groupSearch": "Grup ara",
   "mobile.server.connectors.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",

@@ -67,6 +67,8 @@ export const messages = defineMessages("composer", {
   "composer.voice.blocked": "Microphone access is blocked. Allow OpenBot to use the microphone in system settings.",
   "composer.voice.noMicrophone": "No microphone is available.",
   "composer.voice.startFailed": "OpenBot could not start voice recording.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot could not open the microphone. Close other apps that use it, make sure that it is connected and allowed in system settings, then try again.",
   "composer.voice.transcribeFailed": "OpenBot could not transcribe this recording.",
   "composer.reply.toYou": "Replying to your message",
   "composer.reply.toAgent": "Replying to Agent",

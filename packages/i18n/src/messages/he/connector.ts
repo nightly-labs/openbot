@@ -500,7 +500,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, הרשימה מציגה את מספר הטלפון.",
   "connector.whatsapp.add": "הוספה",
   "connector.whatsapp.groupTitle": "הוספת קבוצה",
-  "connector.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "connector.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "connector.whatsapp.groupSearch": "חיפוש קבוצות",
   "connector.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",

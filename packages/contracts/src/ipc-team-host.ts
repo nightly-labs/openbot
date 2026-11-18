@@ -32,6 +32,8 @@ export type ServerConnectionIssueCode =
   | "client_update_required"
   | "host_update_required"
   | "protocol_error"
+  /** The server stopped its start loop. The message is the reason that the host sent. */
+  | "server_safe_mode"
   | "authentication_required"
   | "network_unavailable";
 

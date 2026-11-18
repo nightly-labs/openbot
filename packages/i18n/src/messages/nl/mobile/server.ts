@@ -957,7 +957,8 @@ export const messages = {
     "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "mobile.server.connectors.whatsapp.add": "Toevoegen",
   "mobile.server.connectors.whatsapp.groupTitle": "Voeg een groep toe",
-  "mobile.server.connectors.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "mobile.server.connectors.whatsapp.groupSearch": "Zoek groepen",
   "mobile.server.connectors.whatsapp.groupsLoading": "Groepen lezen…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",

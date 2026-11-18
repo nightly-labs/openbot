@@ -3,7 +3,8 @@
 // temporary profile. Each client sends what its release sent and reads the reply with the frozen
 // decoder of its protocol, so a change of a released wire meaning fails here:
 // - v1: compatibility, the protocol gate, join, login, `bot`/`botId` wire keys and the event socket.
-// - v2: the WebRTC frames of a real `TeamWebRtcHostPeer`, from the signed handshake to an RPC.
+// - v2: the WebRTC frames of a real `TeamWebRtcHostPeer`, from the signed handshake to an RPC. An RPC
+//   with no protocol marker (a release before v0.7.0) gets `client_update_required`.
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
@@ -1378,41 +1379,80 @@ try {
     ({ sessionId }) => ({ sessionId, confirmed: true }),
   );
 
-  await step("v2 RPC: `http.request` frames reach the host with the released body vocabulary", async () => {
-    const capabilities = record(fixture("v2/client-scope.json"), "fixture").capabilities;
-    assert.ok(Array.isArray(capabilities));
-    const call = async (method: "GET" | "POST", path: string, body: unknown = null) => {
-      const requestId = randomUUID();
-      const from = v2.bridge.sent.length;
-      v2.bridge.emit(
-        "data",
-        "peer-v2",
-        "rpc",
-        encodeTeamProtocolV2Frame(
-          createTeamProtocolV2Request(requestId, "http.request", { method, path, body, capabilities }),
-        ),
+  await step(
+    "v2 RPC: an unmarked `http.request` gets update required; a marked one keeps the released vocabulary",
+    async () => {
+      // A capability list with no protocol marker comes from a release before v0.7.0 (2026-09-09), which is
+      // outside the support window. The released v2 fixture sends such a list, and the v0.6 clients sent no list.
+      const unmarked = record(fixture("v2/client-scope.json"), "fixture").capabilities;
+      assert.ok(Array.isArray(unmarked));
+      // The earliest marked list: protocol 4, the first protocol of the support window.
+      const marked = [...teamCapabilitiesForProtocol(4)];
+      const call = async (
+        method: "GET" | "POST",
+        path: string,
+        capabilities: readonly unknown[] | undefined,
+        body: unknown = null,
+      ) => {
+        const requestId = randomUUID();
+        const from = v2.bridge.sent.length;
+        v2.bridge.emit(
+          "data",
+          "peer-v2",
+          "rpc",
+          encodeTeamProtocolV2Frame(
+            createTeamProtocolV2Request(requestId, "http.request", {
+              method,
+              path,
+              body,
+              ...(capabilities ? { capabilities } : {}),
+            }),
+          ),
+        );
+        return v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      };
+      const refused = async (method: "GET" | "POST", path: string, capabilities: readonly unknown[] | undefined) => {
+        const frame = await call(method, path, capabilities, method === "POST" ? { operationId: randomUUID() } : null);
+        const error = "error" in frame ? frame.error : undefined;
+        assert.deepEqual(
+          error && { code: error.code, status: error.status, retryable: error.retryable, message: error.message },
+          {
+            code: "client_update_required",
+            status: 426,
+            retryable: false,
+            message: sourceText("error.team.clientUpdateRequired"),
+          },
+          `An unmarked ${method} ${path} was not refused: ${JSON.stringify(frame)}.`,
+        );
+      };
+      await refused("GET", "/v1/agents", unmarked);
+      await refused("GET", "/v1/agents", undefined);
+      await refused("GET", `/v1/agents/${source.id}/queue`, unmarked);
+      await refused("POST", `/v1/agents/${duplicate.copyId}/duplicate`, unmarked);
+      await refused("POST", `/v1/agents/${duplicate.copyId}/duplicate`, []);
+      const result = async (method: "GET" | "POST", path: string, body: unknown = null) => {
+        const frame = await call(method, path, marked, body);
+        assert.ok("result" in frame, `The marked ${method} ${path} frame failed: ${JSON.stringify(frame)}.`);
+        return record(frame.result, "RPC result");
+      };
+      const listed = await result("GET", "/v1/agents");
+      assert.equal(listed.status, 200);
+      const agents = decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, listed.body);
+      assert.ok(Array.isArray(agents) && agents.some((value) => record(value, "agent").id === source.id));
+      const queue = await result("GET", `/v1/agents/${source.id}/queue`);
+      assert.equal(record(queue.body, "queue").botId, source.id, "A protocol 4 queue lost its `botId` key.");
+      const duplicated = await result("POST", `/v1/agents/${duplicate.copyId}/duplicate`, {
+        operationId: randomUUID(),
+      });
+      assert.equal(duplicated.status, 201);
+      const decoded = record(
+        decodeTeamProtocolV3HttpResponse("POST", `/v1/agents/${duplicate.copyId}/duplicate`, 201, duplicated.body),
+        "duplicate",
       );
-      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
-      assert.ok("result" in frame, `The ${method} ${path} frame failed: ${JSON.stringify(frame)}.`);
-      return record(frame.result, "RPC result");
-    };
-    const listed = await call("GET", "/v1/agents");
-    assert.equal(listed.status, 200);
-    const agentsOverV2 = decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, listed.body);
-    assert.ok(Array.isArray(agentsOverV2) && agentsOverV2.some((value) => record(value, "agent").id === source.id));
-    const queue = await call("GET", `/v1/agents/${source.id}/queue`);
-    assert.equal(record(queue.body, "queue").botId, source.id, "A v2 queue lost its `botId` key.");
-    const duplicateOverV2 = await call("POST", `/v1/agents/${duplicate.copyId}/duplicate`, {
-      operationId: randomUUID(),
-    });
-    assert.equal(duplicateOverV2.status, 201);
-    const decoded = record(
-      decodeTeamProtocolV3HttpResponse("POST", `/v1/agents/${duplicate.copyId}/duplicate`, 201, duplicateOverV2.body),
-      "duplicate",
-    );
-    assert.notEqual(record(decoded.bot, "bot").id, duplicate.copyId);
-    return { agents: agentsOverV2.length, queueKeys: Object.keys(record(queue.body, "queue")).sort() };
-  });
+      assert.notEqual(record(decoded.bot, "bot").id, duplicate.copyId);
+      return { refused: 5, agents: agents.length, queueKeys: Object.keys(record(queue.body, "queue")).sort() };
+    },
+  );
 
   await step("v8 RPC: a browser tab opened over WebRTC keeps its owner agent", async () => {
     // What a current desktop client sends when the user opens a tab in an agent's browser panel.

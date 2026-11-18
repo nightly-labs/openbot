@@ -958,7 +958,8 @@ export const messages = {
     "省略できます。空の場合、一覧には電話番号が表示されます。",
   "mobile.server.connectors.whatsapp.add": "追加",
   "mobile.server.connectors.whatsapp.groupTitle": "グループを追加",
-  "mobile.server.connectors.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "mobile.server.connectors.whatsapp.groupSearch": "グループを検索",
   "mobile.server.connectors.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",

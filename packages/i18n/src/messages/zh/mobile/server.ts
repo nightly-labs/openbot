@@ -905,7 +905,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "mobile.server.connectors.whatsapp.add": "添加",
   "mobile.server.connectors.whatsapp.groupTitle": "添加群组",
-  "mobile.server.connectors.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "mobile.server.connectors.whatsapp.groupSearch": "搜索群组",
   "mobile.server.connectors.whatsapp.groupsLoading": "正在读取群组…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",

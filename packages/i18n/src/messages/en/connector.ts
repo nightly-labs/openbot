@@ -497,7 +497,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "connector.whatsapp.add": "Add",
   "connector.whatsapp.groupTitle": "Add a group",
-  "connector.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "connector.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "connector.whatsapp.groupSearch": "Search groups",
   "connector.whatsapp.groupsLoading": "Reading the groups…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",

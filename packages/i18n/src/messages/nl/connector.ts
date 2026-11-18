@@ -465,7 +465,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "connector.whatsapp.add": "Toevoegen",
   "connector.whatsapp.groupTitle": "Voeg een groep toe",
-  "connector.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "connector.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "connector.whatsapp.groupSearch": "Zoek groepen",
   "connector.whatsapp.groupsLoading": "Groepen lezen…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
