@@ -1,7 +1,16 @@
 import { BlurView } from "expo-blur";
 import { type Href, router, usePathname } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import {
   Gesture,
@@ -30,6 +39,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
@@ -46,6 +56,8 @@ const AppDrawerContext = createContext<AppDrawerContextValue | null>(null);
 const DRAWER_SURFACE_MIN_RADIUS = 34;
 // The surface reaches its full corner radius after this part of the opening motion.
 const DRAWER_SURFACE_ROUNDING_PROGRESS = 0.15;
+/** The drawer progress at which a row's screen opens while the drawer closes. */
+const NAVIGATE_AT_PROGRESS = 0.05;
 const DRAWER_SPRING = {
   dampingRatio: 0.8,
   duration: 300,
@@ -78,6 +90,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const localServerKind = useMobileWorkspaceSelector((current) => current.localServerKind);
   const { leaveServer, removeServer, deleteLocalServer, reorderServers, selectServer } = useMobileWorkspaceActions();
   const [muted] = useThemeColor(["muted"]);
+  const reducedMotion = useReducedMotion();
   // The accessibility state of the drawer. It changes when the drawer starts to open and when it has closed.
   const [drawerOpen, setDrawerOpen] = useState(false);
   // The drawer reads its values from the host only after its opening motion: each answer renders the
@@ -118,6 +131,42 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     [commitDrawerState, drawerOpenOnUI],
   );
 
+  // The screen that a drawer row opens when the drawer has closed. One push for each close.
+  const pendingHref = useRef<Href | null>(null);
+  const pushPendingHref = useCallback(() => {
+    const href = pendingHref.current;
+    pendingHref.current = null;
+    if (href) router.push(href);
+  }, []);
+  useEffect(
+    () => () => {
+      pendingHref.current = null;
+    },
+    [],
+  );
+  // The spring comes to rest after 1.5 times its duration, but the drawer looks closed before that.
+  // The screen opens when the drawer is almost closed, so the user does not wait for the rest.
+  const navigatePending = useSharedValue(false);
+  useAnimatedReaction(
+    () => navigatePending.get() && drawerProgress.get() <= NAVIGATE_AT_PROGRESS,
+    (ready, before) => {
+      if (!ready || before) return;
+      navigatePending.set(false);
+      scheduleOnRN(pushPendingHref);
+    },
+  );
+  // A close motion that another motion stops also pushes the screen, at once. The push is done one time.
+  const finishClosingAndNavigate = useCallback(
+    (finished?: boolean) => {
+      "worklet";
+      finishClosing(finished);
+      if (!navigatePending.get()) return;
+      navigatePending.set(false);
+      scheduleOnRN(pushPendingHref);
+    },
+    [finishClosing, navigatePending, pushPendingHref],
+  );
+
   const openDrawer = useCallback(() => {
     triggerDrawerHaptic();
     drawerOpenOnUI.set(true);
@@ -133,6 +182,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (session) return;
+    pendingHref.current = null;
     drawerOpenOnUI.set(false);
     setDrawerOpen(false);
     setDrawerSettled(false);
@@ -263,10 +313,19 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   const navigateAfterClosing = useCallback(
     (href: Href) => {
-      closeDrawer();
-      setTimeout(() => router.push(href), 300);
+      // A second tap while the drawer closes does not push the screen again.
+      if (pendingHref.current) return;
+      if (!drawerOpenOnUI.get() || reducedMotion) {
+        closeDrawer();
+        router.push(href);
+        return;
+      }
+      pendingHref.current = href;
+      navigatePending.set(true);
+      triggerDrawerHaptic();
+      drawerProgress.set(withSpring(0, DRAWER_SPRING, finishClosingAndNavigate));
     },
-    [closeDrawer],
+    [closeDrawer, drawerOpenOnUI, drawerProgress, finishClosingAndNavigate, navigatePending, reducedMotion],
   );
 
   const selectServerAndClose = useCallback(

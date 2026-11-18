@@ -27,11 +27,13 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -126,7 +128,9 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
-  const waitReason = useAgentListWaitReason(agent.id);
+  // The tile reads the activity once and gives it to the avatar and the badge.
+  const activity = useAgentListActivity(agent.id);
+  const waitReason = agentListWaitReason(activity);
 
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -162,10 +166,11 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           hue={agent.avatarHue}
           color={agent.avatarColor}
           seed={agent.avatarSeed}
+          avatarUrl={agent.avatarUrl}
           size={64}
           animateIdle={false}
           rings
-          withThreads
+          activityMood={agentActivityMood(activity)}
         />
         {/* As on the desktop, a wait outranks the unread count in the corner of the avatar. */}
         {waitReason ? (

@@ -70,7 +70,29 @@ function savedImage(folderOf: () => Directory, url: string): string | null {
  * of the agent's photo go. When the phone cannot save it, the data URL comes back unchanged.
  */
 export function saveAgentAvatar(serverId: string, agentId: string, avatarUrl: string, dataUrl: string): string {
-  return saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
+  const uri = saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
+  if (uri !== dataUrl) {
+    savedAgentAvatars += 1;
+    for (const listener of savedAgentAvatarListeners) listener();
+  }
+  return uri;
+}
+
+let savedAgentAvatars = 0;
+const savedAgentAvatarListeners = new Set<() => void>();
+
+/**
+ * Tells the parts that give agent pictures to the system (notifications, the share extension, the
+ * shortcuts) that a new photo is on this phone, so they use it in place of the plush.
+ */
+export function subscribeSavedAgentAvatars(listener: () => void): () => void {
+  savedAgentAvatarListeners.add(listener);
+  return () => savedAgentAvatarListeners.delete(listener);
+}
+
+/** The count of photos saved in this session. It changes when a new photo is saved. */
+export function savedAgentAvatarCount() {
+  return savedAgentAvatars;
 }
 
 function saveImage(folderOf: () => Directory, url: string, dataUrl: string): string {
