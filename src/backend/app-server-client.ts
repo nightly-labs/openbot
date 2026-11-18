@@ -1,8 +1,10 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { agentProviderName } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Fiber, Result, Schema } from "effect";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
@@ -107,6 +109,32 @@ const CODEX_STOP_GRACE_MS = 10_000;
  * runs a stopped turn. An idle process keeps them as long (`PROVIDER_IDLE_RELEASE_MS`), not longer.
  */
 const ABANDONED_PROCESS_BACKGROUND_HOLD_MS = 10 * 60_000;
+/**
+ * How long a turn may send nothing before OpenBot ends it, as for Claude, Pi and ACP. Codex retries a
+ * stopped model stream after 5 minutes and reports each retry, so a turn that works sends something
+ * sooner. A turn that stopped held the agent on "working" and its queue until a Stop (#12315).
+ */
+const CODEX_TURN_STALL_MS = 15 * 60_000;
+/**
+ * The limit while a tool call, a command or a compaction is open. Codex can reason for minutes with no
+ * event after a large tool result (Hermes #112928), and a long command or MCP tool must not be ended.
+ */
+const CODEX_TOOL_STALL_MS = 60 * 60_000;
+/** How often the open turns are checked against the stall limits. */
+const CODEX_STALL_CHECK_MS = 60_000;
+/** Items that show model output. An open one does not raise the stall limit as a tool does. */
+const OUTPUT_ITEM_TYPES: ReadonlySet<unknown> = new Set(["agentMessage", "reasoning", "userMessage", "plan"]);
+
+const logger = createOpenBotLogger("codex-app-server");
+
+/** The clock of a turn that the stall limits watch. */
+interface TurnClock {
+  threadId: string;
+  turnId: string;
+  lastActivityAt: number;
+  /** The tool, command and compaction items that started and did not complete. */
+  openItems: Set<string>;
+}
 /** The requests that start or continue work on a thread. A process replaced during one would cut it. */
 const THREAD_WORK_METHODS: ReadonlySet<string> = new Set([
   "thread/start",
@@ -188,6 +216,14 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * while the chat showed them as stopped (#11419).
    */
   readonly #stoppedParents = new Set<string>();
+  /** The running turns of the threads that are not subagents, by thread and turn, for the stall limits. */
+  readonly #turnClocks = new Map<string, TurnClock>();
+  /**
+   * The requests of Codex that OpenBot answers, such as an OpenBot tool, an approval or a question to the
+   * user, with their thread and turn. The stall limit waits for them, also for those of a subagent.
+   */
+  readonly #hostRequests = new Map<string, { threadId: string; turnKey: string }>();
+  #stallCheck: { timer: ReturnType<typeof setInterval>; at: number } | null = null;
   /** The `THREAD_WORK_METHODS` requests that wait for an answer. */
   #threadWork = 0;
   /** The turn of each thread that showed the sandbox warning, so that a turn shows it once. */
@@ -680,6 +716,10 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #takeServerRequestId(id: RequestId): RequestId | undefined {
     this.#toolRequests.delete(id);
     if (!isString(id)) return undefined;
+    const host = this.#hostRequests.get(id);
+    this.#hostRequests.delete(id);
+    // The stall limit counts again from the answer.
+    if (host) this.#noteTurnActivity(host.threadId);
     const codexId = this.#serverRequestIds.get(id);
     this.#serverRequestIds.delete(id);
     return codexId;
@@ -704,6 +744,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
         }
         const id = randomUUID();
         this.#serverRequestIds.set(id, message.id);
+        if (requestTurn !== null && isRecord(message.params) && isString(message.params.threadId))
+          this.#hostRequests.set(id, { threadId: message.params.threadId, turnKey: requestTurn });
         let signal: AbortSignal | undefined;
         if (
           message.method === "item/tool/call" &&
@@ -737,6 +779,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           return;
         }
         if (turnKey !== null && message.method === "turn/started") this.#liveTurns.add(turnKey);
+        this.#observeTurnClock(message.method, message.params, turnKey);
         if (turnKey !== null && message.method === "turn/completed") this.#endStopWatch(turnKey);
         this.#observeSubagents(message.method, message.params);
         if (
@@ -796,14 +839,21 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * confirmed does: the Stop succeeds, and the turn completes as interrupted. Without this, the chat
    * stayed busy and the agent's queue waited until OpenBot restarted (#11100).
    */
-  #abandonStoppedTurn(threadId: string, turnId: string, child: ChildProcessWithoutNullStreams | null): void {
+  #abandonStoppedTurn(
+    threadId: string,
+    turnId: string,
+    child: ChildProcessWithoutNullStreams | null,
+    status: "interrupted" | "failed" = "interrupted",
+  ): void {
     const key = JSON.stringify([threadId, turnId]);
-    const requests = this.#stopWatches.get(key)?.requests ?? [];
+    const watch = this.#stopWatches.get(key);
+    if (watch) clearTimeout(watch.timer);
+    const requests = watch?.requests ?? [];
     this.#stopWatches.delete(key);
     if (this.#process !== child || !this.#liveTurns.has(key)) return;
     this.#handleMessage({
       method: "turn/completed",
-      params: { threadId, turn: { id: turnId, status: "interrupted" } },
+      params: { threadId, turn: { id: turnId, status } },
     });
     this.#abandonedTurns.set(key, { threadId, at: Date.now() });
     // The process that runs the turn is replaced, and it may not have saved the turn's blocks.
@@ -813,6 +863,109 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       this.#pending.delete(id);
       pending?.resolve({});
     }
+  }
+
+  /** Keeps the clock of each running turn for the stall limits. An event of the thread or of its subagents counts. */
+  #observeTurnClock(method: string, params: unknown, turnKey: string | null): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "turn/completed") {
+      if (turnKey !== null) this.#forgetTurnClock(turnKey);
+      return;
+    }
+    if (method === "turn/started" && turnKey !== null && isRecord(params.turn) && isString(params.turn.id)) {
+      const turnId = params.turn.id;
+      this.#turnClocks.set(turnKey, {
+        threadId: params.threadId,
+        turnId,
+        lastActivityAt: Date.now(),
+        openItems: new Set(),
+      });
+      this.#startStallCheck();
+    }
+    const clock = turnKey === null ? undefined : this.#turnClocks.get(turnKey);
+    const item = params.item;
+    if (clock && isRecord(item) && isString(item.id) && !OUTPUT_ITEM_TYPES.has(item.type)) {
+      if (method === "item/started") clock.openItems.add(item.id);
+      else if (method === "item/completed") clock.openItems.delete(item.id);
+    }
+    this.#noteTurnActivity(params.threadId);
+  }
+
+  /** Starts the stall limits again for the turns of this thread and of the threads whose subagent it is. */
+  #noteTurnActivity(threadId: string): void {
+    const now = Date.now();
+    for (const clock of this.#turnClocks.values())
+      if (this.#isSubagentOf(threadId, clock.threadId)) clock.lastActivityAt = now;
+  }
+
+  #forgetTurnClock(turnKey: string): void {
+    this.#turnClocks.delete(turnKey);
+    for (const [id, request] of this.#hostRequests) if (request.turnKey === turnKey) this.#hostRequests.delete(id);
+    if (this.#turnClocks.size === 0 && this.#stallCheck) {
+      clearInterval(this.#stallCheck.timer);
+      this.#stallCheck = null;
+    }
+  }
+
+  #startStallCheck(): void {
+    if (this.#stallCheck) return;
+    const timer = setInterval(() => this.#checkStalls(), CODEX_STALL_CHECK_MS);
+    timer.unref?.();
+    this.#stallCheck = { timer, at: Date.now() };
+  }
+
+  /**
+   * Ends each turn that sent nothing past its stall limit. A wait for OpenBot, such as an OpenBot tool or
+   * a question to the user, does not count, nor does the time the computer sleeps. A subagent's turn
+   * ends with the turn that started it.
+   */
+  #checkStalls(): void {
+    const check = this.#stallCheck;
+    if (!check) return;
+    const now = Date.now();
+    // A timer does not run while the computer sleeps, but the clock does.
+    const asleep = now - check.at - CODEX_STALL_CHECK_MS;
+    check.at = now;
+    for (const [key, clock] of this.#turnClocks) {
+      if (asleep > CODEX_STALL_CHECK_MS) clock.lastActivityAt = Math.min(now, clock.lastActivityAt + asleep);
+      const silentFor = now - clock.lastActivityAt;
+      const limit = clock.openItems.size > 0 ? CODEX_TOOL_STALL_MS : CODEX_TURN_STALL_MS;
+      if (
+        silentFor < limit ||
+        this.#subagentParents.has(clock.threadId) ||
+        this.#interruptedTurns.has(key) ||
+        [...this.#hostRequests.values()].some((request) => this.#isSubagentOf(request.threadId, clock.threadId))
+      )
+        continue;
+      this.#endStalledTurn(clock, silentFor);
+    }
+  }
+
+  /**
+   * Ends a turn past its stall limit as `#abandonStoppedTurn` ends a Stop that Codex did not confirm, but
+   * as failed, with the text that says what to do. The agent's queue goes on, and the next turn of the
+   * thread resumes it on a new process.
+   */
+  #endStalledTurn(clock: TurnClock, silentFor: number): void {
+    const { threadId, turnId } = clock;
+    logger.warn("Ended a Codex turn that sent nothing past the stall limit.", {
+      threadId,
+      silentForMinutes: Math.floor(silentFor / 60_000),
+      openItems: clock.openItems.size,
+    });
+    const child = this.#process;
+    // Codex may still end the turn. The Stop also stops its subagents and its tool calls.
+    Effect.runFork(this.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+    this.#handleMessage({
+      method: "error",
+      params: {
+        threadId,
+        turnId,
+        message: sourceText("error.agent.turnStalled", { provider: agentProviderName("codex") }),
+        causeCode: "stalled",
+      },
+    });
+    this.#abandonStoppedTurn(threadId, turnId, child, "failed");
   }
 
   /**
@@ -889,6 +1042,10 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#abandonedTurns.clear();
     this.#subagentParents.clear();
     this.#stoppedParents.clear();
+    this.#turnClocks.clear();
+    this.#hostRequests.clear();
+    if (this.#stallCheck) clearInterval(this.#stallCheck.timer);
+    this.#stallCheck = null;
   }
 
   #cancelToolRequests(threadId?: string, turnId?: string): void {
