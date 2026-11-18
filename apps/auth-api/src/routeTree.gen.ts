@@ -58,6 +58,7 @@ import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
+import { Route as OauthMcpCallbackRouteImport } from './routes/oauth/mcp-callback'
 import { Route as OauthMcpClientDotjsonRouteImport } from './routes/oauth/mcp-client[.]json'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
@@ -462,6 +463,11 @@ const NewsOpenbotVsGrokbotRoute = NewsOpenbotVsGrokbotRouteImport.update({
 const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
   id: '/news/rss.xml',
   path: '/news/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthMcpCallbackRoute = OauthMcpCallbackRouteImport.update({
+  id: '/oauth/mcp-callback',
+  path: '/oauth/mcp-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthMcpClientDotjsonRoute = OauthMcpClientDotjsonRouteImport.update({
@@ -1387,6 +1393,7 @@ export interface FileRoutesByFullPath {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-callback': typeof OauthMcpCallbackRoute
   '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
@@ -1597,6 +1604,7 @@ export interface FileRoutesByTo {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-callback': typeof OauthMcpCallbackRoute
   '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
@@ -1811,6 +1819,7 @@ export interface FileRoutesById {
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/oauth/mcp-callback': typeof OauthMcpCallbackRoute
   '/oauth/mcp-client.json': typeof OauthMcpClientDotjsonRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/providers/$slug': typeof ProvidersSlugRoute
@@ -2024,6 +2033,7 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-callback'
     | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
@@ -2234,6 +2244,7 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-callback'
     | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
@@ -2447,6 +2458,7 @@ export interface FileRouteTypes {
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
+    | '/oauth/mcp-callback'
     | '/oauth/mcp-client.json'
     | '/plugins/$slug'
     | '/providers/$slug'
@@ -2657,6 +2669,7 @@ export interface RootRouteChildren {
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
+  OauthMcpCallbackRoute: typeof OauthMcpCallbackRoute
   OauthMcpClientDotjsonRoute: typeof OauthMcpClientDotjsonRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
   ProvidersSlugRoute: typeof ProvidersSlugRoute
@@ -3135,6 +3148,13 @@ declare module '@tanstack/solid-router' {
       path: '/news/rss.xml'
       fullPath: '/news/rss.xml'
       preLoaderRoute: typeof NewsRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/mcp-callback': {
+      id: '/oauth/mcp-callback'
+      path: '/oauth/mcp-callback'
+      fullPath: '/oauth/mcp-callback'
+      preLoaderRoute: typeof OauthMcpCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/mcp-client.json': {
@@ -4543,6 +4563,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
+  OauthMcpCallbackRoute: OauthMcpCallbackRoute,
   OauthMcpClientDotjsonRoute: OauthMcpClientDotjsonRoute,
   PluginsSlugRoute: PluginsSlugRoute,
   ProvidersSlugRoute: ProvidersSlugRoute,

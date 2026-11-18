@@ -1151,9 +1151,10 @@ export class OpenBotToolRouter {
   }
 
   /**
-   * A `tool_call` that names a tool of one of the agent's saved MCP servers (`forAgent`). Antigravity 1.5 leaves the
-   * tools over its schema budget out of the tool list, with no `call_mcp_tool` for them (#7427), so
-   * OpenBot runs the tool itself, with the sign-in of the server's address. The user approves it as a
+   * A `tool_call` that names a tool of one of the agent's saved MCP servers or of the GitHub connection
+   * (`forAgent`, #12035). Antigravity 1.5 leaves the tools over its schema budget out of the tool list,
+   * with no `call_mcp_tool` for them (#7427), so OpenBot runs the tool itself, with the sign-in of the
+   * server's address or the GitHub connection's bearer. The user approves it as a
    * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
    */
   readonly #userMcpTool = Effect.fn("OpenBotToolRouter.userMcpTool")(function* (

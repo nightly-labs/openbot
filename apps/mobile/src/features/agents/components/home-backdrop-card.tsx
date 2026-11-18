@@ -73,18 +73,19 @@ interface CardFill {
   serverId: string;
   /** The server whose card is in place. Until it is `serverId`, the part is clear. */
   cardServer: SharedValue<string>;
-  /**
-   * The list reveal has ended, after the card top is in place. The part then takes a plain opaque
-   * style: a later render cannot put back the clear first-render value of the animated style.
-   */
+  /** The list reveal has ended, after the card top is in place. When true, the fill is opaque. */
   settled: boolean;
 }
 
+// Keep one animated style, also when settled. Reanimated keeps the last value an animated style set on
+// the view, so a plain style after it cannot change the color: a theme change kept the old fill.
 function useCardFill({ background, serverId, cardServer, settled }: CardFill) {
-  const fill = useAnimatedStyle(() => ({
-    backgroundColor: cardServer.get() === serverId ? background : "transparent",
-  }));
-  return settled ? { backgroundColor: background } : fill;
+  return useAnimatedStyle(
+    () => ({
+      backgroundColor: settled || cardServer.get() === serverId ? background : "transparent",
+    }),
+    [background, serverId, settled],
+  );
 }
 
 /**

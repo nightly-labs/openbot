@@ -32,12 +32,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
-import {
-  AcpConfiguration,
-  type AcpModel,
-  currentModelFromSessionSetup,
-  sessionSettingsSnapshot,
-} from "./acp-configuration";
+import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure } from "./acp-flavor";
 import {
@@ -852,6 +847,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null,
+      effortCategories: options.flavor.effortCategories,
     });
   }
 
@@ -1100,7 +1096,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const thread = yield* providerSync(() => this.#requireThread(threadId));
-    return sessionSettingsSnapshot(thread.configOptions);
+    return this.#configuration.sessionSettings(thread.configOptions);
   });
 
   readonly setSessionSetting = Effect.fn("AcpAgentClient.setSessionSetting")(function* (
@@ -1125,7 +1121,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #publishSessionSettings(thread: AcpThread): void {
     this.emit("notification", {
       method: "openbot/sessionSettings/updated",
-      params: { threadId: thread.id, ...sessionSettingsSnapshot(thread.configOptions) },
+      params: { threadId: thread.id, ...this.#configuration.sessionSettings(thread.configOptions) },
     });
   }
 
@@ -1227,7 +1223,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* thread.relays;
     if (thread.transport) return yield* thread.transport.stop(Effect.void);
     yield* providerCall(() =>
-      this.#transport.connection?.closeSession({ sessionId: thread.id }).catch(() => undefined),
+      this.#transport.connection?.closeSession({ sessionId: thread.id, ...this.#forcedClose }).catch(() => undefined),
     );
   });
 
@@ -1833,6 +1829,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close);
   }
 
+  /**
+   * The `_meta` of a `session/close` that unloads the session, for an agent that advertises it. Devin
+   * CLI 3000.14.30821 keeps a session after a plain close, and a later `session/load` keeps the MCP
+   * servers that the session got first. OpenBot then refused their old token, and each OpenBot tool
+   * call of that agent failed until Devin stopped (#12082).
+   */
+  get #forcedClose(): { _meta?: { "cognition.ai/force": true } } {
+    const meta = this.#initialization?.agentCapabilities?.sessionCapabilities?.close?._meta;
+    return meta?.["cognition.ai/force"] === true ? { _meta: { "cognition.ai/force": true } } : {};
+  }
+
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
@@ -1936,12 +1943,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
     // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
     // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
-    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
+    // Devin CLI 3000.14.30821 runs its sessions in a background process that outlives OpenBot for
+    // about 10 minutes, and a load joins a session that it still holds, with the MCP servers of the
+    // OpenBot that opened it. After a restart, each OpenBot tool call failed (#12082). An idle
+    // release already closed its session.
+    else if (
+      (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) ||
+      (!held && this.#loadsSessions && this.#forcedClose._meta && !this.#threads.isReleased(requestedThreadId))
+    ) {
       this.#stopThreadSubagents(requestedThreadId);
-      yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
-        this.#backgroundTimeout("session/close"),
-        Effect.ignore,
-      );
+      yield* providerCall(() =>
+        this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
+      ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
     }
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
@@ -2742,7 +2755,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     for (const [configId, value] of Object.entries(overrides ?? {})) {
       if (typeof value !== "boolean" && typeof value !== "string")
         return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
-      const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
+      const option = this.#configuration
+        .sessionSettings(thread.configOptions)
+        .options.find((entry) => entry.id === configId);
       // A provider update can remove an option or choice. Keep the saved override in the
       // store and report the effective value for correction, without blocking the prompt.
       const available =

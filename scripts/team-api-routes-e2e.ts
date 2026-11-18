@@ -899,6 +899,8 @@ let antigravityPool: ProviderAccountPool | undefined;
 let codeSignInAccount: string | null = null;
 /** The status that the agents fake gives, while a case sets one. Unset, the status read fails. */
 let agentStatus: AgentStatus | null = null;
+/** The text with which the agents fake fails a delete, while a case sets one. */
+let deleteFailure: string | null = null;
 
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
@@ -1289,7 +1291,10 @@ const fakeAgents: TeamApiAgents = {
         insideWorkspace: false,
       };
     }),
-  deleteAgent: (agentId) => Effect.sync(() => record("deleteAgent", agentId)),
+  deleteAgent: (agentId) =>
+    deleteFailure === null
+      ? Effect.sync(() => record("deleteAgent", agentId))
+      : Effect.fail(new AgentLifecycleFailed({ operation: "deleteAgent", cause: new Error(deleteFailure) })),
   // Only `agent-usage-limit-v1` reads the snapshot in this run: a usage limit holds Ada and the hidden Pi.
   getRuntimeSnapshot: () => ({
     agents: [],
@@ -3619,6 +3624,26 @@ try {
         callsOf("deleteAgent").length === 0,
       summary(memberDelete),
     );
+
+    // #7023: a refusal is a 409 with its text, which the web client shows. A failed removal stays a 500.
+    for (const [key, status] of [
+      ["error.agent.stopBeforeDelete", 409],
+      ["error.agent.deletionBusy", 409],
+      ["error.agent.deleteIncomplete", 500],
+    ] as const) {
+      deleteFailure = sourceText(key);
+      const loggedBefore = logged.length;
+      const refused = await call("DELETE", TEAM_API_ROUTES.agent.one("agent-ada"), { token: adaToken });
+      deleteFailure = null;
+      const loggedAsFault = logged.slice(loggedBefore).some((line) => line.includes("Team API request failed"));
+      check(
+        `an admin's delete that fails with ${key} answers ${status} with its text`,
+        errorIs(refused, status, sourceText(key)) &&
+          callsOf("deleteAgent").length === 0 &&
+          loggedAsFault === (status === 500),
+        { ...summary(refused), loggedAsFault },
+      );
+    }
   }
 
   // ---- Backup models (agent-backup-models-v1) ----

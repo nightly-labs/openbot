@@ -114,6 +114,7 @@ export const messages = {
   "server.local.create": "서버 만들기",
   "server.local.creating": "서버 만드는 중…",
   "server.local.createFailed": "서버를 만들지 못했어요.",
+  "server.local.createFailedRetry": "문제가 생겼어요. 다시 시도하세요. 또 실패하면 OpenBot을 다시 시작하세요.",
   "server.local.limitReached": "이 컴퓨터에는 서버를 최대 {limit}개까지 둘 수 있어요. 새로 만들려면 하나를 삭제하세요.",
   "server.local.deleteConfirmTitle": "{name}을(를) 삭제할까요?",
   "server.local.deleteConfirmDescription": "OpenBot이 서버를 중지하고 에이전트, 채팅, 파일을 휴지통으로 옮겨요.",

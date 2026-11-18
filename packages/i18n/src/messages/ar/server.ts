@@ -118,6 +118,7 @@ export const messages = {
   "server.local.create": "إنشاء خادم",
   "server.local.creating": "جارٍ إنشاء الخادم…",
   "server.local.createFailed": "تعذّر إنشاء الخادم.",
+  "server.local.createFailedRetry": "حدث خطأ ما. حاول مرة أخرى. إذا فشل ذلك مرة أخرى، فأعد تشغيل OpenBot.",
   "server.local.limitReached": "يمكن أن يكون لديك {limit} خادم كحد أقصى على هذا الحاسوب. احذف واحدًا لإنشاء آخر.",
   "server.local.deleteConfirmTitle": "هل تريد حذف {name}؟",
   "server.local.deleteConfirmDescription": "يوقف OpenBot الخادم وينقل وكلاءه ودردشاته وملفاته إلى سلة المهملات.",

@@ -120,6 +120,8 @@ export const messages = {
   "server.local.create": "Sunucu oluştur",
   "server.local.creating": "Sunucu oluşturuluyor…",
   "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.createFailedRetry":
+    "Bir sorun oluştu. Tekrar deneyin. Yine başarısız olursa OpenBot'u yeniden başlatın.",
   "server.local.limitReached":
     "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
   "server.local.deleteConfirmTitle": "{name} silinsin mi?",

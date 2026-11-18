@@ -220,7 +220,7 @@ export const messages = {
   "crm.customer.paidOn": "已于 {date} 付款",
   "crm.customer.billing": "账单",
   "crm.customer.details": "详情",
-  "crm.customer.since": "成为客户日期",
+  "crm.customer.added": "添加日期",
   "crm.customer.activity": "活动",
   "crm.customer.loading": "加载中…",
 
