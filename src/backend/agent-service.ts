@@ -7059,6 +7059,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // The task can close while the message is stored, and a closed task shows no queue to cancel it.
     if (task && this.#tasks.threadId(task.taskId) === null) {
       yield* this.cancelQueuedMessage(agent.id, delivery.delivery.id);
+      // The send failed, so a retry with the same client id must send again, not get the cancelled receipt.
+      if (idempotencyKey) this.#mailbox.forgetIdempotencyKey(idempotencyKey);
       return yield* new AgentLifecycleFailed({
         operation: "send message",
         cause: new Error(sourceText("error.backend.threadArchived")),
