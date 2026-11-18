@@ -429,12 +429,15 @@ export class AcpConfiguration {
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) {
         // Antigravity resumed a session with a list that left out the agent's model, and the turn ran
-        // on the model the session opened on, while the agent showed its own (#11797). A value that
-        // extends a listed one, such as the effort suffix of an older Antigravity model, is left as before.
+        // on the model the session opened on, while the agent showed its own (#11797). A listed model with
+        // an effort suffix, as older Antigravity versions named its efforts, is left as before.
         if (
           category === "model" &&
           requireModel &&
-          !values.some((candidate) => value.startsWith(`${candidate.value}-`))
+          !values.some(
+            (candidate) =>
+              value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
+          )
         ) {
           logger.warn("An agent session does not offer the model of the turn.", {
             provider: this.options.provider,

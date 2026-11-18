@@ -1363,7 +1363,10 @@ export class DrainScheduler {
             this.#usageLimits.failed(delivery.recipientAgentId, requestedModel);
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-            this.scheduleDrain(delivery.recipientAgentId);
+            // The move drains the agent again when it ends. A turn of the agent that still runs holds the
+            // move, and the lane waits for the drain at that turn's end: a start now fails the same way.
+            if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
+              this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             return;
           }
           // The provider of a routine run did not start, such as with no internet connection. Nothing
