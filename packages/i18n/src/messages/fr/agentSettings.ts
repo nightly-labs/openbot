@@ -205,6 +205,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Demander d’abord",
 
   "agentSettings.links.usage": "Utilisation",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Tous les agents",
   "agentSettings.links.memories": "Souvenirs",
   "agentSettings.links.memoriesCount": { one: "{count} enregistré", other: "{count} enregistrés" },
   "agentSettings.links.skills": "Compétences",
