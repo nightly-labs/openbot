@@ -701,7 +701,7 @@
   contain: inline-size;
 }
 
-.message-entry-agent .ui-bubble:has(.message-data-table-scroll) > .ui-bubble-content {
+.message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block)) > .ui-bubble-content {
   width: 100%;
 }
 
@@ -873,8 +873,8 @@
   font: inherit;
 }
 
-/* An agent reply with code has no bubble, and the sidebar colour is the chat canvas colour, so the code
-   would sit on the chat. It takes the surface of the block, as the text of a reply takes its bubble. */
+/* A generated image or video reply has no bubble, and the sidebar colour is the chat canvas colour, so its
+   code would sit on the chat. It takes the surface of the block, as the text of a reply takes its bubble. */
 .message-entry-agent .ui-bubble-variant-ghost .message-code-scroll {
   background: transparent;
 }
