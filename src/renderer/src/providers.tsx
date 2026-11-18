@@ -41,7 +41,7 @@ import { useCustomProviders } from "./features/custom-providers/custom-providers
 import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
 import { createProviderConnection } from "./features/provider-updates/provider-connection";
-import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
+import { createProviderRuntimeStore, hostConnection } from "./features/provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "./features/provider-updates/remote-provider-runtimes";
 import { remoteAdminServer, serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServers } from "./features/servers/servers-context";
@@ -90,6 +90,7 @@ const Providers = createSimpleContext({
         systemCliVersion,
         isLocalServer: () => activeServer()?.kind === "local",
         managesRuntimes: () => activeServer()?.kind === "local" || providerAdminServerId() !== undefined,
+        hostConnection: () => hostConnection(activeServer()),
       },
     );
     // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.

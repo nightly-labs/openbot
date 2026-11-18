@@ -11,14 +11,20 @@ import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
-import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useAgentFirstUnreadMessageId,
+  useApprovalRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { openTurnActivity } from "@/features/workspace/model/agent-activity";
+import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import { currentText, useText } from "@/shared/lib/text";
 import {
   chatRowIndex,
@@ -35,9 +41,11 @@ import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { useAgentBackdrops } from "./use-agent-backdrops";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useComposerContextMeter } from "./use-context-usage";
+import { useCoveredByScreen } from "./use-covered-by-screen";
 import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
@@ -57,7 +65,9 @@ export function MobileChatView({
 }) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
-  const agents = useMobileWorkspaceSelector((current) => current.agents);
+  // The chat does not show the latest message of each agent, so a new message keeps the same list and
+  // the messages do not render again.
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === agent.serverId));
   const loadConversation = useMobileWorkspaceSelector((current) => current.loadConversation);
@@ -76,11 +86,22 @@ export function MobileChatView({
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
   );
+  // Under a full screen, such as a subagent, a streamed reply does not render the hidden chat on
+  // each chunk. The store keeps the chat current. The chat keeps the conversation that it showed,
+  // also when another change renders it, and takes the latest one when it shows again.
+  const covered = useCoveredByScreen();
+  const shownConversation = useRef<ReturnType<typeof conversationStore.get>>(undefined);
   const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agent.id, notify),
-    [agent.id, conversationStore],
+    (notify: () => void) =>
+      conversationStore.subscribe(agent.id, () => {
+        if (!covered.current) notify();
+      }),
+    [agent.id, conversationStore, covered],
   );
-  const snapshot = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
+  const snapshot = useCallback(() => {
+    if (!covered.current || !shownConversation.current) shownConversation.current = conversationStore.get(agent.id);
+    return shownConversation.current;
+  }, [agent.id, conversationStore, covered]);
   const stopTurn = useCallback(
     (turnId: string) => workspace().interruptTurn(agent.id, turnId, agent.serverId),
     [agent.id, agent.serverId, workspace],
@@ -94,6 +115,13 @@ export function MobileChatView({
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
+  useAgentBackdrops({
+    serverId: agent.serverId,
+    agentId: agent.id,
+    messages: conversation?.messages,
+    memberId,
+    accountUserId,
+  });
   const projected = useMemo(
     () =>
       withQuestionContext(
@@ -137,6 +165,7 @@ export function MobileChatView({
       ? undefined
       : liveActivity;
   const serverApprovals = useApprovalRequests(agent.serverId);
+  const threadWaits = useThreadWaits(agent.serverId);
   // As on the desktop, only this chat's thread. A channel task of the same agent asks in the channel.
   const approvals = useMemo(
     () =>
@@ -360,12 +389,13 @@ export function MobileChatView({
           );
     return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation?.messages]);
+  // The open question of the running turn, or one that the host still waits for after its turn (#11440).
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
       !message.prompt.resolution &&
-      Boolean(conversation?.activeTurnId) &&
-      message.turnId === conversation?.activeTurnId,
+      ((Boolean(conversation?.activeTurnId) && message.turnId === conversation?.activeTurnId) ||
+        hostAwaitsQuestion(threadWaits, agent.id, message.turnId, message.prompt.requestId)),
   );
   const viewOnly = useAgentViewOnly(agent.serverId, agent.id);
   const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });

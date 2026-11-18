@@ -1222,6 +1222,8 @@ export function createMarketplaceController(
   const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   /** Ends the sign-in that waits now, on the server and for the address that it started with. */
   let stopSignIn: (() => void) | undefined;
+  /** Copies the page of the sign-in that waits now, for a browser that did not show it. */
+  let copySignIn: (() => Promise<void>) | undefined;
 
   /**
    * A browser sign-in for a "link" listing: opens the browser when the server asks for one. A joined
@@ -1235,7 +1237,10 @@ export function createMarketplaceController(
     const { mcp } = calls();
     const signIn = mcp.signInMcpServer({ config }, serverId);
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
+    const copyLink = calls().copySignInLink;
+    const copy = copyLink ? () => copyLink(config.url, serverId) : undefined;
     stopSignIn = stop;
+    copySignIn = copy;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
     // A page that only the host can reach opens in the host's own tab instead of the relay.
     if (relay?.hostTab && props.pluginHostView)
@@ -1243,6 +1248,7 @@ export function createMarketplaceController(
     return signIn.finally(() => {
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
+      if (copy && copySignIn === copy) copySignIn = undefined;
     });
   }
 
@@ -1305,6 +1311,12 @@ export function createMarketplaceController(
     const serverId = props.pluginServerId;
     if (!relay || !current || !serverId) throw new Error(t("error.mcp.relayEnded"));
     await relay.paste(current.url, address, serverId);
+  }
+
+  /** Copies the page of the sign-in that waits on this computer. */
+  async function copySignInLink(): Promise<void> {
+    if (!copySignIn) throw new Error(t("error.mcp.relayEnded"));
+    await copySignIn();
   }
 
   /**
@@ -2075,6 +2087,8 @@ export function createMarketplaceController(
     openSignInRelay,
     pasteSignInRelay,
     cancelSignIn,
+    /** Absent when this client cannot copy the page of a sign-in in this computer's browser. */
+    copySignInLink: () => (calls().copySignInLink ? copySignInLink : undefined),
     openPluginUrl,
     mcpServerApp,
   };

@@ -29,7 +29,7 @@ import {
   hostedServerStorageGb,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
-import { type LicenseOrder, parseLicenseOrder } from "@openbot/contracts/license";
+import { parseLicenseOrder } from "@openbot/contracts/license";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RouteHostState } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { sourceText } from "@openbot/i18n/source";
@@ -42,7 +42,13 @@ import {
   NO_ACCOUNT_ANALYTICS,
 } from "./account-analytics";
 import { getServerEntitlement } from "./billing-entitlement";
-import { BillingError, type BillingReturnTarget, type BillingService, type SubscriptionSync } from "./billing-service";
+import {
+  BillingError,
+  type BillingReturnTarget,
+  type BillingService,
+  type CheckoutOrder,
+  type SubscriptionSync,
+} from "./billing-service";
 import {
   BoatApiError,
   BoatClient,
@@ -313,6 +319,8 @@ export interface CheckoutReturn {
   origin: string;
   /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
+  /** The code of a discount link. Only the web client sends one. */
+  promotionCode?: string;
 }
 
 /** The answer to a free pool machine that asks for a server. The claim signs OpenBot on that machine in. */
@@ -464,6 +472,7 @@ export class HostedServerService {
         currency: unknown;
         entryPoint?: unknown;
         license?: unknown;
+        earlyStart?: unknown;
       },
       idempotencyKeyHeader: string | null,
       checkoutReturn: CheckoutReturn,
@@ -495,6 +504,11 @@ export class HostedServerService {
           ((input.plan === "starter" && license.tier !== "starter") || license.users > memberLimitForPlan(input.plan)))
       )
         return yield* invalid("license");
+      // Only `true` is a request. An older client sends nothing, and its order has no record of a request.
+      const order: CheckoutOrder = {
+        license: license ?? null,
+        earlyStartAt: input.earlyStart === true ? dependencies.now() : null,
+      };
       // An optional currency, such as BRL, sells only when the Stripe Prices of the plan and of the license
       // have it. The check comes before the server row, so a refused order leaves no unpaid server.
       if (isOneOf(BILLING_OPTIONAL_CURRENCIES, input.currency)) {
@@ -516,7 +530,7 @@ export class HostedServerService {
           .bind(user.id, idempotencyKey)
           .first<HostedServerRow>(),
       );
-      if (previous) return yield* this.#checkout(previous, user, billing, returnTo, license);
+      if (previous) return yield* this.#checkout(previous, user, billing, returnTo, order);
       if (SOLD_OUT_PLANS.has(input.plan)) return yield* planSoldOut();
       const unpaid = yield* hostedCall(() =>
         dependencies.database
@@ -534,7 +548,7 @@ export class HostedServerService {
       );
       if (unpaid) {
         const choice = { plan: input.plan, interval: input.interval, currency: input.currency };
-        return yield* this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo, license);
+        return yield* this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo, order);
       }
       const count = yield* hostedCall(() =>
         dependencies.database
@@ -574,9 +588,9 @@ export class HostedServerService {
         );
         if (!concurrent)
           return yield* new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
-        return yield* this.#checkout(concurrent, user, billing, returnTo, license);
+        return yield* this.#checkout(concurrent, user, billing, returnTo, order);
       }
-      return yield* this.#checkout(yield* this.#requireRow(serverId), user, billing, returnTo, license);
+      return yield* this.#checkout(yield* this.#requireRow(serverId), user, billing, returnTo, order);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1663,7 +1677,7 @@ export class HostedServerService {
   /**
    * A Checkout page for a server that waits for payment, or none when the server needs no page. A license
    * order adds a second line to the page. The row does not keep the order: `previous` reads it from the
-   * page that closes, so a later page sells the same license.
+   * page that closes, so a later page sells the same license and keeps the time of the early start request.
    */
   readonly #checkout = Effect.fn("HostedServerService.checkout")(function* (
     this: HostedServerService,
@@ -1671,7 +1685,7 @@ export class HostedServerService {
     user: AuthUser,
     billing: HostedServerBilling,
     returnTo: CheckoutReturn,
-    order?: LicenseOrder | "previous",
+    order?: CheckoutOrder | "previous",
   ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     // A scheduled deletion must be withdrawn before a replacement plan can be purchased.
@@ -1697,7 +1711,9 @@ export class HostedServerService {
     }
     // A server that has had no plan cannot buy a sold-out plan. A server whose plan ended can renew it.
     if (awaiting && SOLD_OUT_PLANS.has(row.plan)) return yield* planSoldOut();
-    const license = order === "previous" ? closed?.license : order;
+    const chosen = order === "previous" ? closed : order;
+    const license = chosen?.license;
+    const earlyStartAt = chosen?.earlyStartAt;
     const session = yield* billing
       .createCheckout({
         user: { id: user.id, email: user.email },
@@ -1708,7 +1724,9 @@ export class HostedServerService {
         target: returnTo.target,
         origin: returnTo.origin,
         ...(returnTo.entryPoint ? { entryPoint: returnTo.entryPoint } : {}),
+        ...(returnTo.promotionCode ? { promotionCode: returnTo.promotionCode } : {}),
         ...(license ? { license } : {}),
+        ...(earlyStartAt != null ? { earlyStartAt } : {}),
       })
       .pipe(Effect.mapError(hostedFailure));
     // A new plan choice changes the key of an unpaid server, so a page for the plan before it is not stored.
@@ -1744,7 +1762,7 @@ export class HostedServerService {
     user: AuthUser,
     billing: HostedServerBilling,
     returnTo: CheckoutReturn,
-    license?: LicenseOrder,
+    order: CheckoutOrder,
   ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     const previous = row.checkout_session_id;
@@ -1783,7 +1801,7 @@ export class HostedServerService {
     // A second request changed the server first, or changed it again before its page was made.
     if (updated.meta.changes !== 1 || claimed.idempotency_key !== idempotencyKey)
       return yield* new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
-    return yield* this.#checkout(claimed, user, billing, returnTo, license);
+    return yield* this.#checkout(claimed, user, billing, returnTo, order);
   });
 
   /**
@@ -2132,7 +2150,7 @@ export class HostedServerService {
   /** A server on boat must move to a pool machine by hand later (docs/hosted-servers.md#move-a-server-from-boat). */
   #alertBoatStart(row: HostedServerRow, reason: string): Effect.Effect<void, never, HostedServerDependencies> {
     return this.#alertPool(
-      `A ${row.plan} server (${row.currency}, ${row.server_id.slice(0, 8)}) starts on boat: ${reason}.`,
+      `⛵ **Boat start** · ${row.plan} server · ${row.currency} · ${row.server_id.slice(0, 8)} · ${reason}`,
     );
   }
 
@@ -2165,7 +2183,7 @@ export class HostedServerService {
       ),
     );
     if (free === null || free > LOW_POOL_FREE) return;
-    yield* this.#alertPool(`Pool ${location} ${product}: ${free} free machine${free === 1 ? "" : "s"} left.`);
+    yield* this.#alertPool(`${free === 0 ? "🔴" : "🟠"} **Pool** ${location} ${product} · ${free} free left`);
   });
 
   /** Sends an operator message after the current work, as analytics does. */
@@ -2222,7 +2240,7 @@ export class HostedServerService {
     });
     const current = yield* this.#requireRow(row.server_id);
     yield* this.#alertPool(
-      `A ${row.plan} server (${row.server_id.slice(0, 8)}) did not start on pool machine ${hostId}. Prepare the machine again.`,
+      `🛠️ **Pool start lost** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId} · prepare it again`,
     );
     if (current.observed_state !== "awaiting_payment") return false;
     yield* this.#provision(current, false, `pool machine ${hostId} did not start it`);

@@ -10,6 +10,23 @@ export function agentTaskThreadStatus(task: AgentTask, waitsFor: SidebarWaitReas
   return task.awaitedReplies?.length ? { kind: "awaiting" } : { kind: "idle" };
 }
 
+/** The thread item of a side thread, as the header and the sidebar show it. */
+export function sideThreadItem(
+  task: AgentTask,
+  waitsFor: SidebarWaitReason | undefined,
+  unread: number | undefined,
+): ThreadItem {
+  const item: ThreadItem = {
+    id: task.id,
+    kind: "side",
+    title: task.title,
+    updatedAt: task.updatedAt,
+    status: agentTaskThreadStatus(task, waitsFor),
+  };
+  if (unread !== undefined) item.unread = unread;
+  return item;
+}
+
 export interface ThreadListsInput {
   /** When the agent's own chat changed last. The new thread tab shows this time. */
   mainUpdatedAt: string;
@@ -45,14 +62,7 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
   const open: ThreadItem[] = [];
   for (const task of input.tasks) {
     if (input.hidden.has(task.id)) continue;
-    const item: ThreadItem = {
-      id: task.id,
-      kind: "side",
-      title: task.title,
-      updatedAt: task.updatedAt,
-      status: agentTaskThreadStatus(task, input.waitsFor(task)),
-    };
-    if (input.unread) item.unread = input.unread(task);
+    const item = sideThreadItem(task, input.waitsFor(task), input.unread?.(task));
     if (task.state === "closed") archived.push(item);
     else {
       items.set(task.id, item);

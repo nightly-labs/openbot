@@ -123,6 +123,9 @@ export const messages = {
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
+  "provider.picker.endpointModelsInCustom":
+    "{name}에서 사용자 지정 엔드포인트를 실행해요. 해당 모델은 사용자 지정 탭에 있어요.",
+  "provider.picker.showCustomModels": "모델 보기",
   "provider.picker.museNoModels":
     "Muse가 이 계정에 모델을 보내지 않았어요. 이 에이전트가 실행되는 국가에서는 Muse를 사용할 수 없을 수 있어요. 다른 제공자의 모델을 선택하세요.",
   "provider.picker.customEmpty":
@@ -309,6 +312,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
   "provider.settings.otherVersionInstalledByUser": "사용 안 함: {version} · 직접 설치함",
   "provider.settings.otherVersionDownloaded": "사용 안 함: {version} · OpenBot이 다운로드함",
+  "provider.settings.installedVersionIncomplete":
+    "일부 모델에는 이 버전에 없는 구성 요소가 필요합니다. 사용하려면 OpenBot 버전을 다운로드하세요.",
   "provider.settings.useInstalledVersion": "설치한 버전 사용",
   "provider.settings.useDownloadedVersion": "OpenBot 버전 사용",
   "provider.settings.update": "업데이트",

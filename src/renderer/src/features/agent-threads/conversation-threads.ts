@@ -7,6 +7,7 @@ import {
   threadLists,
 } from "@openbot/ui/features/conversation/threads/thread-items";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type {
   BrowserTakeoverRequest,
@@ -60,14 +61,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     tasks: list,
     draftTitle: input.newThreadTitle,
     hidden: tabs.hidden(),
-    waitsFor: (task) =>
-      taskApproval(task, approvals) !== undefined
-        ? "approval"
-        : ofTaskThread(task, prompts) !== undefined
-          ? "question"
-          : ofTaskThread(task, takeovers) !== undefined
-            ? "takeover"
-            : undefined,
+    waitsFor: (task) => taskWaitsFor(task, { approvals, prompts, takeovers }),
     unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
@@ -258,6 +252,21 @@ function routineTask(list: readonly AgentTask[], routineId: string): AgentTask |
 }
 
 type TaskThread = { agentId: string; threadId: string };
+
+/** The requests that wait for the user on the server, of every thread. */
+export interface ThreadWaits {
+  approvals: readonly AgentApproval[];
+  prompts: readonly PromptEvent[];
+  takeovers: readonly BrowserTakeoverRequest[];
+}
+
+/** What the running turn of a side thread waits for the user to do, if anything. */
+export function taskWaitsFor(task: AgentTask, waits: ThreadWaits): SidebarWaitReason | undefined {
+  if (taskApproval(task, waits.approvals) !== undefined) return "approval";
+  if (ofTaskThread(task, waits.prompts) !== undefined) return "question";
+  if (ofTaskThread(task, waits.takeovers) !== undefined) return "takeover";
+  return undefined;
+}
 
 /** The question or takeover that the turn of this task waits for: the one of the task's own thread. */
 function ofTaskThread<Request extends TaskThread>(task: TaskThread, requests: readonly Request[]): Request | undefined {

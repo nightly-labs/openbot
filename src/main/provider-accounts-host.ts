@@ -117,12 +117,12 @@ export class ProviderAccountsHost {
   }).bind(this);
 
   /** The sign-in it replaces ends first, so that account does not stay connecting where no cancel reaches it. */
-  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab") {
+  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab", atHost = false) {
     return this.#pages.interrupt(provider).pipe(
       Effect.andThen(
         this.#pages.start(
           provider,
-          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage),
+          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage, atHost),
           (exit) => resultOf(provider, exit),
           mode,
         ),
@@ -131,9 +131,12 @@ export class ProviderAccountsHost {
     );
   }
 
-  /** Starts the sign-in with no tab: the page address waits for a client to open it (`provider-account-relay-v1`). */
-  startRelay(provider: AgentProviderId, accountId: string | null) {
-    return this.startSignIn(provider, accountId, "relay");
+  /**
+   * Starts the sign-in with no tab: the page address waits for a client to open it (`provider-account-relay-v1`).
+   * `atHost`: the client is at this computer (`ProviderRuntime.signInProviderAccountOnHost`).
+   */
+  startRelay(provider: AgentProviderId, accountId: string | null, atHost = false) {
+    return this.startSignIn(provider, accountId, "relay", atHost);
   }
 
   /** The page address of a relayed sign-in, and how it ended. */

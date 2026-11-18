@@ -79,6 +79,7 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -119,6 +120,7 @@ import {
   hostedStartStep,
   WAKE_RECONNECT_STATES,
 } from "@openbot/team-client/hosted-server-wake";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { Deferred, Effect, Exit, Layer, Result, Scope, Semaphore } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import { ComputerActivityReport } from "./computer-activity-report";
@@ -133,7 +135,12 @@ import {
   decodeRemoteAgentColors,
   decodeRemoteChatColors,
 } from "./remote-agent-decoding";
-import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
+import {
+  AttachmentDownloadStopped,
+  REMOTE_ATTACHMENT_PREVIEW_LIMITS,
+  type RemoteAttachment,
+  RemoteAttachmentCache,
+} from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import {
   decodeConversationPageFromHost,
@@ -195,8 +202,6 @@ export interface LocalServerAttachInput {
   publicKey: string;
   username: string;
   password: string;
-  /** Selects the server: true only when the user just made it. */
-  select: boolean;
 }
 
 interface RemoteServerEvents {
@@ -320,6 +325,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The small copies of pictures (`attachment-preview-v1`), apart so a large file does not push them out. */
+  readonly #attachmentPreviews = new RemoteAttachmentCache(Date.now, REMOTE_ATTACHMENT_PREVIEW_LIMITS);
   /** The agent and channel pictures of joined servers, on disk, so they show while a host is offline. */
   readonly #pictures: RemotePictureCache;
   /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
@@ -336,7 +343,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #allowLocalDevelopmentInvites: boolean;
   readonly #inviteLinks: InviteLinkOptions;
   readonly #appVersion: string | null;
-  #duplicateOperationIds = new Map<string, string>();
+  // A duplicate whose answer got lost sends its id again and gets the first copy.
+  #duplicateIds = retryOperationIds(randomUUID);
   /** When Signal first missed each host that restarts into an update. */
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
@@ -928,6 +936,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   /** A file on this server was deleted, so a copy of it must not be shown again. */
   forgetCachedAttachments(serverId: string): void {
     this.#attachments.forget(serverId);
+    this.#attachmentPreviews.forget(serverId);
   }
 
   readonly syncRemoteHosts = Effect.fn("RemoteManager.syncRemoteHosts")(
@@ -1329,7 +1338,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#connections.setCompatibility(stored.id, verifiedIdentity.compatibility);
       this.#connections.clearIssue(stored.id);
       this.#connections.setState(stored.id, "online");
-      yield* this.#store.attachLocal(stored, input.select);
+      yield* this.#store.attachLocal(stored);
       this.#events.syncScopes();
       this.#emitChanged();
       yield* this.#events.restart(stored.id, true);
@@ -1356,7 +1365,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
-        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken }, false);
+        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken });
         this.#connections.setState(serverId, "offline");
         this.#events.suspendReconnect(serverId);
       }
@@ -1815,6 +1824,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#client.forget(serverId);
     this.#presence.forget(serverId);
     this.#attachments.forget(serverId);
+    this.#attachmentPreviews.forget(serverId);
   }
 
   /**
@@ -1845,25 +1855,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       agentId: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<DuplicateAgentResult, RemoteWorkflowError, RemoteRequest> {
-      const key = `${serverId}\0${agentId}`;
-      const operationId = this.#duplicateOperationIds.get(key) ?? randomUUID();
-      this.#duplicateOperationIds.set(key, operationId);
-      return yield* Effect.gen({ self: this }, function* () {
-        const result = yield* this.request(
-          serverId,
-          TEAM_API_ROUTES.agent.duplicate(agentId),
-          decodeDuplicateAgentResultFromHost,
-          { method: "POST", body: { operationId }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
-        );
-        this.#duplicateOperationIds.delete(key);
-        return result;
-      }).pipe(
+      const duplicate = this.#duplicateIds([serverId, agentId]);
+      return yield* this.request(
+        serverId,
+        TEAM_API_ROUTES.agent.duplicate(agentId),
+        decodeDuplicateAgentResultFromHost,
+        { method: "POST", body: { operationId: duplicate.id }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
+      ).pipe(
         Effect.catch(({ cause: error }) =>
-          Effect.gen({ self: this }, function* () {
-            if (error instanceof RemoteRequestError && error.status >= 400 && error.status < 500) {
-              this.#duplicateOperationIds.delete(key);
-            }
-            return yield* new RemoteWorkflowError({ cause: error });
+          Effect.suspend(() => {
+            // The host refused the request, so it made no copy: a retry is a new duplicate.
+            if (!(error instanceof RemoteRequestError && error.status >= 400 && error.status < 500)) duplicate.failed();
+            return Effect.fail(new RemoteWorkflowError({ cause: error }));
           }),
         ),
       );
@@ -2725,6 +2728,46 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * A small copy of a picture on a joined server, for a card that shows it small. A host without
+   * `attachment-preview-v1` sends the whole file, as `downloadAttachment` does. When the host has no
+   * copy (a large WebP or GIF file), or the copy fails, the whole file comes through the file cache,
+   * at its own pace.
+   */
+  readonly downloadAttachmentPreview = Effect.fn("RemoteManager.downloadAttachmentPreview")(
+    function* (
+      this: RemoteServerManager,
+      attachmentId: string,
+      serverId: string,
+    ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
+      if (!this.supportsCapability(serverId, ATTACHMENT_PREVIEW_CAPABILITY))
+        return yield* this.downloadAttachment(attachmentId, serverId, true);
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      return yield* this.#attachmentPreviews
+        .get(
+          server.id,
+          attachmentId,
+          () =>
+            this.#owned(
+              Effect.gen({ self: this }, function* () {
+                const response = yield* this.#client.fetch(
+                  server,
+                  new URL(TEAM_API_ROUTES.attachmentPreview(attachmentId), server.apiUrl),
+                );
+                return {
+                  bytes: yield* remoteCall(() => response.arrayBuffer().then((buffer) => new Uint8Array(buffer))),
+                  name: attachmentId,
+                  mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+                };
+              }),
+            ),
+          true,
+        )
+        .pipe(Effect.catch(() => this.downloadAttachment(attachmentId, serverId, true)));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   /** Ends a download that an open or a save started. The open or the save answers without a file. */
   stopAttachmentDownload(attachmentId: string, serverId: string): void {
     const stop = this.#attachmentStops.get(JSON.stringify([serverId, attachmentId]));
@@ -2828,6 +2871,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#refresh.clear();
       this.#client.clear();
       this.#attachments.clear();
+      this.#attachmentPreviews.clear();
       if (this.#remoteViewerProxy) yield* this.#remoteViewerProxy.stop().pipe(Effect.catch(() => Effect.void));
       if (this.#webrtcTransport) yield* this.#webrtcTransport.stop().pipe(Effect.catch(() => Effect.void));
       yield* Scope.close(this.#scope, Exit.void);
@@ -2854,6 +2898,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
+      this.#attachmentPreviews.clear();
       yield* this.#pictures.clear();
       if (!transport) return;
       // First: a session kept for the next run belongs to the account that leaves.
@@ -3003,7 +3048,7 @@ function sameAppearance(left: ServerAppearance | null | undefined, right: Server
 
 function requiredServerSummary(servers: ServerSummary[], serverId: string): ServerSummary {
   const server = servers.find((candidate) => candidate.id === serverId);
-  if (!server) throw new Error("Remote server summary is missing.");
+  if (!server) throw new Error(sourceText("error.remote.serverNotLoaded"));
   return server;
 }
 

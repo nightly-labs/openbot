@@ -1,3 +1,4 @@
+import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { ConversationMessage } from "./ipc-conversation-messages";
@@ -358,7 +359,8 @@ export function isVaultChangeMarker(message: ConversationMessage): boolean {
 
 /**
  * The item type of the note that a turn ended with open steps in the agent's plan, and that the agent
- * continues by itself. The text says which automatic continuation this is.
+ * continues by itself. The text says which automatic continuation this is. The note that the agent
+ * stopped with open steps and no answer has the same type; its text says that the agent stopped.
  */
 export const PLAN_CONTINUATION_ITEM_TYPE = "plan-continuation";
 
@@ -369,6 +371,22 @@ export function isPlanContinuationMarker(message: ConversationMessage): boolean 
     message.status === "completed" &&
     message.itemType === PLAN_CONTINUATION_ITEM_TYPE
   );
+}
+
+/**
+ * The item type of the note that a turn of the agent's own chat failed because the sign-in of its
+ * provider expired, followed by the provider. The banner above the composer goes when the user types,
+ * so this note keeps the reason in the chat (#11815). The text is the readable reason, so a client that
+ * does not know this item type still shows it.
+ */
+export const SIGN_IN_FAILURE_ITEM_TYPE_PREFIX = "sign-in-failure:";
+
+/** The provider whose expired sign-in failed the turn of this note, or null for another message. */
+export function signInFailureProvider(message: ConversationMessage): AgentProviderId | null {
+  if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
+  if (!message.itemType?.startsWith(SIGN_IN_FAILURE_ITEM_TYPE_PREFIX)) return null;
+  const provider = message.itemType.slice(SIGN_IN_FAILURE_ITEM_TYPE_PREFIX.length);
+  return isAgentProvider(provider) ? provider : null;
 }
 
 /**

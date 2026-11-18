@@ -32,6 +32,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
                 signalHome,
                 failedSignalUrl: signalHome === true && isString(body.failedSignalUrl) ? body.failedSignalUrl : null,
                 location: signalHome === true ? requestLocation(request) : null,
+                country: signalHome === true ? requestCountry(request) : null,
               }),
             );
           }),
@@ -45,4 +46,10 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
 function requestLocation(request: Request): SignalLocation | null {
   const cf = request.cf;
   return cf && "latitude" in cf && "longitude" in cf ? signalLocation(cf.latitude, cf.longitude) : null;
+}
+
+/** The Cloudflare country code of the host request, for `REMOTE_SIGNAL_HOME_COUNTRIES`. */
+function requestCountry(request: Request): string | null {
+  const country = request.cf?.country;
+  return typeof country === "string" && country ? country : null;
 }

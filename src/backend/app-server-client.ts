@@ -11,6 +11,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   ProviderSessionBusyError,
+  ProviderStoppedError,
   RequestTimeoutError,
 } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
@@ -93,6 +94,8 @@ const LINUX_SANDBOX_FAILURE =
 const CODEX_APP_SANDBOX_ENV = "CODEX_WINDOWS_REGISTERED_CORE";
 /** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
 const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
+/** The `collabAgentToolCall` tools whose receivers are subagents of the calling thread. */
+const SUBAGENT_OWNER_TOOLS: ReadonlySet<unknown> = new Set(["spawnAgent", "resumeAgent", "sendInput"]);
 /**
  * How long Codex may take to end a stopped turn before OpenBot ends it, as for ACP and Claude. Codex
  * answers `turn/interrupt` only when the turn ends, and a command that hangs keeps it from ending
@@ -174,6 +177,17 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * This process still runs the turn, and Codex adds a new turn of that thread to it.
    */
   readonly #abandonedTurns = new Map<string, { threadId: string; at: number }>();
+  /**
+   * The thread that started each subagent thread, from `collabAgentToolCall` and `subAgentActivity`
+   * items. Codex sends the items of every thread to each connection.
+   */
+  readonly #subagentParents = new Map<string, string>();
+  /**
+   * The threads with a stopped turn whose subagents must stop too, until the thread starts a new turn.
+   * Codex stops only the thread that `turn/interrupt` names, and its subagents worked on for hours,
+   * while the chat showed them as stopped (#11419).
+   */
+  readonly #stoppedParents = new Set<string>();
   /** The `THREAD_WORK_METHODS` requests that wait for an answer. */
   #threadWork = 0;
   /** The turn of each thread that showed the sandbox warning, so that a turn shows it once. */
@@ -539,6 +553,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
           this.#cancelToolRequests(params.threadId, params.turnId);
           this.#watchStop(params.threadId, params.turnId, id, child);
+          this.#stopSubagentsOf(params.threadId);
         }
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
@@ -671,8 +686,9 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   #write(message: unknown): void {
+    // Thrown before the write: Codex did not get this request.
     if (!this.running || !this.#process) {
-      throw new Error("Codex App Server is not running.");
+      throw new ProviderStoppedError("Codex", "Codex App Server is not running.");
     }
     this.#process.stdin.write(`${JSON.stringify(message)}\n`);
   }
@@ -722,6 +738,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
         }
         if (turnKey !== null && message.method === "turn/started") this.#liveTurns.add(turnKey);
         if (turnKey !== null && message.method === "turn/completed") this.#endStopWatch(turnKey);
+        this.#observeSubagents(message.method, message.params);
         if (
           message.method === "turn/completed" &&
           isRecord(message.params) &&
@@ -798,12 +815,80 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     }
   }
 
+  /**
+   * Keeps the link of each subagent thread to its parent. A turn that a subagent of a stopped thread
+   * starts is stopped too; a new turn of any other thread lets its own subagents work again.
+   */
+  #observeSubagents(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const threadId = params.threadId;
+    if (method === "turn/started") {
+      const turnId = isRecord(params.turn) ? params.turn.id : undefined;
+      if (!isString(turnId)) return;
+      const parent = this.#subagentParents.get(threadId);
+      if (parent !== undefined && this.#stoppedParents.has(parent)) this.#stopSubagentTurn(threadId, turnId);
+      // A Stop can come before `turn/started` of the turn that it stops.
+      else if (!this.#interruptedTurns.has(JSON.stringify([threadId, turnId]))) this.#stoppedParents.delete(threadId);
+      return;
+    }
+    if ((method !== "item/started" && method !== "item/completed") || !isRecord(params.item)) return;
+    const item = params.item;
+    const children =
+      item.type === "collabAgentToolCall" &&
+      SUBAGENT_OWNER_TOOLS.has(item.tool) &&
+      Array.isArray(item.receiverThreadIds)
+        ? item.receiverThreadIds.filter(isString)
+        : item.type === "subAgentActivity" && isString(item.agentThreadId)
+          ? [item.agentThreadId]
+          : [];
+    for (const child of children) {
+      if (this.#subagentParents.get(child) === threadId || this.#isSubagentOf(threadId, child)) continue;
+      this.#subagentParents.set(child, threadId);
+      // A subagent that the stopped turn started just before its end.
+      if (this.#stoppedParents.has(threadId)) this.#stopSubagent(child);
+    }
+  }
+
+  /** Whether `threadId` is the thread `ancestor` or one of its subagents. Keeps the links free of loops. */
+  #isSubagentOf(threadId: string, ancestor: string): boolean {
+    for (
+      let current: string | undefined = threadId;
+      current !== undefined;
+      current = this.#subagentParents.get(current)
+    )
+      if (current === ancestor) return true;
+    return false;
+  }
+
+  /** Stops the subagents of a stopped thread, and their own subagents. A second Stop sends their Stops again. */
+  #stopSubagentsOf(threadId: string): void {
+    this.#stoppedParents.add(threadId);
+    for (const [child, parent] of this.#subagentParents) if (parent === threadId) this.#stopSubagent(child);
+  }
+
+  #stopSubagent(threadId: string): void {
+    const prefix = `${JSON.stringify([threadId]).slice(0, -1)},`;
+    for (const key of this.#liveTurns) {
+      const turnId = key.startsWith(prefix) ? JSON.parse(key)[1] : undefined;
+      if (isString(turnId)) this.#stopSubagentTurn(threadId, turnId);
+    }
+    this.#stopSubagentsOf(threadId);
+  }
+
+  /** Sends the Stop of a subagent's turn. It has the same deadline as a Stop of the person's turn. */
+  #stopSubagentTurn(threadId: string, turnId: string): void {
+    if (this.#interruptedTurns.has(JSON.stringify([threadId, turnId]))) return;
+    Effect.runFork(this.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+  }
+
   /** The process ended: none of its turns runs any more. */
   #forgetTurns(): void {
     for (const watch of this.#stopWatches.values()) clearTimeout(watch.timer);
     this.#stopWatches.clear();
     this.#liveTurns.clear();
     this.#abandonedTurns.clear();
+    this.#subagentParents.clear();
+    this.#stoppedParents.clear();
   }
 
   #cancelToolRequests(threadId?: string, turnId?: string): void {

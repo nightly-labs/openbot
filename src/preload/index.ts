@@ -98,6 +98,7 @@ import {
   type Untyped,
 } from "@openbot/contracts/ipc";
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -257,6 +258,7 @@ import {
   decodeComputerUseState,
 } from "./computer-use-decoding";
 import {
+  decodeActiveQueues,
   decodeAgentTask,
   decodeAgentTaskReadState,
   decodeAgentTaskReadStates,
@@ -679,6 +681,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   deleteConversationMessage: decodeVoid,
   withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
+  listActiveQueues: decodeActiveQueues,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
   setMessagePinned: decodePinnedMessages,
@@ -1442,6 +1445,7 @@ const openbotApi: OpenBotDesktopApi = {
       openMcpSignInRelay: decodeVoid,
       completeMcpSignInRelay: decodeVoid,
       cancelMcpSignIn: decodeVoid,
+      copyMcpSignInLink: decodeVoid,
       signOutMcpServer: decodeMcpSignInStates,
       listMcpSignIns: decodeMcpSignInStates,
       mcpSignInApp: decodeMcpSignInAppState,
@@ -1661,6 +1665,7 @@ const openbotApi: OpenBotDesktopApi = {
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
     setSecret: decodeVoid,
+    giveSecretToAgent: decodeAgentWebhookSecret,
     sendTestEvent: decodeWebhookTestResult,
     listActivity: decodeEventActivity,
     listRoutineRuns: decodeEventRoutineRuns,

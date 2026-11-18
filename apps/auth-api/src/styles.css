@@ -1928,12 +1928,12 @@ a {
   outline-offset: 3px;
 }
 
-.landing-download-action-apk {
+.landing-download-action-alternate {
   position: relative;
   z-index: 1;
 }
 
-.landing-download-action-apk:focus-visible {
+.landing-download-action-alternate:focus-visible {
   border-radius: 4px;
   outline: 2px solid var(--openbot-download-card-focus);
   outline-offset: 4px;
@@ -4091,12 +4091,12 @@ a {
     transform: translate(2px, -2px);
   }
 
-  /* The pointer is on the APK link, so the card does not show the Google Play link as the target. */
-  .landing-download-card[data-state="available"]:has(.landing-download-action-apk:hover) .landing-download-arrow {
+  /* The pointer is on the second link, so the card does not show its first link as the target. */
+  .landing-download-card[data-state="available"]:has(.landing-download-action-alternate:hover) .landing-download-arrow {
     transform: none;
   }
 
-  .landing-download-action-apk:hover {
+  .landing-download-action-alternate:hover {
     text-decoration: underline;
     text-underline-offset: 4px;
   }

@@ -1,4 +1,5 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_ACTIVE_QUEUES_ROUTES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -102,6 +103,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RESULTS_ROUTES.destination,
   ROUTINE_RUN_PLACE_ROUTES.list,
   ROUTINE_PAUSE_REASONS_ROUTES.list,
+  AGENT_ACTIVE_QUEUES_ROUTES.list,
   ROUTINES_ONCE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,
   HOST_RELEASE_ROUTES.status,

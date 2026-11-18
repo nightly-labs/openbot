@@ -193,6 +193,33 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
 }
 
 /**
+ * The provider process stopped, or did not answer, so it did not get this request. A request before
+ * `turn/start`, or a `turn/start` that was not written, ran nothing: the drain queues the message again
+ * for the next process (#11843). Other callers handle it as any failed request.
+ */
+export class ProviderStoppedError extends Error {
+  constructor(
+    readonly providerName: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProviderStoppedError";
+  }
+}
+
+/**
+ * The session does not offer the model that the turn asks for, so no prompt was sent. Antigravity can
+ * resume a session with a model list that leaves out a model it offered before (#11797). The caller
+ * moves the agent to a backup model, or shows this message.
+ */
+export class ProviderModelNotOfferedError extends Error {
+  constructor(providerName: string, model: string) {
+    super(sourceText("error.provider.acpModelNotOffered", { provider: providerName, model }));
+    this.name = "ProviderModelNotOfferedError";
+  }
+}
+
+/**
  * Claude cannot resume this session ID, because another provider made it. Nothing ran, so
  * `isMissingProviderSessionError` reads it as a missing session and the caller opens a new one.
  */

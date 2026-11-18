@@ -30,6 +30,7 @@ import {
   clipboard,
   type Display,
   dialog,
+  type Event as ElectronEvent,
   type Input,
   Menu,
   type MenuItemConstructorOptions,
@@ -512,7 +513,13 @@ export function createMainWindowController({
 
   function loadRenderer(window: BrowserWindow): Promise<void> {
     onRendererLoadStarted();
-    return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString());
+    return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString()).catch((error: unknown) => {
+      // Another load of the page, such as View > Reload while the start loads, replaced this one. The
+      // window still loads OpenBot, so the start waits for that load instead of failing (#11326). A stop
+      // also gives ERR_ABORTED, but then nothing loads, and no event would end the wait.
+      if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
+      return replacementLoad(window.webContents, error);
+    });
   }
 
   async function ensureMainWindow(): Promise<BrowserWindow> {
@@ -921,6 +928,40 @@ function appRendererUrl(developmentUrl: string | undefined): URL {
 
 function chatWindowKey(target: ChatWindowTarget): string {
   return JSON.stringify([target.serverId, target.agentId]);
+}
+
+/** `ERR_ABORTED`: Electron rejects a `loadURL` with it when a newer load of the window starts first. */
+const REPLACED_LOAD_ERROR = -3;
+
+function isReplacedLoad(error: unknown): error is Error {
+  return error instanceof Error && "errno" in error && error.errno === REPLACED_LOAD_ERROR;
+}
+
+/** Settles as `loadURL` does, for the load that replaced the first one, or for the next that replaces it. */
+function replacementLoad(contents: WebContents, replaced: Error): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const settle = (error: Error | null) => {
+      contents.off("did-finish-load", onFinish);
+      contents.off("did-fail-load", onFail);
+      contents.off("did-stop-loading", onStop);
+      contents.off("destroyed", onStop);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onFinish = () => settle(null);
+    const onFail = (_event: ElectronEvent, code: number, description: string, url: string, isMainFrame: boolean) => {
+      if (!isMainFrame || code === REPLACED_LOAD_ERROR) return;
+      settle(
+        Object.assign(new Error(`${description} (${code}) loading '${url}'`), { errno: code, code: description, url }),
+      );
+    };
+    // A load that stops with no finish or failure, or a window that closes, fails as the first load did.
+    const onStop = () => settle(replaced);
+    contents.on("did-finish-load", onFinish);
+    contents.on("did-fail-load", onFail);
+    contents.on("did-stop-loading", onStop);
+    contents.on("destroyed", onStop);
+  });
 }
 
 /** The entry for the helper windows. It does not load `App`, so each window uses less memory. */

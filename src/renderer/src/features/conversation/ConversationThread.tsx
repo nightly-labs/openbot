@@ -30,6 +30,7 @@ import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /** The open side thread of the agent, in the place of the agent's own chat and its message box. */
 export function ConversationThread() {
@@ -39,6 +40,7 @@ export function ConversationThread() {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    openThreadFile,
     browserTakeoverResolution,
     installedSkills,
     installedSkillsLoadFailed,
@@ -107,6 +109,11 @@ export function ConversationThread() {
     messages: () => messages,
     lines: () => undefined,
     activeTurnId: () => props.threads?.open?.activeTurnId,
+  });
+  const turnTrace = useTurnTrace({
+    turnSteps,
+    agentName: () => props.agent?.name,
+    agents: () => props.agents,
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
@@ -314,6 +321,7 @@ export function ConversationThread() {
             }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onOpenFile={openThreadFile}
             onSelectAgent={props.onSelectAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
@@ -339,6 +347,7 @@ export function ConversationThread() {
             newerMessages={current().threads.newerMessages}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             sendShortcut={deviceSendShortcut(props.platform)}

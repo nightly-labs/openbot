@@ -48,7 +48,8 @@ interface CachedServer {
 
 export interface WorkspaceCache {
   read(serverId: string): Promise<CachedServer | null>;
-  write(serverId: string, value: CachedServer): Promise<void>;
+  /** True when the file is written. False when the keychain gives no key, so nothing is written. */
+  write(serverId: string, value: CachedServer): Promise<boolean>;
   remove(serverId: string): Promise<void>;
   /** Deletes the files of the servers that the account no longer lists, also those removed while the app was closed. */
   retain(serverIds: readonly string[]): Promise<void>;
@@ -275,41 +276,49 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     write: (serverId, value) =>
       inOrder(serverId, async () => {
         const key = await cacheKey();
-        if (!key) return;
+        if (!key) return false;
         // A provider that this build does not know goes back to `provider`, where the decoder reads it.
         const agents = value.agents.map(({ foreignProvider, ...agent }) => ({
           ...agent,
           provider: agent.provider ?? foreignProvider,
         }));
         // Each page counts with its escapes and the comma before it. Chats and channels share the
-        // limit, newest first.
-        const conversations: ConversationPage[] = [];
-        const channelPages: ChannelPage[] = [];
-        const channels = value.channels && { channels: value.channels.channels, pages: channelPages };
-        const file = { format: FORMAT, ...value, agents, conversations, channels };
-        let length = asciiJson(file).length;
+        // limit, newest first. Each page becomes JSON one time: the kept pages go into the file text
+        // in place of two markers, so the file is the same as `asciiJson` of the whole value.
+        const marker = Crypto.randomUUID();
+        const conversationsMarker = `${marker}:conversations`;
+        const channelPagesMarker = `${marker}:channel-pages`;
+        const channels = value.channels && { channels: value.channels.channels, pages: channelPagesMarker };
+        const head = asciiJson({ format: FORMAT, ...value, agents, conversations: conversationsMarker, channels });
+        // A marker in quotes stands where `[]` stands in a file with no pages.
+        let length = head.length - conversationsMarker.length - (channels ? channelPagesMarker.length : 0);
+        const conversations: string[] = [];
+        const channelPages: string[] = [];
         const pages = [
           // A quiet routine answer (`routine-quiet-answers-v1`) stays out: the bundle in the binary, which
           // a rollback runs, would read it from this file as a new answer.
           ...value.conversations.map((page) => {
-            const kept = {
-              ...page,
-              messages: page.messages.filter(({ itemType }) => itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE),
-            };
-            return { page: kept, at: kept.messages.at(-1)?.createdAt ?? "", keep: () => conversations.push(kept) };
+            const messages = page.messages.filter(({ itemType }) => itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);
+            return { page: { ...page, messages }, at: messages.at(-1)?.createdAt ?? "", kept: conversations };
           }),
           ...(value.channels?.pages ?? []).map((page) => ({
             page,
             at: page.messages.at(-1)?.message.createdAt ?? "",
-            keep: () => channelPages.push(page),
+            kept: channelPages,
           })),
         ].sort((a, b) => b.at.localeCompare(a.at));
-        for (const { page, keep } of pages) {
-          length += asciiJson(page).length + 1;
+        for (const { page, kept } of pages) {
+          const json = asciiJson(page);
+          length += json.length + 1;
           if (length > MAX_JSON_LENGTH) break;
-          keep();
+          kept.push(json);
         }
-        await seal(serverId, key, asciiJson(file));
+        // A function gives the text as it is: a replacement string reads `$&` and `$1` in the pages.
+        const json = head
+          .replace(`"${conversationsMarker}"`, () => `[${conversations.join(",")}]`)
+          .replace(`"${channelPagesMarker}"`, () => `[${channelPages.join(",")}]`);
+        await seal(serverId, key, json);
+        return true;
       }),
     remove: (serverId) =>
       inOrder(serverId, async () => {

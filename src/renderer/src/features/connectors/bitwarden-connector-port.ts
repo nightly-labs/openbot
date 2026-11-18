@@ -36,28 +36,36 @@ const HOST_POLL_LIMIT = 240;
 
 /**
  * A port to a joined server's connection. The host sends no event, so `onChanged` reads the status
- * while the host signs in, and stops after `HOST_POLL_LIMIT` reads or when a read fails. A session key
- * from this computer cannot open the host's vault, so `connect` fails.
+ * while the host signs in, and stops when the host is no longer signing in or after
+ * `HOST_POLL_LIMIT` reads. A failed read counts as a read: one dropped request does not leave the
+ * page on "Connecting". A session key from this computer cannot open the host's vault, so `connect`
+ * fails.
  */
 export function polledBitwardenConnectorPort(actions: HostBitwardenActions): BitwardenConnectorPort {
   const listeners = new Set<(status: BitwardenConnectorStatus) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let reads = 0;
+  /** Whether the last status that came was `connecting`. Only then does a failed read try again. */
+  let connecting = false;
   const stop = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
   };
+  const schedule = () => {
+    if (!connecting || timer !== null || listeners.size === 0 || reads >= HOST_POLL_LIMIT) return;
+    timer = setTimeout(() => {
+      timer = null;
+      reads += 1;
+      void actions.status().then(seen, schedule);
+    }, HOST_POLL_MS);
+  };
   const seen = (status: BitwardenConnectorStatus) => {
     for (const listener of listeners) listener(status);
-    if (!status.connecting) {
+    connecting = status.connecting;
+    if (!connecting) {
       stop();
       reads = 0;
-    } else if (timer === null && listeners.size > 0 && reads < HOST_POLL_LIMIT)
-      timer = setTimeout(() => {
-        timer = null;
-        reads += 1;
-        void actions.status().then(seen, () => undefined);
-      }, HOST_POLL_MS);
+    } else schedule();
     return status;
   };
   return {

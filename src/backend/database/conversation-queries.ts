@@ -120,6 +120,10 @@ export class ConversationQueries {
    * so it does not load and parse the whole history of the thread for it. The turn row names the
    * thread that ran the turn: the agent's chat or a side thread, such as a routine thread. A branch
    * keeps the turn ids of the rows it copied, but the turn row stays with the source thread.
+   *
+   * The read goes through the turn index. Without the hint, SQLite takes the page order index to skip
+   * the sort, and reads every message of the thread for the few rows of one turn: about a second on
+   * the main process for a chat of a million messages, at the end of each routine run (#11463).
    */
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     const rows = databaseRows(
@@ -127,7 +131,7 @@ export class ConversationQueries {
         .prepare(
           `SELECT message.message_json FROM projection_turns AS turn
            JOIN projection_threads AS thread ON thread.thread_id = turn.thread_id
-           JOIN projection_thread_messages AS message
+           JOIN projection_thread_messages AS message INDEXED BY thread_messages_turn
              ON message.thread_id = turn.thread_id AND message.turn_id = turn.turn_id
            WHERE turn.turn_id = ? AND thread.agent_id = ? AND message.author = 'assistant'
            ORDER BY message.created_at, message.ordinal, message.message_id`,
@@ -206,9 +210,10 @@ export class ConversationQueries {
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     if (!threadId) return { activeTurnId: null, latestMessage: null };
+    // Each runtime snapshot reads this for each agent whose chat is not loaded.
     const thread = databaseRow(
-      this.#core.connection
-        .prepare(
+      this.#core
+        .statement(
           "SELECT active_turn_id, last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?",
         )
         .get(threadId, agentId),

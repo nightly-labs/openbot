@@ -95,6 +95,8 @@ import {
   QuestionSecretComposer,
 } from "./browser-secret-card";
 import { ChatAttachmentPanel } from "./chat-attachment-panel";
+import { ChatBackdropLayer, useChatBackdropBase } from "./chat-backdrop-layer";
+import { ChatBackdropUndo } from "./chat-backdrop-undo";
 import type { OutboxRowStatus } from "./chat-outbox-status";
 import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
@@ -224,6 +226,8 @@ export interface ChatViewProps {
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
+/** The Undo of an agent backdrop sits under the header buttons. */
+const BACKDROP_UNDO_TOP = 64;
 /** The swipe away from Back opens its screen after this distance, or after a shorter fast flick. */
 const SWIPE_FORWARD_DISTANCE = 72;
 const SWIPE_FORWARD_FLICK_DISTANCE = 32;
@@ -878,8 +882,11 @@ export function ChatView({
       ? questionForm
       : undefined;
   const dark = useColorScheme() === "dark";
-  // The chat background that the user picked for this theme in Settings › Appearance.
-  const chatBackground = useChatBackgroundColor() ?? background;
+  // The base color of the backdrop, or the chat background that the user picked for this theme in
+  // Settings › Appearance. A backdrop replaces the color, as on the desktop.
+  const backdropBase = useChatBackdropBase();
+  const pickedBackground = useChatBackgroundColor();
+  const chatBackground = backdropBase ?? pickedBackground ?? background;
   // The glow and the filled voice controls take that agent's colour. A channel with no leader mixes
   // the colours of its first members.
   const voiceColors = useMemo(
@@ -1295,6 +1302,7 @@ export function ChatView({
   return (
     <GestureDetector gesture={edgeBackGesture}>
       <View className="flex-1" style={{ backgroundColor: chatBackground }}>
+        <ChatBackdropLayer variant="chat" active={isFocused} />
         <ChatDropTarget
           // A drop needs the composer, as a paste does. A secret request or question replaces it, and
           // the voice bar or the dictation strip hides its attachments.
@@ -1334,7 +1342,19 @@ export function ChatView({
                 onBack={leaveConversation}
                 threadMenu={threadMenu}
               />
+              {target.kind === "agent" ? (
+                <ChatBackdropUndo
+                  serverId={target.serverId}
+                  agentId={target.id}
+                  agentName={target.name}
+                  top={insets.top + BACKDROP_UNDO_TOP}
+                  liquidGlass={liquidGlassAvailable}
+                  fallbackBackground={fieldBackground}
+                  foreground={String(foreground)}
+                />
+              ) : null}
               <ChatMessageList
+                bubbleSurface={String(chatBackground)}
                 // Only an agent's chat has the swipe: it is off in a channel. Every chat has the pull.
                 swipeGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
                 pullGesture={endPull.gesture}

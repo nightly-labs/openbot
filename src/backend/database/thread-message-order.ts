@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { databaseRow, optionalStringColumn, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+import { cachedStatement } from "./statement-cache";
 
 /**
  * The stored shown order of a thread's messages: `group_start`, `group_first`, `group_id` and
@@ -81,7 +82,8 @@ export function readOrderInputs(
   threadId: string,
   messageIds: readonly string[],
 ): Map<string, MessageOrderInputs> {
-  const read = db.prepare(
+  const read = cachedStatement(
+    db,
     `SELECT NULLIF(turn_id, '') AS turn,
        created_at || char(0) || ordinal || char(0) || (${ROLE_RANK_SQL}) || char(0) || (${STEERED_SQL}) AS inputs,
        group_id IS NOT NULL AS keyed
@@ -123,11 +125,11 @@ export function refreshChangedOrder(
     else if (current) singles.add(messageId);
   }
   if (turns.size > 0) {
-    const refreshTurn = db.prepare(refreshOrderSql("AND turn_id = $key"));
+    const refreshTurn = cachedStatement(db, refreshOrderSql("AND turn_id = $key"));
     for (const turn of turns) refreshTurn.run({ thread: threadId, key: turn });
   }
   if (singles.size > 0) {
-    const refreshMessage = db.prepare(refreshOrderSql("AND message_id = $key"));
+    const refreshMessage = cachedStatement(db, refreshOrderSql("AND message_id = $key"));
     for (const messageId of singles) refreshMessage.run({ thread: threadId, key: messageId });
   }
 }

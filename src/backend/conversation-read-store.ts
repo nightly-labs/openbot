@@ -13,6 +13,7 @@ import {
   ORDER_KEY_DESC,
   ORDERED_THREAD_MESSAGES,
 } from "./database/conversation-queries";
+import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
 
 export type { ConversationMarkerExclusions } from "./database/conversation-queries";
@@ -184,12 +185,11 @@ export class ConversationReadStore {
   }
 
   #storedCursor(threadId: string, memberId: string): string | null | undefined {
-    const row = this.database.connection
-      .prepare(
-        `SELECT through_message_id FROM projection_thread_reads
-         WHERE thread_id = ? AND member_id = ?`,
-      )
-      .get(threadId, memberId);
+    const row = cachedStatement(
+      this.database.connection,
+      `SELECT through_message_id FROM projection_thread_reads
+       WHERE thread_id = ? AND member_id = ?`,
+    ).get(threadId, memberId);
     if (row === undefined) return undefined;
     if (!isDynamicRecord(row)) {
       throw new Error("The stored conversation read state is malformed.");

@@ -27,7 +27,14 @@ import { type MessagingContextMessage, messagingPromptText, REPLY_CHARACTERS } f
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, type MessagingPingInput, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, HistoryFilter, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
+import {
+  type ContextEntry,
+  chatFailureReason,
+  type HistoryFilter,
+  type InboundFile,
+  type MessageTarget,
+  type MessagingPlace,
+} from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -54,7 +61,10 @@ export type MessagingActivity =
       followUp: boolean;
       answer: string | null;
       files: MessagingAnswerFile[];
-      /** The catalog text of a start that failed, such as a provider that is not downloaded. */
+      /**
+       * The catalog text of a start or a turn that failed, such as a provider that is not downloaded
+       * or an expired sign-in. Null gives the general text.
+       */
       reason?: string | null;
     }
   | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
@@ -355,6 +365,11 @@ export class MessagingThreads {
         origin: MessagingOrigin,
       ) => Effect.Effect<MessagingPromptContext, MessagingOperationFailed>)
     | null = null;
+  /**
+   * True for another person's chat on the owner's personal WhatsApp number, where an answer shows as
+   * the owner. It is a local fact, so a slow or failed context read does not lose it.
+   */
+  #ownerPosts: ((link: MessagingLink) => boolean) | null = null;
   #historySource:
     | ((
         link: MessagingLink,
@@ -391,6 +406,10 @@ export class MessagingThreads {
       | null,
   ): void {
     this.#contextSource = source;
+  }
+
+  setOwnerPostSource(source: ((link: MessagingLink) => boolean) | null): void {
+    this.#ownerPosts = source;
   }
 
   /** The source answers null when the connection does not run now. */
@@ -818,6 +837,7 @@ export class MessagingThreads {
       // Only the "Message yourself" chat has the linked number as the author of a direct message:
       // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
       fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
+      postsAsOwner: this.#ownerPosts?.(link) === true,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,
@@ -961,8 +981,15 @@ export class MessagingThreads {
           }
         }
         this.store.touch(link.linkId);
+        // The turn's end stored the failure on its deliveries before this event.
+        const reason =
+          event.status === "failed"
+            ? chatFailureReason(
+                started.deliveryIds.map((id) => this.#mailbox.getDelivery(id)?.delivery.error).find(Boolean),
+              )
+            : null;
         Effect.runFork(
-          this.#finished(link, event.turnId, event.status, started.origin, started.followUp).pipe(
+          this.#finished(link, event.turnId, event.status, started.origin, started.followUp, reason).pipe(
             Effect.uninterruptible,
             Effect.forkIn(scope, { startImmediately: true }),
           ),
@@ -1143,6 +1170,7 @@ export class MessagingThreads {
     status: string,
     origin: MessagingOrigin | null,
     followUp: boolean,
+    reason: string | null,
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     const messages = yield* threadsStep(() => this.#turnMessages(link, turnId));
     const answer = [...messages].reverse().find(isAnswer)?.text ?? null;
@@ -1163,6 +1191,7 @@ export class MessagingThreads {
       followUp,
       answer,
       files,
+      reason,
     });
   });
 

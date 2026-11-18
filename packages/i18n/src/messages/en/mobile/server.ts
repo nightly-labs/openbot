@@ -975,6 +975,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.protonPass.keyHelp":
     "In Proton Pass, make an access key that can read only the vault you share with OpenBot, then paste it here. {host} keeps the key; this phone does not.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Your Proton plan does not include the Proton Pass command-line tool. It needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change the plan of your account, then connect again.",
   // A password manager that the host connects through its CLI. {name} is the manager, such as
   // Proton Pass. {date} is a date, such as 5 Nov 2026.
   "mobile.server.connectors.passwordManager.unavailable": "{name} is not available on this server.",
@@ -1006,8 +1008,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Read only",
   "mobile.server.connectors.passwordManager.keyExpires": "Read only. Expires on {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Expired on {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "The {name} command-line tool needs a paid plan. Change the plan of your account, then connect again.",
   "mobile.server.connectors.passwordManager.expiredTitle": "The {name} key expired",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agents on {host} cannot sign in with your shared logins until you connect again.",
@@ -1252,7 +1252,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "mobile.server.connectors.whatsapp.add": "Add",
   "mobile.server.connectors.whatsapp.groupTitle": "Add a group",
-  "mobile.server.connectors.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "mobile.server.connectors.whatsapp.groupSearch": "Search groups",
   "mobile.server.connectors.whatsapp.groupsLoading": "Reading the groups…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
@@ -2077,8 +2078,12 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.transfer.copyTo": "To",
   "mobile.server.transfer.copyNoAgents": "This server has no agents.",
   "mobile.server.transfer.copyNotMoved":
-    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+    "Their channels, routine flows, workflows, and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copy duplicate agents?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copy duplicates",
   "mobile.server.transfer.copying": "Copying…",
   "mobile.server.transfer.copyFailed": "The copy did not finish.",
   "mobile.server.transfer.copied": {

@@ -26,6 +26,13 @@ export const messages = {
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -840,8 +847,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ce serveur n’a aucun agent.",
   "settings.transfer.copy.new": "Nouveau",
   "settings.transfer.copy.notCopied":
-    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {
     one: "{count} agent copié vers {server}.",

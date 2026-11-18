@@ -126,7 +126,7 @@ import {
   type ProviderDetectionCalls,
 } from "../custom-providers/stores/provider-detection-store";
 import { createProviderConnection } from "../provider-updates/provider-connection";
-import { createProviderRuntimeStore } from "../provider-updates/provider-runtime-store";
+import { createProviderRuntimeStore, hostConnection } from "../provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "../provider-updates/remote-provider-runtimes";
 import { remoteAdminServer, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
@@ -444,6 +444,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
       isLocalServer: () => false,
       managesRuntimes: () => serverId() !== undefined,
+      hostConnection: () => hostConnection(options.server()),
     },
   );
   // A boolean, so that a server-list update that keeps the capability does not read the list again.
@@ -458,8 +459,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     editsCustomProviders();
     if (!id) return undefined;
     const store = createCustomProvidersStore(() => hostCustomProvidersApi(() => admin, id));
-    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here.
-    void store.refreshCustomProviders().catch(() => undefined);
+    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here. The read
+    // picks its routes from the server summary; untracked, so a summary update does not read it again.
+    void untrack(() => store.refreshCustomProviders()).catch(() => undefined);
     return store;
   });
   // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.

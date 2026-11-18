@@ -29,12 +29,14 @@ import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressa
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle } from "@/shared/lib/text-direction";
@@ -112,7 +114,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
@@ -125,15 +127,17 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
+  // The row reads the activity once and gives it to the avatar, the badge and the channel line.
+  const activity = useAgentListActivity(agent.id);
   // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
-  const waitingChannel = useWaitingChannel(agent.id, agent.serverId);
+  const waitingChannel = useWaitingChannel(activity, agent.serverId);
   const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
-  const waitReason = useAgentListWaitReason(agent.id);
+  const waitReason = agentListWaitReason(activity);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
@@ -142,10 +146,11 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       hue={agent.avatarHue}
       color={agent.avatarColor}
       seed={agent.avatarSeed}
+      avatarUrl={agent.avatarUrl}
       size={54}
       animateIdle={false}
       rings
-      withThreads
+      activityMood={agentActivityMood(activity)}
     />
   );
   // As on the desktop, a wait outranks the unread count in the corner of the avatar.

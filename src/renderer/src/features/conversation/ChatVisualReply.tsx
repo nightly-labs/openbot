@@ -9,6 +9,7 @@ import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
+import { useMessageBackdropAction } from "./message-backdrop";
 import { draftWithPageContext, draftWithPageText } from "./stores/message-actions";
 
 export interface ChatVisualPage {
@@ -45,6 +46,8 @@ export function ChatVisualReply(props: {
   const pageQuoteId = () =>
     fileQuoteId({ source: "attachment", attachmentId: visual().attachment.id, name: visual().attachment.name });
   const loadPage = untrack(() => conversationRuntime(view).visualPage);
+  // The page row has no message menu, so the page offers "Use as backdrop" with its own buttons.
+  const backdropAction = useMessageBackdropAction(untrack(() => conversationRuntime(view)));
   const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
   if (loadPage && !untrack(pageUrl)) {
     let mounted = true;
@@ -73,6 +76,7 @@ export function ChatVisualReply(props: {
       onQuote={(text) => props.onQuote(pageQuoteId(), text)}
       quoteShortcut={deviceQuoteShortcut(view.platform)}
       onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
+      onUseAsBackdrop={backdropAction(props.message)}
       isAppShortcut={isChatVisualAppShortcut}
       macWindowControls={view.platform === "darwin"}
     />

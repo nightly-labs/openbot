@@ -106,7 +106,10 @@ type QuotaGroup = AccountRateLimitGroupResult & { primary: UsageWindow | null; s
 export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
   tokenFile: string;
   model: string | null;
+  /** The calls to Google. The app gives one that uses the computer's proxy settings (#11278). */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
 }) {
+  const send = options.fetch ?? fetch;
   const accessToken = yield* Effect.tryPromise(() => readFile(options.tokenFile, "utf8")).pipe(
     Effect.map(validAccessToken),
     Effect.orElseSucceed(() => null),
@@ -115,7 +118,7 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
   const testEndpoint = localTestUrl(process.env[DEV_CODE_ASSIST_URL]);
   const call = <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
     Effect.tryPromise(async (signal) => {
-      const response = await fetch(`${endpoint}:${method}`, {
+      const response = await send(`${endpoint}:${method}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,

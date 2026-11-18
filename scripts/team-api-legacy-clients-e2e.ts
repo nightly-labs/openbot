@@ -3,12 +3,15 @@
 // temporary profile. Each client sends what its release sent and reads the reply with the frozen
 // decoder of its protocol, so a change of a released wire meaning fails here:
 // - v1: compatibility, the protocol gate, join, login, `bot`/`botId` wire keys and the event socket.
-// - v2: the WebRTC frames of a real `TeamWebRtcHostPeer`, from the signed handshake to an RPC.
+// - v2: the WebRTC frames of a real `TeamWebRtcHostPeer`, from the signed handshake to an RPC. An RPC
+//   with no protocol marker (a release before v0.7.0) gets `client_update_required`.
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
 // - v9: the v9 decoder reads the v9 fixtures, which have more than 128 capabilities; the v8 decoder
 //   refuses them.
+// - Capability limits: each list that a client can send, and each client fixture, fits the limit of its
+//   protocol. A protocol 6 request with the bootstrap list keeps its capabilities; one over 64 keeps none.
 // - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent, and a secure
 //   authentication answer and an agent profile save keep their agent (#3949).
 // - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
@@ -19,6 +22,8 @@
 //   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
 // - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
 //   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
+// - WebRTC client range: mobile and the web client compare the host range with the protocols that they
+//   speak, so a host that raises its minimum still connects, and the side that is too old is named.
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -67,14 +72,19 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_WEB_CLIENT_PROTOCOL,
+  TEAM_WEBRTC_CLIENT_PROTOCOL,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_REASONING_EFFORTS,
   TEAM_REASONING_EFFORTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { TEAM_PI_MUSE_CAPABILITY } from "@openbot/contracts/team-protocol/v7";
 import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
 import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
@@ -84,6 +94,7 @@ import {
   TEAM_PROTOCOL_V9,
   TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -656,6 +667,68 @@ try {
       "The v8 decoder read v9/host-compatibility.json.",
     );
     return { client: client.length, host: host.capabilities.length };
+  });
+
+  // --- Capability list limits ---
+
+  await step("capability limits: each list that a client can send fits the limit of its protocol", async () => {
+    const sizes: Record<string, { size: number; limit: number }> = {};
+    const fits = (label: string, list: readonly unknown[], limit: number) => {
+      assert.ok(list.length <= limit, `${label} has ${list.length} capabilities. Its peer reads at most ${limit}.`);
+      sizes[label] = { size: list.length, limit };
+    };
+    // A client sends the bootstrap list before it knows the protocol, and to each host of protocol 6
+    // or older. Hosts v0.20 to v0.34 refuse a longer WebRTC request and read a longer header as none.
+    fits("bootstrap", TEAM_BOOTSTRAP_CAPABILITIES, teamProtocolCapabilityLimit(null));
+    for (let protocol = TEAM_PROTOCOL_V1; protocol <= TEAM_PROTOCOL_V9; protocol += 1) {
+      fits(`protocol ${protocol}`, teamCapabilitiesForProtocol(protocol), teamProtocolCapabilityLimit(protocol));
+    }
+    for (const [path, protocol] of [
+      ["v1/client-scope.json", TEAM_PROTOCOL_V1],
+      ["v2/client-scope.json", 2],
+      ["v9/client-capabilities.json", TEAM_PROTOCOL_V9],
+    ] as const) {
+      const value = fixture(path);
+      const list = Array.isArray(value) ? value : record(value, path).capabilities;
+      assert.ok(Array.isArray(list), `${path} has no capability list.`);
+      fits(path, list, teamProtocolCapabilityLimit(protocol));
+    }
+    // A current host reads the protocol of a WebRTC request from these markers.
+    const bootstrap = new Set<string>(TEAM_BOOTSTRAP_CAPABILITIES);
+    assert.ok(bootstrap.has(TEAM_PI_MUSE_CAPABILITY), "The bootstrap list lost the protocol 7 marker.");
+    assert.ok(bootstrap.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The bootstrap list lost the protocol 9 marker.");
+    return sizes;
+  });
+
+  await step("capability limits: a protocol 6 request with the bootstrap list keeps its capabilities", async () => {
+    // Mark-unread needs `conversation-unread` in the request. A protocol 6 header makes this host read
+    // the list as a v0.34 host does: a list over 64 counts as no capabilities.
+    const markUnread = async (capabilities: readonly string[]) => {
+      const response = await fetch(`http://127.0.0.1:${port}/v1/agents/${source.id}/conversation/unread`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${member.token}`,
+          [TEAM_PROTOCOL_VERSION_HEADER]: "6",
+          [TEAM_APP_VERSION_HEADER]: CLIENT_VERSION,
+          [TEAM_CAPABILITIES_HEADER]: capabilities.join(","),
+        },
+        body: "{}",
+      });
+      return response.status;
+    };
+    const sent = teamCapabilitiesForProtocol(6);
+    assert.ok(new Set<string>(sent).has("conversation-unread"), "The protocol 6 list has no `conversation-unread`.");
+    const kept = await markUnread(sent);
+    assert.equal(kept, 200, `A protocol 6 request with the bootstrap list got ${kept}.`);
+    // One capability over the limit: the host reads none, so the route refuses.
+    const extra = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((capability) => !sent.includes(capability));
+    const tooLong = [...sent, ...extra].slice(0, teamProtocolCapabilityLimit(6) + 1);
+    assert.equal(tooLong.length, teamProtocolCapabilityLimit(6) + 1);
+    const refused = await markUnread(tooLong);
+    assert.equal(refused, 400, `A protocol 6 request with ${tooLong.length} capabilities got ${refused}.`);
+    return { sent: sent.length, kept, tooLong: tooLong.length, refused };
   });
 
   await step("v7 client: this host serves protocol 7 without the v8 `displayName`", async () => {
@@ -1306,41 +1379,80 @@ try {
     ({ sessionId }) => ({ sessionId, confirmed: true }),
   );
 
-  await step("v2 RPC: `http.request` frames reach the host with the released body vocabulary", async () => {
-    const capabilities = record(fixture("v2/client-scope.json"), "fixture").capabilities;
-    assert.ok(Array.isArray(capabilities));
-    const call = async (method: "GET" | "POST", path: string, body: unknown = null) => {
-      const requestId = randomUUID();
-      const from = v2.bridge.sent.length;
-      v2.bridge.emit(
-        "data",
-        "peer-v2",
-        "rpc",
-        encodeTeamProtocolV2Frame(
-          createTeamProtocolV2Request(requestId, "http.request", { method, path, body, capabilities }),
-        ),
+  await step(
+    "v2 RPC: an unmarked `http.request` gets update required; a marked one keeps the released vocabulary",
+    async () => {
+      // A capability list with no protocol marker comes from a release before v0.7.0 (2026-09-09), which is
+      // outside the support window. The released v2 fixture sends such a list, and the v0.6 clients sent no list.
+      const unmarked = record(fixture("v2/client-scope.json"), "fixture").capabilities;
+      assert.ok(Array.isArray(unmarked));
+      // The earliest marked list: protocol 4, the first protocol of the support window.
+      const marked = [...teamCapabilitiesForProtocol(4)];
+      const call = async (
+        method: "GET" | "POST",
+        path: string,
+        capabilities: readonly unknown[] | undefined,
+        body: unknown = null,
+      ) => {
+        const requestId = randomUUID();
+        const from = v2.bridge.sent.length;
+        v2.bridge.emit(
+          "data",
+          "peer-v2",
+          "rpc",
+          encodeTeamProtocolV2Frame(
+            createTeamProtocolV2Request(requestId, "http.request", {
+              method,
+              path,
+              body,
+              ...(capabilities ? { capabilities } : {}),
+            }),
+          ),
+        );
+        return v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      };
+      const refused = async (method: "GET" | "POST", path: string, capabilities: readonly unknown[] | undefined) => {
+        const frame = await call(method, path, capabilities, method === "POST" ? { operationId: randomUUID() } : null);
+        const error = "error" in frame ? frame.error : undefined;
+        assert.deepEqual(
+          error && { code: error.code, status: error.status, retryable: error.retryable, message: error.message },
+          {
+            code: "client_update_required",
+            status: 426,
+            retryable: false,
+            message: sourceText("error.team.clientUpdateRequired"),
+          },
+          `An unmarked ${method} ${path} was not refused: ${JSON.stringify(frame)}.`,
+        );
+      };
+      await refused("GET", "/v1/agents", unmarked);
+      await refused("GET", "/v1/agents", undefined);
+      await refused("GET", `/v1/agents/${source.id}/queue`, unmarked);
+      await refused("POST", `/v1/agents/${duplicate.copyId}/duplicate`, unmarked);
+      await refused("POST", `/v1/agents/${duplicate.copyId}/duplicate`, []);
+      const result = async (method: "GET" | "POST", path: string, body: unknown = null) => {
+        const frame = await call(method, path, marked, body);
+        assert.ok("result" in frame, `The marked ${method} ${path} frame failed: ${JSON.stringify(frame)}.`);
+        return record(frame.result, "RPC result");
+      };
+      const listed = await result("GET", "/v1/agents");
+      assert.equal(listed.status, 200);
+      const agents = decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, listed.body);
+      assert.ok(Array.isArray(agents) && agents.some((value) => record(value, "agent").id === source.id));
+      const queue = await result("GET", `/v1/agents/${source.id}/queue`);
+      assert.equal(record(queue.body, "queue").botId, source.id, "A protocol 4 queue lost its `botId` key.");
+      const duplicated = await result("POST", `/v1/agents/${duplicate.copyId}/duplicate`, {
+        operationId: randomUUID(),
+      });
+      assert.equal(duplicated.status, 201);
+      const decoded = record(
+        decodeTeamProtocolV3HttpResponse("POST", `/v1/agents/${duplicate.copyId}/duplicate`, 201, duplicated.body),
+        "duplicate",
       );
-      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
-      assert.ok("result" in frame, `The ${method} ${path} frame failed: ${JSON.stringify(frame)}.`);
-      return record(frame.result, "RPC result");
-    };
-    const listed = await call("GET", "/v1/agents");
-    assert.equal(listed.status, 200);
-    const agentsOverV2 = decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, listed.body);
-    assert.ok(Array.isArray(agentsOverV2) && agentsOverV2.some((value) => record(value, "agent").id === source.id));
-    const queue = await call("GET", `/v1/agents/${source.id}/queue`);
-    assert.equal(record(queue.body, "queue").botId, source.id, "A v2 queue lost its `botId` key.");
-    const duplicateOverV2 = await call("POST", `/v1/agents/${duplicate.copyId}/duplicate`, {
-      operationId: randomUUID(),
-    });
-    assert.equal(duplicateOverV2.status, 201);
-    const decoded = record(
-      decodeTeamProtocolV3HttpResponse("POST", `/v1/agents/${duplicate.copyId}/duplicate`, 201, duplicateOverV2.body),
-      "duplicate",
-    );
-    assert.notEqual(record(decoded.bot, "bot").id, duplicate.copyId);
-    return { agents: agentsOverV2.length, queueKeys: Object.keys(record(queue.body, "queue")).sort() };
-  });
+      assert.notEqual(record(decoded.bot, "bot").id, duplicate.copyId);
+      return { refused: 5, agents: agents.length, queueKeys: Object.keys(record(queue.body, "queue")).sort() };
+    },
+  );
 
   await step("v8 RPC: a browser tab opened over WebRTC keeps its owner agent", async () => {
     // What a current desktop client sends when the user opens a tab in an agent's browser panel.
@@ -1426,7 +1538,8 @@ try {
     };
     // The bootstrap list of a protocol 9 client has the marker, so its first read is complete.
     const first = decodeTeamProtocolSupportV9(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
-    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V9);
+    // The host speaks protocol 10 too. A protocol 9 client reads the maximum and stays on 9.
+    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V10);
     assert.ok(first.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
     // A protocol 9 request may carry more than 128 capabilities.
     const full = decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)));
@@ -1440,6 +1553,55 @@ try {
       "A protocol 8 peer got a protocol 9 capability.",
     );
     return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+  });
+
+  await step("WebRTC client range: the highest common protocol, or the side that must update", async () => {
+    // The compatibility read that mobile and the web client make over WebRTC.
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "GET",
+          path: "/v1/compatibility",
+          body: null,
+          capabilities: [...TEAM_BOOTSTRAP_CAPABILITIES],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
+    const host = decodeTeamProtocolSupportV9(record(frame.result, "RPC result").body).protocol;
+    // This host advertises 1-10. A client of protocol 9, such as mobile, works as before, on protocol 9.
+    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 });
+    assert.deepEqual(teamWebRtcClientProtocol(host), { protocol: TEAM_PROTOCOL_V9, update: null });
+    // The web client speaks protocol 10 with it.
+    assert.deepEqual(teamWebRtcClientProtocol(host, TEAM_WEB_CLIENT_PROTOCOL), {
+      protocol: TEAM_PROTOCOL_V10,
+      update: null,
+    });
+    // A host that raised its minimum to 9 still serves a client that speaks 9.
+    const raised = { minimum: TEAM_PROTOCOL_V9, maximum: TEAM_PROTOCOL_V9 };
+    assert.deepEqual(teamWebRtcClientProtocol(raised), { protocol: TEAM_PROTOCOL_V9, update: null });
+    // A protocol 3 host still works with the clients of today, which have always accepted it.
+    const oldest = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 };
+    assert.deepEqual(teamWebRtcClientProtocol(oldest), { protocol: TEAM_PROTOCOL_V3, update: null });
+    // A client whose minimum is above 3 names the host as the side to update.
+    const laterClient = { minimum: TEAM_PROTOCOL_V3 + 1, maximum: TEAM_PROTOCOL_V9 };
+    assert.deepEqual(teamWebRtcClientProtocol(oldest, laterClient), {
+      protocol: null,
+      update: "host_update_required",
+    });
+    // A host whose minimum is above the client maximum names the client as the side to update.
+    const newer = {
+      minimum: TEAM_WEBRTC_CLIENT_PROTOCOL.maximum + 1,
+      maximum: TEAM_WEBRTC_CLIENT_PROTOCOL.maximum + 2,
+    };
+    assert.deepEqual(teamWebRtcClientProtocol(newer), { protocol: null, update: "client_update_required" });
+    return { client: TEAM_WEBRTC_CLIENT_PROTOCOL, host };
   });
 
   await step("usage-tertiary-v1 RPC: a WebRTC usage read follows the capability", async () => {

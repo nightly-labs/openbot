@@ -40,10 +40,12 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  expandTeamCapabilitiesV10,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -58,7 +60,13 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  readTeamCapabilitiesV10,
+  TEAM_ABSENT_CAPABILITIES_HEADER,
+  TEAM_PROTOCOL_V10,
+  type TeamCapabilitiesV10,
+} from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -134,17 +142,35 @@ function isLowSurrogate(code: number): boolean {
 }
 
 export function requestCapabilities(request: IncomingMessage): Set<string> {
+  const protocol = requestProtocol(request);
+  if (protocol >= TEAM_PROTOCOL_V10) {
+    // `#protocolIssue` refuses a malformed list; a route above it reads none.
+    const lists = requestCapabilityListsV10(request);
+    return new Set(lists ? expandTeamCapabilitiesV10(lists).filter(isTeamCurrentCapability) : []);
+  }
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
   const value = Array.isArray(header) ? header.join(",") : header;
-  const protocol = requestProtocol(request);
   // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
+}
+
+/** The two lists of a protocol 10 request (`v10.ts`), or null when one is malformed. A missing header is an empty list. */
+export function requestCapabilityListsV10(request: IncomingMessage): TeamCapabilitiesV10 | null {
+  return readTeamCapabilitiesV10(
+    headerCapabilityList(request, TEAM_CAPABILITIES_HEADER),
+    headerCapabilityList(request, TEAM_ABSENT_CAPABILITIES_HEADER),
+  );
+}
+
+function headerCapabilityList(request: IncomingMessage, name: string): string[] | null {
+  const header = request.headers[name.toLowerCase()];
+  const value = Array.isArray(header) ? header.join(",") : header;
+  if (!value) return [];
+  if (value.length > 8_192) return null;
+  return value.split(",").map((capability) => capability.trim());
 }
 
 export function conversationSnapshotForCapabilities(
@@ -543,6 +569,8 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
     ...(value.provider === undefined ? {} : { provider: value.provider }),
     ...(value.model === undefined ? {} : { model: value.model }),
     ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort }),
+    // `agent-create-operation-v1`: the protocol 9 codec already checked it. A released client does not send it.
+    ...(isString(value.operationId) ? { operationId: value.operationId } : {}),
   };
 }
 

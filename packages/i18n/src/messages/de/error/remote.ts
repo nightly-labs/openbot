@@ -24,6 +24,10 @@ export const messages = {
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
   "error.remote.windowsSessionDisconnected":
     "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
+  "error.remote.streamTooSlow":
+    "Die Verbindung zum Host ist zu langsam für das Bild. Nutze ein schnelleres Netzwerk und versuche es erneut.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -82,10 +86,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Nur der Eigentümer kann diesen Server entfernen.",
   "error.remote.requestTimeout": "Die Zeit für die entfernte Anfrage ist abgelaufen.",
   "error.remote.requestFailed": "Die entfernte Anfrage ist fehlgeschlagen.",
-  "error.remote.pinnedKeyMissing": "Der entfernte Host hat keinen fest hinterlegten Geräteschlüssel.",
+  "error.remote.hostKeyMissing":
+    "OpenBot kann diesen Server nicht prüfen, weil sein Sicherheitsschlüssel fehlt oder sich geändert hat. Bitte den Serverbesitzer, den Server zu prüfen.",
+  "error.remote.connectionNotStarted":
+    "OpenBot konnte die Verbindung zu diesem Server nicht starten. Wenn das weiter passiert, beende OpenBot und öffne es erneut.",
   "error.remote.hostDidNotConnect": "Der WebRTC-Host hat sich nicht verbunden.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
-  "error.remote.hostDisconnected": "Der WebRTC-Host hat die Verbindung getrennt.",
+  "error.remote.hostDisconnected":
+    "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",
   "error.remote.eventGap": "Die Ereignisfolge des Hosts hat eine Lücke.",
   "error.remote.malformedKnownEvent": "Der Host hat ein fehlerhaft formatiertes bekanntes Ereignis zurückgegeben.",
   "error.remote.fileTransportIsStopped": "Der WebRTC-Dateitransport ist gestoppt.",
@@ -211,6 +219,9 @@ export const messages = {
     "Die Nachricht wurde gesendet, aber der Chatverlauf konnte nicht aktualisiert werden.",
   "error.remote.taskHistoryRefreshFailed":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",
+  "error.remote.serverNotLoaded": "OpenBot konnte den Server nicht laden. Versuche es erneut.",
+  "error.remote.localServerNotStarted":
+    "Der Server auf diesem Computer wurde nicht gestartet. Versuche es erneut. Wenn er nicht startet, starte OpenBot auf diesem Computer neu.",
   "error.remote.localServerAccountRemovalFailed":
     "Der Server ist auf seinem Computer gelöscht, aber das Konto führt ihn noch. Lösche ihn erneut, um ihn aus dem Konto zu entfernen.",
 } as const satisfies PartialTranslation<typeof source>;

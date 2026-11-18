@@ -123,10 +123,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.bubbleStyle": "Ballonstijl",
+  "mobile.settings.appearance.bubbleStyleSolid": "Vol",
+  "mobile.settings.appearance.bubbleStyleTint": "Tint",
+  "mobile.settings.appearance.seeThroughBubbles": "Doorzichtige ballonnen",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Agentballonnen en ballonnen zonder kleur laten de achtergrond doorschijnen. Zonder achtergrond zijn ballonnen altijd dekkend.",
+  "mobile.settings.appearance.tab.colors": "Kleuren",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 routineruns",
+  "mobile.settings.appearance.preview.thinking": "4 seconden nagedacht",
+  "mobile.settings.appearance.preview.memory": "1 herinnering opgeslagen",
+  "mobile.settings.appearance.backdrop.title": "Achtergrond",
+  "mobile.settings.appearance.backdrop.footer":
+    "Staat achter Home en je chats op deze telefoon. Een agent kan er een voor je instellen; met Ongedaan maken in de chat komt de oude terug.",
+  "mobile.settings.appearance.backdrop.none": "Geen",
+  "mobile.settings.appearance.backdrop.pond": "Koivijver",
+  "mobile.settings.appearance.backdrop.jellyfish": "Kwallen",
+  "mobile.settings.appearance.backdrop.sunset": "Retro zonsondergang",
+  "mobile.settings.appearance.backdrop.snowfall": "Sneeuwval",
+  "mobile.settings.appearance.backdrop.fireflies": "Vuurvliegjes",
+  "mobile.settings.appearance.backdrop.agentPage": "Agentpagina",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Ingesteld door een agent",
+  "mobile.settings.appearance.backdrop.photo": "Foto",
+  "mobile.settings.appearance.backdrop.photoChoose": "Kiezen uit je foto's",
+  "mobile.settings.appearance.backdrop.photoChange": "Tik nogmaals om een andere foto te kiezen",
+  "mobile.settings.appearance.backdrop.strength": "Achtergrondsterkte",
+  "mobile.settings.appearance.backdrop.calm": "Rustig",
+  "mobile.settings.appearance.backdrop.vivid": "Levendig",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Een rustige achtergrond houdt lange antwoorden goed leesbaar. Bovenaan Home zie je er het meeste van.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Kun je de release note schrijven?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Hier is een concept: de achtergrond die een agent instelt, staat nu ook op je telefoon.",
   "mobile.settings.appearance.chatBackground": "Chatachtergrond",
   "mobile.settings.appearance.chatBackgroundDefault": "Standaard",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "De achtergrond vervangt de chatachtergrond. Kies Geen als achtergrond om een kleur te gebruiken.",
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
@@ -410,7 +445,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot is vergrendeld",
   "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open.",
+    "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open. Open Agent opent de chat.",
   "mobile.settings.shortcuts.send.sent": "Verzonden",
   "mobile.settings.shortcuts.send.failed": "OpenBot kon dit niet verzenden.",
   "mobile.settings.shortcuts.send.unconfirmed": "Geen antwoord van de server. Het bericht kan in de chat staan.",

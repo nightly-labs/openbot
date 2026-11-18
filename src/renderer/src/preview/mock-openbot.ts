@@ -189,6 +189,7 @@ import {
   type UpdateStatus,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { ACTIVE_QUEUE_STATUSES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
   AGENT_IMPORT_PREVIEW,
@@ -2646,6 +2647,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       cancelMcpSignIn: async () => {
         cancelPendingMcpSignIn?.();
       },
+      copyMcpSignInLink: async () => undefined,
       signOutMcpServer: async ({ mcpServerId }) => {
         forgetMcpSignIn(mcpServerId);
         return mcpSignInStates();
@@ -3366,6 +3368,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         });
       },
       listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
+      listActiveQueues: async (agentIds) => ({
+        queues: agentIds.map((agentId) => {
+          const queue = clone(queues.get(agentId) ?? emptyQueue(agentId));
+          return {
+            ...queue,
+            deliveries: queue.deliveries.filter((delivery) => ACTIVE_QUEUE_STATUSES.has(delivery.status)),
+          };
+        }),
+        omitted: [],
+      }),
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
       listTasks: async (agentId) => taskList(agentId),

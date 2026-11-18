@@ -19,15 +19,28 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import {
+  createRoutineFlows,
+  type RoutineFlowsHandle,
+  routineFlowNoticeEvent,
+} from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
-import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import {
+  createRoutineResults,
+  type RoutineResultsHandle,
+  routineResultNoticeEvent,
+} from "../backend/routine-results/routine-results";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowNotice,
+  type WorkflowsHandle,
+  workflowNoticeEvent,
+} from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
@@ -37,6 +50,7 @@ import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
+import { AttachmentPreviews } from "./attachment-previews";
 import {
   type BrowserProfileService,
   browserProxyConnection,
@@ -56,6 +70,7 @@ import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
+import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
@@ -120,6 +135,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -169,6 +185,7 @@ import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usa
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { UserFilesBytes } from "../backend/user-files-bytes";
+import { centralAuthApiUrl, createCentralAuthManager, safeStorageCipher } from "./account-service-access";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
 import {
   type AgentDefaultsPreferenceStore,
@@ -208,12 +225,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
-import {
-  CentralAuthManager,
-  isHostNotOnAccount,
-  readCentralAuthApiUrl,
-  readMobileConnectApiUrl,
-} from "./central-auth-manager";
+import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
   type ClaudeCompactWindowControl,
@@ -275,7 +287,12 @@ import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
+import {
+  agentWebhookRoutineWriter,
+  HostEventsService,
+  hostAgentWebhookKeys,
+  type WebhookDeliveryReport,
+} from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
@@ -351,6 +368,7 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -399,18 +417,14 @@ import {
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
-import {
-  createSecretStorage,
-  SECRET_STORAGE_KEY_FILE,
-  type SecretStorage,
-  type SecretStorageCipher,
-} from "./secret-storage-cipher";
+import type { SecretStorageCipher } from "./secret-storage-cipher";
 import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
@@ -433,20 +447,24 @@ import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-de
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
-import { TeamStore } from "./team-store";
+import { LEGACY_TEAM_STORE_FILE, TEAM_STORE_FILE, TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
-import { macShipItDirectory, UPDATE_HANDOVER_FILE } from "./update-install-guard";
+import {
+  macShipItDirectory,
+  readNotInstalledUpdate,
+  UPDATE_HANDOVER_FILE,
+  UPDATE_INSTALL_RECORD_FILE,
+} from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
@@ -518,11 +536,7 @@ const APP_BEHAVIOR_PREFERENCE_FILE = "openbot-app-behavior-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
-const TEAM_FILE = "openbot-team-server-v1.json";
-/** One host per account. The v1 file above stays as the last build without accounts left it. */
-const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
-const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const REMOTE_SESSIONS_FILE = "openbot-remote-sessions-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
@@ -565,6 +579,8 @@ const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
   startupTiming: 9.5,
+  // Before the updater and the requested update that it drives.
+  requiredUpdate: 9.8,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -737,6 +753,8 @@ export interface ApplicationServices {
   requestedUpdate: RequestedUpdate;
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
+  /** Null in a development run and in a local server child. */
+  requiredUpdate: RequiredUpdate | null;
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
@@ -842,52 +860,10 @@ export interface ApplicationServices {
   centralAuthInitialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>;
 }
 
-let userDataSecretStorage: SecretStorage | null = null;
-
-/** The secret storage of userData. Made at first use, when userData has its final path. */
-function secretStorage(): SecretStorage {
-  userDataSecretStorage ??= createSecretStorage({
-    keyPath: join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE),
-  });
-  return userDataSecretStorage;
-}
-
-/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux and macOS key file. */
-function safeStorageCipher(
-  unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
-): SecretStorageCipher {
-  return secretStorage().cipher(() => sourceText(unavailableKey));
-}
-
-/**
- * The account service requests go through Chromium's network stack, which uses the computer's proxy
- * settings as the built-in browser does. Node `fetch` ignores them, so the server list and a
- * connection timed out on a network that needs the system proxy (#10314). The requests carry a
- * bearer token: they send no browser cookie and use no HTTP cache, as with Node `fetch`.
- *
- * A Chromium network failure (`net::ERR_CONNECTION_REFUSED`) is thrown as Node `fetch` throws one,
- * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
- * An abort rejects with the signal's reason, as in Node.
- */
-async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
-  try {
-    return await net.fetch(input instanceof URL ? input.href : input, {
-      ...init,
-      credentials: "omit",
-      cache: "no-store",
-    });
-  } catch (error) {
-    if (!(error instanceof Error)) throw error;
-    const code = /^net::(ERR_[A-Z0-9_]+)$/u.exec(error.message)?.[1];
-    if (code === undefined) throw error;
-    throw new TypeError("fetch failed", { cause: Object.assign(error, { code }) });
-  }
-}
-
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
-  if (state.status === "permissions-required") return "setup-required";
+  if (state.status === "permissions-required" || state.status === "restart-required") return "setup-required";
   return "unavailable";
 }
 
@@ -1291,17 +1267,7 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
-  const centralAuthApiUrl = readCentralAuthApiUrl(
-    process.env.OPENBOT_AUTH_API_URL,
-    app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
-  );
-  const centralAuth = new CentralAuthManager({
-    apiUrl: centralAuthApiUrl,
-    mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
-    storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
-    fetch: accountServiceFetch,
-    ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
-    keyringChanged: () => secretStorage().madeKeyFile(),
+  const centralAuth = createCentralAuthManager({
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
     confirmSessionAtStart: hostedServer !== null && hostedServer !== undefined,
@@ -1538,6 +1504,7 @@ export async function createApplicationServices({
         Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
+    hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
@@ -1796,10 +1763,13 @@ export async function createApplicationServices({
   });
   // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
   let updateCheckWait: Fiber.Fiber<void> | null = null;
+  // The start asks the model servers which models cannot reason, and asks again while one is not up.
+  let modelReasoningWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
     runCauseEffect(
       Effect.gen(function* () {
         if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        if (modelReasoningWait) yield* Fiber.interrupt(modelReasoningWait);
         yield* providerRuntimes.stop();
       }),
     ),
@@ -1809,6 +1779,7 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
     cipher: secretCipher,
   });
+  const modelReasoning = createModelReasoningSupport(() => customProviders.configs());
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   // The same reasons as the endpoints: before the service, and a file this build cannot read only
@@ -1930,12 +1901,15 @@ export async function createApplicationServices({
     preferredPort: MCP_OAUTH_REDIRECT_PORT,
     deliver: (state, code, query) => {
       const elsewhere = mcpOAuthAuthority?.openedElsewhere(state) ?? false;
+      // Read before the grant is handed over, which ends the wait that holds it. A relayed sign-in
+      // and one opened elsewhere end on another computer, which no answer reports back to here.
+      const exchange = elsewhere ? null : (mcpOAuthAuthority?.grantExchange(state) ?? null);
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code))
         return signInRelayClient.deliver(state, query) ? "relayed" : false;
       if (elsewhere) return true;
       const current = windows.getMainWindow();
       if (current && !current.isDestroyed()) showMainWindow(current);
-      return true;
+      return exchange ? Effect.runPromise(exchange) : true;
     },
     relayRefusal: (state, query) => {
       signInRelayClient.deliver(state, query);
@@ -1968,7 +1942,7 @@ export async function createApplicationServices({
     app: githubAppConfig(),
     store: new GitHubConnectorStore(join(app.getPath("userData"), GITHUB_CONNECTOR_FILE), secretCipher),
     toolDirectory: join(app.getPath("userData"), "provider-state", "github"),
-    apiUrl: centralAuthApiUrl,
+    apiUrl: centralAuthApiUrl(),
     openExternal: openLink,
   });
   await runCauseEffect(githubConnector.load());
@@ -2437,7 +2411,8 @@ export async function createApplicationServices({
       providerEnvironment: (provider) => providerEnvironmentSetting.resolve(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
-      customProviders: () => customProviders.configs(),
+      // With the models that an Ollama server reports as not able to reason (#8381).
+      customProviders: () => modelReasoning.configs(),
       // The same rule: `configs()`, with the environment values, goes to the agent process only.
       customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
@@ -2451,6 +2426,10 @@ export async function createApplicationServices({
       // never the token; only a test the user pressed may open a browser.
       mcpOAuth,
       mcpOAuthProxySettings,
+      // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+      // Node `fetch` ignores them, so the Gemini quota read timed out behind a system proxy (#11278).
+      // The requests carry a bearer token: no browser cookie and no HTTP cache.
+      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
@@ -2485,6 +2464,7 @@ export async function createApplicationServices({
     crm: () => crmHandle,
     // `host` is built later, after the agent service; a CRM tool reads it when it runs.
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
+    personCanAdminister: (personId) => host.personCanAdminister(personId),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
@@ -2808,10 +2788,7 @@ export async function createApplicationServices({
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
       store: new RoutineResultStore(store.database),
-      delivery: (deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        return found ? { turnId: found.turnId } : null;
-      },
+      runTurns: (deliveryId) => mailbox.routineRunTurns(deliveryId),
       turnAnswer,
       connection: (connectionId) => {
         const record = service.messaging.store.connection(connectionId);
@@ -2824,10 +2801,12 @@ export async function createApplicationServices({
       },
     }),
   );
+  // Most events are streamed text that no sweep waits for, so a fiber starts only for an event that a
+  // sweep uses.
   service.on("event", (event) => {
-    Effect.runFork(routineFlowRuntime.notice(event));
-    Effect.runFork(routineResultRuntime.notice(event));
-    Effect.runFork(workflowRuntime.notice(event));
+    if (routineFlowNoticeEvent(event)) Effect.runFork(routineFlowRuntime.notice(event));
+    if (routineResultNoticeEvent(event)) Effect.runFork(routineResultRuntime.notice(event));
+    if (workflowNoticeEvent(event)) Effect.runFork(workflowRuntime.notice(event));
   });
   teardown.push(TEARDOWN_ORDER.routineResults, "the routine results", () =>
     Effect.runPromise(routineResultRuntime.close()),
@@ -3035,8 +3014,8 @@ export async function createApplicationServices({
     installLocal: (input) => skills.installLocal(input),
   });
   const teamStore = new TeamStore(
-    join(app.getPath("userData"), TEAM_FILE_V2),
-    join(app.getPath("userData"), TEAM_FILE),
+    join(app.getPath("userData"), TEAM_STORE_FILE),
+    join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
   );
   await runCauseEffect(teamStore.initialize());
   performance.mark("openbot:services.team");
@@ -3092,6 +3071,10 @@ export async function createApplicationServices({
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
+    agentKeys: hostAgentWebhookKeys(
+      agentApiKeys,
+      (agentId) => store.list().find((agent) => agent.id === agentId)?.name,
+    ),
     workflows: {
       receive: (delivery) => workflowRuntime.receiveWebhook(delivery),
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
@@ -3219,7 +3202,25 @@ export async function createApplicationServices({
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("connected", (memberId) => browser.forgetComputerFailures(memberId));
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
+  const customProviderChanges = createCustomProviderChanges({
+    service,
+    customProviders,
+    providerRuntimes,
+    refreshModelReasoning: () => modelReasoning.refresh().pipe(Effect.map(({ changed }) => changed)),
+  });
+  // The endpoints saved before this start. The start does not wait for their servers: an OpenCode
+  // that started before the answer restarts with it, after a turn in progress. A server that starts
+  // with the computer can come up after OpenBot, so the question is asked again a few times.
+  modelReasoningWait = Effect.runFork(
+    Effect.gen(function* () {
+      for (const wait of MODEL_REASONING_RETRY_WAITS_MS) {
+        yield* Effect.sleep(wait);
+        const { changed, unreachable } = yield* modelReasoning.refresh();
+        if (changed) yield* service.reloadCustomProviderConfig("opencode").pipe(Effect.ignore);
+        if (!unreachable) return;
+      }
+    }),
+  );
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),
@@ -3354,8 +3355,11 @@ export async function createApplicationServices({
       return {
         list: () =>
           library.pipe(
-            Effect.flatMap((local) => local.list()),
-            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+            Effect.flatMap((local) => local.listWithUnreadable()),
+            Effect.map(({ skills, unreadable }) => ({
+              skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+              unreadable: unreadable.map(({ skillId }) => skillId),
+            })),
           ),
         assigned: (agentIds: readonly string[]) =>
           Effect.forEach(agentIds, (agentId) =>
@@ -3461,6 +3465,7 @@ export async function createApplicationServices({
     providers: providerSignIns,
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
+    receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
     // The search ignores case, so the exact address is checked again on each agent message it finds.
     printedLink: (agentId, url) =>
       agentPrintedLink(
@@ -3468,6 +3473,8 @@ export async function createApplicationServices({
         url,
         Date.now(),
       ),
+    // A server on this computer: only the desktop app here signs in with its owner password.
+    atHost: (sessionId) => localServerChild !== null && teamStore.isStoredOwnerSession(sessionId),
   });
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),
@@ -3523,6 +3530,8 @@ export async function createApplicationServices({
   // start gives it to Sunshine again. So it stays in memory: the remote desktop also starts when the
   // system keyring or the macOS Keychain is not available.
   const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
+  // Small copies of image attachments, for the cards of the Workflows canvas here and on joined clients.
+  const attachmentPreviews = new AttachmentPreviews(join(app.getPath("userData"), "attachment-previews"));
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3533,6 +3542,7 @@ export async function createApplicationServices({
     skills,
     sidebarLayout,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: teamChatStore,
     channels: service.channels,
@@ -4054,6 +4064,8 @@ export async function createApplicationServices({
   );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
+  // Development only: the speed of the link from a host, for `scripts/workflow-canvas-pictures-perf-e2e.ts`.
+  const developmentDownlinkKbps = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_DOWNLINK_KBPS) || 0);
   installRemoteSyncProfileSink(
     remoteSyncProfileFile({
       isPackaged: app.isPackaged,
@@ -4072,7 +4084,7 @@ export async function createApplicationServices({
     },
     {
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
-      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
+      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl()),
       appVersion: app.getVersion(),
       connectTrace,
       // The owner's levels on this computer's server, which the host also reads for the owner's phones.
@@ -4136,6 +4148,7 @@ export async function createApplicationServices({
         connectTrace,
         sessionCache: remoteSessionCache,
         developmentRoundTripMs,
+        developmentDownlinkKbps,
       }),
     },
   );
@@ -4380,6 +4393,10 @@ export async function createApplicationServices({
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
     );
   }
+  // A model file that this version replaced, such as the int8 Whisper turbo decoder.
+  void Effect.runPromise(voice.removeRetiredModelFiles()).catch((error) =>
+    logger.warn("Could not remove the old voice model files.", toLogValue(error)),
+  );
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
@@ -4499,6 +4516,10 @@ export async function createApplicationServices({
       ? {
           shipItDirectory: macShipItDirectory(),
           handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE),
+          installRecordPath: join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE),
+          notInstalledVersion: Effect.runSync(
+            readNotInstalledUpdate(join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE), app.getVersion()),
+          ),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
         }
       : {}),
@@ -4606,6 +4627,22 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
   });
   teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
+  const requiredUpdate =
+    app.isPackaged && !localServerChild
+      ? new RequiredUpdate({
+          surface: hostedServer || serverModeEnvironment ? "host" : "desktop",
+          currentVersion,
+          resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+          updater,
+          setRequired: (required) => remoteUpdate.setRequired(required),
+          log: (message) => logger.info(message),
+        })
+      : null;
+  if (requiredUpdate) {
+    teardown.push(TEARDOWN_ORDER.requiredUpdate, "the minimum version check", () =>
+      Effect.runPromise(requiredUpdate.dispose()),
+    );
+  }
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -4820,6 +4857,7 @@ export async function createApplicationServices({
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
     idleRestart,
+    requiredUpdate,
     describeRestartReadiness,
     sidebarLayout,
     host,

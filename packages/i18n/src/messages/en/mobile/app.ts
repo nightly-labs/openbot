@@ -64,6 +64,10 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.update.group.removed": "Removed",
   "mobile.app.update.group.deprecated": "Deprecated",
   "mobile.app.update.group.security": "Security",
+  // The screen in place of the app while this version is below the lowest supported one.
+  "mobile.app.update.requiredTitle": "Update required",
+  "mobile.app.update.requiredBody":
+    "OpenBot {version} is no longer supported. Update to {minimum} or newer to continue.",
   "mobile.app.update.notesFailed": "The release notes could not load.",
   "mobile.app.update.notesEmpty": "There are no release notes for this version yet.",
   "mobile.app.update.fullChangelog": "Full changelog",

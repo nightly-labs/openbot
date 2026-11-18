@@ -89,6 +89,7 @@ import {
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/team-client/instance-transfer-copy";
 import { Deferred, Effect, Exit, Result } from "effect";
 import { Zip, ZipPassThrough, zipSync } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
@@ -102,6 +103,7 @@ import {
   isUnsafeEntry,
   MANIFEST_MAX_BYTES,
   readArchiveEffect,
+  readAtEffect,
   readEntriesEffect,
   readSkillEffect,
   withArchive,
@@ -293,7 +295,11 @@ export interface InstanceTransferOptions {
   serverPreferences?: TransferServerPreferencePort;
   /** The skills of the shared library. Absent where the server has no library. */
   sharedSkills?: {
-    list(): Effect.Effect<{ id: string; slug: string; name: string; version: number }[], unknown>;
+    /** The skills that read, and the ids of the skills whose latest revision does not read. */
+    list(): Effect.Effect<
+      { skills: { id: string; slug: string; name: string; version: number }[]; unreadable: string[] },
+      unknown
+    >;
     /** The ids of the skills that these agents have. They carry those skills themselves. */
     assigned(agentIds: readonly string[]): Effect.Effect<ReadonlySet<string>, unknown>;
     bundle(id: string, version: number): Effect.Effect<Uint8Array, unknown>;
@@ -428,6 +434,8 @@ export class InstanceTransferService {
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
     exporter?: string,
+    /** `sharedSkills: false`: Copy to another server leaves the shared skills out, so they are not read. */
+    options: { sharedSkills?: boolean } = {},
   ): Effect.fn.Return<PreparedExport, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
@@ -638,13 +646,14 @@ export class InstanceTransferService {
         });
       }
     }
-    const sharedSkills = input.includeSettings
-      ? yield* this.#exportSharedSkills(
-          agents.map((agent) => agent.id),
-          entries,
-          warnings,
-        )
-      : { skills: [], bytes: 0 };
+    const sharedSkills =
+      input.includeSettings && options.sharedSkills !== false
+        ? yield* this.#exportSharedSkills(
+            agents.map((agent) => agent.id),
+            entries,
+            warnings,
+          )
+        : { skills: [], bytes: 0 };
     bytes += sharedSkills.bytes;
     // Before the limits, so the logo counts.
     const serverIdentity = input.includeServerPreferences ? yield* this.#exportServerIdentity(entries) : {};
@@ -796,6 +805,49 @@ export class InstanceTransferService {
     return yield* this.#stageFile(path, owner, false, ARCHIVE);
   }).bind(this);
 
+  /**
+   * Copy to another server: keeps only the settings of the copied agents in the file at `path`
+   * (`@openbot/team-client/instance-transfer-copy`). The file can be up to 2 GB, so only its end is
+   * read and written again.
+   */
+  readonly keepCopiedSettings = Effect.fn("InstanceTransfer.keepCopiedSettings")(function* (
+    path: string,
+  ): Effect.fn.Return<void, ArchiveOperationError> {
+    const invalid = sourceText("error.import.transferNotFile");
+    const archive = yield* readArchiveEffect(path, ARCHIVE);
+    const bytes = (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST], MANIFEST_MAX_BYTES))[
+      INSTANCE_TRANSFER_MANIFEST
+    ];
+    const copied = bytes && copyManifestBytes(bytes);
+    if (!copied) return yield* archiveFailure(new Error(invalid));
+    yield* Effect.acquireUseRelease(
+      archiveCall(() => open(path, "r+")),
+      (handle) =>
+        Effect.gen(function* () {
+          const { size } = yield* archiveCall(() => handle.stat());
+          const tailStart = Math.max(0, size - ZIP_TAIL_BYTES);
+          const location = zipDirectory(yield* readAtEffect(handle, tailStart, size - tailStart, invalid), tailStart);
+          if (!location) return yield* archiveFailure(new Error(invalid));
+          const directory = yield* readAtEffect(handle, location.offset, location.bytes, invalid);
+          const replacement = copyTail(directory, location.offset, copied);
+          if (!replacement) return yield* archiveFailure(new Error(invalid));
+          yield* archiveCall(async () => {
+            for (let written = 0; written < replacement.length; ) {
+              const { bytesWritten } = await handle.write(
+                replacement,
+                written,
+                replacement.length - written,
+                location.offset + written,
+              );
+              written += bytesWritten;
+            }
+            await handle.truncate(location.offset + replacement.length);
+          });
+        }),
+      (handle) => archiveCall(() => handle.close()).pipe(Effect.ignore),
+    );
+  });
+
   /** A file that a member of a joined client sends: the service keeps it until the token ends. */
   readonly stageUpload = Effect.fn("InstanceTransfer.stageUpload")(function* (
     this: InstanceTransferService,
@@ -829,7 +881,10 @@ export class InstanceTransferService {
     const read = yield* Effect.result(
       Effect.gen(function* () {
         const assigned = yield* port.assigned(agentIds);
-        const skills = (yield* port.list()).filter((skill) => !assigned.has(skill.id));
+        const listed = yield* port.list();
+        // A skill that does not read stays here; the others still go in the file.
+        if (listed.unreadable.length > 0) warnings.push(sourceText("error.import.transferSharedSkillsSkipped"));
+        const skills = listed.skills.filter((skill) => !assigned.has(skill.id));
         const shared: NonNullable<TransferManifestFile["sharedSkills"]> = [];
         let size = 0;
         for (const skill of skills.slice(0, TRANSFER_SHARED_SKILLS)) {
@@ -876,7 +931,7 @@ export class InstanceTransferService {
       warnings.push(sourceText("error.import.transferSharedSkillsNotAdded"));
       return;
     }
-    const existing = new Map(listed.success.map((skill) => [skill.slug, skill]));
+    const existing = new Map(listed.success.skills.map((skill) => [skill.slug, skill]));
     for (const value of values) {
       if (
         !isDynamicRecord(value) ||

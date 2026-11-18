@@ -19,11 +19,36 @@ import {
 import { refreshThreadOrder } from "../database/thread-message-order";
 import type { OpenBotDatabase } from "../openbot-database";
 
+// `projection_agent_threads` has one row for each side thread; the agent's own chat
+// (`projection_agents.thread_id`) has no row. Migrations 47, 48 and 54 make the table. Deleting the thread deletes
+// the row.
+//
+// `legacy_task_id` is the id of a task from before migration 47; mailbox records and Team API clients still name the
+// thread by it. It is null for a thread created after 47. `origin` says who started it: the person, or the agent with
+// its `start_task` tool. `title_source` says where the title came from: the first message (`auto`), the agent's
+// `start_task` call (`agent`), or a rename (`user`). `outcome` is the end of the last turn, null before its first turn
+// ends. `error` is the redacted provider error of the last failed turn; a new turn clears it. `archived_at` is set
+// when the person or the agent archives the thread; an archived thread takes no message until it is restored. The
+// title lives only here: the roster rewrites `projection_threads.title` to the agent name.
+//
+// The `branch_*` columns (migration 48) link a branch to the place it was copied from: the source thread, the message
+// the person chose there, and the last copied row in the branch. They have no foreign key, because the branch outlives
+// its source. All three are null for a thread that is not a branch, or all three are set; this store keeps that rule.
+//
+// `routine_id` (migration 54) names the routine of the agent whose runs go to this thread. Each routine has one thread
+// at most, open or archived. It has no foreign key: routines are not in this database. It is null for every other
+// thread.
 const AGENT_THREAD_ORIGINS = ["user", "agent"] as const;
 export type AgentThreadOrigin = (typeof AGENT_THREAD_ORIGINS)[number];
 
 const AGENT_THREAD_TITLE_SOURCES = ["auto", "agent", "user"] as const;
 type AgentThreadTitleSource = (typeof AGENT_THREAD_TITLE_SOURCES)[number];
+
+/** A side thread in the list of `recent`, as its sort keys: the next page starts after it. */
+export interface ThreadListPosition {
+  updatedAt: string;
+  threadId: string;
+}
 
 /**
  * A side thread: a second conversation of one agent, with its own thread, next to the agent's own chat.
@@ -138,15 +163,24 @@ export class AgentThreadStore {
 
   /**
    * The threads of this agent, open and archived, with activity (`updated_at`: a turn start, a close
-   * or a reopen) at or after `after`. The latest activity first.
+   * or a reopen) at or after `after`. The latest activity first. With `last`, the threads that come
+   * after it in this order: the next page of a list that ended with `last`.
    */
-  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+  recent(
+    agentId: string,
+    after: string | null,
+    limit: number,
+    last: ThreadListPosition | null = null,
+  ): AgentThreadRecord[] {
+    const lastUpdatedAt = last?.updatedAt ?? null;
     return databaseRows(
       this.#database.connection
         .prepare(
-          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?)
+           AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND thread_id > ?))
+           ORDER BY updated_at DESC, thread_id LIMIT ?`,
         )
-        .all(agentId, after, after, limit),
+        .all(agentId, after, after, lastUpdatedAt, lastUpdatedAt, lastUpdatedAt, last?.threadId ?? null, limit),
     ).map(decodeThread);
   }
 

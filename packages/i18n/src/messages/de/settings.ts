@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Code-Schrift",
   "settings.codeFont.description": "Die Schrift von Code, Terminals und Dateipfaden.",
   "settings.codeFont.default": "Standard",
+  "settings.motion.title": "Bewegung",
+  "settings.backgroundBlur.title": "Hintergrundunschärfe",
+  "settings.backgroundBlur.description":
+    "Unschärfe hinter Menüs und Dialogen. Auf einem Computer ohne GPU ist sie anfangs aus.",
+  "settings.movingFaces.title": "Bewegte Agentengesichter",
+  "settings.movingFaces.description":
+    "Agentengesichter blinzeln und bewegen sich. Auf einem Computer ohne GPU sind sie anfangs still.",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -844,8 +851,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Dieser Server hat keine Agenten.",
   "settings.transfer.copy.new": "Neu",
   "settings.transfer.copy.notCopied":
-    "Ihre Kanäle und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
+    "Ihre Kanäle, Routinenabläufe, Workflows und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
   "settings.transfer.copy.submit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
+  "settings.transfer.copy.duplicatesTitle": "Doppelte Agenten kopieren?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} hat bereits Agenten mit diesen Namen: {names}. Die Kopie fügt jeweils einen zweiten Agenten hinzu. Jede Kopie ist ein eigener Agent mit eigenen Chats, Dateien und Erinnerungen.",
+  "settings.transfer.copy.duplicatesConfirm": "Duplikate kopieren",
   "settings.transfer.copy.copying": "Wird kopiert…",
   "settings.transfer.copy.done": {
     one: "{count} Agent auf {server} kopiert.",

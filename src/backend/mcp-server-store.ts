@@ -13,6 +13,7 @@ import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values"
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
+import { withTransaction } from "./database/sqlite-transaction";
 import { registerMcpSecretValues } from "./mcp-redaction";
 import type { OpenBotDatabase } from "./openbot-database";
 
@@ -114,8 +115,7 @@ export class McpServerStore {
     if (!isMcpServerConfig(normalized)) throw new McpServerError(sourceText("error.backend.mcpServerInvalid"));
 
     const db = this.database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(db, () => {
       const existing = normalized.id ? this.get(normalized.id) : null;
       if (normalized.id && !existing) throw new McpServerError(sourceText("error.backend.mcpServerGone"));
       if (!existing && this.count() >= INPUT_LIMITS.mcpServers)
@@ -159,13 +159,8 @@ export class McpServerStore {
         now,
         now,
       );
-      db.exec("COMMIT");
       return stored;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   remove(mcpServerId: string): void {
@@ -205,8 +200,7 @@ export class McpServerStore {
   migrateCatalogRows(now = new Date().toISOString()): number {
     const db = this.database.connection;
     let converted = 0;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(db, () => {
       const rows = databaseRows(
         db.prepare("SELECT mcp_server_id, name, transport, command, args_json FROM projection_mcp_servers").all(),
       );
@@ -234,13 +228,8 @@ export class McpServerStore {
         ).run(bridge.url, now, requiredStringColumn(row, "mcp_server_id"));
         converted += 1;
       }
-      db.exec("COMMIT");
       return converted;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   private read(mcpServerId: string): StoredServer | null {
