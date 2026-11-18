@@ -226,6 +226,7 @@ import {
 } from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
   type RemoteLargeDownload,
   type RemoteTeamCommandResult,
@@ -445,7 +446,8 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<WebFile>;
+  /** With `progress`, the bytes of the file report as they arrive. */
+  download(attachmentId: string, progress?: RemoteDownloadWatch): Promise<WebFile>;
   /** A file under the host's shared folder. */
   sharedFile(path: string): Promise<WebFile>;
   /** A file in one agent's workspace on the host. */
@@ -678,6 +680,8 @@ export function createWebWorkspaceRuntime(
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
+  /** The progress listener of each request that reports the bytes of its file, by command id. */
+  const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   /** The host of a connect attempt that Signal holds until the host is online. */
   let waitingHostId: string | null = null;
   const openedActions: RemoteTeamPeerActions = {
@@ -698,6 +702,7 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onDownloadProgress: async ({ commandId, received, total }) => downloadProgress.get(commandId)?.(received, total),
   };
   // A new page sends its first reads with the protocol of the last visit, beside the compatibility
   // read. `connectHost` reads them again when the protocol changed.
@@ -869,22 +874,28 @@ export function createWebWorkspaceRuntime(
     body: TeamProtocolV2Json = {},
     upload?: RemoteFileUpload,
     largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
   ) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
     const timeoutMs =
       method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path);
-    const result = await peer.execute({
-      id: crypto.randomUUID(),
-      type: "request",
-      method,
-      path,
-      body,
-      ...(upload === undefined ? {} : { upload }),
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
-      ...(largeDownload === undefined ? {} : { largeDownload }),
-    });
+    const id = crypto.randomUUID();
+    if (download) downloadProgress.set(id, download.onProgress);
+    const result = await peer
+      .execute({
+        id,
+        type: "request",
+        method,
+        path,
+        body,
+        ...(upload === undefined ? {} : { upload }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(largeDownload === undefined ? {} : { largeDownload }),
+        ...(download === undefined ? {} : { downloadSize: download.size }),
+      })
+      .finally(() => downloadProgress.delete(id));
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
     // An action can be forbidden while membership remains valid. Confirm access before clearing drafts.
@@ -1702,8 +1713,10 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
       revokeLocalDraftPreviews([id]);
     },
-    async download(id) {
-      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
+    async download(id, progress) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD, progress),
+      );
     },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });

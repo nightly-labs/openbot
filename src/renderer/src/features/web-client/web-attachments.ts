@@ -2,6 +2,7 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { base64ToBytes } from "@openbot/team-client/base64";
+import type { RemoteDownloadWatch } from "@openbot/team-client/remote-peer";
 import { currentText } from "@openbot/ui/text";
 import type { WebAttachmentMedia } from "./web-attachment-media";
 import { createWebFileSaver } from "./web-file-download";
@@ -23,13 +24,14 @@ export function createWebAttachmentFiles(
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
   return {
-    async download(id: string): Promise<void> {
+    /** With `progress`, a file that the chat does not hold reports its bytes as they arrive. */
+    async download(id: string, progress?: RemoteDownloadWatch): Promise<void> {
       const held = await media.file(id);
       // As the host path, the saved file has no media type: a blob URL of an SVG could run on this origin.
       save(
         held
           ? { name: held.name, blob: new Blob([held.blob], { type: "application/octet-stream" }) }
-          : await remote.download(id),
+          : await remote.download(id, progress),
       );
     },
     async preview(attachment: AttachmentSummary): Promise<FilePreview> {
