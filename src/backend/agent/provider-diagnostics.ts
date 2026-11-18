@@ -64,7 +64,7 @@ export const MCP_PROVIDER_FAILURE_TEXT = {
  * test and still time out in the provider. `deadline has elapsed` is the Rust `tokio` timeout text.
  * A bare `timeout` does not count: a server name or a quoted option such as `--timeout` can hold it.
  */
-export function isMcpTimeoutDiagnostic(message: string): boolean {
+function isMcpTimeoutDiagnostic(message: string): boolean {
   return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
 }
 
