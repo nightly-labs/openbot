@@ -115,12 +115,13 @@ function RootNavigator() {
   // slow, the eyes start to think and the status shows under them.
   const [slow, setSlow] = useState(false);
   useEffect(() => {
-    if (!covered) {
-      setSlow(false);
-      return;
+    if (covered) {
+      const timer = setTimeout(() => setSlow(true), SLOW_LAUNCH_MS);
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => setSlow(true), SLOW_LAUNCH_MS);
-    return () => clearTimeout(timer);
+    // Brief handoff gaps reset `covered` for a frame. Wait before the caption leaves.
+    const reset = setTimeout(() => setSlow(false), 120);
+    return () => clearTimeout(reset);
   }, [covered]);
   useBloubStageRequest(
     covered

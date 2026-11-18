@@ -83,9 +83,11 @@ function StageCaption({
       </Animated.View>
     );
   }
+  // One shell for the status line. A key on the text made a new entering view on every label change,
+  // and the old ones finished their exit together.
   return (
     <Animated.View
-      key={`status-${caption.text}`}
+      key="bloub-status-line"
       entering={enter}
       exiting={exit}
       pointerEvents="none"
