@@ -68,6 +68,8 @@ export const messages = {
   "composer.voice.blocked": "הגישה למיקרופון חסומה. יש לאפשר ל-OpenBot להשתמש במיקרופון בהגדרות המערכת.",
   "composer.voice.noMicrophone": "אין מיקרופון זמין.",
   "composer.voice.startFailed": "OpenBot לא הצליח להתחיל הקלטת קול.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot לא הצליח לפתוח את המיקרופון. יש לסגור אפליקציות אחרות שמשתמשות בו, לוודא שהוא מחובר ומותר בהגדרות המערכת, ולנסות שוב.",
   "composer.voice.transcribeFailed": "OpenBot לא הצליח לתמלל את ההקלטה הזו.",
   "composer.reply.toYou": "משיב להודעה שלך",
   "composer.reply.toAgent": "משיב לסוכן",
