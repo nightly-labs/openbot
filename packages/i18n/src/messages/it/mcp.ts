@@ -28,7 +28,6 @@ export const messages = {
   "mcp.signIn.waiting": "In attesa del browser…",
   "mcp.signIn.continue": "Continua su {name}",
   "mcp.signIn.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da lì.",
-  "mcp.server.loadFailed": "Impossibile caricare i server MCP.",
   "mcp.test.connected": { one: "Connesso · {count} tool", other: "Connesso · {count} tool" },
   "mcp.status.testing": "Test in corso…",
   "mcp.status.failed": "Non riuscito",
@@ -54,12 +53,6 @@ export const messages = {
   "mcp.panel.noAnswer": "Quel server non ha risposto.",
   "mcp.panel.connectTitle": "Connetti un MCP personalizzato",
   "mcp.panel.editTitle": "Modifica server MCP",
-  "mcp.panel.changesNotSaved": "Modifiche non salvate",
-  "mcp.panel.title": "Server MCP",
-  "mcp.panel.description":
-    "I server Model Context Protocol danno agli agenti di questo server tool in più. Gli agenti Claude e Codex usano solo i server di questo elenco; gli agenti OpenCode e Grok possono avviare server anche dai propri file di configurazione.",
-  "mcp.panel.connectCustom": "Connetti un MCP personalizzato",
-  "mcp.panel.empty": "Ancora nessun server MCP.",
   "mcp.panel.enable": "Attiva {name}",
   "mcp.panel.detailsTitle": "Dettagli",
   "mcp.panel.detailsDescription": "Dai un nome a questo server e scegli come OpenBot lo raggiunge.",
@@ -101,17 +94,10 @@ export const messages = {
     "Si collega una volta con queste impostazioni e riporta i tool che offre. Non viene salvato né conservato nulla.",
   "mcp.panel.testConnection": "Prova la connessione",
   "mcp.panel.notTested": "Non ancora testato.",
-  "mcp.panel.removeTitle": "Rimuovere {name}?",
-  "mcp.panel.removeDescription":
-    "I suoi tool non verranno più offerti agli agenti di questo server. La configurazione non viene conservata.",
-  "mcp.panel.removeConfirm": "Rimuovi server MCP",
-  "mcp.panel.actionsFor": "Azioni per {name}",
-  "mcp.panel.testUnavailable": "Questo server non può essere testato qui.",
   "mcp.panel.signIn": "Accedi",
   "mcp.panel.signOut": "Esci",
   "mcp.panel.cancelSignIn": "Annulla accesso",
   "mcp.panel.signInTo": "Accedi a {name}",
-  "mcp.panel.cancelSignInTo": "Annulla accesso a {name}",
   "mcp.panel.signInWaiting": {
     one: "Completa l'accesso nel browser. OpenBot smette di aspettare dopo {count} minuto.",
     other: "Completa l'accesso nel browser. OpenBot smette di aspettare dopo {count} minuti.",
@@ -151,6 +137,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Accedi su {page} nel browser e completa l'accesso lì. {host} vede l'accesso da solo.",
   "mcp.signIn.relayOpen": "Apri la pagina di accesso",
+  "mcp.signIn.relayCopy": "Copia link",
   "mcp.signIn.relayPasteHint": "Se il browser non torna a OpenBot, copia l'indirizzo che mostra e incollalo qui.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot non può ottenere l'accesso dal browser da solo. Quando hai finito, copia l'indirizzo che mostra il browser e incollalo qui.",

@@ -22,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Ein Remote-Desktop-Test ist aktiv. Versuche es nach seinem Abschluss erneut.",
   "error.remote.screenRecordingDenied":
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
+  "error.remote.windowsSessionDisconnected":
+    "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -151,6 +153,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Der Host hat den Anhang abgelehnt.",
   "error.remote.attachmentTooLarge": "Anhänge dürfen höchstens 10 MB groß sein.",
   "error.remote.attachmentBusy": "Warte, bis der aktuelle Anhang abgeschlossen ist.",
+  "error.remote.attachmentChanged": "Die Datei hat sich geändert oder ist nicht verfügbar. Wähle sie erneut aus.",
   "error.remote.uploadTimeout": "Die Zeit für den Anhangsupload ist abgelaufen.",
   "error.remote.hostSessionActive": "Der Host hat bereits eine aktive entfernte Sitzung.",
   "error.remote.tooManyConnections": "Zu viele aktive entfernte Verbindungen.",

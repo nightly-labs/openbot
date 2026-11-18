@@ -2,22 +2,32 @@ import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_DOCK_LIMITS,
+  type AgentApproval,
   type AgentDockAgent,
+  type AgentDockApproval,
+  type AgentDockBackupModel,
   type AgentDockChannel,
   type AgentDockChat,
   type AgentDockMessage,
   type AgentDockPresentation,
+  type AgentDockPrompt,
   type AgentDockResult,
   type AgentDockSeat,
   type AgentDockSeatRef,
   type AgentDockSeatState,
+  type AgentDockTakeover,
+  type AgentDockTakeoverPage,
+  type AgentDockUsageLimit,
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  sameAgentModelChoice,
 } from "@openbot/contracts/ipc";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import {
   AgentDock,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockSendResult,
   type AgentDockChannel as AgentDockUiChannel,
@@ -25,27 +35,35 @@ import {
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
 import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
+import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { createAgentActivity } from "../agents/agent-activity";
+import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
+import { useBrowserTabs } from "../browser/browser-context";
 import {
   channelConversationRows,
   channelMessageHasContent,
   sentChannelMessageId,
 } from "../channels/channel-conversation-rows";
 import { useChannels } from "../channels/channels-context";
+import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
+import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
@@ -149,15 +167,30 @@ export function AgentDockHost() {
 
 /** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
-  const { agentList, userHiddenAgentIds } = useAgents();
-  const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply } = useConversation();
+  const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
+    useAgents();
+  const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
+    useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
+  const agentTasks = useAgentTasks();
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const channels = useChannels();
-  const { approvals, pendingPrompts } = useTurns();
-  const { currentTeamMember } = usePresence();
+  const {
+    approvals,
+    pendingPrompts,
+    respondToApprovalRequest,
+    answerPromptRequest,
+    respondToBrowserTakeoverRequest,
+    queues,
+    usageLimits,
+    usageLimitedModels,
+    waitedUsageLimits,
+    setWaitedUsageLimits,
+  } = useTurns();
+  const { readerMemberId } = usePresence();
   const auth = useAuth();
   const { activeServer } = useServers();
+  const { browserTabs } = useBrowserTabs();
   const { t, errorMessage } = useText();
   const preference = useAgentDockPreference();
   const seatRefs = createMemo(
@@ -275,7 +308,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });
@@ -355,6 +388,139 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   });
   const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
 
+  /* The answers that failed, by request. A failure shows the card's controls again. */
+  const [failedAnswers, setFailedAnswers] = createSignal<Record<string, number>>({});
+  const attemptOf = (key: string) => Math.min(failedAnswers()[key] ?? 0, AGENT_DOCK_LIMITS.count);
+  const failed = (key: string) => {
+    if (!disposed) setFailedAnswers((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
+  };
+  /** The threads whose requests show in the seat's chat: the agent's own chat, or the threads of the channel. */
+  const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] =>
+    seat.kind === "agent"
+      ? shownAgents().flatMap((agent) =>
+          agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
+        )
+      : (shownChannels().find((channel) => channel.id === seat.id)?.threads ?? []);
+  /** The oldest approval of the seat, the same one that the main chat shows. The user answers it in the dock chat. */
+  const approvalOf = (seat: AgentDockSeatRef): AgentDockApproval | null => {
+    const threads = threadsOf(seat);
+    const approval = approvals().find((item) =>
+      threads.some((thread) => thread.agentId === item.agentId && thread.threadId === item.threadId),
+    );
+    if (!approval) return null;
+    return {
+      approval,
+      attempt: attemptOf(answerKey("approval", approval.agentId, approval.requestId)),
+      cut: approvalIsCut(approval),
+    };
+  };
+  /** The question that a thread of the seat waits for. */
+  const promptOf = (seat: AgentDockSeatRef): AgentDockPrompt | null => {
+    for (const thread of threadsOf(seat)) {
+      const event = pendingPrompts()[attentionKey(thread.agentId, thread.threadId)];
+      if (event?.type !== "prompt" || event.questions.length === 0) continue;
+      return {
+        requestId: event.requestId,
+        agentId: event.agentId,
+        threadId: event.threadId,
+        turnId: event.turnId,
+        questions: event.questions.slice(0, INPUT_LIMITS.promptQuestions),
+        attempt: attemptOf(answerKey("prompt", event.agentId, event.requestId)),
+      };
+    }
+    return null;
+  };
+  /**
+   * The title and the origin of the takeover's tab. The tabs are the active server's, as the dock's.
+   * Only the origin goes to the dock: the full address can hold a sign-in token.
+   */
+  const takeoverPage = (tabId: string): AgentDockTakeoverPage | null => {
+    const tab = browserTabs().find((candidate) => candidate.id === tabId);
+    if (!tab) return null;
+    let origin = "";
+    try {
+      const parsed = new URL(tab.url).origin;
+      if (parsed !== "null") origin = parsed;
+    } catch {
+      // A tab without a web address shows the host fallback of the card.
+    }
+    return {
+      title: tab.title.slice(0, AGENT_DOCK_LIMITS.pageTitle),
+      origin: origin.slice(0, AGENT_DOCK_LIMITS.pageOrigin),
+    };
+  };
+  /** The browser takeover that a thread of the seat waits for, with the vault choice of a password card. */
+  const takeoverOf = (seat: AgentDockSeatRef): AgentDockTakeover | null => {
+    for (const thread of threadsOf(seat)) {
+      const event = pendingPrompts()[attentionKey(thread.agentId, thread.threadId)];
+      if (event?.type !== "browser-takeover-requested") continue;
+      const { request } = event;
+      const name = agentList().find((agent) => agent.id === request.agentId)?.name ?? t("chat.message.agentFallback");
+      const vault = request.secret ? browserSecretVault(activeServer()) : undefined;
+      return {
+        request,
+        page: takeoverPage(request.tabId),
+        agentName: name.slice(0, INPUT_LIMITS.agentName),
+        vault: vault ? { ...vault, server: vault.server?.slice(0, INPUT_LIMITS.agentName) ?? null } : null,
+        attempt: attemptOf(answerKey("takeover", request.agentId, request.requestId)),
+      };
+    }
+    return null;
+  };
+
+  /* A usage limit holds the agent's queued message: the chat asks where to send it, with the same
+     gates as the main chat. On a joined server, the levels that decide Delete of any message decide it.
+     The dock does not read a joined server's backup models, so there "Remember" stays in the main
+     chat: a save here would replace the order that the host keeps. Channels ask in the main window. */
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+  const remote = () => activeServer()?.kind === "remote";
+  const usageLimitAskFor = usageLimitAskFrom({
+    available: (agentId) =>
+      serverSupportsCapability(activeServer(), "agent-usage-limit-v1") &&
+      (!remote() || deletesAnyAgentMessage(agentId)),
+    rememberable: () => !remote(),
+    usageLimits,
+    waited: waitedUsageLimits,
+    wait: (agentId, resetsAt) => setWaitedUsageLimits((current) => ({ ...current, [agentId]: resetsAt })),
+    modelOptions,
+    providers: () => agentStatus().providers,
+    limited: (choice) => usageLimitedModels().some((held) => sameAgentModelChoice(held, choice)),
+    // Model fields go through the Team API route on a joined server, as in the main chat.
+    update: async (agentId, updates) => {
+      await updateAgent(agentId, updates);
+    },
+  });
+  const usageLimitAsk = (agentId: string): UsageLimitAskCardProps | undefined => {
+    if (!queues()[agentId]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
+    return usageLimitAskFor(shownAgents().find((agent) => agent.id === agentId));
+  };
+  const usageLimitOf = (seat: AgentDockSeatRef): AgentDockUsageLimit | null => {
+    if (seat.kind !== "agent") return null;
+    const ask = usageLimitAsk(seat.id);
+    if (!ask) return null;
+    return {
+      agentId: seat.id,
+      provider: ask.provider,
+      model: ask.model?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
+      agentName: ask.agentName?.slice(0, INPUT_LIMITS.agentName) ?? null,
+      resetsAt: ask.resetsAt === null ? null : Math.max(0, Math.floor(ask.resetsAt)),
+      options: ask.options
+        .filter((option) => option.key.length > 0 && option.key.length <= AGENT_DOCK_LIMITS.backupModelKey)
+        .slice(0, AGENT_DOCK_LIMITS.backupModels)
+        .map(
+          (option): AgentDockBackupModel => ({
+            key: option.key,
+            choice: { ...option.choice },
+            model: option.model.slice(0, AGENT_DOCK_LIMITS.backupModelLabel),
+            account: option.account?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
+            state: option.state,
+          }),
+        ),
+      rememberable: ask.rememberable !== false,
+      attempt: attemptOf(answerKey("usage-limit", seat.id, ask.resetsAt ?? "")),
+    };
+  };
+
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel => {
     if (seat.kind === "channel") {
       const summary = shownChannels().find((channel) => channel.id === seat.id);
@@ -362,6 +528,10 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
         messages: shownChannelId() === seat.id ? channelMessages() : [],
         working: (summary?.activeTasks ?? 0) > 0,
         wait: channelWaits()[seat.id]?.reason ?? null,
+        approval: approvalOf(seat),
+        prompt: promptOf(seat),
+        takeover: takeoverOf(seat),
+        usageLimit: null,
       };
     }
     const state = agentStates()[seat.id];
@@ -369,6 +539,10 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       messages: agentMessages(seat.id),
       working: Boolean(workingTurns()[seat.id]),
       wait: state?.kind === "waiting" ? state.reason : null,
+      approval: approvalOf(seat),
+      prompt: promptOf(seat),
+      takeover: takeoverOf(seat),
+      usageLimit: usageLimitOf(seat),
     };
   };
 
@@ -386,6 +560,32 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!open?.latest || !readable()) return;
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
+    },
+  );
+  /* A joined server that connects again, as after its restart, sends only the newest reply of each agent.
+     The main window reads its open agent's latest page again. Each other agent chat that the dock loaded
+     reads its page here, or the messages from the time without a connection stay missing (#11748). A second
+     read of the open agent would replace the main window's read, which then keeps its loading state. */
+  let connectedSequence: number | undefined;
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.state === "online" ? server.connectionSequence : undefined;
+    },
+    (sequence) => {
+      if (sequence === undefined || sequence === connectedSequence) return;
+      const reconnected = connectedSequence !== undefined;
+      connectedSequence = sequence;
+      if (!reconnected) return;
+      const loaded = untrack(() =>
+        seats().flatMap((seat) =>
+          seat.kind === "agent" && seat.agent.id !== activeAgentId() && conversations[seat.agent.id]?.messages?.length
+            ? [seat.agent.id]
+            : [],
+        ),
+      );
+      // A failed read keeps the chat as it is; the next change of the agent's chat reads it again.
+      for (const agentId of loaded) void loadLatestAgentMessages(agentId).catch(() => undefined);
     },
   );
   /* A channel is read through the newest message of its page, once for each new message. */
@@ -456,6 +656,21 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       // The main window keeps the latest page of every agent it has opened; another agent loads it here.
       if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
+    /**
+     * The thread tab that the main window opens for an agent of the dock. When the seat's badge comes
+     * only from new replies in side threads, the dock chat cannot show them, so the main window opens
+     * the newest of those threads. Its tab reads the replies, and the badge goes. Otherwise the agent
+     * opens as before.
+     */
+    mainTabOf(agentId: string): string | undefined {
+      const state = agentStates()[agentId];
+      if (state?.kind !== "unread" || state.count > 0) return undefined;
+      let newest: { id: string; updatedAt: string } | undefined;
+      for (const task of agentTasks.snapshot(agentId)?.tasks ?? []) {
+        if (agentTasks.unreadCount(task) > 0 && (!newest || task.updatedAt > newest.updatedAt)) newest = task;
+      }
+      return newest?.id;
+    },
     add(seat: AgentDockSeatRef) {
       if (!seated(seat)) saveSeats([...seatRefs(), { kind: seat.kind, id: seat.id }]);
     },
@@ -471,6 +686,66 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       const index = before ? others.findIndex((item) => item.kind === before.kind && item.id === before.id) : -1;
       const moved = { kind: seat.kind, id: seat.id };
       saveSeats(index < 0 ? [...others, moved] : [...others.slice(0, index), moved, ...others.slice(index)]);
+    },
+    /**
+     * Answers an approval that waits, the same answer as in the main window. A failure writes its error
+     * in the agent's chat, and the card shows its buttons again.
+     */
+    async respondToApproval(
+      agentId: string,
+      requestId: string | number,
+      decision: "accept" | "decline",
+    ): Promise<boolean> {
+      const done = await respondToApprovalRequest(agentId, requestId, decision);
+      if (!done) failed(answerKey("approval", agentId, requestId));
+      return done;
+    },
+    /**
+     * Answers a question, the same answer as in the main window. The dock shows no resolution, so the
+     * question leaves the agent's chat as soon as the answer went.
+     */
+    async answerPrompt(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      answers: Record<string, string[]>,
+    ): Promise<boolean> {
+      const event = pendingPrompts()[attentionKey(agentId, threadId)];
+      const turnId = event?.type === "prompt" ? event.turnId : null;
+      const done = await answerPromptRequest(agentId, threadId, requestId, answers);
+      if (!done) failed(answerKey("prompt", agentId, requestId));
+      else if (turnId !== null && !disposed) presentPromptResolution(agentId, turnId, requestId);
+      return done;
+    },
+    /** Ends a browser takeover. A failure writes its error in the agent's chat. */
+    async respondToTakeover(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      decision: "complete" | "cancel",
+    ): Promise<boolean> {
+      const done = await respondToBrowserTakeoverRequest(agentId, threadId, requestId, decision);
+      if (!done) failed(answerKey("takeover", agentId, requestId));
+      return done;
+    },
+    /** Moves the held message of the agent to another model. A failure rejects. */
+    async sendOnBackup(agentId: string, optionKey: string, remember: boolean): Promise<void> {
+      const ask = usageLimitAsk(agentId);
+      const option = ask?.options.find((item) => item.key === optionKey);
+      if (!ask || !option) throw new Error(t("chat.usageLimit.failed"));
+      await ask.onSend(option, remember && ask.rememberable !== false);
+    },
+    /** Lets the message wait for the reset. */
+    waitForReset(agentId: string): void {
+      usageLimitAsk(agentId)?.onWait();
+    },
+    /**
+     * Marks the failed send of a usage-limit card of the dock window, so the card shows again. That card
+     * cannot show the error, so the error goes in the agent's chat, as for the other answers.
+     */
+    failBackupSend(agentId: string, error: unknown): void {
+      if (!disposed) appendUiError(agentId, error, t("chat.usageLimit.failed"), serverId);
+      failed(answerKey("usage-limit", agentId, usageLimitAsk(agentId)?.resetsAt ?? ""));
     },
     /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
     async sendToChannel(channelId: string, text: string): Promise<AgentDockSendResult> {
@@ -512,6 +787,16 @@ function WindowAgentDock(props: { serverId: string }) {
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
   const voice = createAgentDockVoice(() => props.serverId);
+  const answers: AgentDockChatAnswers = {
+    approval: (approval, decision) => dock.respondToApproval(approval.agentId, approval.requestId, decision),
+    prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
+    takeover: ({ request }, decision) =>
+      dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    // Main sends the secret to the server of the dock, this computer or a joined server.
+    secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
+    usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
+    usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
+  };
 
   return (
     <AgentDock
@@ -528,8 +813,11 @@ function WindowAgentDock(props: { serverId: string }) {
           ? dock.sendToChannel(seat.id, text)
           : sendMessage(text, [], null, { agentId: seat.id, serverId: props.serverId })
       }
-      onOpenInMain={(seat) => (seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id))}
+      onOpenInMain={(seat) =>
+        seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id, dock.mainTabOf(seat.id))
+      }
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
+      answers={answers}
       voice={voice}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
@@ -646,13 +934,30 @@ function ScreenAgentDock(props: { serverId: string }) {
           dock.move(action.seat, action.before);
           return;
         case "open-agent":
-          selectAgent(action.agentId);
+          selectAgent(action.agentId, dock.mainTabOf(action.agentId));
           return;
         case "open-channel":
           void channels.open(action.channelId);
           return;
         case "open-window":
           void appPort().openChatWindow({ serverId: action.serverId, agentId: action.agentId });
+          return;
+        case "respond-approval":
+          void dock.respondToApproval(action.agentId, action.requestId, action.decision);
+          return;
+        case "answer-prompt":
+          void dock.answerPrompt(action.agentId, action.threadId, action.requestId, action.answers);
+          return;
+        case "respond-takeover":
+          void dock.respondToTakeover(action.agentId, action.threadId, action.requestId, action.decision);
+          return;
+        case "usage-limit-send":
+          void dock
+            .sendOnBackup(action.agentId, action.optionKey, action.remember)
+            .catch((error: unknown) => dock.failBackupSend(action.agentId, error));
+          return;
+        case "usage-limit-wait":
+          dock.waitForReset(action.agentId);
           return;
         case "send":
           return;
@@ -749,8 +1054,47 @@ function openChats(
       messages: messages(seat).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
       working: model.working,
       wait: model.wait,
+      approval: model.approval ? dockApproval(model.approval) : null,
+      prompt: model.prompt ?? null,
+      takeover: model.takeover ?? null,
+      usageLimit: model.usageLimit ?? null,
     },
   ];
+}
+
+/** One key for each request of an agent. */
+function answerKey(kind: string, agentId: string, requestId: string | number): string {
+  return JSON.stringify([kind, agentId, String(requestId)]);
+}
+
+/** A plain copy of an approval for the dock window. */
+function dockApproval(current: { approval: AgentApproval; attempt: number }): AgentDockApproval {
+  const { approval } = current;
+  return {
+    approval: {
+      requestId: approval.requestId,
+      agentId: approval.agentId,
+      threadId: approval.threadId,
+      turnId: approval.turnId,
+      kind: approval.kind,
+      command: approval.command,
+      cwd: approval.cwd,
+      reason: approval.reason,
+      grantRoot: approval.grantRoot,
+      permissions: approval.permissions
+        ? {
+            fileSystem: {
+              read: [...approval.permissions.fileSystem.read],
+              write: [...approval.permissions.fileSystem.write],
+            },
+            network: approval.permissions.network,
+          }
+        : null,
+    },
+    attempt: current.attempt,
+    // The copy drops the runtime fields, so the cut mark goes with it on its own.
+    cut: approvalIsCut(current.approval),
+  };
 }
 
 function dockMessage(message: AgentMessage): AgentDockMessage {

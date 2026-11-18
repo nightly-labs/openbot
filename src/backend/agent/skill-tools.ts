@@ -9,6 +9,7 @@ import type {
   SkillConversationEvent,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
+import { GITHUB_SKILL_ID_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -27,8 +28,9 @@ const targetAgentId = z
   .max(INPUT_LIMITS.identifier)
   .describe("Stable id of the agent to change, from list_agents. Omit it to change your own agent.")
   .optional();
-// An installed skill can come from the marketplace too, so its id is not always a local skill id.
-const installedSkillId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
+// An installed skill can come from the marketplace or GitHub too, so its id is not always a local
+// skill id. A GitHub id names a repository folder and can be long.
+const installedSkillId = z.string().trim().min(1).max(GITHUB_SKILL_ID_MAX_LENGTH);
 export const installLocalSkillSchema = z.object({ agentId: targetAgentId, skillId, revision }).strict();
 const setSkillEnabledSchema = z
   .object({ agentId: targetAgentId, skillId: installedSkillId, enabled: z.boolean() })

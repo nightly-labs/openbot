@@ -8,11 +8,13 @@ import {
   type ChannelDraft,
   isAvatarHue,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
+import { profileToolErrorMessage } from "./profile-tools";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -87,7 +89,7 @@ export const updateChannelToolSchema = z
     imagePath: channelFields.imagePath.nullable().describe(`${IMAGE_TEXT} null removes it.`).optional(),
     archived: z
       .boolean()
-      .describe("true archives the channel and stops its work. false brings an archived channel back.")
+      .describe("true archives the channel; it fails while a task runs there. false brings it back.")
       .optional(),
   })
   .refine(
@@ -98,6 +100,26 @@ export const updateChannelToolSchema = z
     ({ channelId: _channelId, ...change }) => Object.values(change).some((value) => value !== undefined),
     "At least one channel change is required.",
   );
+
+const CREATE_CHANNEL_FIELDS = Object.keys(createChannelToolSchema.shape);
+const UPDATE_CHANNEL_FIELDS = Object.keys(updateChannelToolSchema.shape);
+const ICON_FIELDS = Object.keys(channelFields.icon.shape);
+
+/**
+ * Describe a failed `create_channel` or `update_channel` call. A field that the tool does not take
+ * gets the names of the fields that it takes, never the name that the call sent (#1354, #8627).
+ */
+export function channelAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    if (path.length === 0) {
+      const fields = tool === "create_channel" ? CREATE_CHANNEL_FIELDS : UPDATE_CHANNEL_FIELDS;
+      return `Remove the fields that ${tool} does not take. It takes: ${fields.join(", ")}.`;
+    }
+    if (path.length === 1 && path[0] === "icon")
+      return `Remove the fields that icon does not take. It takes: ${ICON_FIELDS.join(", ")}.`;
+    return `Remove the fields that ${path.map(String).join(".")} does not take.`;
+  });
+}
 
 type CreateChannelArgs = z.infer<typeof createChannelToolSchema>;
 type UpdateChannelArgs = z.infer<typeof updateChannelToolSchema>;
@@ -270,6 +292,10 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   // takes the same changes as an open one and the archive stops the work they start. The changes
   // are checked first, so that a refused change does not leave the channel restored.
   const stored = channels.store.get(channelId);
+  // The archive comes last and the service refuses it while a task runs there, so this refuses first
+  // and the other changes are not saved without it.
+  if (archived === true && !stored.archived && channels.store.tasks(channelId).some((task) => task.state === "running"))
+    throw new Error(sourceText("error.backend.channelArchiveRunning"));
   if (archived === false && stored.archived) {
     if (changesDraft) updatedChannelDraft(stored, args, agents);
     yield* channels.command({ type: "restore", operationId: `${operationId}:restore`, channelId }, actor);

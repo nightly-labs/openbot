@@ -7,6 +7,7 @@ import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
+import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
 import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
 
@@ -320,6 +321,9 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
+  const shape = usePictureShape(() => (isImage() ? (file()?.previewUrl ?? undefined) : undefined));
+  /** A picture with clear pixels shows on the canvas at its own shape, with no card behind it. */
+  const clear = () => (isImage() ? shape()?.clear === true : false);
   const [sending, setSending] = createSignal(false);
   /** Sends a file from the computer to the library, and makes it the asset. The host shows a failure. */
   const send = (chosen: File) => {
@@ -345,7 +349,8 @@ export function AssetNode(props: { id: string; file?: string }) {
         label={t("workflow.asset.title")}
         kind="asset"
         media={isImage()}
-        style={{ "--wfn-aspect": "4 / 3" }}
+        clear={clear()}
+        style={{ "--wfn-aspect": clear() ? String(shape()?.ratio ?? 4 / 3) : "4 / 3" }}
         output={file() ? (isImage() ? "image" : "file") : undefined}
         toolbar={
           <NodeToolbar id={props.id} name={t("workflow.asset.name")} locked={locked()} onLock={setLocked}>

@@ -131,6 +131,8 @@ interface VoiceTranscriptionServiceOptions {
   spawnHost: () => VoiceTranscriptionHostProcess;
   openStreamSocket: OpenVoiceStreamSocket;
   fetch?: typeof fetch;
+  /** The download of the dictation models. Without it, `fetch`. */
+  modelFetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 }
 
 /** A failure the host reported. Only its category is known; the addon's own message stays there. */
@@ -174,11 +176,12 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.#preferences = options.preferences;
     this.#apiKeys = options.apiKeys;
     this.#fetch = options.fetch ?? fetch;
+    const modelFetch = options.modelFetch ?? options.fetch;
     const model = (modelId: LocalVoiceModelId) => {
       const service = new VoiceModelService<LocalVoiceModelId>({
         modelId,
         directory: options.modelDirectories[modelId],
-        ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+        ...(modelFetch === undefined ? {} : { fetch: modelFetch }),
       });
       service.on("status", (status) => this.emit("modelStatus", status));
       return service;
@@ -395,6 +398,13 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   cancelStream({ streamId }: VoiceStream): void {
     this.#endStream(streamId);
   }
+
+  /** Deletes the model files of an earlier pin, for each model whose current files are verified. */
+  readonly removeRetiredModelFiles = Effect.fn("VoiceTranscription.removeRetiredModelFiles")(function* (
+    this: VoiceTranscriptionService,
+  ) {
+    for (const modelId of LOCAL_VOICE_MODEL_IDS) yield* this.#models[modelId].removeRetiredFiles();
+  }).bind(this);
 
   readonly shutdown = Effect.fn("VoiceTranscription.shutdown")(function* (this: VoiceTranscriptionService) {
     this.#endStream();

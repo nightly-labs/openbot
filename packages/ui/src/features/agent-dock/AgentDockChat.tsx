@@ -2,8 +2,19 @@
  * The chat in the agent dock's panel: a header, the recent text messages and a compact composer.
  * Tool steps, plans and other timeline items stay in the main window, which opens from the ⋯ menu.
  * A channel seat shows the same chat, with the author's name over each message from someone else.
+ * A request that the agent waits for shows at the end of the messages, and the user answers it there:
+ * an approval, a question, a browser takeover or a usage limit.
  */
 
+import type {
+  AgentApproval,
+  AgentDockBackupModel,
+  AgentDockPrompt,
+  AgentDockTakeover,
+  AgentDockUsageLimit,
+  BrowserTab,
+  LocalBrowserSecretResponse,
+} from "@openbot/contracts/ipc";
 import {
   AppWindow,
   ArrowUp,
@@ -20,12 +31,15 @@ import {
 } from "@openbot/ui";
 import { createMemo, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentMessage, ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { UsageLimitAskCard } from "../conversation/BackupModels";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
@@ -52,8 +66,29 @@ export interface AgentDockChatModel {
   messages: readonly AgentMessage[];
   /** True while the agent works on a turn. */
   working: boolean;
-  /** Set while the agent waits for the user. The user answers in the main window. */
+  /** Set while the agent waits for the user. Without a card for the request, the wait bar opens the main window. */
   wait: SidebarWaitReason | null;
+  /*
+   * The requests that the agent waits for, which the user answers in the chat. `attempt` changes when
+   * an answer fails, so the card shows its controls again.
+   */
+  approval?: { approval: AgentApproval; attempt: number } | null | undefined;
+  prompt?: AgentDockPrompt | null | undefined;
+  takeover?: AgentDockTakeover | null | undefined;
+  usageLimit?: AgentDockUsageLimit | null | undefined;
+}
+
+/** How the chat answers the requests that it shows. Each answer is true or resolves when it went. */
+export interface AgentDockChatAnswers {
+  approval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
+  /** An empty record cancels the question. */
+  prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
+  takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  /** Sends a password or a code that the agent asked for. */
+  secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
+  /** Moves the held message to another model. A failure rejects, and the card shows it. */
+  usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
+  usageLimitWait: (limit: AgentDockUsageLimit) => void;
 }
 
 /** A message the user sent from the panel, until the host's copy is in `messages`. */
@@ -129,6 +164,8 @@ export function AgentDockChat(props: {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /** Answers the requests. Without it, the chat shows the wait bar, which opens the main window. */
+  answers?: AgentDockChatAnswers | undefined;
 }) {
   const { t } = useText();
   let log: HTMLDivElement | undefined;
@@ -151,10 +188,61 @@ export function AgentDockChat(props: {
     if (message.senderMember) return message.senderMember.name;
     return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
   };
-  const waitReason = () => props.chat.wait;
+  /* The requests that the chat answers. A card replaces the wait bar. */
+  const approval = () => (props.answers ? (props.chat.approval ?? undefined) : undefined);
+  const approvalKey = () => {
+    const current = approval();
+    return current ? `${current.approval.agentId}:${current.approval.requestId}:${current.attempt}` : undefined;
+  };
+  const prompt = () => (props.answers ? (props.chat.prompt ?? undefined) : undefined);
+  const promptKey = () => {
+    const current = prompt();
+    return current ? `${current.agentId}:${current.requestId}:${current.attempt}` : undefined;
+  };
+  const takeover = () => (props.answers ? (props.chat.takeover ?? undefined) : undefined);
+  const takeoverKey = () => {
+    const current = takeover();
+    return current ? `${current.request.agentId}:${current.request.requestId}:${current.attempt}` : undefined;
+  };
+  const usageLimit = () => (props.answers ? (props.chat.usageLimit ?? undefined) : undefined);
+  const usageLimitKey = () => {
+    const current = usageLimit();
+    return current ? `${current.agentId}:${current.resetsAt ?? ""}:${current.attempt}` : undefined;
+  };
+  const answering = () => Boolean(approval() || prompt() || takeover() || usageLimit());
+  const waitReason = () => (answering() ? null : props.chat.wait);
   const voicePhase = (): VoicePhase => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";
   const transcribing = () => voicePhase() === "transcribing";
+  const respond = (current: AgentApproval, decision: "accept" | "decline") =>
+    props.answers ? props.answers.approval(current, decision) : Promise.resolve(false);
+  const answerPrompt = (current: AgentDockPrompt, answers: Record<string, string[]>) =>
+    props.answers ? props.answers.prompt(current, answers) : Promise.resolve(false);
+  const respondTakeover = (current: AgentDockTakeover, decision: "complete" | "cancel") =>
+    props.answers ? props.answers.takeover(current, decision) : Promise.resolve(false);
+  /** The page of a takeover, as the card shows it: the title and the origin, not the full address. */
+  const takeoverTab = (current: AgentDockTakeover): BrowserTab | undefined => {
+    const page = current.page;
+    if (!page) return undefined;
+    return {
+      id: current.request.tabId,
+      title: page.title,
+      url: page.origin,
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: null,
+    };
+  };
+  /** The vault choice of a password card, when the host can save it. */
+  const takeoverSecret = (current: AgentDockTakeover) => ({
+    vault: current.vault ?? undefined,
+    onRespond: (input: LocalBrowserSecretResponse) =>
+      props.answers ? props.answers.secret(current, input) : Promise.resolve(),
+  });
+  const sendOnBackup = (current: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) =>
+    props.answers ? props.answers.usageLimitSend(current, option, remember) : Promise.resolve();
+  const usageLimitModel = (current: AgentDockUsageLimit) => current.model ?? undefined;
+  const usageLimitAgent = (current: AgentDockUsageLimit) => current.agentName ?? undefined;
   /** A send while the microphone records sends the draft with the words. */
   function submit(): void {
     if (recording()) props.voice?.onSend();
@@ -385,6 +473,79 @@ export function AgentDockChat(props: {
                 )}
               </For>
             </Show>
+            <Show when={usageLimitKey()} keyed>
+              {(_key) => (
+                <Show when={usageLimit()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <UsageLimitAskCard
+                        provider={current().provider}
+                        model={usageLimitModel(current())}
+                        agentName={usageLimitAgent(current())}
+                        resetsAt={current().resetsAt}
+                        options={current().options}
+                        rememberable={current().rememberable}
+                        onSend={(option, remember) => sendOnBackup(current(), option, remember)}
+                        onWait={() => props.answers?.usageLimitWait(current())}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            {/* The dock has no image of the page, so the card shows the page title without a preview. */}
+            <Show when={takeoverKey()} keyed>
+              {(_key) => (
+                <Show when={takeover()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <BrowserTakeoverCard
+                        request={current().request}
+                        agentName={current().agentName}
+                        tab={takeoverTab(current())}
+                        preview={null}
+                        previewStatus="idle"
+                        onOpen={() => props.onOpenInMain()}
+                        onComplete={() => respondTakeover(current(), "complete")}
+                        onCancel={() => respondTakeover(current(), "cancel")}
+                        browserSecret={takeoverSecret(current())}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            <Show when={promptKey()} keyed>
+              {(_key) => (
+                <Show when={prompt()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <QuestionPromptBubble
+                        questions={current().questions}
+                        onSubmit={(answers) => answerPrompt(current(), answers)}
+                        onOpenLink={(url) => props.onOpenLink?.(url)}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            {/* Always allow changes the permissions of the agent, so it stays in the main window. */}
+            <Show when={approvalKey()} keyed>
+              {(_key) => (
+                <Show when={approval()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <ApprovalCard
+                        approval={current().approval}
+                        onApprove={() => respond(current().approval, "accept")}
+                        onReject={() => respond(current().approval, "decline")}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
             <Show when={props.chat.working && !props.chat.wait}>
               <Bubble align="start" variant="muted" class="agent-dock-bubble">
                 <BubbleContent>
@@ -457,6 +618,7 @@ export function AgentDockChat(props: {
                   onStart={() => voice().onStart()}
                   onCancel={() => voice().onCancel()}
                   onFinish={() => voice().onFinish()}
+                  onSend={submit}
                   send={sendButton()}
                 />
               )}

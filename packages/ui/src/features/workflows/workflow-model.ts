@@ -15,6 +15,8 @@ import {
   WORKFLOW_NODE_KINDS,
   type WorkflowMediaAspect,
   type WorkflowMediaKind,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
@@ -110,6 +112,8 @@ export interface WorkflowImageModel {
   durations?: readonly number[];
   /** The resolutions that it makes, the default first. */
   resolutions?: readonly string[];
+  /** Whether an image can have a transparent background. */
+  transparent?: boolean;
   /**
    * The accounts of the provider, when it has more than one and the host makes a file on the account
    * of the step (`workflows-media-account-v1`). The picker then has one entry for each account.
@@ -136,6 +140,17 @@ export interface WorkflowCatalogs {
   /** The open OpenBot channels of the host. Only this computer gives them. */
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  /**
+   * What one file of a Sunra or Higgsfield model costs with the choices of a step, as the service
+   * quotes it (`workflows-media-catalog-v1`). Without it, a step shows no price.
+   */
+  mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  /**
+   * Whether an image step can have a custom size in pixels, which the host crops and scales the picture
+   * of the model to, or the aspect ratios 4:5 and 5:4 (`workflows-media-size-v1`). An older host reads
+   * them as the first aspect ratio of the model.
+   */
+  mediaSize?: boolean | undefined;
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
   /**

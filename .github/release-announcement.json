@@ -1,10 +1,10 @@
 {
-  "version": "0.69.0",
+  "version": "0.72.0",
   "highlights": [
-    "Hidden agents now keep working. Turn on again the routines of the agents that you hid before this version.",
-    "A message that you send to a working agent now steers its turn. You can still select Queue in Settings > Agents.",
-    "Pin messages in a chat, and sort your Library files into folders.",
-    "Teach an agent a task in its browser, and add skills from a GitHub link.",
-    "Pool the accounts of a provider, and export a full copy of a server or copy its agents to another server."
+    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
+    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
+    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
+    "Answer an agent in the agent dock chat without the main window.",
+    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
   ]
 }

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useUniwind } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
+import { MotionPicture } from "@/features/settings/components/settings-pictures";
 import { type MotionPreference, useMotionPreferences } from "@/features/settings/model/motion";
 import { saveMotionPreference } from "@/features/settings/model/motion-storage";
 import { haptics } from "@/shared/lib/haptics";
@@ -12,7 +14,7 @@ export function AnimationsSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
   const preferences = useMotionPreferences();
-  // Reduced motion, from the device or from the first switch, holds the other animations off.
+  // Reduced motion, from the device or from the Reduced picture, holds the other animations off.
   const reduced = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   function save(name: MotionPreference, enabled: boolean) {
@@ -22,16 +24,16 @@ export function AnimationsSettingsScreen() {
       void haptics.notification("error");
     });
   }
-  const animations: { name: Exclude<MotionPreference, "allAnimations">; label: string; footer: string }[] = [
+  // The compact message field is stored with the animations but shows in Settings > Conversations.
+  const animations: {
+    name: Exclude<MotionPreference, "allAnimations" | "composerResize">;
+    label: string;
+    footer: string;
+  }[] = [
     {
       name: "agentFaces",
       label: t("mobile.settings.animations.agentFaces"),
       footer: t("mobile.settings.animations.agentFacesFooter"),
-    },
-    {
-      name: "composerResize",
-      label: t("mobile.settings.animations.composerResize"),
-      footer: t("mobile.settings.animations.composerResizeFooter"),
     },
     {
       name: "textReveal",
@@ -46,16 +48,25 @@ export function AnimationsSettingsScreen() {
   ];
   return (
     <SettingsContent>
-      <SettingsSection footer={error ?? t("mobile.settings.animations.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={preferences.allAnimations}
-            disabled={!preferences.ready}
-            label={t("mobile.settings.animations.all")}
-            dark={theme === "dark"}
-            onValueChange={(enabled) => save("allAnimations", enabled)}
-          />
-        </SettingsRow>
+      <SettingsSection footer={error ?? t("mobile.settings.animations.motionFooter")}>
+        <SettingsPictureChoice<boolean>
+          label={t("mobile.settings.animations.title")}
+          value={preferences.allAnimations}
+          disabled={!preferences.ready}
+          options={[
+            {
+              value: true,
+              label: t("mobile.settings.animations.fullMotion"),
+              picture: (play) => <MotionPicture full play={play} />,
+            },
+            {
+              value: false,
+              label: t("mobile.settings.animations.reduced"),
+              picture: (play) => <MotionPicture full={false} play={play} />,
+            },
+          ]}
+          onChange={(enabled) => save("allAnimations", enabled)}
+        />
       </SettingsSection>
       {animations.map((animation) => (
         <SettingsSection key={animation.name} footer={animation.footer}>

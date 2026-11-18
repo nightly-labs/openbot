@@ -23,6 +23,10 @@ import {
   CUSTOM_PROVIDER_EDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -87,21 +91,23 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  const capability = EDIT_ROUTES.has(url.pathname)
-    ? CUSTOM_PROVIDER_EDIT_CAPABILITY
-    : HARNESS_ROUTES.has(url.pathname)
-      ? CUSTOM_PROVIDER_HARNESS_CAPABILITY
-      : V8_ROUTES.has(url.pathname)
-        ? PROVIDERS_V8_CAPABILITY
-        : V5_ROUTES.has(url.pathname)
-          ? PROVIDERS_V5_CAPABILITY
-          : V4_ROUTES.has(url.pathname)
-            ? PROVIDERS_V4_CAPABILITY
-            : V3_ROUTES.has(url.pathname)
-              ? PROVIDERS_SIGN_IN_V3_CAPABILITY
-              : V2_ROUTES.has(url.pathname)
-                ? PROVIDERS_RUNTIMES_V2_CAPABILITY
-                : PROVIDERS_ADMIN_CAPABILITY;
+  const capability = CHOICE_ROUTES.has(url.pathname)
+    ? CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY
+    : EDIT_ROUTES.has(url.pathname)
+      ? CUSTOM_PROVIDER_EDIT_CAPABILITY
+      : HARNESS_ROUTES.has(url.pathname)
+        ? CUSTOM_PROVIDER_HARNESS_CAPABILITY
+        : V8_ROUTES.has(url.pathname)
+          ? PROVIDERS_V8_CAPABILITY
+          : V5_ROUTES.has(url.pathname)
+            ? PROVIDERS_V5_CAPABILITY
+            : V4_ROUTES.has(url.pathname)
+              ? PROVIDERS_V4_CAPABILITY
+              : V3_ROUTES.has(url.pathname)
+                ? PROVIDERS_SIGN_IN_V3_CAPABILITY
+                : V2_ROUTES.has(url.pathname)
+                  ? PROVIDERS_RUNTIMES_V2_CAPABILITY
+                  : PROVIDERS_ADMIN_CAPABILITY;
   if (!providers || !capabilities.has(capability))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
@@ -271,11 +277,26 @@ export async function routeProviders(
       case CUSTOM_PROVIDER_HARNESS_ROUTES.customList:
         return json(200, customProviders.list().map(wireHarnessCustomProvider));
       case CUSTOM_PROVIDER_EDIT_ROUTES.customList:
+      case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customList:
         return json(200, customProviders.list().map(wireEditCustomProvider));
       case CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate: {
         // The endpoint keeps its harness and the settings of each kept model: the wire has neither.
         const result = await runCauseEffect(
           customProviders.peerUpdate(parsed(parseUpdateCustomProvider, releasedSaveBody(body))),
+        );
+        return json(200, wireResult(url.pathname, result));
+      }
+      case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate: {
+        // The endpoint moves to the named harness and keeps the settings of each kept model.
+        const { harness, ...input } = parsed(parseUpdateCustomProvider, harnessChoiceBody(body));
+        // The frozen codec requires a harness, so a body with none does not get here.
+        if (!harness) throw new Error("Unknown harness.");
+        const result = await runCauseEffect(customProviders.peerHarnessUpdate(input, harness));
+        return json(200, wireResult(url.pathname, result));
+      }
+      case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customSave: {
+        const result = await runCauseEffect(
+          customProviders.save(parsed(parseSaveCustomProvider, harnessChoiceBody(body))),
         );
         return json(200, wireResult(url.pathname, result));
       }
@@ -287,7 +308,8 @@ export async function routeProviders(
         );
         return json(200, wireResult(url.pathname, result));
       }
-      // The delete route of `providers-v1`, `custom-provider-harness-v1` and `custom-provider-edit-v1`.
+      // The delete route of `providers-v1`, `custom-provider-harness-v1`, `custom-provider-edit-v1` and
+      // `custom-provider-harness-choice-v1`.
       default:
         return json(
           200,
@@ -313,6 +335,7 @@ const V4_ROUTES = new Set<string>(Object.values(PROVIDERS_V4_ROUTES));
 const V8_ROUTES = new Set<string>(Object.values(PROVIDERS_V8_ROUTES));
 const HARNESS_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_HARNESS_ROUTES));
 const EDIT_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_EDIT_ROUTES));
+const CHOICE_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES));
 const ROUTES = new Set<string>([
   ...Object.values(PROVIDERS_ADMIN_ROUTES),
   ...V2_ROUTES,
@@ -322,6 +345,7 @@ const ROUTES = new Set<string>([
   ...V8_ROUTES,
   ...HARNESS_ROUTES,
   ...EDIT_ROUTES,
+  ...CHOICE_ROUTES,
 ]);
 
 function isProvidersRoute(pathname: string): boolean {
@@ -363,6 +387,11 @@ function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): Dynami
   };
 }
 
+/** A `custom-provider-harness-choice-v1` save or edit: the released fields, and the harness that it names. */
+function harnessChoiceBody(body: DynamicRecord): DynamicRecord {
+  return { ...releasedSaveBody(body), harness: body.harness };
+}
+
 function wireCustomModel({ id, name }: CustomProviderModel): CustomProviderModel {
   return { id, name };
 }
@@ -382,11 +411,12 @@ function wireEditCustomProvider(provider: CustomProviderSummary): CustomProvider
 
 /** A save, an edit or a delete answers with the summaries of the protocol that the route belongs to. */
 function wireResult(route: string, result: CustomProviderResult): CustomProviderResult {
-  const wire = EDIT_ROUTES.has(route)
-    ? wireEditCustomProvider
-    : HARNESS_ROUTES.has(route)
-      ? wireHarnessCustomProvider
-      : wireCustomProvider;
+  const wire =
+    EDIT_ROUTES.has(route) || CHOICE_ROUTES.has(route)
+      ? wireEditCustomProvider
+      : HARNESS_ROUTES.has(route)
+        ? wireHarnessCustomProvider
+        : wireCustomProvider;
   return { ...result, providers: result.providers.map(wire) };
 }
 

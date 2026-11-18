@@ -24,6 +24,7 @@ import {
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -49,6 +50,8 @@ export interface ChannelState {
   canCancelTasks: boolean;
   /** The host takes a channel icon and image (`channel-picture-v1`). */
   canSetPicture: boolean;
+  /** The host takes "New conversation", "Compact context" and "Delete history" (`chat-history-v1`). */
+  canUseContextActions: boolean;
   loading: boolean;
   /** The host list has loaded at least once, or the host has no channels to list. */
   listed: boolean;
@@ -62,6 +65,7 @@ const EMPTY: ChannelState = {
   canDelete: false,
   canCancelTasks: false,
   canSetPicture: false,
+  canUseContextActions: false,
   loading: false,
   listed: false,
   error: null,
@@ -157,6 +161,7 @@ export class MobileChannelStore {
       next.canDelete === entry.state.canDelete &&
       next.canCancelTasks === entry.state.canCancelTasks &&
       next.canSetPicture === entry.state.canSetPicture &&
+      next.canUseContextActions === entry.state.canUseContextActions &&
       next.loading === entry.state.loading &&
       next.listed === entry.state.listed &&
       next.error === entry.state.error
@@ -173,6 +178,7 @@ export class MobileChannelStore {
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
+      canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
       // A host without channels has its whole list already: none. A kept copy goes.
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
@@ -190,6 +196,7 @@ export class MobileChannelStore {
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
+      canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
       channels,
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
@@ -413,7 +420,9 @@ export class MobileChannelStore {
         !item.message.questionPrompt.resolution,
     );
     const prompt = message?.message.questionPrompt;
-    if (!prompt || page?.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
+    // A question with no open row in the page shows from the host's request, and the host refuses an
+    // answer when it no longer waits (#10178). The screen shows no card for a row that has its answer.
+    if (!page || page.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
     await this.request(
       "POST",
       TEAM_API_ROUTES.respond.prompt,
@@ -426,7 +435,7 @@ export class MobileChannelStore {
     );
     // A successful answer stays resolved even if the history refresh loses connection.
     const current = entry.state.pages.get(channelId);
-    if (entry.valid && current) {
+    if (entry.valid && current && message && prompt) {
       const pages = new Map(entry.state.pages);
       pages.set(channelId, {
         ...current,
@@ -634,6 +643,40 @@ export class MobileChannelStore {
   }
   async discard(serverId: string, attachmentId: string) {
     await this.request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), () => undefined, undefined, serverId);
+  }
+  /** "New conversation": the members forget the earlier messages. The host writes a marker; the messages stay. */
+  async clearContext(serverId: string, channelId: string) {
+    await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelClear, channelId);
+  }
+  /** Compacts the channel session of each member now. The messages stay. */
+  async compactContext(serverId: string, channelId: string) {
+    await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelCompact, channelId, false);
+  }
+  /** "Delete history": the messages go, and the members forget them. Owners and admins only. */
+  async deleteHistory(serverId: string, channelId: string) {
+    await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelDelete, channelId);
+  }
+  private async contextAction(serverId: string, path: string, channelId: string, changesHistory = true) {
+    const entry = this.entry(serverId);
+    if (!entry.state.canUseContextActions)
+      throw new Error(
+        sourceText(
+          path === CHAT_HISTORY_ROUTES.channelDelete
+            ? "error.team.historyDeleteUnsupported"
+            : "error.team.channelContextUnsupported",
+        ),
+      );
+    await this.request("POST", path, () => undefined, { channelId }, serverId);
+    if (!changesHistory) return;
+    // A read that started before the change must not bring the earlier page back.
+    entry.writes += 1;
+    // A latest page keeps the older loaded messages next to it, so a deleted history drops the page.
+    if (path === CHAT_HISTORY_ROUTES.channelDelete && entry.state.pages.has(channelId)) {
+      const pages = new Map(entry.state.pages);
+      pages.delete(channelId);
+      this.publish(entry, { pages });
+    }
+    await this.refresh(serverId, channelId);
   }
   async delete(serverId: string, channelId: string) {
     const entry = this.entry(serverId);

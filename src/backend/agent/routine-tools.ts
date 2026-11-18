@@ -144,11 +144,11 @@ export function openBotToolResult(value: unknown): OpenBotToolResponse {
  *
  * `#handleServerRequest` turns a thrown error into an opaque JSON-RPC fault, which a model can only
  * give up on. `claude-client.ts` maps `success: false` onto `isError: true`, so both provider paths
- * show this as a failed tool call with the reason attached.
+ * show this as a failed tool call with the reason attached. `details` adds counts beside the reason.
  */
-export function openBotToolFailure(message: string): OpenBotToolResponse {
+export function openBotToolFailure(message: string, details?: Readonly<Record<string, number>>): OpenBotToolResponse {
   return {
     success: false,
-    contentItems: [{ type: "inputText", text: JSON.stringify({ error: message }) }],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ ...details, error: message }) }],
   };
 }

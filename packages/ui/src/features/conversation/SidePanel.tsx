@@ -1,6 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  AudioLines,
   Button,
   buttonVariants,
   DropdownMenu,
@@ -20,6 +19,7 @@ import {
   attachmentReferenceTone,
 } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -56,7 +56,6 @@ const SIDE_PANEL_PANES = {
     label: "conversation.sidePanel.pane.question",
     icon: () => <MessageCircleQuestionMark aria-hidden="true" />,
   },
-  voice: { label: "conversation.sidePanel.pane.voice", icon: () => <AudioLines aria-hidden="true" /> },
   subagent: { label: "conversation.sidePanel.pane.subagent", icon: () => <Workflow aria-hidden="true" /> },
 } as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
 
@@ -150,6 +149,8 @@ export interface SidePanelFileTab {
   key: string;
   name: string;
   folder: boolean;
+  /** The file did not open. While the tab has the focus, its X closes it also when it is not selected. */
+  unavailable?: boolean | undefined;
 }
 
 /** The file tabs of the side panel. They come after the thread tabs. */
@@ -531,6 +532,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                   class="side-panel-tab side-panel-file-tab no-drag"
                   data-file-key={file().key}
                   data-selected={selected() ? "true" : undefined}
+                  data-unavailable={file().unavailable ? "true" : undefined}
                 >
                   <Button
                     variant="ghost"
@@ -636,6 +638,9 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
             </Button>
           </Show>
         </div>
+        <Show when={hasTabs()}>
+          <TabShape selected=".side-panel-tab[data-selected]" sized=".side-panel-tabs, .side-panel-tab" />
+        </Show>
       </Tabs.Root>
       <Show when={carriedHere()}>
         <div class="side-panel-drop" aria-hidden="true">
