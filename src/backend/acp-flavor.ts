@@ -358,6 +358,12 @@ export interface AcpFlavor {
    */
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   /**
+   * How long a turn may send nothing before OpenBot ends it as stalled (`ACP_TURN_STALL_MS` when
+   * absent), for an agent that waits longer for a silent model stream than that and then gives a
+   * notice of its own. Only the turn's stall watch uses it, not the checks of a process that stopped.
+   */
+  turnStallMs?: number;
+  /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
    */
@@ -623,6 +629,10 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
     },
   },
   retryNotice: grokRetryNotice,
+  // Grok CLI 1.0.77 waits 10 minutes for a silent model stream, then sends an `idle_timeout` retry
+  // notice (`GROK_RETRY_TYPES`). A long step after many tool calls can send nothing for more than 5
+  // minutes, so OpenBot ended it as stalled while Grok still worked, and its reply came later (#12295).
+  turnStallMs: 12 * 60_000,
   turnFailure: grokTurnFailure,
 };
 
