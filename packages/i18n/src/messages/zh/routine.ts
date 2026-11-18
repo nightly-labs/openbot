@@ -219,6 +219,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "打开 {name}",
   "routine.calendar.completed": "已完成",
+  "routine.calendar.new": "新建自动化任务",
+  "routine.calendar.newOn": "在 {day} 新建自动化任务",
+  "routine.calendar.agent": "助手",
+  "routine.calendar.agentChoice": "助手：{name}",
 
   "routine.settings.loadFailed": "无法加载自动化任务。",
   "routine.settings.loadRunsFailed": "无法加载运行历史。",
@@ -235,6 +239,7 @@ export const messages = {
   "routine.settings.loading": "正在加载自动化任务…",
   "routine.settings.empty": "还没有自动化任务。",
   "routine.settings.paused": "已暂停",
+  "routine.settings.pausedByRun": "已被 {time} 的运行暂停",
   "routine.settings.completed": "已结束 · {schedule}",
   "routine.settings.active": "启用中",
   "routine.settings.pauseFailed": "无法暂停该自动化任务。",

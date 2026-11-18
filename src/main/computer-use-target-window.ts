@@ -1,6 +1,6 @@
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import type { Rectangle } from "electron";
-import type { ObservedAction } from "./cua-driver-action-tap";
+import type { Point, Rectangle } from "electron";
+import type { ObservedAction, ObservedPointer } from "./cua-driver-action-tap";
 import { HIGHLIGHT_OWNER_SHORT_ID } from "./cua-driver-daemon-client";
 
 /** Below this a "window" is a tool palette or a shadow helper, not something an agent works in. */
@@ -122,6 +122,22 @@ export interface TargetChoice {
    * size or overlap is measured, so the covered strips still meet edge to edge after it.
    */
   toDesktop?: (bounds: Rectangle) => Rectangle;
+}
+
+/**
+ * The desktop point an agent aimed at, in the driver's units, or `null` when nothing places it.
+ *
+ * A point in a window is a pixel of that window's last screenshot. The driver acts on it as the
+ * window's top-left corner plus the point scaled from the screenshot to the window's size: the
+ * screenshot can be smaller than the window, and on macOS it is in pixels while the window is in
+ * points. The tap keeps that screenshot's width with the point; without the window there is no cursor.
+ */
+export function pointerOnDesktop(pointer: ObservedPointer, windows: unknown): Point | null {
+  if (pointer.windowId === null || pointer.screenshotWidth === null) return { x: pointer.x, y: pointer.y };
+  const window = readWindows(windows).find((entry) => entry.windowId === pointer.windowId);
+  if (!window) return null;
+  const scale = window.bounds.width / pointer.screenshotWidth;
+  return { x: window.bounds.x + pointer.x * scale, y: window.bounds.y + pointer.y * scale };
 }
 
 /**

@@ -19,6 +19,12 @@ export const messages = {
   "webClient.pane.chat": "Chat",
   "webClient.pane.routines": "Routinen",
   "webClient.pane.workspace": "Arbeitsbereich",
+  "webClient.phoneApp.title": "Nutze die OpenBot-App",
+  "webClient.phoneApp.description":
+    "Auf dem Handy funktioniert OpenBot am besten in der App. Melde dich mit derselben E-Mail an.",
+  "webClient.phoneApp.ios": "Für iPhone laden",
+  "webClient.phoneApp.android": "Für Android laden",
+  "webClient.phoneApp.continue": "Im Browser fortfahren",
   "webClient.notice.connecting": "Verbindung mit deinem Server wird hergestellt",
   "webClient.notice.findingHosts": "Deine Server werden gesucht",
   "webClient.notice.hostsFailed": "Deine Server konnten nicht geladen werden",

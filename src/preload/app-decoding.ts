@@ -6,6 +6,7 @@
 
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
+import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
   type HostedServerCatalog,
   type HostedServerList,
@@ -102,6 +103,7 @@ import {
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isVoiceTurnPause,
   isXaiSpeechVoice,
   type LinkAccountStatus,
   type MobileConnectedDevice,
@@ -136,6 +138,7 @@ import {
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
+  type WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
@@ -433,13 +436,14 @@ export function decodeAccountSessions(value: unknown): AccountSession[] {
 
 export function decodeUpdateStatus(value: unknown): UpdateStatus {
   const status = decodeRecord(value, "update status");
-  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart, stagedVersion } = status;
+  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart, stagedVersion, requiredVersion } = status;
   if (!isOneOf(UPDATE_PHASES, phase)) throw new Error("Invalid phase.");
   if (errorCode !== null && !isOneOf(["check_failed", "download_failed", "install_failed"] as const, errorCode)) {
     throw new Error("Invalid errorCode.");
   }
   if (managedByHost !== undefined && !isBoolean(managedByHost)) throw new Error("Invalid managedByHost.");
   if (stagedVersion !== undefined && !isString(stagedVersion)) throw new Error("Invalid stagedVersion.");
+  if (requiredVersion !== undefined && !isString(requiredVersion)) throw new Error("Invalid requiredVersion.");
   return {
     phase,
     currentVersion: requiredString(status, "currentVersion"),
@@ -452,6 +456,7 @@ export function decodeUpdateStatus(value: unknown): UpdateStatus {
     ...(scheduledRestart === undefined ? {} : { scheduledRestart: decodeScheduledUpdateRestart(scheduledRestart) }),
     ...(idleRestart === undefined ? {} : { idleRestart: decodeIdleRestart(idleRestart) }),
     ...(stagedVersion === undefined ? {} : { stagedVersion }),
+    ...(requiredVersion === undefined ? {} : { requiredVersion }),
   };
 }
 
@@ -548,6 +553,11 @@ export function decodeNotificationOpenedEvent(value: unknown): NotificationOpene
   };
 }
 
+export function decodeWorkflowNotificationOpenedEvent(value: unknown): WorkflowNotificationOpenedEvent {
+  const opened = decodeRecord(value, "opened workflow notification");
+  return { serverId: requiredString(opened, "serverId"), workflowId: requiredString(opened, "workflowId") };
+}
+
 const VOICE_MODEL_PHASES: readonly VoiceModelStatus["phase"][] = ["missing", "downloading", "ready", "error"];
 
 export function decodeVoiceModelStatus(value: unknown): VoiceModelStatus {
@@ -593,14 +603,15 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice } = settings;
+  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice, turnPauseMs } = settings;
   if (
     !isSpeechModelId(modelId) ||
     !isSpeechVoice(voice) ||
     !isElevenLabsSpeechVoice(elevenLabsVoice) ||
     !isXaiSpeechVoice(xaiVoice) ||
     !isSpeechSpeed(speed) ||
-    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice))
+    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)) ||
+    !isVoiceTurnPause(turnPauseMs)
   )
     throw new Error("Invalid speech settings.");
   return {
@@ -612,6 +623,7 @@ export function decodeSpeechSettings(value: unknown): SpeechSettings {
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),
     codexLiveVoice,
+    turnPauseMs,
   };
 }
 
@@ -732,6 +744,12 @@ export function decodeBillingState(value: unknown): BillingState {
   const state = parseBillingState(value);
   if (!state) throw new Error("Invalid billing state response.");
   return state;
+}
+
+export function decodeBillingDetails(value: unknown): BillingDetails {
+  const details = parseBillingDetails(value);
+  if (!details) throw new Error("Invalid billing details response.");
+  return details;
 }
 
 export function decodeLicenseState(value: unknown): LicenseState {

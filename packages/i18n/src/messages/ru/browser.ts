@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Закрыть {name}",
   "browser.tab.closeUnnamed": "Закрыть вкладку браузера",
   "browser.newTab": "Новая вкладка браузера",
-  "browser.hide": "Скрыть браузер",
+  "browser.backToChat": "Вернуться в чат",
   "browser.goBack": "Назад",
   "browser.goForward": "Вперёд",
   "browser.reload": "Перезагрузить страницу",
@@ -69,6 +69,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Этот текст слишком длинный для вставки. Вставьте меньше 100 000 символов.",
   "browser.liveView.copyTooLarge": "Выделение слишком длинное для копирования. Выделите меньше текста.",
   "browser.liveView.copyFailed": "Не удалось скопировать текст. Нажмите на страницу и повторите попытку.",
+  "browser.liveView.pageCopied":
+    "Страница скопировала текст. Выберите «Копировать», чтобы поместить его в буфер обмена.",
   "browser.previews.label": "Превью браузера",
   "browser.previews.resize": "Изменить размер правой панели",
   "browser.previews.empty": "Нет вкладок браузера",
@@ -93,6 +95,18 @@ export const messages = {
   "browser.secret.submitting": "Отправка…",
   "browser.secret.takeOver": "Взять управление",
   "browser.secret.failed": "Не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что агент запустил скрипт на этой странице. Чтобы их использовать, попросите агента перезагрузить страницу и попробовать снова.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что агент выбрал не то поле на странице.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot не использовал сохранённые учётные данные, потому что агент не выбрал ни одни из учётных данных, сохранённых для этого сайта. Скажите агенту, какой аккаунт использовать.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что в них нет пароля для этого сайта.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что в них нет ключа аутентификатора.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot не использовал сохранённые учётные данные, потому что не смог прочитать ваш менеджер паролей.",
   "browser.error.openAddress": "Не удалось открыть адрес в этой вкладке.",
   "browser.error.channelNoBrowserMember": "Ни один участник не может открыть новую вкладку в этом канале.",
   "browser.error.closeTab": "Не удалось закрыть вкладку браузера.",

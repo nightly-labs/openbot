@@ -21,6 +21,14 @@ export interface ConnectorRow {
  * computer, so its row is `unavailable`.
  */
 export function useConnectorRows(serverId: string): ConnectorRow[] {
+  return useConnectorRowState(serverId).rows;
+}
+
+/**
+ * The rows, and the connectors that have no row yet because their status still loads. A connector that
+ * is in neither list cannot run on the host, or the user cannot manage it.
+ */
+export function useConnectorRowState(serverId: string): { rows: ConnectorRow[]; loading: MobileConnectorId[] } {
   const {
     agents,
     connectors,
@@ -46,8 +54,12 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
 
   // The query data keeps its reference while it does not change, so the Marketplace listings stay cached.
   return useMemo(() => {
-    const failed = (id: MobileConnectorId, isError: boolean): ConnectorRow[] =>
-      isError ? [{ id, status: "unknown" }] : [];
+    const loading: MobileConnectorId[] = [];
+    const failed = (id: MobileConnectorId, isError: boolean): ConnectorRow[] => {
+      if (isError) return [{ id, status: "unknown" }];
+      loading.push(id);
+      return [];
+    };
     const row = (id: MobileConnectorId): ConnectorRow[] => {
       if (id === "bitwarden") {
         if (!bitwardenAvailable) return [{ id, status: "unavailable" }];
@@ -103,7 +115,7 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
       if (!connections) return failed(id, isError);
       return [{ id, status: messagingStatus(id, connections, agents) }];
     };
-    return MOBILE_CONNECTOR_IDS.flatMap(row);
+    return { rows: MOBILE_CONNECTOR_IDS.flatMap(row), loading };
   }, [
     agents,
     connectors,

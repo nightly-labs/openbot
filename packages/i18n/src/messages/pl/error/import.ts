@@ -68,6 +68,23 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: model „{model}” nie jest tu jeszcze dostępny, więc agent używa modelu domyślnego. Wybierz model ponownie, gdy jego dostawca będzie gotowy.",
   "error.import.transferSettingSkipped": "Nie zaimportowano: {name}. {reason}",
+  "error.import.transferRunsSkipped": "{name}: nie zaimportowano historii uruchomień rutyny „{routine}”.",
+  "error.import.transferSharedSkillsSkipped": "Nie udało się odczytać wspólnych umiejętności, więc nie ma ich w pliku.",
+  "error.import.transferSharedSkillsNotAdded": "Nie udało się dodać do tego serwera wspólnych umiejętności z pliku.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Nie udało się zapisać wyborów {count} członka.",
+    few: "Nie udało się zapisać wyborów {count} członków.",
+    many: "Nie udało się zapisać wyborów {count} członków.",
+    other: "Nie udało się zapisać wyborów {count} członków.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Na tym serwerze jest już wspólna umiejętność o tej nazwie i innych plikach.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} preferencja serwera z pliku jest tu nieprawidłowa, więc nie zostanie zaimportowana.",
+    few: "{count} preferencje serwera z pliku są tu nieprawidłowe, więc nie zostaną zaimportowane.",
+    many: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+    other: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+  },
   "error.import.transferRoutineFlowSkipped": "Import pominął przepływ rutyny. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: własni agenci nie są importowani, ponieważ uruchamiają polecenie. Sprawdź polecenie „{command}” i dodaj agenta ponownie w Ustawieniach.",
@@ -77,7 +94,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: wpisz ponownie klucz API w Ustawieniach.",
   "error.import.transferAgentEnv": "{name}: wpisz ponownie wartości {names} w Ustawieniach.",
   "error.import.transferMcpValues":
-    "{name}: serwer MCP został dodany jako wyłączony. Sprawdź jego polecenie, wpisz ponownie wartości i pełny adres, a potem włącz go w ustawieniach MCP.",
+    "{name}: serwer MCP został dodany jako wyłączony. Sprawdź jego polecenie, wpisz ponownie wartości i pełny adres, a potem włącz go w Marketplace, Aplikacje.",
   "error.import.transferValuesCleared":
     "{name}: z argumentów lub adresu usunięto wartości, które mogą zawierać sekret. Wpisz je ponownie w Ustawieniach.",
   "error.import.transferSharedKept":

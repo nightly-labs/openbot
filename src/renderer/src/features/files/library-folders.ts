@@ -74,7 +74,7 @@ export function createLibraryFolders(
     });
   }
 
-  createEffect(serverId, () => {
+  createEffect(serverId, (server) => {
     run += 1;
     pending = 0;
     readWaits = false;
@@ -82,6 +82,9 @@ export function createLibraryFolders(
     show(null);
     setReady(false);
     read();
+    // A change on another device, or by an agent, reaches this page at once. The read waits behind
+    // the changes of this page, and their answers are newer than the event.
+    return untrack(calls).onLibraryFoldersChanged?.(server, read);
   });
 
   /** A change failed: the changes after it were made on top of it, so they go too. */

@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "בדיקת שולחן עבודה מרוחק פעילה. יש לנסות שוב כשהיא תסתיים.",
   "error.remote.screenRecordingDenied":
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
+  "error.remote.windowsSessionDisconnected":
+    "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",
@@ -80,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "למארח המרוחק אין מפתח מכשיר מוצמד.",
   "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
-  "error.remote.hostDisconnected": "מארח ה-WebRTC התנתק.",
+  "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",
   "error.remote.eventGap": "ברצף האירועים של המארח יש פער.",
   "error.remote.malformedKnownEvent": "המארח החזיר אירוע מוכר שגוי.",
   "error.remote.fileTransportIsStopped": "שכבת העברת הקבצים של WebRTC נעצרה.",
@@ -145,6 +147,7 @@ export const messages = {
   "error.remote.attachmentRejected": "המארח דחה את הקובץ המצורף.",
   "error.remote.attachmentTooLarge": "קבצים מצורפים צריכים להיות בגודל 10 MB לכל היותר.",
   "error.remote.attachmentBusy": "יש להמתין לסיום הקובץ המצורף הנוכחי.",
+  "error.remote.attachmentChanged": "הקובץ השתנה או שאינו זמין. יש לבחור אותו שוב.",
   "error.remote.uploadTimeout": "העלאת הקובץ המצורף חרגה ממגבלת הזמן.",
   "error.remote.hostSessionActive": "במארח כבר יש סשן מרוחק פעיל.",
   "error.remote.tooManyConnections": "יותר מדי חיבורים מרוחקים פעילים.",

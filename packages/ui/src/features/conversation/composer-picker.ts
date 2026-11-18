@@ -26,8 +26,11 @@ export type PickerOption =
   | { type: "attachment"; attachment: DraftAttachment }
   /** A browser tab of the agent. The agent gets its tab id and can use it with its browser tool. */
   | { type: "tab"; tab: ComposerBrowserTab }
-  /** A side thread of the agent. The agent gets its task id and can read its history. */
-  | { type: "thread"; thread: ComposerThread };
+  /**
+   * A side thread of the agent. The agent gets its task id and can read its history. `snippet` is set
+   * when a message of the thread, not its title, has the query: it shows that message.
+   */
+  | { type: "thread"; thread: ComposerThread; snippet?: string | undefined };
 
 /**
  * A group of the `@` list. When the list has more than one group, each group shows its title and
@@ -81,7 +84,7 @@ export function pickerOptionDescription(
   if (option.type === "skill") return skillDescription(option.skill);
   if (option.type === "mcp") return mcpServerDescription(option.server);
   if (option.type === "tab") return browserDisplayUrl(option.tab.url) || undefined;
-  if (option.type === "thread") return threadDetail(option.thread);
+  if (option.type === "thread") return option.snippet ?? threadDetail(option.thread);
   return option.agent.description.trim() || option.agent.title.trim() || undefined;
 }
 

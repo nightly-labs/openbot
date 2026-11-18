@@ -7,6 +7,8 @@ import {
   agentProviderDescriptor,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderAccountState,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
@@ -16,20 +18,26 @@ import {
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Cause, Effect, Fiber, Schema, type Scope } from "effect";
+import { Cause, Deferred, Effect, Exit, Fiber, Schema, type Scope } from "effect";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
-import type { AccountReadResult } from "./../protocol";
+import { type AccountReadResult, CLAUDE_CLI_API_KEY_ACCOUNT_TYPE } from "./../protocol";
 import { ProviderSignInError } from "../provider-client-effects";
-import { type ProviderAccountSupport, requireProviderDriver } from "./../provider-drivers";
+import {
+  isKeyAccountSupport,
+  type ProviderAccountSupport,
+  type ProviderHomeAccountSupport,
+  requireProviderDriver,
+} from "./../provider-drivers";
 import type { ProviderTempOptions } from "./../provider-temp";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
+import { type CliCodeLogin, type CliCodePrompt, pasteCodeLoginSupported, startCliCodeLogin } from "./cli-code-login";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSignInProcess, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -44,6 +52,14 @@ export class ProviderAccountFailed extends Schema.TaggedError<ProviderAccountFai
 
 function accountFailure(text: string): ProviderAccountFailed {
   return new ProviderAccountFailed({ cause: new Error(text) });
+}
+
+/**
+ * The message of a connected account whose CLI bills an API key of the user's own, not the plan
+ * (#10192). The account rows carry it to the provider settings of each client; null for other accounts.
+ */
+export function ownApiKeyNotice(account: AccountReadResult["account"] | undefined): string | null {
+  return account?.type === CLAUDE_CLI_API_KEY_ACCOUNT_TYPE ? sourceText("status.provider.claudeOwnApiKey") : null;
 }
 
 /** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
@@ -69,6 +85,14 @@ export interface ProviderAccountsHost {
   defaultLogin(provider: AgentProviderId): AccountLogin | null;
   /** The provider's saved API key. */
   apiKey(provider: AgentProviderId): string | null;
+  /** The saved key of an account that is a key (`ProviderKeyAccountSupport`). */
+  accountKey(provider: AgentProviderId, accountId: string): string | null;
+  /** Saves the key of such an account, or removes it when `key` is null. */
+  saveAccountKey(
+    provider: AgentProviderId,
+    accountId: string,
+    key: string | null,
+  ): Effect.Effect<void, ProviderAccountFailed>;
   /** Whether the provider's own sign-in runs on its saved key, as it does with no account of its own. */
   defaultUsesApiKey(provider: AgentProviderId): boolean;
   /** The temporary folder of an ACP sign-in process, as the provider's own sign-in gets it. */
@@ -96,6 +120,8 @@ export interface ProviderAccountsHost {
   resetCredits(client: AgentClient): number | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
+  /** Runs after an account check listed the account's models. */
+  modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   /** Sends the reading of an account check: after a sign-in, and when the provider's own sign-in connects. */
   usageChanged(limit: AccountUsageLimit): void;
   redact(text: string): string;
@@ -113,6 +139,15 @@ export class ProviderAccounts {
   readonly #signIns = new Map<string, Fiber.Fiber<string | null>>();
   /** Accounts whose first sign-in runs. A cancel removes them with their folder. */
   readonly #added = new Set<string>();
+  /**
+   * How the last code sign-in of each account ended. A canceled one leaves nothing. Two accounts of
+   * one provider can sign in at the same time, so the result is not one for each provider.
+   */
+  readonly #codeResults = new Map<string, { error: string | null }>();
+  /** Accounts whose running sign-in is a code sign-in. Another sign-in of the account is not one. */
+  readonly #codeSignIns = new Set<string>();
+  /** The CLI of each account whose sign-in waits for a pasted code. `submitCode` types the code into it. */
+  readonly #pasteLogins = new Map<string, CliCodeLogin>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
   /** The last usage reading of each account, with the usage reset credits it counted. */
   readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
@@ -134,8 +169,8 @@ export class ProviderAccounts {
   }
 
   /** The command that signs the provider's own sign-in out, or undefined when its CLI has none. */
-  static signOutCommand(provider: AgentProviderId): ProviderAccountSupport["signOut"] {
-    return ProviderAccounts.support(provider)?.signOut ?? requireProviderDriver(provider).signOut;
+  static signOutCommand(provider: AgentProviderId): ProviderHomeAccountSupport["signOut"] {
+    return homeSupport(provider)?.signOut ?? requireProviderDriver(provider).signOut;
   }
 
   /** The stored account an agent names, or null for the provider's own sign-in or a removed account. */
@@ -148,6 +183,8 @@ export class ProviderAccounts {
   environment(account: StoredProviderAccount): Readonly<Record<string, string>> {
     const support = ProviderAccounts.support(account.provider);
     if (!support) throw new Error("Invalid provider account.");
+    if (isKeyAccountSupport(support))
+      return support.keyEnvironment(this.#host.accountKey(account.provider, account.id) ?? "");
     const key = isKeyAccount(account) ? this.#host.apiKey(account.provider) : null;
     return { [support.homeVariable]: this.#store.home(account), ...(key ? { ANTHROPIC_API_KEY: key } : {}) };
   }
@@ -157,7 +194,7 @@ export class ProviderAccounts {
     return this.#support(provider) !== undefined;
   }
 
-  /** The support of a provider whose connected CLI reads the home folder variable. */
+  /** The support of a provider whose connected CLI reads the home folder variable, or keeps a key account apart. */
   #support(provider: AgentProviderId): ProviderAccountSupport | undefined {
     const support = ProviderAccounts.support(provider);
     if (!support?.supports) return support;
@@ -166,7 +203,11 @@ export class ProviderAccounts {
   }
 
   /** The rows of a connected provider that can hold more than one account; its own sign-in first. */
-  rows(provider: AgentProviderId, defaultEmail: string | null): ProviderAccountStatus[] | undefined {
+  rows(
+    provider: AgentProviderId,
+    defaultEmail: string | null,
+    defaultMessage: string | null,
+  ): ProviderAccountStatus[] | undefined {
     if (!this.#support(provider)) return undefined;
     return [
       {
@@ -174,7 +215,7 @@ export class ProviderAccounts {
         label: this.#store.defaultLabel(provider),
         email: defaultEmail,
         state: "connected",
-        message: null,
+        message: defaultMessage,
       },
       // With no claude.ai account, the own sign-in runs on the key too: one row is enough.
       ...this.#store
@@ -197,8 +238,15 @@ export class ProviderAccounts {
 
   /** The models of an account after the first, from its last check; empty before one listed them. */
   models(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] {
+    return this.listedModels(provider, accountId) ?? [];
+  }
+
+  /** As `models`, but null while an account after the first has not listed its models yet. */
+  listedModels(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] | null {
     const account = this.account(provider, accountId);
-    return account ? structuredClone(this.#models.get(account.id) ?? []) : [];
+    if (!account) return [];
+    const models = this.#models.get(account.id);
+    return models ? structuredClone(models) : null;
   }
 
   /**
@@ -213,12 +261,22 @@ export class ProviderAccounts {
     accountId: string | null,
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    /** Runs the code sign-in of the driver, and gets what its CLI printed. Only `connectWithCode` gives it. */
+    code?: Deferred.Deferred<CliCodePrompt | null>,
   ) {
     const support = this.#support(provider);
     const name = providerLabel(provider);
     if (!support) return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    // A client that does not know key accounts asks for a browser sign-in.
+    if (isKeyAccountSupport(support))
+      return yield* accountFailure(sourceText("error.provider.accountNeedsKey", { provider: name }));
     const cli = this.#host.cli(provider);
     if (!cli) return yield* accountFailure(sourceText("error.provider.accountNeedsConnection", { provider: name }));
+    if (code && !support.codeSignIn)
+      return yield* accountFailure(sourceText("error.provider.noCodeSignIn", { provider: name }));
+    // Refused before a new account gets its folder.
+    if (code && support.codeSignIn?.flow === "paste" && !pasteCodeLoginSupported())
+      return yield* accountFailure(sourceText("error.provider.codeLoginUnsupported"));
     let account: StoredProviderAccount;
     const added = accountId === null;
     if (added) {
@@ -239,7 +297,8 @@ export class ProviderAccounts {
       account = stored;
     }
     const command = support.signIn;
-    if (!added && "kind" in command) {
+    const codeSignIn = code ? support.codeSignIn : undefined;
+    if (!added && !codeSignIn && "kind" in command) {
       // The sign-out removes the token that the account's processes use.
       if (this.#host.isAccountBusy(provider, account.id))
         return yield* accountFailure(sourceText("error.provider.cliBusyReconnect", { provider: name }));
@@ -247,9 +306,38 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
+    else {
+      // A Reconnect can sign in to another login, or fail after a sign-out: the old reading is not its usage.
+      this.#usage.delete(account.id);
+      this.#usageGate(account.id).reset();
+    }
+    if (code) {
+      this.#codeResults.delete(account.id);
+      this.#codeSignIns.add(account.id);
+    }
     this.#setState(account.id, { state: "connecting", message: null });
     const signIn = Effect.scoped(
       Effect.gen({ self: this }, function* () {
+        if (code && codeSignIn) {
+          // The account's saved sign-in, if it has one, stays until the CLI saves the new one.
+          const login = yield* startCliCodeLogin({
+            flow: codeSignIn.flow,
+            executable: cli.executable,
+            argv: codeSignIn.command.argv,
+            env: { ...cliPathEnvironment(cli), ...codeSignIn.command.env(cli), ...this.environment(account) },
+            timeoutMs: codeSignIn.command.timeoutMs,
+            ...(codeSignIn.command.closeInput ? { closeInput: true } : {}),
+          }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+          const prompt = yield* login.prompt.pipe(
+            Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
+          );
+          if (prompt?.flow === "paste") {
+            this.#pasteLogins.set(account.id, login);
+            yield* Effect.addFinalizer(() => Effect.sync(() => this.#pasteLogins.delete(account.id)));
+          }
+          yield* Deferred.succeed(code, prompt);
+          return yield* login.done.pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+        }
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
           // The server prints Google's page, which a host shows and this computer opens itself, except
@@ -266,7 +354,7 @@ export class ProviderAccounts {
           });
           return yield* login.done;
         }
-        const browser = onHost ? yield* captureBrowser(openExternal) : {};
+        const browser = signInPageByOpenBot(onHost, command) ? yield* captureBrowser(openExternal) : {};
         const target = cliSpawnTarget(cli.executable, command.argv);
         const child = yield* Effect.acquireRelease(
           Effect.sync(() =>
@@ -279,7 +367,7 @@ export class ProviderAccounts {
                 ...this.environment(account),
                 ...browser,
               },
-              stdio: "ignore",
+              stdio: command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
               shell: false,
               windowsHide: process.platform === "win32",
               windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -287,7 +375,10 @@ export class ProviderAccounts {
           ),
           (child) => stopProcessTree(child).pipe(Effect.ignore),
         );
-        yield* waitForSuccessfulProcess(child, command.timeoutMs);
+        // A known reason is a safe message, which the account row shows as it is.
+        yield* waitForSignInProcess(child, command).pipe(
+          Effect.mapError((error) => (error.cause instanceof ProviderSignInError ? error.cause : error)),
+        );
       }),
     ).pipe(
       Effect.andThen(this.#check(account, true)),
@@ -310,10 +401,16 @@ export class ProviderAccounts {
       ),
       Effect.as<string | null>(null),
       Effect.catch((error) => Effect.succeed(this.#message(provider, error))),
+      Effect.tap((error) =>
+        Effect.sync(() => {
+          if (code) this.#codeResults.set(account.id, { error });
+        }),
+      ),
       Effect.ensuring(
         Effect.sync(() => {
           this.#signIns.delete(account.id);
           this.#added.delete(account.id);
+          if (code) this.#codeSignIns.delete(account.id);
         }),
       ),
     );
@@ -321,6 +418,142 @@ export class ProviderAccounts {
     // A sign-in that already ended has removed itself; do not hold its fiber.
     if (fiber.pollUnsafe() === undefined) this.#signIns.set(account.id, fiber);
     return { accountId: account.id, signIn: fiber, ended: Fiber.join(fiber) };
+  }).bind(this);
+
+  /**
+   * Signs an account in with a code or a link that the user finishes on any device: a new account
+   * when `accountId` is null. Answers when the CLI has printed it. `codeSignInStatus` and the account
+   * row tell how the sign-in ends, and `cancel` stops it. A new account that does not finish is
+   * removed with its folder.
+   */
+  readonly connectWithCode = Effect.fn("ProviderAccounts.connectWithCode")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    accountId: string | null,
+  ): Effect.fn.Return<ProviderAccountCodeLoginStart, ProviderAccountFailed> {
+    const prompt = Deferred.makeUnsafe<CliCodePrompt | null>();
+    const signIn = yield* this.connect(provider, accountId, () => Promise.resolve(), false, prompt);
+    const support = this.#support(provider);
+    const timeoutMs = support && !isKeyAccountSupport(support) ? (support.codeSignIn?.command.timeoutMs ?? 0) : 0;
+    const expiresAt = Date.now() + timeoutMs;
+    // The sign-in can end before it prints anything: its error is then the answer.
+    const first = yield* Effect.raceFirst(
+      Deferred.await(prompt).pipe(Effect.map((printed) => ({ printed, error: null }))),
+      // A cancel can interrupt the sign-in before it prints: that is an end with a reason too.
+      Fiber.await(signIn.signIn).pipe(
+        Effect.map((exit) => ({
+          printed: null,
+          error: Exit.isSuccess(exit)
+            ? exit.value
+            : sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }),
+        })),
+      ),
+    );
+    if (first.error) return yield* accountFailure(first.error);
+    const printed = first.printed;
+    if (printed === null) return { accountId: signIn.accountId, start: { kind: "connected" } };
+    if (printed.flow !== "device")
+      return {
+        accountId: signIn.accountId,
+        start: { kind: printed.flow, verificationUrl: printed.verificationUrl, expiresAt },
+      };
+    return {
+      accountId: signIn.accountId,
+      start: {
+        kind: "code",
+        userCode: printed.userCode,
+        verificationUrl: printed.verificationUrl,
+        ...(printed.verificationUrlComplete ? { verificationUrlComplete: printed.verificationUrlComplete } : {}),
+        expiresAt,
+      },
+    };
+  }).bind(this);
+
+  /**
+   * Types the code that the provider's page showed into the CLI of the account's sign-in. The code
+   * is a credential: it goes to the CLI's stdin and nowhere else. `codeSignInStatus` tells how the
+   * sign-in ends. Throws when no sign-in of the account waits for a code.
+   */
+  submitCode(provider: AgentProviderId, accountId: string, code: string): void {
+    // The account must be one of this provider: the code must not reach the CLI of another provider.
+    const login = this.account(provider, accountId) ? this.#pasteLogins.get(accountId) : undefined;
+    if (!login) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    login.submit(code);
+  }
+
+  /** Whether the code sign-in of an account goes on, and how it ended. */
+  codeSignInStatus(provider: AgentProviderId, accountId: string): ProviderAccountCodeLoginStatus {
+    if (this.#signIns.has(accountId)) {
+      if (this.#codeSignIns.has(accountId)) return { result: null };
+      // Another sign-in of the account replaced the code sign-in.
+      return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
+    }
+    const ended = this.#codeResults.get(accountId);
+    if (ended && (ended.error !== null || this.account(provider, accountId))) return { result: { error: ended.error } };
+    return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
+  }
+
+  /**
+   * Gives an account its API key and checks it: a new account when `accountId` is null. Answers when
+   * the check ends, and fails with the reason when the provider refuses the key. A new account that
+   * fails is removed with its key; another one gets its last key back.
+   */
+  readonly connectKey = Effect.fn("ProviderAccounts.connectKey")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    accountId: string | null,
+    key: string,
+  ) {
+    const name = providerLabel(provider);
+    if (!isKeyAccountSupport(this.#support(provider)))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    if (!this.#host.cli(provider))
+      return yield* accountFailure(sourceText("error.provider.accountNeedsConnection", { provider: name }));
+    const added = accountId === null;
+    const stored = added
+      ? yield* this.#store
+          .create(provider)
+          .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })))
+      : this.account(provider, accountId);
+    if (!stored)
+      return yield* accountFailure(
+        added
+          ? sourceText("error.provider.accountLimit", { provider: name, limit: MAX_PROVIDER_ACCOUNTS })
+          : sourceText("error.provider.accountNotFound", { provider: name }),
+      );
+    const account = stored;
+    const previous = added ? null : this.#host.accountKey(provider, account.id);
+    const discard = Effect.gen({ self: this }, function* () {
+      yield* this.#host.saveAccountKey(provider, account.id, null).pipe(Effect.ignore);
+      yield* this.#store.remove(account).pipe(Effect.ignore);
+      this.#forget(account.id);
+      this.#host.changed();
+    });
+    if (!added) {
+      // The processes of the account run on its last key.
+      if (this.#host.isAccountBusy(provider, account.id))
+        return yield* accountFailure(sourceText("error.provider.cliBusyReconnect", { provider: name }));
+      yield* this.#interrupt(account.id);
+      yield* this.#host.stopAgentClients(provider, account.id);
+    }
+    yield* this.#host
+      .saveAccountKey(provider, account.id, key)
+      .pipe(Effect.tapError(() => (added ? discard : Effect.void)));
+    this.#usage.delete(account.id);
+    this.#setState(account.id, { state: "connecting", message: null });
+    yield* this.#check(account, true).pipe(
+      Effect.onExit((exit) => {
+        if (Exit.isSuccess(exit)) return Effect.void;
+        logger.warn("A provider account did not accept its key.", { provider, added });
+        if (added) return discard;
+        // The check that follows reports the state of the last key.
+        return this.#host
+          .saveAccountKey(provider, account.id, previous)
+          .pipe(Effect.ignore, Effect.andThen(this.#startCheck(account)));
+      }),
+      Effect.mapError((error) => accountFailure(this.#message(provider, signInCause(error) ?? error))),
+    );
+    return account.id;
   }).bind(this);
 
   /**
@@ -420,6 +653,8 @@ export class ProviderAccounts {
     yield* this.#interrupt(account.id);
     yield* this.#host.stopAgentClients(provider, account.id);
     yield* this.#signOut(account);
+    if (isKeyAccountSupport(ProviderAccounts.support(provider)))
+      yield* this.#host.saveAccountKey(provider, account.id, null);
     yield* this.#store
       .remove(account)
       .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
@@ -488,6 +723,18 @@ export class ProviderAccounts {
     );
   }
 
+  /**
+   * Marks an account signed out when a start of its process found no login (#8277): its row then
+   * offers the sign-in again. Returns the text of the row, or null when a sign-in of the account
+   * runs, which reports its own end.
+   */
+  foundSignedOut(account: StoredProviderAccount): string | null {
+    if (this.#signIns.has(account.id)) return null;
+    const message = signedOutMessage(account.provider);
+    this.#setState(account.id, { state: "signed-out", message });
+    return message;
+  }
+
   #startCheck(account: StoredProviderAccount): Effect.Effect<void> {
     const provider = account.provider;
     return Effect.gen({ self: this }, function* () {
@@ -498,9 +745,7 @@ export class ProviderAccounts {
             const signedOut = error instanceof ProviderSignInError || isSignInError(error);
             this.#setState(account.id, {
               state: signedOut ? "signed-out" : "error",
-              message: signedOut
-                ? sourceText("error.provider.accountSignedOut", { provider: providerLabel(provider) })
-                : this.#message(provider, error),
+              message: signedOut ? signedOutMessage(provider) : this.#message(provider, error),
             });
           }),
         ),
@@ -512,7 +757,8 @@ export class ProviderAccounts {
   }
 
   /**
-   * The usage of each connected account of a provider that reports usage. Each account's gate decides
+   * The usage of each account of a provider that reports usage: a connected account's reading, and the
+   * kept reading of an account in a check or after a failed one. Each connected account's gate decides
    * when it is read again; until then, or when a read fails, the kept reading answers. A read takes an
    * agent's process or a short check.
    */
@@ -525,8 +771,18 @@ export class ProviderAccounts {
     if (!this.#support(provider)) return limits;
     for (const account of this.#store.list(provider)) {
       // A key has no plan, so no usage to read.
-      if (isKeyAccount(account) || this.#states.get(account.id)?.state !== "connected") continue;
+      if (isKeyAccount(account)) continue;
       const kept = () => this.#usage.get(account.id)?.limit ?? null;
+      const state = this.#states.get(account.id)?.state;
+      // A check that runs reads the usage itself, and a failed check, such as a refused usage read, keeps
+      // the account from a read. Until a check connects it again, the last reading keeps its row, unless a
+      // window of the reading has reset (#11239).
+      if (state === "checking" || state === "error") {
+        const reading = kept();
+        if (reading && !usageWindowResetSince(reading, 0)) limits.push(reading);
+        continue;
+      }
+      if (state !== "connected") continue;
       const limit = yield* this.#usageGate(account.id)
         .run({
           read: this.#readUsage(account, model),
@@ -641,16 +897,40 @@ export class ProviderAccounts {
       );
     if (this.#states.get(account.id)?.state !== "connecting")
       this.#setState(account.id, { state: "checking", message: null });
+    const support = ProviderAccounts.support(provider);
+    if (isKeyAccountSupport(support) && support.checkKey) {
+      const name = providerLabel(provider);
+      const key = this.#host.accountKey(provider, account.id);
+      // An account whose key cannot be read has no key to ask about.
+      const accepted = yield* (key ? support.checkKey(key) : Effect.succeed(false)).pipe(
+        Effect.mapError((error) => {
+          logger.warn("A provider did not answer a key check.", {
+            provider,
+            message: this.#message(provider, error.cause),
+          });
+          return accountFailure(sourceText("error.provider.accountKeyUnreachable", { provider: name }));
+        }),
+      );
+      if (!accepted)
+        return yield* new ProviderAccountFailed({
+          cause: new ProviderSignInError({
+            message: sourceText("error.provider.accountKeyRefused", { provider: name }),
+          }),
+        });
+    }
     yield* Effect.acquireUseRelease(
       this.#host.authenticate(provider, cli, this.environment(account), true),
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization }))
+          if (email && this.#loginTaken(provider, account.id, { email, organization })) {
+            // The folder holds another login now, so the kept reading is not the account's.
+            this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
+          }
           // The reading comes first: a usage request for a connected account uses it and starts no client.
           const reading = this.#host
             .readUsage(client, defaultUsageModel(provider))
@@ -673,7 +953,7 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, organization, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
           // After the connected state, so a slow list does not delay it; the end of the sign-in still
@@ -682,6 +962,7 @@ export class ProviderAccounts {
           if (models && this.#states.has(account.id)) {
             this.#models.set(account.id, models);
             this.#host.changed();
+            if (this.#host.modelsListed) yield* this.#host.modelsListed(provider, account.id);
           }
         }),
       ({ client }) => this.#host.stopClient(client),
@@ -695,8 +976,7 @@ export class ProviderAccounts {
   ) {
     const running = this.#host.agentClient(account.provider, account.id);
     if (running) return yield* this.#storeUsage(account, running, yield* this.#host.readUsage(running, model));
-    if (ProviderAccounts.support(account.provider)?.usageLeavesSession)
-      return this.#usage.get(account.id)?.limit ?? null;
+    if (homeSupport(account.provider)?.usageLeavesSession) return this.#usage.get(account.id)?.limit ?? null;
     const cli = this.#host.cli(account.provider);
     if (!cli) return null;
     return yield* Effect.acquireUseRelease(
@@ -749,7 +1029,7 @@ export class ProviderAccounts {
     this: ProviderAccounts,
     account: StoredProviderAccount,
   ) {
-    const command = ProviderAccounts.support(account.provider)?.signOut;
+    const command = homeSupport(account.provider)?.signOut;
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
@@ -769,7 +1049,7 @@ export class ProviderAccounts {
   #runSignOut(
     provider: AgentProviderId,
     cli: AgentCliInfo,
-    command: NonNullable<ProviderAccountSupport["signOut"]>,
+    command: NonNullable<ProviderHomeAccountSupport["signOut"]>,
     environment: Readonly<Record<string, string>>,
   ): Effect.Effect<void, ProviderProcessFailed | ProviderSignInError> {
     const privateTemp = this.#host.signInTemp(provider);
@@ -834,6 +1114,7 @@ export class ProviderAccounts {
 
   #forget(accountId: string): void {
     this.#states.delete(accountId);
+    this.#codeResults.delete(accountId);
     this.#usage.delete(accountId);
     this.#usageGates.delete(accountId);
     this.#models.delete(accountId);
@@ -871,18 +1152,38 @@ export class ProviderAccounts {
   }
 }
 
-/** The account that a saved key runs on. */
+/** The account that a saved key runs on: it has no browser sign-in, no CLI sign-out and no plan usage. */
 function isKeyAccount(account: StoredProviderAccount): boolean {
-  return account.provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID;
+  return (
+    (account.provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID) ||
+    isKeyAccountSupport(ProviderAccounts.support(account.provider))
+  );
+}
+
+/** The support of a provider whose accounts each sign in to a home folder. */
+function homeSupport(provider: AgentProviderId): ProviderHomeAccountSupport | undefined {
+  const support = ProviderAccounts.support(provider);
+  return isKeyAccountSupport(support) ? undefined : support;
+}
+
+/** What the row of a signed-out account says. */
+function signedOutMessage(provider: AgentProviderId): string {
+  return sourceText(
+    isKeyAccountSupport(ProviderAccounts.support(provider))
+      ? "error.provider.accountKeySignedOut"
+      : "error.provider.accountSignedOut",
+    { provider: providerLabel(provider) },
+  );
 }
 
 function isSignInError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "cause" in error &&
-    (error.cause instanceof ProviderSignInError || isSignInError(error.cause))
-  );
+  return signInCause(error) !== null;
+}
+
+/** The sign-in error in a failure, which holds the provider's reason in safe words. */
+function signInCause(error: unknown): ProviderSignInError | null {
+  if (error instanceof ProviderSignInError) return error;
+  return typeof error === "object" && error !== null && "cause" in error ? signInCause(error.cause) : null;
 }
 
 export function defaultUsageModel(provider: AgentProviderId): string | undefined {

@@ -3,8 +3,21 @@ import type { createWorkspacePreferences, RemoteWorkspacePreferences } from "@op
 
 const MAX_PINNED_AGENTS = 16;
 
-export function canToggleAgentPin(pinned: readonly string[], agentId: string): boolean {
-  return pinned.includes(agentId) || pinned.length < MAX_PINNED_AGENTS;
+/**
+ * True when the chat can be pinned or unpinned: it is pinned, or the server has room for one more pin.
+ * Agent and channel pins share one limit. It makes no joined list, so a list row can call it at each
+ * change of the workspace.
+ */
+export function canToggleChatPin(
+  pinnedAgentIds: readonly string[],
+  pinnedChannelIds: readonly string[],
+  chatId: string,
+): boolean {
+  return (
+    pinnedAgentIds.includes(chatId) ||
+    pinnedChannelIds.includes(chatId) ||
+    pinnedAgentIds.length + pinnedChannelIds.length < MAX_PINNED_AGENTS
+  );
 }
 
 /** True when a server with `count` pinned chats takes one more pin. */

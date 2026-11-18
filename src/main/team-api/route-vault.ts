@@ -17,6 +17,12 @@ import {
   VAULT_V3_WIRE_ITEM_LIMIT,
   VAULT_V3_WIRE_NAME_LIMIT,
 } from "@openbot/contracts/team-protocol/vault-v3";
+import {
+  VAULT_V4_CAPABILITY,
+  VAULT_V4_ROUTES,
+  VAULT_V4_WIRE_ITEM_LIMIT,
+  VAULT_V4_WIRE_NAME_LIMIT,
+} from "@openbot/contracts/team-protocol/vault-v4";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { decodeVaultSaveInput, decodeVaultSecretRequest } from "../vault-inputs";
@@ -28,8 +34,9 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 const V1_ROUTES: ReadonlySet<string> = new Set(Object.values(VAULT_ROUTES));
 const V2_ROUTES: ReadonlySet<string> = new Set(Object.values(VAULT_V2_ROUTES));
 const V3_ROUTES: ReadonlySet<string> = new Set(Object.values(VAULT_V3_ROUTES));
+const V4_ROUTES: ReadonlySet<string> = new Set(Object.values(VAULT_V4_ROUTES));
 
-type VaultWireVersion = 1 | 2 | 3;
+type VaultWireVersion = 1 | 2 | 3 | 4;
 
 const WIRE = {
   1: { capability: VAULT_CAPABILITY, routes: VAULT_ROUTES, items: VAULT_WIRE_ITEM_LIMIT, name: VAULT_WIRE_NAME_LIMIT },
@@ -45,22 +52,32 @@ const WIRE = {
     items: VAULT_V3_WIRE_ITEM_LIMIT,
     name: VAULT_V3_WIRE_NAME_LIMIT,
   },
+  4: {
+    capability: VAULT_V4_CAPABILITY,
+    routes: VAULT_V4_ROUTES,
+    items: VAULT_V4_WIRE_ITEM_LIMIT,
+    name: VAULT_V4_WIRE_NAME_LIMIT,
+  },
 } as const;
 
 function wireVersion(path: string): VaultWireVersion | null {
+  if (V4_ROUTES.has(path)) return 4;
   if (V3_ROUTES.has(path)) return 3;
   if (V2_ROUTES.has(path)) return 2;
   return V1_ROUTES.has(path) ? 1 : null;
 }
 
 /** A list item as one wire version sends it. */
-type WireItem = VaultItemSummary | Omit<VaultLoginSummary, "hasTwoStep">;
+type WireItem = Omit<VaultItemSummary, "agents"> | Omit<VaultLoginSummary, "hasTwoStep" | "agents">;
 
 function wireItem(item: VaultItemSummary, version: VaultWireVersion): WireItem {
   const named = item.addedBy === undefined ? item : { ...item, addedBy: item.addedBy.slice(0, WIRE[version].name) };
-  if (named.kind !== "login" || version === 3) return named;
-  // `hasTwoStep` came with `vault-v3`; the item of an older version keeps its released shape.
-  const { hasTwoStep: _hasTwoStep, ...released } = named;
+  if (version === 4) return named;
+  // `agents` came with `vault-v4`; the item of an older version keeps its released shape.
+  const { agents: _agents, ...unscoped } = named;
+  if (unscoped.kind !== "login" || version === 3) return unscoped;
+  // `hasTwoStep` came with `vault-v3`.
+  const { hasTwoStep: _hasTwoStep, ...released } = unscoped;
   return released;
 }
 
@@ -80,8 +97,9 @@ function wireState(state: VaultState, version: VaultWireVersion): { status: Vaul
 
 /**
  * The Vault of this host, which an owner or administrator manages from their own computer or browser.
- * Frozen by `vault-v1`, `vault-v2` and `vault-v3`. `vault-v2` and later list and change API keys;
- * only `vault-v3` changes two-step keys and answers two-step codes.
+ * Frozen by `vault-v1` to `vault-v4`. `vault-v2` and later list and change API keys; `vault-v3` and
+ * later change two-step keys and answer two-step codes; only `vault-v4` shows and changes the agents
+ * of each item.
  *
  * A list never carries a password, a card number, a security code or an API key; `reveal` answers one
  * for the user who asked to see or copy it. `requireAdmin` runs on every route.
@@ -98,7 +116,7 @@ export async function routeVault(
     throw new HttpError(400, sourceText("error.team.vaultUnsupported"));
   requireAdmin(member);
   // `readJson` has already run the body through the codec of the route's version. An older version's
-  // codec drops `twoStepKey`, so its save keeps the saved key.
+  // codec drops `twoStepKey` and `agents`, so its save keeps the saved key and agents.
   const body = await readJson(request);
   const routes = WIRE[version].routes;
   const answer = (state: VaultState) => json(200, wireState(state, version));
@@ -121,6 +139,7 @@ export async function routeVault(
           throw new HttpError(409, sourceText("error.team.vaultResetReadable"));
         return answer(await runCauseEffect(vault.reset()));
       case VAULT_V3_ROUTES.codes:
+      case VAULT_V4_ROUTES.codes:
         return json(200, await runCauseEffect(vault.codes()));
       default:
         return answer(vault.state());

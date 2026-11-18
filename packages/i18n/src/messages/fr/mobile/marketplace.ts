@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Connexion",
   "mobile.marketplace.facts.accessLocal": "Cet ordinateur",
   "mobile.marketplace.facts.accessNone": "Sans connexion",
+  "mobile.marketplace.facts.accessMac": "Mac uniquement",
   "mobile.marketplace.permission.admin":
     "Seuls les propriétaires et les administrateurs peuvent installer depuis la Marketplace.",
   "mobile.marketplace.permission.unavailable":
@@ -97,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Aidez-moi à utiliser cette compétence.",
   "mobile.marketplace.app.add": "Ajouter l’app",
+  "mobile.marketplace.app.addCustom": "Ajout personnalisé",
   "mobile.marketplace.app.connect": "Connecter",
   "mobile.marketplace.app.connectTitle": "Connecter {name}",
   "mobile.marketplace.app.keyIntro": "Collez la clé de votre compte. Le serveur la teste avant d’enregistrer l’app.",
@@ -116,6 +118,8 @@ export const messages = {
   "mobile.marketplace.app.docs": "Obtenir une clé",
   "mobile.marketplace.app.local":
     "Cette app s’exécute sur l’ordinateur avec OpenBot. Configurez-la sur cet ordinateur.",
+  "mobile.marketplace.app.needsMac":
+    "Cette app fonctionne uniquement sur un Mac qui exécute OpenBot, et ce serveur n’est pas un Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Cette app demande une connexion dans le navigateur. Mettez à jour OpenBot sur le serveur ou connectez l’app sur l’ordinateur.",
   "mobile.marketplace.app.waiting": "En attente de la page de connexion…",

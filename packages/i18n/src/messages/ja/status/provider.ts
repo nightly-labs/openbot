@@ -10,6 +10,11 @@ export const messages = {
   "status.provider.retryUnreachable": "{provider} がサーバーに接続できません。再試行 {attempt}/{maxAttempts}。",
   "status.provider.retryServerError":
     "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}/{maxAttempts}。",
+  "status.provider.modelRetryUnreachable":
+    "{provider} がモデルプロバイダーに接続できません。再試行しています: {attempt} 回目。",
+  "status.provider.modelRetryServerError":
+    "モデルプロバイダーが混雑しているか、エラーが発生しています。{provider} が再試行しています: {attempt} 回目。",
+  "status.provider.modelRetryRecovered": "モデルプロバイダーが再び応答しています。",
   "status.provider.retryRecovered": "{provider} がサーバーから再び応答を受け取っています。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude は標準の速度で応答しました。Claude サブスクリプションでは、高速モードは使用クレジットを使います。Claude アカウントでオンにしてください。",
@@ -23,4 +28,6 @@ export const messages = {
     "Claude は標準の速度で応答しました。高速モードは Claude Code の設定または組織によってオフになっています。",
   "status.provider.claudeFastModeUnavailable":
     "Claude は標準の速度で応答しました。Claude Code はこのターンで高速モードを使えませんでした。",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code は Anthropic API キーを使うように設定されています。Anthropic は各リクエストを Claude プランではなく、キーの API クレジットに請求します。プランを使うには、Claude Code の設定または環境変数からキーを削除し、OpenBot を再起動してください。",
 } as const satisfies PartialTranslation<typeof source>;

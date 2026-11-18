@@ -9,6 +9,7 @@ import type {
   SkillConversationEvent,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
+import { GITHUB_SKILL_ID_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -27,18 +28,30 @@ const targetAgentId = z
   .max(INPUT_LIMITS.identifier)
   .describe("Stable id of the agent to change, from list_agents. Omit it to change your own agent.")
   .optional();
-// An installed skill can come from the marketplace too, so its id is not always a local skill id.
-const installedSkillId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
+// An installed skill can come from the marketplace or GitHub too, so its id is not always a local
+// skill id. A GitHub id names a repository folder and can be long.
+const installedSkillId = z.string().trim().min(1).max(GITHUB_SKILL_ID_MAX_LENGTH);
 export const installLocalSkillSchema = z.object({ agentId: targetAgentId, skillId, revision }).strict();
 const setSkillEnabledSchema = z
   .object({ agentId: targetAgentId, skillId: installedSkillId, enabled: z.boolean() })
   .strict();
 const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
 
+/** A saved skill whose latest revision does not read, for example because its frontmatter is not valid YAML. */
+export interface UnreadableLocalSkill {
+  skillId: string;
+  error: string;
+}
+
+export interface LocalSkillListing {
+  skills: MarketplaceSkillDetail[];
+  unreadable: UnreadableLocalSkill[];
+}
+
 export interface LocalSkillTools {
   create(input: CreateLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
   revise(input: ReviseLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
-  list(): Effect.Effect<MarketplaceSkillDetail[], ToolOperationFailed>;
+  list(): Effect.Effect<LocalSkillListing, ToolOperationFailed>;
   get(
     input: LocalSkillRevisionInput,
   ): Effect.Effect<MarketplaceSkillDetail & { archivePath: string }, ToolOperationFailed>;
@@ -158,8 +171,12 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
       });
       return skill;
     }
-    case "list_local_skills":
-      return (yield* api.list()).map(skillToolSummary);
+    case "list_local_skills": {
+      const { skills, unreadable } = yield* api.list();
+      const listed = skills.map(skillToolSummary);
+      // The agent names each skill that does not read, so the user can fix it or ask for help.
+      return unreadable.length ? { skills: listed, unreadable } : listed;
+    }
     case "set_skill_enabled": {
       const input = yield* toolStep(() => setSkillEnabledSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));

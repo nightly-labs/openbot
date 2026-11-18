@@ -10,22 +10,39 @@ import {
 import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
+/**
+ * The most tasks of one agent that run a turn at the same time by the agent's own limit, next to its
+ * own chat. Frozen by `agent-task-limit-v1`, `agent-tasks-v1` and the instance archive.
+ */
 export const AGENT_TASK_LIMIT_MAX = 4;
-/** The task limit of an agent that has no limit of its own. */
+/**
+ * The most that an owner or admin can set as the host default for agents with no limit of their own
+ * (`HostTurnLimits.agentTaskLimit`, `host-turn-limits-v1`).
+ */
+export const HOST_AGENT_TASK_LIMIT_MAX = 64;
+/** The built-in task limit of an agent that has no limit of its own, when the host sets no default. */
 export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
 }
 
+/** A host default task limit, or a limit that follows it. */
+export function isHostAgentTaskLimit(value: unknown): value is number {
+  return integerInRange(value, 1, HOST_AGENT_TASK_LIMIT_MAX);
+}
+
 /**
  * How many tasks of the agent run a turn at the same time. A provider that runs one turn at a time
- * runs one task, and the agent's own chat waits for it.
+ * runs one task, and the agent's own chat waits for it. `hostDefault` is the limit of an agent that
+ * has no limit of its own.
  */
-export function agentTaskLimit(agent: { provider: AgentProviderId; taskLimit?: number }): number {
+export function agentTaskLimit(
+  agent: { provider: AgentProviderId; taskLimit?: number },
+  hostDefault: number = AGENT_TASK_LIMIT_DEFAULT,
+): number {
   if (!agentProviderDescriptor(agent.provider).concurrentTurns) return 1;
-  return agent.taskLimit ?? AGENT_TASK_LIMIT_DEFAULT;
+  return agent.taskLimit ?? hostDefault;
 }
 
 export const AGENT_TASK_STATES = ["running", "queued", "idle", "closed"] as const;
@@ -55,6 +72,25 @@ export type AgentTaskOutcome = (typeof AGENT_TASK_OUTCOMES)[number];
 
 /** The most characters of a queued message that a task row shows. */
 export const AGENT_TASK_QUEUED_PREVIEW = 500;
+
+/** The states of a request whose answer has not come back yet. */
+export const AGENT_TASK_AWAITED_STATES = ["queued", "starting", "running"] as const;
+
+/** A request that the agent sent from a task to another agent, whose answer has not come back yet. */
+export interface AgentTaskAwaitedReply {
+  messageId: string;
+  recipientAgentId: string;
+  status: (typeof AGENT_TASK_AWAITED_STATES)[number];
+}
+
+export function isAgentTaskAwaitedReply(value: unknown): value is AgentTaskAwaitedReply {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.messageId) &&
+    isIdentifier(value.recipientAgentId) &&
+    isOneOf(AGENT_TASK_AWAITED_STATES, value.status)
+  );
+}
 
 /** A message that waits to start in a task. */
 export interface AgentTaskQueuedMessage {
@@ -93,6 +129,11 @@ export interface AgentTask {
    * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
    */
   queue?: QueueDelivery[];
+  /**
+   * The requests that the agent sent from this task and that wait for their answer. A joined server
+   * sends them through `agent-thread-requests-v1`; the frozen `agent-tasks-v1` routes do not.
+   */
+  awaitedReplies?: AgentTaskAwaitedReply[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -255,6 +296,8 @@ export function isAgentTask(value: unknown): value is AgentTask {
     Array.isArray(value.queuedMessages) &&
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
     (value.queue === undefined || (Array.isArray(value.queue) && value.queue.every(isQueueDelivery))) &&
+    (value.awaitedReplies === undefined ||
+      (Array.isArray(value.awaitedReplies) && value.awaitedReplies.every(isAgentTaskAwaitedReply))) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
@@ -280,6 +323,6 @@ export function isAgentTasksSnapshot(value: unknown): value is AgentTasksSnapsho
     Array.isArray(value.tasks) &&
     value.tasks.length <= INPUT_LIMITS.agentTasks &&
     value.tasks.every(isAgentTask) &&
-    isAgentTaskLimit(value.limit)
+    isHostAgentTaskLimit(value.limit)
   );
 }

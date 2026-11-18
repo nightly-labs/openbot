@@ -24,6 +24,8 @@ export const messages = {
   "error.remote.testActive": "Um teste de área de trabalho remota está ativo. Tente novamente quando terminar.",
   "error.remote.screenRecordingDenied":
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
+  "error.remote.windowsSessionDisconnected":
+    "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
   "error.remote.teamSessionExpired": "A sessão da equipe expirou.",
   "error.remote.finishTestBeforeSwitch": "Conclua o teste de área de trabalho remota antes de trocar de tela.",
   "error.remote.displayNotFound": "Tela remota não encontrada.",
@@ -87,7 +89,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",
   "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
-  "error.remote.hostDisconnected": "O computador anfitrião WebRTC se desconectou.",
+  "error.remote.hostDisconnected":
+    "A conexão com o servidor foi perdida. Verifique se a ação foi concluída e tente novamente.",
   "error.remote.eventGap": "Há uma lacuna na sequência de eventos do computador anfitrião.",
   "error.remote.malformedKnownEvent": "O computador anfitrião retornou um evento conhecido malformado.",
   "error.remote.fileTransportIsStopped": "O transporte de arquivos WebRTC está parado.",
@@ -155,6 +158,7 @@ export const messages = {
   "error.remote.attachmentRejected": "O computador anfitrião rejeitou o anexo.",
   "error.remote.attachmentTooLarge": "Os anexos devem ter no máximo 10 MB.",
   "error.remote.attachmentBusy": "Aguarde o anexo atual terminar.",
+  "error.remote.attachmentChanged": "O arquivo mudou ou não está disponível. Selecione-o novamente.",
   "error.remote.uploadTimeout": "O tempo para enviar o anexo esgotou.",
   "error.remote.hostSessionActive": "O computador anfitrião já tem uma sessão remota ativa.",
   "error.remote.tooManyConnections": "Há conexões remotas ativas demais.",

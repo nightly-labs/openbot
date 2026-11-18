@@ -156,8 +156,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "גישת הסוכן",
   "agentSettings.runtime.busyMessage": "בזמן עבודה",
   "agentSettings.runtime.busyMessageLabel": "הודעות בזמן שהסוכן עובד",
-  "agentSettings.runtime.taskLimit": "שרשורים במקביל",
-  "agentSettings.runtime.taskLimitLabel": "שרשורים שפועלים בו זמנית",
   "agentSettings.runtime.workingDirectory": "תיקיית עבודה",
   "agentSettings.runtime.notAvailable": "עדיין לא זמין",
   "agentSettings.runtime.fullAccessNote": "הסוכן פועל עם גישה מלאה למחשב מתוך סביבת העבודה שלו והתיקייה המשותפת.",
@@ -176,8 +174,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "הכוונה",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} אינו יכול להכווין תור שרץ. הודעות שנשלחות בזמן שהוא עובד ממתינות בתור.",
-  "agentSettings.taskLimit.default": "ברירת מחדל ({count})",
-  "agentSettings.taskLimit.oneTurn": "{provider} מריץ תור אחד בכל פעם. השרשורים של הסוכן הזה ממתינים זה לזה.",
 
   "agentSettings.notificationLevel.title": "התראות אליי",
   "agentSettings.notificationLevel.server": "ברירת המחדל של השרת ({level})",

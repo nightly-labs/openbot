@@ -4,6 +4,7 @@ import type { AgentProfile } from "@openbot/ui/data";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import type { LibraryDropMark } from "./library-folder-drag";
 import type { LibraryLocation } from "./library-folders-view";
 
 interface LibraryPathHeadProps {
@@ -15,11 +16,16 @@ interface LibraryPathHeadProps {
   /** The folders above the folder of the place, from the top level down. */
   parents: readonly LibraryFolder[];
   onGo: (place: LibraryLocation) => void;
+  /** How a step of the path shows a drop. */
+  dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
   /** The controls at the end of the row. */
   children: JSX.Element;
 }
 
-/** The top row of the Library with folders: the path of the place, then the controls of the page. */
+/**
+ * The top row of the Library with folders: the path of the place, then the controls of the page. Each
+ * step of the path takes dropped files and folders, and a drag that stays on a step goes there.
+ */
 export function LibraryPathHead(props: LibraryPathHeadProps) {
   /** The agent of the current folder. It is the first step of the path. */
   const parentAgent = () => (props.place.kind === "folder" ? props.agent : undefined);
@@ -36,6 +42,9 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
                 variant="ghost"
                 size="sm"
                 class="library-crumb"
+                data-library-agent={agent.id}
+                data-library-drop="go"
+                data-drop={props.dropMark(agent.id, null) === "into" ? "into" : undefined}
                 onClick={() => props.onGo({ kind: "agent", agentId: agent.id })}
               >
                 <AgentAvatar agent={agent} class="library-path-avatar" />
@@ -55,6 +64,10 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
                 variant="ghost"
                 size="sm"
                 class="library-crumb"
+                data-library-agent={folder().agentId}
+                data-library-folder={folder().id}
+                data-library-drop="go"
+                data-drop={props.dropMark(folder().agentId, folder().id) === "into" ? "into" : undefined}
                 onClick={() => props.onGo({ kind: "folder", agentId: folder().agentId, folderId: folder().id })}
               >
                 <span class="library-truncate" dir="auto">

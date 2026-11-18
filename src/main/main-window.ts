@@ -30,6 +30,7 @@ import {
   clipboard,
   type Display,
   dialog,
+  type Event as ElectronEvent,
   type Input,
   Menu,
   type MenuItemConstructorOptions,
@@ -50,6 +51,7 @@ import {
   isSelectAllShortcut,
   isToggleDevToolsShortcut,
 } from "../backend/browser-shortcuts";
+import { allowPinchZoom } from "../backend/pinch-zoom";
 import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
@@ -170,6 +172,11 @@ export interface MainWindowContext {
   workingAgents: () => AgentSummary[];
   /** A function, not a value: the user can change the choice while the window is open. */
   quitGuard: () => QuitGuard;
+  /**
+   * True when the user kept OpenBot running at a close while agents worked, so the tray icon must
+   * show; false when the main window shows again.
+   */
+  onHiddenWhileWorking: (hidden: boolean) => void;
 }
 
 export interface MainWindowController {
@@ -210,6 +217,7 @@ export function createMainWindowController({
   quitFromShortcut,
   workingAgents,
   quitGuard,
+  onHiddenWhileWorking,
 }: MainWindowContext): MainWindowController {
   const quitShortcut =
     process.platform === "darwin"
@@ -229,6 +237,44 @@ export function createMainWindowController({
       reportError,
     });
   let rendererReloadTimes: number[] = [];
+  let closeConfirmationOpen = false;
+  /** The user chose to quit in the question, so the next close goes through. */
+  let closeConfirmed = false;
+
+  /**
+   * The user can keep OpenBot running for this close, with the tray icon as the way back, quit,
+   * or keep the window. Keeping it running does not change the saved choice in Settings.
+   */
+  function confirmCloseWhileWorking(window: BrowserWindow): void {
+    const translate = getTranslate();
+    closeConfirmationOpen = true;
+    void dialog
+      .showMessageBox(window, {
+        type: "question",
+        message: translate("menu.closeWorkingTitle", { count: workingAgents().length }),
+        detail: translate("menu.closeWorkingBody"),
+        buttons: [translate("menu.closeKeepRunning"), translate("menu.quitConfirm"), translate("common.cancel")],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
+      })
+      .then(({ response }) => {
+        if (window.isDestroyed()) return;
+        if (response === 0) {
+          rememberMainWindowBounds(window.getNormalBounds());
+          getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
+          onHiddenWhileWorking(true);
+          window.hide();
+        } else if (response === 1) {
+          closeConfirmed = true;
+          window.close();
+        }
+      })
+      .catch((error: unknown) => reportError("Unable to ask before the main window closes:", error))
+      .finally(() => {
+        closeConfirmationOpen = false;
+      });
+  }
 
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
@@ -284,6 +330,19 @@ export function createMainWindowController({
       }
     });
     window.on("close", (event) => {
+      // On Windows and Linux the close quits OpenBot and stops the agents that work (#6391). Ask
+      // first, while the agents are still known: after the close it is too late.
+      if (
+        process.platform !== "darwin" &&
+        !keepRunningInBackground() &&
+        !isQuitting() &&
+        !closeConfirmed &&
+        workingAgents().length > 0
+      ) {
+        event.preventDefault();
+        if (!closeConfirmationOpen) confirmCloseWhileWorking(window);
+        return;
+      }
       rememberMainWindowBounds(window.getNormalBounds());
       // Nobody can use a tab without the window, so the agents waiting on it continue.
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
@@ -296,6 +355,7 @@ export function createMainWindowController({
         window.hide();
       }
     });
+    window.on("show", () => onHiddenWhileWorking(false));
     onMainWindowCreated(window);
     window.on("closed", () => {
       if (holder.current === window) holder.current = null;
@@ -338,6 +398,7 @@ export function createMainWindowController({
       });
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
+    allowPinchZoom(window.webContents);
     followWindowButtonSide(window, getLayoutDirection);
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
@@ -431,6 +492,7 @@ export function createMainWindowController({
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
+    allowPinchZoom(window.webContents);
     followWindowButtonSide(window, getLayoutDirection);
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
@@ -451,7 +513,13 @@ export function createMainWindowController({
 
   function loadRenderer(window: BrowserWindow): Promise<void> {
     onRendererLoadStarted();
-    return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString());
+    return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString()).catch((error: unknown) => {
+      // Another load of the page, such as View > Reload while the start loads, replaced this one. The
+      // window still loads OpenBot, so the start waits for that load instead of failing (#11326). A stop
+      // also gives ERR_ABORTED, but then nothing loads, and no event would end the wait.
+      if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
+      return replacementLoad(window.webContents, error);
+    });
   }
 
   async function ensureMainWindow(): Promise<BrowserWindow> {
@@ -683,6 +751,10 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   // X11: a window that is not focusable when it is made has no window manager, so it never takes keys.
   // A dock window that is focusable at first stays on top on each desktop and takes keys for the chat.
   const x11 = process.platform === "linux";
+  // Hyprland ignores the X11 shape and draws its border and shadow around the full window, also around
+  // its empty part (#9855). It draws none around a splash window, which floats and takes focus on a
+  // click there, as a dock window does.
+  const x11Type = process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
@@ -699,7 +771,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     hasShadow: false,
     skipTaskbar: true,
     // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
-    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11Type : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -767,8 +839,9 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
   // A floating level, which is the only thing that holds this window in front on macOS: both
   // `moveAbove` and `moveTop` return without an error and leave a transparent panel where it was.
   // The level stays below the menu bar, and the rim is a thin edge around one window, so being in
-  // front costs the user almost none of what is behind it.
-  window.setAlwaysOnTop(true, "floating");
+  // front costs the user almost none of what is behind it. On Windows, Electron puts a "floating"
+  // window just behind the taskbar, where a full-screen app can put it under other apps.
+  window.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
   // The agent works wherever the user left the window, which can be another Space or another
   // application's full screen. One overlay on every Space is what lets the rim follow it there
   // without a second window and without pulling the user out of the Space they are on. The
@@ -855,6 +928,40 @@ function appRendererUrl(developmentUrl: string | undefined): URL {
 
 function chatWindowKey(target: ChatWindowTarget): string {
   return JSON.stringify([target.serverId, target.agentId]);
+}
+
+/** `ERR_ABORTED`: Electron rejects a `loadURL` with it when a newer load of the window starts first. */
+const REPLACED_LOAD_ERROR = -3;
+
+function isReplacedLoad(error: unknown): error is Error {
+  return error instanceof Error && "errno" in error && error.errno === REPLACED_LOAD_ERROR;
+}
+
+/** Settles as `loadURL` does, for the load that replaced the first one, or for the next that replaces it. */
+function replacementLoad(contents: WebContents, replaced: Error): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const settle = (error: Error | null) => {
+      contents.off("did-finish-load", onFinish);
+      contents.off("did-fail-load", onFail);
+      contents.off("did-stop-loading", onStop);
+      contents.off("destroyed", onStop);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onFinish = () => settle(null);
+    const onFail = (_event: ElectronEvent, code: number, description: string, url: string, isMainFrame: boolean) => {
+      if (!isMainFrame || code === REPLACED_LOAD_ERROR) return;
+      settle(
+        Object.assign(new Error(`${description} (${code}) loading '${url}'`), { errno: code, code: description, url }),
+      );
+    };
+    // A load that stops with no finish or failure, or a window that closes, fails as the first load did.
+    const onStop = () => settle(replaced);
+    contents.on("did-finish-load", onFinish);
+    contents.on("did-fail-load", onFail);
+    contents.on("did-stop-loading", onStop);
+    contents.on("destroyed", onStop);
+  });
 }
 
 /** The entry for the helper windows. It does not load `App`, so each window uses less memory. */

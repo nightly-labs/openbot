@@ -87,6 +87,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "אני מצהיר/ה שאני מקבל/ת את {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "מדיניות הפרטיות",
   "sitePage.pricing.consent.terms": "התנאים וזכות הביטול",
+  "sitePage.pricing.consent.earlyStart":
+    "אני מבקש/ת ששירות האחסון יתחיל לפני תום תקופת הביטול בת 14 הימים. ידוע לי שאם אבטל את החוזה לפני שהשירות בוצע במלואו, אצטרך לשלם על השירותים שניתנו עד מועד הביטול, ושלאחר שהשירות יבוצע במלואו, אאבד את זכותי לבטל את החוזה.",
   "sitePage.teams.title": "OpenBot לצוותים",
   "sitePage.teams.description":
     "אפשר להריץ את OpenBot על תשתית מנוהלת, או לתת לנו לתכנן פריסה מותאמת סביב הצוות, תהליכי העבודה והמערכות הקיימות שלכם.",
@@ -373,6 +375,7 @@ export const messages = {
   "sitePage.landing.download.appStore": "הורדה מ-App Store",
   "sitePage.landing.download.googlePlay": "זמין ב-Google Play",
   "sitePage.landing.download.pages": "דרישות מערכת ושלבי התקנה:",
+  "sitePage.landing.download.apk": "הורדת APK",
   "sitePage.site.download": "הורדה",
   "sitePage.site.app": "אפליקציה",
   "sitePage.site.primaryNavigation": "ניווט ראשי",

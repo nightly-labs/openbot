@@ -143,8 +143,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "에이전트 접근 권한",
   "agentSettings.runtime.busyMessage": "작업 중일 때",
   "agentSettings.runtime.busyMessageLabel": "에이전트가 작업 중일 때의 메시지",
-  "agentSettings.runtime.taskLimit": "병렬 스레드",
-  "agentSettings.runtime.taskLimitLabel": "동시에 실행되는 스레드",
   "agentSettings.runtime.workingDirectory": "작업 디렉터리",
   "agentSettings.runtime.notAvailable": "아직 사용할 수 없음",
   "agentSettings.runtime.fullAccessNote": "에이전트가 워크스페이스와 공유 폴더에서 컴퓨터 전체 접근 권한으로 실행돼요.",
@@ -162,9 +160,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "방향 지시",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider}은(는) 실행 중인 턴에 방향을 지시할 수 없어요. 작업 중에 보낸 메시지는 대기열에서 기다려요.",
-  "agentSettings.taskLimit.default": "기본값({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider}은(는) 한 번에 한 턴씩 실행해요. 이 에이전트의 스레드는 서로를 기다려요.",
   "agentSettings.notificationLevel.title": "내 알림",
   "agentSettings.notificationLevel.server": "서버 기본값 ({level})",
   "agentSettings.notificationLevel.note":

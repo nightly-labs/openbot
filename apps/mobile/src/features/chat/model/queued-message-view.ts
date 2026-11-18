@@ -23,5 +23,7 @@ export function queuedMessageLocks(delivery: QueueDelivery, state: QueueActionSt
     locked: state.busy || !state.online || Boolean(state.held && state.held.id !== delivery.id),
     // Another device holds this one. Only confirmed deletion remains available.
     editedElsewhere: Boolean(delivery.editing) && state.held?.id !== delivery.id,
+    // The host keeps a message under an edit hold in the queue, also when the hold is this phone's.
+    heldForEdit: Boolean(delivery.editing) || state.held?.id === delivery.id,
   };
 }

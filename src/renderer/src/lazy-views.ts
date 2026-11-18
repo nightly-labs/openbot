@@ -22,6 +22,11 @@ export const AgentUsagePanel = lazy(() =>
 export const LibraryPanel = lazy(() =>
   import("./features/files/LibraryPanel").then((module) => ({ default: module.LibraryPanel })),
 );
+export const CrmPage = lazy(() => import("./features/crm/CrmPage").then((module) => ({ default: module.CrmPage })));
+/** The CRM page without the desktop contexts, for the browser app. */
+export const CrmScreen = lazy(() =>
+  import("./features/crm/CrmScreen").then((module) => ({ default: module.CrmScreen })),
+);
 export const ServerLibrary = lazy(() =>
   import("./features/files/ServerLibrary").then((module) => ({ default: module.ServerLibrary })),
 );
@@ -41,6 +46,9 @@ export const InitialSetup = lazy(() =>
 );
 export const AddServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/AddServerDialog").then((module) => ({ default: module.AddServerDialog })),
+);
+export const HostedPricingPage = lazy(() =>
+  import("@openbot/ui/features/servers/HostedPricingPage").then((module) => ({ default: module.HostedPricingPage })),
 );
 export const CreateLocalServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/CreateLocalServerDialog").then((module) => ({

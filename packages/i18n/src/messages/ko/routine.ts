@@ -217,6 +217,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "{name} 열기",
   "routine.calendar.completed": "완료됨",
+  "routine.calendar.new": "새 루틴",
+  "routine.calendar.newOn": "{day}에 새 루틴",
+  "routine.calendar.agent": "에이전트",
+  "routine.calendar.agentChoice": "에이전트: {name}",
 
   "routine.settings.loadFailed": "루틴을 불러올 수 없어요.",
   "routine.settings.loadRunsFailed": "실행 기록을 불러올 수 없어요.",
@@ -233,6 +237,7 @@ export const messages = {
   "routine.settings.loading": "루틴을 불러오는 중…",
   "routine.settings.empty": "아직 루틴이 없어요.",
   "routine.settings.paused": "일시 정지됨",
+  "routine.settings.pausedByRun": "{time} 실행에서 일시 정지됨",
   "routine.settings.completed": "완료 · {schedule}",
   "routine.settings.active": "활성",
   "routine.settings.pauseFailed": "이 루틴을 일시 정지할 수 없어요.",

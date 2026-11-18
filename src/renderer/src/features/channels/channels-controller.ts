@@ -115,6 +115,8 @@ function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPa
 
 /** How many left channels keep their page for the next visit. */
 const KEPT_PAGES = 6;
+/** The shortest time from the start of one read to the next one that only host events asked for. */
+const CHANGE_READ_GAP_MS = 250;
 
 export function createChannelsController(env: ChannelsEnvironment) {
   const [state, setState] = createStore<ChannelsState>({
@@ -178,6 +180,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
   let readToken = 0;
   let laterRead: Promise<void> | null = null;
   let settleLaterRead: (() => void) | null = null;
+  /** When the current read started, for the gap before a read that only host events asked for. */
+  let readStartedAt = 0;
+  /** Ends the gap before a read that waits for it, so the read starts now. */
+  let endWaitingGap: (() => void) | null = null;
   /**
    * `withPage: false` reads only the list: a change in another channel moves its row and its unread
    * count, and the open transcript stays as it is. Before, each streamed chunk of any channel read
@@ -191,6 +197,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       return reading;
     }
     const token = ++readToken;
+    readStartedAt = Date.now();
     const run = read(selectedOverride, withPage).finally(() => {
       if (token !== readToken) return;
       reading = null;
@@ -201,11 +208,39 @@ export function createChannelsController(env: ChannelsEnvironment) {
         const page = readAgainPage;
         readAgain = false;
         readAgainPage = false;
-        void refresh(undefined, page).finally(() => settle?.());
+        const gap = settle ? 0 : CHANGE_READ_GAP_MS - (Date.now() - readStartedAt);
+        if (gap <= 0) void refresh(undefined, page).finally(() => settle?.());
+        else readAfterGap(gap, page);
       } else settle?.();
     });
     reading = run;
     return run;
+  }
+  /**
+   * Host events alone asked for the next read, so it starts `CHANGE_READ_GAP_MS` after the last one.
+   * Each streamed chunk of each member is an event, and a read lists every channel and reads the
+   * open page: back to back, with many members writing, the reads kept the host busy all the time.
+   * The events of the gap join this read. A write that waits for a read (`refreshAfter`) ends the
+   * gap at once, and a navigation replaces the read.
+   */
+  function readAfterGap(gap: number, page: boolean): void {
+    const held = new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, gap);
+      endWaitingGap = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    }).then(() => {
+      endWaitingGap = null;
+      if (reading !== held) return;
+      reading = null;
+      if (disposed) return;
+      const withPage = page || readAgainPage;
+      readAgain = false;
+      readAgainPage = false;
+      return refresh(undefined, withPage);
+    });
+    reading = held;
   }
   /**
    * A read that starts after this call.
@@ -221,6 +256,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     laterRead ??= new Promise<void>((resolve) => {
       settleLaterRead = resolve;
     });
+    endWaitingGap?.();
     return laterRead;
   }
   async function read(selectedOverride?: string | null, withPage = true) {
@@ -257,6 +293,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
+          if (page.waits === undefined) delete state.page.waits;
+          else state.page.waits = page.waits;
           if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else if (withPage || !selectedExists) state.page = page;
         if (withPage || !selectedExists) state.loading = false;
@@ -608,10 +646,20 @@ export function createChannelsController(env: ChannelsEnvironment) {
         state.editing = "settings";
       });
     },
+    /**
+     * The delete dialog shows a failure, so it does not stay as the open channel's error with a Retry
+     * of this delete. The host refuses it while a task runs there (#10472).
+     */
     remove: async (channelId: string) => {
-      if (!(await command({ type: "archive", channelId, operationId: crypto.randomUUID() }))) {
-        throw new Error(state.error ?? currentText().t("channel.error.delete"));
+      if (await command({ type: "archive", channelId, operationId: crypto.randomUUID() })) return;
+      const message = state.error ?? currentText().t("channel.error.delete");
+      if (failedCommand?.type === "archive" && failedCommand.channelId === channelId) {
+        failedCommand = null;
+        setState((state) => {
+          Object.assign(state, { error: null, errorReference: null });
+        });
       }
+      throw new Error(message);
     },
     /**
      * A deleted channel comes back with its history. Its stopped tasks stay stopped. The sidebar menu

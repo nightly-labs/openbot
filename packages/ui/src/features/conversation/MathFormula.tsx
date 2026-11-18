@@ -1,5 +1,6 @@
 import type katex from "katex";
 import { createMemo, createSignal, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { CodeBlock } from "./CodeBlock";
 
 // Settled messages render again as the list scrolls, so each formula is typeset once. Cap the size
@@ -69,7 +70,15 @@ export function MathFormula(props: { tex: string; raw: string; display: boolean;
       <Show when={html()} fallback={source()}>
         {(value) => (
           // A formula reads left to right in every paragraph, and its own direction isolates it.
-          <span class={props.display ? "message-math-display" : undefined} dir="ltr" innerHTML={value()} />
+          <Show
+            when={props.block}
+            fallback={<span class={props.display ? "message-math-display" : undefined} dir="ltr" innerHTML={value()} />}
+          >
+            {/* A formula of its own scrolls sideways with the arrows, as a table does. */}
+            <ScrollEdges axis="x" viewClass="message-math-display" dir="ltr">
+              <span innerHTML={value()} />
+            </ScrollEdges>
+          </Show>
         )}
       </Show>
     </Show>

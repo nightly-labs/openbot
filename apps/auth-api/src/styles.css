@@ -6,6 +6,7 @@
 @import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
 @import "@openbot/ui/styles/sr-only.css";
+@import "@openbot/ui/styles/scroll-edges.css";
 
 /* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
    so the hero does not move when the font changes. Inter is wider than the system font, and on a
@@ -34,6 +35,14 @@
   --openbot-font-sans:
     "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
     sans-serif;
+  /* The site keeps the type scale that it was designed for. The app made its three small steps 1px
+   * larger, in @openbot/brand/tokens.css. */
+  --openbot-text-sm: 12px;
+  --openbot-text-md: 13px;
+  --openbot-text-lg: 14px;
+  --openbot-leading-sm: 16px;
+  --openbot-leading-md: 18px;
+  --openbot-leading-lg: 20px;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;
@@ -1880,6 +1889,59 @@ a {
   width: 15px;
   height: 15px;
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* A card with two downloads is a box, not a link. Its first link covers the card, so the card
+   opens it as the other cards open theirs. The second link is above that cover. */
+.landing-download-card:has(.landing-download-card-link) {
+  position: relative;
+}
+
+.landing-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 28px;
+  margin-top: 28px;
+}
+
+.landing-download-actions .landing-download-action {
+  margin-top: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The radius of `.landing-download-card`. `inherit` would take the radius of the link, which has none. */
+.landing-download-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+}
+
+.landing-download-card-link:focus-visible {
+  outline: none;
+}
+
+.landing-download-card-link:focus-visible::after {
+  outline: 3px solid var(--openbot-download-card-focus);
+  outline-offset: 3px;
+}
+
+.landing-download-action-alternate {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-download-action-alternate:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--openbot-download-card-focus);
+  outline-offset: 4px;
+}
+
+.landing-download-action-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .landing-download-heading[data-revealed="false"],
@@ -4027,6 +4089,16 @@ a {
 
   .landing-download-card[data-state="available"]:hover .landing-download-arrow {
     transform: translate(2px, -2px);
+  }
+
+  /* The pointer is on the second link, so the card does not show its first link as the target. */
+  .landing-download-card[data-state="available"]:has(.landing-download-action-alternate:hover) .landing-download-arrow {
+    transform: none;
+  }
+
+  .landing-download-action-alternate:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
 
   .landing-footer-social:hover {
@@ -6442,13 +6514,18 @@ a {
 }
 
 /* Blurs the faces behind the text, and fades out from the centre, so it has no edge.
-   The pointer goes through it to the faces. */
+   The pointer goes through it to the faces. The box ends where the fade does: the faces
+   in it keep still, because the blur draws the whole box again when one of them moves. */
 .post-cta-veil {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: min(100%, 1080px);
+  height: 510px;
+  translate: -50% -50%;
   background: color-mix(in srgb, var(--openbot-bg-canvas) 62%, var(--openbot-transparent));
   backdrop-filter: blur(16px);
-  mask-image: radial-gradient(720px 340px at 50% 50%, var(--openbot-mask-solid) 50%, var(--openbot-transparent) 100%);
+  mask-image: radial-gradient(closest-side, var(--openbot-mask-solid) 66%, var(--openbot-transparent) 100%);
   pointer-events: none;
 }
 
@@ -6490,6 +6567,10 @@ a {
   }
 
   .post-cta-veil {
+    inset: 0;
+    width: auto;
+    height: auto;
+    translate: none;
     mask-image: radial-gradient(340px 400px at 50% 50%, var(--openbot-mask-solid) 55%, var(--openbot-transparent) 100%);
   }
 }

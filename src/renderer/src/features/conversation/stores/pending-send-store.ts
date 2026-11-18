@@ -37,6 +37,11 @@ export interface PendingSend {
    */
   queued: boolean;
   /**
+   * A `queued` send that the host has not answered after a moment. The queue panel cannot show it
+   * yet, so the chat does: a message is never out of view while a slow host answers.
+   */
+  late: boolean;
+  /**
    * Sent while the agent was idle, and answered a moment ago. The host queues each message before it
    * starts it, so for a short time the chat keeps this row and the queue panel does not show it.
    */
@@ -53,6 +58,12 @@ const RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 /** How long a send made while the agent was idle may wait to start before the queue panel shows it. */
 const START_GRACE_MS = 3000;
+
+/**
+ * How long a send made while the agent works stays out of the chat. A host that answers in this
+ * time shows it in the queue panel, so it does not show in the chat for a moment and then move.
+ */
+const QUEUED_REVEAL_MS = 400;
 
 /** Whether Retry cannot store the message twice: the host drops a repeat, and its window is still open. */
 export function pendingSendRetrySafe(send: PendingSend, now = Date.now()): boolean {
@@ -136,6 +147,7 @@ export function createPendingSendStore() {
       queued: false,
       ...input,
       starting: false,
+      late: false,
       clientMessageId: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       state: "waiting",
@@ -145,6 +157,12 @@ export function createPendingSendStore() {
     };
     deliverers.set(send.clientMessageId, deliver);
     queues.set(key, [...(queues.get(key) ?? []), send]);
+    if (send.queued)
+      window.setTimeout(() => {
+        if (find(key, send.clientMessageId) !== send || send.state === "sent") return;
+        send.late = true;
+        publish(key);
+      }, QUEUED_REVEAL_MS);
     publish(key);
     pump(key);
   }

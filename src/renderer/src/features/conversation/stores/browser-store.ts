@@ -77,6 +77,9 @@ export interface BrowserStoreDeps {
   >;
   browserAddress: () => string;
   setBrowserAddress: (address: string) => void;
+  /** A chat window asked the main window to show this page of a browser takeover. */
+  takeoverPageRequest: () => { agentId: string; tabId: string } | null;
+  setTakeoverPageRequest: (request: null) => void;
   /** `cause` is the failure behind `error`. The banner shows its code. */
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   panels: BrowserPanels;
@@ -227,6 +230,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const resolution = untrack(browserTakeoverResolution);
     if (resolution && resolution.messageMarker !== messageMarker) setBrowserTakeoverResolution(null);
   });
+  /**
+   * The tab that the takeover card opened in the full view. The view covers the chat, so when the step on
+   * that tab ends there, the chat shows again with the page beside it (#9979). A view that the user opened
+   * on their own stays open.
+   */
+  let takeoverFullViewTabId: string | null = null;
+  createEffect(
+    () => deps.panels.activeRightPanel() === "browser-expanded",
+    (expanded) => {
+      if (!expanded) takeoverFullViewTabId = null;
+    },
+  );
   const respondToBrowserTakeover = async (decision: "complete" | "cancel") => {
     const request = deps.props.browserTakeover;
     if (!request) return false;
@@ -254,6 +269,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         : undefined,
     );
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
+    // The user can be on another tab of the full view by now. Then that page stays.
+    if (
+      completed &&
+      takeoverFullViewTabId === request.tabId &&
+      activeBrowserTab()?.id === request.tabId &&
+      deps.panels.activeRightPanel() === "browser-expanded"
+    )
+      deps.panels.setActiveRightPanel("browser");
     return completed;
   };
   // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
@@ -282,12 +305,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
    * start yet. The card carries the page preview instead, and pressing that preview is what opens
    * the page -- the same gesture as a preview card in the browser sidebar.
    */
-  function openBrowserTakeoverTab() {
-    const tab = browserTakeoverTab();
+  function openBrowserTakeoverTab(tab = browserTakeoverTab()) {
     if (!tab) return;
     if (browserTabs().some((entry) => entry.id === tab.id)) {
       if (deps.props.activeBrowserTabId !== tab.id) activateBrowserTab(tab.id);
       deps.panels.setActiveRightPanel("browser-expanded");
+      takeoverFullViewTabId = tab.id;
       return;
     }
     // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat
@@ -298,6 +321,30 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     deps.panels.setActiveRightPanel("browser-expanded", owner.id);
     deps.props.onSelectAgent(owner.id);
   }
+
+  /** False when a press of the page would do nothing: this view does not have the tab, or cannot show it. */
+  const canOpenBrowserTakeoverTab = () => {
+    const tab = browserTakeoverTab();
+    if (!tab) return false;
+    if (browserTabs().some((entry) => entry.id === tab.id)) return true;
+    return browserTabOwner(tab) !== undefined && browserInteractionAvailable() && !closingBrowserTabIds.has(tab.id);
+  };
+
+  // A chat window shows no browser, so its card asks the main window to open the page. The view of the
+  // agent opens it when the tab is in its list, as a press of the page here would.
+  createEffect(
+    () => {
+      const request = deps.takeoverPageRequest();
+      if (!request || request.agentId !== deps.props.agent?.id) return undefined;
+      return browserTabs().find((tab) => tab.id === request.tabId);
+    },
+    (tab) => {
+      if (!tab) return;
+      deps.setTakeoverPageRequest(null);
+      // Untracked: the open reads the tabs and the panel, which must not run this effect again.
+      untrack(() => openBrowserTakeoverTab(tab));
+    },
+  );
 
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
   /** Only the desktop app opens a window on this computer, and only for a web page of a remote server. */
@@ -312,6 +359,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const tab = browserTakeoverTab();
     return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
   };
+
+  /** The web client cannot send a sign-in from this device, so a page that refused the server needs the desktop app (#9783). */
+  const takeoverNeedsDesktopSignIn = () =>
+    deps.props.runtime !== undefined && deps.props.browserTakeover?.reason === "sign-in-blocked";
 
   /** The agent found that the takeover page refused the sign-in from the server, and this computer can sign in. */
   function blockedTakeoverSignIn() {
@@ -840,6 +891,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTakeoverResolution,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    canOpenBrowserTakeoverTab,
     localSignIn: {
       state: localSignIn,
       canStart: canSignInLocally,
@@ -847,6 +899,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       canStartForTakeover: canSignInTakeoverLocally,
       startForTakeover: signInTakeoverTabLocally,
       blockedTakeover: blockedTakeoverSignIn,
+      needsDesktopForTakeover: takeoverNeedsDesktopSignIn,
       reopen: openLocalSignInWindow,
       finish: () => finishLocalSignIn(),
       cancel: cancelLocalSignIn,

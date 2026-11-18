@@ -2,7 +2,7 @@ import { isDynamicIslandServerVisible } from "@openbot/contracts/ipc";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import type { DynamicIslandText } from "@openbot/team-client/dynamic-island-presentation";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, flush, onSettled, untrack } from "solid-js";
+import { createEffect, flush, onCleanup, onSettled, untrack } from "solid-js";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
@@ -24,13 +24,18 @@ import { dynamicIslandPort } from "./dynamic-island-port";
  * Publishing is batched through `queueMicrotask` rather than an effect. Several
  * of the callers below fire in the same flush - a scoped event, the retain
  * effect, a resolved action - and main only needs the last presentation, so the
- * scheduled flag collapses them into one IPC call.
+ * scheduled flag collapses them into one IPC call. A publish within 100 ms of
+ * the last one waits for the rest of those 100 ms: each streamed piece of text
+ * is an event, and with many agents the presentation was built again hundreds
+ * of times a second. The first publish after a quiet time goes out at once.
  *
  * The coordinator itself is exposed rather than wrapped. Its three remaining
  * callers (`serverState` on a switch, `replaceServer` from the projection
  * effect, `resolveAction` from the action handler) each still live outside this
  * module, and a wrapper per call would only re-declare their signatures.
  */
+const PUBLISH_INTERVAL_MS = 100;
+
 const DynamicIsland = createSimpleContext({
   name: "Dynamic Island",
   init: () => {
@@ -40,6 +45,8 @@ const DynamicIsland = createSimpleContext({
     const coordinator = new DynamicIslandCoordinator(islandText);
     const connectedServers = new Set(["local"]);
     let presentationScheduled = false;
+    let lastPublishedAt = Number.NEGATIVE_INFINITY;
+    let publishTimer: ReturnType<typeof setTimeout> | undefined;
 
     /** Active server first: main renders the head of this list as the leading item. */
     function serverOrder(): string[] {
@@ -67,14 +74,20 @@ const DynamicIsland = createSimpleContext({
       // The main window owns the island; main rejects a publish from a chat window.
       if (platform.landingPreview || platform.chatWindow || presentationScheduled) return;
       presentationScheduled = true;
-      queueMicrotask(() => {
+      const send = () => {
         presentationScheduled = false;
+        publishTimer = undefined;
+        lastPublishedAt = performance.now();
         const presentation = coordinator.presentation(serverOrder());
         void dynamicIslandPort()
           .dynamicIsland.publishPresentation(presentation)
           .catch(() => undefined);
-      });
+      };
+      const wait = lastPublishedAt + PUBLISH_INTERVAL_MS - performance.now();
+      if (wait > 0) publishTimer = setTimeout(send, wait);
+      else queueMicrotask(send);
     }
+    onCleanup(() => clearTimeout(publishTimer));
 
     createEffect(
       () =>
