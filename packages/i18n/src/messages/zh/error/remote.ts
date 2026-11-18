@@ -78,7 +78,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "远程主机没有固定的设备密钥。",
   "error.remote.hostDidNotConnect": "WebRTC 主机未连接。",
   "error.remote.connectionCancelled": "远程连接已取消。",
-  "error.remote.hostDisconnected": "WebRTC 主机已断开。",
+  "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
   "error.remote.eventGap": "主机事件序列存在断档。",
   "error.remote.malformedKnownEvent": "主机返回了格式错误的已知事件。",
   "error.remote.fileTransportIsStopped": "WebRTC 文件传输已停止。",

@@ -267,6 +267,14 @@ const OPEN_REDIRECT_READS = 2;
  * cannot finish, such as a command that a page dialog holds.
  */
 const TOOL_QUEUE_WAIT_MS = 120_000;
+/**
+ * How long a close waits for the earlier operations of its tab. A timed-out operation frees the tab in
+ * about 2 s after its deadline. An operation that a page that does not answer holds can wait for ever,
+ * and the close then removes the page under it (#11918).
+ */
+const CLOSE_QUEUE_WAIT_MS = 10_000;
+/** After that close, the time for the queued operations to end on the closed page. */
+const CLOSED_PAGE_DRAIN_MS = 2_000;
 /** The `keyCode` of `sendInputEvent` for a key whose `Input.key` name is different. */
 const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left", ArrowRight: "Right" };
 /**
@@ -531,7 +539,7 @@ function runBrowserTool<Name extends BrowserToolName>(
 }
 
 const AGENT_CODE_CARD_FILL =
-  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
+  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, take a fresh snapshot, and call fill_card again, or use request_takeover.";
 
 /**
  * The origins of the documents in the page. A frame whose renderer is gone, for example after a crash,
@@ -1495,11 +1503,28 @@ export class BrowserHost {
     tab.engine.releaseDialogs();
     const destroy = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
-        yield* Deferred.await(tab.queue);
+        const queueDrains = (milliseconds: number) =>
+          Deferred.await(tab.queue).pipe(Effect.timeoutOption(milliseconds), Effect.map(Option.isSome));
+        let drained = yield* queueDrains(CLOSE_QUEUE_WAIT_MS);
+        if (!drained) {
+          logger.warn("A browser tab closed before an earlier operation on it finished.", {
+            tabId,
+            host: logUrlHost(tab.requestedUrl),
+            pendingOperations: tab.pendingOperations,
+          });
+          // The commands that wait for the page end with it, and the operations still queued see a closed tab.
+          yield* browserSync(() => {
+            if (!tab.contents.isDestroyed()) tab.contents.close();
+          });
+          drained = yield* queueDrains(CLOSED_PAGE_DRAIN_MS);
+        }
         yield* Effect.all(childDrains, { concurrency: "unbounded", discard: true });
         const discarded = yield* Effect.exit(this.#recorder.discard(tabId, "tab-closed"));
         yield* tab.engine.destroy();
-        yield* Scope.close(tab.scope, Exit.void);
+        // The scope waits for the queued operations. Neither the close nor the host shutdown waits for one
+        // that never ends.
+        if (drained) yield* Scope.close(tab.scope, Exit.void);
+        else yield* Effect.forkDetach(Scope.close(tab.scope, Exit.void), { startImmediately: true });
         yield* browserSync(() => {
           if (!tab.contents.isDestroyed()) tab.contents.close();
         });

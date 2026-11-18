@@ -266,6 +266,8 @@ export const messages = {
     "Deze agent kan maar een beperkt aantal MCP-servers gebruiken. Zet een MCP-server uit die de agent niet nodig heeft om deze server te gebruiken.",
   "error.backend.mcpRegistrationRefused":
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
+  "error.backend.mcpRegistrationUnavailable":
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
@@ -278,6 +280,7 @@ export const messages = {
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
+  "error.backend.mcpSignInRefused": "De inlogpagina weigerde de toegang. Log opnieuw in.",
   "error.backend.mcpSignInResponseTimedOut": "Het antwoord op het inloggen kwam niet op tijd.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot kon de inloggegevens van deze server niet lezen. Controleer het serveradres en probeer het opnieuw.",

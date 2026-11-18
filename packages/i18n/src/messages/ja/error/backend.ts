@@ -268,6 +268,8 @@ export const messages = {
     "このエージェントが使える MCP サーバーの数には上限があります。このサーバーを使うには、エージェントに不要な MCP サーバーをオフにしてください。",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
+  "error.backend.mcpRegistrationUnavailable":
+    "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを保存してから、サインインアプリを追加してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
   "error.backend.mcpSignInForgotten": "MCP のサインインは実行中に破棄されました。",
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",
@@ -281,6 +283,7 @@ export const messages = {
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
+  "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",
   "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot はこのサーバーのサインイン情報を読み取れませんでした。サーバーアドレスを確認して再試行してください。",

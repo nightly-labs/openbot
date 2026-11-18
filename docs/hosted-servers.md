@@ -951,14 +951,14 @@ with the account of an operator. One command does all the steps below.
 Before you start, you need:
 
 - The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
-  gives the four Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+  gives the five Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
 - An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
 - The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
   that the customer sees (6 to 32 characters).
 
 ```sh
 env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
-# 1. Find the VPS just bought: each VPS with no reference on the four accounts.
+# 1. Find the VPS just bought: each VPS with no reference on the five accounts.
 $env bun scripts/hosting/leaseweb-pool.ts free
 # 2. The public keys of the operators, which the bootstrap installs.
 ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
@@ -978,7 +978,7 @@ When it ends, the owner sees the server in the app, and can invite the other mem
   `custom` take the same VPS at the same time, each one reads the reference again, and the one that
   lost stops.
 - It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
-  highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
+  highest on all five accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
 - It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
   operator keys sign in, so `--keys` must have a key of this computer.
 - It makes the claim just before the install, because a claim works for 15 minutes.
@@ -1040,7 +1040,7 @@ restarts.
 
 #### Leaseweb references
 
-The reference tells each operator and each agent which VPS has an owner. All VPS on all four
+The reference tells each operator and each agent which VPS has an owner. All VPS on all five
 Leaseweb accounts use one scheme:
 
 | Reference | Use | Example |
@@ -1053,15 +1053,15 @@ Leaseweb accounts use one scheme:
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
-traffic in and out of each VPS on the four accounts, from the first day of this month (UTC) to today,
+traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
 and the part of the traffic pack of its contract that the outgoing traffic used. Leaseweb counts only
 the outgoing traffic of a VPS against the pack. The output has the reference with no email, and
 `server` for a hosted server.
 
 To take a VPS:
 
-1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`) and select one with no
-   reference in the location you need.
+1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`, `_SG`) and select one
+   with no reference in the location you need.
 2. Set its reference at once, before any other work on it. Then read the VPS again: when the
    reference is not yours, another operator took it, and you select another one.
 3. Never take a VPS that has a reference, also `pool`. A pool VPS leaves the pool only with
@@ -1113,7 +1113,8 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 One Leaseweb account is for one sales organization, and an API key sees only the servers of its
 account: the key of the German account does not list a server in Amsterdam. The key of the German
 account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
-the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEWEB_API_KEY_AU`.
+the accounts that have the Signal machines are `LEASEWEB_API_KEY_US`, `LEASEWEB_API_KEY_AU` and
+`LEASEWEB_API_KEY_SG`.
 
 ### A new server on a pool machine
 

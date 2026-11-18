@@ -262,8 +262,8 @@ the user unlocks. Expo Go does not have the module: it measures with the phone c
 
 ## iOS shortcuts
 
-The Shortcuts app of iOS 26 and later has two OpenBot shortcuts: List Agents and Send Message. An
-older iOS has none: their cards need `SnippetIntent`.
+The Shortcuts app of iOS 26 and later has three OpenBot shortcuts: List Agents, Send Message and
+Open Agent. An older iOS has none: their cards need `SnippetIntent`.
 
 The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
 background, also when the app is not in memory. There the app has no window, React Native does not
@@ -278,6 +278,8 @@ start, and iOS suspends the app soon after the intent returns.
   Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
   keys and the agent pictures are the ones that the app writes for the share extension.
 - List Agents reads that file. A tap on an agent opens its chat.
+- Open Agent opens the app on the chat of the agent of Settings > Shortcuts. With no agent, it opens
+  Settings > Shortcuts. It uses the same `ShortcutBridge` path as the card buttons.
 - Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
   (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
   also adds to the app target). A hidden web view with the Team client connects to the agent's

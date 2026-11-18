@@ -236,7 +236,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 |---|---|---|
 | 13 | Durable idempotency keys for commands that clients retry | DONE (#11906, `2279f4aa56`: task start; #11930, `8aa900004a`: agent create, protocol 9 capability `agent-create-operation-v1`, and a resent thread message keeps its client id. Message sends were already durable. The share extension has no resend after a failure, so it needs no change.) |
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | RE-SCOPED: developer decision, 2026-11-18 (see below) |
-| 16 | Typed update state machine and one runtime state file | TODO |
+| 16 | Typed update state machine and one runtime state file | RE-SCOPED: audit of 2026-11-18 (see below); the host takeover fix is done |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |
 | 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | DONE (#11872, `a694b58a7b`; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
 | 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | DONE (#11643, `d264b0a324`) |
@@ -266,6 +266,29 @@ Decision: no delete sweep, and no check against the replay. Make the replay keep
 and message order first, and only when a repair path needs it. Not confirmed: other users and
 hosted servers. Only one computer was measured.
 
+### 16. Update state audit (re-scoped)
+
+Audited on 2026-11-18: the desktop `UpdateService`, the hosted and container update scripts, and the
+macOS Host Manager. Each claim below was checked in the code.
+
+- **Fixed.** When a Host Manager takes over the updates, the tenant cancels its own check and
+  download and shows no busy phase (`setManagedByHost`, `scripts/update-host-takeover-e2e.ts`).
+  Before, a running download continued, and its events replaced the host state until the next poll.
+- **Not a defect.** A torn `staged.ready` reads as "not staged", and the next `stage` removes the
+  copy and stages it again, so an atomic write changes nothing. After a newer download replaces a
+  ready update, electron-updater has cleared the old file (`AppUpdater.js`, `DownloadedUpdateHelper.js`),
+  so "ready" cannot come back. `availableVersion` in `error` is the version that a download retry
+  uses (`#canDownload`), and mobile shows it. The macOS `failed` phase stops tenant starts by design,
+  and `docs/multi-tenant-hosting.md` "State and recovery" gives the admin reset. The three other
+  `sort -V` copies compare validated `X.Y.Z` versions only, as the tested bash `newer()` does.
+- **Not worth a union type.** `UpdateStatus` is also the server update status that mobile and the
+  web client read, and the loose fields have no defect left after the items above.
+- **Open, needs a decision.** The install result of a hosted server is not saved or reported (no
+  code reads `.applying`). Reporting it needs a new optional capability, and the protocol 9 list is
+  full (item 2). The four "run started" files (`start-attempts`, `run-marker`, `startup-history`,
+  `gpu-start`) can become one versioned file, but released versions read them, so this needs its own
+  upgrade plan.
+
 ## Phase 4: longer term
 
 | # | Item | State |
@@ -274,4 +297,21 @@ hosted servers. Only one computer was measured.
 | 19 | Mailbox unit of work | TODO |
 | 20 | Tables that can be rebuilt move to a separate database | TODO |
 | 21 | Effect Schema for new codecs | TODO |
-| 22 | Split `scripts/team-api-routes-e2e.ts` | TODO |
+| 22 | Split `scripts/team-api-routes-e2e.ts` | NOT DONE: audit of 2026-11-18 (see below); new route areas go in their own script |
+
+### 22. Routes E2E split (not done)
+
+Measured on 2026-11-18 (`main` at `641fc1e429`):
+
+- **No CI gain.** The file has 14,263 lines, but the `Team API routes E2E` job takes 39 s (with
+  the CRM and comparator scripts), and `Check` takes about 4 min. The job is not on the critical path.
+- **The size causes no merge conflicts.** 104 commits changed the file in 30 days. Of the 6 open PRs
+  that change it, `git merge-tree` with `origin/main` finds a conflict in it for 1 PR only (#8198,
+  which also has conflicts in many other files). A split moves each line, so all 6 PRs would get a conflict.
+- **The checks are one sequence.** Lines 2336-14252 are one `try` block on one server, and later
+  checks read stand-in state that earlier checks wrote. Separate scripts would each need the 2,300
+  lines of stand-ins, or a shared context module that only moves the code.
+
+Do instead: give a new route area its own script, as `scripts/crm-team-api-e2e.ts` does for `crm-v1`.
+Open this item again when the job time is on the critical path, or when conflicts in the file are
+frequent.

@@ -1668,7 +1668,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = this.#store.get(agentId);
         return (
           agent !== undefined &&
-          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
+          this.#usageLimits.passesOver(agentId) &&
           (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
         );
       },
@@ -3848,10 +3848,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     queueWhileBusy = true,
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
-      .runExclusive(() =>
-        this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
-      )
+      .runExclusive(() => {
+        const before = this.#store.get(input.agentId);
+        return this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy).pipe(
+          Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))),
+        );
+      })
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
+  }
+
+  /**
+   * A requested change moved the agent to another model, now or when it is next idle, so a provider
+   * error that holds that model gets one try. Automatic moves do not come through here.
+   */
+  #modelChosen(before: AgentSummary | undefined, after: AgentSummary): void {
+    const chosen = (agent: AgentSummary): AgentModelChoice => agent.pendingRuntime ?? agentModelChoice(agent);
+    if (before && !sameAgentModelChoice(chosen(before), chosen(after)))
+      this.#usageLimits.chosen(after.id, usageLimitOf(chosen(after)));
   }
 
   /**
@@ -4365,7 +4378,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // A message from the user tries the held model first: the limit can have ended outside OpenBot.
     // A refused try holds the agent again, and the drain after it moves (#7068).
     if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
-    const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
+    // A model that a person or an agent chose gets one turn before the agent leaves it again (#11992).
+    const failed = !limited && this.#usageLimits.passesOver(agentId);
     if (!limited && !failed) return null;
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
     if (!this.#hasWaitingWork(agentId)) return null;
@@ -7408,6 +7422,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "load interrupted agent", cause: failure.cause }),
         ),
       );
+    // The turn ended, and only its Codex subagents work on: Codex stops a subagent only with a Stop of
+    // its own turn (#11871). The client then also stops the subagents of that subagent.
+    const children = executionThreadId || mayStop ? [] : this.#turn.workingCodexChildren(agentId, turnId);
+    if (children.length > 0 && this.#turn.turnStartedAt(turnId) === null) {
+      // Each subagent stops on its own: one that ended meanwhile does not keep the others working.
+      const exits = yield* Effect.forEach(
+        children,
+        (child) =>
+          Effect.exit(
+            child.client.request(
+              "turn/interrupt",
+              { threadId: child.threadId, turnId: child.turnId },
+              decodeRecordResponse,
+            ),
+          ),
+        { concurrency: "unbounded" },
+      );
+      const failure = exits.every(Exit.isFailure) ? exits.find(Exit.isFailure) : undefined;
+      if (failure) {
+        return yield* new AgentLifecycleFailed({
+          operation: "interrupt subagent turn",
+          cause: Cause.squash(failure.cause),
+        });
+      }
+      return true;
+    }
     // No provider runs a turn whose end failed part way or whose provider exited, so it has nothing to
     // stop. The Stop then settles what OpenBot still holds for the turn, and the queue frees (#2214).
     // A turn that the drain started can wait for its `turn/started` with a snapshot already on it:

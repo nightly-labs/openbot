@@ -2830,10 +2830,7 @@ export async function createApplicationServices({
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
       store: new RoutineResultStore(store.database),
-      delivery: (deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        return found ? { turnId: found.turnId } : null;
-      },
+      runTurns: (deliveryId) => mailbox.routineRunTurns(deliveryId),
       turnAnswer,
       connection: (connectionId) => {
         const record = service.messaging.store.connection(connectionId);
@@ -3488,6 +3485,7 @@ export async function createApplicationServices({
     providers: providerSignIns,
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
+    receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
     // The search ignores case, so the exact address is checked again on each agent message it finds.
     printedLink: (agentId, url) =>
       agentPrintedLink(

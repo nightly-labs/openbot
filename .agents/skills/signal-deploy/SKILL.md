@@ -45,6 +45,7 @@ curl -fsS https://signal1.openbot.run/health/live
 curl -fsS https://signal2.openbot.run/health/live
 curl -fsS https://signal-us.openbot.run/health/live
 curl -fsS https://signal-au.openbot.run/health/live
+curl -fsS https://signal-sg.openbot.run/health/live
 ```
 
 If `commit` is missing (a build from before this field) or `unknown` (built without
@@ -138,9 +139,10 @@ comparison against `signal2` too, and copy each added encrypted line into its ho
 same Nginx change there. `https://signal2.openbot.run/health/ready` must succeed, and `/health/live` must show
 the tag commit.
 
-Then do the same on the regional machines `signal-us.openbot.run` (`root@23.106.44.143`) and
-`signal-au.openbot.run` (`root@23.106.243.56`), see "Regional Signal machines" in the deployment
-document. Their Release, `runtime` and `node_modules` layout is the same as on `signal2`, and
+Then do the same on the regional machines `signal-us.openbot.run` (`root@23.106.44.143`),
+`signal-au.openbot.run` (`root@23.106.243.56`) and `signal-sg.openbot.run` (`root@172.255.212.149`),
+see "Regional Signal machines" in the deployment document. Their Release, `runtime` and
+`node_modules` layout is the same as on `signal2`, and
 `remote-api` listens on `127.0.0.1:8081`. Each home in `REMOTE_SIGNAL_HOMES` must run the same commit.
 
 If a check fails, use the rollback commands of the deployment document with the `before-<tag>` image.

@@ -78,6 +78,11 @@ function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);
 }
 
+/** The blocks of a long document, parsed once and not cached, such as a Markdown file to preview. */
+export function parseChatMarkdownDocument(body: string): TokensList {
+  return parseChatMarkdown(body);
+}
+
 const MAX_STREAMING_BODIES = 8;
 const REPARSED_BLOCKS = 2;
 const ENDED_BY_BLANK_LINE = new Set(["paragraph", "heading", "hr", "table", "blockquote", "html", "code", "blockMath"]);
@@ -183,4 +188,9 @@ export function parseFinishedChatMarkdown(body: string) {
 export function parseInlineChatMarkdown(body: string): Token[] {
   const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
   return [{ type: "paragraph", raw: body, text: body, tokens }];
+}
+
+/** Calls `visit` for each token of a parsed message, also the tokens inside lists, tables and links. */
+export function walkChatMarkdown(tokens: Token[], visit: (token: Token) => void): void {
+  void markdown.walkTokens(tokens, visit);
 }
