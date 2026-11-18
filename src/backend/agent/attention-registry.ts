@@ -2516,10 +2516,10 @@ export class AttentionRegistry {
 
   /**
    * Fills a password or authenticator request from the shared vault, without a card. True when the
-   * request was answered this way. With no login for the site, or several and no `loginId`, the card
-   * opens as before. The value goes to the browser only; the agent gets the usual result. When a saved
-   * login fits the site but is not filled, or the password manager cannot be read, the card gets
-   * `vaultSkip`, so the user sees why.
+   * request was answered this way. With no login for the site, several and no `loginId`, or one login
+   * of another username than the call names, the card opens as before. The value goes to the browser
+   * only; the agent gets the usual result. When a saved login fits the site but is not filled, or the
+   * password manager cannot be read, the card gets `vaultSkip`, so the user sees why.
    */
   readonly #fillFromVault = Effect.fn("AttentionRegistry.fillFromVault")(function* (
     this: AttentionRegistry,
@@ -2546,8 +2546,8 @@ export class AttentionRegistry {
     const parsed = yield* Effect.result(
       attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
     );
-    const loginId =
-      Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args.loginId : undefined;
+    const args = Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args : undefined;
+    const loginId = args?.loginId;
     // Before a vault read, only a call that names a saved login gives the card a reason. A read here
     // would delay the card by a password manager sync.
     const namedCard = (card: BrowserVaultSkipReason) => (loginId ? { loginId, card } : {});
@@ -2578,11 +2578,13 @@ export class AttentionRegistry {
         if (Result.isFailure(parsed)) return yield* parsed.failure;
         const candidates = loginId ? [] : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(fits);
         // A sign-in that names another account than the only saved login gets the card, as a browser
-        // password manager does not fill a login of another username (#12070).
+        // password manager does not fill a login of another username (#12070). A login saved with no
+        // username names no account, so it is filled as before.
         const account = (name: string | null | undefined) => name?.trim().toLowerCase() ?? "";
-        const wanted = parsed.success.tool === "submit_secret" ? account(parsed.success.args.username) : "";
+        const wanted = account(args?.username);
         const only = candidates.length === 1 ? candidates[0] : undefined;
-        if (only && wanted && account(only.username) !== wanted)
+        const saved = account(only?.username);
+        if (only && wanted && saved && saved !== wanted)
           return { chosen: false as const, several: false, otherAccount: true };
         const chosen = loginId ?? only?.id;
         if (!chosen) return { chosen: false as const, several: candidates.length > 1, otherAccount: false };
@@ -2617,7 +2619,7 @@ export class AttentionRegistry {
     if (!login.chosen && login.otherAccount)
       return skip(
         "other-username",
-        "the only saved login for this site has another username than this sign-in, so the user types the password.",
+        "the only saved login for this site has another username than this sign-in, so the user types the password. When the sign-in is for that saved account, call list_logins and use its loginId.",
       );
     if (!login.chosen)
       return skip(

@@ -444,6 +444,7 @@ try {
     async () => {
       const vaultFills: string[] = [];
       const vaultEvents: AgentEvent[] = [];
+      let savedUsername: string | null = "a@example.test";
       const vaultRegistry = new AttentionRegistry({
         conversation: {
           agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
@@ -478,7 +479,7 @@ try {
           connected: () => true,
           loginsFor: () =>
             Effect.succeed([
-              { id: "openbot:a", title: "Account A", username: "a@example.test", hasOneTimePassword: false },
+              { id: "openbot:a", title: "Account A", username: savedUsername, hasOneTimePassword: false },
             ]),
           secretFor: (loginId) => Effect.succeed(loginId === "openbot:a" ? VAULT_SECRET : null),
         },
@@ -538,7 +539,13 @@ try {
       assert.equal(unnamed.status, "completed");
       assert.deepEqual(vaultFills, [SECRET, VAULT_SECRET, VAULT_SECRET], "the saved login was not filled");
       assert.equal(cards(), shown + 1, "a card opened for the saved account");
-      return { typed, same, unnamed };
+      // A login saved with no username names no account, so it is filled as before.
+      savedUsername = null;
+      const noSavedUsername = answerOf(await signIn("b@example.test"));
+      assert.equal(noSavedUsername.status, "completed");
+      assert.equal(vaultFills.at(-1), VAULT_SECRET, "the login with no username was not filled");
+      assert.equal(cards(), shown + 1, "a card opened for the login with no username");
+      return { typed, same, unnamed, noSavedUsername };
     },
   );
 
