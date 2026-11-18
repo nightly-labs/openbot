@@ -40,6 +40,7 @@ export function ConversationThread() {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    openThreadFile,
     browserTakeoverResolution,
     installedSkills,
     installedSkillsLoadFailed,
@@ -320,6 +321,7 @@ export function ConversationThread() {
             }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onOpenFile={openThreadFile}
             onSelectAgent={props.onSelectAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}

@@ -488,6 +488,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     );
   }
 
+  /**
+   * Opens a file that a message of a side thread links to, as the chat does. A file name that a chip joins
+   * to a folder opens as written, from the workspace of `agentId`, when the folder has no such file.
+   */
+  function openThreadFile(kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) {
+    const written = asWritten && agentId ? () => openWorkspaceFile(asWritten, undefined, agentId) : undefined;
+    if (kind === "shared") openSharedFile(path, "tab", written);
+    else if (agentId) openWorkspaceFile(path, undefined, agentId, "tab", undefined, written);
+  }
+
   /** The agent whose workspace the shown file or folder is in, so that its links open there too. */
   function previewWorkspaceAgentId(): string | undefined {
     const source = deps.sidebarFilePreview()?.source;
@@ -799,6 +809,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentAction,
     attachmentDownloads,
     openSharedFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
