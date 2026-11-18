@@ -106,8 +106,15 @@ export class DynamicIslandCoordinator {
     for (const key of rawMessageBodies.keys()) {
       if (!retainedMessageKeys.has(key)) rawMessageBodies.delete(key);
     }
+    // The caller's records can be its own signal values. `applyEvent` changes these records in place,
+    // so it keeps copies: a change to the caller's object hides the next write of that signal.
     this.#servers.set(input.serverId, {
       ...input,
+      activeTurns: { ...input.activeTurns },
+      queues: { ...input.queues },
+      unreadReplies: { ...input.unreadReplies },
+      failedTurns: { ...input.failedTurns },
+      ...(input.unreadMessageIds ? { unreadMessageIds: { ...input.unreadMessageIds } } : {}),
       turnProgress,
       pendingApprovals,
       pendingPrompts,

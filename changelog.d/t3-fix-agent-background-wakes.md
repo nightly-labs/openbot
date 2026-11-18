@@ -10,6 +10,8 @@
   when its background work ended, or a loose steps row.
 - A Claude agent that waits for its background work no longer gets "The agent stopped before its next
   step. It continues". The agent continues when the work ends.
+- In an agent's chat, the "working" row no longer stays after the agent ends its turn. Before, it could
+  stay until you sent a new message.
 
 ### Changed
 
