@@ -115,13 +115,14 @@ import {
   isIgnoredConfigDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
-  isMcpTimeoutDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
   isUsageLimitDiagnostic,
   isUsageReadDiagnostic,
   LOG_TIMESTAMP_PREFIX,
+  MCP_PROVIDER_FAILURE_TEXT,
+  mcpProviderFailureKind,
 } from "./provider-diagnostics";
 import {
   isProviderTimeout,
@@ -455,13 +456,6 @@ const INITIAL_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
-
-/** The text of each kind of provider MCP failure that `#reportMcpServerFailure` shows. */
-const MCP_SERVER_FAILURE_TEXT = {
-  sign_in: "error.backend.mcpServerSignInForProvider",
-  timeout: "error.backend.mcpServerTimedOutInProvider",
-  failed: "error.backend.mcpServerFailedInProvider",
-} as const;
 
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
@@ -5099,13 +5093,13 @@ export class ProviderRuntime implements ProviderPort {
     message: string,
     signIn = isMcpSignInDiagnostic(message),
   ): void {
-    const kind = signIn ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+    const kind = signIn ? "sign_in" : mcpProviderFailureKind(message);
     const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
     this.#emitError(
       "mcp_server_not_started",
-      sourceText(MCP_SERVER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
+      sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
     );
   }
 
