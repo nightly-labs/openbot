@@ -4420,6 +4420,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
+  /**
+   * Whether a pool move waits for the agent's background work. The move closes the Claude session, and
+   * its background subagents and commands end with it (#12117). The pool moves early, while the
+   * current account can still run the next turn, so that turn runs there, and the drain after the
+   * work tries the move again. An account at a limit or after a provider error cannot run it, so the
+   * agent moves.
+   */
+  #poolMoveWaits(agentId: string): Effect.Effect<boolean> {
+    const agent = this.#store.get(agentId);
+    if (!agent || !this.#usageLimits.mayDrain(agentId) || !this.#usageLimitReady(agentModelChoice(agent)))
+      return Effect.succeed(false);
+    return this.#threads.mainRunsBackgroundWork(agent);
+  }
+
   /** Whether a provider error moves this agent to a backup model or to another account of its pool. */
   #mayFailOver(agentId: string): boolean {
     return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
@@ -4711,6 +4725,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
+          if (move.move === "next-turn" && (yield* this.#poolMoveWaits(agentId))) {
+            logger.info("A pool move waits: the agent's Claude session still runs background work.", { agentId });
+            return false;
+          }
           yield* this.#applyAgentUpdate(move.input, undefined, move.move);
           return true;
         }),
