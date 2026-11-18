@@ -217,6 +217,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Zezwól na pełny dostęp",
   "agentSettings.fullAccess.askConfirm": "Najpierw pytaj",
   "agentSettings.links.usage": "Użycie",
+  "agentSettings.links.apps": "Aplikacje",
+  "agentSettings.links.appsScope": "Wszyscy agenci",
   "agentSettings.links.memories": "Wspomnienia",
   "agentSettings.links.memoriesCount": {
     one: "Zapisane: {count}",
