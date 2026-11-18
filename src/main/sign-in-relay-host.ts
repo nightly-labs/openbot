@@ -79,6 +79,11 @@ export interface SignInRelayHostDependencies {
   receiveMcpGrant: (state: string, code: string) => boolean;
   /** Answers whether an agent message of `agentId` holds this exact address. */
   printedLink: (agentId: string, url: string) => boolean;
+  /**
+   * Answers whether the member is at this computer: the owner of a server on this computer, which
+   * only the desktop app here logs in as. A provider's sign-in for that member can open its page here.
+   */
+  atHost?: (memberId: string) => boolean;
   now?: () => number;
 }
 
@@ -140,8 +145,8 @@ export class SignInRelayHost {
     memberId: string,
     provider: SignInRelayProvider,
   ) {
-    const { providers } = this.#dependencies;
-    yield* providers.startRelay(provider);
+    const { providers, atHost } = this.#dependencies;
+    yield* providers.startRelay(provider, atHost?.(memberId) ?? false);
     return this.startReplay(memberId, {
       key: `provider\n${provider}`,
       status: () => {
@@ -166,8 +171,8 @@ export class SignInRelayHost {
     provider: ProviderAccountRelayProvider,
     accountId: string | null,
   ) {
-    const { accounts } = this.#dependencies;
-    yield* accounts.startRelay(provider, accountId);
+    const { accounts, atHost } = this.#dependencies;
+    yield* accounts.startRelay(provider, accountId, atHost?.(memberId) ?? false);
     // One account sign-in runs for each provider, so a new flow replaces the one of any account.
     return this.startReplay(memberId, {
       key: `account\n${provider}`,

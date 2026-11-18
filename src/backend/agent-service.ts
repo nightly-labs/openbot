@@ -5495,9 +5495,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     provider: AgentProvider,
     accountId: string | null,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#providers
-      .signInProviderAccountOnHost(provider, accountId, openPage)
+      .signInProviderAccountOnHost(provider, accountId, openPage, atHost)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "signInProviderAccountOnHost", cause: failure.cause }),
@@ -5642,9 +5643,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   signInProviderOnHost(
     provider: AgentProvider,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#providers
-      .signInProviderOnHost(provider, openPage)
+      .signInProviderOnHost(provider, openPage, atHost)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "signInProviderOnHost", cause: failure.cause }),
