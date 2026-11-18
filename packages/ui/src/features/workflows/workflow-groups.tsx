@@ -34,12 +34,12 @@ export interface CanvasGroup {
 }
 
 /** The room between the members and the frame, and the room above them for the name. */
-export const GROUP_PAD = 28;
-export const GROUP_LABEL = 32;
+const GROUP_PAD = 28;
+const GROUP_LABEL = 32;
 /** More room on the right of an open group, so its ports are clear of the output ports of its members. */
 const PORT_ROOM = 40;
 /** The size of a collapsed group: the stack card. */
-export const STACK_SIZE = { width: 248, height: 216 } as const;
+const STACK_SIZE = { width: 248, height: 216 } as const;
 /** The distance between two output ports of a group. */
 const PORT_STEP = 34;
 /** The most pictures that a stack card shows. */
