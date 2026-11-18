@@ -94,6 +94,7 @@ export function ServerMemoryLimitSetting(
         {(current) => (
           <ItemActions>
             <Select<number>
+              class="settings-modal-select"
               // A host that no longer permits its stored value still shows it.
               options={
                 current().choices.includes(current().limit)

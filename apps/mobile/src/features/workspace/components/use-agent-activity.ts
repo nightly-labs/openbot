@@ -78,9 +78,11 @@ export function useAgentListActivity(agentId: string): MobileAgentActivity | und
   }, [own, threadWait, threadRunning]);
 }
 
-/** What this agent or one of its side threads waits on from the user, or undefined. */
-export function useAgentListWaitReason(agentId: string) {
-  const activity = useAgentListActivity(agentId);
+/**
+ * What this agent or one of its side threads waits on from the user, or undefined. `activity` comes
+ * from `useAgentListActivity`, which the caller reads once for the badge and the avatar.
+ */
+export function agentListWaitReason(activity: MobileAgentActivity | undefined) {
   return activity?.phase === "waiting" ? activity.reason : undefined;
 }
 

@@ -15,13 +15,13 @@ private let methods: Set<String> = ["GET", "HEAD", "POST", "PUT", "DELETE", "OPT
 private let ownedHeaders: Set<String> = ["content-length", "transfer-encoding", "connection"]
 private let webSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-final class InvalidTokenException: Exception {
+final class InvalidTokenException: Exception, @unchecked Sendable {
   override var reason: String {
     "The remote viewer token is not valid"
   }
 }
 
-final class ListenException: Exception {
+final class ListenException: Exception, @unchecked Sendable {
   override var reason: String {
     "The remote viewer proxy could not listen on the loopback address"
   }

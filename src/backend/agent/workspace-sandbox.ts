@@ -1,7 +1,9 @@
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { isAbsolute } from "node:path";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import { isPathInside } from "../path-containment";
 
 type SandboxedAgent = Pick<AgentSummary, "access" | "additionalFolders" | "provider" | "workspacePath">;
 
@@ -71,6 +73,29 @@ export function workspaceWritableRoots(
  */
 export function workspaceExcludedFolders(agent: Pick<AgentSummary, "access" | "excludedFolders">): string[] {
   return workspaceAccessEnforced(agent) ? (agent.excludedFolders ?? []) : [];
+}
+
+/**
+ * Whether a Workspace only agent may change these files with no approval card: each one is in a
+ * writable root and in no excluded folder. Use it only for paths from the agent's own confined
+ * process, where the operating system and not the answer limits the write. A provider asks there for
+ * files outside its own session folder, such as Cursor for the added folders (#6176). Only the path
+ * text is compared: a link to another place gets the answer, and the sandbox then refuses the write.
+ */
+export function confinedWritesAllowed(
+  agent: Pick<AgentSummary, "access" | "additionalFolders" | "excludedFolders" | "workspacePath">,
+  sharedRoot: string,
+  paths: readonly string[],
+): boolean {
+  if (!workspaceAccessEnforced(agent) || paths.length === 0) return false;
+  const roots = workspaceWritableRoots(agent, sharedRoot);
+  const excluded = workspaceExcludedFolders(agent);
+  return paths.every(
+    (path) =>
+      isAbsolute(path) &&
+      roots.some((root) => isPathInside(root, path)) &&
+      !excluded.some((folder) => isPathInside(folder, path)),
+  );
 }
 
 export type CodexSandboxPolicy =

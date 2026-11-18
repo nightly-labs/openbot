@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Вы редактируете сообщение в очереди. Сохраните или отмените правку, чтобы разрешить его выполнение.",
   "composer.queueEdit.cancel": "Отменить правку",
+  "composer.feedbackFix.body":
+    "Исправление отчёта #{number}. Отправьте запрос или отмените, чтобы оставить отчёт как есть.",
+  "composer.feedbackFix.cancel": "Отмена",
   "composer.providerWait.offlineTitle": "Нет подключения к интернету",
   "composer.providerWait.offline": "{provider} не сможет ответить, пока этот компьютер не подключится к сети.",
   "composer.providerWait.silent": "Время без обновлений от {provider}: {duration}.",
@@ -20,6 +23,15 @@ export const messages = {
   "composer.update.manual": "Обновите {provider} на компьютере, где он запущен, чтобы продолжить.",
   "composer.update.pending": "Обновление…",
   "composer.update.action": "Обновить",
+  "composer.imageInput.body":
+    "{model} получает только текст, поэтому не видит прикреплённые изображения. Если эта модель умеет читать изображения, включите для неё изображения.",
+  "composer.imageInput.label": "Включить изображения для {model}",
+  "composer.imageInput.pending": "Включение…",
+  "composer.imageInput.action": "Включить изображения",
+  "composer.usageLimit.credits": "Вы исчерпали лимит тарифа {provider}. Теперь ваши агенты используют ваши кредиты.",
+  "composer.usageLimit.creditsResets":
+    "Вы исчерпали лимит тарифа {provider}. Ваши агенты используют ваши кредиты до сброса {reset}.",
+  "composer.usageLimit.creditsTitle": "Используются кредиты",
   "composer.usageLimit.resets": "Вы исчерпали весь лимит {provider}. Сброс {reset}.",
   "composer.usageLimit.selectModel": "Вы исчерпали весь лимит {provider}. Выберите другую модель, чтобы продолжить.",
   "composer.usageLimit.title": "Лимит использования исчерпан",
@@ -59,6 +71,8 @@ export const messages = {
     "Доступ к микрофону заблокирован. Разрешите OpenBot использовать микрофон в системных настройках.",
   "composer.voice.noMicrophone": "Микрофон недоступен.",
   "composer.voice.startFailed": "OpenBot не удалось начать запись голоса.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot не удалось открыть микрофон. Закройте другие приложения, которые его используют, проверьте, что он подключён и разрешён в системных настройках, и повторите попытку.",
   "composer.voice.transcribeFailed": "OpenBot не удалось расшифровать эту запись.",
   "composer.reply.toYou": "Ответ на ваше сообщение",
   "composer.reply.toAgent": "Ответ агенту",
@@ -108,10 +122,17 @@ export const messages = {
   "composer.error.holdQueued": "Не удалось удержать сообщение в очереди для редактирования.",
   "composer.error.cancelEdit": "Не удалось отменить редактирование сообщения в очереди. Повторите попытку.",
   "composer.error.updateQueued": "Не удалось обновить сообщение в очереди. Повторите попытку.",
+  "composer.queueEdit.received": "Агент уже получил это сообщение, поэтому редактирование завершено.",
+  "composer.queueEdit.receivedKept":
+    "Агент уже получил это сообщение, поэтому редактирование завершено. Ваши изменения остались в поле сообщения.",
+  "composer.queueEdit.deletedKept":
+    "Это сообщение удалено, поэтому редактирование завершено. Ваши изменения остались в поле сообщения.",
+  "composer.queueEdit.endedKept": "Редактирование завершилось до сохранения. Ваши изменения остались в поле сообщения.",
   "composer.voice.prepareFailed": "Не удалось подготовить голосовую модель. Повторите попытку.",
   "composer.voice.noSpeechRecorded": "Речь не записана.",
   "composer.voice.noSpeechDetected": "Речь не обнаружена.",
   "composer.voice.readFailed": "Не удалось прочитать ответ вслух.",
+  "composer.voice.languageUnsupported": "Не удалось прочитать ответ вслух. Этот язык пока недоступен.",
   "composer.error.saveEditTryAgain": "Не удалось сохранить это изменение на этом компьютере. Повторите попытку.",
   "composer.error.saveUnconfirmed":
     "Сохранение не подтверждено. Нажмите «Сохранить» ещё раз, чтобы проверить результат.",
@@ -153,6 +174,7 @@ export const messages = {
   "composer.picker.section.files": "Файлы",
   "composer.picker.section.tabs": "Вкладки браузера",
   "composer.picker.section.threads": "Ветки",
+  "composer.picker.section.messages": "В сообщениях",
   "composer.token.tab": "Вкладка браузера {name}",
   "composer.token.thread": "Ветка {name}",
   "composer.token.unavailableTab": "Закрытая вкладка браузера {name}",

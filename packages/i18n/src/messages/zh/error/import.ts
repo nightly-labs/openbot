@@ -90,7 +90,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}：请在设置中重新输入它的 API 密钥。",
   "error.import.transferAgentEnv": "{name}：请在设置中重新输入 {names} 的值。",
   "error.import.transferMcpValues":
-    "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 MCP 设置中开启。",
+    "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 市场、应用 中开启。",
   "error.import.transferValuesCleared": "{name}：可能包含密钥的取值已从其参数或地址中移除，请在设置中重新输入。",
   "error.import.transferSharedKept": "共享文件夹中已有 {number} 个同名文件，因此保持原样。",
 } as const satisfies PartialTranslation<typeof source>;

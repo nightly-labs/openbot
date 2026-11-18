@@ -25,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "Zezwól",
   "prompt.approval.alwaysAllow": "Zawsze zezwalaj",
   "prompt.approval.deny": "Odrzuć",
+  "prompt.approval.cut":
+    "Ta karta pokazuje tylko początek żądania, więc można je tylko odrzucić. Jeśli przycisk Zezwól nie pojawi się wkrótce, zaktualizuj OpenBot na serwerze.",
   "prompt.approval.report.bugHeadline": "Znalazłeś błąd? Naprawmy go.",
   "prompt.approval.report.ideaHeadline": "Masz pomysł? Zróbmy to.",
   "prompt.approval.report.dontSend": "Nie teraz",
   "prompt.approval.report.send": "Wyślij do zespołu OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Otwórz ten czat w aplikacji OpenBot na telefonie i wyślij zgłoszenie stamtąd. Telefon dodaje swoją wersję, system i dziennik pomocy. Jeśli telefon nie może się połączyć, otwórz Ustawienia > Pomoc w aplikacji na telefonie i zgłoś problem na GitHubie.",
   "prompt.approval.title.command": "Uruchom polecenie",
   "prompt.approval.title.fileChange": "Zmień pliki",
   "prompt.approval.title.permissions": "Przyznaj uprawnienia",
@@ -41,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Wykonaj krok: {host}",
   "prompt.browser.cancelled": "Anulowano",
   "prompt.browser.reload":
-    "Dokończ logowanie, a potem przeładuj stronę w przeglądarce, zanim wybierzesz „Gotowe”. Sprawdzanie strony pozostaje zablokowane do jej przeładowania.",
+    "OpenBot nie mógł dokończyć wpisywania hasła ani kodu. Sprawdź stronę i wpisz to, czego brakuje. Dokończ logowanie, a potem przeładuj stronę w przeglądarce, zanim wybierzesz „Gotowe”. Sprawdzanie strony pozostaje zablokowane do jej przeładowania.",
   "prompt.browser.continuing": "{name} kontynuuje.",
   "prompt.browser.cancelledBody": "Krok w przeglądarce został anulowany.",
   "prompt.browser.pendingBody":
     "Otwórz stronę, aby dokończyć logowanie, weryfikację lub wyrażenie zgody. Następnie pozwól agentowi {name} kontynuować.",
   "prompt.browser.openPage": "Otwórz: {title}",
+  "prompt.browser.openFailed": "Nie udało się otworzyć strony w oknie głównym. Spróbuj ponownie.",
   "prompt.browser.done": "Gotowe",
   "prompt.browser.pageFallback": "Strona przeglądarki",
   "prompt.browser.hostFallback": "przeglądarka",
@@ -54,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Logowanie do {host} anulowane",
   "prompt.browser.signInBlocked.body":
     "Zaloguj się na tym komputerze. OpenBot wyśle do {server} tylko logowanie do {host}, a {name} będzie kontynuować.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} nie akceptuje logowania z serwera. Otwórz ten czat w aplikacji OpenBot na komputer i zaloguj się tam. Potem {name} będzie kontynuować.",
   "prompt.browser.signInBlocked.cancelledBody": "Logowanie zostało anulowane.",
   "prompt.browser.signInBlocked.waiting": "Czekam na logowanie",
   "prompt.browser.signInBlocked.waitingButton": "Czekam na logowanie…",

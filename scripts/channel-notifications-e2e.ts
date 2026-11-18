@@ -56,6 +56,7 @@ import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
@@ -1066,6 +1067,141 @@ try {
       return result;
     },
   );
+
+  await step("A queued request names why it waits, only to a peer with channel-task-waits-v1 (#6067)", async () => {
+    assert.ok(V9_PEER_CAPABILITIES.includes(CHANNEL_TASK_WAITS_CAPABILITY), "A protocol 9 peer lacks it.");
+    const other = await runCauseEffect(
+      channels.command(
+        {
+          type: "save",
+          operationId: randomUUID(),
+          channelId: randomUUID(),
+          draft: {
+            name: "Release check",
+            title: "Verify the release build",
+            instructions: "",
+            members: [{ agentId: agent.id }],
+            leadAgentId: agent.id,
+          },
+        },
+        host.channelActor(),
+      ),
+    );
+    const helper = await runCauseEffect(
+      agentStore.createAgent({
+        name: "Wait fixture",
+        description: "Synthetic agent for the channel wait check",
+        avatarSeed: "channel-wait",
+        avatarHue: null,
+      }),
+    );
+    const queued = (ownerAgentId: string, channelId = channel.id): ChannelTask => {
+      const id = randomUUID();
+      return {
+        id,
+        channelId,
+        parentTaskId: null,
+        rootTaskId: id,
+        ownerAgentId,
+        requestMessageId: randomUUID(),
+        instruction: "Check the launch notes",
+        attachmentDraftIds: [],
+        expectedResult: "",
+        sourceMessageIds: [],
+        dependencies: [],
+        resources: [],
+        state: "queued",
+        revision: 1,
+        assignmentCount: 0,
+        error: null,
+      };
+    };
+    // A running turn of `task`, which the caller saves with it.
+    const running = (task: ChannelTask): ChannelAssignment => ({
+      id: randomUUID(),
+      channelId: task.channelId,
+      taskId: task.id,
+      agentId: task.ownerAgentId ?? "",
+      taskRevision: 1,
+      requestMessageId: randomUUID(),
+      resources: [],
+      deliveryId: null,
+      turnId: null,
+      state: "running",
+      throughSequence: 0,
+      summaryVersion: 0,
+      awaitedTaskIds: [],
+      pendingRevision: null,
+      pendingOutcome: null,
+    });
+    const read = async (capabilities: readonly string[]) => {
+      const response = await wire(port, {
+        method: "POST",
+        path: CHANNEL_ROUTES.read,
+        capabilities,
+        token,
+        protocol: TEAM_PROTOCOL_V9,
+        body: { channelId: channel.id },
+      });
+      assert.equal(response.status, 200, `The page failed: ${JSON.stringify(response.body)}`);
+      return response.body;
+    };
+    const options = { channelAttention: true, channelTaskWaits: true };
+    const waitsOf = (body: unknown) =>
+      decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, body, options)).waits ?? null;
+    const released = V9_PEER_CAPABILITIES.filter((item) => item !== CHANNEL_TASK_WAITS_CAPABILITY);
+
+    // The agent works in another channel, so its request here waits for that work.
+    const busyTask = queued(agent.id);
+    const otherTask: ChannelTask = { ...queued(agent.id, other.id), state: "running", assignmentCount: 1 };
+    const otherWork = running(otherTask);
+    channels.store.update(channels.store.get(channel.id), { tasks: [busyTask] });
+    channels.store.update(channels.store.get(other.id), { tasks: [otherTask], assignments: [otherWork] });
+    const releasedBody = await read(released);
+    // The released wire still reads with the frozen channels-v1 codec.
+    channelResponse(CHANNEL_ROUTES.read, 200, releasedBody);
+    const busy = { released: waitsOf(releasedBody), current: waitsOf(await read(V9_PEER_CAPABILITIES)) };
+    const local = channels.page(channel.id).waits ?? null;
+    channels.store.update(channels.store.get(other.id), {
+      tasks: [{ ...otherTask, state: "completed" }],
+      assignments: [{ ...otherWork, state: "completed" }],
+    });
+    channels.store.update(channels.store.get(channel.id), { tasks: [{ ...busyTask, state: "cancelled" }] });
+
+    // Two tasks run in this channel, so a request of a third agent waits for one of them.
+    const fullTask = queued(helper.id);
+    const runningTasks = [1, 2].map((): ChannelTask => ({ ...queued(agent.id), state: "running", assignmentCount: 1 }));
+    const work = runningTasks.map(running);
+    channels.store.update(channels.store.get(channel.id), { tasks: [fullTask, ...runningTasks], assignments: work });
+    const full = waitsOf(await read(V9_PEER_CAPABILITIES));
+    channels.store.update(channels.store.get(channel.id), {
+      tasks: [
+        { ...fullTask, state: "cancelled" },
+        ...runningTasks.map((item) => ({ ...item, state: "completed" as const })),
+      ],
+      assignments: work.map((item) => ({ ...item, state: "completed" as const })),
+    });
+    const after = waitsOf(await read(V9_PEER_CAPABILITIES));
+
+    const busyWait = {
+      taskId: busyTask.id,
+      agentId: agent.id,
+      reason: "agent-busy",
+      channelId: other.id,
+      channelName: "Release check",
+    };
+    assert.deepEqual(
+      { ...busy, local, full, after },
+      {
+        released: null,
+        current: [busyWait],
+        local: [busyWait],
+        full: [{ taskId: fullTask.id, agentId: helper.id, reason: "channel-full" }],
+        after: null,
+      },
+    );
+    return { ...busy, full, after };
+  });
 
   const withoutChannelFiles = V9_PEER_CAPABILITIES.filter((capability) => capability !== STORAGE_CHANNEL_CAPABILITY);
   const channelFiles = (channelId: string, capabilities: readonly string[] = V9_PEER_CAPABILITIES) =>

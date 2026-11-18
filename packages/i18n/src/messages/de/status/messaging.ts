@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Wird bearbeitet…",
-  "status.messaging.queued": "Wartet: OpenBot bearbeitet eine andere Anfrage. Die Antwort erscheint hier.",
+  "status.messaging.queued": "Wartet, bis eine frühere Anfrage fertig ist. Die Antwort erscheint hier.",
   "status.messaging.busy": "Zu viele Anfragen warten. Versuche es später erneut.",
   "status.messaging.failed": "OpenBot konnte diese Anfrage nicht abschließen. Der OpenBot-Host hat die Details.",
   "status.messaging.noAnswer": "OpenBot wurde ohne schriftliche Antwort fertig.",
@@ -52,6 +52,10 @@ export const messages = {
     "👋 *OpenBot ist verbunden*\n\nSchreib hier, um deine Agenten zu fragen. Der WhatsApp Orchestrator antwortet oder gibt die Arbeit an den passenden Agenten.\n\nSende *stop*, um eine Anfrage zu stoppen.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot ist verbunden*\n\nDie Personen, die du in OpenBot erlaubst, können dieser Nummer jetzt schreiben. Eine neue Person bekommt einen Code: Genehmige ihn in OpenBot unter Anfragen.\n\nSende *stop*, um eine Anfrage zu stoppen.",
+  "status.messaging.whatsappOtherOpenBot":
+    "Ein anderer OpenBot ist mit dieser WhatsApp-Nummer verknüpft, darum bekommst du vielleicht zwei Antworten. Öffne dazu in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
+  "status.messaging.whatsappPaused":
+    "OpenBot antwortet hier 10 Minuten lang nicht: In kurzer Zeit kamen zu viele Nachrichten. Wenn ein anderer OpenBot mit dieser Nummer verknüpft ist, öffne in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwortet in WhatsApp und fragt das Team",
 } as const satisfies PartialTranslation<typeof source>;

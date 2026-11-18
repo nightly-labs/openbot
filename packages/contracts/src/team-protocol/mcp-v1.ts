@@ -8,7 +8,7 @@
 // caller just described, without saving it. `requireAdmin` on all five routes is the only gate.
 // Narrowing that later needs a second capability string, never an edit to this one.
 import { isDynamicRecord, isString } from "../runtime-values";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const MCP_ROUTES = {
   list: "/v1/mcp-servers",

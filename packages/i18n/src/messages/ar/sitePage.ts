@@ -83,6 +83,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "أقر بأنني أقبل {policy} و{terms}.",
   "sitePage.pricing.consent.policy": "سياسة الخصوصية",
   "sitePage.pricing.consent.terms": "الشروط وحق الانسحاب",
+  "sitePage.pricing.consent.earlyStart":
+    "أطلب أن تبدأ خدمة الاستضافة قبل انتهاء مهلة الانسحاب البالغة 14 يومًا. وأقرّ بأنني إذا انسحبت من العقد قبل تنفيذ الخدمة بالكامل، فسيتعين عليّ دفع ثمن الخدمات المقدمة حتى وقت الانسحاب، وبأنني سأفقد حقي في الانسحاب من العقد بمجرد تنفيذ الخدمة بالكامل.",
   "sitePage.marketplace.agents.title": "الوكلاء — متجر OpenBot",
   "sitePage.marketplace.agents.description":
     "وكلاء أنشأهم أشخاص في OpenBot. أضف واحدًا إلى OpenBot مع مهاراته ومهامه الدورية.",

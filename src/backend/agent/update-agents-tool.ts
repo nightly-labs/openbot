@@ -19,6 +19,7 @@ import {
 } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toolStep } from "./tool-operation";
+import { unknownAgentMessage } from "./unknown-agent";
 
 const logger = createOpenBotLogger("update-agents-tool");
 
@@ -88,8 +89,10 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
 
     const results = yield* Effect.forEach(agentIds, (agentId) =>
       Effect.gen(function* () {
-        const target = hooks.listAgents().find((agent) => agent.id === agentId);
-        if (!target) return failed(agentId, sourceText("error.agent.unknown", { id: agentId }));
+        const agents = hooks.listAgents();
+        const target = agents.find((agent) => agent.id === agentId);
+        // A model that copies an id with a mistake gets the near id, as read_agent gives it (#9771).
+        if (!target) return failed(agentId, unknownAgentMessage(agentId, agents));
         if (widensAgentSettings(target, access, computerUse)) {
           return failed(agentId, sourceText("error.agent.onlyUserWidensSettings"));
         }

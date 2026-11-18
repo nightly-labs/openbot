@@ -17,4 +17,5 @@ export const messages = {
   "error.kind.permission": "У вас нет разрешения выполнить это действие. Попросите доступ у владельца.",
   "error.kind.rateLimit": "Слишком много запросов. Подождите немного и повторите попытку.",
   "error.kind.service": "Служба недоступна. Подождите немного и повторите попытку.",
+  "error.kind.interrupted": "Соединение закрылось до завершения ответа. Отправьте сообщение ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

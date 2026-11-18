@@ -4,7 +4,7 @@ import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
 import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
@@ -67,9 +67,10 @@ export function DownloadSection() {
         </header>
 
         <div class="landing-download-grid">
-          <a
+          {/* The Apple silicon installer does not open on an Intel Mac, and a browser cannot reliably
+              tell the two apart. So the card also has the Intel installer, as the Android card has the APK. */}
+          <div
             class="landing-download-card"
-            href={macos.href}
             data-download-platform="macos"
             data-state="available"
             data-revealed={revealState()}
@@ -79,9 +80,23 @@ export function DownloadSection() {
               status={text().available}
               title={macos.label}
               description={macos.description}
-              action={text().desktop.macos}
+              actions={
+                <>
+                  <a class="landing-download-action landing-download-card-link" href={macos.href}>
+                    {text().desktop.macos}
+                    <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+                  </a>
+                  <a
+                    class="landing-download-action landing-download-action-alternate"
+                    href={OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos}
+                  >
+                    {text().intelMac}
+                    <LandingIcon name="download" class="landing-download-action-icon" />
+                  </a>
+                </>
+              }
             />
-          </a>
+          </div>
 
           <a
             class="landing-download-card"
@@ -149,7 +164,7 @@ export function DownloadSection() {
                             <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
                           </a>
                           <a
-                            class="landing-download-action landing-download-action-apk"
+                            class="landing-download-action landing-download-action-alternate"
                             href={OPENBOT_ANDROID_APK_LINK}
                           >
                             {text().apk}

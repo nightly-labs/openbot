@@ -1,7 +1,7 @@
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
-import { OpenPanel, type TrackHandlerPayload } from "@openpanel/react-native";
-import * as Application from "expo-application";
+import type { TrackHandlerPayload } from "@openpanel/react-native";
 import { Platform } from "react-native";
+import { nativeApplication, nativeApplicationVersion, nativeBuildVersion } from "@/shared/lib/native-application";
 import { MobileAnalytics } from "./analytics-core";
 import { MOBILE_EVENTS, type MobileEventName, sanitizeMobileEvent } from "./events";
 import { mobileReportQueue } from "./failure-reports";
@@ -11,8 +11,8 @@ const metadata = {
   environment: "production",
   event_schema_version: ANALYTICS_GENERATIONS.mobile,
   platform: Platform.OS,
-  app_version: Application.nativeApplicationVersion ?? "unknown",
-  build_number: Application.nativeBuildVersion ?? "unknown",
+  app_version: nativeApplicationVersion() ?? "unknown",
+  build_number: nativeBuildVersion() ?? "unknown",
 };
 
 // RN's SDK adds Android install referrers and paths itself. Replace its final
@@ -53,9 +53,12 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     process.env.EXPO_PUBLIC_APP_ENV !== "production" ||
     !clientId ||
     !clientSecret ||
-    (Platform.OS !== "ios" && Platform.OS !== "android")
+    (Platform.OS !== "ios" && Platform.OS !== "android") ||
+    // The SDK imports `expo-application`, which throws in a build without its native module.
+    !nativeApplication
   )
     return null;
+  const { OpenPanel }: typeof import("@openpanel/react-native") = require("@openpanel/react-native");
   const client = new OpenPanel({
     apiUrl: "https://analytics.openbot.run/api",
     clientId,

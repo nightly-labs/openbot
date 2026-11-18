@@ -1,4 +1,5 @@
-import { decodeTeamProtocolSupportV9, type TeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import type { TeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { hasTeamProtocolV10Lists, TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 // One Team API call, from picking a wire format to recording that it failed.
 //
 // **Two encodings, on purpose. Never merge them.** The HTTPS path frames V1 or V3 according to the
@@ -22,22 +23,28 @@ import { randomBytes, verify } from "node:crypto";
 import type { RemoteDesktopCapabilities, ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  decodeTeamProtocolSupportExpanded,
   isAgentCreateRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_BOOTSTRAP_CAPABILITIES,
   type TeamCurrentCapability,
   teamCapabilitiesForProtocol,
+  teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
+import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import {
   highestCommonTeamProtocol,
   TEAM_APP_VERSION_HEADER,
-  TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
   teamProtocolUpdateDirection,
 } from "@openbot/contracts/team-protocol/v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Result } from "effect";
+import { Deferred, Effect, Option, Result } from "effect";
 import { decodeRemoteDesktopCapabilities } from "./remote-device-decoding";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import {
@@ -263,7 +270,11 @@ export class RemoteServerClient {
       headers.set(TEAM_PROTOCOL_VERSION_HEADER, String(compatibility.negotiatedProtocol));
       if (this.#appVersion) {
         headers.set(TEAM_APP_VERSION_HEADER, this.#appVersion);
-        headers.set(TEAM_CAPABILITIES_HEADER, teamCapabilitiesForProtocol(compatibility.negotiatedProtocol).join(","));
+        const capabilities = teamCapabilitiesForProtocol(compatibility.negotiatedProtocol);
+        for (const [name, value] of Object.entries(
+          teamCapabilityHeaders(compatibility.negotiatedProtocol, capabilities),
+        ))
+          headers.set(name, value);
       }
       const response = yield* remoteFetch(input, { ...init, headers }, timeoutMs).pipe(
         Effect.mapError(
@@ -327,7 +338,8 @@ export class RemoteServerClient {
       !refresh &&
       (issue?.code === "client_update_required" ||
         issue?.code === "host_update_required" ||
-        issue?.code === "protocol_error")
+        issue?.code === "protocol_error" ||
+        issue?.code === "server_safe_mode")
     ) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteProtocolError(
@@ -362,6 +374,10 @@ export class RemoteServerClient {
       const compatibility = yield* server.transport === "webrtc-v2"
         ? this.#negotiateWebRtcCompatibilityEffect(server.id)
         : this.negotiateCompatibility(server.apiUrl);
+      // A server in safe mode answers only with its reason. It is not a usable connection, so it is not
+      // recorded as one: the failure records the host versions for the screen that shows the reason.
+      if (compatibility.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
+        return yield* this.#serverSafeModeError(server, compatibility);
       this.#connections.setCompatibility(server.id, compatibility);
       this.#connections.clearStaleIssue(server.id, issueAtStart);
       return compatibility;
@@ -374,6 +390,47 @@ export class RemoteServerClient {
       ),
     );
   }).bind(this);
+
+  /**
+   * The failure for a server in safe mode, with the reason that the host sends to each member. The
+   * read goes past `request`, which would ask for the compatibility again. A reason that cannot be
+   * read gives the general safe-mode sentence: the user still sees why the server does not answer.
+   */
+  readonly #serverSafeModeError = Effect.fn("RemoteClient.serverSafeModeError")(function* (
+    this: RemoteServerClient,
+    server: StoredRemoteServerView,
+    compatibility: ServerCompatibility,
+  ): Effect.fn.Return<never, RemoteWorkflowError> {
+    const reason = yield* server.transport === "webrtc-v2"
+      ? this.#hostRequestEffect(server.id, SERVER_SAFE_MODE_ROUTES.reason).pipe(
+          Effect.flatMap((value) => remoteDecode(() => decodeServerSafeModeReason(value))),
+          Effect.option,
+        )
+      : requestJson(server.apiUrl, SERVER_SAFE_MODE_ROUTES.reason, decodeServerSafeModeReason, {
+          token: this.#servers.token(server),
+          ...this.requestProtocol(compatibility),
+        }).pipe(Effect.option);
+    const message = Option.match(reason, {
+      onNone: () => sourceText("error.team.serverSafeMode"),
+      onSome: ({ reason, appVersion }) =>
+        reason === "newer_database"
+          ? sourceText("error.team.serverSafeModeNewerDatabase", { version: appVersion })
+          : sourceText("error.team.serverSafeModeStartFailed", { version: appVersion }),
+    });
+    return yield* new RemoteWorkflowError({
+      cause: new RemoteProtocolError(
+        "server_safe_mode",
+        message,
+        compatibility.hostAppVersion && compatibility.hostProtocol
+          ? {
+              appVersion: compatibility.hostAppVersion,
+              protocol: compatibility.hostProtocol,
+              capabilities: compatibility.capabilities,
+            }
+          : null,
+      ),
+    });
+  });
 
   /**
    * The one compatibility read after a WebRTC connect. It is the shared negotiation of
@@ -418,6 +475,7 @@ export class RemoteServerClient {
     if (negotiatedProtocol <= 7) return negotiatedCompatibility(this.#appVersion, host, negotiatedProtocol);
     // The first read is a protocol 7 request, so every released host can answer it, but a host shows
     // a protocol 7 peer no protocol 9 capabilities. Read the list again as the negotiated protocol.
+    // A protocol 10 read gets the two protocol 10 lists, which the decoder expands.
     const current = yield* this.#readCompatibilityEffect(
       apiUrl,
       negotiatedProtocol,
@@ -438,7 +496,7 @@ export class RemoteServerClient {
     capabilities: readonly TeamCurrentCapability[],
   ): Effect.fn.Return<TeamProtocolSupportV9, RemoteWorkflowError> {
     const attempt4 = yield* Effect.gen({ self: this }, function* () {
-      return yield* requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9, {
+      return yield* requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportExpanded, {
         protocol,
         capabilities,
       }).pipe(
@@ -596,13 +654,26 @@ export class RemoteServerClient {
     this: RemoteServerClient,
     serverId: string,
   ): Effect.fn.Return<ServerCompatibility, RemoteWorkflowError> {
+    const first = yield* this.#readWebRtcCompatibilityEffect(serverId);
+    // The first read of a connection does not know the protocol, so a host of protocol 10 answers it
+    // as protocol 9. The transport knows the protocol now: read the full set again.
+    const host =
+      !first.lists && Math.min(first.support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum) >= TEAM_PROTOCOL_V10
+        ? (yield* this.#readWebRtcCompatibilityEffect(serverId)).support
+        : first.support;
+    return webRtcCompatibility(this.#appVersion, host);
+  });
+
+  /** One WebRTC compatibility read, and whether the host sent the protocol 10 lists. */
+  readonly #readWebRtcCompatibilityEffect = Effect.fn("RemoteClient.readWebRtcCompatibility")(function* (
+    this: RemoteServerClient,
+    serverId: string,
+  ): Effect.fn.Return<{ support: TeamProtocolSupportV9; lists: boolean }, RemoteWorkflowError> {
     const value = yield* this.#hostRequestEffect(serverId, TEAM_API_ROUTES.compatibility);
-    return yield* remoteDecode(() =>
-      webRtcCompatibility(
-        this.#appVersion,
-        decodeOrProtocolError(decodeTeamProtocolSupportV9, value, sourceText("error.remote.invalidCompatibility")),
-      ),
+    const support = yield* remoteDecode(() =>
+      decodeOrProtocolError(decodeTeamProtocolSupportExpanded, value, sourceText("error.remote.invalidCompatibility")),
     );
+    return { support, lists: hasTeamProtocolV10Lists(value) };
   });
 
   /**

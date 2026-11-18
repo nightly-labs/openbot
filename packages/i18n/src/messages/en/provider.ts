@@ -129,9 +129,13 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
     "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
@@ -159,6 +163,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.selectEffort": "Select effort",
   "provider.picker.custom": "Custom",
   "provider.picker.cliReady": "{cli} ready",
+  "provider.picker.modelSourceProvider": "Uses {name} from your {cli} settings",
+  "provider.picker.modelSourceCatalog": "Uses a model list from your {cli} settings",
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.new": "New",
@@ -191,6 +197,12 @@ export const messages = defineMessages("provider", {
   "provider.codexKey.descriptionHost":
     "Codex saves the key on the host. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
   "provider.codexKey.label": "OpenAI API key",
+  "provider.cursorKey.title": "Cursor API key",
+  "provider.cursorKey.description":
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on this computer.",
+  "provider.cursorKey.descriptionHost":
+    "Each Cursor account after the first uses an API key. Make a key in the Cursor dashboard, under Integrations, and paste it here. The key is saved on the host.",
+  "provider.cursorKey.label": "Cursor API key",
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":
     "Save an Inception API key on this computer to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
@@ -225,6 +237,7 @@ export const messages = defineMessages("provider", {
   "provider.openCodeKey.reconnectFailed": "Could not reconnect.",
   "provider.account.add": "Add account",
   "provider.account.addLabel": "Add another {name} account",
+  "provider.account.addWithCode": "Add account with code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API key",
@@ -321,6 +334,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Not in use: {version} · installed by you",
   "provider.settings.otherVersionDownloaded": "Not in use: {version} · downloaded by OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Some models need a part that this version does not have. Download OpenBot's version to use them.",
   "provider.settings.useInstalledVersion": "Use installed version",
   "provider.settings.useDownloadedVersion": "Use OpenBot's version",
   "provider.settings.update": "Update",
@@ -347,6 +362,29 @@ export const messages = defineMessages("provider", {
   "provider.settings.compactWindowDefault": "Claude Code default",
   "provider.settings.compactWindowTokens": "{size} tokens",
   "provider.settings.compactWindowLoadFailed": "Could not load the compaction size of this server.",
+  "provider.settings.environment": "Environment",
+  "provider.settings.environmentVariables": "Variables",
+  "provider.settings.environmentDescription":
+    "API keys, base URLs and other settings that each {name} process gets. A change applies when the current turns end.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, with OPENAI_API_KEY as its key, sends the model requests of ChatGPT to that address.",
+  "provider.settings.environmentShellNote": "The commands that agents run can read these values.",
+  "provider.settings.environmentAdd": "Add variable",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Value",
+  "provider.settings.environmentSaved": "Saved",
+  "provider.settings.environmentSensitive": "Sensitive",
+  "provider.settings.environmentNameLabel": "Variable name {index}",
+  "provider.settings.environmentValueLabel": "Value of {name}",
+  "provider.settings.environmentSensitiveLabel": "Keep {name} secret",
+  "provider.settings.environmentRemoveLabel": "Remove {name}",
+  "provider.settings.environmentUnnamed": "variable {index}",
+  "provider.settings.environmentPending":
+    "Saving restarts {name} when its current turns end. Sensitive values stay on the server.",
+  "provider.settings.environmentDone": "Saved. {name} restarts when its current turns end.",
+  "provider.settings.environmentDiscard": "Discard",
+  "provider.settings.environmentSave": "Save",
+  "provider.settings.environmentLoadFailed": "Could not load the variables of {name}.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",

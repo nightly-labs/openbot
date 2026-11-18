@@ -306,6 +306,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} üzerindeki OpenBot Telegram mesajlarını alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "connector.telegram.helpError": "OpenBot bu sohbete ulaşamıyor. Yeniden bağlanın veya sohbetin bağlantısını kesin.",
+  "connector.telegram.helpNotLinked": "Bu sohbet bu sunucuya bağlı değil. Bağlamak için Yeniden bağlan'ı seçin.",
   "connector.telegram.retryAt": "Telegram OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.telegram.pause": "Duraklat",
   "connector.telegram.resume": "Sürdür",
@@ -396,6 +397,8 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpError":
     "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot bu numaranın kayıtlı anahtarlarını okuyamıyor. Numarayı yeniden bağlayın.",
   "connector.whatsapp.retryAt": "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.whatsapp.pause": "Duraklat",
   "connector.whatsapp.resume": "Sürdür",
@@ -411,10 +414,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Kişisel numara",
   "connector.whatsapp.ownNumberDescription":
-    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+  "connector.whatsapp.statusReactions": "Durum tepkileri",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "connector.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
@@ -434,10 +440,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Numara",
   "connector.whatsapp.kindPersonal": "Kişisel numaram",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar. Diğer kişiler yanıt almaz.",
   "connector.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
   "connector.whatsapp.kindDedicatedDescription":
-    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+    "OpenBot bu numaradan tanımadığınız her kişiye, size iletmesi için bir kodla yanıt verir. Onları burada onaylarsınız.",
   "connector.whatsapp.methodLabel": "Bağlama yöntemi",
   "connector.whatsapp.methodQr": "QR kodu",
   "connector.whatsapp.methodCode": "Eşleme kodu",
@@ -501,7 +507,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "connector.whatsapp.add": "Ekle",
   "connector.whatsapp.groupTitle": "Bir grup ekleyin",
-  "connector.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "connector.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "connector.whatsapp.groupSearch": "Grup ara",
   "connector.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
@@ -663,9 +670,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Siz yeniden oturum açana kadar ajanlar paylaşılan oturum bilgilerinizle oturum açamaz.",
   "connector.protonPass.reconnect": "Yeniden bağla",
-  "connector.protonPass.planTitle": "Proton Pass ücretli bir plan gerektirir",
+  "connector.protonPass.planTitle": "Proton Pass, Pass Plus içeren bir plan gerektirir",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI yalnızca ücretli bir Proton planıyla çalışır. Planınızı değiştirin, sonra yeniden bağlanın.",
+    "Proton Pass CLI, Pass Plus içeren bir Proton planı gerektirir. Mail Plus gibi diğer ücretli planlar bunu içermez. Planınızı değiştirin, sonra yeniden bağlanın.",
   "connector.protonPass.vaultTitle": "Paylaşılan kasa",
   "connector.protonPass.vaultDescription":
     "Ajanlar bu kasadaki oturum bilgileriyle oturum açabilir. Paylaşmak için bir oturum bilgisini buraya taşıyın.",
