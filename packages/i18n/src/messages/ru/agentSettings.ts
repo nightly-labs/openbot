@@ -173,8 +173,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",
   "agentSettings.runtime.busyMessageLabel": "Сообщения, пока агент работает",
-  "agentSettings.runtime.taskLimit": "Параллельные ветки",
-  "agentSettings.runtime.taskLimitLabel": "Ветки, которые работают одновременно",
   "agentSettings.runtime.workingDirectory": "Рабочая папка",
   "agentSettings.runtime.notAvailable": "Пока недоступно",
   "agentSettings.runtime.fullAccessNote":
@@ -194,8 +192,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Направлять",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
-  "agentSettings.taskLimit.default": "По умолчанию ({count})",
-  "agentSettings.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
 
   "agentSettings.notificationLevel.title": "Уведомлять меня",
   "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",

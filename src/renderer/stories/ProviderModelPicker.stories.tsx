@@ -302,3 +302,38 @@ const usageLimitArgs: Parameters<typeof ProviderModelPicker>[0] = {
  * The rows and the tab show no mark; their names tell a screen reader. Codex has quota left.
  */
 export const UsageLimitReached: Story = { render: () => <ProviderModelPicker {...usageLimitArgs} /> };
+
+/** Models that Codex lists from its own settings, here an Ollama server, in place of OpenAI's list (#9956). */
+const codexOllamaModels = ["gemma4:latest", "qwen3.6:latest", "glm-5.2:cloud", "kimi-k2.7-code:cloud"].map((id) => ({
+  provider: "codex" as const,
+  id,
+  name: id,
+  description: "Codex model discovered from the local CLI.",
+  defaultReasoningEffort: "medium" as const,
+  supportedReasoningEfforts: ["medium" as const],
+}));
+
+const codexStatusWithSource = (modelSource: { kind: "provider"; name: string } | { kind: "catalog" }) => ({
+  ...STORY_AGENT_STATUS,
+  providers: STORY_AGENT_STATUS.providers?.map((provider) =>
+    provider.id === "codex" ? { ...provider, modelSource } : provider,
+  ),
+});
+
+/** Codex runs on a model provider that its settings select: the ChatGPT tab says which one. */
+export const CodexModelProviderSource: Story = {
+  args: {
+    value: "gemma4:latest",
+    modelOptions: [...codexOllamaModels, ...STORY_MODELS.filter((model) => model.provider !== "codex")],
+    agentStatus: codexStatusWithSource({ kind: "provider", name: "Ollama" }),
+  },
+};
+
+/** Codex lists the models of a file that its settings name: the ChatGPT tab says so. */
+export const CodexModelCatalogSource: Story = {
+  args: {
+    value: "gemma4:latest",
+    modelOptions: [...codexOllamaModels, ...STORY_MODELS.filter((model) => model.provider !== "codex")],
+    agentStatus: codexStatusWithSource({ kind: "catalog" }),
+  },
+};

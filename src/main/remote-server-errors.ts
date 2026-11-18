@@ -3,7 +3,8 @@
 // `RemoteRequestError` is the host answering: it understood the request and refused it, so `status`
 // and `code` are the host's own words and the connection is still good. `RemoteProtocolError` is the
 // host and this app disagreeing about the wire itself -- an unreadable body, or a protocol range with
-// no overlap -- which no retry fixes and which pauses the event stream.
+// no overlap -- which no retry fixes and which pauses the event stream. `server_safe_mode` is a host
+// that stopped its start loop and answers only with the reason (`server-safe-mode-v1`).
 //
 // `remote-server-connection-status.ts` is the only place that turns either into something a user
 // sees. Both are classified by `instanceof`, so this file must stay their single definition: a second
@@ -26,13 +27,13 @@ export class RemoteRequestError extends Schema.TaggedError<RemoteRequestError>()
 }
 
 export class RemoteProtocolError extends Schema.TaggedError<RemoteProtocolError>()("RemoteProtocolError", {
-  code: Schema.Literals(["client_update_required", "host_update_required", "protocol_error"]),
+  code: Schema.Literals(["client_update_required", "host_update_required", "protocol_error", "server_safe_mode"]),
   message: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {
   readonly support: TeamProtocolSupportV1 | null;
   constructor(
-    code: "client_update_required" | "host_update_required" | "protocol_error",
+    code: "client_update_required" | "host_update_required" | "protocol_error" | "server_safe_mode",
     message: string,
     support: TeamProtocolSupportV1 | null = null,
     options?: ErrorOptions,

@@ -20,6 +20,10 @@ export const messages = {
   "computerUse.ready.title": "Computer Use 已就绪",
   "computerUse.ready.description": "OpenBot 可以看到并操作这台电脑上的应用，该系统不需要额外权限。",
   "computerUse.openSettingsFailed.title": "无法打开系统设置",
+  "computerUse.restartRequired.title": "需要重启",
+  "computerUse.restartRequired.description":
+    "macOS 仍在阻止点击和输入。如果重启后仍出现此问题，请从“辅助功能”中移除 OpenBot，然后重新添加。",
+  "computerUse.restartRequired.action": "重启 OpenBot",
   "computerUse.compact.title": "启用 Computer Use",
   "computerUse.compact.description": "允许 OpenBot 看到并操作这台电脑上的应用。",
   "computerUse.granted": "已授予",

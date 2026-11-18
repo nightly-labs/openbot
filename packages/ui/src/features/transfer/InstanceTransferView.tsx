@@ -4,6 +4,7 @@ import type {
   InstanceTransferPreview,
   InstanceTransferResult,
   InstanceTransferSummary,
+  InstanceTransferUploadProgress,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -16,19 +17,23 @@ import {
   Checkbox,
   ChevronLeft,
   CircleCheck,
+  ConfirmDialog,
   Download,
   FolderOpen,
   ItemGroup,
   Lock,
   Monitor,
+  Progress,
   Settings,
+  SlidingTabs,
   Sparkles,
   SwitchField,
   TriangleAlert,
   Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
+import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
@@ -37,11 +42,16 @@ export type InstanceTransferScreen = "home" | "export" | "import";
 export type InstanceExportPhase = "options" | "exporting" | "saved";
 export type InstanceImportPhase = "idle" | "reading" | "review" | "importing" | "done";
 
+/** The bytes of a file that the client has sent to a joined server. */
+export type TransferUploadState = Pick<InstanceTransferUploadProgress, "sent" | "total">;
+
 export interface InstanceExportOptions {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
   includeHistory?: boolean;
+  includeChannelMessages?: boolean;
+  includeServerPreferences?: boolean;
 }
 
 export interface InstanceTransferViewProps {
@@ -57,6 +67,11 @@ export interface InstanceTransferViewProps {
   onExport: (options: InstanceExportOptions) => void;
   /** The server can put the chat history in the file. */
   historyAvailable?: boolean | undefined;
+  /**
+   * The server can choose the channel messages apart from the chats, and can put its server
+   * preferences in the file: this computer, or a host with `instance-transfer-full-copy-v1`.
+   */
+  fullCopyAvailable?: boolean | undefined;
   /** Shows the saved file in its folder. Absent in a browser, which saves to its own download folder. */
   onShowExport?: (() => void) | undefined;
   onExportAgain: () => void;
@@ -64,8 +79,11 @@ export interface InstanceTransferViewProps {
   preview: InstanceTransferPreview | null;
   result: InstanceTransferResult | null;
   importError: string | null;
+  /** While `reading`: the bytes sent to a joined server. Null before the first part, and on this computer. */
+  importProgress?: TransferUploadState | null | undefined;
   onChoose: () => void;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  /** `includeServerPreferences`: only where `fullCopyAvailable`; the file's preferences replace this server's. */
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancelImport: () => void;
   onImportDone: () => void;
   /** Absent for a joined server: its providers are signed in on that computer. */
@@ -150,24 +168,92 @@ export function InstanceTransferView(props: InstanceTransferViewProps) {
   );
 }
 
+/** A part of the file that the user can leave out. The agents are always in it. */
+type ExportPart = "settings" | "history" | "channels" | "files" | "preferences";
+
+/** "Templates" is the agents and the server settings: a new server that starts with the same team. */
+const TEMPLATE_PARTS: ReadonlySet<ExportPart> = new Set(["settings"]);
+
 function ExportScreen(props: InstanceTransferViewProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [choosing, setChoosing] = createSignal(false);
-  const [files, setFiles] = createSignal(true);
-  const [settings, setSettings] = createSignal(true);
-  const [history, setHistory] = createSignal(true);
+  const [parts, setParts] = createSignal<ReadonlySet<ExportPart>>(TEMPLATE_PARTS);
   const agents = () => props.summary?.agents ?? [];
   const selected = createMemo(() => agents().filter((agent) => !excluded().has(agent.id)));
   const busy = () => props.exportPhase === "exporting";
-  const totals = () => ({
-    agents: selected().length,
-    skills: selected().reduce((total, agent) => total + agent.skillCount, 0),
-    routines: selected().reduce((total, agent) => total + agent.routineCount, 0),
-    memories: selected().reduce((total, agent) => total + agent.memoryCount, 0),
-    fileBytes: files() ? selected().reduce((total, agent) => total + agent.fileBytes, 0) : null,
-    settings: settings(),
+  const has = (part: ExportPart) => parts().has(part);
+  /** The parts this server offers, in the order of the list. */
+  const available = createMemo((): ExportPart[] => [
+    "settings",
+    ...(props.historyAvailable ? (["history"] as const) : []),
+    ...(props.historyAvailable && props.fullCopyAvailable ? (["channels"] as const) : []),
+    "files",
+    ...(props.fullCopyAvailable ? (["preferences"] as const) : []),
+  ]);
+  const everything = () => available().every(has);
+  const templates = () => available().every((part) => has(part) === TEMPLATE_PARTS.has(part));
+  const preset = () => (templates() ? "templates" : everything() ? "everything" : "custom");
+  // The pill fades in place when a preset follows a custom choice, and does not slide in from the edge.
+  let lastPreset = untrack(preset);
+  const fromCustom = createMemo(() => {
+    const next = preset();
+    const result = lastPreset === "custom" && next !== "custom";
+    lastPreset = next;
+    return result;
   });
+  // `fromCustom` is read on each change, also while the choice is custom, so it sees each step.
+  const pill = () => {
+    const appear = fromCustom();
+    return preset() === "custom" ? "none" : appear ? "appear" : undefined;
+  };
+  const toggle = (part: ExportPart, on: boolean) => {
+    const next = new Set(parts());
+    if (on) next.add(part);
+    else next.delete(part);
+    setParts(next);
+  };
+  const allFileBytes = () => agents().reduce((total, agent) => total + agent.fileBytes, 0);
+  const fileBytes = () => (has("files") ? selected().reduce((total, agent) => total + agent.fileBytes, 0) : 0);
+  const contents = () =>
+    [
+      t("import.count.agent", { count: selected().length }),
+      t("import.count.skill", { count: selected().reduce((total, agent) => total + agent.skillCount, 0) }),
+      t("import.count.routine", { count: selected().reduce((total, agent) => total + agent.routineCount, 0) }),
+      t("import.count.memory", { count: selected().reduce((total, agent) => total + agent.memoryCount, 0) }),
+    ].join(" · ");
+  const row = (part: ExportPart) => {
+    switch (part) {
+      case "settings":
+        return {
+          label: t("settings.transfer.part.settings"),
+          description: t("settings.transfer.export.settingsDescription"),
+        };
+      case "history":
+        return {
+          label: t("settings.transfer.part.chats"),
+          // Without the full copy, the chat history also carries the channel messages.
+          description: props.fullCopyAvailable
+            ? t("settings.transfer.part.chatsDescription")
+            : t("settings.transfer.export.historyDescription"),
+        };
+      case "channels":
+        return {
+          label: t("settings.transfer.part.channels"),
+          description: t("settings.transfer.part.channelsDescription"),
+        };
+      case "files":
+        return {
+          label: t("settings.transfer.part.files"),
+          description: `${format.fileSize(selected().reduce((total, agent) => total + agent.fileBytes, 0))} · ${t("settings.transfer.part.filesDescription")}`,
+        };
+      case "preferences":
+        return {
+          label: t("settings.transfer.part.preferences"),
+          description: t("settings.transfer.part.preferencesDescription"),
+        };
+    }
+  };
 
   return (
     <Show
@@ -187,34 +273,54 @@ function ExportScreen(props: InstanceTransferViewProps) {
         {(error) => <TransferAlert title={t("settings.transfer.export.failed")} description={error()} />}
       </Show>
       <Show when={props.summary} fallback={<p class="agent-import-lede">{t("settings.transfer.loading")}</p>}>
-        <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
+        <div class="instance-transfer-meter">
+          <div class="instance-transfer-meter-head">
+            <RollingPrice value={fileBytes()} format={format.fileSize} class="instance-transfer-meter-total" />
+            <span class="instance-transfer-meter-of">
+              {t("settings.transfer.meter.files", { total: format.fileSize(allFileBytes()) })}
+            </span>
+            {/* A custom choice selects no preset: the tabs need a selected value, else they select
+                the first one and call onChange, so a hidden, disabled value holds it. */}
+            <SlidingTabs.Root
+              class="instance-transfer-presets"
+              data-pill={pill()}
+              value={preset()}
+              disabled={busy()}
+              onChange={(value: string) => {
+                if (value === "templates") setParts(TEMPLATE_PARTS);
+                else if (value === "everything") setParts(new Set(available()));
+              }}
+            >
+              <SlidingTabs.List aria-label={t("settings.transfer.preset.label")}>
+                <SlidingTabs.Trigger value="templates">{t("settings.transfer.preset.templates")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="everything">{t("settings.transfer.preset.everything")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="custom" disabled class="instance-transfer-preset-custom">
+                  {t("settings.transfer.preset.label")}
+                </SlidingTabs.Trigger>
+              </SlidingTabs.List>
+            </SlidingTabs.Root>
+          </div>
+        </div>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             class="settings-modal-row"
-            checked={files()}
-            disabled={busy()}
-            onChange={setFiles}
-            label={t("settings.transfer.export.files")}
-            description={t("settings.transfer.export.filesDescription")}
+            checked
+            disabled
+            label={t("settings.transfer.part.agents")}
+            description={t("settings.transfer.part.agentsDescription", { contents: contents() })}
           />
-          <SwitchField
-            class="settings-modal-row"
-            checked={settings()}
-            disabled={busy()}
-            onChange={setSettings}
-            label={t("settings.transfer.export.settings")}
-            description={t("settings.transfer.export.settingsDescription")}
-          />
-          <Show when={props.historyAvailable}>
-            <SwitchField
-              class="settings-modal-row"
-              checked={history()}
-              disabled={busy()}
-              onChange={setHistory}
-              label={t("settings.transfer.export.history")}
-              description={t("settings.transfer.export.historyDescription")}
-            />
-          </Show>
+          <For each={available()}>
+            {(part) => (
+              <SwitchField
+                class="settings-modal-row"
+                checked={has(part)}
+                disabled={busy()}
+                onChange={(on: boolean) => toggle(part, on)}
+                label={row(part).label}
+                description={row(part).description}
+              />
+            )}
+          </For>
         </ItemGroup>
         <Button
           type="button"
@@ -238,8 +344,8 @@ function ExportScreen(props: InstanceTransferViewProps) {
               skillCount: agent.skillCount,
               routineCount: agent.routineCount,
               memoryCount: agent.memoryCount,
-              fileCount: files() ? agent.fileCount : 0,
-              fileBytes: files() ? agent.fileBytes : 0,
+              fileCount: has("files") ? agent.fileCount : 0,
+              fileBytes: has("files") ? agent.fileBytes : 0,
               nameExists: false,
             }))}
             excluded={excluded()}
@@ -257,9 +363,14 @@ function ExportScreen(props: InstanceTransferViewProps) {
             onClick={() =>
               props.onExport({
                 agentIds: selected().map((agent) => agent.id),
-                includeFiles: files(),
-                includeSettings: settings(),
-                ...(props.historyAvailable && history() ? { includeHistory: true } : {}),
+                includeFiles: has("files"),
+                includeSettings: has("settings"),
+                ...(props.historyAvailable && has("history") ? { includeHistory: true } : {}),
+                // Sent only where the server takes it apart from the chats.
+                ...(props.historyAvailable && props.fullCopyAvailable
+                  ? { includeChannelMessages: has("channels") }
+                  : {}),
+                ...(props.fullCopyAvailable && has("preferences") ? { includeServerPreferences: true } : {}),
               })
             }
           >
@@ -330,6 +441,7 @@ function ExportSaved(props: {
 
 function ImportScreen(props: InstanceTransferViewProps) {
   const { t } = useText();
+  const uploading = () => (props.importPhase === "reading" ? props.importProgress : null);
   return (
     <>
       <Show when={props.importPhase === "idle" || (props.importPhase === "reading" && !props.preview)}>
@@ -342,19 +454,22 @@ function ImportScreen(props: InstanceTransferViewProps) {
           <Button
             type="button"
             loading={props.importPhase === "reading"}
-            loadingLabel={t("settings.transfer.import.reading")}
+            loadingLabel={t(uploadLabel(uploading(), "settings.transfer.import.reading"))}
             onClick={() => props.onChoose()}
           >
             <Upload class="files-button-icon" aria-hidden="true" />
             {t("settings.transfer.import.choose")}
           </Button>
         </div>
+        <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
       </Show>
       {/* Keyed, so a newly chosen file starts with every agent selected again. */}
       <Show when={props.importPhase !== "idle" && props.importPhase !== "done" && props.preview} keyed>
         {(preview) => (
           <ImportReview
             preview={preview}
+            // A host that answers with the v1 preview does not say; then the switch shows.
+            preferencesAvailable={props.fullCopyAvailable === true && preview.hasServerPreferences !== false}
             importing={props.importPhase === "importing"}
             error={props.importError}
             onImport={props.onImport}
@@ -371,15 +486,27 @@ function ImportScreen(props: InstanceTransferViewProps) {
 
 function ImportReview(props: {
   preview: InstanceTransferPreview;
+  /** The server takes the file's preferences, name, logo and members' choices. */
+  preferencesAvailable: boolean;
   importing: boolean;
   error: string | null;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancel: () => void;
 }) {
   const { t, format } = useText();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [settings, setSettings] = createSignal(props.preview.hasSettings);
+  const [preferences, setPreferences] = createSignal(untrack(() => props.preferencesAvailable));
   const selected = createMemo(() => props.preview.agents.filter((agent) => !excluded().has(agent.key)));
+  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
+  const duplicates = createMemo(() => selected().filter((agent) => agent.nameExists));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
+  const startImport = () =>
+    props.onImport(
+      selected().map((agent) => agent.key),
+      settings(),
+      props.preferencesAvailable && preferences(),
+    );
   const totals = () => ({
     agents: selected().length,
     skills: selected().reduce((total, agent) => total + agent.skillCount, 0),
@@ -434,22 +561,29 @@ function ImportReview(props: {
             disabled={props.importing}
             onChange={setSettings}
             label={t("settings.transfer.import.settings")}
-            description={t("settings.transfer.import.settingsDescription")}
+            description={t("settings.transfer.import.settingsAndPreferences")}
+          />
+        </ItemGroup>
+      </Show>
+      <Show when={props.preferencesAvailable}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            class="settings-modal-row"
+            checked={preferences()}
+            disabled={props.importing}
+            onChange={setPreferences}
+            label={t("settings.transfer.import.preferences")}
+            description={t("settings.transfer.import.preferencesDescription")}
           />
         </ItemGroup>
       </Show>
       <div class="agent-import-actions instance-transfer-start">
         <Button
           type="button"
-          disabled={selected().length === 0 && !settings()}
+          disabled={selected().length === 0 && !settings() && !(props.preferencesAvailable && preferences())}
           loading={props.importing}
           loadingLabel={t("settings.transfer.import.importing")}
-          onClick={() =>
-            props.onImport(
-              selected().map((agent) => agent.key),
-              settings(),
-            )
-          }
+          onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startImport())}
         >
           {selected().length > 0
             ? t("settings.transfer.import.submit", { count: selected().length })
@@ -459,6 +593,24 @@ function ImportReview(props: {
           {t("common.cancel")}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("import.review.duplicatesTitle")}
+        description={t("import.review.duplicatesDescription", {
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("import.review.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startImport();
+        }}
+      />
     </>
   );
 }
@@ -647,6 +799,93 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
       <ChevronLeft aria-hidden="true" />
       {t("settings.transfer.back")}
     </Button>
+  );
+}
+
+/** The label of a busy button while a file goes to a joined server, or `fallback` before the first part. */
+function uploadLabel<Fallback extends string>(progress: TransferUploadState | null | undefined, fallback: Fallback) {
+  if (!progress) return fallback;
+  return progress.sent < progress.total ? "settings.transfer.upload.sending" : "settings.transfer.upload.serverReading";
+}
+
+/** The speed of the bytes that arrived in this time gives the time left. */
+const TIME_LEFT_WINDOW_MS = 30_000;
+/** No time left before the upload has sent for this long: the first parts give no stable speed. */
+const TIME_LEFT_FIRST_MS = 3_000;
+
+/**
+ * The seconds until the server has the whole file, from the speed of the last 30 seconds, or null.
+ * The last report before those 30 seconds stays, so a client that reports once for each 8 MB part
+ * on a slow connection also gets an estimate. The clock moves the estimate between reports, so an
+ * upload that stops gets a longer time. When no bytes arrive for 30 seconds, or for two times the
+ * usual time between reports, it has none, and when bytes arrive again it measures from there. A
+ * resumed upload measures from its first report, so the parts that the server already had do not
+ * count as speed.
+ */
+function createSecondsLeft(progress: () => TransferUploadState) {
+  const samples: { at: number; sent: number }[] = [];
+  const [now, setNow] = createSignal(Date.now());
+  const timer = setInterval(() => {
+    const { sent, total } = untrack(progress);
+    if (sent < total) setNow(Date.now());
+  }, 1000);
+  onCleanup(() => clearInterval(timer));
+  return createMemo(() => {
+    const { sent, total } = progress();
+    if (samples.at(-1)?.sent !== sent) {
+      const at = Date.now();
+      const latest = samples.at(-1);
+      const previous = samples.at(-2);
+      // Bytes after a stop: the speed from before the stop is not the speed now.
+      if (latest && previous && at - latest.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * (latest.at - previous.at)))
+        samples.length = 0;
+      samples.push({ at, sent });
+    }
+    const time = Math.max(now(), samples.at(-1)?.at ?? 0);
+    while (samples.length > 2 && time - (samples[1]?.at ?? time) >= TIME_LEFT_WINDOW_MS) samples.shift();
+    const first = samples[0];
+    const last = samples.at(-1);
+    const before = samples.at(-2);
+    if (!first || !last || sent >= total) return null;
+    const usualGap = before ? last.at - before.at : 0;
+    if (time - last.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * usualGap)) return null;
+    const elapsed = time - first.at;
+    const bytesPerMs = (last.sent - first.sent) / elapsed;
+    if (elapsed < TIME_LEFT_FIRST_MS || !(bytesPerMs > 0)) return null;
+    return (total - sent) / bytesPerMs / 1000;
+  });
+}
+
+function timeLeftText(t: AppTranslate, seconds: number): string {
+  if (seconds < 60) return t("settings.transfer.upload.etaSoon");
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return t("settings.transfer.upload.etaMinutes", { minutes });
+  return t("settings.transfer.upload.etaHours", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+}
+
+/** How much of the file a joined server has. After the last byte, the server reads the file. */
+export function TransferUploadProgress(props: { progress: TransferUploadState }) {
+  const { t, format } = useText();
+  const secondsLeft = createSecondsLeft(() => props.progress);
+  const percent = () =>
+    props.progress.total > 0 ? Math.min(100, Math.floor((props.progress.sent / props.progress.total) * 100)) : 0;
+  return (
+    <div class="instance-transfer-upload">
+      <Progress
+        class="instance-transfer-upload-bar"
+        value={percent()}
+        aria-label={t("settings.transfer.upload.label")}
+      />
+      <p class="instance-transfer-upload-status">
+        {t("settings.transfer.upload.sent", {
+          sent: format.fileSizeAmount(props.progress.sent, props.progress.total),
+          total: format.fileSize(props.progress.total),
+        })}
+      </p>
+      <Show when={secondsLeft()}>
+        {(seconds) => <p class="instance-transfer-upload-status">{timeLeftText(t, seconds())}</p>}
+      </Show>
+    </div>
   );
 }
 

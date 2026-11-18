@@ -15,15 +15,20 @@ import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-hos
 import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
 import { OutboxProvider } from "@/features/chat/context/outbox-context";
 import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
+import { requestComposerText } from "@/features/chat/model/composer-requests";
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { HomeOnboardingProvider, useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
 import type { NotificationTarget } from "@/features/push-notifications/push-notifications-native.types";
 import { useNotificationTaps } from "@/features/push-notifications/use-notification-taps";
 import type { QuickActionTarget } from "@/features/quick-actions/model/quick-action-items";
+import { shareOpenBot } from "@/features/quick-actions/model/share-app";
 import { setQuickActionNavigator } from "@/features/quick-actions/quick-actions-native";
 import { requestHomeSearch } from "@/features/search/model/home-search-request";
 import { AppDrawerShell, useAppDrawer } from "@/features/servers/components/app-drawer-shell";
+import { watchAndroidShares } from "@/features/share/model/android-share-watch";
 import { setShareSheetOpener } from "@/features/share/model/share-sheet-opener";
+import type { ShortcutOpenTarget } from "@/features/shortcuts/model/shortcut-target";
+import { setShortcutNavigator } from "@/features/shortcuts/shortcuts-native";
 import {
   MobileWorkspaceProvider,
   useMobileWorkspaceReader,
@@ -160,17 +165,44 @@ function AuthenticatedStack() {
         return;
       }
       whenUnlocked(() => {
+        // The share sheet opens over the current screen, so the user keeps their place.
+        if (target.type === "share") {
+          shareOpenBot();
+          return;
+        }
         closeDrawer();
         if (router.canDismiss()) router.dismissAll();
         if (target.type === "routines")
           router.push({ pathname: "/server-routines", params: { serverId: target.serverId } });
+        else if (target.type === "support") router.push("/settings/support");
         else requestHomeSearch();
       });
     },
     [closeDrawer, openFromOutside],
   );
   useEffect(() => setQuickActionNavigator(openQuickAction), [openQuickAction]);
+  /** Opens the target of a button on a shortcut card: the chat of an agent, or Settings > Shortcuts. */
+  const openShortcutTarget = useCallback(
+    (target: ShortcutOpenTarget) => {
+      if (target.screen === "chat") {
+        // A message that the shortcut could not send waits in the composer of the chat.
+        if (target.draft)
+          requestComposerText({ serverId: target.draft.serverId, agentId: target.agentId, text: target.draft.text });
+        openFromOutside(target.agentId);
+        return;
+      }
+      whenUnlocked(() => {
+        closeDrawer();
+        if (router.canDismiss()) router.dismissAll();
+        if (target.screen === "settings") router.push("/settings/shortcuts");
+      });
+    },
+    [closeDrawer, openFromOutside],
+  );
+  useEffect(() => setShortcutNavigator(openShortcutTarget), [openShortcutTarget]);
   useEffect(() => setShareSheetOpener(() => whenUnlocked(() => router.push("/share"))), []);
+  // Android can give a share without a route change, so the stack looks for one itself.
+  useEffect(() => (isAndroid ? watchAndroidShares() : undefined), []);
   const workspace = useMobileWorkspaceReader();
   const queryClient = useQueryClient();
   // The scope is a new list at each render. The sources read the latest one.
@@ -291,6 +323,21 @@ function AuthenticatedStack() {
       })}
     >
       <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
+      {/* The ask shows over home: the bloub stage drops its header, and the screen slides its panel out
+          from under the edge. The route must stay inside the navigation container, below the stage:
+          a native `transparentModal` draws over the stage, covers its edge and takes the touches of
+          its close button. The close button, "Not now" and Back close the panel before the route
+          leaves, so a swipe is off. */}
+      <Stack.Screen
+        name="rate-app"
+        options={{
+          presentation: "containedTransparentModal",
+          animation: "none",
+          gestureEnabled: false,
+          headerShown: false,
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
       <Stack.Screen
         name="chat/[agentId]"
         options={{
@@ -433,6 +480,18 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="context-usage/[agentId]"
+        // The context ring of the composer opens it. The header comes from the route's `_layout.tsx`.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="channel-actions/[channelId]"
         // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
@@ -514,6 +573,19 @@ function AuthenticatedStack() {
       <Stack.Screen
         name="section-form"
         // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+        listeners={refocusNameField}
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="library-folders"
+        // The header comes from the route's `_layout.tsx`. The name page has a field to focus.
         listeners={refocusNameField}
         options={{
           contentStyle: { backgroundColor: sheetBackground },
@@ -637,14 +709,14 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
       <Stack.Screen
         name="workflow-editor"
-        // One sheet for the editor: its pages are in the stack of `workflow-editor/_layout.tsx`.
+        // The editor is a page: it comes in from the right, so a wide flow and a long list have room.
+        // Its pages are in the stack of `workflow-editor/_layout.tsx`. Back, or the swipe from the
+        // edge, leaves it; its discard guard asks before it drops changes.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
           scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
+          presentation: "card",
         }}
       />
       <Stack.Screen name="server-usage/index" options={largeTitlePage} />
@@ -686,6 +758,18 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="pinned-messages"
+        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="queued-messages"
         options={{
           contentStyle: { backgroundColor: sheetBackground },
@@ -710,6 +794,28 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="turn-thinking"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="subagent"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="memory-changes"
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,

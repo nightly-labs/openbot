@@ -3,8 +3,10 @@ import { expandChatTagReferences } from "../chat-tag-references";
 import { type AgentEvent, isAgentEvent } from "../ipc-agent-events";
 import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { withEventAgentPendingRuntimes } from "./agent-pending-runtime-v1";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { restoreBrowserTakeoverReason } from "./browser-sign-in-v1";
+import { restoreBrowserVaultSkip } from "./browser-vault-skip-v1";
 import { withRuntimeSnapshotContextUsage } from "./context-usage-v1";
 import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
@@ -14,9 +16,11 @@ import {
   toWireAgentKeys,
   toWireAgentKeysObjectForPath,
 } from "./current-agent-keys";
+import { withConversationMemoryChanges } from "./memory-changes-v1";
 import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
+import { withUsageEventTertiary } from "./usage-tertiary-v1";
 import {
   decodeTeamProtocolV8BaseEvent,
   decodeTeamProtocolV8BaseHttpRequest,
@@ -46,15 +50,29 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
   try {
     current = withEventPromptMultiSelect(
       withEventConversationPlans(
-        restoreBrowserTakeoverReason(
-          restoreBrowserSecretMetadata(toCurrentAgentKeys(withRuntimeSnapshotContextUsage(decodedValue, value)), value),
+        restoreBrowserVaultSkip(
+          restoreBrowserTakeoverReason(
+            restoreBrowserSecretMetadata(
+              toCurrentAgentKeys(
+                withEventAgentPendingRuntimes(
+                  withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                  value,
+                ),
+              ),
+              value,
+            ),
+            value,
+          ),
           value,
         ),
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // video request only under video-generation-v1, a multi-select flag only under
-        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, and context states only
-        // under context-usage-v1, so a present one is always kept.
+        // video request only under video-generation-v1, memory changes only under memory-changes-v1,
+        // a multi-select flag only under prompt-multi-select-v1, a takeover reason only under
+        // browser-sign-in, a vault skip reason only under browser-vault-skip-v1, context states only
+        // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending
+        // runtime only under agent-pending-runtime-v1, so a present one is always kept.
+        value,
         value,
         value,
         value,
@@ -75,11 +93,15 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     preserveSemanticTags?: boolean;
     preserveBrowserSecrets?: boolean;
     browserSignIn?: boolean;
+    browserVaultSkip?: boolean;
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     contextUsage?: boolean;
+    usageTertiary?: boolean;
+    agentPendingRuntime?: boolean;
+    memoryChanges?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
@@ -96,13 +118,18 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
+  const usageTertiary = options.usageTertiary === true && event.type === "usage-changed";
+  const pendingRuntime = options.agentPendingRuntime === true && event.type === "agents-changed";
   if (
     !encoded ||
     (!options.preserveBrowserSecrets &&
       !options.browserSignIn &&
+      !options.browserVaultSkip &&
       !eventConversationKey(event.type) &&
       !promptMultiSelect &&
-      !contextUsage)
+      !contextUsage &&
+      !usageTertiary &&
+      !pendingRuntime)
   )
     return encoded;
   // The block, the subagents and the video request go as written: the key swap would rename a
@@ -113,19 +140,26 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     options.uiBlocks ? currentValue : null,
     options.subagents ? currentValue : null,
     options.videoGeneration ? currentValue : null,
+    options.memoryChanges ? currentValue : null,
   );
   const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
-  const output = contextUsage ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true) : withMultiSelect;
+  const withContext = contextUsage
+    ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true)
+    : withMultiSelect;
+  const withUsage = usageTertiary ? withUsageEventTertiary(withContext, wireValue, true) : withContext;
+  const output = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
-  return JSON.stringify(options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets);
+  const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;
+  return JSON.stringify(options.browserVaultSkip ? restoreBrowserVaultSkip(withReason, wireValue) : withReason);
 }
 
 /**
  * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
  * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
- * the video requests of `videoSource` when it is not null. See `withConversationPlans`,
+ * the video requests of `videoSource` when it is not null, and the memory changes of `memorySource`
+ * when it is not null. See `withConversationPlans`,
  * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
- * `withConversationVideoGeneration`.
+ * `withConversationVideoGeneration` and `withConversationMemoryChanges`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV8BaseJsonValue,
@@ -133,6 +167,7 @@ function withEventConversationPlans(
   uiBlockSource: unknown,
   subagentSource: unknown,
   videoSource: unknown,
+  memorySource: unknown,
 ): TeamProtocolV8BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
@@ -146,11 +181,12 @@ function withEventConversationPlans(
   const withSubagents = isDynamicRecord(subagentSource)
     ? withConversationSubagents(withBlocks, subagentSource[key])
     : withBlocks;
+  const withVideo = isDynamicRecord(videoSource)
+    ? withConversationVideoGeneration(withSubagents, videoSource[key])
+    : withSubagents;
   return {
     ...projected,
-    [key]: isDynamicRecord(videoSource)
-      ? withConversationVideoGeneration(withSubagents, videoSource[key])
-      : withSubagents,
+    [key]: isDynamicRecord(memorySource) ? withConversationMemoryChanges(withVideo, memorySource[key]) : withVideo,
   };
 }
 

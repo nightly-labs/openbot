@@ -1,12 +1,15 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { router, useLocalSearchParams } from "expo-router";
+import type { AttachmentSummary, QueueDelivery } from "@openbot/contracts/ipc";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowUpToLine from "lucide-react-native/icons/arrow-up-to-line";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
 import ExternalLink from "lucide-react-native/icons/external-link";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
+import { useState } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -23,16 +26,25 @@ import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../compone
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 
+/** The route name of a thread in the app stack, `app/(app)/task/[taskId].tsx`. */
+const TASK_ROUTE = "task/[taskId]";
+
 export function QueuedMessageActionsScreen() {
   const { t, format } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
+  // The stack inside the queued messages sheet. Its parent is the app stack, where the thread opens.
+  const sheetStack = useNavigation().getParent();
   const foreground = useThemeColor("foreground");
   const danger = String(useCSSVariable("--openbot-danger-text"));
   const held = queue?.edit?.delivery ?? null;
   // A teammate's answer is not the user's message: steer is its only action.
   const reply = queue?.replies.find((item) => item.id === deliveryId);
-  const delivery = held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply);
+  // The host takes the message out of the queue before it answers the move. The screen keeps it until
+  // the new thread opens.
+  const [moving, setMoving] = useState<QueueDelivery | null>(null);
+  const delivery =
+    (held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply)) ?? moving;
 
   if (!queue || !delivery) {
     return (
@@ -44,11 +56,33 @@ export function QueuedMessageActionsScreen() {
     );
   }
 
-  const { locked, editedElsewhere } = queuedMessageLocks(delivery, { busy: queue.busy, online: queue.online, held });
+  const { locked, editedElsewhere, heldForEdit } = queuedMessageLocks(delivery, {
+    busy: queue.busy,
+    online: queue.online,
+    held,
+  });
+  const head = queue.queued[0];
+  const headEdited = Boolean(head && head.id !== delivery.id && (head.editing || held?.id === head.id));
   const finish = (action: Promise<boolean>) => {
     void action.then((done) => {
       void haptics.notification(done ? "success" : "error");
       if (done) router.back();
+    });
+  };
+
+  // As on desktop's "Run in new thread": the message leaves the queue, starts in a new thread, and the
+  // thread opens in place of this sheet.
+  const runAsThread = () => {
+    setMoving(delivery);
+    void queue.runAsThread(delivery).then((task) => {
+      void haptics.notification(task ? "success" : "error");
+      if (!task) {
+        setMoving(null);
+        return;
+      }
+      sheetStack?.dispatch(
+        StackActions.replace(TASK_ROUTE, { taskId: task.id, agentId: task.agentId, serverId: queue.serverId }),
+      );
     });
   };
 
@@ -85,14 +119,21 @@ export function QueuedMessageActionsScreen() {
             <Typography>{t("common.edit")}</Typography>
           </SettingsRow>
         )}
-        <SettingsRow
-          leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
-          disclosure={false}
-          disabled={locked || editedElsewhere || !queue.activeTurnId}
-          onPress={() => finish(queue.steer(delivery))}
-        >
-          <Typography>{t("mobile.chat.queue.steer")}</Typography>
-        </SettingsRow>
+        {/* As on desktop, an agent that cannot steer offers Send now. An answer has no Send now. */}
+        {queue.steers || !reply ? (
+          <SettingsRow
+            leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
+            disclosure={false}
+            // As on desktop, Send now waits while another message that is first is being edited: an
+            // edited message keeps its place, and the queue starts nothing while it is first.
+            disabled={
+              locked || editedElsewhere || !queue.activeTurnId || queue.steerRefused || (!queue.steers && headEdited)
+            }
+            onPress={() => finish(queue.steers ? queue.steer(delivery) : queue.sendNow(delivery))}
+          >
+            <Typography>{t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}</Typography>
+          </SettingsRow>
+        ) : null}
         {reply ? null : (
           <SettingsRow
             leading={<ArrowUpToLine color={foreground} size={22} />}
@@ -101,6 +142,16 @@ export function QueuedMessageActionsScreen() {
             onPress={() => finish(queue.moveFirst(delivery))}
           >
             <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
+          </SettingsRow>
+        )}
+        {reply || !queue.canRunAsThread ? null : (
+          <SettingsRow
+            leading={<GitBranch color={foreground} size={22} />}
+            disclosure={false}
+            disabled={locked || editedElsewhere || heldForEdit || moving !== null}
+            onPress={runAsThread}
+          >
+            <Typography>{t("mobile.chat.queue.runInNewThread")}</Typography>
           </SettingsRow>
         )}
       </SettingsSection>
@@ -124,7 +175,11 @@ export function QueuedMessageActionsScreen() {
       )}
 
       {editedElsewhere ? <SettingsNote>{t("mobile.chat.queue.editedElsewhere")}</SettingsNote> : null}
-      {queue.activeTurnId ? null : <SettingsNote>{t("mobile.chat.queue.steerNeedsTurn")}</SettingsNote>}
+      {queue.activeTurnId ? null : (
+        <SettingsNote>
+          {t(queue.steers ? "mobile.chat.queue.steerNeedsTurn" : "mobile.chat.queue.sendNowNeedsTurn")}
+        </SettingsNote>
+      )}
       {queue.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
           {queue.error}

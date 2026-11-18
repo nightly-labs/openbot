@@ -96,13 +96,19 @@ function resized(image: SkImage, width: number, height: number): SkImage {
 
 /** The grey picture `image` in `hex`, `pixels` square. */
 function tinted(image: SkImage, hex: string, pixels: number): SkImage {
-  const grey = resized(image, pixels, pixels);
+  return tintedGrey(resized(image, pixels, pixels), hex);
+}
+
+/** The grey picture `grey` in `hex`, at its own size. */
+function tintedGrey(grey: SkImage, hex: string): SkImage {
+  const width = grey.width();
+  const height = grey.height();
   const rampImage = Skia.Image.MakeImage(
     { width: 256, height: 1, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Opaque },
     Skia.Data.fromBytes(tintRamp(hex)),
     256 * 4,
   );
-  const surface = Skia.Surface.Make(pixels, pixels);
+  const surface = Skia.Surface.Make(width, height);
   if (!rampImage || !surface) throw new Error("The plush tint is unavailable.");
   const paint = Skia.Paint();
   paint.setShader(
@@ -114,7 +120,7 @@ function tinted(image: SkImage, hex: string, pixels: number): SkImage {
       ],
     ),
   );
-  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, pixels, pixels), paint);
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, width, height), paint);
   surface.flush();
   return surface.makeImageSnapshot();
 }
@@ -200,4 +206,89 @@ export function loadPlushArt(shape: ShapeId, color: string, pixels: number): Pro
 /** The pictures when they are loaded already, so a remount draws at once. */
 export function loadedPlushArt(shape: ShapeId, color: string, pixels: number): PlushArt | null {
   return ready.get(artKey(shape, color, pixels)) ?? null;
+}
+
+/** The smallest alpha that is fur, as the desktop crops the server plush pictures. */
+const FUR_ALPHA = 16;
+const FUR_SOURCE_SCALE = 1.6;
+
+/** The box of the fur of a body, in parts of its side. */
+interface FurBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const furBoxes = new Map<ShapeId, FurBox>();
+
+/** The box of the pixels of `image` with alpha `FUR_ALPHA` or more. Each shape is measured once. */
+function furBox(shape: ShapeId, image: SkImage): FurBox {
+  const known = furBoxes.get(shape);
+  if (known) return known;
+  const width = image.width();
+  const height = image.height();
+  const pixels = image.readPixels(0, 0, {
+    width,
+    height,
+    colorType: ColorType.RGBA_8888,
+    alphaType: AlphaType.Unpremul,
+  });
+  if (!pixels) throw new Error("The plush body could not be read.");
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if ((pixels[(y * width + x) * 4 + 3] ?? 0) < FUR_ALPHA) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  const box =
+    right < left
+      ? { x: 0, y: 0, width: 1, height: 1 }
+      : { x: left / width, y: top / height, width: (right + 1 - left) / width, height: (bottom + 1 - top) / height };
+  furBoxes.set(shape, box);
+  return box;
+}
+
+const furBodies = new Map<string, Promise<SkImage>>();
+
+/**
+ * The body of `shape` in `color`, with no eyes, in a `pixels` square: its fur fills the square on its
+ * longer side and is centred on the other, as the desktop draws the plush of a server with no logo.
+ */
+export function loadFurBody(shape: ShapeId, color: string, pixels: number): Promise<SkImage> {
+  const key = artKey(shape, color, pixels);
+  const cached = furBodies.get(key);
+  if (cached) return remember(furBodies, key, cached, MAX_ART);
+  // The fur is about two thirds of the side of a body, so the grey body is larger than the square.
+  const loading = body(shape, Math.ceil(pixels * FUR_SOURCE_SCALE)).then((grey) => {
+    const box = furBox(shape, grey);
+    const greyWidth = grey.width();
+    const greyHeight = grey.height();
+    const scale = pixels / Math.max(box.width, box.height);
+    const width = box.width * scale;
+    const height = box.height * scale;
+    const surface = Skia.Surface.Make(pixels, pixels);
+    if (!surface) throw new Error("The plush surface is unavailable.");
+    surface
+      .getCanvas()
+      .drawImageRectOptions(
+        grey,
+        Skia.XYWHRect(box.x * greyWidth, box.y * greyHeight, box.width * greyWidth, box.height * greyHeight),
+        Skia.XYWHRect((pixels - width) / 2, (pixels - height) / 2, width, height),
+        FilterMode.Linear,
+        MipmapMode.Linear,
+        Skia.Paint(),
+      );
+    surface.flush();
+    return tintedGrey(surface.makeImageSnapshot(), color);
+  });
+  loading.catch(() => furBodies.delete(key));
+  return remember(furBodies, key, loading, MAX_ART);
 }

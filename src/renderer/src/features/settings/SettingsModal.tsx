@@ -32,7 +32,11 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
+import {
+  SettingsDialogShell,
+  SettingsNavGroupLabel,
+  type SettingsPagePlacement,
+} from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -49,7 +53,6 @@ import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
-import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
@@ -166,11 +169,6 @@ export function SettingsModal(props: SettingsModalProps) {
     visible: () => props.open && activeTab() === "notifications",
     servers: () => props.servers ?? [],
   });
-  const agents = createSettingsAgentsSection({
-    visible: () => props.open && activeTab() === "agents",
-    value: () => props.value,
-    onValueChange: (value) => props.onValueChange(value),
-  });
   let handledHostedServerDeleteNonce = 0;
   createEffect(
     () => (props.open ? props.hostedServerDeleteRequest : null),
@@ -190,7 +188,6 @@ export function SettingsModal(props: SettingsModalProps) {
     (tab) => {
       if (!tab) return;
       setActiveTab(tab);
-      agents.showList();
     },
   );
   const agentDockShown = () =>
@@ -204,7 +201,6 @@ export function SettingsModal(props: SettingsModalProps) {
     );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
-  const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
@@ -214,7 +210,8 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
-        value === "agents" ||
+        value === "appearance" ||
+        value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
@@ -270,24 +267,27 @@ export function SettingsModal(props: SettingsModalProps) {
         page={props.page}
         open={props.open}
         title={title()}
-        crumb={agentsCrumb()}
         description={description()}
-        contentKey={`${activeTab()}:${agents.crumb()?.title ?? ""}`}
+        contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {visibleNavItems().map((item) => {
+            {visibleNavItems().map((item, index, items) => {
               const NavIcon = item.icon;
+              const group = item.group !== items[index - 1]?.group ? item.group : undefined;
               return (
-                <Tabs.Trigger
-                  class="settings-modal-nav-item"
-                  value={item.value}
-                  aria-current={activeTab() === item.value ? "page" : undefined}
-                >
-                  <NavIcon aria-hidden="true" />
-                  <span>{i18n.t(item.titleKey)}</span>
-                </Tabs.Trigger>
+                <>
+                  {group ? <SettingsNavGroupLabel label={i18n.t(group)} /> : null}
+                  <Tabs.Trigger
+                    class="settings-modal-nav-item"
+                    value={item.value}
+                    aria-current={activeTab() === item.value ? "page" : undefined}
+                  >
+                    <NavIcon aria-hidden="true" />
+                    <span>{i18n.t(item.titleKey)}</span>
+                  </Tabs.Trigger>
+                </>
               );
             })}
           </Tabs.List>
@@ -296,6 +296,7 @@ export function SettingsModal(props: SettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel" data-tab="general">
           {preferencesLoadError()}
           <SettingsGeneralTab
+            part="general"
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
             platform={props.appInfo?.platform}
@@ -307,9 +308,34 @@ export function SettingsModal(props: SettingsModalProps) {
           />
         </Tabs.Content>
 
-        <Tabs.Content value="agents" class="settings-modal-tab-panel" data-tab="agents">
+        <Tabs.Content value="appearance" class="settings-modal-tab-panel" data-tab="appearance">
           {preferencesLoadError()}
-          <agents.Panel menuMount={modalElement} />
+          <SettingsGeneralTab
+            part="appearance"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="app-behavior" class="settings-modal-tab-panel" data-tab="app-behavior">
+          {preferencesLoadError()}
+          <SettingsGeneralTab
+            part="app-behavior"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="notifications" class="settings-modal-tab-panel" data-tab="notifications">
@@ -394,6 +420,7 @@ export function SettingsModal(props: SettingsModalProps) {
                 store={license}
                 onManagePayment={() => void billing.openPortal({ flow: "manage" })}
                 onContactUs={licenseContactUs(props.onContactUs)}
+                billingDetails={props.billingApi}
               />
             }
           />

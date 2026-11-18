@@ -5,13 +5,18 @@ import {
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import {
   createRemoteCommandMailbox,
+  type RemoteDownloadProgress,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
   type RemoteLargeDownload,
   type RemoteTeamCommand,
@@ -25,6 +30,7 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
+import { File, FileMode } from "expo-file-system";
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type {
@@ -45,6 +51,7 @@ import {
   createRequestLimiter,
   isBackgroundRead,
 } from "@/features/workspace/model/request-lanes";
+import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
@@ -66,6 +73,8 @@ export interface RemoteTeamTransportRef {
     onUploadProgress?: (fraction: number) => void,
     /** Lets one file larger than the attachment limit answer this request. */
     largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file of `size` that answers this request. */
+    download?: RemoteDownloadWatch,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
@@ -119,6 +128,7 @@ type RemoteTeamCommandInput =
       body: TeamProtocolV2Json;
       upload?: RemoteFileUpload;
       largeDownload?: RemoteLargeDownload;
+      downloadSize?: number;
     };
 
 /**
@@ -203,10 +213,15 @@ export const RemoteTeamTransport = memo(
 
     // Upload progress arrives from the web view by command ID, while the command is still pending.
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
+    // Download progress arrives the same way, for a request that names the size of its file.
+    const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
+    // The page reads only the device files of the uploads that wait for a result, by count of commands.
+    const uploadFiles = useRef(new Map<string, number>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
         onUploadProgress?: (fraction: number) => void,
+        onDownloadProgress?: (received: number, total: number) => void,
       ): Promise<RemoteTeamCommandResult> => {
         const id = Crypto.randomUUID();
         const command: RemoteTeamCommand =
@@ -229,11 +244,22 @@ export const RemoteTeamTransport = memo(
                     : next.largeDownload
                       ? { largeDownload: next.largeDownload }
                       : {}),
+                  ...(next.downloadSize === undefined ? {} : { downloadSize: next.downloadSize }),
                 }
               : { id, type: "disconnect" };
-        if (!onUploadProgress) return mailbox.send(command);
-        uploadListeners.current.set(id, onUploadProgress);
-        return mailbox.send(command).finally(() => uploadListeners.current.delete(id));
+        const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
+        if (!onUploadProgress && !onDownloadProgress && !fileRef) return mailbox.send(command);
+        if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
+        if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
+        if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
+        return mailbox.send(command).finally(() => {
+          uploadListeners.current.delete(id);
+          downloadListeners.current.delete(id);
+          if (!fileRef) return;
+          const count = (uploadFiles.current.get(fileRef) ?? 1) - 1;
+          if (count > 0) uploadFiles.current.set(fileRef, count);
+          else uploadFiles.current.delete(fileRef);
+        });
       },
       [mailbox],
     );
@@ -272,9 +298,15 @@ export const RemoteTeamTransport = memo(
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
           largeDownload?: RemoteLargeDownload,
+          download?: RemoteDownloadWatch,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload, largeDownload }, onUploadProgress);
+          const send = () =>
+            enqueue(
+              { type: "request", method, path, body, upload, largeDownload, downloadSize: download?.size },
+              onUploadProgress,
+              download?.onProgress,
+            );
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
@@ -296,7 +328,13 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
-          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.approval)
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === TEAM_API_ROUTES.respond.approval ||
+              path === PENDING_APPROVAL_ROUTES.read ||
+              path === PHONE_FEEDBACK_ROUTES.send)
+          )
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
@@ -395,7 +433,27 @@ export const RemoteTeamTransport = memo(
         sessionId: runTeamEffect(props.directory.startSession(props.hostId)).catch(() => null),
       };
     }, [props.active, props.hostId, props.directory]);
+    const uploadFile = (ref: string) => {
+      if (!uploadFiles.current.has(ref)) throw new Error("The file is not part of an upload.");
+      if (uploadCancelled(ref)) {
+        // The peer stops the transfer and tells the host, so the host does not wait for the rest.
+        const cancelUpload = bridge.current?.cancelUpload;
+        if (typeof cancelUpload === "function") cancelUpload(null);
+        throw new Error("The upload was cancelled.");
+      }
+      return new File(ref);
+    };
     const [actions] = useState(() => ({
+      digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
+      readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
+        const handle = uploadFile(ref).open(FileMode.ReadOnly);
+        try {
+          handle.offset = offset;
+          return bytesToBase64(await handle.readBytes(length));
+        } finally {
+          handle.close();
+        }
+      },
       endSession: (sessionId: string) => runTeamEffect(latest.current.props.directory.endSession(sessionId)),
       getBootstrap: async (hostId: string, clientPublicKey: string, existingSessionId: string | null) => {
         const { directory } = latest.current.props;
@@ -419,6 +477,8 @@ export const RemoteTeamTransport = memo(
       },
       onUploadProgress: async ({ commandId, sent, total }: RemoteUploadProgress) =>
         uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1),
+      onDownloadProgress: async ({ commandId, received, total }: RemoteDownloadProgress) =>
+        downloadListeners.current.get(commandId)?.(received, total),
       onAccountProfileChanged: () => latest.current.refreshProfile(),
       onBrowserViewEvent: async (event: BrowserViewBridgeEvent) => {
         const listener = viewListeners.current.get(event.viewId);

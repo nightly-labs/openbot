@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AgentSummary, ConversationMessage } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { runCauseEffect } from "./effect-boundary";
+import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { OpenBotDatabase } from "./openbot-database";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
@@ -80,14 +82,19 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-const PIN_TABLES = { projection_pinned_thread_messages: [] };
+const PIN_TABLES = {
+  projection_messaging_history: [],
+  projection_pinned_thread_messages: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
+  ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+};
 
 function pinTables(db: DatabaseSync) {
   return db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%pinned_thread_messages%' ORDER BY name").all();
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 61 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -134,9 +141,9 @@ describe("pinned thread messages migration", () => {
     seed(db);
     seedDeletedRecord(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=62; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(pinTables(db)).toEqual([]);
@@ -151,8 +158,8 @@ describe("pinned thread messages migration", () => {
        VALUES ('thread-chief', 'message-1', '2026-01-02', 'person')`,
     ).run();
     const after = contents(db);
-    // The next release adds 62: this application is the older one for that database.
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    // The next release adds 65: this application is the older one for that database.
+    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

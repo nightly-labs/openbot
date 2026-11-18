@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Vous modifiez un message en attente. Enregistrez ou annulez la modification pour permettre son exécution.",
   "composer.queueEdit.cancel": "Annuler",
+  "composer.feedbackFix.body":
+    "Correction du rapport #{number}. Envoyez la demande, ou annulez pour garder le rapport tel quel.",
+  "composer.feedbackFix.cancel": "Annuler",
   "composer.providerWait.offlineTitle": "Pas de connexion Internet",
   "composer.providerWait.offline":
     "{provider} ne peut pas répondre tant que cet ordinateur n’est pas de nouveau en ligne.",
@@ -21,6 +24,16 @@ export const messages = {
   "composer.update.manual": "Mettez à jour {provider} sur l’ordinateur qui l’exécute pour continuer.",
   "composer.update.pending": "Mise à jour…",
   "composer.update.action": "Mettre à jour",
+  "composer.imageInput.body":
+    "{model} reçoit uniquement du texte et ne voit donc pas les images que vous joignez. Si ce modèle peut lire des images, activez les images pour lui.",
+  "composer.imageInput.label": "Activer les images pour {model}",
+  "composer.imageInput.pending": "Activation…",
+  "composer.imageInput.action": "Activer les images",
+  "composer.usageLimit.credits":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent maintenant vos crédits.",
+  "composer.usageLimit.creditsResets":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent vos crédits jusqu’à sa réinitialisation {reset}.",
+  "composer.usageLimit.creditsTitle": "Crédits utilisés",
   "composer.usageLimit.resets": "Vous avez utilisé toute votre limite {provider}. Elle se réinitialise {reset}.",
   "composer.usageLimit.selectModel":
     "Vous avez utilisé toute votre limite {provider}. Sélectionnez un autre modèle pour continuer.",
@@ -61,6 +74,8 @@ export const messages = {
     "L’accès au microphone est bloqué. Autorisez OpenBot à utiliser le microphone dans les réglages du système.",
   "composer.voice.noMicrophone": "Aucun microphone n’est disponible.",
   "composer.voice.startFailed": "OpenBot n’a pas pu démarrer l’enregistrement vocal.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot n’a pas pu ouvrir le microphone. Fermez les autres apps qui l’utilisent, vérifiez qu’il est branché et autorisé dans les réglages du système, puis réessayez.",
   "composer.voice.transcribeFailed": "OpenBot n’a pas pu transcrire cet enregistrement.",
   "composer.reply.toYou": "Réponse à votre message",
   "composer.reply.toAgent": "Réponse à l’agent",
@@ -111,10 +126,19 @@ export const messages = {
   "composer.error.holdQueued": "Impossible de réserver le message en attente pour le modifier.",
   "composer.error.cancelEdit": "Impossible d’annuler la modification du message en attente. Réessayez.",
   "composer.error.updateQueued": "Impossible de mettre à jour le message en attente. Réessayez.",
+  "composer.queueEdit.received": "L’agent a déjà reçu ce message, votre modification est donc terminée.",
+  "composer.queueEdit.receivedKept":
+    "L’agent a déjà reçu ce message, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
+  "composer.queueEdit.deletedKept":
+    "Ce message a été supprimé, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
+  "composer.queueEdit.endedKept":
+    "Cette modification s’est terminée avant d’être enregistrée. Vos changements sont toujours dans la zone de message.",
   "composer.voice.prepareFailed": "Impossible de préparer le modèle vocal. Réessayez.",
   "composer.voice.noSpeechRecorded": "Aucune parole n’a été enregistrée.",
   "composer.voice.noSpeechDetected": "Aucune parole n’a été détectée.",
   "composer.voice.readFailed": "Impossible de lire la réponse à voix haute.",
+  "composer.voice.languageUnsupported":
+    "Impossible de lire la réponse à voix haute. Cette langue n’est pas encore disponible.",
   "composer.error.saveEditTryAgain": "Impossible d’enregistrer cette modification sur cet ordinateur. Réessayez.",
   "composer.error.saveUnconfirmed":
     "L’enregistrement n’est pas confirmé. Relancez l’enregistrement pour vérifier le résultat.",
@@ -156,6 +180,7 @@ export const messages = {
   "composer.picker.section.files": "Fichiers",
   "composer.picker.section.tabs": "Onglets du navigateur",
   "composer.picker.section.threads": "Fils",
+  "composer.picker.section.messages": "Dans les messages",
   "composer.token.tab": "Onglet du navigateur {name}",
   "composer.token.thread": "Fil {name}",
   "composer.token.unavailableTab": "Onglet du navigateur fermé {name}",

@@ -10,6 +10,8 @@
 // One more model saves its efforts (#4154): OpenCode must list exactly those efforts, and a turn at
 // `max` must send `reasoning_effort: "max"`. A model with no saved efforts keeps OpenCode's own set.
 // A model saved with no efforts (#7500) must offer no effort, and a turn at `high` must send none.
+// A model that the server reports as not able to reason (#8381): the real probe must find it through
+// `/api/show`, OpenBot must offer no effort choice for it, and a turn at `high` must send no effort.
 // Input kinds (#5332): a model with none saved keeps OpenCode's default and gets an attached image;
 // a model saved as text-only does not. The read tool gives a PDF to a model saved with PDF input,
 // and refuses it for the others.
@@ -24,12 +26,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolveOpencodeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { CustomProviderConfig } from "../src/backend/opencode-config";
 import { getArray, getString, isRecord } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
+import { createModelReasoningSupport } from "../src/main/model-reasoning-probe";
 import { runTurn, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-custom-model");
@@ -50,6 +54,8 @@ const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
 /** #7500: an endpoint that refuses every request with `reasoning_effort` for this model. */
 const NO_EFFORT_MODEL = "no-effort-model";
+/** #8381: a model that the server reports as not able to reason, such as Ollama's `mistral:latest`. */
+const PLAIN_MODEL = "plain-model";
 /** #5332: a vision model behind the endpoint, saved with image and PDF input. */
 const VISION_MODEL = "vision-model";
 /** An endpoint that refuses images for this model, saved as text-only. */
@@ -94,11 +100,13 @@ interface Report {
   /** The efforts that OpenBot listed for each model. */
   efforts?: Record<string, string[]>;
   requests: Request[];
+  /** The paths of Ollama's own API that the reasoning probe asked. */
+  ollamaRequests: string[];
   turns: { reply: string; error: string | null; status: string | null }[];
   error?: string;
 }
 
-const report: Report = { passed: false, requests: [], turns: [] };
+const report: Report = { passed: false, requests: [], ollamaRequests: [], turns: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-model-e2e-"));
 const clients: AgentClient[] = [];
 const run = promisify(execFile);
@@ -167,6 +175,19 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
     const read = await readRequest(request);
     const { model, stream } = read;
     const path = request.url ?? "";
+    // Ollama's own API, which the main process asks for the models that cannot reason (#8381).
+    if (path.startsWith("/api/")) {
+      report.ollamaRequests.push(path);
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify(
+          path === "/api/version"
+            ? { version: "0.0.0-e2e" }
+            : { capabilities: model === PLAIN_MODEL ? ["completion", "tools"] : ["completion", "tools", "thinking"] },
+        ),
+      );
+      return;
+    }
     if (!path.startsWith(KEYED_PATH)) report.requests.push({ path, ...read });
     else {
       const header = request.headers.authorization;
@@ -272,8 +293,32 @@ try {
       { id: NO_EFFORT_MODEL, name: "No effort model", reasoningEfforts: [] },
       { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
       { id: TEXT_MODEL, name: "Text model", inputs: [] },
+      { id: PLAIN_MODEL, name: "Plain model" },
     ],
   };
+  // The real probe, against the fake server's `/api/show`. It must name the plain model only, and
+  // must not ask about the model with saved efforts.
+  const reasoning = createModelReasoningSupport(() => [endpoint]);
+  assert.deepEqual(
+    await Effect.runPromise(reasoning.refresh()),
+    { changed: true, unreachable: false },
+    "The first answer must count as a change.",
+  );
+  assert.deepEqual(reasoning.configs()[0]?.withoutReasoning, [PLAIN_MODEL]);
+  assert.deepEqual(
+    await Effect.runPromise(reasoning.refresh()),
+    { changed: false, unreachable: false },
+    "The same answer must not count as a change.",
+  );
+  // A server that is not up yet: the start asks it again, and the models keep their efforts.
+  const down = createModelReasoningSupport(() => [{ ...endpoint, baseUrl: "http://127.0.0.1:9/v1" }]);
+  assert.deepEqual(await Effect.runPromise(down.refresh()), { changed: false, unreachable: true });
+  assert.equal(down.configs()[0]?.withoutReasoning, undefined);
+  assert.equal(
+    report.ollamaRequests.filter((path) => path === "/api/show").length,
+    2 * endpoint.models.filter((model) => model.reasoningEfforts === undefined).length,
+    "The probe must ask only about the models with no saved efforts.",
+  );
 
   const cli = await runCauseEffect(resolveOpencodeCli({ bundledExecutable: process.env.OPENCODE_CLI }));
   report.openCodeVersion = cli.version;
@@ -282,7 +327,7 @@ try {
 
   const client = requireProviderDriver("opencode").createClient(cli, 60_000, {
     apiKey: () => null,
-    customProviders: () => [endpoint],
+    customProviders: () => reasoning.configs(),
     mcpServers: () => [],
     providerStateDirectory: join(root, "provider-state"),
   });
@@ -307,6 +352,14 @@ try {
     report.efforts[`${ENDPOINT}/${AGENT_MODEL}`],
     ["low", "medium", "high"],
     "A model with no saved efforts must keep OpenCode's own efforts.",
+  );
+
+  // OpenBot lists a model with no effort as one fixed effort that the user cannot change.
+  const plain = getArray(listed, "data").find((model) => getString(model, "model") === `${ENDPOINT}/${PLAIN_MODEL}`);
+  assert.equal(
+    isRecord(plain) && plain.reasoningEffortConfigurable,
+    false,
+    "A model that cannot reason must offer no effort choice.",
   );
 
   const thread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${AGENT_MODEL}` });
@@ -335,6 +388,16 @@ try {
   const effortTurn = await runTurn(client, effortThread, { effort: "max", text: "Say one word.", timeoutMs: 120_000 });
   report.turns.push(effortTurn);
   assert.equal(effortTurn.error, null, `The turn on ${EFFORT_MODEL} failed: ${effortTurn.error}`);
+  // #8381: the agent's saved effort must not reach a model that cannot reason.
+  const plainThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${PLAIN_MODEL}` });
+  const plainTurn = await runTurn(client, plainThread, { effort: "high", text: "Say one word.", timeoutMs: 120_000 });
+  report.turns.push(plainTurn);
+  assert.equal(plainTurn.error, null, `The turn on ${PLAIN_MODEL} failed: ${plainTurn.error}`);
+  const plainRequests = report.requests.filter((request) => request.model === PLAIN_MODEL);
+  assert.ok(plainRequests.length > 0, `The endpoint got no request for ${PLAIN_MODEL}.`);
+  for (const request of plainRequests) {
+    assert.equal(request.reasoningEffort, null, `${PLAIN_MODEL} must get no reasoning effort.`);
+  }
   const effortRequests = report.requests.filter((request) => request.model === EFFORT_MODEL);
   assert.ok(effortRequests.length > 0, `The endpoint got no request for ${EFFORT_MODEL}.`);
   for (const request of effortRequests) {
@@ -420,6 +483,7 @@ try {
     AGENT_MODEL,
     EFFORT_MODEL,
     NO_EFFORT_MODEL,
+    PLAIN_MODEL,
     VISION_MODEL,
     TEXT_MODEL,
     ...budgets.map(([model]) => model),
@@ -464,7 +528,7 @@ try {
     "The endpoint must get the saved key.",
   );
   const refused = await keyedTurn("e2e-refused-key");
-  assert.equal(refused.error, sourceText("error.provider.customEndpointKeyRefused", { provider: "Vault" }));
+  assert.equal(refused.error, sourceText("error.provider.customEndpointAccessRefused", { provider: "Vault" }));
   const missing = await keyedTurn(null);
   assert.equal(missing.error, sourceText("error.provider.customEndpointKeyMissing", { provider: "Vault" }));
   report.passed = true;

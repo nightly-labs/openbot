@@ -1,4 +1,10 @@
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
@@ -6,6 +12,14 @@ import { Marked, type Token, type TokensList } from "marked";
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
+    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",
@@ -76,6 +90,11 @@ const markdown = new Marked({
 
 function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);
+}
+
+/** The blocks of a long document, parsed once and not cached, such as a Markdown file to preview. */
+export function parseChatMarkdownDocument(body: string): TokensList {
+  return parseChatMarkdown(body);
 }
 
 const MAX_STREAMING_BODIES = 8;
@@ -183,4 +202,9 @@ export function parseFinishedChatMarkdown(body: string) {
 export function parseInlineChatMarkdown(body: string): Token[] {
   const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
   return [{ type: "paragraph", raw: body, text: body, tokens }];
+}
+
+/** Calls `visit` for each token of a parsed message, also the tokens inside lists, tables and links. */
+export function walkChatMarkdown(tokens: Token[], visit: (token: Token) => void): void {
+  void markdown.walkTokens(tokens, visit);
 }

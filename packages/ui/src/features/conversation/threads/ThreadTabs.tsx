@@ -13,6 +13,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, flush, onSettled, Show } from "solid-js";
+import { modelPickerFit } from "../model-picker-fit";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
 import { ThreadTabGhost } from "./ThreadTabGhost";
 import { ThreadTitle } from "./ThreadTitle";
@@ -30,8 +31,6 @@ const DRAG_SCROLL_MAX = 12;
 const CHOICE_EVENTS = ["pointerdown", "click", "keydown"];
 /** For this time after the field opens, focus that leaves it comes back. */
 const RENAME_FOCUS_GUARD = 400;
-/** The steps of the model picker, from the full picker to its icon. Each step gives the tabs more room. */
-const MODEL_FIT = ["full", "short", "icon"] as const;
 
 /** A tab whose title the user edits, and where its field shows over the title of the tab. */
 interface Rename {
@@ -189,11 +188,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
     };
     const header = element.closest<HTMLElement>(".conversation-header");
     // When the tabs do not fit, the model picker in the header gets smaller first: without the effort,
-    // then as its icon. It gets larger again when the tabs still fit after the change. Each step is
-    // measured at its end size with the transitions off. Then the picker slides to the new step.
-    let step = 0;
-    let sliding = false;
-    let disposed = false;
+    // then as its icon (model-picker-fit.ts).
     // Tabs that are narrower than their full width also need room, so the picker gets smaller before them.
     const overflows = () => {
       if (element.scrollWidth - element.clientWidth > 1) return true;
@@ -202,46 +197,9 @@ export function ThreadTabs(props: ThreadHeaderProps) {
         tab !== null && tab.getBoundingClientRect().width < Number.parseFloat(getComputedStyle(tab).maxWidth) - 0.5
       );
     };
-    const show = (next: number) => {
-      step = next;
-      if (!header) return;
-      if (next === 0) delete header.dataset.modelFit;
-      else header.dataset.modelFit = MODEL_FIT[next];
-    };
-    const fitting = () => {
-      while (step < MODEL_FIT.length - 1 && overflows()) show(step + 1);
-      if (overflows()) return step;
-      while (step > 0) {
-        const current = step;
-        show(current - 1);
-        if (!overflows()) continue;
-        show(current);
-        break;
-      }
-      return step;
-    };
-    const fitPicker = () => {
-      // While the picker slides, its width is not final. The tabs measure again after the slide.
-      if (!header || sliding) return;
-      const from = step;
-      header.toggleAttribute("data-model-measure", true);
-      const to = fitting();
-      show(from);
-      header.getBoundingClientRect();
-      header.removeAttribute("data-model-measure");
-      if (to === from) return;
-      header.getBoundingClientRect();
-      show(to);
-      header.getBoundingClientRect();
-      sliding = true;
-      const slides = header.querySelector(".provider-model-trigger")?.getAnimations({ subtree: true }) ?? [];
-      void Promise.allSettled(slides.map((slide) => slide.finished)).then(() => {
-        sliding = false;
-        if (!disposed) measure();
-      });
-    };
+    const picker = header ? modelPickerFit(header, overflows, () => measure()) : undefined;
     const measure = () => {
-      fitPicker();
+      picker?.fit();
       const tab = element.querySelector<HTMLElement>('.agent-threads-tab[aria-selected="true"]');
       // The agent's own chat has no tab: while it is open, no tab is selected and the fill hides.
       if (!tab) {
@@ -456,8 +414,9 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       window.addEventListener("pointercancel", onDragEnd);
     };
 
-    /** A mouse wheel scrolls the tabs sideways. A trackpad already scrolls them. */
+    /** A mouse wheel scrolls the tabs sideways. A trackpad already scrolls them. A pinch zooms the page. */
     const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
       if (element.scrollWidth <= element.clientWidth) return;
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       event.preventDefault();
@@ -499,8 +458,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       window.removeEventListener("pointercancel", onDragEnd);
       if (drag) cancelAnimationFrame(drag.frame);
       if (drag?.away) setCarriedThreadTab(null);
-      disposed = true;
-      show(0);
+      picker?.stop();
       document.removeEventListener("focusin", keepFocus);
       document.removeEventListener("pointerdown", onPointer, true);
     };

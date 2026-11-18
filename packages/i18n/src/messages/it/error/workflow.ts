@@ -16,9 +16,29 @@ export const messages = {
   "error.workflow.agentMissing": "Scegli un agente per questo passaggio.",
   "error.workflow.handoffFailed": "OpenBot non è riuscito a inviare questo passaggio al suo agente.",
   "error.workflow.agentStepEnded": "Il messaggio all’agente è stato rimosso prima della sua risposta.",
+  "error.workflow.agentStepStopped":
+    "L’agente si è fermato prima di rispondere a questo passaggio. Esegui di nuovo il passaggio.",
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",
+  "error.workflow.modelTimedOut":
+    "Il modello non ha risposto in tempo. Scegli un impegno più basso o un modello più veloce per questo passaggio, poi eseguilo di nuovo.",
+  "error.workflow.modelToolUse":
+    "Il modello ha provato a usare uno strumento, ma questo passaggio può rispondere solo con testo. Esegui di nuovo il passaggio o scegli un altro modello.",
+  "error.workflow.modelUnavailable":
+    "Il modello di questo passaggio non è disponibile. Scegli un altro modello per questo passaggio.",
+  "error.workflow.providerBusy": "Il provider è occupato. Attendi qualche minuto, poi esegui di nuovo il passaggio.",
+  "error.workflow.providerOffline":
+    "OpenBot non è riuscito a raggiungere il provider. Controlla la connessione a internet, poi esegui di nuovo il passaggio.",
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
+  "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
+  "error.workflow.pictureMissing": "L’immagine non è più sul server. Inviala di nuovo.",
+  "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
+  "error.workflow.mediaInputMissing":
+    "Un’immagine di un passaggio precedente non è disponibile. Esegui di nuovo quel passaggio.",
+  "error.workflow.mediaEmptyRequest":
+    "Scrivi una descrizione o esegui i passaggi precedenti, così arriva un testo o un’immagine.",
+  "error.workflow.mediaInputNotImage":
+    "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",
   "error.workflow.nodeMissing": "Questo passaggio non è nel flusso di lavoro.",
   "error.workflow.runMissing": "Questa esecuzione non esiste più.",
@@ -66,4 +86,24 @@ export const messages = {
   "error.workflow.githubUncertain":
     "La modifica si è fermata a metà. Può essere già su GitHub. Controlla lì prima di eseguire di nuovo il passaggio.",
   "error.workflow.githubNoEvent": "Su GitHub non c'è una issue o pull request da cui parte questo trigger.",
+  "error.workflow.sunraSignIn": "Accedi a Sunra in App per usare i modelli Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Il tuo account Sunra non ha crediti sufficienti. Aggiungi crediti su sunra.ai/pricing, poi esegui di nuovo il passaggio.",
+  "error.workflow.sunraNeedsPlan":
+    "Questo modello Sunra richiede un piano Sunra. Scegli un piano su sunra.ai/pricing o seleziona un altro modello.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra usa le immagini di input solo con un account personale. Seleziona il tuo account personale in Sunra o rimuovi i collegamenti delle immagini.",
+  "error.workflow.sunraFailed": "Sunra non è riuscito a creare il file: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra non ha finito il file in tempo. Controlla il progetto OpenBot su sunra.ai prima di eseguire di nuovo il passaggio.",
+  "error.workflow.higgsfieldSignIn": "Accedi a Higgsfield in App per usare i modelli Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Il tuo account Higgsfield non ha crediti sufficienti. Aggiungi crediti su higgsfield.ai/pricing, poi esegui di nuovo il passaggio.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Questo modello Higgsfield richiede un piano Higgsfield. Scegli un piano su higgsfield.ai/pricing oppure seleziona un altro modello.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield non ha creato il file perché il controllo dei contenuti lo ha fermato. Modifica il prompt o le immagini di input, poi esegui di nuovo il passaggio.",
+  "error.workflow.higgsfieldFailed": "Higgsfield non è riuscito a creare il file: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield non ha completato il file in tempo. Controlla la tua cronologia su higgsfield.ai prima di eseguire di nuovo il passaggio.",
 } as const satisfies PartialTranslation<typeof source>;

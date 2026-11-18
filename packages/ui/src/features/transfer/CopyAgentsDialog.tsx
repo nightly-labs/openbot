@@ -1,10 +1,12 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { InstanceTransferAgent, InstanceTransferResult } from "@openbot/contracts/ipc";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   ArrowRight,
   Button,
   Checkbox,
   CircleCheck,
+  ConfirmDialog,
   Dialog,
   Input,
   Select,
@@ -17,7 +19,13 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untr
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
-import { NotMoved, TransferAlert, TransferNotes } from "./InstanceTransferView";
+import {
+  NotMoved,
+  TransferAlert,
+  TransferNotes,
+  TransferUploadProgress,
+  type TransferUploadState,
+} from "./InstanceTransferView";
 
 export type CopyAgentsAgent = Pick<InstanceTransferAgent, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
@@ -25,6 +33,7 @@ export interface CopyAgentsServer {
   id: string;
   name: string;
   logoUrl: string | null;
+  appearance?: ServerAppearance | null | undefined;
 }
 
 export type CopyAgentsPhase = "idle" | "copying" | "done";
@@ -42,6 +51,8 @@ export interface CopyAgentsDialogProps {
   /** The agents of a side could not be read. */
   loadError: string | null;
   phase: CopyAgentsPhase;
+  /** While `copying`: the bytes sent to a joined destination. Null before the first part, and for this computer. */
+  progress?: TransferUploadState | null | undefined;
   result: InstanceTransferResult | null;
   error: string | null;
   onCopy: (agentIds: string[]) => void;
@@ -78,7 +89,19 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
     return text ? agents().filter((agent) => agent.name.toLowerCase().includes(text)) : agents();
   });
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
+  // An agent whose name is already on the destination is copied as a second, separate agent: the user accepts that first.
+  const duplicates = createMemo(() => selected().filter((agent) => takenNames().has(agent.name.toLowerCase())));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
+  const startCopy = () => props.onCopy(selected().map((agent) => agent.id));
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = () => props.toAgents === null && !props.loadError;
   const busy = () => props.phase === "copying";
+  const uploading = () => (busy() ? props.progress : null);
+  // After the last byte the server reads the file and then adds the agents: both are the copy.
+  const sendingFile = () => {
+    const progress = uploading();
+    return progress ? progress.sent < progress.total : false;
+  };
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
   const to = () => props.servers.find((server) => server.id === props.toId) ?? null;
@@ -93,7 +116,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const doneResult = () => (done() ? props.result : null);
   const doneVariant = () => (props.onOpenServer ? "ghost" : "default");
 
-  return (
+  const dialog = (
     <Dialog.Root
       open
       modal
@@ -233,6 +256,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
               <Show when={props.error}>
                 {(message) => <TransferAlert title={t("settings.transfer.copy.failed")} description={message()} />}
               </Show>
+              <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
               <Show when={doneResult()} fallback={<NotMoved text="settings.transfer.copy.notCopied" />}>
                 {(result) => <CopyResult result={result()} server={to()?.name ?? ""} />}
               </Show>
@@ -247,10 +271,12 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                     </Button>
                     <Button
                       type="button"
-                      disabled={!to() || selected().length === 0}
+                      disabled={!to() || selected().length === 0 || readingDestination()}
                       loading={busy()}
-                      loadingLabel={t("settings.transfer.copy.copying")}
-                      onClick={() => props.onCopy(selected().map((agent) => agent.id))}
+                      loadingLabel={t(
+                        sendingFile() ? "settings.transfer.upload.sending" : "settings.transfer.copy.copying",
+                      )}
+                      onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startCopy())}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}
                     </Button>
@@ -274,12 +300,36 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
       </Dialog.Portal>
     </Dialog.Root>
   );
+  return (
+    <>
+      {dialog}
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("settings.transfer.copy.duplicatesTitle")}
+        description={t("settings.transfer.copy.duplicatesDescription", {
+          server: to()?.name ?? "",
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("settings.transfer.copy.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startCopy();
+        }}
+      />
+    </>
+  );
 }
 
 function ServerName(props: { server: CopyAgentsServer }) {
   return (
     <span class="copy-agents-server">
-      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} />
+      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} appearance={props.server.appearance} />
       <span class="copy-agents-server-name">{props.server.name}</span>
     </span>
   );

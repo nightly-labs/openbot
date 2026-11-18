@@ -14,27 +14,6 @@ export function modelDisplayName(name: string): string {
 }
 
 /**
- * OpenCode models a stored key does not buy, dropped while OpenBot supplies the key.
- *
- * The stored key is an OpenCode Go key: it buys `opencode-go/` and the free tier, not OpenCode
- * Zen. OpenCode reports both products as one catalog although they are two products on two
- * endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- so a stored key also lists
- * Zen models that answer every prompt with "Invalid API key.".
- *
- * The drop applies only while OpenBot is the one supplying the key. With no key stored, a Zen
- * model can only come from the user's own OpenCode sign-in, and that one does buy it.
- *
- * Free is decided by id and display name, after the name is resolved: `isFreeOpencodeModel`
- * is what the picker badges a model with, so the badge and the catalog cannot disagree about
- * what costs money.
- */
-export function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean {
-  const lower = id.toLowerCase();
-  if (lower.startsWith("opencode-go/")) return false;
-  return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
-}
-
-/**
  * Which OpenCode model a new agent runs, as the tier its catalog leads with.
  *
  * A provider with no `defaultProviderModel` falls back to the first model of its catalog, so list

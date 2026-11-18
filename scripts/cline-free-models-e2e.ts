@@ -1,10 +1,12 @@
 // Lists and selects Cline's free models end to end on the real Cline driver, with a fake `cline --acp`
 // that answers as Cline 3.0.73 does: a provider option of the model category comes before the model
-// option, the model option does not list the `cline-free/*` models, and the agent takes any model
-// value. Cline's recommended-models endpoint is answered in this process. Checks that the picker gets
-// the free models with a "(free)" name, that a listed and a free model each reach the session through
-// the `model` option, that a free model moves the session to the `cline` provider, that a list that
-// cannot be read gives the last good one, then the bundled one, and that an empty free tier is kept.
+// option, the model option does not list the `cline-free/*` or `cline-pass/*` models, and the agent
+// takes any model value. Cline's recommended-models endpoint is answered in this process. Checks that
+// the picker gets the ClinePass models with a "(ClinePass)" name and the free models with a "(free)"
+// name, that a listed, a free and a ClinePass model each reach the session through the `model`
+// option, that a free model moves the session to the `cline` provider and a ClinePass model to the
+// `cline-pass` provider (#8587), that a list that cannot be read gives the last good one, then the
+// bundled one (in which a ClinePass model still runs), and that an empty free tier is kept.
 // `bun scripts/cline-free-models-e2e.ts`. Writes .openbot-build/cline-free-models-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -105,10 +107,11 @@ try {
     [
       { id: "anthropic/claude-sonnet-5.5", name: "Claude Sonnet 5.5" },
       { id: "openai/gpt-6-astra", name: "GPT-6 Astra" },
+      { id: "cline-pass/glm-5.3", name: "glm-5.3 (ClinePass)" },
       { id: "cline-free/minimax-m3.1-flash", name: "Minimax M3.1 Flash (free)" },
-      { id: "cline-free/nemotron-3.5-super-vl", name: "cline-free/nemotron-3.5-super-vl (free)" },
+      { id: "cline-free/nemotron-3.5-super-vl", name: "nemotron-3.5-super-vl (free)" },
     ],
-    "The picker lists the CLI's models and Cline's valid free models.",
+    "The picker lists the CLI's models, then Cline's ClinePass and valid free models.",
   );
   assert.ok(requests.length > 0, "OpenBot reads Cline's recommended models.");
   for (const request of requests) {
@@ -118,8 +121,9 @@ try {
   report.listed = listed;
   report.requests = requests;
 
-  // 2. A listed and a free model each reach the session through the `model` option, not `provider`.
-  // The session starts on `cline-pass`: a listed model keeps it, and a free one moves it to `cline`.
+  // 2. A listed, a free and a ClinePass model each reach the session through the `model` option, not
+  // `provider`. The session starts on `cline-pass`: a listed model keeps it, a free one moves it to
+  // `cline`, and a ClinePass one moves it to `cline-pass`.
   await rm(log, { force: true });
   const thread = await startThread(client, { model: "openai/gpt-6-astra", cwd: workspace });
   report.turns = [];
@@ -127,6 +131,7 @@ try {
   for (const [model, provider, providerChange] of [
     ["openai/gpt-6-astra", "cline-pass", false],
     ["cline-free/minimax-m3.1-flash", "cline", true],
+    ["cline-pass/glm-5.3", "cline-pass", true],
     ["openai/gpt-6-astra", "cline-pass", true],
   ] as const) {
     await rm(log, { force: true });
@@ -159,10 +164,20 @@ try {
   );
   report.lastGood = lastGood;
 
-  // 4. With no good read yet, the bundled free tier is listed.
-  const bundled = (await listModels(open(cli)))
-    .map((model) => model.model ?? "")
-    .filter((id) => id.startsWith("cline-free/"));
+  // 4. With no good read yet, the bundled ClinePass models and free tier are listed, and a saved
+  // ClinePass model still reaches the session.
+  const fresh = open(cli);
+  const bundledIds = (await listModels(fresh)).map((model) => model.model ?? "");
+  assert.ok(bundledIds.includes("cline-pass/glm-5.3"), "With no good read, the bundled ClinePass models are listed.");
+  await rm(log, { force: true });
+  const freshThread = await startThread(fresh, { model: "cline-pass/glm-5.3", cwd: workspace });
+  assert.equal((await runTurn(fresh, freshThread, { model: "cline-pass/glm-5.3" })).error, null);
+  const freshPrompt = (await readJsonl<LogEntry>(log))
+    .filter((entry) => entry.sessionId === freshThread && entry.event === "prompt")
+    .at(-1);
+  assert.equal(freshPrompt?.model, "cline-pass/glm-5.3", "A bundled ClinePass model runs with no good read.");
+  assert.equal(freshPrompt?.provider, "cline-pass", "A bundled ClinePass model runs on the cline-pass provider.");
+  const bundled = bundledIds.filter((id) => id.startsWith("cline-free/"));
   assert.deepEqual(
     bundled,
     [
@@ -182,7 +197,7 @@ try {
   const ended = (await listModels(client)).map((model) => model.model ?? "");
   assert.deepEqual(
     ended,
-    ["anthropic/claude-sonnet-5.5", "openai/gpt-6-astra"],
+    ["anthropic/claude-sonnet-5.5", "openai/gpt-6-astra", "cline-pass/glm-5.3"],
     "An empty free tier removes the free models.",
   );
   report.ended = ended;

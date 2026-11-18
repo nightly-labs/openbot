@@ -175,7 +175,8 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
     const list: ListFrame[] = [];
     let sectionId: string | null = null;
     for (const item of items) {
-      if (item.kind === "waiting") {
+      // "Needs you" and "Unread" are not sections of the layout.
+      if (item.kind === "waiting" || item.kind === "unread") {
         sectionId = null;
         continue;
       }

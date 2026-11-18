@@ -87,6 +87,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "我声明接受{policy}、{terms}。",
   "sitePage.pricing.consent.policy": "隐私政策",
   "sitePage.pricing.consent.terms": "条款和撤回权",
+  "sitePage.pricing.consent.earlyStart":
+    "我要求在 14 天撤回期结束前开始提供托管服务。我知悉：如果我在服务完全履行前撤回合同，我需要支付截至撤回时已提供的服务费用；服务完全履行后，我将失去撤回合同的权利。",
   "sitePage.marketplace.agents.title": "助手 — OpenBot 市场",
   "sitePage.marketplace.agents.description":
     "其他人在 OpenBot 中创建的助手。将助手连同技能和自动化任务一起添加到 OpenBot。",

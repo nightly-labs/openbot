@@ -4,6 +4,7 @@ import {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -58,6 +59,7 @@ export function createBrowserActions({
           clipboard: advertised.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
           contextMenu: advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
           viewport: advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY) ? BROWSER_VIEW_PAGE_SIZE : null,
+          pageCopy: advertised.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
         },
         listener,
       );

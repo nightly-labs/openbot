@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "Un test del desktop remoto è in corso. Riprova quando finisce.",
   "error.remote.screenRecordingDenied":
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
+  "error.remote.windowsSessionDisconnected":
+    "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
   "error.remote.teamSessionExpired": "La sessione del team è scaduta.",
   "error.remote.finishTestBeforeSwitch": "Termina il test del desktop remoto prima di cambiare schermo.",
   "error.remote.displayNotFound": "Schermo remoto non trovato.",
@@ -79,10 +81,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Solo il proprietario può rimuovere questo server.",
   "error.remote.requestTimeout": "La richiesta remota è scaduta.",
   "error.remote.requestFailed": "La richiesta remota non è riuscita.",
-  "error.remote.pinnedKeyMissing": "L'host remoto non ha una chiave del dispositivo fissata.",
+  "error.remote.hostKeyMissing":
+    "OpenBot non può verificare questo server perché la sua chiave di sicurezza manca o è cambiata. Chiedi al proprietario del server di controllarlo.",
+  "error.remote.connectionNotStarted":
+    "OpenBot non è riuscito ad avviare la connessione a questo server. Se il problema continua, chiudi OpenBot e riaprilo.",
   "error.remote.hostDidNotConnect": "L'host WebRTC non si è collegato.",
   "error.remote.connectionCancelled": "La connessione remota è stata annullata.",
-  "error.remote.hostDisconnected": "L'host WebRTC si è disconnesso.",
+  "error.remote.hostDisconnected":
+    "La connessione al server si è interrotta. Controlla se l'azione è stata completata, poi riprova.",
   "error.remote.eventGap": "La sequenza di eventi dell'host presenta un'interruzione.",
   "error.remote.malformedKnownEvent": "L'host ha restituito un evento noto malformato.",
   "error.remote.fileTransportIsStopped": "Il trasporto file WebRTC è fermo.",
@@ -148,6 +154,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L'host ha rifiutato l'allegato.",
   "error.remote.attachmentTooLarge": "Gli allegati devono essere di 10 MB o meno.",
   "error.remote.attachmentBusy": "Attendi che l'allegato attuale finisca.",
+  "error.remote.attachmentChanged": "Il file è cambiato o non è disponibile. Selezionalo di nuovo.",
   "error.remote.uploadTimeout": "Il caricamento dell'allegato è scaduto.",
   "error.remote.hostSessionActive": "L'host ha già una sessione remota attiva.",
   "error.remote.tooManyConnections": "Troppe connessioni remote attive.",
@@ -204,6 +211,9 @@ export const messages = {
     "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
   "error.remote.taskHistoryRefreshFailed":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.serverNotLoaded": "OpenBot non è riuscito a caricare il server. Riprova.",
+  "error.remote.localServerNotStarted":
+    "Il server su questo computer non si è avviato. Riprova. Se non si avvia, riavvia OpenBot su questo computer.",
   "error.remote.localServerAccountRemovalFailed":
     "Il server è eliminato sul suo computer, ma l’account lo elenca ancora. Eliminalo di nuovo per rimuoverlo dall’account.",
 } as const satisfies PartialTranslation<typeof source>;

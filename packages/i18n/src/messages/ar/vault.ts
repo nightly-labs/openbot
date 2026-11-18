@@ -4,7 +4,14 @@ import type { messages as source } from "../en/vault";
 export const messages = {
   "vault.items.title": "العناصر المحفوظة",
   "vault.items.description":
-    "يمكن لكل وكيل على هذا الخادم استخدام هذه العناصر. يكتب OpenBot كلمات المرور وأرقام البطاقات ورموز الأمان في الصفحة، لذا لا يراها الوكلاء أبدًا. يقرأ الوكلاء مفاتيح API من ملف خاص، لا من الدردشة.",
+    "يمكن لكل وكيل على هذا الخادم استخدام هذه العناصر. يكتب OpenBot كلمات المرور وأرقام البطاقات ورموز الأمان في الصفحة، لذا لا يراها الوكلاء أبدًا. يقرأ الوكلاء مفاتيح API من ملف، لا من الدردشة.",
+  "vault.items.scopedDescription":
+    "كل عنصر مخصص للوكلاء الذين تختارهم. يكتب OpenBot كلمات المرور وأرقام البطاقات ورموز الأمان في الصفحة، لذا لا يراها الوكلاء أبدًا. يقرأ الوكلاء مفاتيح API من ملف، لا من الدردشة. يعمل كل الوكلاء كمستخدم النظام نفسه، لذا يمكن للوكيل أيضًا قراءة ملف مفتاح API مخصص لوكلاء آخرين.",
+  "vault.agents.label": "الوكلاء",
+  "vault.agents.all": "كل الوكلاء",
+  "vault.agents.some": "{chosen} من {total}",
+  "vault.agents.choose": "اختر الوكلاء لـ {name}: {agents}",
+  "vault.agents.list": "الوكلاء الذين يمكنهم استخدام {name}",
   "vault.newItem": "عنصر جديد",
   "vault.kind.login": "بيانات دخول",
   "vault.kind.card": "بطاقة",
@@ -121,6 +128,8 @@ export const messages = {
   "vault.request.addLogin": "إضافة بيانات دخول",
   "vault.request.addCard": "إضافة بطاقة",
   "vault.request.addContact": "إضافة عنوان",
+  "vault.request.addApiKey": "إضافة مفتاح API",
+  "vault.request.apiKeyPrivate": "يُحفظ في خزنتك، لا في المحادثة.",
   "vault.request.saved": "حُفظ في الخزنة",
   "vault.twoStep.title": "رمز التحقق بخطوتين",
   "vault.twoStep.on": "مفعّل",

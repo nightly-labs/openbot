@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddedAgent,
   ClientAgentSummary,
+  GithubSkillSource,
   InstalledSkill,
   MacAutomationResult,
   MacAutomationTarget,
@@ -14,12 +15,17 @@ import type {
   MarketplaceSkillSummary,
   McpServerAccess,
   McpServerConfig,
+  McpSignInAppState,
   McpSignInRelayPage,
   McpSignInState,
+  SaveMcpSignInAppInput,
 } from "@openbot/contracts/ipc";
 import {
   assignedSkillCount,
   DEFAULT_MCP_SERVER_ACCESS,
+  githubSkillDetail,
+  isGithubSkillId,
+  isOtherGithubCommit,
   isRemovableSkill,
   isSkillEnabled,
   mcpConfigErrors,
@@ -29,12 +35,14 @@ import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accoun
 import { type McpConnectFlow, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { isConnectorId } from "@openbot/ui/features/connectors/connectors";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import type {
   AgentListingState,
+  GithubSkillRead,
   MarketplaceApp,
   MarketplaceAppConnection,
   MarketplaceAppStatus,
@@ -42,10 +50,12 @@ import type {
   MarketplaceMacAutomation,
   MarketplaceMcpAccess,
   MarketplaceModel,
+  MarketplaceServerSlots,
   MarketplaceSkillChange,
   MarketplaceSkillRef,
   SkillRead,
 } from "@openbot/ui/features/marketplace/marketplace-model";
+import { pluginNeedsMac } from "@openbot/ui/features/marketplace/marketplace-model";
 import { serverAddress } from "@openbot/ui/features/marketplace/marketplace-view";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import {
@@ -64,6 +74,7 @@ import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
+import type { McpServerSignIn, McpServerTools } from "../servers/mcp-server-tools";
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { desktopMarketplaceCalls, type MarketplaceCalls, type MarketplaceSignInRelay } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
@@ -113,6 +124,11 @@ export interface MarketplaceControllerProps {
   pluginHostName?: string | undefined;
   /** The joined server in `pluginServerId` relays its sign-ins to this computer (`sign-in-relay-v1`). */
   pluginSignInRelay?: boolean | undefined;
+  /**
+   * The live view of the joined server in `pluginServerId`, for a sign-in page that only the host can
+   * reach (`mcp-sign-in-v1`, `browser-view`). Absent: this client cannot show the host's tab.
+   */
+  pluginHostView?: { runtime: BrowserViewRuntime; clipboard: boolean } | undefined;
   /** The server in `pluginServerId` keeps a separate sign-in for each account of an app (`mcp-accounts-v1`). */
   pluginAccounts?: boolean | undefined;
   /** This account sets who gets each MCP server of `pluginServerId` (`mcp-access-v1`, owner or admin). */
@@ -123,6 +139,8 @@ export interface MarketplaceControllerProps {
   agentServerId?: string | undefined;
   /** The joined server in `hostServerId` when its host also updates an agent. */
   agentUpdateServerId?: string | undefined;
+  /** The host of the skills reads a GitHub link (`github-skills-v1`), and this account can add skills there. */
+  githubSkills?: boolean | undefined;
   onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   /** The connectors of the server. Each one that this account can connect is an app. */
   connectors?: ConnectorRegistry | undefined;
@@ -130,8 +148,21 @@ export interface MarketplaceControllerProps {
   calls?: MarketplaceCalls | undefined;
   /** This computer runs macOS, so an app that drives Apple apps can ask for their Automation access. */
   macOS?: boolean | undefined;
-  /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
-  onAddServer?: (() => void) | undefined;
+  /** The host of the apps is not a Mac, so an app that drives Apple apps does not connect there. */
+  macAppsUnavailable?: boolean | undefined;
+  /** The server in `pluginServerId` keeps a pre-registered OAuth app for an MCP server (`mcp-sign-in-app-v1`). */
+  pluginSignInApp?: boolean | undefined;
+  /**
+   * One sentence about the managed runtime that starts a STDIO server on this computer, or null.
+   * Absent for a joined server, which holds its own runtime.
+   */
+  mcpToolRuntimeNote?: string | null | undefined;
+  /** An MCP row to sign in to: the user pressed Sign in on an agent's card. Its page opens and signs in. */
+  mcpSignInRequest?: string | null | undefined;
+  /** Runs once the request is taken, so it does not start again. */
+  onMcpSignInRequestHandled?: (() => void) | undefined;
+  /** The sign-in state of the MCP rows of `serverId`, after each read. An agent's card shows it. */
+  onMcpSignIns?: ((serverId: string, states: Readonly<Record<string, McpSignInState>>) => void) | undefined;
 }
 
 /** The connect step of one app. `settle(null)` is a closed dialog. */
@@ -147,6 +178,29 @@ export interface PendingSkillConfirm {
   kind: "replace" | "remove";
   /** The agents whose copy has local changes, as a list. */
   agents: string;
+  settle: (confirmed: boolean) => void;
+}
+
+/**
+ * Whether two http addresses share one sign-in on the host, which keys it by the parsed address
+ * without a fragment, plus an account fragment (`mcpOAuthAccountKey`).
+ */
+function sameSignInAddress(a: string, b: string): boolean {
+  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
+  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
+  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
+  first.hash = "";
+  second.hash = "";
+  return first.href === second.href;
+}
+
+/**
+ * The question before an app takes the name of a server that is not the app's. `server` is that
+ * name, `app` the name of the app.
+ */
+export interface PendingServerReplace {
+  server: string;
+  app: string;
   settle: (confirmed: boolean) => void;
 }
 
@@ -214,6 +268,8 @@ const MAC_AUTOMATION_APP_NAME = {
 
 /** How often the page of a relayed sign-in is read while it waits. */
 const SIGN_IN_RELAY_POLL_MS = 1_000;
+/** How long a found GitHub read stays good for the same link. */
+const GITHUB_READ_KEPT_MS = 5 * 60_000;
 
 /** The relayed sign-in of one app while it waits. */
 export interface MarketplaceSignInRelayState {
@@ -232,7 +288,14 @@ interface AddedRecord {
  * install, connect and uninstall flows are the flows of the previous Marketplace, with their
  * analytics.
  */
-export function createMarketplaceController(props: MarketplaceControllerProps) {
+/** A GitHub skill id names a repository and a folder. Analytics get the source only. */
+const skillSlug = (id: string) => (isGithubSkillId(id) ? "github" : id);
+
+export function createMarketplaceController(
+  props: MarketplaceControllerProps,
+  /** Draws the custom MCP server form and card with the tools the controller builds. */
+  serverSlots?: (tools: McpServerTools) => MarketplaceServerSlots,
+) {
   const { t, format } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
@@ -241,6 +304,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const agents = createMemo(() => props.agents);
   const activeAgentId = createMemo(() => props.activeAgentId);
   const hostServerId = createMemo(() => props.hostServerId);
+  const mcpSignInRequest = createMemo(() => props.mcpSignInRequest ?? null);
 
   const [error, setErrorText] = createSignal<string | null>(null);
   const [errorCode, setErrorCode] = createSignal<string | null>(null);
@@ -506,6 +570,22 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     });
   }
 
+  const [serverReplace, setServerReplace] = createSignal<PendingServerReplace | null>(null);
+  /** Asks to replace the server `server` with the app `app`. False when the user cancels. */
+  function confirmServerReplace(server: string, app: string): Promise<boolean> {
+    untrack(serverReplace)?.settle(false);
+    return new Promise((resolve) => {
+      setServerReplace({
+        server,
+        app,
+        settle: (confirmed) => {
+          setServerReplace(null);
+          resolve(confirmed);
+        },
+      });
+    });
+  }
+
   /** One sentence for the agents that did not change: the reason alone when only one agent was asked. */
   function skillFailure(name: string, failed: readonly string[], reasons: ReadonlySet<string>, asked: number) {
     const reason = [...reasons].join(" ");
@@ -552,7 +632,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     for (const agentId of addIds) {
       if (restores.includes(agentId) || storedSkill(agentId, skill.id)) continue;
       const list = skills.installed[agentId] ?? [];
-      if (skills.read[agentId] === "loaded" && assignedSkillCount(list) >= INPUT_LIMITS.agentSkills) {
+      /* The host replaces an older commit of the same GitHub skill: the count stays the same. */
+      const replaces = list.some((item) => isOtherGithubCommit(skill.id, item.skillId));
+      if (!replaces && skills.read[agentId] === "loaded" && assignedSkillCount(list) >= INPUT_LIMITS.agentSkills) {
         failed.push(nameOf(agentId));
         reasons.add(t("skill.marketplace.limitReason", { limit: INPUT_LIMITS.agentSkills }));
       } else installs.push(agentId);
@@ -593,7 +675,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "install",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "succeeded",
         });
       } catch (cause) {
@@ -603,7 +685,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "install",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "failed",
           failure_code: "install_failed",
         });
@@ -664,7 +746,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           analytics.track("marketplace_action", {
             entity: "skill",
             action: "uninstall",
-            listing_slug: skill.id,
+            listing_slug: skillSlug(skill.id),
             result: "succeeded",
           });
         } catch (cause) {
@@ -674,7 +756,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           analytics.track("marketplace_action", {
             entity: "skill",
             action: "uninstall",
-            listing_slug: skill.id,
+            listing_slug: skillSlug(skill.id),
             result: "failed",
             failure_code: "uninstall_failed",
           });
@@ -740,7 +822,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "update",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "succeeded",
         });
       } catch (cause) {
@@ -750,7 +832,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "update",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "failed",
           failure_code: "update_failed",
         });
@@ -778,7 +860,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         const list = draft.installed[agentId];
         if (list) draft.installed[agentId] = list.map((item) => (item.skillId === skillId ? next : item));
       });
-      analytics.track("marketplace_action", { entity: "skill", action, listing_slug: skillId, result: "succeeded" });
+      analytics.track("marketplace_action", {
+        entity: "skill",
+        action,
+        listing_slug: skillSlug(skillId),
+        result: "succeeded",
+      });
     } catch (cause) {
       // The host refuses a changed copy and one that needs repair: `error.skill.disableModified` and
       // `error.skill.disableNeedsRepair`, in the reader's language.
@@ -786,7 +873,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       analytics.track("marketplace_action", {
         entity: "skill",
         action,
-        listing_slug: skillId,
+        listing_slug: skillSlug(skillId),
         result: "failed",
         failure_code: `${action}_failed`,
       });
@@ -794,13 +881,36 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, false);
   }
 
+  /* The skills of the GitHub links that this window read, by id: the skill page and the agents dialog
+     show them without a second read, which would use the GitHub limit again. */
+  const githubDetails = new Map<string, MarketplaceSkillDetail>();
+  /* The last reads of each link on each host. A search that goes back to a link does not read it again
+     for a short time, because each read uses the GitHub limit. */
+  const githubReads = new Map<string, { at: number; source: GithubSkillSource }>();
+
+  async function readGithubSkills(link: string): Promise<GithubSkillRead> {
+    const read = skillCalls().readGithub;
+    if (!read) return { status: "failed", message: t("error.skill.githubHostTooOld") };
+    const key = `${untrack(() => props.hostServerId) ?? ""}\n${link}`;
+    const kept = githubReads.get(key);
+    if (kept && Date.now() - kept.at < GITHUB_READ_KEPT_MS) return { status: "found", source: kept.source };
+    try {
+      const source: GithubSkillSource = await read(link);
+      for (const skill of source.skills) githubDetails.set(skill.id, githubSkillDetail(source, skill));
+      githubReads.set(key, { at: Date.now(), source });
+      return { status: "found", source };
+    } catch (cause) {
+      return { status: "failed", message: marketplaceErrorMessage(cause) };
+    }
+  }
+
   async function loadSkill(id: string) {
     const analytics = desktopAnalytics.scope();
-    const value = await run(() => calls().skills.get(id));
+    const value = githubDetails.get(id) ?? (await run(() => calls().skills.get(id)));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
-      listing_slug: id,
+      listing_slug: skillSlug(id),
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
@@ -827,6 +937,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   };
   /** The first row of this app, or nothing. */
   const heldApp = (app: MarketplacePluginApp): McpServerConfig | undefined => heldApps(app)[0];
+  /**
+   * A row with the app's server name that is not the app's, such as one the user added by hand at
+   * another address. The host keeps names unique, so the app can connect only in place of it.
+   */
+  const otherRowNamed = (app: MarketplacePluginApp): McpServerConfig | undefined =>
+    heldApp(app) ? undefined : servers().find((row) => row.name === app.server.name);
   /** Which held http rows have a sign-in, by row id. Read with the rows. */
   const [signIns, setSignIns] = createSignal<Readonly<Record<string, McpSignInState>>>({});
   /**
@@ -1102,6 +1218,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   /** The relay of a joined server, when both sides can relay a sign-in. */
   const signInRelay = () => (props.pluginSignInRelay ? calls().signInRelay : undefined);
   const [relayed, setRelayed] = createSignal<MarketplaceSignInRelayState | null>(null);
+  /** The host tab of a sign-in whose page only the joined server can reach, while it waits. */
+  const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   /** Ends the sign-in that waits now, on the server and for the address that it started with. */
   let stopSignIn: (() => void) | undefined;
 
@@ -1119,6 +1237,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
     stopSignIn = stop;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
+    // A page that only the host can reach opens in the host's own tab instead of the relay.
+    if (relay?.hostTab && props.pluginHostView)
+      void followSignInHostTab(relay.hostTab, config.url, serverId, () => waiting);
     return signIn.finally(() => {
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
@@ -1136,12 +1257,35 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         const page = await relay.page(url, serverId).catch(() => null);
         if (!waiting()) return;
         const current = relayed();
-        if (current?.page.authorizeHost !== page?.authorizeHost || current?.page.listening !== page?.listening)
+        if (
+          current?.page.authorizeHost !== page?.authorizeHost ||
+          current?.page.url !== page?.url ||
+          current?.page.listening !== page?.listening
+        )
           setRelayed(page ? { url, page } : null);
         await new Promise((resolve) => setTimeout(resolve, SIGN_IN_RELAY_POLL_MS));
       }
     } finally {
       setRelayed(null);
+    }
+  }
+
+  async function followSignInHostTab(
+    hostTab: NonNullable<MarketplaceSignInRelay["hostTab"]>,
+    url: string,
+    serverId: string,
+    waiting: () => boolean,
+  ): Promise<void> {
+    try {
+      while (waiting()) {
+        const tabId = await hostTab(url, serverId).catch(() => null);
+        if (!waiting()) return;
+        const current = hostTabbed();
+        if (current?.url !== url || current.tabId !== tabId) setHostTabbed(tabId ? { url, tabId } : null);
+        await new Promise((resolve) => setTimeout(resolve, SIGN_IN_RELAY_POLL_MS));
+      }
+    } finally {
+      setHostTabbed(null);
     }
   }
 
@@ -1173,6 +1317,179 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     stop?.();
   }
 
+  /* Custom MCP servers: the form and the connection card of a custom server's page. */
+
+  /** The server that holds the rows, or the error that the form shows. */
+  function mcpServerId(): string {
+    const serverId = props.pluginServerId;
+    if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
+    return serverId;
+  }
+  const mcpServerKind = () => (props.pluginHostName ? "remote" : "local");
+
+  /** Main answers each change with the whole list, so the rows are taken from the answer. */
+  async function changeMcpServers(
+    action: "mcp_server_saved" | "mcp_server_removed" | "mcp_server_toggled",
+    failureCode: string,
+    change: (serverId: string) => Promise<McpServerConfig[]>,
+  ): Promise<McpServerConfig[]> {
+    const serverId = mcpServerId();
+    const analytics = desktopAnalytics.scope();
+    let next: McpServerConfig[];
+    try {
+      next = await change(serverId);
+    } catch (cause) {
+      analytics.track("team_action", {
+        action,
+        result: "failed",
+        server_kind: mcpServerKind(),
+        failure_code: failureCode,
+      });
+      throw cause;
+    }
+    analytics.track("team_action", { action, result: "succeeded", server_kind: mcpServerKind() });
+    if (props.pluginServerId !== serverId) return next;
+    // A read in flight started before this change and would put the old rows back. The answer
+    // holds the whole list, so it ends that read: the rows count as read.
+    serversRead += 1;
+    setServers(next);
+    setServersReadFor(serverId);
+    // A saved row can name an address the host is already signed in to.
+    void readSignIns(serverId);
+    return next;
+  }
+
+  /** A changed or removed OAuth app drops the sign-in that the old client held, so the states are read again. */
+  async function changeSignInApp(change: (serverId: string) => Promise<McpSignInAppState>) {
+    const serverId = mcpServerId();
+    const state = await change(serverId);
+    await readSignIns(serverId);
+    return state;
+  }
+
+  const mcpTools: McpServerTools = {
+    servers,
+    signIns,
+    save: async (config) => {
+      const next = await changeMcpServers("mcp_server_saved", "mcp_server_save_failed", (serverId) =>
+        calls().mcp.saveMcpServer({ config }, serverId),
+      );
+      // An edit keeps its id. A new row gets its id on the host, which keeps names unique.
+      const saved = next.find((row) => (config.id ? row.id === config.id : row.name === config.name));
+      if (!saved) throw new Error(t("mcp.panel.saveFailed"));
+      return saved;
+    },
+    test: async (config) => {
+      const serverId = mcpServerId();
+      const analytics = desktopAnalytics.scope();
+      const result = await calls().mcp.testMcpServer({ config }, serverId);
+      analytics.track("team_action", {
+        action: "mcp_server_tested",
+        result: result.error ? "failed" : "succeeded",
+        server_kind: mcpServerKind(),
+        ...(result.error ? { failure_code: "mcp_server_test_failed" } : {}),
+      });
+      return result;
+    },
+    setEnabled: async (id, enabled) => {
+      await changeMcpServers("mcp_server_toggled", "mcp_server_toggle_failed", (serverId) =>
+        calls().mcp.setMcpServerEnabled({ mcpServerId: id, enabled }, serverId),
+      );
+    },
+    toolRuntimeNote: () => props.mcpToolRuntimeNote ?? null,
+    signIn: () => {
+      // This computer signs in itself; a joined server only when it relays the page here.
+      if (!props.pluginServerId || (props.pluginHostName && !signInRelay())) return undefined;
+      return mcpSignIn;
+    },
+    signInRequest: mcpSignInRequest,
+    // The owner clears the request, so the same row can be asked for again later.
+    endSignInRequest: () => props.onMcpSignInRequestHandled?.(),
+  };
+
+  const mcpSignIn: McpServerSignIn = {
+    start: async (config) => {
+      const serverId = mcpServerId();
+      const result = await signInPluginApp(config);
+      await readSignIns(serverId);
+      return result;
+    },
+    cancel: (url) => calls().mcp.cancelMcpSignIn({ url }, mcpServerId()),
+    signOut: async (id) => {
+      const serverId = mcpServerId();
+      const states = await calls().mcp.signOutMcpServer({ mcpServerId: id }, serverId);
+      if (props.pluginServerId === serverId) {
+        signInsRead += 1;
+        setSignIns(mcpSignInRecord(states));
+      }
+    },
+    get relay() {
+      const relay = signInRelay();
+      if (!relay) return undefined;
+      return {
+        hostName: props.pluginHostName ?? "",
+        page: (url: string) => {
+          const current = relayed();
+          return current?.url === url ? current.page : undefined;
+        },
+        open: (url: string) => relay.open(url, mcpServerId()),
+        paste: (url: string, address: string) => relay.paste(url, address, mcpServerId()),
+      };
+    },
+    get hostTab() {
+      const view = props.pluginHostView;
+      if (!signInRelay()?.hostTab || !view) return undefined;
+      return {
+        hostName: props.pluginHostName ?? "",
+        page: (url: string) => {
+          const current = hostTabbed();
+          return current?.url === url
+            ? { runtime: view.runtime, tabId: current.tabId, clipboard: view.clipboard }
+            : undefined;
+        },
+      };
+    },
+    get app() {
+      // Read here, where the page tracks it: the section loads the app in an effect callback.
+      const serverId = props.pluginServerId;
+      if (!props.pluginSignInApp || !serverId) return undefined;
+      const { mcp } = calls();
+      return {
+        load: (id: string) => mcp.mcpSignInApp({ mcpServerId: id }, serverId),
+        save: (input: SaveMcpSignInAppInput) =>
+          changeSignInApp((serverId) => calls().mcp.saveMcpSignInApp(input, serverId)),
+        remove: (id: string) =>
+          changeSignInApp((serverId) => calls().mcp.removeMcpSignInApp({ mcpServerId: id }, serverId)),
+      };
+    },
+  };
+  const serverSlotsBuilt = serverSlots?.(mcpTools);
+
+  /**
+   * The page of an MCP row: `custom:<id>` for a row the user added, the app's id for a row that an
+   * app installed. Undefined until the rows are read, and null when the host has no such row.
+   */
+  function mcpServerApp(id: string): string | null | undefined {
+    if (!props.pluginServerId || serversReadFor() !== props.pluginServerId) return undefined;
+    const holds = (app: MarketplaceApp) =>
+      app.kind === "custom"
+        ? app.server.id === id
+        : app.kind === "plugin" && app.plugin.apps.some((entry) => heldApps(entry).some((row) => row.id === id));
+    return apps().find(holds)?.id ?? null;
+  }
+
+  /* An agent's card shows whether the host holds a sign-in, read with the rows here. */
+  createEffect(
+    () => {
+      const serverId = serversReadFor();
+      const report = props.onMcpSignIns;
+      return serverId && report ? { serverId, states: signIns(), report } : null;
+    },
+    (read) => {
+      read?.report(read.serverId, read.states);
+    },
+  );
+
   /**
    * The ways into `app` that work from here. On a joined server a local server answers only on the
    * host, and a browser sign-in needs a host that relays it; a key works from any computer.
@@ -1191,6 +1508,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * and keeps the grant itself. False, with the error shown, when one of `apps` cannot connect here.
    */
   function canConnectHere(plugin: MarketplacePluginDetail, apps: readonly MarketplacePluginApp[]): boolean {
+    if (pluginNeedsMac(props, { apps })) {
+      setError(t("marketplace.app.blocked.mac", { name: plugin.name }));
+      return false;
+    }
     const hostOnly = apps.find((app) => (app.server.auth ?? []).length > 0 && flowsHere(app).length === 0);
     if (!hostOnly) return true;
     const key =
@@ -1250,6 +1571,15 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const installed = await run(async () => {
+      /* Asked before the skills and the sign-in, so a cancel changes nothing. The other row is removed
+         only after the app connected, as Remove server does: its sign-in, access and owner go with it. */
+      const replacing = new Map<string, McpServerConfig>();
+      for (const app of plugin.apps) {
+        const other = otherRowNamed(app);
+        if (!other) continue;
+        if (!(await confirmServerReplace(other.name, app.name))) return false;
+        replacing.set(app.id, other);
+      }
       const addedSkills: string[] = [];
       try {
         for (const skill of plugin.skills) {
@@ -1269,7 +1599,14 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
             await undoSkills(agentId, addedSkills);
             return false;
           }
-          setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
+          const replaced = replacing.get(app.id);
+          /* A removal forgets the sign-in of its address. When the app's address shares it, as
+             `https://mcp.stripe.com/` does with `https://mcp.stripe.com`, the app is saved on the old row instead. */
+          const sharesSignIn = replaced !== undefined && sameSignInAddress(replaced.url, connected.url);
+          if (replaced && !sharesSignIn)
+            setServers(await calls().mcp.removeMcpServer({ mcpServerId: replaced.id }, serverId));
+          const saved = replaced && sharesSignIn ? { ...connected, id: replaced.id } : connected;
+          setServers(await calls().mcp.saveMcpServer({ config: saved }, serverId));
         }
       } catch (cause) {
         await undoSkills(agentId, addedSkills);
@@ -1533,9 +1870,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       return false;
     }
     const name = servers().find((server) => server.id === id)?.name ?? "";
-    const next = await run(() => calls().mcp.removeMcpServer({ mcpServerId: id }, serverId));
+    const next = await run(() =>
+      changeMcpServers("mcp_server_removed", "mcp_server_remove_failed", (target) =>
+        calls().mcp.removeMcpServer({ mcpServerId: id }, target),
+      ),
+    );
     if (!next) return false;
-    setServers(next);
     setNotice(t("marketplace.notice.serverRemoved", { name }));
     return true;
   }
@@ -1590,6 +1930,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const stopDialogs = () => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
     setUninstalling(null);
   };
@@ -1602,6 +1943,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   onCleanup(() => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
   });
 
@@ -1627,10 +1969,16 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       return skillHomeCache(calls());
     },
     loadSkill,
-    skillListing: (id) =>
-      calls()
+    skillListing: (id) => {
+      const github = githubDetails.get(id);
+      if (github) return Promise.resolve(github);
+      /* Each GitHub read uses the limit of 60 an hour. Without a read in this window, the row opens
+         the page of an added skill, which names the repository. */
+      if (isGithubSkillId(id)) return Promise.resolve(undefined);
+      return calls()
         .skills.get(id)
-        .catch(() => undefined),
+        .catch(() => undefined);
+    },
     agents,
     activeAgentId,
     readSkills,
@@ -1641,6 +1989,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     changeSkill,
     setSkillEnabled,
     updateSkill,
+    get readGithubSkills() {
+      return props.githubSkills && skillCalls().readGithub ? readGithubSkills : undefined;
+    },
     get createSkill() {
       return props.onCreateSkill;
     },
@@ -1672,13 +2023,16 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     get macAutomation() {
       return requestMacAutomation() ? macAutomation : undefined;
     },
+    get macAppsUnavailable() {
+      return props.macAppsUnavailable;
+    },
     disconnectApp: (app) => setUninstalling(app.plugin),
     removeServer,
     get mcpAccess() {
       return accessServers() ? mcpAccess : undefined;
     },
-    get addServer() {
-      return props.onAddServer;
+    get servers() {
+      return props.pluginServerId ? serverSlotsBuilt : undefined;
     },
     get runPrompt() {
       const run = props.onRunPluginPrompt;
@@ -1703,6 +2057,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     connecting,
     uninstalling,
     skillConfirm,
+    serverReplace,
     agentUpdate,
     uninstallPlan,
     uninstallPlugin,
@@ -1711,9 +2066,16 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     testPluginApp,
     signInPluginApp,
     signInRelayed: relayed,
+    /** The host tab of a sign-in whose page only the joined server can reach, while it waits. */
+    signInHostPage: () => {
+      const current = hostTabbed();
+      const view = props.pluginHostView;
+      return current && view ? { runtime: view.runtime, tabId: current.tabId, clipboard: view.clipboard } : null;
+    },
     openSignInRelay,
     pasteSignInRelay,
     cancelSignIn,
     openPluginUrl,
+    mcpServerApp,
   };
 }

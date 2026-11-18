@@ -1,4 +1,13 @@
+import type { BillingPlanId } from "@openbot/contracts/billing";
 import type { HostedServerSummary } from "@openbot/contracts/hosted-servers";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
+
+/** The name and the summary of each plan, for the plans sheet and Settings > Billing. */
+export const HOSTED_PLAN_TEXT = {
+  starter: { name: "mobile.server.hosted.plan.starter", summary: "mobile.server.hosted.plan.starterSummary" },
+  standard: { name: "mobile.server.hosted.plan.standard", summary: "mobile.server.hosted.plan.standardSummary" },
+  pro: { name: "mobile.server.hosted.plan.pro", summary: "mobile.server.hosted.plan.proSummary" },
+} as const satisfies Record<BillingPlanId, { name: MobileTextKey; summary: MobileTextKey }>;
 
 /**
  * What the setup screen shows for a new server. `payment`: the server waits for the first payment.

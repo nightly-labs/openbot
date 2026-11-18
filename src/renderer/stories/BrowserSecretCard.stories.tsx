@@ -54,6 +54,17 @@ export const PasswordMember: Story = {
 export const PasswordOlderHost: Story = {
   args: { ...Password.args, vault: { server: "Studio Mac mini", blocked: "version" } },
 };
+/** A saved login fits the site, but OpenBot did not fill it: the card says why. */
+export const PasswordVaultSkipped: Story = {
+  args: {
+    ...Password.args,
+    request: {
+      ...request,
+      secret: { method: "password", origin: "https://accounts.example.com", digits: 6 },
+      vaultSkip: "agent-script",
+    },
+  },
+};
 export const EightDigits: Story = {
   args: { request: { ...request, secret: { method: "otp", origin: "https://accounts.example.com", digits: 8 } } },
 };
@@ -108,6 +119,10 @@ export const IslandPassword: Story = {
 
 export const IslandPasswordJoinedServer: Story = {
   args: { ...PasswordJoinedServer.args, variant: "island" },
+};
+
+export const IslandPasswordVaultSkipped: Story = {
+  args: { ...PasswordVaultSkipped.args, variant: "island" },
 };
 
 export const IslandEightDigits: Story = {

@@ -40,6 +40,7 @@ import {
   channelWorkers,
   channelWorkingTurns,
   firstUnreadChannelMessageId,
+  liveChannelPrompt,
   sentChannelMessageId,
   waitingChannelPrompt,
 } from "./channel-conversation-rows";
@@ -56,6 +57,8 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
+  /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
+  prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
   /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
   pausedAgentIds: () => ReadonlySet<string>;
 }
@@ -134,11 +137,14 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const waiting = createMemo(() => {
     const current = page();
-    return current ? waitingChannelPrompt(current) : null;
+    return current ? waitingChannelPrompt(current, threads(), env.prompts()) : null;
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();
-    if (!found) return undefined;
+    if (!found) {
+      const current = page();
+      return current ? liveChannelPrompt(current, threads(), env.prompts()) : undefined;
+    }
     const agentId = found.entry.author.id;
     return {
       type: "prompt",
@@ -351,7 +357,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
     onLoadOlder: () => void channels.loadOlder(),
     onAnswerPrompt: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => {
-      const requestId = waiting()?.prompt.requestId;
+      const requestId = prompt()?.requestId;
       if (requestId === undefined) return Promise.resolve(false);
       return respond(() => channels.port().agent.respondToPrompt({ requestId, answers }), options);
     },

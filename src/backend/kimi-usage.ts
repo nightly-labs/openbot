@@ -83,43 +83,79 @@ function credentialName(key: string): string | null {
   return name && !/[/\\]/u.test(name) && !name.startsWith(".") ? name : null;
 }
 
-/** An `https` address with no user, query, or fragment, so the token goes to Kimi's API only. */
-function usageUrl(baseUrl: string): string | null {
+/**
+ * An `https` address with no user, query, or fragment, so the token goes to Kimi's API only. A path
+ * is appended to it, not resolved: a resolved relative path drops the last segment of the address.
+ */
+function apiUrl(baseUrl: string): string | null {
   if (!URL.canParse(baseUrl)) return null;
   const url = new URL(baseUrl);
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return null;
-  // Appended, not resolved: a resolved relative path drops the last segment of the address.
-  return `${url.origin}${url.pathname.replace(/\/+$/u, "")}/usages`;
+  return `${url.origin}${url.pathname.replace(/\/+$/u, "")}`;
 }
 
-const KimiToken = Schema.Struct({ access_token: Schema.NonEmptyString, expires_at: Schema.optional(Schema.Finite) });
+const KimiToken = Schema.Struct({
+  access_token: Schema.NonEmptyString,
+  refresh_token: Schema.optional(Schema.NullOr(Schema.String)),
+  expires_at: Schema.optional(Schema.Finite),
+});
 
 const readText = (path: string) =>
   Effect.tryPromise({ try: () => readFile(path, "utf8"), catch: (cause) => new KimiUsageFailed({ cause }) }).pipe(
     Effect.option,
   );
 
+/** The CLI's saved sign-in: its token file, its token, and the API address that the token is for. */
+export interface KimiSavedSignIn {
+  /** False when `config.toml` names no token for the managed provider: the CLI then does not use this token. */
+  readonly managed: boolean;
+  readonly path: string;
+  readonly apiUrl: string;
+  readonly accessToken: string;
+  readonly refreshToken: string | null;
+  readonly expiresAt: number | null;
+}
+
 /**
  * `python`: the CLI is 1.x. `env` is the environment of the CLI process, so that `KIMI_SHARE_DIR`,
- * `KIMI_CODE_HOME` and `KIMI_CODE_BASE_URL` move this read as they move the CLI.
+ * `KIMI_CODE_HOME` and `KIMI_CODE_BASE_URL` move this read as they move the CLI. None without a
+ * sign-in that this read can use.
  */
-export const readKimiUsage = Effect.fn("Kimi.readUsage")(function* (python: boolean, env: NodeJS.ProcessEnv) {
+export const readKimiSavedSignIn = Effect.fn("Kimi.readSavedSignIn")(function* (
+  python: boolean,
+  env: NodeJS.ProcessEnv,
+) {
   const home = python ? kimiHomeDirectory(env) : kimiCodeHomeDirectory(env);
   const config = yield* readText(join(home, "config.toml"));
-  if (Option.isNone(config)) return NO_USAGE;
+  if (Option.isNone(config)) return Option.none<KimiSavedSignIn>();
   const provider = managedProvider(config.value);
   const name = credentialName(provider.key ?? "oauth/kimi-code");
-  const url = usageUrl(env.KIMI_CODE_BASE_URL?.trim() || provider.baseUrl || KIMI_CODE_BASE_URL);
-  if (!name || !url) return NO_USAGE;
-  const text = yield* readText(join(home, "credentials", `${name}.json`));
-  if (Option.isNone(text)) return NO_USAGE;
+  const url = apiUrl(env.KIMI_CODE_BASE_URL?.trim() || provider.baseUrl || KIMI_CODE_BASE_URL);
+  if (!name || !url) return Option.none<KimiSavedSignIn>();
+  const path = join(home, "credentials", `${name}.json`);
+  const text = yield* readText(path);
+  if (Option.isNone(text)) return Option.none<KimiSavedSignIn>();
   const token = Schema.decodeUnknownOption(Schema.fromJsonString(KimiToken))(text.value);
-  if (Option.isNone(token)) return NO_USAGE;
+  if (Option.isNone(token)) return Option.none<KimiSavedSignIn>();
+  return Option.some<KimiSavedSignIn>({
+    managed: provider.key !== null,
+    path,
+    apiUrl: url,
+    accessToken: token.value.access_token,
+    refreshToken: token.value.refresh_token || null,
+    expiresAt: token.value.expires_at ?? null,
+  });
+});
+
+/** `python` and `env` as for `readKimiSavedSignIn`. */
+export const readKimiUsage = Effect.fn("Kimi.readUsage")(function* (python: boolean, env: NodeJS.ProcessEnv) {
+  const signIn = yield* readKimiSavedSignIn(python, env);
+  if (Option.isNone(signIn)) return NO_USAGE;
   // The token lasts 15 minutes, and the CLI refreshes it only during a turn. An idle Kimi keeps its
   // last reading until the next turn gives a new token.
-  if (token.value.expires_at !== undefined && token.value.expires_at * 1_000 <= Date.now())
+  if (signIn.value.expiresAt !== null && signIn.value.expiresAt * 1_000 <= Date.now())
     return yield* new KimiUsageFailed({ cause: new Error("The Kimi sign-in token has expired.") });
-  const usage = yield* getUsages(url, token.value.access_token);
+  const usage = yield* getUsages(`${signIn.value.apiUrl}/usages`, signIn.value.accessToken);
   return usage === null ? NO_USAGE : kimiRateLimits(usage);
 });
 

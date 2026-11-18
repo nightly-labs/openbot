@@ -6,6 +6,7 @@ import {
   isSupportedAttachmentNameFor,
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
@@ -20,6 +21,8 @@ import { isAndroid } from "@/shared/lib/platform";
 import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import { fileLimitText } from "../model/large-files";
+import { smallerPhoto } from "../model/smaller-photo";
 
 /**
  * Where the plus is drawn, from the screen's left and bottom edges. Measuring
@@ -31,6 +34,10 @@ export interface ChatAttachmentAnchor {
   left: number;
   bottom: number;
   size: number;
+  /** The start edge of the composer card, from the same edge as `left`. The menu and the camera align to it. */
+  barStart: number;
+  /** The top of the composer card, from the screen's bottom edge. The menu and the camera open above it. */
+  barTop: number;
 }
 
 export interface ChatAttachment extends RemoteFileUpload {
@@ -42,7 +49,7 @@ export interface ChatAttachment extends RemoteFileUpload {
 }
 
 /** Longer pasted or shared text goes in as a text file, not into the composer. */
-const LARGE_TEXT_LENGTH = 4_000;
+export const LARGE_TEXT_LENGTH = 4_000;
 
 function base64(bytes: Uint8Array) {
   let binary = "";
@@ -51,6 +58,14 @@ function base64(bytes: Uint8Array) {
 }
 
 let sharedImagesCleared = false;
+
+function deleteCopy(uri: string) {
+  try {
+    new File(uri).delete();
+  } catch {
+    // The system clears the cache folder itself when it needs the space.
+  }
+}
 
 /**
  * An Android copy of a shared or pasted image, so the image views get a short file URI, not a data
@@ -84,13 +99,43 @@ async function keepSharedImage(file: RemoteFileUpload): Promise<string | undefin
   }
 }
 
+let largeFilesCleared = false;
+
+/**
+ * A copy of a large shared file. The caller deletes the shared file after the read, and the item
+ * sends the file from this copy in parts. A copy stays for one launch, as the image copies do.
+ */
+async function keepLargeFile(uri: string, name: string): Promise<string> {
+  const folder = new Directory(Paths.cache, "composer-files");
+  if (!largeFilesCleared) {
+    largeFilesCleared = true;
+    try {
+      if (folder.exists) folder.delete();
+    } catch {
+      // The system clears the cache folder itself when it needs the space.
+    }
+  }
+  folder.create({ intermediates: true, idempotent: true });
+  const extension =
+    name
+      .split(".")
+      .at(-1)
+      ?.replace(/[^a-zA-Z0-9]/gu, "") || "bin";
+  const copy = new File(folder, `${Crypto.randomUUID()}.${extension}`);
+  await new File(uri).copy(copy);
+  return copy.uri;
+}
+
 export function useChatAttachments(
   initialItems: ChatAttachment[] = [],
   persist?: (items: ChatAttachment[]) => Promise<void>,
   /** What the receiving host accepts. Read on each selection, because it loads with the connection. */
   support?: () => AttachmentSupport,
 ) {
-  const { t, errorMessage } = useText();
+  const text = useText();
+  const { t, errorMessage } = text;
+  const tooLarge = (name: string, bytes: number) =>
+    new Error(t("mobile.chat.attachment.tooLarge", { name, limit: fileLimitText(text, bytes) }));
   const limitMessage = () => t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments });
   // The plus's rect while the attachment card is open, and null while it is
   // not: one value, so the card can never be open without an anchor to grow
@@ -145,12 +190,17 @@ export function useChatAttachments(
     assertSupported(input.name);
     if (!input.name.trim() || input.name.length > INPUT_LIMITS.attachmentName)
       throw new Error(t("mobile.chat.attachment.nameTooLong"));
+    if (input.file) {
+      if (input.file.size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
+        throw tooLarge(input.name, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+      return { ...input, size: input.file.size, id: `mobile-draft-attachment-${++sequence.current}` };
+    }
     if (input.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(input.base64))
       throw new Error(t("mobile.chat.attachment.damaged"));
     const size =
       Math.floor((input.base64.length * 3) / 4) -
       (input.base64.endsWith("==") ? 2 : input.base64.endsWith("=") ? 1 : 0);
-    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: input.name }));
+    if (size > MOBILE_ATTACHMENT_BYTES) throw tooLarge(input.name, MOBILE_ATTACHMENT_BYTES);
     const dimensions = input.mimeType.startsWith("image/") ? imageDimensions(input.base64) : null;
     return {
       ...input,
@@ -177,14 +227,24 @@ export function useChatAttachments(
   async function readFile(uri: string, name: string): Promise<RemoteFileUpload & { uri: string }> {
     const file = new File(uri);
     const safeName = name.replace(/[/\\]/gu, "_");
+    const size = file.size;
     // Check before reading: a rejected file should not be copied into memory first.
-    if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: safeName }));
+    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw tooLarge(safeName, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
     assertSupported(safeName);
-    return { name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await readFileBase64(file), uri };
+    const mimeType = attachmentMimeTypeForName(safeName);
+    // A large file stays on disk. The upload reads it in parts, so it is never in memory as one string.
+    if (size > MOBILE_ATTACHMENT_BYTES) return { name: safeName, mimeType, base64: "", uri, file: { ref: uri, size } };
+    return { name: safeName, mimeType, base64: await readFileBase64(file), uri };
   }
   async function addFile(uri: string, name: string) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     await add(await readFile(uri, name));
+  }
+  /** A photo from the library, the camera or another app. The files picker sends a file as it is. */
+  async function addPhotoFile(uri: string, name: string) {
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
+    const photo = await smallerPhoto(uri, name);
+    await addFile(photo.uri, photo.name);
   }
   function photoName(asset: ImagePicker.ImagePickerAsset) {
     const extension = asset.uri.split(".").at(-1)?.toLowerCase();
@@ -211,7 +271,7 @@ export function useChatAttachments(
         preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
       const asset = result.canceled ? undefined : result.assets[0];
-      if (asset) picked = { uri: asset.uri, name: photoName(asset) };
+      if (asset) picked = await smallerPhoto(asset.uri, photoName(asset));
     } else {
       const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
       const asset = result.canceled ? undefined : result.assets[0];
@@ -269,7 +329,9 @@ export function useChatAttachments(
     });
     if (result.canceled)
       mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
-    else for (const asset of result.assets) await addFile(asset.uri, photoName(asset));
+    else
+      for (const asset of result.assets)
+        await (asset.type === "video" ? addFile : addPhotoFile)(asset.uri, photoName(asset));
   }
   function pasteText(text: string, onText: (text: string) => void) {
     if (text.length > LARGE_TEXT_LENGTH)
@@ -297,16 +359,17 @@ export function useChatAttachments(
   }
   /**
    * Adds what another app shared. Long text becomes a file, as a paste does. Each file is read on its
-   * own, so a refused file does not stop the others, and one alert names each refused file.
+   * own, so a refused file does not stop the others, and one alert names each refused file. It gives
+   * the files after the read, and whether a file was refused.
    */
   async function addShared(
     text: string,
     files: readonly { uri: string; name: string }[],
     onText: (text: string) => void,
-  ) {
+  ): Promise<{ items: readonly ChatAttachment[]; refused: boolean }> {
     const large = text.length > LARGE_TEXT_LENGTH;
     if (text && !large) onText(text);
-    if (!large && files.length === 0) return;
+    if (!large && files.length === 0) return { items: itemsRef.current, refused: false };
     const failures: unknown[] = [];
     beginPreparing();
     try {
@@ -325,9 +388,23 @@ export function useChatAttachments(
         try {
           if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
           // The caller deletes the copy after this read, so the item keeps the bytes, not the address.
-          const { name, mimeType, base64 } = await readFile(file.uri, file.name);
-          const uri = await keepSharedImage({ name, mimeType, base64 });
-          await add({ name, mimeType, base64, ...(uri ? { uri } : {}) });
+          // A large file keeps a copy of its own.
+          const photo = await smallerPhoto(file.uri, file.name);
+          const read = await readFile(photo.uri, photo.name)
+            .then(async ({ uri, ...rest }) => {
+              if (!rest.file) return rest;
+              const copy = await keepLargeFile(uri, rest.name);
+              return { ...rest, uri: copy, file: { ref: copy, size: rest.file.size } };
+            })
+            .finally(() => {
+              if (photo.uri !== file.uri) deleteCopy(photo.uri);
+            });
+          if (read.file) await add(read);
+          else {
+            const { name, mimeType, base64 } = read;
+            const uri = await keepSharedImage({ name, mimeType, base64 });
+            await add({ name, mimeType, base64, ...(uri ? { uri } : {}) });
+          }
         } catch (error) {
           failures.push(error);
         }
@@ -336,6 +413,7 @@ export function useChatAttachments(
       endPreparing();
     }
     if (failures.length > 0) reportFailures(failures);
+    return { items: itemsRef.current, refused: failures.length > 0 };
   }
   const busyRef = useRef(false);
   function report(operation: () => Promise<void>) {
@@ -355,7 +433,7 @@ export function useChatAttachments(
     // Held after the card has left, so the file read, the base64 encode and
     // the composer's re-render do not land on the frames of its exit. It
     // reports its own failure, because by then there is no card to show one in.
-    addPhoto: (uri: string) => report(() => addFile(uri, "photo.jpg")),
+    addPhoto: (uri: string) => report(() => addPhotoFile(uri, "photo.jpg")),
     choosePhotos: () => report(choosePhotos),
     requestCamera,
     chooseFiles: () => report(chooseFiles),

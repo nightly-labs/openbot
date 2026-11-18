@@ -43,6 +43,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentAccessLevel,
+  canAdministerServer,
   conversationMessageSender,
   DEFAULT_REMOTE_CONTROL_POLICY,
   isAvatarColor,
@@ -50,6 +51,7 @@ import {
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -60,7 +62,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import {
+  isFinalClientError,
+  type RemoteHostTicketHome,
+  type VerifiedRemoteSessionTicket,
+} from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -85,6 +91,7 @@ import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
+import { windowsSessionDisconnected } from "./windows-session-state";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
 
@@ -146,6 +153,7 @@ interface HostServiceOptions {
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
+  crm?: ForwardedApiOptions["crm"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
@@ -167,6 +175,7 @@ interface HostServiceOptions {
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
   mailbox: ForwardedApiOptions["mailbox"];
+  attachmentPreviews?: ForwardedApiOptions["attachmentPreviews"];
   browser: ForwardedApiOptions["browser"];
   chat?: TeamChatStore;
   /**
@@ -294,6 +303,11 @@ interface HostServiceOptions {
     image: AvatarImageInput | null,
     version?: string | null,
   ) => Effect.Effect<string | null, RemoteWorkflowError>;
+  /** Copies the shape and colour of the server to the account service, as `updateRemoteHostLogo` does the logo. */
+  updateRemoteHostAppearance?: (
+    hostId: string,
+    appearance: ServerAppearance | null,
+  ) => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 class HostApiRuntime extends Context.Service<
@@ -359,6 +373,7 @@ export class HostService extends EventEmitter<HostEvents> {
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
+      sessionDisconnected: windowsSessionDisconnected,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -512,6 +527,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
+      ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
       ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
       ...(options.agentNotificationLevels === undefined
@@ -536,6 +552,7 @@ export class HostService extends EventEmitter<HostEvents> {
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
+      ...(options.attachmentPreviews === undefined ? {} : { attachmentPreviews: options.attachmentPreviews }),
       browser: options.browser,
       browserView: this.#browserView,
       remoteScreen: this.#remoteScreen,
@@ -577,6 +594,7 @@ export class HostService extends EventEmitter<HostEvents> {
                 });
               return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
+          renewalRefused: isFinalClientError,
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
             this.#setStatus({
@@ -870,6 +888,7 @@ export class HostService extends EventEmitter<HostEvents> {
         configured: true,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: identity.enabledOnLaunch,
       });
     } else {
@@ -879,6 +898,7 @@ export class HostService extends EventEmitter<HostEvents> {
     if (identity) {
       this.#api.refreshPresence();
       this.#api.refreshIdentity();
+      this.#api.refreshAppearance();
     }
   }
 
@@ -924,6 +944,7 @@ export class HostService extends EventEmitter<HostEvents> {
         serverId: identity.serverId,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: false,
         message: null,
       });
@@ -965,6 +986,7 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
+      const optionalUpdateRemoteHostAppearance = this.#options.updateRemoteHostAppearance;
       // A server on this computer has no account session (#5092). Only the desktop app knows its
       // owner password, and the Team API route already required an admin.
       const passwordOwner = this.#options.passwordOwner === true;
@@ -977,9 +999,11 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#setStatus({
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      if (input.appearance !== undefined) this.#api.refreshAppearance();
       // The desktop app registers it for the account at each start, with the name of that start.
       if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
@@ -987,6 +1011,9 @@ export class HostService extends EventEmitter<HostEvents> {
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
         yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
           Effect.succeed(undefined);
+      }
+      if (input.appearance !== undefined && this.#isActiveHost(identity.serverId)) {
+        yield* optionalUpdateRemoteHostAppearance?.(identity.serverId, identity.appearance) ?? Effect.void;
       }
       return this.getStatus();
     },
@@ -1094,6 +1121,21 @@ export class HostService extends EventEmitter<HostEvents> {
     yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
     // `automatic`: the account service refuses a host that its owner removed (#5273).
     yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()), true);
+  }).bind(this);
+
+  /**
+   * Registers the running host again when the user asks for it, as a start does. A start of a running
+   * host does not register, so this sends a key change whose answer was lost and the current key (#9369).
+   */
+  readonly refreshRegistration = Effect.fn("HostService.refreshRegistration")(function* (this: HostService) {
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const publicKey = this.#options.store.getIdentity()?.publicKey;
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()));
+    const identity = this.#options.store.getIdentity();
+    if (identity && identity.publicKey !== publicKey && this.#isActiveHost(identity.serverId))
+      this.#api.refreshIdentity();
   }).bind(this);
 
   /**
@@ -2196,11 +2238,36 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   /**
+   * Whether an active member who is not an owner or admin can see `agentId`. Such a member reads the
+   * agent's chat and can add a routine to it, so the CRM tools refuse the agent.
+   */
+  agentVisibleToMembers(agentId: string): boolean {
+    return this.#options.store
+      .listMembers()
+      .some(
+        (member) => member.role === "member" && !member.disabled && this.#api.agentLevel(member, agentId) !== "none",
+      );
+  }
+
+  /**
+   * Whether `personId` can change the server settings: this computer's user, or an active owner or
+   * admin of the team.
+   */
+  personCanAdminister(personId: string): boolean {
+    if (!this.channelPersonIsRemote(personId)) return true;
+    const member = this.#options.store.getMember(personId);
+    return member !== null && !member.disabled && canAdministerServer(member.role);
+  }
+
+  /**
    * Whether `personId`, who wrote a channel request, is someone other than this computer's user: a
    * team member, whose app has only what the Team API gives it.
    */
   channelPersonIsRemote(personId: string): boolean {
     if (personId === SIGNED_OUT_CHANNEL_MEMBER_ID || personId === this.#findCurrentMemberId()) return false;
+    // A server on this computer has no account session. Its owner is the password member that only
+    // the desktop app on this computer logs in as.
+    if (this.#options.passwordOwner === true && personId === this.#options.store.getOwnerMemberId()) return false;
     try {
       return personId !== `local-user:${this.#options.getSignedInUser().id}`;
     } catch {
@@ -2280,6 +2347,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     serverId: identity?.serverId ?? null,
     serverName: identity?.serverName ?? null,
     logoUrl: identity?.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+    appearance: identity?.appearance ?? null,
     apiUrl: null,
     apiOnline: false,
     remoteDesktopReady: false,

@@ -69,6 +69,20 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: המודל "{model}" עדיין אינו זמין כאן, ולכן הסוכן משתמש במודל ברירת המחדל. יש לבחור את המודל שוב כשהספק שלו יהיה מוכן.',
   "error.import.transferSettingSkipped": "{name} לא מיובא. {reason}",
+  "error.import.transferRunsSkipped": '{name}: היסטוריית הריצות של השגרה "{routine}" לא מיובאת.',
+  "error.import.transferSharedSkillsSkipped": "לא ניתן לקרוא את המיומנויות המשותפות, ולכן הן לא בקובץ.",
+  "error.import.transferSharedSkillsNotAdded": "לא ניתן להוסיף לשרת הזה את המיומנויות המשותפות שבקובץ.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "לא ניתן לשמור את הבחירות של חבר אחד.",
+    two: "לא ניתן לשמור את הבחירות של שני חברים.",
+    other: "לא ניתן לשמור את הבחירות של {count} חברים.",
+  },
+  "error.import.transferSharedSkillExists": "מיומנות משותפת בשם הזה ועם קבצים אחרים כבר קיימת בשרת הזה.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "העדפת שרת אחת בקובץ אינה תקפה כאן, ולכן היא לא מיובאת.",
+    two: "שתי העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+    other: "{count} העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+  },
   "error.import.transferRoutineFlowSkipped": "הייבוא השמיט זרימת שגרה. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: סוכנים מותאמים אישית אינם מיובאים, כי הם מריצים פקודה. יש לבדוק את הפקודה "{command}" ולהוסיף את הסוכן שוב בהגדרות.',
@@ -78,7 +92,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: יש להזין שוב את מפתח ה-API שלו בהגדרות.",
   "error.import.transferAgentEnv": "{name}: יש להזין שוב את הערכים של {names} בהגדרות.",
   "error.import.transferMcpValues":
-    "{name}: שרת ה-MCP נוסף במצב כבוי. יש לבדוק את הפקודה שלו, להזין שוב את הערכים והכתובת המלאה שלו, ולהפעיל אותו בהגדרות MCP.",
+    "{name}: שרת ה-MCP נוסף במצב כבוי. יש לבדוק את הפקודה שלו, להזין שוב את הערכים והכתובת המלאה שלו, ולהפעיל אותו בחנות, אפליקציות.",
   "error.import.transferValuesCleared":
     "{name}: ערכים שעשויים להכיל סוד הוסרו מהארגומנטים או מהכתובת שלו. יש להזין אותם שוב בהגדרות.",
   "error.import.transferSharedKept": "{number} קבצים בתיקייה Shared כבר נמצאים כאן, ולכן הם נשמרים כפי שהם.",

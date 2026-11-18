@@ -74,6 +74,16 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: 모델 "{model}"을(를) 아직 여기서 사용할 수 없어서 에이전트가 기본 모델을 사용해요. 제공자가 준비되면 모델을 다시 선택해 주세요.',
   "error.import.transferSettingSkipped": "{name}을(를) 가져오지 않았어요. {reason}",
+  "error.import.transferRunsSkipped": '{name}: 루틴 "{routine}"의 실행 기록은 가져오지 않아요.',
+  "error.import.transferSharedSkillsSkipped": "공유 스킬을 읽을 수 없어서 파일에 포함되지 않았어요.",
+  "error.import.transferSharedSkillsNotAdded": "파일의 공유 스킬을 이 서버에 추가할 수 없었어요.",
+  "error.import.transferMemberPreferencesSkipped": {
+    other: "멤버 {count}명의 선택을 저장할 수 없었어요.",
+  },
+  "error.import.transferSharedSkillExists": "이름이 같고 파일이 다른 공유 스킬이 이 서버에 이미 있어요.",
+  "error.import.transferServerPreferencesSkipped": {
+    other: "파일의 서버 환경설정 {count}개가 여기서 유효하지 않아 가져오지 않아요.",
+  },
   "error.import.transferRoutineFlowSkipped": "가져오기에서 루틴 플로우 하나를 제외했어요. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: 커스텀 에이전트는 명령을 실행하므로 가져오지 않았어요. 명령 "{command}"을(를) 확인한 후 설정에서 에이전트를 다시 추가해 주세요.',
@@ -83,7 +93,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: 설정에서 API 키를 다시 입력해 주세요.",
   "error.import.transferAgentEnv": "{name}: 설정에서 {names} 값을 다시 입력해 주세요.",
   "error.import.transferMcpValues":
-    "{name}: MCP 서버를 꺼진 상태로 추가했어요. 명령을 확인하고 값과 전체 주소를 다시 입력한 후 MCP 설정에서 켜 주세요.",
+    "{name}: MCP 서버를 꺼진 상태로 추가했어요. 명령을 확인하고 값과 전체 주소를 다시 입력한 후 마켓플레이스, 앱에서 켜 주세요.",
   "error.import.transferValuesCleared":
     "{name}: 비밀 정보가 들어 있을 수 있는 값을 인수 또는 주소에서 제거했어요. 설정에서 다시 입력해 주세요.",
   "error.import.transferSharedKept": "공유 폴더의 파일 {number}개는 이미 여기에 있어서 그대로 두었어요.",

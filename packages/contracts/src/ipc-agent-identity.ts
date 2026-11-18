@@ -171,6 +171,17 @@ export interface AgentModelOption {
   ultrafastServiceTier?: string;
   /** See `AgentModelListing`. The released Team API model list does not carry it; `model-visibility-v1` does. */
   listing?: AgentModelListing;
+  /**
+   * True when the agent that serves this model takes a message into its running turn, for a provider
+   * whose `steer` is `reported` (a custom ACP agent). The released Team API model list does not carry
+   * it; `model-steering-v1` does.
+   */
+  steersTurns?: boolean;
+  /**
+   * True when the host cannot run this model's provider with Workspace only, so a Workspace only agent
+   * cannot move to it. The client sets it with `withWorkspaceOnlyLimit`; the Team API does not carry it.
+   */
+  workspaceOnlyUnavailable?: boolean;
 }
 
 export function isAgentModelOption(value: unknown): value is AgentModelOption {
@@ -196,6 +207,7 @@ function hasAgentModelOptionFields(value: DynamicRecord): boolean {
     (value.fastServiceTier === undefined || isBoundedString(value.fastServiceTier, INPUT_LIMITS.serviceTier)) &&
     (value.ultrafastServiceTier === undefined ||
       isBoundedString(value.ultrafastServiceTier, INPUT_LIMITS.serviceTier)) &&
-    (value.listing === undefined || isOneOf(AGENT_MODEL_LISTINGS, value.listing))
+    (value.listing === undefined || isOneOf(AGENT_MODEL_LISTINGS, value.listing)) &&
+    (value.steersTurns === undefined || isBoolean(value.steersTurns))
   );
 }

@@ -1,3 +1,4 @@
+import type { HostAppearanceEvent } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -38,7 +39,11 @@ import type {
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { type TeamCurrentCapability, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import {
+  supportsTeamCapability,
+  type TeamCurrentCapability,
+  teamCapabilitiesForProtocol,
+} from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
   encodeTeamProtocolV1CurrentClientEvent,
@@ -120,6 +125,7 @@ export interface RemoteEventStreamOptions {
   onDirectMessage: (serverId: string, event: DirectMessageRealtimeEvent) => void;
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
   onHostRestart: (serverId: string, event: HostRestartEvent) => void;
+  onHostAppearance: (serverId: string, event: HostAppearanceEvent) => void;
   onMachineAlert: (serverId: string, event: MachineAlertEvent) => void;
   onLiveVoice: (serverId: string, event: LiveVoiceEvent) => void;
   onOffline: (serverId: string) => void;
@@ -140,6 +146,7 @@ export class RemoteEventStream {
   readonly #onDirectMessage: RemoteEventStreamOptions["onDirectMessage"];
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
   readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
+  readonly #onHostAppearance: RemoteEventStreamOptions["onHostAppearance"];
   readonly #onMachineAlert: RemoteEventStreamOptions["onMachineAlert"];
   readonly #onLiveVoice: RemoteEventStreamOptions["onLiveVoice"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
@@ -154,6 +161,10 @@ export class RemoteEventStream {
   readonly #offlineHosts = new Map<string, number>();
   /** When this app last saw each host online. */
   readonly #seenOnlineAt = new Map<string, number>();
+  /** When the WebRTC transport last connected to each host. */
+  readonly #transportConnectedAt = new Map<string, number>();
+  /** The WebRTC connections to each host in a sequence that dropped before they were healthy. */
+  readonly #transportDrops = new Map<string, number>();
   /** Hosted servers that start after a wake request. */
   readonly #startingHosts = new Set<string>();
   #appFocused = true;
@@ -171,6 +182,7 @@ export class RemoteEventStream {
     this.#onDirectMessage = options.onDirectMessage;
     this.#onDirectTyping = options.onDirectTyping;
     this.#onHostRestart = options.onHostRestart;
+    this.#onHostAppearance = options.onHostAppearance;
     this.#onMachineAlert = options.onMachineAlert;
     this.#onLiveVoice = options.onLiveVoice;
     this.#onOffline = options.onOffline;
@@ -195,6 +207,8 @@ export class RemoteEventStream {
     this.#reconnectAttempts.clear();
     this.#offlineHosts.clear();
     this.#seenOnlineAt.clear();
+    this.#transportConnectedAt.clear();
+    this.#transportDrops.clear();
     this.#transportAttempts.clear();
     this.#authenticationPaused.clear();
     yield* Scope.close(this.#scope, Exit.void);
@@ -252,12 +266,50 @@ export class RemoteEventStream {
     this.syncScopes();
   }
 
-  // The transport reconnected on its own, so the backoff it earned no longer applies.
+  /**
+   * The WebRTC transport connected. A pending retry is not necessary now. The backoff starts again from
+   * the connections that dropped before they were healthy, not from the failed attempts of an outage.
+   * Before, each connection cleared it, so a connection that dropped after some seconds was tried again
+   * after one second, and again after each drop.
+   */
+  transportConnected(serverId: string): void {
+    this.#cancelPendingReconnect(serverId);
+    const drops = this.#transportDrops.get(serverId);
+    if (drops) this.#reconnectAttempts.set(serverId, drops);
+    else this.#reconnectAttempts.delete(serverId);
+    this.#transportConnectedAt.set(serverId, Date.now());
+  }
+
+  /**
+   * The WebRTC transport disconnected. A connection that stayed healthy clears the backoff. The result
+   * is true for the first drop since the last healthy connection: only that drop reads the host list
+   * again, not each drop of a connection that cannot stay up.
+   */
+  transportDisconnected(serverId: string): boolean {
+    const connectedAt = this.#transportConnectedAt.get(serverId);
+    this.#transportConnectedAt.delete(serverId);
+    if (connectedAt === undefined) return !this.#transportDrops.has(serverId);
+    if (Date.now() - connectedAt >= REMOTE_EVENT_HEALTHY_MS) {
+      this.#transportDrops.delete(serverId);
+      this.#reconnectAttempts.delete(serverId);
+      return true;
+    }
+    const drops = (this.#transportDrops.get(serverId) ?? 0) + 1;
+    this.#transportDrops.set(serverId, drops);
+    return drops === 1;
+  }
+
+  // The backoff no longer applies: the computer woke, or the user asked for the server again.
   clearReconnectBackoff(serverId: string): void {
+    this.#cancelPendingReconnect(serverId);
+    this.#reconnectAttempts.delete(serverId);
+    this.#transportDrops.delete(serverId);
+  }
+
+  #cancelPendingReconnect(serverId: string): void {
     const reconnectTimer = this.#reconnectTimers.get(serverId);
     if (reconnectTimer) clearTimeout(reconnectTimer);
     this.#reconnectTimers.delete(serverId);
-    this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
     this.#startingHosts.delete(serverId);
   }
@@ -388,6 +440,8 @@ export class RemoteEventStream {
     this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
     this.#seenOnlineAt.delete(serverId);
+    this.#transportConnectedAt.delete(serverId);
+    this.#transportDrops.delete(serverId);
     this.#startingHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);
@@ -590,6 +644,8 @@ export class RemoteEventStream {
               this.#onDirectTyping(serverId, event);
             } else if (event.type === "host-restart") {
               this.#onHostRestart(serverId, event);
+            } else if (event.type === "host-appearance") {
+              this.#onHostAppearance(serverId, event);
             } else if (event.type === "machine-alert") {
               this.#onMachineAlert(serverId, event);
             } else if (event.type === "live-voice") {
@@ -736,13 +792,16 @@ export class RemoteEventStream {
   /** Whether the `agent-event-scope` message of this server names `capability`. */
   #advertises(serverId: string, capability: TeamCurrentCapability): boolean {
     if (!this.#appVersion) return false;
-    return teamCapabilitiesForProtocol(this.#connections.compatibilityFor(serverId)?.negotiatedProtocol).includes(
+    return supportsTeamCapability(
+      teamCapabilitiesForProtocol(this.#connections.compatibilityFor(serverId)?.negotiatedProtocol),
       capability,
     );
   }
 
+  /** Whether the host serves `capability`. A protocol 10 host's compatibility is already expanded. */
   #supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
-    return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;
+    const capabilities = this.#connections.compatibilityFor(serverId)?.capabilities;
+    return capabilities ? supportsTeamCapability(capabilities, capability) : false;
   }
 
   // The pre-`appVersion` hosts predate capability negotiation, so the subprotocol they accepted is

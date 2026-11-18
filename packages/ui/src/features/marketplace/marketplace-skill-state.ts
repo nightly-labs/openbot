@@ -3,6 +3,7 @@ import {
   isRemovableSkill,
   type MarketplaceSkillSort,
   type MarketplaceSkillSummary,
+  parseGithubSkillId,
 } from "@openbot/contracts/ipc";
 import { useText } from "@openbot/ui/text";
 import type { MarketplaceAgent, MarketplaceModel } from "./marketplace-model";
@@ -119,6 +120,8 @@ export function useSkillWords(model: () => MarketplaceModel) {
   const sourceOf = (skill: InstalledSkill): string => {
     if (skill.origin === "local") return t("marketplace.skills.origin.local");
     if (skill.origin === "workspace") return t("marketplace.skills.origin.workspace");
+    const github = parseGithubSkillId(skill.skillId);
+    if (github) return t("marketplace.skills.origin.github", { repository: `${github.owner}/${github.repo}` });
     return t("marketplace.skills.origin.marketplace", { version: format.number(skill.installedVersion) });
   };
 

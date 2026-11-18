@@ -66,11 +66,11 @@ export function McpSignInAppSection(props: {
   }
 
   createEffect(
-    () => props.mcpServerId,
-    (mcpServerId) => {
+    () => ({ mcpServerId: props.mcpServerId, load: props.api.load }),
+    ({ mcpServerId, load }) => {
       const run = ++loadRun;
       if (!mcpServerId) return;
-      props.api.load(mcpServerId).then(
+      load(mcpServerId).then(
         (stored) => {
           if (run === loadRun) show(stored);
         },

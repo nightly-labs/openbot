@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { OPEN_STATUSES_SQL } from "./billing-errors";
-import { OPERATOR_HOST_DATA_KEPT_MS } from "./hosted-server-service";
+import { OPERATOR_HOST_DATA_KEPT_MS, POOL_SEEN_WITHIN_MS } from "./hosted-server-service";
 
 const DAY_MS = 24 * 60 * 60_000;
 /** The location and the product of a machine that `operator_hosts` does not list. */
@@ -19,6 +19,9 @@ class HostedPoolSnapshotError extends Schema.TaggedError<HostedPoolSnapshotError
  * - `cancel_scheduled`: the plan or the server ends at the end of the period, or at a date.
  * - `in_use`: each other server.
  *
+ * `ready` counts the free machines that the account service can give to a new customer now: prepared,
+ * with a token, and seen a short time ago (`HostedServerService.poolAssignment`).
+ *
  * `free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews:
  * the free ones, the ones to reinstall, and each other one whose date is in the time. A plan that ended
  * with a subscription that Stripe still retries (`unpaid`), or with no subscription, has no date.
@@ -28,6 +31,7 @@ export interface HostedPoolGroup {
   product: string;
   machines: number;
   free: number;
+  ready: number;
   to_reinstall: number;
   plan_ended: number;
   cancel_scheduled: number;
@@ -39,6 +43,7 @@ export interface HostedPoolGroup {
 interface PoolRow {
   location: string;
   product: string;
+  offered: number;
   server_id: string | null;
   desired_state: string | null;
   observed_state: string | null;
@@ -70,15 +75,17 @@ export const readHostedPool = Effect.fn("HostedPool.read")(function* (database: 
     try: () =>
       database
         .prepare(
-          `SELECT p.location, p.product, ${PLAN_COLUMNS}
+          `SELECT p.location, p.product,
+           (p.assign_token_hash IS NOT NULL AND COALESCE(p.seen_at, 0) > ?) AS offered, ${PLAN_COLUMNS}
          FROM operator_hosts p LEFT JOIN hosted_servers h ON h.operator_host = p.host_id
          WHERE p.removed_at IS NULL
          UNION ALL
-         SELECT '${UNLISTED}', '${UNLISTED}', ${PLAN_COLUMNS}
+         SELECT '${UNLISTED}', '${UNLISTED}', 0, ${PLAN_COLUMNS}
          FROM hosted_servers h
          WHERE h.operator_host IS NOT NULL AND NOT EXISTS(
            SELECT 1 FROM operator_hosts p WHERE p.host_id = h.operator_host AND p.removed_at IS NULL)`,
         )
+        .bind(now - POOL_SEEN_WITHIN_MS)
         .all<PoolRow>(),
     catch: () => new HostedPoolSnapshotError({}),
   });
@@ -93,6 +100,7 @@ export const readHostedPool = Effect.fn("HostedPool.read")(function* (database: 
       product,
       machines: 0,
       free: 0,
+      ready: 0,
       to_reinstall: 0,
       plan_ended: 0,
       cancel_scheduled: 0,
@@ -109,6 +117,7 @@ export const readHostedPool = Effect.fn("HostedPool.read")(function* (database: 
     for (const target of [group(row.location, row.product), total]) {
       target.machines += 1;
       target[state] += 1;
+      if (state === "free" && row.offered) target.ready += 1;
       if (freeAt !== null && freeAt <= now + 7 * DAY_MS) target.free_in_7d += 1;
       if (freeAt !== null && freeAt <= now + 30 * DAY_MS) target.free_in_30d += 1;
     }

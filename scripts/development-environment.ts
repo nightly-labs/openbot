@@ -14,10 +14,11 @@ const LOCAL_IDENTITY_KEYS = [
 ] as const;
 
 /**
- * Manual harness tests read these with `dotenvx run`. Provider CLIs read them from the environment
- * too, so the dev stack must not pass them on: a dev thread would spend the shared token budget.
+ * Manual tests read these with `dotenvx run`. Provider CLIs and agents read the environment too, so
+ * the dev stack must not pass them on: a dev thread would spend the shared token budget or see the
+ * test account password.
  */
-const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY"]);
+const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY", "DEV_TEST_GMAIL_ADDRESS", "DEV_TEST_GMAIL_PASSWORD"]);
 
 export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));

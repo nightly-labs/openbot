@@ -126,6 +126,8 @@ function unused(name: string) {
 function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApiKey">): ProviderAccountsHost {
   return {
     ...key,
+    accountKey: () => null,
+    saveAccountKey: unused("saveAccountKey"),
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
     defaultLogin: () => null,
@@ -220,7 +222,7 @@ try {
     "the added account got the key or another folder",
   );
 
-  const rowIds = () => accounts.rows("claude", null)?.map((row) => row.id) ?? [];
+  const rowIds = () => accounts.rows("claude", null, null)?.map((row) => row.id) ?? [];
   assert.deepEqual(rowIds(), ["default", CLAUDE_API_KEY_ACCOUNT_ID, added.id], "the key account row is missing");
   defaultUsesApiKey = true;
   assert.deepEqual(rowIds(), ["default", added.id], "the key account row shows while the own sign-in uses the key");
@@ -248,6 +250,11 @@ try {
       listAgents: unused("listAgents"),
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
+      connectProviderAccountKey: unused("connectProviderAccountKey"),
+      startProviderAccountCodeLogin: unused("startProviderAccountCodeLogin"),
+      submitProviderAccountCodeLogin: unused("submitProviderAccountCodeLogin"),
+      providerAccountCodeLoginStatus: unused("providerAccountCodeLoginStatus"),
+      cancelProviderAccountSignIn: unused("cancelProviderAccountSignIn"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
       setProviderAccountPool: unused("setProviderAccountPool"),

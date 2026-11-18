@@ -4,7 +4,8 @@
 // path, and only main can reveal the saved file.
 //
 // `copy` joins the two: it exports agents from one server to a temporary file and imports that file
-// at another, with the same routes, so a host needs no new route.
+// at another, with the same routes, so a host needs no new route. Between them, main keeps only the
+// settings of the copied agents in the file: their routine flows and workflows.
 
 import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -18,6 +19,7 @@ import {
   type InstanceExportResult,
   type InstanceTransferPreview,
   type InstanceTransferResult,
+  type InstanceTransferUploadProgress,
   LOCAL_SERVER_ID,
   parseApplyInstanceTransferInput,
   parseCopyInstanceAgentsInput,
@@ -26,6 +28,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_REMOTE_BYTES,
@@ -59,6 +65,8 @@ export interface InstanceTransferIpcDependencies {
   >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
+  /** The bytes of a file in parts that this computer has sent to a joined server. */
+  reportUploadProgress: (progress: InstanceTransferUploadProgress) => void;
 }
 
 export function instanceTransferIpcHandlers({
@@ -66,6 +74,7 @@ export function instanceTransferIpcHandlers({
   remoteServers,
   getMainWindow,
   translate,
+  reportUploadProgress,
 }: InstanceTransferIpcDependencies): Pick<IpcGroupHandlers, "instanceTransfer"> {
   const filters = [{ name: translate("dialog.filter.transfer"), extensions: ["zip"] }];
   /** The file this computer saved last, for "Show the file". */
@@ -117,12 +126,16 @@ export function instanceTransferIpcHandlers({
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
     if (inParts(serverId)) {
-      const { warnings } = await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      const fullCopy = remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
+      const { warnings } = await runCauseEffect(
+        downloadTransferInParts(remoteServers, serverId, input, path, fullCopy),
+      );
       lastExport = path;
       return { saved: true, fileName: basename(path), warnings };
     }
-    // `instance-transfer-v1` carries no chat history.
-    const { includeHistory: _history, ...v1 } = input;
+    // `instance-transfer-v1` carries no chat history, channel messages or server preferences.
+    const { agentIds, includeFiles, includeSettings } = input;
+    const v1 = { agentIds, includeFiles, includeSettings };
     const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, v1));
     // The file appears only when it is complete, as a local export does.
     const part = `${path}.part`;
@@ -146,7 +159,12 @@ export function instanceTransferIpcHandlers({
 
   /** Sends the file at `path` to the host. The size check comes before the read. */
   const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
-    if (inParts(serverId)) return runCauseEffect(uploadTransferInParts(remoteServers, serverId, path));
+    if (inParts(serverId))
+      return runCauseEffect(
+        uploadTransferInParts(remoteServers, serverId, path, (sent, total) =>
+          reportUploadProgress({ serverId, sent, total }),
+        ),
+      );
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > INSTANCE_TRANSFER_REMOTE_BYTES) throw new Error(sourceText("error.import.transferRemoteTooLarge"));
@@ -155,12 +173,29 @@ export function instanceTransferIpcHandlers({
 
   const applyRemote = async (input: ApplyInstanceTransferInput, serverId: string) => {
     requireRemote(serverId);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Only `instance-transfer-full-copy-v1` replaces the server preferences; the v1 apply never does.
+    const fullCopy = remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
+    const { token, keys, includeSettings } = input;
     const result = await runCauseEffect(
-      remoteServers.request(serverId, INSTANCE_TRANSFER_ROUTES.apply, decodeRemoteInstanceTransferResult, {
-        method: "POST",
-        body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
-      }),
+      remoteServers.request(
+        serverId,
+        fullCopy ? INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply : INSTANCE_TRANSFER_ROUTES.apply,
+        decodeRemoteInstanceTransferResult,
+        {
+          method: "POST",
+          body: fullCopy
+            ? {
+                token,
+                keys,
+                includeSettings,
+                includeServerPreferences: input.includeServerPreferences === true,
+                timezone,
+              }
+            : { token, keys, includeSettings, timezone },
+          timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+        },
+      ),
     );
     return resolveRemoteInstanceTransferResult(
       result,
@@ -168,11 +203,13 @@ export function instanceTransferIpcHandlers({
     );
   };
 
-  /** Writes the source server's agents to `path`, with their files and without chats or settings. Returns its warnings. */
+  /** Writes the source server's agents to `path`, with their files and settings and without chats. Returns its warnings. */
   const exportTo = async (serverId: string, agentIds: string[], path: string): Promise<string[]> => {
-    const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: false };
+    const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: true };
     if (serverId === LOCAL_SERVER_ID) {
-      const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
+      const prepared = await runCauseEffect(
+        instanceTransfer.prepareExport(input, undefined, undefined, { sharedSkills: false }),
+      );
       return (await runCauseEffect(prepared.write(path))).warnings;
     }
     requireRemote(serverId);
@@ -202,12 +239,15 @@ export function instanceTransferIpcHandlers({
     const directory = await mkdtemp(join(app.getPath("temp"), "openbot-copy-"));
     try {
       const path = join(directory, "agents.zip");
-      const exportWarnings = await exportTo(fromServerId, agentIds, path);
+      // A copy leaves the shared skills out, so the export's warning about them does not apply.
+      const sharedSkills = sourceText("error.import.transferSharedSkillsSkipped");
+      const exportWarnings = (await exportTo(fromServerId, agentIds, path)).filter((text) => text !== sharedSkills);
+      await runCauseEffect(instanceTransfer.keepCopiedSettings(path));
       const preview = await stageAt(serverId, path);
       const input: ApplyInstanceTransferInput = {
         token: preview.token,
         keys: preview.agents.map((agent) => agent.key),
-        includeSettings: false,
+        includeSettings: true,
       };
       // The apply releases the token and the staged file, also when it fails.
       const result = await routeToServer(serverId, {

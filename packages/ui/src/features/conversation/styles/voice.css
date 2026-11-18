@@ -1,4 +1,4 @@
-/* Spoken replies: the speaking bar above the composer, and the voice pane in the side panel. */
+/* Spoken replies: the speaking bar above the composer, and the voice conversation pill at the top of the chat. */
 
 .speaking-bar {
   display: flex;
@@ -49,157 +49,260 @@
   white-space: nowrap;
 }
 
-.voice-panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  padding: var(--openbot-space-4);
-}
+/*
+ * A voice conversation: a pill below the top edge of the chat, over the messages. It comes out of the
+ * edge as liquid. The dock spans the chat column and lets clicks through, so the messages beside the
+ * pill stay usable.
+ */
+.voice-pill-dock {
+  /* The liquid has the window frame colour, so the pill comes out of the frame, as the agent dock does. */
+  --voice-pill-fill: var(--window-solid-frame, var(--openbot-bg-frame));
+  --agent-avatar-outline: var(--voice-pill-fill);
 
-.voice-panel-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--openbot-space-0-5);
-}
-
-.voice-panel-name {
-  margin: 0;
-  font-size: var(--openbot-text-md);
-  font-weight: 600;
-}
-
-.voice-panel-phase {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.voice-panel-stage {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--openbot-space-8);
-}
-
-.voice-panel-presence {
-  position: relative;
-  display: grid;
-  width: 140px;
-  height: 140px;
-  place-items: center;
-  transform: scale(var(--voice-presence-scale, 1));
-  transition:
-    transform var(--openbot-duration-fast) linear,
-    opacity var(--openbot-duration-normal) ease;
-}
-
-/* A soft glow of the accent colour behind the face, brighter while the agent speaks. */
-.voice-panel-presence::before {
   position: absolute;
-  inset: -24px;
-  border-radius: var(--openbot-radius-pill);
-  background: radial-gradient(closest-side, var(--openbot-accent-soft), transparent);
-  content: "";
-  opacity: 0.5;
-  transition: opacity var(--openbot-duration-normal) ease;
-}
-
-.voice-panel-presence[data-phase="speaking"]::before {
-  opacity: 1;
-}
-
-.voice-panel-presence[data-phase="thinking"]::before {
-  animation: voice-panel-think 1.6s var(--openbot-ease-in-out) infinite alternate;
-}
-
-@keyframes voice-panel-think {
-  to {
-    opacity: 0.15;
-  }
-}
-
-.voice-panel-avatar {
-  --agent-avatar-optical-offset: calc(112px * -0.14);
-
-  position: relative;
-  width: 112px;
-  height: 112px;
-}
-
-/* The waveform keeps its place when it is hidden, so the captions do not move. */
-/* A muted microphone: the agent's face dims until the user speaks again. */
-.voice-panel-presence[data-muted] {
-  opacity: 0.5;
-}
-
-.voice-panel-waveform {
+  z-index: 3;
+  /* On the top line of the chat card, so the drop covers it where it comes out. */
+  top: calc(var(--left-header-height, 38px) - 1px);
+  inset-inline: 0;
   display: flex;
-  width: 141px;
-  color: var(--openbot-text-secondary);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-4);
+  pointer-events: none;
+}
+
+/*
+ * The messages that scroll under the pill blur and darken into the canvas, most at the top of the
+ * chat. Each layer blurs more and stops higher, so the blur gets weaker step by step and the band
+ * has no edge. The band is short: it stops a little below the pill, so the messages stay readable.
+ */
+.voice-pill-blur {
+  position: absolute;
+  z-index: -1;
+  /*
+   * It starts below the top line of the chat card, so the header and the line stay sharp. It ends
+   * below the pill and follows it: VoicePill.tsx sets how far the pill is above its place at rest.
+   */
+  inset-block: 1px calc(-1 * var(--openbot-space-6) - var(--voice-pill-drop, 0px));
+  inset-inline: 0;
+  /*
+   * The chat can reach the rounded top corners of the card; the band does not paint past them. Each
+   * layer takes the corners, as a rounded `overflow: hidden` here makes Chromium drop the masks of
+   * the layers: then the strongest blur covers the band and stops on a hard line.
+   */
+  border-start-start-radius: var(--openbot-radius-card);
+  border-start-end-radius: var(--openbot-radius-card);
+}
+
+/*
+ * The layers fade in and out with the pill (VoicePill.tsx sets the open progress). The band itself
+ * keeps full opacity: below it, Chromium blurs nothing behind the layers.
+ */
+.voice-pill-blur::before,
+.voice-pill-blur > div {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: var(--voice-pill-open, 1);
+}
+
+.voice-pill-blur::before {
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--openbot-bg-canvas) 70%, transparent),
+    color-mix(in srgb, var(--openbot-bg-canvas) 35%, transparent) 50%,
+    transparent
+  );
+}
+
+/* Each step doubles the blur and its fade overlaps the next, so no step shows as a line. */
+.voice-pill-blur > div:nth-child(1) {
+  backdrop-filter: blur(1px);
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 40%, transparent);
+}
+
+.voice-pill-blur > div:nth-child(2) {
+  backdrop-filter: blur(2px);
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 30%, transparent 90%);
+}
+
+.voice-pill-blur > div:nth-child(3) {
+  backdrop-filter: blur(4px);
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 20%, transparent 75%);
+}
+
+.voice-pill-blur > div:nth-child(4) {
+  backdrop-filter: blur(8px);
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 10%, transparent 60%);
+}
+
+.voice-pill-blur > div:nth-child(5) {
+  backdrop-filter: blur(16px);
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary), transparent 45%);
+}
+
+.conversation-panel.browser-panel-active > .voice-pill-dock {
+  inset-inline-end: var(--browser-panel-width, 380px);
+}
+
+.conversation-panel[data-settings-panel] > .voice-pill-dock {
+  inset-inline-end: var(--settings-panel-width, 360px);
+}
+
+.voice-pill-filter {
+  position: absolute;
+}
+
+/* The liquid (VoicePill.tsx): the frame above the edge, the neck and the pill, under the goo filter. */
+.voice-pill-liquid {
+  position: absolute;
+  inset-inline: 0;
+}
+
+.voice-pill-liquid > div,
+.voice-pill-shape {
+  position: absolute;
+  background: var(--voice-pill-fill);
+}
+
+.voice-pill-frame {
+  top: 0;
+  inset-inline: 0;
+}
+
+.voice-pill-neck,
+.voice-pill-body,
+.voice-pill-shape {
   opacity: 0;
+}
+
+/* The pill again, without the filter, so its shape stays exact at rest. */
+.voice-pill-shape {
+  pointer-events: none;
+}
+
+/* The content of the pill. It shows when the pill is almost full. */
+.voice-pill {
+  position: relative;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  /* The distance from the top edge at rest. The liquid reads it, so the goo lets the pill come off. */
+  margin-top: var(--openbot-space-3);
+  gap: var(--openbot-space-2);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
+  opacity: 0;
+  pointer-events: auto;
+  transform-origin: top center;
+}
+
+/* The face is drawn low in its own box; the app lifts it by the same share. */
+.voice-pill-avatar {
+  --agent-avatar-optical-offset: calc(28px * -0.14);
+
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
   transition: opacity var(--openbot-duration-normal) ease;
 }
 
-.voice-panel-waveform[data-phase] {
-  opacity: 1;
+/* A muted microphone: the agent's face dims until the user speaks again. */
+.voice-pill[data-muted] .voice-pill-avatar {
+  opacity: 0.5;
 }
 
-.voice-panel-waveform[data-phase="speaking"] {
+/* The waveform keeps its width while it is empty, so the buttons do not move. */
+.voice-pill-waveform {
+  width: 69px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+}
+
+.voice-pill[data-phase="speaking"] .voice-pill-waveform {
   color: var(--openbot-accent);
 }
 
-.voice-panel-captions {
-  width: 100%;
-  min-height: calc(var(--openbot-leading-xl) * 4);
-  overflow-y: auto;
-  text-align: center;
-}
-
-.voice-panel-caption {
-  margin: 0;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xl);
-  line-height: var(--openbot-leading-xl);
-}
-
-.voice-panel-caption[data-empty] {
-  color: var(--openbot-text-muted);
-}
-
-.voice-panel-error {
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
-}
-
-.voice-panel-controls {
-  display: flex;
-  justify-content: center;
-  gap: var(--openbot-space-4);
-}
-
-.voice-panel-control {
+/*
+ * The actions are those of the toolbar of a canvas node (workflow-nodes.css): round, secondary text
+ * until the pointer or the focus is on them, then a light fill and no ring, and a small press.
+ */
+.voice-pill-button {
+  flex: 0 0 auto;
   border-radius: var(--openbot-radius-pill);
-  transition:
-    background-color var(--openbot-duration-fast) ease,
-    color var(--openbot-duration-fast) ease;
+  box-shadow: none;
+  color: var(--openbot-text-secondary);
+  transition-property: background-color, color, opacity, scale;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.voice-pill .voice-pill-button:is(:hover, :focus-visible):not(:disabled) {
+  background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+}
+
+.voice-pill .voice-pill-button:active:not(:disabled) {
+  scale: 0.96;
+}
+
+.voice-pill-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+/* A muted microphone takes the danger colour, as Delete does on the canvas. */
+.voice-pill .voice-pill-button[aria-pressed="true"] {
+  color: var(--openbot-danger-text);
+}
+
+.voice-pill .voice-pill-button[aria-pressed="true"]:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--openbot-danger) 16%, transparent);
+  color: var(--openbot-danger-text);
+}
+
+/* The tooltip of a canvas control: a 1px ring and no shadow. */
+.ui-tooltip.voice-pill-tooltip {
+  border-radius: var(--openbot-radius-md);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
+  font-weight: var(--openbot-weight-medium);
 }
 
 /* The speed is text: the size of the player time, and the same width of each digit. */
-.voice-panel-speed {
+.voice-pill-speed {
+  width: auto;
+  padding-inline: var(--openbot-space-1-5);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
 
+.voice-pill-error {
+  max-width: min(480px, 100%);
+  margin: 0;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
+  pointer-events: auto;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+/* While the pill flows back into the top edge, the error fades out. The blur follows the pill. */
+.voice-pill-dock[data-closing] > .voice-pill-error {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .speaking-bar,
-  .voice-panel-presence[data-phase="thinking"]::before {
+  .speaking-bar {
     animation: none;
   }
 
-  .voice-panel-presence {
-    transform: none;
+  .voice-pill .voice-pill-button:active:not(:disabled) {
+    scale: none;
   }
 }
 

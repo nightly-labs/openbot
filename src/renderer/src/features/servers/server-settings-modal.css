@@ -139,9 +139,10 @@
   padding-inline-start: var(--openbot-space-8);
 }
 
+/* The card has a thin line around it on the background of the page, as the other settings cards do. */
 .server-settings-invite-card.ui-card {
-  border: 0;
-  background: var(--openbot-bg-surface);
+  border: 1px solid var(--openbot-border);
+  background: transparent;
   padding: var(--openbot-space-4);
   box-shadow: none;
 }
@@ -615,6 +616,6 @@
 
 /* The width of the zone list, which shows the long "Automatic (zone)" label of most hosts. */
 .server-settings-timezone-pending {
-  width: 200px;
+  width: 220px;
   min-height: var(--openbot-control-sm);
 }

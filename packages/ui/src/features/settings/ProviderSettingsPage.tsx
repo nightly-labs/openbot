@@ -5,7 +5,7 @@
  */
 
 import { ProviderLogo } from "@openbot/brand";
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AgentModelId,
   type AgentProviderId,
@@ -16,15 +16,19 @@ import {
   claudeCompactWindowSizes,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  isProviderEnvironmentProvider,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountPool,
   type ProviderAccountState,
+  type ProviderEnvironment,
+  type ProviderEnvironmentVariableInput,
   type ProviderModelVisibility,
   type ProviderRuntimeDownload,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
+  providerEnvironmentProblem,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -41,6 +45,7 @@ import {
   Ellipsis,
   Gauge,
   Globe2,
+  IconButton,
   Input,
   Item,
   ItemActions,
@@ -75,12 +80,20 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
-import { isApiKeyAccount, type ProviderPickerAccount, providerAccountName } from "../../components/provider-accounts";
+import {
+  accountCodeSignInOffered,
+  hasKeyAccounts,
+  isApiKeyAccount,
+  isProviderKeyAccount,
+  type ProviderPickerAccount,
+  providerAccountName,
+} from "../../components/provider-accounts";
 import {
   createProviderRow,
+  customEngineDownloadAction,
   PROVIDER_ACTION_LABEL,
   PROVIDER_ACTION_TEXT,
   type ProviderRow,
@@ -94,8 +107,9 @@ import { useText } from "../../text";
 import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
-import { providerUpdateAvailable } from "../provider-updates/provider-update";
+import { providerUpdateAvailable, providerVersionLabel } from "../provider-updates/provider-update";
 import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
+import { type KeyDialogText, OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 
 /** The provider page on screen. The settings window puts "Providers ›" before its title. */
 export interface ProviderSettingsDetail {
@@ -125,6 +139,19 @@ export interface ProviderClaudeCompactWindow {
   /** A load or a save that failed. */
   error: string | null;
   onChange: (tokens: number | null) => void;
+}
+
+/**
+ * The environment variables of one provider of the host. `value` is null until the host answers. A
+ * sensitive variable has an empty `value` and `stored: true`; the host never sends its value back.
+ */
+export interface ProviderEnvironmentControl {
+  value: ProviderEnvironment | null;
+  pending: boolean;
+  /** A load or a save that failed. */
+  error: string | null;
+  /** Replaces the whole list. `value: null` keeps a stored sensitive value. */
+  onSave: (variables: ProviderEnvironmentVariableInput[]) => void;
 }
 
 /** Whether Claude loads the user's own Claude Code setup. `value` is null until main answers. */
@@ -161,6 +188,11 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
     | undefined;
   disabled?: boolean | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /**
+   * Runs the CLI the user installed (`installed`), also when OpenBot's copy is newer, or the newer copy
+   * again. The provider restarts when its turns end. This computer only.
+   */
+  onChooseInstalledCli?: ((provider: ManagedProviderId, installed: boolean) => void | Promise<void>) | undefined;
   /** Turns a provider on or off. A provider that an agent uses stays on and names its agents. */
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   /** What `onRemoveProviderDownload` frees now: nothing while the provider is on. */
@@ -194,6 +226,12 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
   /** On the Claude page. Only for a host with `claude-compact-window-v1` that this account administers. */
   claudeCompactWindow?: ProviderClaudeCompactWindow | undefined;
+  /**
+   * The Environment section of one provider page. Called once when the page opens, so the control
+   * lives as long as the page. Only for a host with `provider-environment-v1` that this account
+   * administers, and only for a provider that takes variables.
+   */
+  environment?: ((provider: AgentProviderId) => ProviderEnvironmentControl | undefined) | undefined;
   /**
    * The model list of one provider page. Called once when the page opens, so the control lives as
    * long as the page. Only for a host with `model-visibility-v1` that this account administers.
@@ -579,6 +617,8 @@ function ProviderPage(props: PageProps) {
   };
   const modelVisibility = createMemo(() => props.modelVisibility);
   const models = createMemo(() => modelVisibility()?.(provider()));
+  const environmentControl = createMemo(() => props.environment);
+  const environment = createMemo(() => environmentControl()?.(provider()));
   return (
     <>
       <DetailHeader
@@ -613,6 +653,16 @@ function ProviderPage(props: PageProps) {
           {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
+        <Show when={isProviderEnvironmentProvider(props.option.id) && environment()}>
+          {(control) => (
+            <EnvironmentSection
+              control={control()}
+              provider={props.option.id}
+              name={props.option.name}
+              disabled={props.disabled}
+            />
+          )}
+        </Show>
       </Show>
       <Show when={!runtimeMissing()}>
         <UseSection {...props} row={row} />
@@ -716,9 +766,39 @@ function disconnectDescription(
     .join(" ");
 }
 
+/** The key dialog text of each provider whose accounts after the first are API keys. */
+const ACCOUNT_KEY_TEXT: Partial<Record<AgentProviderId, KeyDialogText>> = {
+  cursor: {
+    name: "Cursor",
+    title: "provider.cursorKey.title",
+    description: "provider.cursorKey.description",
+    descriptionHost: "provider.cursorKey.descriptionHost",
+    label: "provider.cursorKey.label",
+  },
+};
+
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const accounts = () => props.option.accounts ?? [];
+  /** The text of the key dialog, where each account after the first is an API key. */
+  const keyText = () => (hasKeyAccounts(props.option.id) ? ACCOUNT_KEY_TEXT[props.option.id] : undefined);
+  /** The key dialog is offered where the computer that runs the providers takes such a key. */
+  const keyOffered = () => Boolean(keyText() && props.accountActions?.connectKey);
+  /** The account whose key the dialog asks for: null adds an account. Undefined while the dialog is closed. */
+  const [keyTarget, setKeyTarget] = createSignal<string | null | undefined>(undefined);
+  /**
+   * The key dialog saves through the account action. The key is new each time and no call reads it
+   * back, so the dialog has no saved state and no Remove: the account's menu removes it.
+   */
+  const keyApi = (accountId: string | null): ProviderKeyApi => ({
+    onHost: !props.accountActions?.local,
+    getProviderApiKeyState: async () => ({ provider: props.option.id, status: "missing" }),
+    setProviderApiKey: async ({ key }) => {
+      await props.accountActions?.connectKey?.(props.option.id, accountId, key);
+    },
+    clearProviderApiKey: async () => undefined,
+    openExternal: async () => undefined,
+  });
   const [removing, setRemoving] = createSignal<ProviderPickerAccount | null>(null);
   const [resetting, setResetting] = createSignal<ProviderPickerAccount | null>(null);
   const [disconnecting, setDisconnecting] = createSignal<ProviderPickerAccount | null>(null);
@@ -783,7 +863,7 @@ function AccountsSection(props: SectionProps) {
   const pool = () => (props.accountActions?.setPool ? props.option.accountPool : undefined);
   /** The pool switch shows where the host has a pool and the provider has a second account to use. */
   /** A saved key has no plan limit, so it is not a pool member. */
-  const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id));
+  const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id, props.option.id));
   const poolOffered = () => Boolean(props.accountActions?.setPool) && (planAccounts().length > 1 || Boolean(pool()));
   const poolLabelId = `provider-settings-${props.option.id}-pool-label`;
   const setPool = (enabled: boolean, leftOut: readonly string[]) =>
@@ -807,19 +887,39 @@ function AccountsSection(props: SectionProps) {
         max: MAX_PROVIDER_ACCOUNTS,
       })}
       actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={t("provider.account.addLabel", { name: props.option.name })}
-          disabled={
-            props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()
-          }
-          onClick={props.row.addAccount}
-        >
-          <UserRoundPlus aria-hidden="true" />
-          {t("provider.account.add")}
-        </Button>
+        // A host that takes no key cannot add an account that is a key, so it offers none.
+        <Show when={!hasKeyAccounts(props.option.id) || keyOffered()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={t("provider.account.addLabel", { name: props.option.name })}
+            disabled={
+              props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()
+            }
+            onClick={() => (keyOffered() ? setKeyTarget(null) : props.row.addAccount())}
+          >
+            <UserRoundPlus aria-hidden="true" />
+            {t("provider.account.add")}
+          </Button>
+          {/* The other way in for a new account, in a ⋯ menu as on the provider's own sign-in. */}
+          <Show when={!keyOffered() && props.row.accountCodeOffered()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+              <MenuTrigger
+                label={t("provider.account.moreActions", { name: t("provider.account.add") })}
+                disabled={props.disabled || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()}
+              />
+              <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
+                <DropdownMenu.Content>
+                  <DropdownMenu.Item onSelect={props.row.addAccountWithCode}>
+                    <Smartphone aria-hidden="true" />
+                    {t("provider.account.addWithCode")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
+        </Show>
       }
     >
       <ItemGroup class="settings-modal-card" aria-label={t("provider.account.listLabel", { name: props.option.name })}>
@@ -866,6 +966,7 @@ function AccountsSection(props: SectionProps) {
               }
               resetsLeft={props.accountActions?.resetUsage ? resetsLeft(account().id) : 0}
               onResetUsage={() => setResetting({ ...account() })}
+              onChangeKey={keyOffered() ? () => setKeyTarget(account().id) : undefined}
             />
           )}
         </For>
@@ -887,6 +988,11 @@ function AccountsSection(props: SectionProps) {
           <ItemDescription class="provider-settings-error" role="alert">
             {message()}
           </ItemDescription>
+        )}
+      </Show>
+      <Show when={keyTarget() !== undefined ? keyText() : undefined}>
+        {(text) => (
+          <OpenCodeKeyDialog api={keyApi(keyTarget() ?? null)} text={text()} onClose={() => setKeyTarget(undefined)} />
         )}
       </Show>
       <ConfirmDialog
@@ -971,6 +1077,16 @@ const VERSION_SOURCE = {
   managed: "provider.settings.versionDownloaded",
 } as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
 
+/** The CLI the user can switch to, named by its owner: the opposite of the one that runs. */
+const OTHER_VERSION = {
+  managed: "provider.settings.otherVersionInstalledByUser",
+  system: "provider.settings.otherVersionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+const OTHER_VERSION_ACTION = {
+  managed: "provider.settings.useInstalledVersion",
+  system: "provider.settings.useDownloadedVersion",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+
 /** One account. Its text says what is wrong; the right edge has at most one button, then the ⋯ menu. */
 function AccountRow(
   props: SectionProps & {
@@ -987,14 +1103,18 @@ function AccountRow(
     pool: ProviderAccountPool | undefined;
     /** Leaves the account out of the pool, or puts it back. */
     onTogglePool: () => void;
+    /** Opens the key dialog for an account that is an API key. Absent where the host takes no key. */
+    onChangeKey: (() => void) | undefined;
   },
 ) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [renaming, setRenaming] = createSignal(false);
   const name = () => providerAccountName(t, props.accounts, props.account.id);
   const own = () => props.account.id === DEFAULT_PROVIDER_ACCOUNT_ID;
   /** The saved key's account: the key dialog changes or removes it, and it has no sign-in or plan usage. */
   const apiKey = () => isApiKeyAccount(props.account.id);
+  /** One API key of a provider whose accounts after the first are keys: it has no sign-in, no plan usage and no pool. */
+  const keyAccount = () => isProviderKeyAccount(props.option.id, props.account.id);
   /**
    * A saved Gemini key serves the turns in place of the own Google sign-in, with the key's models. A
    * Reconnect or a Disconnect of the Google sign-in then changes nothing that the user sees (#7913).
@@ -1005,13 +1125,15 @@ function AccountRow(
     Object.hasOwn(ACCOUNT_STATE_TEXT, props.account.state) ? props.account.state : "error";
   const needsSignIn = () => state() === "signed-out" || state() === "error";
   /** The own account signs in again with the provider's Reconnect, so only the others have their own. */
-  const signInAgain = () => !own() && !apiKey() && needsSignIn();
-  const connecting = () => !own() && !apiKey() && state() === "connecting";
+  const signInAgain = () => !own() && !apiKey() && !keyAccount() && needsSignIn();
+  /** A key that the provider no longer accepts is replaced, where a browser account signs in again. */
+  const changeKey = () => (keyAccount() ? props.onChangeKey : undefined);
+  const connecting = () => !own() && !apiKey() && !keyAccount() && state() === "connecting";
   /** A Reconnect of the provider waits for the browser. */
   const ownSigningIn = () => own() && props.row.signingIn();
   const agents = () => props.account.usedBy ?? [];
   /** A pool member: a saved key is never one. */
-  const poolMember = () => Boolean(props.pool) && !apiKey();
+  const poolMember = () => Boolean(props.pool) && !apiKey() && !keyAccount();
   const inPool = () => poolMember() && !props.pool?.leftOut.includes(props.account.id);
   const detail = () =>
     [
@@ -1057,9 +1179,13 @@ function AccountRow(
         <Show when={keyReplacesOwn()}>
           <ItemDescription>{t("provider.settings.geminiKeyReplacesAccount")}</ItemDescription>
         </Show>
+        {/* A connected account has a message only when its CLI bills an API key in place of the plan. */}
+        <Show when={state() === "connected" && props.account.message}>
+          {(message) => <ItemDescription role="status">{sourceText(message())}</ItemDescription>}
+        </Show>
         <Show when={state() !== "connected"}>
           <ItemDescription class={{ "provider-settings-warning": needsSignIn() }}>
-            {props.account.message ?? t(ACCOUNT_STATE_TEXT[state()])}
+            {props.account.message ? sourceText(props.account.message) : t(ACCOUNT_STATE_TEXT[state()])}
             <Show when={needsSignIn() && agents().length > 0}>
               {` ${t("provider.settings.accountBlocked", { agents: format.list(agents()) })}`}
             </Show>
@@ -1084,6 +1210,14 @@ function AccountRow(
             <LogIn aria-hidden="true" />
             {t("provider.account.signInAgain")}
           </Button>
+        </Show>
+        <Show when={needsSignIn() ? changeKey() : undefined}>
+          {(open) => (
+            <Button type="button" size="sm" disabled={props.disabled} onClick={() => open()()}>
+              <KeyRound aria-hidden="true" />
+              {t("provider.settings.changeKey")}
+            </Button>
+          )}
         </Show>
         <Show when={connecting()}>
           <Button
@@ -1132,7 +1266,7 @@ function AccountRow(
                   </Show>
                 </DropdownMenu.Item>
               </Show>
-              <Show when={state() === "connected" && !apiKey() && props.resetsLeft > 0}>
+              <Show when={state() === "connected" && !apiKey() && !keyAccount() && props.resetsLeft > 0}>
                 <DropdownMenu.Item onSelect={() => props.onResetUsage()}>
                   <Gauge aria-hidden="true" />
                   {t("provider.account.resetUsage")}
@@ -1149,11 +1283,29 @@ function AccountRow(
               <Show when={own()}>
                 <AlternativeItem row={props.row} />
               </Show>
+              <Show when={signInAgain() && accountCodeSignInOffered(props.option.id, props.accountActions)}>
+                <DropdownMenu.Item
+                  onSelect={() =>
+                    props.run(name(), () => props.accountActions?.connectWithCode?.(props.option.id, props.account.id))
+                  }
+                >
+                  <Smartphone aria-hidden="true" />
+                  {t("provider.action.signInWithCode")}
+                </DropdownMenu.Item>
+              </Show>
               <Show when={apiKey()}>
                 <DropdownMenu.Item onSelect={() => void props.onSignInProvider?.(props.option.id)}>
                   <KeyRound aria-hidden="true" />
                   {t("provider.settings.changeKey")}
                 </DropdownMenu.Item>
+              </Show>
+              <Show when={changeKey()}>
+                {(open) => (
+                  <DropdownMenu.Item onSelect={() => open()()}>
+                    <KeyRound aria-hidden="true" />
+                    {t("provider.settings.changeKey")}
+                  </DropdownMenu.Item>
+                )}
               </Show>
               <Show when={!own() && !apiKey()}>
                 <DropdownMenu.Separator />
@@ -1542,7 +1694,15 @@ function RuntimeSection(props: SectionProps) {
   const versionLine = () => {
     const current = runtime();
     if (!current) return null;
-    if (current.phase === "not-downloaded") return t("provider.status.notDownloaded");
+    if (current.phase === "not-downloaded") {
+      // The user's own CLI runs until the offered copy is downloaded, so the line names it (#11854).
+      const version = props.option.incompleteCliVersion;
+      return version
+        ? t("provider.settings.versionInstalledByUser", {
+            version: providerVersionLabel({ ...current, version }, { t }) ?? version,
+          })
+        : t("provider.status.notDownloaded");
+    }
     if (current.phase === "download-error")
       return current.message ?? providerStatusLabel(t, format, row().state(), false, current);
     if (current.phase === "downloading" || current.phase === "finishing") {
@@ -1555,6 +1715,20 @@ function RuntimeSection(props: SectionProps) {
     // Names the CLI that runs, so a failure of the user's own install does not read as OpenBot's (#4375).
     const source = props.option.cliSource;
     return installed && source ? t(VERSION_SOURCE[source], { version: installed }) : installed;
+  };
+  /**
+   * The CLI the provider can run instead, while nothing downloads or restarts: the user's own after an
+   * update started OpenBot's copy, so that a launcher of theirs runs again (#6327), or the copy back.
+   */
+  const otherCli = () => {
+    const source = props.option.cliSource;
+    const version = props.option.otherCliVersion;
+    const provider = props.option.id;
+    if (!source || !version || !props.onChooseInstalledCli || !isManagedRuntimeProvider(provider)) return null;
+    const current = runtime();
+    if (storeAction() || props.option.restartPending || current?.phase !== "ready") return null;
+    // Written as the Version line writes the version that runs.
+    return { source, version: providerVersionLabel({ ...current, version }, { t }) ?? version, provider };
   };
   /** The sign-in card already shows a check error, so the same text does not show twice. */
   const lastError = () =>
@@ -1576,6 +1750,14 @@ function RuntimeSection(props: SectionProps) {
                     </ItemDescription>
                   )}
                 </Show>
+                <Show when={otherCli()}>
+                  {(other) => (
+                    <ItemDescription>{t(OTHER_VERSION[other().source], { version: other().version })}</ItemDescription>
+                  )}
+                </Show>
+                <Show when={runtime()?.phase === "not-downloaded" && props.option.incompleteCliVersion}>
+                  <ItemDescription>{t("provider.settings.installedVersionIncomplete")}</ItemDescription>
+                </Show>
                 <Show when={progress() !== null}>
                   <Progress
                     class="provider-settings-progress"
@@ -1585,6 +1767,19 @@ function RuntimeSection(props: SectionProps) {
                 </Show>
               </ItemContent>
               <ItemActions>
+                <Show when={otherCli()}>
+                  {(other) => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={props.disabled || row().connecting()}
+                      onClick={() => void props.onChooseInstalledCli?.(other().provider, other().source === "managed")}
+                    >
+                      {t(OTHER_VERSION_ACTION[other().source])}
+                    </Button>
+                  )}
+                </Show>
                 <Show
                   when={storeAction()}
                   fallback={
@@ -1865,6 +2060,277 @@ function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disable
             </ItemActions>
           </Show>
         </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
+/* ---------------------------------------------- Environment */
+
+interface EnvironmentRow {
+  /** A key for the list, so a typed character does not make the row again. */
+  id: number;
+  name: string;
+  value: string;
+  sensitive: boolean;
+  /** The host has the value of this sensitive name; an empty field keeps it. */
+  stored: boolean;
+}
+
+/**
+ * The variables that each process of the provider starts with. The list is a draft until Save. A
+ * removed row fades and folds, so the rows under it slide up; from the keyboard, the focus then goes to
+ * the next row's Remove, the previous one, or Add variable. A sensitive value is typed only to change
+ * it. Saving restarts the provider when its turns end.
+ */
+function EnvironmentSection(props: {
+  control: ProviderEnvironmentControl;
+  provider: AgentProviderId;
+  name: string;
+  disabled: boolean | undefined;
+}) {
+  const { t } = useText();
+  let nextId = 0;
+  const rowsOf = (environment: ProviderEnvironment | null): EnvironmentRow[] =>
+    (environment?.variables ?? []).map((variable) => ({ ...variable, id: nextId++ }));
+  const [draft, setDraft] = createSignal<EnvironmentRow[]>([]);
+  /** What the draft was last set to from the host: a change of the user is a difference from it. */
+  const [baseline, setBaseline] = createSignal<string>("[]");
+  const [leaving, setLeaving] = createSignal<ReadonlySet<number>>(new Set());
+  const [saved, setSaved] = createSignal(false);
+  const removeButtons = new Map<number, HTMLButtonElement>();
+  let addButton: HTMLButtonElement | undefined;
+  const snapshot = (rows: readonly Omit<EnvironmentRow, "id">[]) =>
+    JSON.stringify(rows.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
+  const kept = () => draft().filter((row) => !leaving().has(row.id));
+  const dirty = () => snapshot(kept()) !== baseline();
+  /** Sets the draft to what the host keeps now. */
+  const reset = (environment: ProviderEnvironment | null) => {
+    const rows = rowsOf(environment);
+    setLeaving(new Set<number>());
+    setDraft(rows);
+    setBaseline(snapshot(rows));
+  };
+  // An answer of the host starts the draft again from what the host keeps, but not while the user has
+  // a change: each status event reads the variables again, also while the user types. The answer to a
+  // save of this page does start it again.
+  createEffect(
+    () => props.control.value,
+    (environment) => {
+      const keep = untrack(() => dirty() && !(saved() && !props.control.error));
+      if (keep) return;
+      reset(environment);
+    },
+  );
+  const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);
+  const keptNames = () => kept().map((row) => row.name.trim());
+  const problem = (row: EnvironmentRow): string | null => {
+    if (!isProviderEnvironmentProvider(props.provider)) return null;
+    const name = row.name.trim();
+    if (name === "" && row.value === "") return null;
+    const found = providerEnvironmentProblem(props.provider, name, keptNames());
+    if (found === "name") return t("error.provider.environmentNameInvalid", { name: name || "…" });
+    if (found === "reserved") return t("error.provider.environmentNameReserved", { name });
+    if (found === "duplicate") return t("error.provider.environmentNameDuplicate", { name });
+    return null;
+  };
+  const invalid = () => kept().some((row) => problem(row) !== null);
+  const update = (id: number, change: Partial<EnvironmentRow>) => {
+    setSaved(false);
+    setDraft((rows) => rows.map((row) => (row.id === id ? { ...row, ...change } : row)));
+  };
+  const drop = (id: number) => {
+    setLeaving((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setDraft((rows) => rows.filter((row) => row.id !== id));
+    removeButtons.delete(id);
+  };
+  const remove = (id: number) => {
+    if (leaving().has(id)) return;
+    setSaved(false);
+    const rows = draft();
+    const index = rows.findIndex((row) => row.id === id);
+    const staying = rows.filter((row) => row.id !== id && !leaving().has(row.id));
+    const next = staying.find((row) => rows.indexOf(row) > index) ?? staying.at(-1) ?? null;
+    // Only a keyboard user gets the focus moved: after a click it would open the next button's tooltip.
+    if (removeButtons.get(id)?.matches(":focus-visible"))
+      (next ? removeButtons.get(next.id) : addButton)?.focus({ preventScroll: true });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      drop(id);
+      return;
+    }
+    setLeaving((current) => new Set(current).add(id));
+    // The fold reports its end; the timer covers a window in the background, which runs no transition.
+    setTimeout(() => {
+      if (leaving().has(id)) drop(id);
+    }, 260);
+  };
+  const save = () => {
+    const variables: ProviderEnvironmentVariableInput[] = kept()
+      .filter((row) => row.name.trim() !== "" || row.value !== "")
+      .map((row) => ({
+        name: row.name.trim(),
+        // An empty field of a stored sensitive value keeps it.
+        value: row.sensitive && row.stored && row.value === "" ? null : row.value,
+        sensitive: row.sensitive,
+      }));
+    setSaved(true);
+    props.control.onSave(variables);
+  };
+  const label = (row: EnvironmentRow, index: number) =>
+    row.name.trim() || t("provider.settings.environmentUnnamed", { index: index + 1 });
+  return (
+    <SettingsSection title={t("provider.settings.environment")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle>{t("provider.settings.environmentVariables")}</ItemTitle>
+            <Show
+              when={props.control.error}
+              fallback={
+                <ItemDescription>
+                  {t("provider.settings.environmentDescription", { name: props.name })}{" "}
+                  {props.provider === "codex" ? `${t("provider.settings.environmentCodexHint")} ` : ""}
+                  {t("provider.settings.environmentShellNote")}
+                </ItemDescription>
+              }
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy()}
+              ref={(element: HTMLButtonElement) => {
+                addButton = element;
+              }}
+              onClick={() => {
+                setSaved(false);
+                setDraft((rows) => [...rows, { id: nextId++, name: "", value: "", sensitive: false, stored: false }]);
+              }}
+            >
+              <Plus />
+              {t("provider.settings.environmentAdd")}
+            </Button>
+          </ItemActions>
+        </Item>
+        <For each={draft()} keyed={(row) => row.id}>
+          {(row, index) => (
+            // The wrapper folds its row away: its grid row goes from 1fr to 0fr while the row fades.
+            <div
+              class="provider-environment-fold"
+              data-leaving={leaving().has(row().id) ? "" : undefined}
+              inert={leaving().has(row().id)}
+              onTransitionEnd={(event) => {
+                if (event.target === event.currentTarget && event.propertyName === "grid-template-rows") drop(row().id);
+              }}
+            >
+              <Item class="settings-modal-row provider-environment-row">
+                <div class="provider-environment-fields">
+                  <Input
+                    size="sm"
+                    class="provider-environment-mono"
+                    spellcheck={false}
+                    autocomplete="off"
+                    placeholder={t("provider.settings.environmentNamePlaceholder")}
+                    aria-label={t("provider.settings.environmentNameLabel", { index: index() + 1 })}
+                    disabled={busy()}
+                    value={row().name}
+                    // A new name needs its own value: the stored one belongs to the old name.
+                    onValueChange={(value) => update(row().id, { name: value, stored: false })}
+                  />
+                  <Input
+                    size="sm"
+                    class="provider-environment-mono"
+                    type={row().sensitive ? "password" : "text"}
+                    spellcheck={false}
+                    autocomplete="off"
+                    placeholder={
+                      row().stored
+                        ? t("provider.settings.environmentSaved")
+                        : t("provider.settings.environmentValuePlaceholder")
+                    }
+                    aria-label={t("provider.settings.environmentValueLabel", { name: label(row(), index()) })}
+                    disabled={busy()}
+                    value={row().value}
+                    onValueChange={(value) => update(row().id, { value })}
+                  />
+                  <Show when={problem(row())}>
+                    {(message) => <ItemDescription class="provider-settings-error">{message()}</ItemDescription>}
+                  </Show>
+                </div>
+                <ItemActions>
+                  <div class="provider-environment-sensitive">
+                    <Switch
+                      size="sm"
+                      checked={row().sensitive}
+                      disabled={busy()}
+                      aria-label={t("provider.settings.environmentSensitiveLabel", { name: label(row(), index()) })}
+                      onChange={(on: boolean) => update(row().id, { sensitive: on, stored: on && row().stored })}
+                    />
+                    <span aria-hidden="true">{t("provider.settings.environmentSensitive")}</span>
+                  </div>
+                  <IconButton
+                    variant="ghost"
+                    size="icon-sm"
+                    label={t("provider.settings.environmentRemoveLabel", { name: label(row(), index()) })}
+                    disabled={busy()}
+                    ref={(element: HTMLButtonElement) => {
+                      removeButtons.set(row().id, element);
+                    }}
+                    onClick={() => remove(row().id)}
+                  >
+                    <Trash2 />
+                  </IconButton>
+                </ItemActions>
+              </Item>
+            </div>
+          )}
+        </For>
+        <Show when={dirty() || (saved() && !props.control.pending && !props.control.error)}>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemDescription>
+                {dirty()
+                  ? t("provider.settings.environmentPending", { name: props.name })
+                  : t("provider.settings.environmentDone", { name: props.name })}
+              </ItemDescription>
+            </ItemContent>
+            <Show when={dirty()}>
+              <ItemActions>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={props.control.pending}
+                  // The host's answers that came during the change show now.
+                  onClick={() => reset(props.control.value)}
+                >
+                  {t("provider.settings.environmentDiscard")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={props.control.pending}
+                  disabled={busy() || invalid()}
+                  onClick={save}
+                >
+                  {t("provider.settings.environmentSave")}
+                </Button>
+              </ItemActions>
+            </Show>
+          </Item>
+        </Show>
       </ItemGroup>
     </SettingsSection>
   );
@@ -2192,6 +2658,14 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
   const ready = () => servesCustomEndpoints(props);
+  /**
+   * While OpenCode is not downloaded, Add can do nothing, so the section offers the download that
+   * makes it usable, as the onboarding picker does (#9191).
+   */
+  const engineAction = () => {
+    if (ready() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
+    return customEngineDownloadAction(engine());
+  };
   const runsOn = (endpoint: CustomProviderSummary) =>
     t("customProvider.list.runsOn", {
       name: agentProviderName(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS),
@@ -2217,17 +2691,39 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
       <SettingsSection
         title={t("provider.settings.endpoints")}
         actions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label={t("provider.custom.addLabel")}
-            disabled={props.disabled || !ready()}
-            onClick={() => props.onAddCustomProvider?.()}
+          <Show
+            when={engineAction()}
+            fallback={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={t("provider.custom.addLabel")}
+                disabled={props.disabled || !ready()}
+                onClick={() => props.onAddCustomProvider?.()}
+              >
+                <Plus aria-hidden="true" />
+                {t("common.add")}
+              </Button>
+            }
           >
-            <Plus aria-hidden="true" />
-            {t("common.add")}
-          </Button>
+            {(action) => (
+              <Button
+                type="button"
+                variant={action() === "download" ? "default" : "outline"}
+                size="sm"
+                aria-label={t(PROVIDER_ACTION_LABEL[action()], { name: engine()?.name ?? "" })}
+                disabled={props.disabled}
+                onClick={() =>
+                  void (action() === "cancel"
+                    ? props.onCancelProviderDownload?.("opencode")
+                    : props.onDownloadProvider?.("opencode"))
+                }
+              >
+                {t(PROVIDER_ACTION_TEXT[action()])}
+              </Button>
+            )}
+          </Show>
         }
       >
         <ItemGroup class="settings-modal-card" aria-label={t("customProvider.list.label")}>

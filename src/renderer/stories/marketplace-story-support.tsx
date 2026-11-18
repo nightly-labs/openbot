@@ -8,6 +8,7 @@ import {
   type MarketplaceSkillSummary,
   type McpServerAccess,
   type McpServerConfig,
+  type McpSignInState,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
@@ -32,6 +33,9 @@ import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
+import { McpServerControls } from "../src/features/servers/McpServerControls";
+import { McpServerForm } from "../src/features/servers/McpServerForm";
+import type { McpServerTools } from "../src/features/servers/mcp-server-tools";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
   STORY_AGENT_SUMMARIES,
@@ -510,6 +514,50 @@ export function MarketplaceStory(props: StoryProps) {
   const dialogListing = CATALOG.find((entry) => entry.id === dialogSkill);
   const [dialogOpen, setDialogOpen] = createSignal(true);
 
+  /** The custom servers of the window, with a host that answers each test with three tools. */
+  const [signIns, setSignIns] = createSignal<Record<string, McpSignInState>>({});
+  const customServers = () => state.apps.flatMap((app) => (app.kind === "custom" ? [app.server] : []));
+  const putServer = (server: McpServerConfig) =>
+    setState((draft) => {
+      const app: MarketplaceApp = {
+        kind: "custom",
+        id: `custom:${server.id}`,
+        name: server.name,
+        tagline: server.transport === "stdio" ? server.command : server.url,
+        status: "connected",
+        server,
+      };
+      const index = draft.apps.findIndex((entry) => entry.id === app.id);
+      if (index === -1) draft.apps.push(app);
+      else draft.apps[index] = app;
+    });
+  const serverTools: McpServerTools = {
+    servers: customServers,
+    signIns,
+    save: async (config) => {
+      const saved = { ...config, id: config.id || `story-${config.name.toLocaleLowerCase().replace(/\W+/g, "-")}` };
+      putServer(saved);
+      return saved;
+    },
+    test: async () => ({ toolCount: 3, error: null }),
+    setEnabled: async (id, enabled) => {
+      const server = customServers().find((candidate) => candidate.id === id);
+      if (server) putServer({ ...server, enabled });
+    },
+    toolRuntimeNote: () => null,
+    signIn: () => ({
+      start: async (config) => {
+        setSignIns((held) => ({ ...held, [config.id]: { mcpServerId: config.id, signedIn: true } }));
+        return { toolCount: 3, error: null };
+      },
+      cancel: async () => {},
+      signOut: async (id) => {
+        setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
+      },
+    }),
+    signInRequest: () => null,
+    endSignInRequest: () => {},
+  };
   const model: MarketplaceModel = {
     listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
     loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
@@ -656,7 +704,12 @@ export function MarketplaceStory(props: StoryProps) {
             return true;
           },
         },
-    addServer: member ? undefined : fn(),
+    servers: member
+      ? undefined
+      : {
+          form: (form) => <McpServerForm tools={serverTools} id={form.id} onClose={form.onClose} />,
+          controls: (controls) => <McpServerControls tools={serverTools} id={controls.id} />,
+        },
     runPrompt: fn(),
     copyLink: fn(),
     copyListingLink: fn(),

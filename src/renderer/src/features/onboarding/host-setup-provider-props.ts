@@ -11,6 +11,9 @@ import type { SetupProviderProps } from "./SetupProviderPicker";
 export function hostSetupProviderProps(settings: HostProviderSettings): SetupProviderProps {
   return {
     hostProviders: true,
+    get customProviderHarnessChoice() {
+      return settings.customProviderHarnessChoice;
+    },
     get agentStatus() {
       return settings.agentStatus;
     },

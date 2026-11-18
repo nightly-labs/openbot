@@ -126,9 +126,14 @@ export const messages = {
   "provider.picker.download": "Téléchargement de {name}",
   "provider.picker.search": "Rechercher des modèles",
   "provider.picker.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
+  "provider.picker.showCustomModels": "Voir les modèles",
   "provider.picker.museNoModels":
     "Muse n’a envoyé aucun modèle pour ce compte. Muse n’est peut-être pas disponible dans le pays où cet agent s’exécute. Choisissez un modèle d’un autre fournisseur.",
   "provider.picker.customEmpty":
@@ -156,6 +161,8 @@ export const messages = {
   "provider.picker.selectEffort": "Choisir l’effort",
   "provider.picker.custom": "Personnalisé",
   "provider.picker.cliReady": "{cli} prêt",
+  "provider.picker.modelSourceProvider": "Utilise {name} depuis vos paramètres {cli}",
+  "provider.picker.modelSourceCatalog": "Utilise une liste de modèles depuis vos paramètres {cli}",
   "provider.status.signInRequired": "Connexion requise",
   "provider.model.free": "Gratuit",
   "provider.model.new": "Nouveau",
@@ -176,22 +183,36 @@ export const messages = {
   "provider.geminiKey.title": "Clé d’API Gemini",
   "provider.geminiKey.description":
     "Enregistrez une clé d’API Gemini sur cet ordinateur. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Enregistrez une clé d’API Gemini sur l’hôte. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
   "provider.geminiKey.label": "Clé d’API Gemini",
   "provider.claudeKey.title": "Clé d’API Anthropic",
   "provider.claudeKey.description":
     "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête au crédit API de la clé, pas à votre forfait Claude. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
   "provider.claudeKey.label": "Clé d’API Anthropic",
+  "provider.cursorKey.title": "Clé d’API Cursor",
+  "provider.cursorKey.description":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur cet ordinateur.",
+  "provider.cursorKey.descriptionHost":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur l’hôte.",
+  "provider.cursorKey.label": "Clé d’API Cursor",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":
     "Enregistrez une clé d’API Inception sur cet ordinateur pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.inceptionKey.descriptionHost":
+    "Enregistrez une clé d’API Inception sur l’hôte pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.inceptionKey.label": "Clé d’API Inception",
   "provider.deepseekKey.title": "Clé d’API DeepSeek",
   "provider.deepseekKey.description":
     "Enregistrez une clé d’API DeepSeek sur cet ordinateur pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.deepseekKey.descriptionHost":
+    "Enregistrez une clé d’API DeepSeek sur l’hôte pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.deepseekKey.label": "Clé d’API DeepSeek",
   "provider.openrouterKey.title": "Clé d’API OpenRouter",
   "provider.openrouterKey.description":
     "Enregistrez une clé d’API OpenRouter sur cet ordinateur pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.openrouterKey.descriptionHost":
+    "Enregistrez une clé d’API OpenRouter sur l’hôte pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
@@ -208,6 +229,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Impossible de se reconnecter.",
   "provider.account.add": "Ajouter un compte",
   "provider.account.addLabel": "Ajouter un autre compte {name}",
+  "provider.account.addWithCode": "Ajouter un compte par code",
   "provider.account.count": { one: "{count} compte", other: "{count} comptes" },
   "provider.account.numbered": "Compte {number}",
   "provider.account.apiKey": "Clé API",
@@ -255,6 +277,12 @@ export const messages = {
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
+  "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Certains modèles ont besoin d'un élément absent de cette version. Téléchargez la version d'OpenBot pour les utiliser.",
+  "provider.settings.useInstalledVersion": "Utiliser l'installée",
+  "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":
@@ -276,6 +304,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Défaut de Claude Code",
   "provider.settings.compactWindowTokens": "{size} jetons",
   "provider.settings.compactWindowLoadFailed": "Impossible de charger la taille de compactage de ce serveur.",
+  "provider.settings.environment": "Environnement",
+  "provider.settings.environmentVariables": "Variables",
+  "provider.settings.environmentDescription":
+    "Clés d’API, URL de base et autres réglages que reçoit chaque processus {name}. Un changement s’applique à la fin des tours en cours.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, avec OPENAI_API_KEY comme clé, envoie les requêtes de modèle de ChatGPT à cette adresse.",
+  "provider.settings.environmentShellNote": "Les commandes que lancent les agents peuvent lire ces valeurs.",
+  "provider.settings.environmentAdd": "Ajouter une variable",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valeur",
+  "provider.settings.environmentSaved": "Enregistrée",
+  "provider.settings.environmentSensitive": "Sensible",
+  "provider.settings.environmentNameLabel": "Nom de la variable {index}",
+  "provider.settings.environmentValueLabel": "Valeur de {name}",
+  "provider.settings.environmentSensitiveLabel": "Garder {name} secrète",
+  "provider.settings.environmentRemoveLabel": "Retirer {name}",
+  "provider.settings.environmentUnnamed": "variable {index}",
+  "provider.settings.environmentPending":
+    "L’enregistrement redémarre {name} à la fin de ses tours en cours. Les valeurs sensibles restent sur le serveur.",
+  "provider.settings.environmentDone": "Enregistré. {name} redémarre à la fin de ses tours en cours.",
+  "provider.settings.environmentDiscard": "Annuler",
+  "provider.settings.environmentSave": "Enregistrer",
+  "provider.settings.environmentLoadFailed": "Impossible de charger les variables de {name}.",
   "provider.settings.models": "Modèles",
   "provider.settings.modelsDescription": {
     one: "{shown} modèle sur {count} apparaît dans le sélecteur de modèle.",

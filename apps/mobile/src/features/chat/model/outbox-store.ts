@@ -1,3 +1,4 @@
+import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { ChatAttachment } from "../components/use-chat-attachments";
 import {
   type DecodedOutbox,
@@ -105,6 +106,11 @@ export class OutboxStore {
   private readonly listeners = new Set<() => void>();
   /** The bytes of files added in this run. Sent messages use them to fill the preview cache. */
   private readonly memoryFiles = new Map<string, ChatAttachment[]>();
+  /**
+   * Saves of messages with large files. A large file can come from the folder of the message that
+   * this one replaces, which goes when the save ends, so the upload waits for the saved copy.
+   */
+  private readonly saving = new Map<string, Promise<void>>();
   private readonly uploads = new Map<string, OutboxUpload>();
   /** Replaced on each change only, so a progress update does not draw the chat's rows again. */
   private storing: ReadonlySet<string> = new Set();
@@ -255,7 +261,10 @@ export class OutboxStore {
     this.memoryFiles.set(clientMessageId, files);
     this.messages = [...this.messages, message];
     this.publish();
-    void this.save(message, files).then(() => {
+    const saved = this.save(message, files);
+    if (files.some((file) => file.file)) this.saving.set(clientMessageId, saved);
+    void saved.then(() => {
+      this.saving.delete(clientMessageId);
       for (const id of replaces) void this.cancel(id);
     });
     this.pump();
@@ -273,6 +282,17 @@ export class OutboxStore {
           return;
         }
         this.update(message.clientMessageId, { files: stored });
+        // A large file is sent from the saved copy: the file that it came from can go.
+        if (files.some((file) => file.file))
+          this.memoryFiles.set(
+            message.clientMessageId,
+            files.map((file, index) => {
+              const saved = stored[index];
+              if (!file.file || !saved) return file;
+              const uri = storage.fileUri(message.clientMessageId, saved);
+              return { ...file, uri, file: { ref: uri, size: file.file.size } };
+            }),
+          );
       }
       await this.persist();
     } catch {
@@ -396,19 +416,26 @@ export class OutboxStore {
   }
 
   private async readFiles(message: OutboxMessage): Promise<ChatAttachment[]> {
+    await this.saving.get(message.clientMessageId);
     const memory = this.memoryFiles.get(message.clientMessageId);
     if (memory) return memory;
     const { storage } = this.options;
     if (!storage) return [];
     return Promise.all(
-      message.files.map(async (file) => ({
-        id: file.id,
-        name: file.name,
-        mimeType: file.mimeType,
-        size: file.size,
-        base64: await storage.readFile(message.clientMessageId, file),
-        ...(file.dimensions ? { dimensions: file.dimensions } : {}),
-      })),
+      message.files.map(async (file) => {
+        const item = {
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          ...(file.dimensions ? { dimensions: file.dimensions } : {}),
+        };
+        // A large file is sent from its saved copy in parts, not read into memory.
+        if (file.size <= MOBILE_ATTACHMENT_BYTES)
+          return { ...item, base64: await storage.readFile(message.clientMessageId, file) };
+        const uri = storage.fileUri(message.clientMessageId, file);
+        return { ...item, base64: "", uri, file: { ref: uri, size: file.size } };
+      }),
     );
   }
 

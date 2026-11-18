@@ -1,12 +1,13 @@
-// The optional side protocols that every Team API version shares: channels, MCP servers, storage and
-// the admin routes in `optional-routes.ts`.
+// The optional side protocols that every Team API version shares: channels, MCP servers, storage,
+// attachment previews and the admin routes in `optional-routes.ts`.
 // Each has its own frozen codec, and a route that belongs to one of them never reaches the adapter of
 // the negotiated protocol. Every transport, HTTP and WebRTC, client and host, asks here, so a new side
 // protocol cannot be added to one of them and left out of another.
 //
-// The route sets compare `url.pathname` for equality and share no path, so the order of the checks
-// below does not change which codec a route gets.
+// The route sets compare `url.pathname` for equality, or with one pattern (attachment previews), and
+// share no path, so the order of the checks below does not change which codec a route gets.
 import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
+import { ATTACHMENT_PREVIEW_CODEC, isAttachmentPreviewRoute } from "./attachment-preview-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
 import { withChannelBrowser, withChannelDraftBrowser } from "./channel-browser-v1";
 import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
@@ -16,13 +17,15 @@ import {
   withChannelDraftPicture,
   withChannelPicture,
 } from "./channel-picture-v1";
+import { withChannelSeenSubtasks } from "./channel-seen-subtasks-v1";
+import { withChannelTaskWaits } from "./channel-task-waits-v1";
 import { CHANNEL_ROUTES, channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
 import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export interface TeamSideRouteOptions {
   /**
@@ -49,6 +52,10 @@ export interface TeamSideRouteOptions {
   channelPicture?: boolean;
   /** channel-browser-v1: a channel keeps `browser`, as `channelIsolation` keeps `isolated`. */
   channelBrowser?: boolean;
+  /** channel-seen-subtasks-v1: a waiting task of a channel page keeps `seenDependencies`. Passed as `channelAttention` is. */
+  channelSeenSubtasks?: boolean;
+  /** channel-task-waits-v1: the first page of a channel keeps `waits`. Passed as `channelAttention` is. */
+  channelTaskWaits?: boolean;
   /**
    * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
    * `channelAttention` is.
@@ -77,9 +84,11 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
     const isolated = options?.channelIsolation && status < 400 ? withChannelIsolation(path, extended, value) : extended;
     const pictured = options?.channelPicture && status < 400 ? withChannelPicture(path, isolated, value) : isolated;
     const browser = options?.channelBrowser && status < 400 ? withChannelBrowser(path, pictured, value) : pictured;
+    const seen = options?.channelSeenSubtasks && status < 400 ? withChannelSeenSubtasks(path, browser, value) : browser;
+    const waits = options?.channelTaskWaits && status < 400 ? withChannelTaskWaits(path, seen, value) : seen;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, browser, value)
-      : browser;
+      ? withChannelAttention(path, waits, value)
+      : waits;
   },
 };
 /** The image route of channel-picture-v1. Its channel answer is the answer of a channel command. */
@@ -101,6 +110,11 @@ const MCP_CODEC: TeamSideRouteCodec = {
     options?.mcpManyServers ? mcpManyServersResponse(path, status, value) : mcpResponse(path, status, value),
 };
 const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: storageResponse };
+/** attachment-preview-v1: a `GET` with no body, whose answer is a file. */
+const ATTACHMENT_PREVIEW_SIDE_CODEC: TeamSideRouteCodec = {
+  request: (_path, value) => ATTACHMENT_PREVIEW_CODEC.request(value),
+  response: (_path, status, value) => ATTACHMENT_PREVIEW_CODEC.response(status, value),
+};
 
 /** The side-protocol codec that owns `path`, or `null` when the negotiated protocol's adapter does. */
 export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
@@ -108,6 +122,7 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
   if (isChannelPictureRoute(path)) return CHANNEL_PICTURE_CODEC;
   if (isMcpRoute(path)) return MCP_CODEC;
   if (isStorageRoute(path)) return STORAGE_CODEC;
+  if (isAttachmentPreviewRoute(path)) return ATTACHMENT_PREVIEW_SIDE_CODEC;
   const admin = optionalRouteCodec(path);
   return admin
     ? {

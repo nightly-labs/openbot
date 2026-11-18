@@ -3,7 +3,7 @@ import { isDynamicRecord } from "../runtime-values";
 import { AGENT_TASKS_ROUTES } from "./agent-tasks-v1";
 import type { OptionalTeamEvent } from "./optional-events";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional agent-task-ui-blocks-v1 contract: the interactive block of an `ask_ui` question

@@ -9,6 +9,7 @@ import {
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   type McpServerConfig,
   type ResponseStyle,
   workspaceAccessEnforced,
@@ -17,7 +18,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
-import type { AgentClient, AgentProvider } from "../agent-client";
+import { type AgentClient, type AgentProvider, ProviderStoppedError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
 import { causeHelpers } from "../effect-boundary";
@@ -44,6 +45,7 @@ import {
   mcpFingerprintValues,
   NO_MCP_TOOL_RUNTIMES,
   openCodeMcpServers,
+  providerMcpServerName,
   toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
@@ -69,6 +71,7 @@ import {
   unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
+import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
@@ -143,8 +146,13 @@ const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
  * Codex declares `create_goal`, `get_goal` and `update_goal` in each request, about 3.5k characters.
  * A goal continues the turn by itself until the agent marks it done, and only the user can pause or
  * resume it. OpenBot has no control for a goal, so it turns the feature off.
+ *
+ * `request_permissions` lets the model ask for more reach in a card with a reason that it writes. A
+ * user's own Codex settings can turn it on. A Workspace only agent already has the network, and
+ * OpenBot's tools run outside its sandbox, so it asked again and again before work that needed nothing
+ * (#10855). A step outside the workspace still asks as a command or file-change approval.
  */
-export const CODEX_FEATURES_CONFIG = { "features.goals": false } as const;
+export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
 
 /**
  * Codex gives each MCP server that is not `required` 1 second to start before a turn's first step,
@@ -194,6 +202,8 @@ export interface ThreadLifecycleOptions {
   mcpEndpoint?: McpEndpointSource;
   /** What the tool manifest records about the OAuth proxy for a set. See `McpGateway.proxyFingerprint`. */
   mcpProxyFingerprint?: (configs: readonly McpServerConfig[]) => Effect.Effect<string | null, McpOperationError>;
+  /** The rows of a set that have a sign-in. See `McpGateway.proxiedServerIds`. */
+  mcpProxiedServerIds?: (configs: readonly McpServerConfig[]) => readonly string[];
   /**
    * Variables for the commands a Codex agent runs, such as the paths that point `gh` and `git` at
    * the built-in GitHub connection. Claude and the ACP clients read the same source at spawn.
@@ -202,13 +212,18 @@ export interface ThreadLifecycleOptions {
   /** Whether a password vault is connected, read at each start and resume of a session. */
   passwordVaultConnected?: () => boolean;
   /** What the Vault holds, read at each start and resume of a session. */
-  vaultItems?: () => VaultContents;
+  /** What the Vault holds for the agent with this id. */
+  vaultItems?: (agentId: string) => VaultContents;
   /** OpenBot runs on a server. The prompt then names the sign-in on the user's computer. */
   serverHost?: boolean;
   /** The plan storage in GB of a hosted server, read at each start and resume of a session. */
   hostedStorageGb?: () => number | null;
   /** OpenBot draws the Computer Use agent cursor. False on a host whose agents have a display of their own. */
   agentCursorDrawn?: boolean;
+  /** The Computer Use driver drives a native Wayland desktop, where video can have no route. */
+  computerUseOnWayland?: boolean;
+  /** The Computer Use driver refuses keys and clicks on this Wayland desktop, read at each start and resume of a session. */
+  computerUseInputRefused?: () => boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -251,12 +266,15 @@ export class ThreadLifecycle {
   readonly #mcpProxyFingerprint: (
     configs: readonly McpServerConfig[],
   ) => Effect.Effect<string | null, McpOperationError>;
+  readonly #mcpProxiedServerIds: (configs: readonly McpServerConfig[]) => readonly string[];
   readonly #agentEnvironment: () => Readonly<Record<string, string>>;
   readonly #passwordVaultConnected: () => boolean;
-  readonly #vaultItems: () => VaultContents;
+  readonly #vaultItems: (agentId: string) => VaultContents;
   readonly #serverHost: boolean;
   readonly #hostedStorageGb: () => number | null;
   readonly #agentCursorDrawn: boolean;
+  readonly #computerUseOnWayland: boolean;
+  readonly #computerUseInputRefused: () => boolean;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -278,6 +296,11 @@ export class ThreadLifecycle {
    */
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
   readonly #pendingRuntimeRefreshes = new Set<string>();
+  /**
+   * The marks of `#pendingRuntimeRefreshes` that an MCP set change wrote. They do not wait for
+   * background work: a revoked server or a signed-out account must leave the session at once.
+   */
+  readonly #mcpRuntimeRefreshes = new Set<string>();
   /**
    * How many starts of each agent are in flight: a provider session, or a turn on one.
    *
@@ -306,12 +329,15 @@ export class ThreadLifecycle {
     this.#mcpToolRuntimes = options.mcpToolRuntimes;
     this.#mcpEndpoint = options.mcpEndpoint;
     this.#mcpProxyFingerprint = options.mcpProxyFingerprint ?? (() => Effect.succeed(null));
+    this.#mcpProxiedServerIds = options.mcpProxiedServerIds ?? (() => []);
     this.#agentEnvironment = options.agentEnvironment ?? (() => ({}));
     this.#passwordVaultConnected = options.passwordVaultConnected ?? (() => false);
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
     this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
     this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
+    this.#computerUseOnWayland = options.computerUseOnWayland ?? false;
+    this.#computerUseInputRefused = options.computerUseInputRefused ?? (() => false);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -360,6 +386,7 @@ export class ThreadLifecycle {
   ) {
     for (const agent of this.#store.list()) {
       this.#pendingRuntimeRefreshes.add(agent.id);
+      this.#mcpRuntimeRefreshes.add(agent.id);
       yield* this.applyPendingRuntimeRefresh(agent);
     }
   }, Effect.uninterruptible).bind(this);
@@ -494,6 +521,7 @@ export class ThreadLifecycle {
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();
+    this.#mcpRuntimeRefreshes.clear();
     this.#pendingStarts.clear();
     this.#pendingMainStarts.clear();
   }
@@ -518,10 +546,9 @@ export class ThreadLifecycle {
       );
       if (Result.isSuccess(handoff)) this.#pendingHandoffs.set(session.externalSessionId, handoff.success);
       else if (!missingSessionFile(handoff.failure.cause)) return yield* handoff.failure;
-      // A Codex tool/config change replaces only the provider session, never the public thread.
+      // A tool/config change replaces only the provider session, never the public thread.
       if (
-        client.provider === "codex" &&
-        !(yield* this.hasCurrentToolsEffect(
+        !(yield* this.#hasCurrentSessionTools(
           this.#sessionAgent(currentAgent, publicThreadId),
           client,
           session.externalSessionId,
@@ -624,7 +651,7 @@ export class ThreadLifecycle {
   ): "idle" | "held" | "gone" {
     if (this.#conversation.loadedClientFor(externalThreadId) !== client) return "gone";
     const agentId = this.#conversation.agentForThread(externalThreadId);
-    // A routine session is ephemeral: no rollout is kept to resume it from.
+    // A routine session ends with its run, and nothing resumes it.
     if (!agentId || this.#conversation.isRoutineSession(externalThreadId)) return "gone";
     const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     const session = this.#store.database.activeProviderSession(publicThreadId, client.provider);
@@ -660,6 +687,9 @@ export class ThreadLifecycle {
    * read a whole session again. Its items go to `routineThreadId`, the routine's own side thread, or
    * with no such thread to the agent's chat. Its first turn reads the newest messages of the chat
    * and of the routine's thread.
+   *
+   * Codex still saves the session: a subagent that forks the run's context reads it from the saved
+   * history, and an ephemeral session fails that with `no rollout found` (#8743).
    */
   readonly startRoutineThread = Effect.fn("ThreadLifecycle.startRoutineThread")(function* (
     this: ThreadLifecycle,
@@ -679,7 +709,7 @@ export class ThreadLifecycle {
     });
     const { params } = yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
-      .request("thread/start", { ...params, ephemeral: true, persistSession: false }, decodeThreadResponse)
+      .request("thread/start", { ...params, ephemeral: false, persistSession: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
     const externalThreadId = response.thread.id;
     this.#conversation.bindThread(externalThreadId, owner.id, publicThreadId);
@@ -690,14 +720,21 @@ export class ThreadLifecycle {
     return externalThreadId;
   }, Effect.uninterruptible).bind(this);
 
-  /** Ends the provider session of a routine run. A second call does nothing. */
+  /**
+   * Ends the provider session of a routine run. A second call does nothing. `archive`: no subagent of
+   * the run still works, so the saved session also leaves the provider's own thread list, as a
+   * replaced session does. An archive would stop a subagent that still works.
+   */
   readonly closeRoutineThread = Effect.fn("ThreadLifecycle.closeRoutineThread")(function* (
     this: ThreadLifecycle,
     externalThreadId: string,
+    archive = false,
   ) {
     if (!this.#conversation.isRoutineSession(externalThreadId)) return;
     this.#conversation.forgetRoutineSession(externalThreadId);
-    yield* this.#releaseProviderSession(externalThreadId);
+    const client = this.#conversation.openClientFor(externalThreadId);
+    yield* this.#releaseProviderSession(externalThreadId, client);
+    if (archive && client) yield* this.#archiveSession(client, externalThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
     this.#givenTurnContext.delete(externalThreadId);
@@ -822,6 +859,9 @@ export class ThreadLifecycle {
     const givenContext = yield* this.#turnContextKey(owner, client);
     const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
+    // Before the request, with the same reading, as the Codex manifest: a sign-in or a download that
+    // finishes while the provider answers is not what this session was given.
+    const mcpSet = this.#mcpSetFingerprint(mcpServers, toolRuntimes);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
@@ -851,6 +891,8 @@ export class ThreadLifecycle {
             this.toolFingerprint(agent, mcpServers, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
             approvals,
           );
+        } else if (client.mcpToolsFixedAtStart?.(externalThreadId)) {
+          yield* this.#writeToolManifest(externalThreadId, mcpSet, []);
         }
         // The handoff reads the store synchronously. A failure there must also clean up this session.
         const handoff = yield* this.buildProviderHandoff(agent.id, publicThreadId).pipe(
@@ -1012,6 +1054,7 @@ export class ThreadLifecycle {
         project_doc_max_bytes: number;
         mcp_optional_startup_grace_ms: number;
         "features.goals": false;
+        "features.request_permissions_tool": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & CodexPromptSettings &
@@ -1073,7 +1116,10 @@ export class ThreadLifecycle {
         if (isProviderTimeout(failure.cause) || !client.running) {
           return Effect.fail(
             new ThreadOperationFailed({
-              cause: new Error(sourceText("error.provider.cliTimedOut", { provider: providerLabel(client.provider) })),
+              cause: new ProviderStoppedError(
+                "Codex",
+                sourceText("error.provider.cliTimedOut", { provider: providerLabel(client.provider) }),
+              ),
             }),
           );
         }
@@ -1172,6 +1218,8 @@ export class ThreadLifecycle {
             ...(excluded.length ? [["excluded", ...excluded]] : []),
             ...(agentAutomationAllowed(agent, this.#store.agentDefaults()) ? ["automation"] : []),
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
+            // Only "off" adds a value: on is the default, so its sessions keep their fingerprint (#10033).
+            ...(this.#store.agentDefaults().commitCoAuthor ? [] : ["no-commit-co-author"]),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
@@ -1319,6 +1367,53 @@ export class ThreadLifecycle {
       : {};
   }
 
+  /**
+   * Whether a stored session can resume with the tools of now. Codex keeps the configuration of a
+   * resumed session (`hasCurrentToolsEffect`). A provider that keeps the MCP tools of a session's first
+   * turn gives a server added later only as a note: an agent knew the Tavily tools of a resumed Kimi
+   * session and could not call them (#8931). The refresh after an MCP change replaces the sessions,
+   * but it is lost when OpenBot restarts first. A session that this client holds got that refresh,
+   * so only a resume reads the record. The other providers take the current servers on resume.
+   */
+  readonly #hasCurrentSessionTools = Effect.fn("ThreadLifecycle.hasCurrentSessionTools")(function* (
+    this: ThreadLifecycle,
+    agent: AgentSummary,
+    client: AgentClient,
+    sessionId: string,
+  ) {
+    if (client.provider === "codex") return yield* this.hasCurrentToolsEffect(agent, client, sessionId);
+    if (!client.mcpToolsFixedAtStart?.(sessionId) || this.#conversation.loadedClientFor(sessionId) === client)
+      return true;
+    const fingerprint = yield* threadStep(() =>
+      this.#mcpSetFingerprint(this.#agentMcpServers(agent), this.#toolRuntimes()),
+    );
+    const stored = yield* Effect.result(threadIo(() => readFile(this.toolManifestPath(sessionId), "utf8")));
+    if (Result.isSuccess(stored)) return stored.success.split("\n", 1)[0] === fingerprint;
+    if (!missingSessionFile(stored.failure.cause)) return yield* stored.failure;
+    // A session from before this record keeps its provider history: it is compared from now on.
+    yield* this.#writeToolManifest(sessionId, fingerprint, []);
+    return true;
+  });
+
+  /**
+   * The MCP set that a session of `mcpToolsFixedAtStart` was given: the user's servers, which of them
+   * have a sign-in (a row then moves to the proxy), and the managed runtimes, without which an `npx`
+   * server is left out. Not the proxy addresses, and not the built-in Computer Use and GitHub entries:
+   * these change at each start of OpenBot (a new port, a driver that is not ready yet), and a resume
+   * gets the new values while the tools keep their names.
+   */
+  #mcpSetFingerprint(configs: readonly McpServerConfig[], toolRuntimes: McpToolRuntimes): string {
+    const rows = configs.filter(
+      (config) => config.id !== COMPUTER_USE_MCP_SERVER_ID && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID,
+    );
+    const { binDirectories, commandAliases } = toolRuntimes;
+    return createHash("sha256")
+      .update(
+        JSON.stringify([mcpFingerprintValues(rows), this.#mcpProxiedServerIds(rows), [binDirectories, commandAliases]]),
+      )
+      .digest("hex");
+  }
+
   private readonly hasCurrentToolsEffect = Effect.fn("ThreadLifecycle.hasCurrentTools")(function* (
     this: ThreadLifecycle,
     agent: AgentSummary,
@@ -1408,10 +1503,12 @@ export class ThreadLifecycle {
         agentComputerUseEnabled(agent) && !mcpServers.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID),
       sideThread,
       passwordVault: this.#passwordVaultConnected(),
-      vaultItems: this.#vaultItems(),
+      vaultItems: this.#vaultItems(agent.id),
       serverHost: this.#serverHost,
       hostedStorageGb: this.#hostedStorageGb(),
       agentCursorDrawn: this.#agentCursorDrawn,
+      computerUseOnWayland: this.#computerUseOnWayland,
+      computerUseInputRefused: this.#computerUseInputRefused(),
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
@@ -1425,12 +1522,21 @@ export class ThreadLifecycle {
       homeSkills,
       workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      mcpApps: mcpServers.some((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID),
       deferredMcpServers:
         client.provider === "codex"
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
-            : [],
+            : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
+              // tools of the saved rows and of the GitHub connection through tool_call (#12035), so
+              // only the servers that it can run are listed. Computer Use is not one of them.
+              client.provider === "antigravity"
+              ? mcpServers
+                  .filter((config) => mcpFallbackRunsServer(config, agent) && config.id !== COMPUTER_USE_MCP_SERVER_ID)
+                  .map((config) => providerMcpServerName(config.name))
+              : [],
+      catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
@@ -1614,6 +1720,39 @@ export class ThreadLifecycle {
   }
 
   /**
+   * Loads a Codex session in `client` before a compaction of it. Codex compacts only a thread that its
+   * process holds, and answers `thread not found` for one that an idle release or a process restart
+   * unloaded (#7894). A turn resumes it in `ensureThread`; a compaction before the turn did not.
+   * False when the next turn replaces the session, so a compaction of it has no use: its tools
+   * changed, or Codex has no rollout to resume it from.
+   */
+  readonly loadSessionForCompaction = Effect.fn("ThreadLifecycle.loadSessionForCompaction")(function* (
+    this: ThreadLifecycle,
+    agentId: string,
+    client: AgentClient,
+    externalThreadId: string,
+  ) {
+    // Only Codex: the other clients load their sessions themselves. A session marked for reload is
+    // still loaded in Codex, and its next turn resumes it.
+    if (client.provider !== "codex" || this.#conversation.openClientFor(externalThreadId) === client) return true;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (!(yield* this.hasCurrentToolsEffect(this.#sessionAgent(agent, publicThreadId), client, externalThreadId)))
+      return false;
+    const resumed = yield* Effect.result(
+      Effect.acquireUseRelease(
+        Effect.sync(() => this.holdRuntimeRefresh(agentId, this.#conversation.isSideThread(publicThreadId))),
+        () => this.resumeThread(agent, client, externalThreadId),
+        (release) => Effect.sync(release),
+      ),
+    );
+    if (Result.isSuccess(resumed)) return true;
+    if (isMissingProviderSessionError(resumed.failure.cause, client.provider)) return false;
+    return yield* resumed.failure;
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * Compacts the context of a provider that cannot compact on request: the session ends, and a new
    * one on the same public thread starts from the history handoff, or from the complete packet on a
    * channel thread. The agent, its thread, and its messages stay. Returns the new session, or `null`
@@ -1712,21 +1851,52 @@ export class ThreadLifecycle {
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);
+    const reloadProvider = RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null;
+    const waitsForBackground = reloadProvider !== null && !this.#mcpRuntimeRefreshes.has(agent.id);
     for (const threadId of threadIds) {
       // A running turn owns its provider session, so the refresh waits for it. The mark stays, and
-      // the next drain of this agent refreshes the thread that was busy this time.
-      if (this.#activeTurnOf(agent.id, threadId)) deferred = true;
-      else
-        yield* this.#refreshThreadRuntime(
-          threadId,
-          RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null,
-        );
+      // the next drain of this agent refreshes the thread that was busy this time. A reload closes
+      // the process, which also ends the background subagents and commands of a finished turn, so
+      // a skill or setting change waits for them in the same way (#8484). An MCP change does not.
+      if (this.#activeTurnOf(agent.id, threadId) || (waitsForBackground && (yield* this.#runsBackgroundWork(threadId))))
+        deferred = true;
+      else yield* this.#refreshThreadRuntime(threadId, reloadProvider);
     }
     if (!deferred) {
       this.#pendingRuntimeRefreshes.delete(agent.id);
+      this.#mcpRuntimeRefreshes.delete(agent.id);
       this.#store.clearSessionSettingReset(agent.id, settingsIdentity);
     }
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Whether a Claude session of the agent's own chat runs background subagents or commands. A new
+   * chat closes that session, and the work would end with it (#10743). A Codex background terminal,
+   * such as a dev server, can run without end, so it does not hold the new chat that the agent asked for.
+   */
+  mainRunsBackgroundWork(agent: AgentSummary): Effect.Effect<boolean> {
+    if (agent.threadId === null) return Effect.succeed(false);
+    return this.#runsBackgroundWork(agent.threadId, RUNTIME_RELOADED_ON_RESUME);
+  }
+
+  /**
+   * Whether a loaded session of this thread runs background work, of `providers` alone when given.
+   * A failed check keeps the session.
+   */
+  readonly #runsBackgroundWork = Effect.fn("ThreadLifecycle.runsBackgroundWork")(function* (
+    this: ThreadLifecycle,
+    threadId: string,
+    providers?: ReadonlySet<AgentProvider>,
+  ) {
+    for (const session of this.#store.database.listProviderSessions(threadId)) {
+      if (session.state !== "active" || (providers && !providers.has(session.provider))) continue;
+      const client = this.#conversation.openClientFor(session.externalSessionId);
+      if (!client?.holdsBackgroundWork) continue;
+      const background = yield* Effect.result(client.holdsBackgroundWork(session.externalSessionId));
+      if (Result.isFailure(background) || background.success) return true;
+    }
+    return false;
+  });
 
   /**
    * Whether a provider turn may own a session of this agent's own thread, as the checks of

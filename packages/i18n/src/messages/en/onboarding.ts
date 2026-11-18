@@ -100,7 +100,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.action.connect": "Connect",
   "onboarding.action.open": "Open OpenBot",
   "onboarding.action.next": "Next",
-  "onboarding.server.title": "Set up {server}",
+  "onboarding.server.title": "Welcome to {server}",
   "onboarding.server.description":
     "OpenBot does not include an AI subscription. Connect your own provider to this server before you make an agent.",
   "onboarding.server.label": "Choose the AI provider of this server",

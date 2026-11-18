@@ -34,7 +34,7 @@ import { useConnectors } from "./features/connectors/connectors-context";
 import { appendDraftText, EMPTY_DRAFT } from "./features/conversation/composer-draft";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { composerDraftKey } from "./features/conversation/conversation-keys";
-import { conversationPort } from "./features/conversation/conversation-port";
+import { desktopCrmHost } from "./features/crm/crm-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { desktopProviderDetectionCalls } from "./features/custom-providers/custom-providers-port";
@@ -55,7 +55,6 @@ import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
 import {
-  remoteMcpSignIn,
   serverCanAdminister,
   serverRotatesHostKey,
   serverSupportsCapability,
@@ -159,19 +158,36 @@ export function SkillsMarketplace() {
     setPendingPluginConnect,
     pendingMarketplaceListing,
     setPendingMarketplaceListing,
+    pendingMcpSignIn,
+    setPendingMcpSignIn,
+    setMcpSignIns,
   } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const { openMcpAdd } = useServerSettings();
   const connectors = useConnectors();
   const platform = usePlatform();
   const { remoteDesktopWorkspaceVisible, hideRemoteDesktopWorkspace } = useRemoteDesktop();
+  /**
+   * The tool runtime note, only when the providers context holds this server's runtimes: this
+   * computer's, or, over `providers-v1`, those of the host of the joined server on screen. Another
+   * host starts its servers with its own runtime, which this window has not read.
+   */
+  const mcpRuntimeNote = () => {
+    const server = activeServer();
+    if (!server) return null;
+    const held =
+      server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
+    return held ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null;
+  };
   // The remote desktop covers the window card, so a link or a search that opens the page hides it.
   // The remote desktop session stays.
+  // A sign-in that an agent's card asked for ends with the page, also when another page closes it.
   createEffect(skillsMarketplaceOpen, (open) => {
-    if (open && untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
+    if (!open) setPendingMcpSignIn(null);
+    else if (untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
   });
 
   return (
@@ -193,11 +209,11 @@ export function SkillsMarketplace() {
       marketplaceListing={pendingMarketplaceListing()}
       onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
-      macOS={platform.appInfo()?.platform === "darwin"}
-      onAddServer={(serverId) => {
-        setSkillsMarketplaceOpen(false);
-        openMcpAdd(serverId, null);
-      }}
+      macOS={platform.appInfo() ? platform.appInfo()?.platform === "darwin" : undefined}
+      mcpToolRuntimeNote={mcpRuntimeNote()}
+      mcpSignInRequest={pendingMcpSignIn()}
+      onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
+      onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
     />
   );
 }
@@ -317,7 +333,7 @@ function InstallServer() {
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, setAppSettingsOpen } = useSettings();
   const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
@@ -338,6 +354,7 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      billingDetails={appPort().billing}
       thisComputer
       pricingPage={windowPage.pricing}
       onOpenUrl={(url) => void appPort().openUrl(url)}
@@ -345,6 +362,8 @@ function AddServer() {
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
         setAddServerOpen(false);
+        // The server menu can open this dialog over Settings; the server opens in front of them.
+        setAppSettingsOpen(false);
         void select(serverId);
       }}
       onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -477,8 +496,8 @@ function ServerSettings() {
   const { setPendingAgentSelection } = useServerSwitch();
   const { agentList, agentStatus } = useAgents();
   const { setupState, saveSetup } = useSetup();
+  const { setSkillsMarketplaceOpen, setPendingPluginSlug, setPendingPluginConnect } = useSettings();
   const {
-    toolRuntimeStatuses,
     providerAdminServerId,
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -497,6 +516,7 @@ function ServerSettings() {
     providerAccounts,
     restartProvider,
     cancelProviderRestart,
+    chooseInstalledCli,
     connection,
     providerKeys,
     hostCustomProviders,
@@ -578,16 +598,12 @@ function ServerSettings() {
       return customAgents.diagnostics;
     },
   };
-  /**
-   * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
-   * over `providers-v1`, those of the host of the joined server on screen.
-   */
-  const holdsToolRuntimes = (server: ServerSummary) =>
-    server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
   const {
     openServerSettings,
     serverSettingsTarget,
     serverSettingsSection,
+    setServerSettingsShownSection,
+    serverSettingsOpenRequest,
     serverSettingsOpen,
     setServerSettingsOpen,
     serverSettingsRestoreTarget,
@@ -597,6 +613,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    saveServerAppearance,
     recheckScreenRecording,
     rotateHostKey,
     setServerPublished,
@@ -605,28 +622,6 @@ function ServerSettings() {
     removeServerMember,
     leaveServer,
     revokeServerInvite,
-    serverSettingsMcp,
-    serverSettingsMcpError,
-    serverSettingsMcpSignIns,
-    serverSettingsMcpSignInRequest,
-    clearMcpSignInRequest,
-    serverSettingsMcpAddRequest,
-    clearMcpAddRequest,
-    serverSettingsMcpSignInPages,
-    serverSettingsMcpSignInRelays,
-    openMcpSignInRelay,
-    pasteMcpSignInRelay,
-    signInMcpServer,
-    cancelMcpSignIn,
-    signOutMcpServer,
-    mcpSignInApp,
-    saveMcpSignInApp,
-    removeMcpSignInApp,
-    refreshMcpServers,
-    saveMcpServer,
-    removeMcpServer,
-    setMcpServerEnabled,
-    testMcpServer,
   } = useServerSettings();
   /**
    * The named browser profiles of the selected server: this computer, or a joined server whose host
@@ -660,6 +655,7 @@ function ServerSettings() {
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
   /**
@@ -759,6 +755,9 @@ function ServerSettings() {
           endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
         return editable ? endpoints.updateCustomProvider : undefined;
       },
+      get customProviderHarnessChoice() {
+        return !local && serverSupportsCapability(server, "custom-provider-harness-choice-v1");
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },
@@ -818,6 +817,7 @@ function ServerSettings() {
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
+      onChooseInstalledCli: local ? chooseInstalledCli : undefined,
       get providerDetection() {
         return detectionOf()?.detection();
       },
@@ -915,6 +915,17 @@ function ServerSettings() {
           sectionQuery={windowPage.serverSettingsQuery()}
           openFirstSectionRequest={windowPage.openFirstServerSectionRequest()}
           onFirstSectionOpened={() => windowPage.setServerSettingsQuery("")}
+          // The Marketplace shows the apps of the active server, so only its settings open it.
+          onOpenMarketplaceApps={
+            server().id === activeServer()?.id
+              ? () => {
+                  windowPage.setServerSettingsQuery("");
+                  setPendingPluginConnect(false);
+                  setPendingPluginSlug(null);
+                  setSkillsMarketplaceOpen(true);
+                }
+              : undefined
+          }
           restoreFocusTarget={serverSettingsRestoreTarget()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           server={server()}
@@ -925,6 +936,7 @@ function ServerSettings() {
           loadError={serverSettingsError()}
           onRetry={() => refreshServerSettings(server().id)}
           onSaveIdentity={saveServerIdentity}
+          onSaveAppearance={saveServerAppearance}
           onSetPublished={setServerPublished}
           onRotateHostKey={serverRotatesHostKey(server()) ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
@@ -939,52 +951,6 @@ function ServerSettings() {
           onRemoveServer={hostedServersLoaded() && !hostedServerIds().has(server().id) ? leaveServer : undefined}
           onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
           onRecheckScreenRecording={recheckScreenRecording}
-          mcpServers={serverSettingsMcp()}
-          // Only for the computer whose runtimes this window holds: another host starts its servers
-          // with its own runtime, which this window has not read.
-          mcpToolRuntimeNote={holdsToolRuntimes(server()) ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
-          mcpLoadError={serverSettingsMcpError()}
-          onMcpSectionShown={() => void refreshMcpServers()}
-          onRetryMcpServers={() => void refreshMcpServers()}
-          onSaveMcpServer={saveMcpServer}
-          onRemoveMcpServer={removeMcpServer}
-          onSetMcpServerEnabled={setMcpServerEnabled}
-          onTestMcpServer={testMcpServer}
-          mcpAddRequest={serverSettingsMcpAddRequest()}
-          onMcpAddRequestHandled={clearMcpAddRequest}
-          // A remote host with `sign-in-relay-v1` opens the page in this computer's browser. An older
-          // host's page shows here through the live view, which streams the active server only.
-          mcpSignInRequest={serverSettingsMcpSignInRequest()}
-          onMcpSignInRequestHandled={clearMcpSignInRequest}
-          mcpSignIn={
-            server().kind === "local" || remoteMcpSignIn(server())
-              ? {
-                  states: serverSettingsMcpSignIns(),
-                  remote:
-                    server().kind === "remote"
-                      ? {
-                          hostName: server().name,
-                          runtime: conversationPort().browser,
-                          clipboard: serverSupportsCapability(server(), "browser-view-clipboard"),
-                          pages: serverSettingsMcpSignInPages(),
-                          relay: serverSupportsCapability(server(), "sign-in-relay-v1")
-                            ? {
-                                pages: serverSettingsMcpSignInRelays(),
-                                open: openMcpSignInRelay,
-                                paste: pasteMcpSignInRelay,
-                              }
-                            : undefined,
-                        }
-                      : undefined,
-                  start: signInMcpServer,
-                  cancel: cancelMcpSignIn,
-                  signOut: signOutMcpServer,
-                  app: serverSupportsCapability(server(), "mcp-sign-in-app-v1")
-                    ? { load: mcpSignInApp, save: saveMcpSignInApp, remove: removeMcpSignInApp }
-                    : undefined,
-                }
-              : undefined
-          }
           storage={storageOptions(server())}
           providers={providerSettings(server())}
           onSwitchToManageProviders={
@@ -1006,6 +972,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
@@ -1014,11 +981,15 @@ function ServerSettings() {
           hostPromptCacheTtl={{}}
           claudeUserSetup={{}}
           claudeCompactWindow={{}}
+          providerEnvironment={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
+          initialSectionRequest={serverSettingsOpenRequest()}
+          onSectionChange={setServerSettingsShownSection}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
             serverSupportsCapability(server(), "agent-import-v1")
@@ -1031,10 +1002,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true, copy: copyOptions() }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1"), copy: copyOptions() }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.
@@ -1049,6 +1031,7 @@ function ServerSettings() {
               : undefined
           }
           vault={vault()}
+          crm={desktopCrmHost(server().id)}
         />
       )}
     </Show>

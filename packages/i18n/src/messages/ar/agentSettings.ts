@@ -181,8 +181,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "وصول الوكيل",
   "agentSettings.runtime.busyMessage": "أثناء العمل",
   "agentSettings.runtime.busyMessageLabel": "الرسائل أثناء عمل الوكيل",
-  "agentSettings.runtime.taskLimit": "السلاسل المتوازية",
-  "agentSettings.runtime.taskLimitLabel": "السلاسل التي تعمل في الوقت نفسه",
   "agentSettings.runtime.workingDirectory": "دليل العمل",
   "agentSettings.runtime.notAvailable": "غير متاح بعد",
   "agentSettings.runtime.fullAccessNote": "يعمل الوكيل بوصول كامل إلى الحاسوب من مساحة عمله والمجلد المشترك.",
@@ -200,8 +198,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "توجيه",
   "agentSettings.busyMessage.steerUnsupported":
     "لا يستطيع {provider} توجيه دور قيد التشغيل. تنتظر الرسائل المرسلة أثناء عمله في قائمة الانتظار.",
-  "agentSettings.taskLimit.default": "افتراضي ({count})",
-  "agentSettings.taskLimit.oneTurn": "يشغّل {provider} دورًا واحدًا في كل مرة. تنتظر سلاسل هذا الوكيل بعضها بعضًا.",
 
   "agentSettings.notificationLevel.title": "إشعاري",
   "agentSettings.notificationLevel.server": "افتراضي الخادم ({level})",

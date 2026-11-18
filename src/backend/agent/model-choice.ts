@@ -5,6 +5,7 @@ import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
+import { providerCanRun } from "./model-tools";
 import { providerLabel } from "./thread-items";
 
 /** The provider and model setup or Settings recorded, `model` being `null` for the provider's default. */
@@ -168,10 +169,8 @@ export function workflowProvider(
   models: readonly AgentModelOption[],
 ): AgentProvider {
   if (starting !== DEFAULT_AGENT_PROVIDER || !builtInDefault(preference)) return starting;
-  const row = providers.find((candidate) => candidate.id === starting);
   // A provider that starts or runs keeps the step. A missing Codex reports "error", not "not-installed".
-  if (!row || (!row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started")))
-    return starting;
+  if (providerCanRun(starting, providers)) return starting;
   return (
     PICKER_PROVIDERS.find(
       (provider) =>

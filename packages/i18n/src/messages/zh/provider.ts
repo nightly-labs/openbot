@@ -129,9 +129,13 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.workspaceOnlyUnavailable":
+    "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
+  "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
     "Muse 没有为此账号返回任何模型。Muse 可能在此智能体运行的国家或地区不可用。请选择其他提供商的模型。",
   "provider.picker.customEmpty":
@@ -158,6 +162,8 @@ export const messages = {
   "provider.picker.selectEffort": "选择强度",
   "provider.picker.custom": "自定义",
   "provider.picker.cliReady": "{cli} 已就绪",
+  "provider.picker.modelSourceProvider": "使用 {cli} 设置中的 {name}",
+  "provider.picker.modelSourceCatalog": "使用 {cli} 设置中的模型列表",
   "provider.status.signInRequired": "需要登录",
   "provider.model.free": "免费",
   "provider.model.new": "新",
@@ -177,18 +183,32 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API 密钥",
   "provider.geminiKey.description":
     "在这台电脑上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
+  "provider.geminiKey.descriptionHost":
+    "在主机上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
   "provider.geminiKey.label": "Gemini API 密钥",
+  "provider.cursorKey.title": "Cursor API 密钥",
+  "provider.cursorKey.description":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
+  "provider.cursorKey.descriptionHost":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在主机上。",
+  "provider.cursorKey.label": "Cursor API 密钥",
   "provider.inceptionKey.title": "Inception API 密钥",
   "provider.inceptionKey.description":
     "在这台电脑上保存 Inception API 密钥，即可使用 Mercury 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.inceptionKey.descriptionHost":
+    "在主机上保存 Inception API 密钥，即可使用 Mercury 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.inceptionKey.label": "Inception API 密钥",
   "provider.deepseekKey.title": "DeepSeek API 密钥",
   "provider.deepseekKey.description":
     "在这台电脑上保存 DeepSeek API 密钥，即可使用 DeepSeek 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.deepseekKey.descriptionHost":
+    "在主机上保存 DeepSeek API 密钥，即可使用 DeepSeek 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.deepseekKey.label": "DeepSeek API 密钥",
   "provider.openrouterKey.title": "OpenRouter API 密钥",
   "provider.openrouterKey.description":
     "在这台电脑上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.openrouterKey.descriptionHost":
+    "在主机上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.label": "OpenRouter API 密钥",
 
   // The optional OpenCode Go key dialog.
@@ -206,6 +226,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "无法重新连接。",
   "provider.account.add": "添加账号",
   "provider.account.addLabel": "添加另一个 {name} 账号",
+  "provider.account.addWithCode": "用验证码添加账号",
   "provider.account.count": { one: "{count} 个账号", other: "{count} 个账号" },
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",
@@ -287,6 +308,11 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · 有 {available} 可用",
   "provider.settings.versionInstalledByUser": "{version} · 你自己安装的",
   "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
+  "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 你自己安装的",
+  "provider.settings.otherVersionDownloaded": "未使用：{version} · 由 OpenBot 下载",
+  "provider.settings.installedVersionIncomplete": "部分模型需要此版本缺少的组件。下载 OpenBot 的版本即可使用它们。",
+  "provider.settings.useInstalledVersion": "使用已安装的版本",
+  "provider.settings.useDownloadedVersion": "使用 OpenBot 的版本",
   "provider.settings.update": "更新",
   "provider.settings.downloadLabel": "{name} 的下载",
   "provider.settings.diagnostics": "诊断",
@@ -310,6 +336,28 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Claude Code 默认",
   "provider.settings.compactWindowTokens": "{size} 个 token",
   "provider.settings.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
+  "provider.settings.environment": "环境",
+  "provider.settings.environmentVariables": "变量",
+  "provider.settings.environmentDescription":
+    "{name} 的每个进程获得的 API 密钥、基础 URL 等设置。更改在当前回合结束后生效。",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL 配合作为密钥的 OPENAI_API_KEY，会把 ChatGPT 的模型请求发送到该地址。",
+  "provider.settings.environmentShellNote": "智能体运行的命令可以读取这些值。",
+  "provider.settings.environmentAdd": "添加变量",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "值",
+  "provider.settings.environmentSaved": "已保存",
+  "provider.settings.environmentSensitive": "敏感",
+  "provider.settings.environmentNameLabel": "变量名 {index}",
+  "provider.settings.environmentValueLabel": "{name} 的值",
+  "provider.settings.environmentSensitiveLabel": "将 {name} 保密",
+  "provider.settings.environmentRemoveLabel": "移除 {name}",
+  "provider.settings.environmentUnnamed": "变量 {index}",
+  "provider.settings.environmentPending": "保存后，{name} 会在当前回合结束后重启。敏感值保留在服务器上。",
+  "provider.settings.environmentDone": "已保存。{name} 会在当前回合结束后重启。",
+  "provider.settings.environmentDiscard": "放弃",
+  "provider.settings.environmentSave": "保存",
+  "provider.settings.environmentLoadFailed": "无法加载 {name} 的变量。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",

@@ -3,9 +3,15 @@
 // the phone apps from the native module minimums, the Mobile Connect settings and the mobile changelog. Keep it to what the
 // released app does, because these pages are what a search engine shows for "OpenBot for Linux".
 
+import { ANDROID_APK_AVAILABLE } from "./android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
 import { faqStructuredData, type LandingQuestion } from "./landing-faq";
-import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_PAGE_LINKS } from "./landing-links";
+import {
+  OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_ANDROID_APK_LINK,
+  OPENBOT_DOWNLOAD_LINKS,
+  OPENBOT_DOWNLOAD_PAGE_LINKS,
+} from "./landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
 import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
@@ -98,6 +104,46 @@ const PHONE_COMPUTER_QUESTION: LandingQuestion = {
 };
 const PHONE_FREE_ANSWER =
   "Yes. The app costs $0. You pay only your AI provider, through the plan or API key you already have.";
+
+/**
+ * What the Android page adds while a version has an APK (./android-apk.ts). The APK is for a phone
+ * with no Google Play, so Google Play stays the first download.
+ */
+const ANDROID_APK = {
+  installer: {
+    label: "Download the APK",
+    shortLabel: "APK",
+    detail: "For a phone with no Google Play",
+    href: OPENBOT_ANDROID_APK_LINK,
+  },
+  section: {
+    title: "Install from the APK",
+    steps: [
+      {
+        text: "Use the APK when your phone has no Google Play. On the phone, open this page in the browser and select Download the APK.",
+      },
+      {
+        text: "Open the downloaded file. Android asks you to let the browser install apps: allow it, then select Install.",
+      },
+      { text: "Open OpenBot and connect it to your computer with the QR code, as the steps above show." },
+    ],
+  },
+  notes: [
+    "The APK is the build that Google Play has, with the same signature.",
+    "With the APK, the app tells you when a new version is ready. Download the APK from this page again and install it over the app. You keep your sign-in.",
+    "Notifications come through Google's push service. A phone with no Google Play services gets none.",
+  ],
+  question: {
+    question: "Can I install OpenBot for Android without Google Play?",
+    answer:
+      "Yes. Download the APK from this page and open it on your phone. It is the build that Google Play has, and it is free.",
+  },
+} satisfies {
+  installer: DownloadInstaller;
+  section: DownloadPageSection;
+  notes: readonly string[];
+  question: LandingQuestion;
+};
 
 function providersQuestion(system: string): LandingQuestion {
   return {
@@ -343,11 +389,13 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
     platform: "android",
     name: "Android",
     title: "Download OpenBot for Android: your AI agents on your phone",
-    description:
-      "Get OpenBot for Android on Google Play. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
+    description: ANDROID_APK_AVAILABLE
+      ? "Get OpenBot for Android on Google Play or as an APK. Chat with the AI agents on your computer, follow their work and send files from anywhere."
+      : "Get OpenBot for Android on Google Play. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
     heading: "OpenBot for Android",
-    intro:
-      "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play.",
+    intro: ANDROID_APK_AVAILABLE
+      ? "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play, or download the APK."
+      : "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play.",
     installers: [
       {
         label: "Get it on Google Play",
@@ -356,12 +404,13 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
         href: MOBILE_APPS.android.href,
         external: true,
       },
+      ...(ANDROID_APK_AVAILABLE ? [ANDROID_APK.installer] : []),
     ],
     specs: [
       { label: "System", value: "Android 7.0 or later" },
-      { label: "Store", value: "Google Play" },
+      { label: "Store", value: ANDROID_APK_AVAILABLE ? "Google Play, or an APK" : "Google Play" },
       { label: "Needs", value: "OpenBot on a computer" },
-      { label: "Updates", value: "Through Google Play" },
+      { label: "Updates", value: ANDROID_APK_AVAILABLE ? "Google Play, or a new APK" : "Through Google Play" },
     ],
     installSteps: [
       COMPUTER_STEP,
@@ -369,12 +418,17 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
       GENERATE_CODE_STEP,
       { text: "Open OpenBot on your phone, choose Scan QR code and point the camera at the code." },
     ],
-    extraSections: [],
+    extraSections: ANDROID_APK_AVAILABLE ? [ANDROID_APK.section] : [],
     notes: [
       ...PHONE_NOTES,
       "The app does not ask for access to all your photos and videos. You choose photos and files with the system picker.",
+      ...(ANDROID_APK_AVAILABLE ? ANDROID_APK.notes : []),
     ],
-    faq: [{ question: "Is OpenBot for Android free?", answer: PHONE_FREE_ANSWER }, PHONE_COMPUTER_QUESTION],
+    faq: [
+      { question: "Is OpenBot for Android free?", answer: PHONE_FREE_ANSWER },
+      PHONE_COMPUTER_QUESTION,
+      ...(ANDROID_APK_AVAILABLE ? [ANDROID_APK.question] : []),
+    ],
     operatingSystem: "Android 7.0 or later",
   },
 };

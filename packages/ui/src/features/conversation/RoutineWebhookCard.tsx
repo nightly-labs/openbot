@@ -40,7 +40,13 @@ export function RoutineWebhookCard(props: RoutineWebhookCardProps) {
       case "error":
         return { kind: "error", text: props.errorText ?? t("routine.card.webhookSaveFailed") };
       case "idle":
-        return props.secret ? undefined : { kind: "note", text: t("routine.card.webhookSecretNote") };
+        if (props.secret) return undefined;
+        return {
+          kind: "note",
+          text: props.agentSecret
+            ? t("routine.card.webhookSecretAgentNote", { name: props.agentSecret.agentName })
+            : t("routine.card.webhookSecretNote"),
+        };
     }
   };
   return (
@@ -61,6 +67,7 @@ export function RoutineWebhookCard(props: RoutineWebhookCardProps) {
           onSecretDismiss={props.onSecretDismiss}
           onRegenerateSecret={props.onRegenerateSecret}
           onUseSenderSecret={props.onUseSenderSecret}
+          agentSecret={props.agentSecret}
         />
         <RoutineWebhookEvents
           eventType={props.eventType}

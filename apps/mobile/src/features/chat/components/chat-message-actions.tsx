@@ -31,6 +31,10 @@ export interface MessageActionsInput {
   onDelete?: () => Promise<void>;
   /** Marks the message and the messages after it unread for the reader. Unset where it cannot. */
   onMarkUnread?: () => void;
+  /** The message is pinned in its chat. */
+  pinned?: boolean;
+  /** Pins the message, or unpins it when `pinned`. Unset where the chat cannot pin messages. */
+  onTogglePin?: () => Promise<void>;
   /** The files of the message on the host. Unset for a message without files. */
   files?: MessageFiles;
 }
@@ -89,6 +93,18 @@ export function useMessageActions(input: MessageActionsInput | null) {
         ]);
       }
     : undefined;
+  const onTogglePin = input?.onTogglePin;
+  const togglePin = onTogglePin
+    ? () =>
+        onTogglePin().then(
+          () => void haptics.notification("success"),
+          (error: unknown) => {
+            void haptics.notification("error");
+            const title = currentText().t("mobile.chat.pins.failed");
+            showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
+          },
+        )
+    : undefined;
   const open = input
     ? () =>
         openMessageActions({
@@ -102,6 +118,8 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onBranch: input.onBranch,
           onSelectText: input.onSelectText,
           onMarkUnread: input.onMarkUnread,
+          pinned: input.pinned ?? false,
+          onTogglePin: togglePin,
           sendToChannel: input.sendToChannel,
           onDelete: confirmDelete,
           files: input.files,

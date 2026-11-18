@@ -270,6 +270,12 @@
   font-size: var(--openbot-text-sm);
 }
 
+.browser-secret-vault-skip {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .browser-secret-error {
   margin: 0;
   color: var(--openbot-danger);

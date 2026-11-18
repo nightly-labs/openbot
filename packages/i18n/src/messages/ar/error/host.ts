@@ -18,9 +18,11 @@ export const messages = {
   "error.host.publishFailed": "تعذّر نشر OpenBot هذا.",
   "error.host.mobileConnectPublishFailed": "تعذّر نشر OpenBot هذا لـ Mobile Connect.",
   "error.host.mobileConnectHostChanged": "تغيّر مضيف Mobile Connect. حاول مرة أخرى.",
+  "error.host.mobileConnectHostMismatch": "لدى حسابك مفتاح مختلف لهذا الخادم. حاول مرة أخرى.",
   "error.host.noServer": "لا يوجد على هذا الحاسوب خادم لتغييره.",
   "error.host.identityLocalOnly": "لا يمكن تغيير اسم الخادم وشعاره إلا على الحاسوب الذي يشغّله.",
   "error.host.timezoneInvalid": "هذه المنطقة الزمنية غير معروفة.",
+  "error.host.turnLimitInvalid": "هذا الحد للخيوط غير صالح.",
   "error.host.maintenanceInterrupted": "توقفت صيانة المضيف. تحقق من التطبيق وأعد تعيين حالة المضيف قبل إعادة المحاولة.",
   "error.host.updateFailed":
     "فشل تحديث المضيف أثناء {phase}. تحقق من ملكية الحزمة والتوقيع وحالة المستأجر والمساحة الحرة على القرص قبل إعادة تعيين الحالة.",

@@ -10,7 +10,10 @@ const GIB = 1024 * MIB;
 /** A turn that starts counts this much until its provider processes have grown. */
 const TURN_RESERVE_BYTES = 300 * MIB;
 const TURN_RESERVE_MS = 60_000;
-/** A low level goes back to "ok" only this far above the low threshold, so it does not flap. */
+/**
+ * A low level goes back to "ok" only this far above the low threshold, so it does not flap. A ceiling
+ * below 2.5 GiB uses a tenth of the ceiling (`lowBytes`).
+ */
 const RECOVER_MARGIN_BYTES = 256 * MIB;
 /**
  * `openbot.service` starts main at -500, and a container starts it at 0. Each process that main starts
@@ -205,9 +208,9 @@ export class ServerMemory implements HostMemory {
     }
     if (sample.available < criticalBytes(sample)) return "critical";
     const free = sample.available - this.#reservations.size * TURN_RESERVE_BYTES;
-    const low = Math.max(512 * MIB, sample.total * 0.12);
+    const low = lowBytes(sample);
     if (free < low) return "low";
-    if (this.#level !== "ok" && free < low + RECOVER_MARGIN_BYTES) return "low";
+    if (this.#level !== "ok" && free < low + Math.min(RECOVER_MARGIN_BYTES, sample.total * 0.1)) return "low";
     return "ok";
   }
 
@@ -221,6 +224,18 @@ export class ServerMemory implements HostMemory {
   #now(): number {
     return this.#options.now?.() ?? Date.now();
   }
+}
+
+/**
+ * Below a ceiling of 2.5 GiB, 512 MiB is more than a fifth of the memory. OpenBot and two agents can
+ * then leave less than 512 MiB plus `RECOVER_MARGIN_BYTES` free: a turn's own reservation makes the
+ * level "low", and it never goes back to "ok", so no tab opens and no new turn starts (#10311). There
+ * the low limit is a fifth of the ceiling, and the recover margin a tenth of it. A larger ceiling keeps
+ * 512 MiB and 256 MiB. The low limit stays 64 MiB above the critical one, so a ceiling below 1.6 GiB
+ * also goes through "low" before "critical".
+ */
+function lowBytes(sample: MemorySample): number {
+  return Math.max(criticalBytes(sample) + 64 * MIB, sample.total * 0.12, Math.min(512 * MIB, sample.total * 0.2));
 }
 
 function criticalBytes(sample: MemorySample): number {
@@ -284,12 +299,12 @@ const readUnitMemory = Effect.fn("ServerMemory.readUnit")(function* () {
   if (max === undefined) return "unknown";
   if (max === "max") return "unlimited";
   const current = Number((yield* memoryIO(() => readFile(`${root}/memory.current`, "utf8"))).trim());
-  // `memory.current` counts the file cache too. The kernel takes the inactive part back before the
-  // OOM killer acts, so it is free memory, as it is in `MemAvailable`.
-  const inactiveFile = /^inactive_file (\d+)$/m.exec(
-    yield* memoryIO(() => readFile(`${root}/memory.stat`, "utf8")),
-  )?.[1];
-  return { max: Number(max), current: current - Number(inactiveFile ?? 0) };
+  // `memory.current` counts the file cache too. The kernel takes it back before the OOM killer acts,
+  // as `MemAvailable` counts it. Half of the active part stays used: it can be code that runs (#7645).
+  const stat = yield* memoryIO(() => readFile(`${root}/memory.stat`, "utf8"));
+  const statBytes = (name: string): number => Number(new RegExp(`^${name} (\\d+)$`, "m").exec(stat)?.[1] ?? 0);
+  const reclaimable = statBytes("inactive_file") + Math.floor(statBytes("active_file") / 2);
+  return { max: Number(max), current: current - reclaimable };
 });
 
 interface ProcessEntry {

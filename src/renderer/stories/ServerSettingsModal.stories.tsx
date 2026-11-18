@@ -6,9 +6,6 @@ import {
   type BrowserProxySummary,
   type HostStatus,
   type HostUpdateStatus,
-  type McpServerConfig,
-  type McpSignInState,
-  type McpTestResult,
   nextBrowserProfileHue,
   parseBrowserProxyAddress,
   type ServerAuditEntry,
@@ -20,18 +17,15 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { ServerBrowserProfilesOptions } from "../src/features/browser/ServerBrowserProfilesPanel";
 import type { ServerAuditOptions } from "../src/features/servers/ServerAuditSection";
-import type { McpPanelSignIn } from "../src/features/servers/ServerMcpPanel";
 import type { ServerAgentAccessOptions } from "../src/features/servers/ServerRolesSection";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import {
   STORY_AGENT_SUMMARIES,
   STORY_HOST_STATUS,
   STORY_HOSTED_SITES,
-  STORY_MCP_SERVERS,
   STORY_PRESENCE,
   STORY_SERVER_AUDIT_ENTRIES,
 } from "../src/preview/fixtures";
-import { createSignInHost } from "./mcp-sign-in-host";
 import {
   ServerSettingsStory,
   STORY_LOCAL_SERVER,
@@ -179,155 +173,6 @@ export const RemoteMember: Story = {
     invites: [],
   },
 };
-
-/**
- * A joined server's MCP list. Granola asks for a sign-in on Test connection; Linear is signed in
- * already. Sign in shows the server's page from the host's browser: Allow finishes the sign-in, and
- * Cancel sign-in stops it.
- */
-const REMOTE_MCP_SERVERS: McpServerConfig[] = [
-  {
-    id: "mcp-granola",
-    name: "Granola",
-    transport: "http",
-    enabled: true,
-    command: "",
-    args: [],
-    env: [],
-    envPassthrough: [],
-    workingDirectory: "",
-    url: "https://mcp.granola.ai/mcp",
-    headers: [],
-  },
-  ...STORY_MCP_SERVERS.filter((config) => config.id === "mcp-linear" || config.id === "mcp-sqlite").map((config) => ({
-    ...config,
-    headers: [],
-  })),
-];
-
-export const RemoteMcpSignIn: Story = {
-  args: {
-    server: { ...remoteServer, role: "admin" },
-    hostStatus: null,
-    initialSection: "mcp",
-    mcpServers: REMOTE_MCP_SERVERS,
-  },
-  render: (args) => <McpSignInStory settings={args} />,
-};
-
-export const RemoteMcpMember: Story = {
-  args: {
-    server: { ...remoteServer, role: "member" },
-    hostStatus: null,
-    invites: [],
-    initialSection: "mcp",
-    mcpServers: REMOTE_MCP_SERVERS,
-  },
-  render: (args) => <McpSignInStory settings={args} />,
-};
-
-/**
- * This computer's MCP list after Granola refused its saved sign-in. The row asks for a new sign-in
- * with no test, and Sign in finishes at once. A joined host never reports a lost sign-in.
- */
-export const LocalMcpSignInNeeded: Story = {
-  args: {
-    initialSection: "mcp",
-    mcpServers: REMOTE_MCP_SERVERS,
-  },
-  render: (args) => (
-    <McpSignInStory
-      settings={args}
-      initial={{ "mcp-granola": { mcpServerId: "mcp-granola", signedIn: false, needsSignIn: true } }}
-    />
-  ),
-};
-
-/**
- * This computer's MCP list, to connect Granola. In Connect a custom MCP, paste
- * `https://mcp.granola.ai/mcp` into Command to launch: the form moves to Streamable HTTP. Save
- * tests the server, which asks for a sign-in, signs in, and then saves the row.
- */
-export const LocalMcpConnect: Story = {
-  args: {
-    initialSection: "mcp",
-    mcpServers: REMOTE_MCP_SERVERS.filter((config) => config.id !== "mcp-granola"),
-  },
-  render: (args) => <McpSignInStory settings={args} />,
-};
-
-function McpSignInStory(props: { settings: ServerSettingsModalProps; initial?: Record<string, McpSignInState> }) {
-  const [states, setStates] = createStore<Record<string, McpSignInState>>({
-    "mcp-linear": { mcpServerId: "mcp-linear", signedIn: true },
-    ...props.initial,
-  });
-  const [servers, setServers] = createSignal(props.settings.mcpServers ?? []);
-  const save = async (config: McpServerConfig) => {
-    const id = config.id || `mcp-${config.name.toLowerCase().replaceAll(" ", "-")}`;
-    // A draft signs in before it has an id: the new row keeps that sign-in.
-    if (!config.id && states[""]?.signedIn)
-      setStates((current) => {
-        current[id] = { mcpServerId: id, signedIn: true };
-        delete current[""];
-      });
-    setServers((list) =>
-      list.some((server) => server.id === id)
-        ? list.map((server) => (server.id === id ? { ...config, id } : server))
-        : [...list, { ...config, id }],
-    );
-  };
-  const local = props.settings.server.kind === "local";
-  const host = createSignInHost();
-  const waiting = new Map<string, (result: McpTestResult) => void>();
-  const finish = (url: string, result: McpTestResult) => {
-    host.close(url);
-    waiting.get(url)?.(result);
-    waiting.delete(url);
-  };
-  const signIn: McpPanelSignIn = {
-    states,
-    ...(local
-      ? {}
-      : {
-          remote: { hostName: props.settings.server.name, runtime: host.runtime, clipboard: true, pages: host.pages },
-        }),
-    start: (config) =>
-      new Promise((resolve) => {
-        waiting.set(config.url, (result) => {
-          if (!result.error)
-            setStates((current) => {
-              current[config.id] = { mcpServerId: config.id, signedIn: true };
-            });
-          resolve(result);
-        });
-        if (local) finish(config.url, { toolCount: 6, error: null });
-        else host.open(config.url, config.name, () => finish(config.url, { toolCount: 6, error: null }));
-      }),
-    cancel: async (url) => finish(url, { toolCount: 0, error: sourceText("error.backend.mcpSignInCancelled") }),
-    signOut: async (id) =>
-      setStates((current) => {
-        delete current[id];
-      }),
-  };
-  const test = async (config: McpServerConfig): Promise<McpTestResult> => {
-    if (config.transport === "http" && !states[config.id]?.signedIn)
-      return { toolCount: 0, error: sourceText("error.backend.mcpSignInRequired") };
-    return { toolCount: 6, error: null };
-  };
-  return (
-    <ServerSettingsStory
-      settings={{
-        ...props.settings,
-        get mcpServers() {
-          return servers();
-        },
-        mcpSignIn: signIn,
-        onTestMcpServer: test,
-        onSaveMcpServer: save,
-      }}
-    />
-  );
-}
 
 /** A Starter server with one site of its own and one unlinked site from before it was registered. */
 export const Sites: Story = {

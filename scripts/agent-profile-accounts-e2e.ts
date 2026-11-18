@@ -8,15 +8,20 @@
 // create_agent accepts a model that the short list leaves out, that the
 // account and the backup models are written and read back, that an unknown account or model is a tool
 // failure that changes nothing, that a reset returns both to their defaults, that a model that only the
-// second account lists is listed and accepted for that account only (#6109), and that a delete stops the
-// process that the agent runs on with the second account.
+// second account lists is listed and accepted for that account only (#6109), that a delete stops the
+// process that the agent runs on with the second account, and that list_models names a saved custom
+// endpoint, where the user changes it and why it lists no model, without its base URL or key (#6471).
+// It also asserts that update_profile with avatarHue keeps the agent's photo and its file, and that only
+// avatarSeed removes them (#10431), and that with Pool accounts on an agent that names an account, also
+// "default", keeps it while null gives it to the pool (#10661).
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import type { z } from "zod";
 import type {
@@ -54,6 +59,7 @@ const { ProviderAccountStore } = await import("../src/backend/agent/provider-acc
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
 const CALL_MARK = "PROFILE-CALL";
 const MODEL = "gpt-6-luna";
@@ -68,6 +74,16 @@ const CATALOG = [
   { model: OTHER_MODEL, displayName: "GPT-6 Sol" },
 ];
 const ACCOUNT_CATALOG = [...CATALOG, { model: ACCOUNT_MODEL, displayName: "GPT-6.1 Sol" }];
+/** A saved custom endpoint. OpenCode, which runs it, is off, so it lists no model. */
+const ENDPOINT = {
+  id: "gateway",
+  name: "Gateway",
+  baseUrl: "http://127.0.0.1:9/v1",
+  apiKey: "sk-endpoint-secret-6471",
+  models: [{ id: "chat-model", name: "Chat Model" }],
+  headers: [],
+  harness: "opencode",
+} as const;
 
 /**
  * A Codex app-server with the methods that the service calls. A turn whose input has
@@ -192,6 +208,10 @@ interface ProfileToolBody {
   providerAccountId?: string;
   backupModels?: { automatic: boolean; order: ChoiceBody[] } | null;
   usageLimitReturn?: unknown;
+  customProviders?: {
+    settings: string;
+    endpoints: { id: string; name: string; provider: string; models: string[]; message?: string }[];
+  };
   /** update_agents: the number of agents that changed. */
   updated?: number;
 }
@@ -200,6 +220,8 @@ const report: {
   calls: { name: string; turnId: string; success: boolean | null; text: string }[];
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
+  /** The agent's pin after it names the second account, "default" and null with Pool accounts on. */
+  pool?: { second: string | null; default: string | null; null: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -271,6 +293,7 @@ const agents = new AgentService({
   providerAccounts: accounts,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  credentials: { ...NO_PROVIDER_CREDENTIALS, customProviders: () => [ENDPOINT] },
 });
 
 const idle = (agentId: string) =>
@@ -278,8 +301,16 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends a chat message that makes the fake call the tool, and returns the tool result it logged. */
-async function callTool(name: string, agentId: string, tool: string, args: Partial<ProfileToolArgs> = {}) {
+/**
+ * Sends a chat message that makes the fake call the tool, and returns the tool result it logged. A refused
+ * call can also send fields that the tool does not take, as a model does.
+ */
+async function callTool(
+  name: string,
+  agentId: string,
+  tool: string,
+  args: Partial<ProfileToolArgs> | DynamicRecord = {},
+) {
   const receipt = await runCauseEffect(
     agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` }),
   );
@@ -369,6 +400,32 @@ try {
       !listed.text.includes(accountsRoot) &&
       !listed.text.includes(home),
     listed.text,
+  );
+  pass(
+    "A list_models call for another provider leaves the custom endpoints out",
+    listed.body?.customProviders === undefined,
+    listed.text,
+  );
+
+  // 1b. With no provider, list_models names the saved endpoint, where the user changes it, and why it
+  // lists no model now. The agent no longer tells the user that OpenBot cannot use such an API (#6471).
+  const listedAll = await callTool("list all models", coordinator.id, "list_models");
+  const endpointRow = listedAll.body?.customProviders?.endpoints[0];
+  pass(
+    "list_models names the saved custom endpoint and where the user changes it",
+    listedAll.body?.customProviders?.settings === "Server settings > Providers > Custom provider" &&
+      listedAll.body.customProviders.endpoints.length === 1 &&
+      endpointRow?.id === ENDPOINT.id &&
+      endpointRow.name === ENDPOINT.name &&
+      endpointRow.provider === "opencode" &&
+      endpointRow.models.length === 0 &&
+      endpointRow.message?.startsWith("OpenCode runs this endpoint and cannot run now.") === true,
+    listedAll.text,
+  );
+  pass(
+    "list_models has no base URL or key of a custom endpoint",
+    !listedAll.text.includes(ENDPOINT.baseUrl) && !listedAll.text.includes(ENDPOINT.apiKey),
+    listedAll.text,
   );
 
   // 2. update_profile sets the account and the backup models. Equal choices are kept once, and the
@@ -480,6 +537,35 @@ try {
       refused(badId, "Use an account id from list_models"),
     [unknownAccount, unknownBackupAccount, unknownBackupModel, badId].map((call) => call.text).join("\n"),
   );
+  // A field that the tool does not take gets the fields that its object takes, never the name that the
+  // call sent, so the agent can correct the call (#10024).
+  const extraBackupField = await callTool("extra backupModels field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    name: "Renamed",
+    backupModels: { models: [{ provider: "codex", model: MODEL }], automatic: true, order: [] },
+  });
+  const extraEntryField = await callTool("extra backup entry field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: true, order: [{ provider: "codex", model: MODEL, effortLevel: "high" }] },
+  });
+  const extraToolField = await callTool("extra update_profile field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    fallbackModels: [MODEL],
+  });
+  const entryFields = "Each backupModels.order entry takes only: provider, model, providerAccountId.";
+  pass(
+    "A field that update_profile does not take is refused with the fields that its object takes",
+    refused(
+      extraBackupField,
+      `Remove unsupported profile fields. backupModels takes only: automatic, order. ${entryFields}`,
+    ) &&
+      refused(extraEntryField, `Remove unsupported profile fields. ${entryFields}`) &&
+      refused(extraToolField, "Remove unsupported profile fields. update_profile takes only: agentId, name,") &&
+      [extraBackupField, extraEntryField, extraToolField].every(
+        (call) => !call.text.includes("effortLevel") && !call.text.includes("fallbackModels"),
+      ),
+    [extraBackupField, extraEntryField, extraToolField].map((call) => call.text).join("\n"),
+  );
   const afterFailures = storedAgent(worker.id);
   pass(
     "A refused request changes nothing, the name in the same call included",
@@ -586,6 +672,79 @@ try {
   pass(
     "The delete removes the workspace and the record",
     report.deletedAgent.workspaceRemoved && !store.list().some((candidate) => candidate.id === worker.id),
+  );
+
+  // 8b. With Pool accounts on, an account that an agent names stays: also the provider's own sign-in
+  // as "default". Only null gives the agent back to the pool (#10661).
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [] }));
+  const pooled = await create("Pooled");
+  await waitFor("the pooled agent's first turn to end", () => idle(pooled.id));
+  const pinnedSecond = await callTool("pin the second account", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: second.id,
+  });
+  const pinSecond = storedAgent(pooled.id).pinnedAccountId;
+  const pinnedDefault = await callTool("pin the own sign-in", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: "default",
+  });
+  const afterDefault = storedAgent(pooled.id);
+  const pooledAgain = await callTool("give the account to the pool", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: null,
+  });
+  const afterNull = storedAgent(pooled.id);
+  report.pool = {
+    second: pinSecond ?? null,
+    default: afterDefault.pinnedAccountId ?? null,
+    null: afterNull.pinnedAccountId ?? null,
+  };
+  pass(
+    "With Pool accounts on, an agent that names an account keeps it, also the own sign-in",
+    pinnedSecond.success &&
+      pinSecond === second.id &&
+      pinnedDefault.success &&
+      afterDefault.providerAccountId === undefined &&
+      afterDefault.pinnedAccountId === "default",
+    `${pinnedSecond.text}\n${pinnedDefault.text}`,
+  );
+  pass(
+    "With Pool accounts on, a null account gives the agent to the pool",
+    pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
+    pooledAgain.text,
+  );
+  await runCauseEffect(accounts.setPool("codex", null));
+
+  // 9. A color keeps the agent's photo and its file. Only a generated face removes them (#10431).
+  const photoSource = join(root, "photo.png");
+  await copyFile(resolve(import.meta.dirname, "../apps/auth-api/public/apple-touch-icon.png"), photoSource);
+  const photo = await callTool("set photo", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarPath: photoSource,
+  });
+  const photoUrl = storedAgent(coordinator.id).avatarUrl;
+  const photoFile = store.resolveAvatar(coordinator.id)?.path ?? "";
+  pass("update_profile sets a photo", photo.success && photoUrl !== null && existsSync(photoFile), photo.text);
+  const color = await callTool("set color", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarHue: 0,
+  });
+  pass(
+    "update_profile with avatarHue keeps the photo and its file",
+    color.success &&
+      storedAgent(coordinator.id).avatarHue === 0 &&
+      storedAgent(coordinator.id).avatarUrl === photoUrl &&
+      existsSync(photoFile),
+    color.text,
+  );
+  const face = await callTool("set generated face", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarSeed: storedAgent(coordinator.id).avatarSeed,
+  });
+  pass(
+    "update_profile with avatarSeed removes the photo and its file",
+    face.success && storedAgent(coordinator.id).avatarUrl === null && !existsSync(photoFile),
+    face.text,
   );
   report.passed = true;
 } catch (error) {

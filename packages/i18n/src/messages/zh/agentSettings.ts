@@ -142,8 +142,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "助手访问权限",
   "agentSettings.runtime.busyMessage": "忙碌时",
   "agentSettings.runtime.busyMessageLabel": "助手工作期间收到的消息",
-  "agentSettings.runtime.taskLimit": "并行话题数",
-  "agentSettings.runtime.taskLimitLabel": "同时运行的话题",
   "agentSettings.runtime.workingDirectory": "工作目录",
   "agentSettings.runtime.notAvailable": "暂不可用",
   "agentSettings.runtime.fullAccessNote": "助手可从其工作区和共享文件夹获得完整的电脑访问权限。",
@@ -160,8 +158,6 @@ export const messages = {
   "agentSettings.busyMessage.queue": "排队",
   "agentSettings.busyMessage.steer": "引导",
   "agentSettings.busyMessage.steerUnsupported": "{provider} 无法在运行中引导。助手工作期间发送的消息会进入队列等待。",
-  "agentSettings.taskLimit.default": "默认（{count}）",
-  "agentSettings.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
 
   "agentSettings.notificationLevel.title": "通知我",
   "agentSettings.notificationLevel.server": "服务器默认（{level}）",

@@ -32,4 +32,8 @@ export const messages = {
   "common.download": "下载",
   "common.removing": "移除中…",
   "common.sending": "发送中…",
+  "common.scrollLeft": "向左滚动",
+  "common.scrollRight": "向右滚动",
+  "common.scrollUp": "向上滚动",
+  "common.scrollDown": "向下滚动",
 } as const satisfies PartialTranslation<typeof source>;

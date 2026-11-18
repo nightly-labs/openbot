@@ -53,6 +53,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import {
   type IntegrationPageSlots,
@@ -106,6 +107,8 @@ export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
   onSetOwnNumber: (workspaceId: string, ownNumber: boolean) => void;
   /** Shown only for a number whose account carries `workingMessage`: an older joined server cannot set it. */
   onSetWorkingMessage: (workspaceId: string, workingMessage: boolean) => void;
+  /** Shown only for a number whose account carries `statusReactions`: an older joined server cannot set it. */
+  onSetStatusReactions: (workspaceId: string, statusReactions: boolean) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
   /** The groups of a linked number, to choose from. Rejects with the reason. */
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
@@ -164,9 +167,14 @@ const WHATSAPP_HOST_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   // WhatsApp removed the linked device: only a new link brings the number back.
   invalid_token: "connector.whatsapp.helpLoggedOut",
-  secret_storage_unavailable: "connector.whatsapp.helpError",
+  // The saved keys of the number cannot be read: a reconnect has nothing to connect with.
+  secret_storage_unavailable: "connector.whatsapp.helpKeysUnreadable",
   error: "connector.whatsapp.helpError",
 };
+
+/** True when only a new link from the phone brings the number back. */
+const needsNewLink = (connection: MessagingConnection) =>
+  connection.state === "invalid_token" || connection.state === "secret_storage_unavailable";
 
 const LINK_ERROR = {
   timeout: "connector.whatsapp.failedTimeout",
@@ -211,7 +219,9 @@ export function whatsappIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.whatsapp.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.whatsapp.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.whatsapp.statusConnected", attention }
+  );
 }
 
 /** Where the link dialog starts: at the number link, or at the orchestrator of the linked numbers. */
@@ -320,10 +330,9 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                       connection={connection}
                       note={note(connection)}
                       busy={props.busy}
-                      // WhatsApp removed the device. Only a new link from the phone brings the number back.
-                      canReconnect={connection.state !== "invalid_token"}
+                      canReconnect={!needsNewLink(connection)}
                       action={
-                        <Show when={connection.state === "invalid_token"}>
+                        <Show when={needsNewLink(connection)}>
                           <Button
                             type="button"
                             size="sm"
@@ -359,6 +368,16 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                               onChange={(checked) => props.onSetWorkingMessage(connection.workspaceId, checked)}
                               label={t("connector.whatsapp.workingMessage")}
                               description={t("connector.whatsapp.workingMessageDescription")}
+                            />
+                          </Show>
+                          <Show when={settings().statusReactions !== undefined}>
+                            <SwitchField
+                              class="settings-modal-row"
+                              checked={settings().statusReactions !== false}
+                              disabled={props.busy}
+                              onChange={(checked) => props.onSetStatusReactions(connection.workspaceId, checked)}
+                              label={t("connector.whatsapp.statusReactions")}
+                              description={t("connector.whatsapp.statusReactionsDescription")}
                             />
                           </Show>
                         </>

@@ -8,9 +8,14 @@ export const messages = {
   "status.agent.instructionsChanged": "Zaktualizował swoje instrukcje",
   "status.agent.modelSwitchedForLimit": "Osiągnięto limit użycia. Przełączono na {model}.",
   "status.agent.modelReturnedAfterLimit": "Limit użycia już nie obowiązuje. Przełączono z powrotem na {model}.",
+  "status.agent.routineSkippedRunOpen": "Pominięto: poprzednie uruchomienie jeszcze się nie zakończyło",
+  "status.agent.routineSkippedUsageLimit": "Pominięto: osiągnięto limit użycia",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",
   "status.agent.marketplaceSuggested": "Zaproponowano aplikację z Marketplace: {app}.",
+  "status.agent.settingShown": "Pokazano ustawienie: {setting}.",
   "status.agent.channelMemberAdded": "Agent {agent} dodał {member} do kanału. Prośba od: {person}.",
   "status.agent.channelMemberRemoved": "Agent {agent} usunął {member} z kanału. Prośba od: {person}.",
   "status.agent.channelInstructionsChanged": "Agent {agent} zmienił instrukcje kanału. Prośba od: {person}.",
@@ -28,16 +33,34 @@ export const messages = {
     "Przechwyć obszar ekranu w punkcie {x}, {y} o rozmiarze {width} × {height} punktów i wyślij obraz do modelu agenta.",
   "status.agent.reportProblem":
     "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji i Twoim systemem. Twoje imię nie jest widoczne.",
+  "status.agent.reportPhoneProblem":
+    "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji, Twoim systemem oraz wersją, systemem i dziennikiem pomocy Twojego telefonu. Twoje imię nie jest widoczne.",
   "status.agent.sendIdea": "To będzie publiczne zgłoszenie na GitHubie. Twoje imię nie będzie widoczne.",
   "status.agent.feedbackRecentErrors": "Ostatnie błędy w czacie:",
   "status.agent.feedbackSameAs": "Dodaje do zgłoszenia #{issue}",
   "status.agent.feedbackSent": "Wysłano do zespołu OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Usunięto z GitHuba: {title}",
+  "status.agent.feedbackWithdrawCommand": "Usuń zgłoszenie #{issue} z GitHuba",
+  "status.agent.feedbackWithdrawReason":
+    "Nikt już nie zobaczy tego zgłoszenia na GitHubie. Tego nie można cofnąć. Aby je poprawić, agent może wysłać poprawione zgłoszenie.",
+  "status.agent.feedbackWithdrawing": "Usuwanie zgłoszenia z GitHuba…",
   "status.agent.serverInstallCommand":
     "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
   "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
+  "status.agent.browserProfileNamed":
+    "Przenieś {agents} do profilu przeglądarki {profile}. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.commitCoAuthorOff": "Przestań dodawać OpenBot jako współautora commitów wszystkich agentów.",
+  "status.agent.commitCoAuthorOn": "Znowu dodawaj OpenBot jako współautora commitów wszystkich agentów.",
+  "status.agent.browserProfileNew":
+    "Utwórz nowy profil przeglądarki {profile} i przenieś do niego {agents}. Nie ma w nim logowań. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileShared":
+    "Przenieś {agents} do wspólnego profilu przeglądarki. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileOwn":
+    "Daj każdemu z {agents} własny profil przeglądarki. Ich otwarte karty zostaną zamknięte.",
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
+  "status.agent.deleteAgents": "Usuń {agents} razem z ich czatami i plikami. Tej operacji nie można cofnąć.",
   "status.agent.screenCaptureProgress": "Prośba o przechwycenie ekranu…",
   "status.agent.screenCaptureReviewing": "Sprawdzanie przechwyconego ekranu…",
   "status.agent.browserOpening": "Otwieranie strony internetowej…",
@@ -55,6 +78,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Aktualizowanie wspomnień…",
   "status.agent.skillUsing": "Używanie umiejętności {name}…",
+  "status.agent.backdropSetting": "Zmienianie tła…",
   "status.agent.skillReading": "Czytanie umiejętności…",
   "status.agent.toolStepFailed": "Krok narzędzia nie powiódł się; sprawdzam wynik i decyduję, co spróbuję dalej…",
   "status.agent.toolResultReviewing": "Sprawdzanie najnowszego wyniku narzędzia…",
@@ -86,8 +110,12 @@ export const messages = {
   "status.agent.memoryChanges": "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
+  "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Zamknięto po nowej wiadomości",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
+  "status.agent.planStopped": "Agent zatrzymał się z otwartymi krokami w planie. Wyślij wiadomość, aby kontynuować.",
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",
+  "status.agent.providerExitContinues": "Agent zatrzymał się, zanim skończył odpowiedź. Agent kontynuuje.",
   "status.agent.branchTitle": "Odgałęziony czat",
 } as const satisfies PartialTranslation<typeof source>;

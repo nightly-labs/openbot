@@ -12,20 +12,27 @@ import {
 import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  decodeTeamProtocolSupportExpanded,
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2Json,
   decodeTeamProtocolV2RpcFrame,
   decodeTeamProtocolV8CurrentEvent,
-  decodeTeamProtocolV9WebRtcHttpResponse,
+  decodeTeamProtocolV10WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV8WebRtcHttpRequest,
+  encodeTeamProtocolV9WebRtcHttpRequest,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
+  TEAM_PROTOCOL_V10,
+  TEAM_WEBRTC_CLIENT_PROTOCOL,
+  type TeamProtocolSupportV1,
   type TeamProtocolV2AuthFrame,
   type TeamProtocolV2Json,
   teamCapabilitiesForProtocol,
+  teamCapabilityLists,
   teamProtocolV2AuthenticationTranscript,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
@@ -37,11 +44,11 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
-import { base64UrlToBytes, bytesToBase64Url } from "./base64";
+import { base64ToBytes, base64UrlToBytes, bytesToBase64Url } from "./base64";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 
 /** `reference` is the code a user can copy, such as `signal/host_busy`. It never holds server text. */
@@ -75,9 +82,11 @@ const SIGNAL_RATE_LIMIT_MS = 60_000;
 const peerCall = <A>(operation: () => Promise<A> | A) =>
   Effect.tryPromise({ try: async () => operation(), catch: peerError });
 const peerDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: peerError });
+/** A device file that the native side cannot read was moved, deleted or changed after it was selected. */
+const deviceFileError = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
 
 import { createRemoteFileReceiver } from "./file-download";
-import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
+import { createRemoteFileSender, FileTransferError, type RemoteFileUpload } from "./file-upload";
 import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from "./sync-profile";
 
 export type { RemoteFileUpload } from "./file-upload";
@@ -90,6 +99,7 @@ import {
   type ProbeSample,
   unmeasuredProbeMs,
 } from "./remote-path-check";
+import { startRemoteRequestDeadline } from "./remote-recovery";
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 
@@ -116,6 +126,8 @@ export type RemoteTeamCommand =
       timeoutMs?: number | undefined;
       /** A larger cap for the one file that answers this request, such as a transfer file. */
       largeDownload?: RemoteLargeDownload | undefined;
+      /** The size of the file that answers this request. The page then reports its download progress. */
+      downloadSize?: number | undefined;
     };
 
 export interface RemoteTeamBootstrapPayload {
@@ -186,11 +198,20 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
     return null;
   const maxBytes = value.maxBytes;
   if (!(maxBytes === undefined || isNumber(maxBytes))) return null;
+  const file = value.file;
+  let source: RemoteFileUpload["file"];
+  if (file !== undefined) {
+    if (!isDynamicRecord(file)) return null;
+    const { ref, size } = file;
+    if (!isString(ref) || !isNumber(size)) return null;
+    source = { ref, size };
+  }
   return {
     name: value.name,
     mimeType: value.mimeType,
     base64: value.base64,
     ...(maxBytes === undefined ? {} : { maxBytes }),
+    ...(source === undefined ? {} : { file: source }),
   };
 }
 
@@ -223,6 +244,8 @@ export function decodeRemoteTeamCommand(value: unknown): {
   if (largeDownload === null) return invalid;
   const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
   if (upload === null) return invalid;
+  const downloadSize = value.downloadSize;
+  if (!(downloadSize === undefined || (isNumber(downloadSize) && downloadSize > 0))) return invalid;
   let body: TeamProtocolV2Json;
   try {
     body = decodeTeamProtocolV2Json(value.body);
@@ -239,6 +262,7 @@ export function decodeRemoteTeamCommand(value: unknown): {
       ...(upload ? { upload } : {}),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
       ...(largeDownload ? { largeDownload } : {}),
+      ...(downloadSize === undefined ? {} : { downloadSize }),
     },
     commandId: id,
   };
@@ -308,10 +332,25 @@ export interface RemoteUploadProgress {
   total: number;
 }
 
+/** The size of the file that answers a request, and a listener for the bytes that have arrived. */
+export interface RemoteDownloadWatch {
+  size: number;
+  onProgress: (received: number, total: number) => void;
+}
+
+/** How much of the file that answers one request command has arrived. */
+export interface RemoteDownloadProgress {
+  commandId: string;
+  received: number;
+  total: number;
+}
+
 export interface RemoteTeamPeerActions {
   onHostStreamData?: (data: string | ArrayBuffer) => void;
   /** Hears upload progress, at most once per whole percent. Optional, and never affects the upload. */
   onUploadProgress?: (progress: RemoteUploadProgress) => Promise<void>;
+  /** Hears download progress of a command with `downloadSize`, at most once per whole percent. Optional, and never affects the download. */
+  onDownloadProgress?: (progress: RemoteDownloadProgress) => Promise<void>;
   onAccountProfileChanged?: () => Promise<void>;
   /** The account's server list changed on another device of this account. */
   onAccountServersChanged?: () => Promise<void>;
@@ -328,6 +367,13 @@ export interface RemoteTeamPeerActions {
   /** The platform reported that the network came back. A consumer that waits to retry can retry now. */
   onNetworkRestored?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
+  /**
+   * The SHA-256 digest, as 64 lowercase hex characters, of the device file of an upload in progress
+   * (`RemoteFileUpload.file`). Only a client that sends device files has it.
+   */
+  digestUploadFile?: (ref: string) => Promise<string>;
+  /** Bytes of the device file of an upload in progress, as Base64. */
+  readUploadFile?: (part: { ref: string; offset: number; length: number }) => Promise<string>;
 }
 interface ActionsRef {
   current: RemoteTeamPeerActions;
@@ -400,6 +446,15 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
+  /**
+   * This peer asked for a runtime snapshot after the host learned its full capabilities. The
+   * compatibility read goes with the bootstrap list, and the host sends its first snapshot for that
+   * list, without the fields of later capabilities such as the context usage. The host does not send
+   * the snapshot again when the next request widens the list.
+   */
+  fullSnapshotRequested: boolean;
+  /** When the host last answered a request on this peer, as `performance.now()`. A request deadline counts from it. */
+  lastAnswerAt: number;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
   /** For the support log: when the current socket opened, and when and why the last offer went out. */
@@ -540,11 +595,16 @@ export interface RemoteHostProtocols {
 /**
  * `waitForHost` asks Signal to hold an attempt while the host is offline, rather than fail it. The
  * consumer must handle the `hostOffline` update. `hostProtocols` can keep the protocols after the
- * peer ends; the default keeps them for the life of the peer.
+ * peer ends; the default keeps them for the life of the peer. `clientProtocol` is the range that this
+ * client speaks; the default is `TEAM_WEBRTC_CLIENT_PROTOCOL`.
  */
 export function createRemoteTeamPeer(
   actions: ActionsRef,
-  options: { waitForHost?: boolean; hostProtocols?: RemoteHostProtocols } = {},
+  options: {
+    waitForHost?: boolean;
+    hostProtocols?: RemoteHostProtocols;
+    clientProtocol?: TeamProtocolSupportV1["protocol"];
+  } = {},
 ) {
   const runtime = ManagedRuntime.make(RemotePeerIO.layer(actions));
   const workScope = Scope.makeUnsafe();
@@ -577,6 +637,23 @@ export function createRemoteTeamPeer(
         return sendPayload(state, "files", data);
       }),
     () => createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size))),
+    {
+      digest: (ref) =>
+        peerCall(() => {
+          const digest = actions.current.digestUploadFile;
+          if (!digest) throw new Error("This client cannot read device files.");
+          return digest(ref);
+        }).pipe(Effect.mapError(deviceFileError)),
+      read: (ref, offset, length) =>
+        peerCall(() => {
+          const read = actions.current.readUploadFile;
+          if (!read) throw new Error("This client cannot read device files.");
+          return read({ ref, offset, length });
+        }).pipe(
+          Effect.flatMap((base64) => peerDecode(() => base64ToBytes(base64))),
+          Effect.mapError(deviceFileError),
+        ),
+    },
   );
   const downloads = createRemoteFileReceiver((data) =>
     Effect.suspend(() => {
@@ -593,6 +670,7 @@ export function createRemoteTeamPeer(
   // A new peer of a known host sends the capabilities of its last protocol. With the bootstrap
   // capabilities, the host would hide the agents of the providers that protocol 7 does not know.
   const hostProtocols: RemoteHostProtocols = options.hostProtocols ?? new Map<string, number>();
+  const clientProtocol = options.clientProtocol ?? TEAM_WEBRTC_CLIENT_PROTOCOL;
   // The last `ready` of a host. A new connection to it opens its Signal socket while the ticket
   // request runs, and gathers ICE candidates before `ready`.
   let lastSignal: { hostId: string; signalUrl: string; iceServers: RTCIceServer[]; at: number } | null = null;
@@ -998,6 +1076,7 @@ export function createRemoteTeamPeer(
           return { commandId: command.id, ok: true };
         }
         let reported = -1;
+        let downloaded = -1;
         const response = yield* requestEffect(
           command.method,
           command.path,
@@ -1013,6 +1092,19 @@ export function createRemoteTeamPeer(
           },
           command.timeoutMs,
           command.largeDownload,
+          command.downloadSize === undefined
+            ? undefined
+            : {
+                size: command.downloadSize,
+                onProgress: (received, total) => {
+                  const percent = total > 0 ? Math.floor((received / total) * 100) : 100;
+                  if (percent === downloaded) return;
+                  downloaded = percent;
+                  void runPeerEffect(
+                    peerCall(() => actions.current.onDownloadProgress?.({ commandId: command.id, received, total })),
+                  ).catch(() => undefined);
+                },
+              },
         );
         return { commandId: command.id, ok: true, status: response.status, body: response.body };
       }).pipe(Effect.result);
@@ -1119,6 +1211,8 @@ export function createRemoteTeamPeer(
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
+        fullSnapshotRequested: false,
+        lastAnswerAt: 0,
         lastSignalClose: null,
         signalOpenedAt: 0,
         offerSentAt: null,
@@ -1753,6 +1847,7 @@ export function createRemoteTeamPeer(
         if (frame.type !== "response")
           return yield* new RemotePeerError({ message: "The host returned an invalid RPC frame." });
         state.answeredRequest = true;
+        state.lastAnswerAt = performance.now();
         const pending = pendingRequests.get(frame.requestId);
         if (!pending) return;
         pending.profile?.responded(data);
@@ -1777,7 +1872,9 @@ export function createRemoteTeamPeer(
           const status = frame.result.status;
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
-            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol.maximum;
+            // The highest protocol that both sides speak. A host that this client refuses keeps its maximum.
+            const host = (yield* peerDecode(() => decodeTeamProtocolSupportExpanded(body))).protocol;
+            state.hostProtocol = teamWebRtcClientProtocol(host, clientProtocol).protocol ?? host.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({
@@ -1791,13 +1888,15 @@ export function createRemoteTeamPeer(
                     channelIsolation: true,
                     channelPicture: true,
                     channelBrowser: true,
+                    channelSeenSubtasks: true,
+                    channelTaskWaits: true,
                     mcpManyServers: true,
                   }),
                 )
               : yield* peerDecode(() =>
                   withWireBlockExtensions(
                     state,
-                    decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
+                    decodeTeamProtocolV10WebRtcHttpResponse(pending.method, pending.path, status, body),
                     body,
                   ),
                 ),
@@ -1927,6 +2026,7 @@ export function createRemoteTeamPeer(
     onUploadProgress?: (sent: number, total: number) => void,
     timeoutMs = REQUEST_TIMEOUT_MS,
     largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
   ) {
     return Effect.fn("RemotePeer.request")(function* () {
       const state = peer;
@@ -1945,6 +2045,7 @@ export function createRemoteTeamPeer(
         largeDownload === undefined
           ? null
           : downloads.allow(Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES), largeDownload.mimeType);
+      const stopDownloadWatch = download ? downloads.watch(download.size, download.onProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
         if (peer !== state || !isPeerOnline(state))
@@ -1961,12 +2062,20 @@ export function createRemoteTeamPeer(
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV8WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV9WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
+        // The list that this request declares to the host. The snapshot request below depends on it.
+        // The first compatibility read of a connection sends the bootstrap list. A later one of protocol 10
+        // sends the protocol 10 lists, so the host answers with its full set.
+        const capabilityProtocol =
+          !checksConnection || (state.hostProtocol !== undefined && state.hostProtocol >= TEAM_PROTOCOL_V10)
+            ? state.hostProtocol
+            : undefined;
+        const sentCapabilities = teamCapabilitiesForProtocol(capabilityProtocol);
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -1978,7 +2087,7 @@ export function createRemoteTeamPeer(
               path,
               body: payloadBody,
               ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
-              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
+              ...teamCapabilityLists(capabilityProtocol, sentCapabilities),
             },
           }),
         );
@@ -2041,12 +2150,19 @@ export function createRemoteTeamPeer(
               resolve,
               reject,
               profile: startRemoteRequest(method, path, payload),
-              timer: setTimeout(
-                checksConnection ? checkPath : expire,
-                checksConnection
-                  ? Math.min(arm ? PATH_CHECK_INTERVAL_MS : unmeasuredProbeMs(!state.answeredRequest), timeoutMs)
-                  : timeoutMs,
-              ),
+              timer: checksConnection
+                ? setTimeout(
+                    checkPath,
+                    Math.min(arm ? PATH_CHECK_INTERVAL_MS : unmeasuredProbeMs(!state.answeredRequest), timeoutMs),
+                  )
+                : startRemoteRequestDeadline(
+                    timeoutMs,
+                    () => state.lastAnswerAt,
+                    expire,
+                    (timer) => {
+                      pending.timer = timer;
+                    },
+                  ),
             };
             pendingRequests.set(requestId, pending);
             return pending;
@@ -2074,12 +2190,23 @@ export function createRemoteTeamPeer(
         );
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
+        // The host applied this request's capabilities before it answered, on the same event socket that
+        // the request below goes to, so the snapshot it sends has the fields of every capability.
+        // A request that went with the bootstrap list does not count, also when the protocol is known now.
+        if (!state.fullSnapshotRequested && sentCapabilities !== TEAM_BOOTSTRAP_CAPABILITIES) {
+          state.fullSnapshotRequested = true;
+          // A send that fails, such as on a channel that is not open yet, lets the next answer ask again.
+          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => {
+            state.fullSnapshotRequested = false;
+          });
+        }
         return response;
       }).pipe(
         Effect.ensuring(
           Effect.sync(() => {
             delivery?.stop();
             releaseDownload?.();
+            stopDownloadWatch?.();
             if (protocolRead) Deferred.doneUnsafe(protocolRead, Effect.void);
           }),
         ),

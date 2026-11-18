@@ -102,6 +102,13 @@ export function serverFromHost(
     id: host.hostId,
     name: host.name,
     logoKey: host.logoKey,
+    // A connected host sends its look at connect and after each change, so that look is current.
+    // The account copy can be older, and an older account server sends none.
+    ...(previous?.appearance !== undefined && (host.appearance === undefined || previous.state === "online")
+      ? { appearance: previous.appearance }
+      : host.appearance === undefined
+        ? {}
+        : { appearance: host.appearance }),
     kind,
     state: previous?.state ?? "unknown",
     initialConnectionPending: previous?.initialConnectionPending ?? true,
@@ -118,6 +125,7 @@ export function serverFromHost(
     role: host.role,
     ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
     ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+    ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
     ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
     ...(host.keyChangedAt === undefined ? {} : { keyChangedAt: host.keyChangedAt }),
   };

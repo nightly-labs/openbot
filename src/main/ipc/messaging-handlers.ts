@@ -14,10 +14,13 @@ import {
   isDiscordAccess,
   isDiscordRoleList,
   isWhatsAppGroupList,
+  isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   messagingPage,
   type WhatsAppGroupList,
+  type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
+  withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, nullableString } from "@openbot/contracts/ipc-decoding";
@@ -29,6 +32,10 @@ import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_ROUTES,
@@ -57,6 +64,7 @@ import {
   parseSetDiscordAccessInput,
   parseSetMessagingEnabledInput,
   parseSetWhatsAppOwnNumberInput,
+  parseSetWhatsAppStatusReactionsInput,
   parseSetWhatsAppWorkingMessageInput,
   parseStartWhatsAppLinkInput,
   parseWhatsAppSenderInput,
@@ -94,6 +102,7 @@ interface MessagingIpcDependencies {
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
   >;
   remoteServers: {
     supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -134,6 +143,10 @@ const decodeOrchestrator = (value: unknown): AddMessagingOrchestratorResult => {
 
 const decodeWhatsAppWorkingMessages = (value: unknown): WhatsAppWorkingMessageList => {
   if (!isWhatsAppWorkingMessageList(value)) throw new Error("Invalid WhatsApp working message response.");
+  return value;
+};
+const decodeWhatsAppStatusReactions = (value: unknown): WhatsAppStatusReactionsList => {
+  if (!isWhatsAppStatusReactionsList(value)) throw new Error("Invalid WhatsApp status reactions response.");
   return value;
 };
 const decodeWhatsAppGroups = (value: unknown): WhatsAppGroupList => {
@@ -279,6 +292,11 @@ export function messagingIpcHandlers({
         ({ workspaceId, workingMessage }) =>
           runCauseEffect(messaging.setWhatsAppWorkingMessage(workspaceId, workingMessage)),
       ),
+      setWhatsAppStatusReactions: payloadHandler(
+        parseSetWhatsAppStatusReactionsInput,
+        ({ workspaceId, statusReactions }) =>
+          runCauseEffect(messaging.setWhatsAppStatusReactions(workspaceId, statusReactions)),
+      ),
       hostOverview: scopedHandler(parseHostMessagingPlatformInput, {
         local: ({ platform }) => overview(platform),
         remote: ({ platform }, serverId) =>
@@ -364,15 +382,19 @@ export function messagingIpcHandlers({
       }),
       hostGetWhatsAppOverview: scopedQueryHandler({
         local: () => messaging.whatsappOverview(),
-        // `whatsapp-connector-v1` is frozen without the setting: a second request reads it. An older
-        // host has no such route, and its numbers then carry no setting.
+        // `whatsapp-connector-v1` is frozen without the settings: more requests read them. An older
+        // host has no such route, and its numbers then carry no such setting.
         remote: async (serverId) => {
-          const overview = await postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview);
-          if (!remoteServers.supportsCapability(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)) return overview;
-          return withWhatsAppWorkingMessages(
-            overview,
-            await postWhatsApp(serverId, WHATSAPP_WORKING_MESSAGE_ROUTES.list, decodeWhatsAppWorkingMessages),
-          );
+          const [overview, workingMessages, statusReactions] = await Promise.all([
+            postWhatsApp(serverId, WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview),
+            remoteServers.supportsCapability(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)
+              ? postWhatsApp(serverId, WHATSAPP_WORKING_MESSAGE_ROUTES.list, decodeWhatsAppWorkingMessages)
+              : null,
+            remoteServers.supportsCapability(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
+              ? postWhatsApp(serverId, WHATSAPP_STATUS_REACTIONS_ROUTES.list, decodeWhatsAppStatusReactions)
+              : null,
+          ]);
+          return withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions);
         },
       }),
       hostStartWhatsAppLink: scopedHandler(parseStartWhatsAppLinkInput, {
@@ -459,6 +481,18 @@ export function messagingIpcHandlers({
           await postWhatsApp(serverId, WHATSAPP_WORKING_MESSAGE_ROUTES.update, decodeEmpty, {
             workspaceId,
             workingMessage,
+          });
+        },
+      }),
+      hostSetWhatsAppStatusReactions: scopedHandler(parseSetWhatsAppStatusReactionsInput, {
+        local: ({ workspaceId, statusReactions }) =>
+          runCauseEffect(messaging.setWhatsAppStatusReactions(workspaceId, statusReactions)),
+        remote: async ({ workspaceId, statusReactions }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorsUnsupported"));
+          await postWhatsApp(serverId, WHATSAPP_STATUS_REACTIONS_ROUTES.update, decodeEmpty, {
+            workspaceId,
+            statusReactions,
           });
         },
       }),

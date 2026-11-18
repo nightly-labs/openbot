@@ -10,6 +10,7 @@ import { useTurns } from "../../turns";
 import { attentionByAgent, attentionEventKey, attentionOfAgent } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
 import { useConversation } from "../conversation/conversation-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { promptRequestKey } from "../conversation/conversation-keys";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSelection } from "../servers/server-selection";
@@ -51,6 +52,7 @@ export function DynamicIslandBridge() {
   } = useTurns();
   const { unreadReplies, conversations } = useConversation();
   const { selectAgent, openAgentMessage } = useNavigation();
+  const { setBrowserTakeoverPageRequest } = useConversationController();
   /** The handoff this bridge published, so it never consumes or clears its own. */
   let publishedAction: DynamicIslandAction | null = null;
 
@@ -178,7 +180,10 @@ export function DynamicIslandBridge() {
       setPendingIslandAction(action);
       return;
     }
-    selectAgent(action.agentId);
+    const opened = selectAgent(action.agentId);
+    // A chat window has no browser. The agent's view here opens the page once its tab is listed.
+    if (action.type === "open-browser-takeover" && opened)
+      setBrowserTakeoverPageRequest({ agentId: action.agentId, tabId: action.tabId });
     if (action.type === "open-message") await openAgentMessage(action.agentId, action.messageId);
     if (action.type === "open-failure") {
       try {

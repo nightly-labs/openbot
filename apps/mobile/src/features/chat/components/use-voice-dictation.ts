@@ -31,6 +31,7 @@ import {
   dictationNotice,
   emptyDictationTranscript,
   hasRecognitionLocale,
+  isRepeatedFinal,
   microphoneOffNotice,
   pickRecognitionLocale,
   retriesWithSystemService,
@@ -254,10 +255,9 @@ function useSystemDictation({
         const current = session.current;
         if (owner !== id || !current?.native) return;
         current.heard = true;
-        current.transcript = applyDictationResult(current.transcript, {
-          isFinal: event.isFinal,
-          text: event.results[0]?.transcript ?? "",
-        });
+        const result = { isFinal: event.isFinal, text: event.results[0]?.transcript ?? "" };
+        if (isIOS && isRepeatedFinal(current.transcript, result)) return;
+        current.transcript = applyDictationResult(current.transcript, result);
         onDraftRef.current(dictationDraft(current.base, spokenText(current.transcript)));
       }),
       speechRecognition.addListener("error", (event) => {

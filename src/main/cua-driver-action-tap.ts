@@ -67,6 +67,9 @@ const NEWLINE = 0x0a;
  */
 const SLOW_CALL_MS = 5_000;
 
+/** How many windows keep the width of their last screenshot. An agent works in a few at a time. */
+const MAX_SCREENSHOT_WINDOWS = 32;
+
 const defaultLogger = createOpenBotLogger("cua-driver-tap");
 
 /**
@@ -97,7 +100,20 @@ export interface ObservedAction {
 export interface ObservedPointer {
   /** The driver tool that named the point, kept so a log can say why the cursor moved. */
   tool: string;
-  /** The desktop point, in the same units `list_windows` reports window bounds in. */
+  /**
+   * The window whose own last screenshot `x` and `y` are pixels of, or `null` when they are a
+   * desktop point in the units `list_windows` reports window bounds in.
+   *
+   * A click or a scroll aimed at a window names a pixel of that window's screenshot, which is the
+   * driver's default. Read as a desktop point, it put the cursor on the main display while the
+   * agent worked on another one (#7511).
+   */
+  windowId: number | null;
+  /**
+   * The width of that window's last screenshot when the request passed, or `null` for a desktop
+   * point. Kept with the point, because a later screenshot of another size must not move it.
+   */
+  screenshotWidth: number | null;
   x: number;
   y: number;
   /** When the request passed through, from `Date.now()`. */
@@ -114,7 +130,8 @@ interface ObservedRequest {
   /** Whether the line asks for the tool list, whose answer loses the driver's cursor tools. */
   list: boolean;
   action: ObservedAction | null;
-  pointer: ObservedPointer | null;
+  /** The point, `"unplaced"` for a point that cannot be placed, or `null` when the line names none. */
+  pointer: ObservedPointer | "unplaced" | null;
 }
 
 const NOTHING: ObservedRequest = { tool: null, list: false, action: null, pointer: null };
@@ -146,10 +163,10 @@ const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
  * The protocol is one JSON object per line. A tool call is
  * `{"method":"call","name":"click","args":{…}}`; the target sits in the arguments either directly
  * as `pid` and `window_id` or inside a `target` object, and the point sits beside it as `x` and
- * `y`. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
- * reports nothing rather than a guess.
+ * `y`. A `run_steps` call holds such calls as its steps. A `list` asks for the tool list. Anything
+ * else - a `session_begin`, a call with neither - reports nothing rather than a guess.
  */
-function readRequest(line: string, at: number): ObservedRequest {
+function readRequest(line: string, at: number, screenshotWidth: (windowId: number) => number | null): ObservedRequest {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
@@ -161,7 +178,67 @@ function readRequest(line: string, at: number): ObservedRequest {
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { tool, list: false, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  if (tool === RUN_STEPS_TOOL) return { tool, list: false, ...readSteps(args, at, screenshotWidth) };
+  return {
+    tool,
+    list: false,
+    action: readTarget(tool, args, at),
+    pointer: readPointer(tool, args, at, screenshotWidth),
+  };
+}
+
+/** The driver's batch tool. Its own instructions tell agents to act through it, even for one step. */
+const RUN_STEPS_TOOL = "run_steps";
+/** The fields of a step that are not the arguments of its tool, as the driver reads a step. */
+const STEP_KEYS = new Set(["tool", "args", "wait_for", "expect", "timeout_ms"]);
+/** The fields that name a window, which later steps inherit from the batch or an earlier step. */
+const WINDOW_KEYS = ["pid", "window_id", "app", "window"] as const;
+
+/**
+ * What a `run_steps` call says, read step by step as if each step were its own call.
+ *
+ * The driver runs each step inside the daemon, so the call's arguments are the only place the tap
+ * sees these clicks and moves. Without this, a batch drew no cursor at all (#10986). A step without
+ * a window gets the window of the batch, or of the last step that named one, as in the driver.
+ */
+function readSteps(
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): Pick<ObservedRequest, "action" | "pointer"> {
+  let context = windowOf(args);
+  let action: ObservedAction | null = null;
+  let pointer: ObservedPointer | "unplaced" | null = null;
+  for (const raw of Array.isArray(args.steps) ? args.steps : []) {
+    const step = readStep(raw);
+    if (!step) continue;
+    const named = windowOf(step.args);
+    if (named) context = named;
+    const stepArgs = named || !context ? step.args : { ...context, ...step.args };
+    action = readTarget(step.tool, stepArgs, at) ?? action;
+    pointer = readPointer(step.tool, stepArgs, at, screenshotWidth) ?? pointer;
+  }
+  return { action, pointer };
+}
+
+/** One step's tool and arguments, from `{tool, args}`, `{<tool>: args}` or `{tool, ...args}`. */
+function readStep(raw: unknown): { tool: string; args: DynamicRecord } | null {
+  if (!isDynamicRecord(raw)) return null;
+  if (typeof raw.tool === "string") {
+    if (isDynamicRecord(raw.args)) return { tool: raw.tool, args: raw.args };
+    return { tool: raw.tool, args: Object.fromEntries(Object.entries(raw).filter(([key]) => !STEP_KEYS.has(key))) };
+  }
+  const named = Object.keys(raw).filter((key) => !STEP_KEYS.has(key));
+  const tool = named[0];
+  if (named.length !== 1 || tool === undefined) return null;
+  const args = raw[tool];
+  return isDynamicRecord(args) ? { tool, args } : null;
+}
+
+/** The window fields of some arguments, or `null` when they name no window. */
+function windowOf(args: DynamicRecord): DynamicRecord | null {
+  const fields = WINDOW_KEYS.filter((key) => args[key] !== undefined && args[key] !== null);
+  return fields.length > 0 ? Object.fromEntries(fields.map((key) => [key, args[key]])) : null;
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -172,14 +249,59 @@ function readTarget(tool: string, args: DynamicRecord, at: number): ObservedActi
   return { tool, pid, windowId, at };
 }
 
-function readPointer(tool: string, args: DynamicRecord, at: number): ObservedPointer | null {
+function readPointer(
+  tool: string,
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): ObservedPointer | "unplaced" | null {
   if (!POINTER_TOOLS.has(tool)) return null;
   const x = numberIn(args.x);
   const y = numberIn(args.y);
   // A click on an element names the element and no point at all, which is the driver's own
   // accessibility route. There is nowhere to draw a cursor then, so none is drawn.
   if (x === null || y === null) return null;
-  return { tool, x, y, at };
+  const windowId = pointerWindow(tool, args);
+  if (windowId === undefined) return "unplaced";
+  if (windowId === null) return { tool, windowId, screenshotWidth: null, x, y, at };
+  const width = screenshotWidth(windowId);
+  return width === null ? "unplaced" : { tool, windowId, screenshotWidth: width, x, y, at };
+}
+
+/**
+ * The window whose screenshot pixels a point is in, `null` for a desktop point, or `undefined` when
+ * the request does not say enough to place it.
+ *
+ * `move_cursor` names a desktop point in each of its scopes. A click or a scroll names one only in
+ * the desktop frame, or when it names no application at all; otherwise the point is in the
+ * window's own screenshot. A point in a zoomed image, or in a window that the request does not
+ * name, has no place OpenBot can work out, and a cursor in the wrong place is worse than none.
+ */
+function pointerWindow(tool: string, args: DynamicRecord): number | null | undefined {
+  if (tool === "move_cursor") return null;
+  const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
+  if (args.scope === "desktop" || args.coordinate_frame === "desktop" || target.kind === "desktop") return null;
+  const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
+  // A `run_steps` step can name its window by app or title, which only the driver resolves.
+  if (windowId === null && (typeof args.app === "string" || typeof args.window === "string")) return undefined;
+  if (windowId === null && numberIn(args.pid) === null && numberIn(target.pid) === null) return null;
+  if (windowId === null || args.from_zoom === true) return undefined;
+  return windowId;
+}
+
+/** The tools whose answer can hold a window screenshot: a read, or a batch with its end read. */
+const SCREENSHOT_TOOLS = new Set(["get_window_state", RUN_STEPS_TOOL]);
+
+/** The window and the width of a `get_window_state` screenshot, from its structured result. */
+function screenshotOf(answer: DynamicRecord): { windowId: number; width: number } | null {
+  const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
+  const structured = result && isDynamicRecord(result.structuredContent) ? result.structuredContent : null;
+  // A `run_steps` answer holds the `get_window_state` result of its end read as `observation.state`.
+  const observation = structured && isDynamicRecord(structured.observation) ? structured.observation : null;
+  const state = observation && isDynamicRecord(observation.state) ? observation.state : structured;
+  const windowId = numberIn(state?.window_id);
+  const width = numberIn(state?.screenshot_width);
+  return windowId !== null && width !== null && width > 0 ? { windowId, width } : null;
 }
 
 function numberIn(value: unknown): number | null {
@@ -222,11 +344,20 @@ class CallAnswerLines extends Transform {
   #held: Buffer[] = [];
   #heldBytes = 0;
   readonly #answered: (tool: string, ms: number) => void;
+  readonly #captured: (windowId: number, width: number) => void;
+  readonly #refused: () => void;
   readonly #now: () => number;
 
-  constructor(answered: (tool: string, ms: number) => void, now: () => number) {
+  constructor(
+    answered: (tool: string, ms: number) => void,
+    captured: (windowId: number, width: number) => void,
+    refused: () => void,
+    now: () => number,
+  ) {
     super();
     this.#answered = answered;
+    this.#captured = captured;
+    this.#refused = refused;
     this.#now = now;
   }
 
@@ -290,8 +421,32 @@ class CallAnswerLines extends Transform {
     this.#held = [];
     this.#heldBytes = 0;
     if (!whole) this.push(line);
-    else this.push(this.#answering === "list" ? withoutDriverCursorTools(line) : withCopy(line));
+    else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
+    else {
+      // The answer goes to the agent first; the refusal then takes the tools back.
+      this.push(withCopy(line, SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined));
+      if (isAccessibilityRefusal(line)) this.#refused();
+    }
   }
+
+  /** Keeps the width of a window screenshot, which scales the pixels a later click names. */
+  readonly #readScreenshot = (answer: DynamicRecord): void => {
+    const screenshot = screenshotOf(answer);
+    if (screenshot) this.#captured(screenshot.windowId, screenshot.width);
+  };
+}
+
+/**
+ * True when a failed call says that macOS refused the Accessibility API itself (#10658).
+ *
+ * The driver names the code as `AXError -25211` and `kAXErrorAPIDisabled`. macOS gives it when the
+ * calling process is not trusted for Accessibility, although `AXIsProcessTrusted()`, which the
+ * permission check reads, can still say that it is. Only a failed call counts, so a window title
+ * that holds the same text does not.
+ */
+function isAccessibilityRefusal(line: Buffer): boolean {
+  if (!line.includes("kAXErrorAPIDisabled") && !line.includes("AXError -25211")) return false;
+  return line.includes('"ok":false') || line.includes('"isError":true');
 }
 
 /** One whole tool list answer line, ending in its newline, less the tools in `DRIVER_CURSOR_TOOLS`. */
@@ -307,12 +462,18 @@ function withoutDriverCursorTools(line: Buffer): Buffer {
   return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
 }
 
-/** One whole answer line, ending in its newline, with the copy added when there is one to add. */
-function withCopy(line: Buffer): Buffer {
+/**
+ * One whole answer line, ending in its newline, with the copy added when there is one to add.
+ * `read` is given the parsed answer, so a field the tap keeps costs no second parse.
+ */
+function withCopy(line: Buffer, read?: (answer: DynamicRecord) => void): Buffer {
   // Most answers have no structured result and are no refusal or error, and this search costs far less than the parse.
   if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
     return line;
-  const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
+  const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
+  if (!parsed) return line;
+  read?.(parsed);
+  const rewritten = rewriteCallAnswer(parsed);
   return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
 }
 
@@ -322,13 +483,21 @@ export class CuaDriverActionTap {
   #sockets = new Set<Socket>();
   #action: ObservedAction | null = null;
   #pointer: ObservedPointer | null = null;
+  /** The width of each window's last screenshot, by window id, oldest first. */
+  #screenshotWidths = new Map<number, number>();
   #address: string | null = null;
   #now: () => number;
   #logger: Logger;
+  #onAccessibilityRefused: (() => void) | null = null;
 
   constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
     this.#now = now;
     this.#logger = logger;
+  }
+
+  /** Told each time a call fails because macOS refused the Accessibility API. See `isAccessibilityRefusal`. */
+  onAccessibilityRefused(listener: () => void): void {
+    this.#onAccessibilityRefused = listener;
   }
 
   /** The address to hand the providers, or `null` while nothing listens. */
@@ -359,6 +528,11 @@ export class CuaDriverActionTap {
     const pointer = this.#pointer;
     if (!pointer) return null;
     return this.#now() - pointer.at <= maxAgeMs ? pointer : null;
+  }
+
+  /** The width of the last screenshot of one window that an agent read, or `null` when none passed. */
+  #screenshotWidth(windowId: number): number | null {
+    return this.#screenshotWidths.get(windowId) ?? null;
   }
 
   listen = Effect.fn("CuaDriverActionTap.listen")(function* (
@@ -399,6 +573,7 @@ export class CuaDriverActionTap {
     this.#address = null;
     this.#action = null;
     this.#pointer = null;
+    this.#screenshotWidths.clear();
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     if (!server) return;
@@ -411,7 +586,12 @@ export class CuaDriverActionTap {
     const daemon = connect(upstream);
     this.#sockets.add(client);
     this.#sockets.add(daemon);
-    const answers = new CallAnswerLines((tool, ms) => this.#logAnswered(tool, ms), this.#now);
+    const answers = new CallAnswerLines(
+      (tool, ms) => this.#logAnswered(tool, ms),
+      (windowId, width) => this.#keepScreenshotWidth(windowId, width),
+      () => this.#onAccessibilityRefused?.(),
+      this.#now,
+    );
     const end = () => {
       // A call that hangs in the driver ends here, when the agent gives up and closes the connection.
       for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
@@ -446,10 +626,11 @@ export class CuaDriverActionTap {
           answers.expect(null);
         } else {
           const at = this.#now();
-          const { tool, list, action, pointer } = readRequest(line, at);
+          const { tool, list, action, pointer } = readRequest(line, at, (windowId) => this.#screenshotWidth(windowId));
           answers.expect(list ? "list" : tool === null ? null : { tool, at });
           if (action) this.#action = action;
-          if (pointer) this.#pointer = pointer;
+          // A point that cannot be placed takes the cursor down: the old one is no longer where the agent works.
+          if (pointer) this.#pointer = pointer === "unplaced" ? null : pointer;
         }
         skipping = false;
         newline = pending.indexOf("\n");
@@ -459,6 +640,15 @@ export class CuaDriverActionTap {
         skipping = true;
       }
     });
+  }
+
+  /** Kept for the windows read last only, so a long session does not grow the map without end. */
+  #keepScreenshotWidth(windowId: number, width: number): void {
+    this.#screenshotWidths.delete(windowId);
+    this.#screenshotWidths.set(windowId, width);
+    const oldest = this.#screenshotWidths.keys().next();
+    if (this.#screenshotWidths.size > MAX_SCREENSHOT_WINDOWS && !oldest.done)
+      this.#screenshotWidths.delete(oldest.value);
   }
 
   /** The tool name and the time only: the arguments are the user's work and are never logged. */

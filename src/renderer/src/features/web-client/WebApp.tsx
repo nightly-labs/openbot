@@ -36,11 +36,16 @@ import { StaticI18nProvider } from "../../i18n-context";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
+import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
+import { keepCachedWorkflows } from "../workflows/workflow-cache";
+import { WebLanguageStep } from "./WebLanguageStep";
+import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
 import { createWebAppearancePreference } from "./web-appearance-preference";
 import { takeWebAppStart, WEB_APP_BILLING_PARAM, type WebAppStart } from "./web-billing";
+import { syncWebChatBackground } from "./web-chat-background";
 import type { WebRuntimeFactory } from "./web-client-context";
 import { takeHostingReturn } from "./web-hosted-servers";
 import { createWebLanguagePreference } from "./web-language-preference";
@@ -65,10 +70,27 @@ function loadWorkspace(): Promise<typeof WebWorkspace> {
 }
 
 /** A sign-in refusal that the login form already shows. */
-class SignInIssueShown extends Error {}
+class SignInIssueShown extends Error {
+  constructor(readonly code: string) {
+    super();
+  }
+}
 
 /** The email signs in with the company's provider, not with an email code. */
 class CompanySignInRequired extends Error {}
+
+/** Longer than the time that the account service gives an email send, as on desktop. */
+const EMAIL_START_TIMEOUT_MS = 35_000;
+
+/** The life of a sign-in code. After it, the account service has no send to answer for. */
+const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
+
+/** After these answers the email can still arrive, so the next request asks about the same send. */
+const UNCERTAIN_EMAIL_DELIVERY = new Set([
+  "email_delivery_pending",
+  "email_delivery_timeout",
+  "email_delivery_unknown",
+]);
 
 /**
  * The error code of a company sign-in that came back without a session, from
@@ -166,7 +188,16 @@ function takeStartLink(): WebAppStart | null {
   return start;
 }
 
+/** The browser client. Its chat bubbles take the colors of the backdrop page that shows. */
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
+  return (
+    <WindowBackdropBubbles>
+      <WebAppContent {...props} />
+    </WindowBackdropBubbles>
+  );
+}
+
+function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   // This component renders the text provider, so it reads the text of the last provider that rendered.
   const text = currentText();
   const [state, setState] = createStore<{
@@ -224,6 +255,20 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     (initialHostingReturn ? { outcome: initialHostingReturn.paid ? "completed" : "cancelled", kind: "plan" } : null);
   /** Shown after the first session check, because its 401 resets the login state. */
   let companySignInReturnError = takeCompanySignInError();
+  /**
+   * A link or a return in the address opens the web client directly. The address no longer holds
+   * it, so a phone screen in front of it would lose an invitation, and a return comes back from a
+   * flow that the user started in the browser.
+   */
+  const addressHadLink =
+    agentTemplateId() !== null ||
+    inviteUrl() !== null ||
+    pluginSlug() !== null ||
+    marketplaceListing() !== null ||
+    startLink() !== null ||
+    initialBillingReturn !== null ||
+    initialHostingReturn !== null ||
+    companySignInReturnError !== null;
   const [workspace, setWorkspace] = createSignal<typeof WebWorkspace>();
   /** Sets the account when the workspace code is ready to show it. */
   async function showAccount(account: CentralAuthUser) {
@@ -247,6 +292,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     if (ended) {
       deleteRemoteWorkspaceFrames(null);
       void deleteSavedAgentPictures(null);
+      keepCachedWorkflows(null);
     }
     sessionGeneration += 1;
     setState((draft) => {
@@ -278,13 +324,21 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       | { email: string }
       | { challengeId: string | null; code: string; firstTouch?: FirstTouch }
       | Record<string, never>,
+    send?: { idempotencyKey: string; signal: AbortSignal },
   ) {
     const response = await accountFetch(`/api/browser/${path}`, {
       method: body ? "POST" : "GET",
       credentials: "same-origin",
       cache: "no-store",
-      headers: body ? { "Content-Type": "application/json", "X-OpenBot-Browser": "1" } : {},
+      headers: body
+        ? {
+            "Content-Type": "application/json",
+            "X-OpenBot-Browser": "1",
+            ...(send ? { "Idempotency-Key": send.idempotencyKey } : {}),
+          }
+        : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(send ? { signal: send.signal } : {}),
     });
     const value = await response.json();
     if (!response.ok) {
@@ -311,7 +365,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
         setState((draft) => {
           draft.login = draft.login.status === "code_sent" ? { ...draft.login, issue } : { status: "error", issue };
         });
-        throw new SignInIssueShown();
+        throw new SignInIssueShown(issue.code);
       }
       throw new Error(
         isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
@@ -403,6 +457,11 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
         });
     }
   }
+  /**
+   * The send whose result is not known yet. A request for the same email uses its key again, so the
+   * account service answers for that send and does not send a second code.
+   */
+  let emailStart: { email: string; idempotencyKey: string; startedAt: number } | null = null;
   async function start(email: string) {
     if (Date.now() < state.resendAt) throw new Error(text.t("webClient.login.wait"));
     // A request for a code answers the analytics box and accepts the Terms of Service.
@@ -411,12 +470,45 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       if (analyticsTouched) setWebAccountPending(analyticsChoice());
       import("./web-analytics").then((module) => module.followWebReportsPreference()).catch(() => undefined);
     }
-    const value = await signInRequest("email/start", { email }).catch((error: unknown) => {
-      if (error instanceof CompanySignInRequired) return COMPANY_SIGN_IN;
-      throw error;
-    });
-    if (value === COMPANY_SIGN_IN) return openCompanySignIn(email);
+    const attempt =
+      emailStart?.email === email && Date.now() - emailStart.startedAt < EMAIL_START_KEY_LIFE_MS
+        ? emailStart
+        : { email, idempotencyKey: crypto.randomUUID(), startedAt: Date.now() };
+    emailStart = attempt;
+    // Without a time limit, a request that gets no answer keeps the form on "Sending code…".
+    const limit = new AbortController();
+    let timedOut = false;
+    // A refusal ends this send. An unknown result keeps its key for the next request.
+    let uncertain = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      limit.abort();
+    }, EMAIL_START_TIMEOUT_MS);
+    const value = await request(
+      "email/start",
+      { email },
+      { idempotencyKey: attempt.idempotencyKey, signal: limit.signal },
+    )
+      .catch((error: unknown) => {
+        if (error instanceof CompanySignInRequired) return COMPANY_SIGN_IN;
+        if (error instanceof SignInIssueShown) {
+          uncertain = UNCERTAIN_EMAIL_DELIVERY.has(error.code);
+          return null;
+        }
+        if (!timedOut) throw error;
+        uncertain = true;
+        setState((draft) => {
+          draft.login = {
+            status: "error",
+            issue: { code: "email_delivery_timeout", message: sourceText("error.auth.deliveryTimeout") },
+          };
+        });
+        return null;
+      })
+      .finally(() => window.clearTimeout(timer));
+    if (emailStart === attempt && !uncertain) emailStart = null;
     if (value === null) return;
+    if (value === COMPANY_SIGN_IN) return openCompanySignIn(email);
     if (!isDynamicRecord(value) || !isString(value.challengeId) || typeof value.resendAt !== "number")
       throw new Error(text.t("webClient.login.responseInvalid"));
     const challengeId = value.challengeId;
@@ -517,6 +609,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const consentAgents = createOnboardingTeam(onboardingSessionSeed(), 3);
   const languagePreference = createWebLanguagePreference();
   const appearancePreference = createWebAppearancePreference();
+  // The chat background of each scheme; leaving `/app` removes it.
+  onSettled(() => syncWebChatBackground());
+  // The sign-in starts in the browser language; its language button opens the wheel to change it.
+  const [languageWheelOpen, setLanguageWheelOpen] = createSignal(false);
+  // On a phone the web client first points to the phone app, unless the address opened a link.
+  const [phoneAppShown, setPhoneAppShown] = createSignal(!addressHadLink && phoneAppScreenWanted());
   return (
     <StaticI18nProvider
       locale={resolveLocale(languagePreference.language(), navigator.language)}
@@ -525,46 +623,65 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       <NotificationObserver onShown={reportNotification}>
         <div class="web-app">
           <Toaster onToastShown={reportNotification} />
-          <Show when={state.loaded}>
+          <Show when={state.loaded && phoneAppShown()}>
+            <WebPhoneAppScreen variant={variant} onContinue={() => setPhoneAppShown(false)} />
+          </Show>
+          <Show when={state.loaded && !phoneAppShown()}>
             <Show
               keyed
               when={state.account?.id}
               fallback={
-                <AccountLogin
-                  variant={variant}
-                  state={state.login}
-                  onRetry={checkSession}
-                  onRequestEmailCode={start}
-                  onVerifyEmailCode={verify}
-                  onOpenCompanySignIn={() =>
-                    state.login.status === "company_sign_in" ? openCompanySignIn(state.login.email) : Promise.resolve()
-                  }
-                  onReset={async () => {
-                    clearSession();
-                    setState((draft) => {
-                      draft.resendAt = 0;
-                    });
-                  }}
-                  consent={
-                    <Show when={!analyticsAgreed()}>
-                      <AnalyticsConsentRow
-                        class="web-consent-row"
-                        checked={analyticsChoice()}
-                        agents={consentAgents}
-                        onChange={(checked) => {
-                          analyticsTouched = true;
-                          setAnalyticsChoice(checked);
-                        }}
-                      />
-                    </Show>
-                  }
-                  notice={
-                    <ConsentNotice
-                      onOpenTerms={() => window.open("/terms", "_blank", "noopener")}
-                      onOpenPrivacy={() => window.open("/privacy", "_blank", "noopener")}
+                <Show
+                  when={!languageWheelOpen()}
+                  fallback={
+                    <WebLanguageStep
+                      variant={variant}
+                      language={languagePreference.language()}
+                      onChangeLanguage={languagePreference.setLanguage}
+                      onDone={() => setLanguageWheelOpen(false)}
                     />
                   }
-                />
+                >
+                  <AccountLogin
+                    variant={variant}
+                    language={resolveLocale(languagePreference.language(), navigator.language)}
+                    onChangeLanguage={() => setLanguageWheelOpen(true)}
+                    state={state.login}
+                    onRetry={checkSession}
+                    onRequestEmailCode={start}
+                    onVerifyEmailCode={verify}
+                    onOpenCompanySignIn={() =>
+                      state.login.status === "company_sign_in"
+                        ? openCompanySignIn(state.login.email)
+                        : Promise.resolve()
+                    }
+                    onReset={async () => {
+                      clearSession();
+                      setState((draft) => {
+                        draft.resendAt = 0;
+                      });
+                    }}
+                    consent={
+                      <Show when={!analyticsAgreed()}>
+                        <AnalyticsConsentRow
+                          class="web-consent-row"
+                          checked={analyticsChoice()}
+                          agents={consentAgents}
+                          onChange={(checked) => {
+                            analyticsTouched = true;
+                            setAnalyticsChoice(checked);
+                          }}
+                        />
+                      </Show>
+                    }
+                    notice={
+                      <ConsentNotice
+                        onOpenTerms={() => window.open("/terms", "_blank", "noopener")}
+                        onOpenPrivacy={() => window.open("/privacy", "_blank", "noopener")}
+                      />
+                    }
+                  />
+                </Show>
               }
             >
               {(accountId) => (
