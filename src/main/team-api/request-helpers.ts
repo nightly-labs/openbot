@@ -543,6 +543,8 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
     ...(value.provider === undefined ? {} : { provider: value.provider }),
     ...(value.model === undefined ? {} : { model: value.model }),
     ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort }),
+    // `agent-create-operation-v1`: the protocol 9 codec already checked it. A released client does not send it.
+    ...(isString(value.operationId) ? { operationId: value.operationId } : {}),
   };
 }
 

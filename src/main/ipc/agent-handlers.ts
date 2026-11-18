@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -30,6 +32,7 @@ import {
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -284,6 +287,8 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
 /** Its lines also go to the provider log. See `PROVIDER_LOG_PREFIXES`. */
 const modelLogger = createOpenBotLogger("provider-models");
 const colorLogger = createOpenBotLogger("agent-colors");
+/** A create on a joined server whose answer got lost sends its id again and gets the first agent. */
+const createOperationId = retryOperationIds(randomUUID);
 const accountLogger = createOpenBotLogger("provider-accounts");
 
 /** A joined server without `agent-tasks-v1`, or a task request that it cannot carry, fails with a reason. */
@@ -869,12 +874,18 @@ export function agentIpcHandlers({
           // The released route does not carry the account either, so it goes on `provider-accounts-v1`
           // after it. A host without that capability starts the agent on the provider's own sign-in.
           const { avatarColor, providerAccountId, ...input } = parsed;
+          const operation = remoteServers.supportsCapability(serverId, AGENT_CREATE_OPERATION_CAPABILITY)
+            ? createOperationId([serverId, input])
+            : null;
           const created = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
               method: "POST",
-              body: input,
+              body: operation ? { ...input, operationId: operation.id } : input,
             }),
-          );
+          ).catch((error: unknown) => {
+            operation?.failed();
+            throw error;
+          });
           const agent = await withCreatedAgentAccount(serverId, created, providerAccountId);
           if (!avatarColor || !remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return agent;
           // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.

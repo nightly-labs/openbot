@@ -100,6 +100,7 @@ import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
@@ -716,17 +717,19 @@ export class TeamWebRtcHostPeer {
                   ? 3
                   : 1;
     const decodeRequest =
-      protocol >= 8
-        ? decodeTeamProtocolV8WebRtcHttpRequest
-        : protocol === 7
-          ? decodeTeamProtocolV7WebRtcHttpRequest
-          : protocol === 6
-            ? decodeTeamProtocolV6WebRtcHttpRequest
-            : protocol === 5
-              ? decodeTeamProtocolV5WebRtcHttpRequest
-              : protocol === 4
-                ? decodeTeamProtocolV4WebRtcHttpRequest
-                : decodeTeamProtocolV3WebRtcHttpRequest;
+      protocol >= 9
+        ? decodeTeamProtocolV9WebRtcHttpRequest
+        : protocol === 8
+          ? decodeTeamProtocolV8WebRtcHttpRequest
+          : protocol === 7
+            ? decodeTeamProtocolV7WebRtcHttpRequest
+            : protocol === 6
+              ? decodeTeamProtocolV6WebRtcHttpRequest
+              : protocol === 5
+                ? decodeTeamProtocolV5WebRtcHttpRequest
+                : protocol === 4
+                  ? decodeTeamProtocolV4WebRtcHttpRequest
+                  : decodeTeamProtocolV3WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined

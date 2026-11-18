@@ -13,6 +13,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -112,6 +113,7 @@ import type {
   RemoteLargeDownload,
   RemoteTeamEvent,
 } from "@openbot/team-client/remote-peer";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -292,6 +294,8 @@ export type {
 } from "@/features/workspace/model/workspace-types";
 
 const NO_IDS: string[] = [];
+/** A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`). */
+const createOperationId = retryOperationIds(() => Crypto.randomUUID());
 const NO_AGENTS: MobileAgent[] = [];
 /** The longest that the servers which are not selected wait for the selected one on a return to the app. */
 const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
@@ -2170,7 +2174,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const serverId = currentActiveServer().id;
         const firstTask = input.firstTask?.trim() ?? "";
         const welcome = hasCapability(serverCapabilities.current, serverId, AGENT_WELCOME_CAPABILITY);
-        const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
+        const body = {
           name: input.name,
           description: input.description,
           avatarSeed: input.avatarSeed,
@@ -2191,6 +2195,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
                 ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
               }
             : {}),
+        };
+        const operation = hasCapability(serverCapabilities.current, serverId, AGENT_CREATE_OPERATION_CAPABILITY)
+          ? createOperationId([serverId, body])
+          : null;
+        const created = await request(
+          "POST",
+          TEAM_API_ROUTES.agents.all,
+          decodeAgent,
+          operation ? { ...body, operationId: operation.id } : body,
+        ).catch((error: unknown) => {
+          operation?.failed();
+          throw error;
         });
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== created.id),

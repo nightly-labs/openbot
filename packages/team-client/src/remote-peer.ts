@@ -19,7 +19,7 @@ import {
   decodeTeamProtocolV8CurrentEvent,
   decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV8WebRtcHttpRequest,
+  encodeTeamProtocolV9WebRtcHttpRequest,
   TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
@@ -2051,7 +2051,7 @@ export function createRemoteTeamPeer(
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV8WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV9WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),

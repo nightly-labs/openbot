@@ -601,6 +601,13 @@ function userSendKey(sender: ConversationMessageSender | undefined, agentId: str
     .update(JSON.stringify([sender?.id ?? null, agentId, clientMessageId]))
     .digest("hex")}`;
 }
+
+/** The mailbox key of a create that a Team API client can send again (`agent-create-operation-v1`). */
+function agentCreateKey(sender: ConversationMessageSender | undefined, operationId: string): string {
+  return `agent-create:${createHash("sha256")
+    .update(JSON.stringify([sender?.id ?? null, operationId]))
+    .digest("hex")}`;
+}
 /** The `send_message` recipient limit, so one message can reach every section-mate the prompt names. */
 const MAX_SECTION_TEAMMATES = 32;
 /** How long an archive waits for the provider to end the turn that it stopped. After it, the archive is refused. */
@@ -644,6 +651,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** User sends still before their mailbox write, by idempotency key: a retry joins the first call. */
   readonly #pendingUserSends = new Map<string, Deferred.Deferred<QueuedMessageReceipt, AgentLifecycleFailed>>();
   readonly #pendingTaskStarts = new Map<string, Deferred.Deferred<AgentTask, AgentLifecycleFailed>>();
+  readonly #pendingAgentCreates = new Map<string, Deferred.Deferred<AgentSummary, AgentLifecycleFailed>>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -3484,6 +3492,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * `sender` is the person who writes the first message, as `sendMessage` takes it. `welcome` marks
    * that message as the client's setup message (`agent-welcome-v1`): the agent answers it, and no
    * chat, queue or preview shows it.
+   *
+   * An `operationId` that the same sender used within a day returns the agent of that create, with no
+   * second agent and no second initial message. The key goes into the mailbox with the initial
+   * message, so it is stored only when the create is complete.
    */
   readonly createAgent = Effect.fn("AgentService.createAgent")(function* (
     this: AgentService,
@@ -3494,6 +3506,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     welcome = false,
     // Another agent made this agent with `create_agent`, so the first turn can end with no answer.
     agentSetup = false,
+  ): Effect.fn.Return<AgentSummary, AgentLifecycleFailed> {
+    const create = (key?: string) =>
+      this.#createAgent(input, configure, profileOperationId, sender, welcome, agentSetup, key);
+    if (!input.operationId) return yield* create();
+    const key = agentCreateKey(sender, input.operationId);
+    this.#mailbox.forgetIdempotencyKeys("agent-create:", new Date(Date.now() - USER_SEND_RETRY_WINDOW_MS));
+    const pending = this.#pendingAgentCreates.get(key);
+    if (pending) return yield* Deferred.await(pending);
+    const createdId = this.#mailbox.receiptForKey(key)?.deliveries[0]?.recipientAgentId;
+    const created = createdId ? this.#store.get(createdId) : undefined;
+    if (created) return created;
+    // The first create failed after its message was stored, or its agent was deleted: this create makes a new one.
+    this.#mailbox.forgetIdempotencyKey(key);
+    const start = Deferred.makeUnsafe<AgentSummary, AgentLifecycleFailed>();
+    this.#pendingAgentCreates.set(key, start);
+    return yield* create(key).pipe(
+      Effect.onExit((exit) => Deferred.done(start, exit)),
+      Effect.ensuring(Effect.sync(() => this.#pendingAgentCreates.delete(key))),
+    );
+  }).bind(this);
+
+  readonly #createAgent = Effect.fn("AgentService.createNewAgent")(function* (
+    this: AgentService,
+    input: CreateAgentInput,
+    configure: ((agent: AgentSummary) => Effect.Effect<AgentSummary, AgentLifecycleFailed>) | undefined,
+    profileOperationId: string | undefined,
+    sender: ConversationMessageSender | undefined,
+    welcome: boolean,
+    agentSetup: boolean,
+    idempotencyKey: string | undefined,
   ) {
     const initialMessage = yield* lifecycleStep("validate initial message", () => {
       const text = input.initialMessage.trim();
@@ -3524,7 +3566,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           { agentId: agent.id, text: initialMessage, attachmentDraftIds: [] },
           sender,
           undefined,
-          undefined,
+          idempotencyKey,
           welcome,
           agentSetup,
         );

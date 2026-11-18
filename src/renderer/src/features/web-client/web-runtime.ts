@@ -103,6 +103,7 @@ import {
   decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -232,6 +233,7 @@ import {
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
@@ -775,6 +777,8 @@ export function createWebWorkspaceRuntime(
   let capabilities: string[] = [];
   let connectedHost: RemoteTeamHost | null = null;
   const duplicateOperationIds = new Map<string, string>();
+  // A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`).
+  const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
   // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
@@ -1828,7 +1832,16 @@ export function createWebWorkspaceRuntime(
       // The released route does not carry the account either, so it goes on `provider-accounts-v1`
       // after it, as on the desktop.
       const { avatarColor, providerAccountId, ...profile } = input;
-      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
+      const operation = capabilities.includes(AGENT_CREATE_OPERATION_CAPABILITY)
+        ? createOperationId([lockedHostId, profile])
+        : null;
+      const value = await request("POST", TEAM_API_ROUTES.agents.all, {
+        ...profile,
+        ...(operation ? { operationId: operation.id } : {}),
+      }).catch((error: unknown) => {
+        operation?.failed();
+        throw error;
+      });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
       const agent: ClientAgentSummary = await withCreatedAgentAccount(value, providerAccountId);
       if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
