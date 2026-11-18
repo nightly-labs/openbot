@@ -40,6 +40,13 @@ const GEMINI_VERIFICATION_ANSWER =
  */
 const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
 /**
+ * Each verification link in the CLI's log. Google's `validation_url` is a `signin/continue` page
+ * (#2419), and its next page can be one other than Gemini's. A logged structure can end the link with
+ * `}`. Not a sign-in link of another kind, such as `/o/oauth2/`.
+ */
+const GEMINI_LOG_ACCOUNT_LINK =
+  /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+/**
  * The answer of the Antigravity CLI 1.5.6 and later when Google refuses a request until the user
  * verifies the account: `CustomUserErrorMessageFromHTTPError` maps `VALIDATION_REQUIRED` to this fixed
  * text, with no link, after the CLI's warning sign (#9508).
@@ -309,18 +316,16 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The CLI's own log after the last prompt of the session. Each session has a process, and so a log,
- * of its own. A session that opened again on a new process has an older log too, so only the newest
- * log with a prompt of the session counts. A log that cannot be read gives `null`: the turn then
- * fails as before.
+ * The ends of the CLI's own logs that changed in the last minutes, newest first. The folder is in the
+ * account's Gemini home, so each log is of this account. A log is read only when the caller gets to
+ * it, and a log that cannot be read is skipped.
  */
-function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
-  if (!home || !appData) return null;
+  if (!home || !appData) return;
   const folder = join(home, appData, "log");
   const since = Date.now() - GEMINI_LOG_RECENT_MS;
-  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
   let logs: { file: string; size: number; mtimeMs: number }[];
   try {
     logs = readdirSync(folder)
@@ -336,15 +341,26 @@ function antigravityLastPromptLog(argv: readonly string[], sessionId: string): s
       })
       .sort((a, b) => b.mtimeMs - a.mtimeMs);
   } catch {
-    return null;
+    return;
   }
   for (const { file, size } of logs) {
-    let log: string;
     try {
-      log = logTail(file, size);
+      yield logTail(file, size);
     } catch {
-      continue;
+      // The CLI can remove or lock a log while it runs.
     }
+  }
+}
+
+/**
+ * The CLI's own log after the last prompt of the session. Each session has a process, and so a log,
+ * of its own. A session that opened again on a new process has an older log too, so only the newest
+ * log with a prompt of the session counts. A log that cannot be read gives `null`: the turn then
+ * fails as before.
+ */
+function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
+  for (const log of antigravityRecentLogs(argv)) {
     const at = log.lastIndexOf(prompt);
     if (at >= 0) return log.slice(at);
   }
@@ -378,19 +394,26 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
  * own log (#9508). A JSON encoder can write the `&`, `=` and `/` of the link as `\u0026`, `\u003d` and
  * `\/`; Go's writes each `&` as `\u0026`. A body that is logged as a JSON string has one more
  * backslash for each escape, and its quotes as `\"`.
+ *
+ * The CLI can log Google's 403 when it opens the session or checks the sign-in, before the line of
+ * the prompt, so only the text after the prompt had no link and the banner had no button (#11702).
+ * The newest link in the account's recent logs is the one to open: the log folder is the account's.
  */
-function antigravityAccountLink(text: string, argv: readonly string[], sessionId: string): string | null {
+function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
   if (link !== null || !GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return link;
-  const log = antigravityLastPromptLog(argv, sessionId);
-  if (log === null || !log.includes("VALIDATION_REQUIRED")) return null;
-  return geminiAccountLink(
-    log
+  for (const log of antigravityRecentLogs(argv)) {
+    if (!log.includes("VALIDATION_REQUIRED")) continue;
+    const links = log
       .replace(/\\+u0026/gu, "&")
       .replace(/\\+u003d/gu, "=")
       .replace(/\\+\//gu, "/")
-      .replace(/\\+"/gu, '"'),
-  );
+      .replace(/\\+"/gu, '"')
+      .match(GEMINI_LOG_ACCOUNT_LINK);
+    const newest = links?.at(-1)?.replace(/[.,;:]+$/u, "");
+    if (newest) return newest;
+  }
+  return null;
 }
 
 function folderNames(folder: string): string[] {
