@@ -72,6 +72,8 @@ import {
   routineMissedPolicyZodSchema,
   routineRunPlaceZodSchema,
   routineScheduleZodSchema,
+  routineTimezoneZodSchema,
+  updateRoutineTimezonesToolSchema,
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
@@ -582,12 +584,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_routine",
     description:
-      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided. Fields you leave out keep their saved values. Replacement schedules must not run more often than every 3 minutes. A one-time routine that already ran resumes only with a new once schedule in the future. The result is the saved routine. For a webhook routine, use update_webhook_routine.",
+      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided. Fields you leave out keep their saved values. timezone keeps local clock times and the pause state; interval schedules keep their absolute anchor. Use update_routine_timezones to move several routines to one timezone. Replacement schedules must not run more often than every 3 minutes. A one-time routine that already ran resumes only with a new once schedule in the future. The result is the saved routine. For a webhook routine, use update_webhook_routine.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
       name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
       instruction: routineInstructionZodSchema.optional(),
+      timezone: routineTimezoneZodSchema.optional(),
       schedule: routineScheduleZodSchema
         .describe("Routine schedule. Must not run more often than every 3 minutes.")
         .optional(),
@@ -596,6 +599,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
       runIn: routineRunPlaceZodSchema.optional(),
     },
+  },
+  {
+    name: "update_routine_timezones",
+    description:
+      "Move up to 100 scheduled routines to one IANA timezone when the user asks. Read list_routines for each agent first. Keeps every routine's local clock time, ID, history and paused state; interval schedules keep their absolute anchor. Each entry is saved independently in order. A refused entry does not stop or undo other changes. Returns updated and failed counts and a result for each entry; tell the user which failed and why. Webhook routines are refused.",
+    shape: updateRoutineTimezonesToolSchema.shape,
   },
   {
     name: "delete_routine",

@@ -5,6 +5,25 @@ import { WEBHOOK_EVENT_TYPE_MAX_LENGTH, WEBHOOK_FILTERS_LIMIT } from "./webhook-
 
 const ROUTINE_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+export const routineTimezoneZodSchema = z.string().min(1).max(128).describe("IANA timezone such as Europe/Warsaw.");
+
+/** Like update_agents, a batch is bounded and reports each saved routine independently. */
+export const updateRoutineTimezonesToolSchema = z.strictObject({
+  timezone: routineTimezoneZodSchema,
+  routines: z
+    .array(
+      z.strictObject({
+        agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+        routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      }),
+    )
+    .min(1)
+    .max(100)
+    .describe(
+      "Scheduled routines from list_routines. Omit an entry's agentId for your own agent. Pass each routine once.",
+    ),
+});
+
 const routineTimeSchema = z.string().regex(ROUTINE_TIME_PATTERN).describe("Local time in HH:mm format.");
 const routineDaySelectionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("every-day") }).strict(),

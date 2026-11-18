@@ -156,6 +156,15 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
+The `update_routine` tool accepts `timezone` for an existing scheduled routine. Calendar schedules
+keep their local clock times and interval schedules keep their absolute anchors. An omitted time
+zone keeps the saved zone. `update_routine_timezones` takes one `timezone` and up to 100 `routines`
+entries (`routineId` and optional `agentId`) and saves each independently, reporting the saved
+routine or refusal for every entry. Both tools preserve IDs, run history and pause state. An active
+one-time routine cannot move to a time that is already past. These tools execute on the agent's
+host, including when the user connects through a joined desktop, web or mobile client. The released
+routine IPC and Team API update inputs do not change.
+
 An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
 routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
 thread. The routine settings show a switch for it on this computer's host, and on a joined host with
