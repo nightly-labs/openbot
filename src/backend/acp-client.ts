@@ -165,6 +165,13 @@ const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
 const ACP_TURN_STALL_MS = 5 * 60_000;
 
 /**
+ * The same limit for Cursor (`turnStallMs` in the Cursor driver). The CLI can send nothing for many
+ * minutes between chunks while it runs tools or waits on Cursor's API, with no open ACP tool call.
+ * The default limit then ended healthy turns as stalled on every model.
+ */
+export const CURSOR_TURN_STALL_MS = 30 * 60_000;
+
+/**
  * How many times the stall limit OpenBot waits for an agent that waits as long for a model and then
  * retries (`AcpFlavor.modelRetryUpdate`), so that the agent's retry notice comes first (#9941).
  */
@@ -1768,13 +1775,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initializeConnection(
     connection: ClientSideConnection,
   ): Effect.Effect<InitializeResponse, ProviderClientOperationError> {
+    const clientCapabilities = {
+      ...OPENBOT_ACP_CLIENT_CAPABILITIES,
+      ...this.#flavor.clientCapabilities,
+    };
     return providerCall(() =>
       connection.initialize({
         protocolVersion: 1,
         // OpenCode sends its subagents' work only to a client that asks for it, and else in the parent's stream.
         clientCapabilities: this.#flavor.childSessionUpdates
-          ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
-          : OPENBOT_ACP_CLIENT_CAPABILITIES,
+          ? { ...clientCapabilities, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
+          : clientCapabilities,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );

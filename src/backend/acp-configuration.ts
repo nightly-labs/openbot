@@ -127,7 +127,8 @@ function isEffortOption(option: SessionConfigOption, categories: readonly string
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
 export class AcpConfiguration {
   /** The model this agent process last took, for an agent whose model belongs to the process. */
-  #processModel: { connection: ClientSideConnection; value: string } | null = null;
+  /** `value` is the base model. `params` is the last fast, context and thinking sent on this process. */
+  #processModel: { connection: ClientSideConnection; value: string; params: Map<string, string> } | null = null;
   /** Model sets sent and not answered. Sets that overlap can apply in an order their answers do not show. */
   #modelSetsInFlight = 0;
   #modelSetsOverlapped = false;
@@ -315,7 +316,20 @@ export class AcpConfiguration {
     // session of the process to it, and Cursor asks its server again on each set (#3800).
     const withoutEfforts =
       !!option && listed && !this.options.processWideModel && listsModelsWithoutEfforts(probe, option);
-    if (!option || (listed && !withoutEfforts)) return yield* providerSync(() => models);
+    // Cursor's parameterized catalog lists a base id and publishes `reasoning` only after that
+    // model is selected. A list whose ids already fix `reasoning` is the older one-variant catalog:
+    // asking again would select each id during discovery.
+    const cursorParameterEfforts =
+      this.options.provider === "cursor" &&
+      option !== undefined &&
+      listed &&
+      !thoughtLevelOption(probe.configOptions ?? []) &&
+      !selectValues(option).every((entry) => modelIdFixesReasoning(entry.value));
+    // Both early exits hold: a list that says nothing about efforts needs no sweep, on any agent, and
+    // Cursor's parameterized catalog does, so it keeps the sweep even when its list looks empty.
+    if (!option || (listed && !withoutEfforts && !cursorParameterEfforts)) {
+      return yield* providerSync(() => speedVariants(models, probe.configOptions ?? []));
+    }
     // A grouped option resolves a model to one of its efforts, so the session opened on the exact
     // model in the list, and goes back to it. The agent takes that model as a value too.
     const opening = grouped ? (listedCurrentModel(probe) ?? option.currentValue) : option.currentValue;
@@ -332,14 +346,51 @@ export class AcpConfiguration {
     const answeredEfforts = this.#answeredEfforts.models;
     // The sweep selects models on the process too, also while a turn sets its own.
     this.#processModel = null;
+    const listedValues = selectValues(option).map((entry) => entry.value);
     for (const model of models) {
-      const response = yield* this.#requestBeforeEffect(
-        () => connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
+      // A parameterized catalog id is sent as its base, then each other parameter, as on a turn.
+      // Sending `deepseek-v4[fast=false]` whole leaves the reasoning option unpublished and every
+      // model shows medium only.
+      const resolved = resolveListedModel(model.id, listedValues);
+      const modelOptionValue = resolved?.base ?? model.id;
+      type ConfigOptionResponse = { configOptions: SessionConfigOption[] };
+      let probeResponse: ConfigOptionResponse | null = yield* this.#requestBeforeEffect<ConfigOptionResponse>(
+        () =>
+          connection.setSessionConfigOption({
+            sessionId: probe.sessionId,
+            configId: option.id,
+            value: modelOptionValue,
+          }),
         Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
         "session/set_config_option",
       );
+      if (probeResponse && resolved && resolved.params.size > 0) {
+        for (const [configId, value] of resolved.params) {
+          if (configId === "reasoning" || configId === "effort") continue;
+          const parameterOption: SessionConfigOption | undefined = probeResponse.configOptions.find(
+            (candidate) => candidate.id === configId,
+          );
+          if (!parameterOption) continue;
+          const nextResponse: ConfigOptionResponse | null = yield* this.#requestBeforeEffect<ConfigOptionResponse>(
+            () =>
+              parameterOption.type === "boolean"
+                ? connection.setSessionConfigOption({
+                    sessionId: probe.sessionId,
+                    configId,
+                    value: value === "true",
+                    type: "boolean",
+                  })
+                : connection.setSessionConfigOption({ sessionId: probe.sessionId, configId, value }),
+            Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
+            "session/set_config_option",
+          );
+          if (!nextResponse) break;
+          probeResponse = nextResponse;
+        }
+      }
+      const response = probeResponse;
       if (response) {
-        selected = model.id;
+        selected = modelOptionValue;
         answered += 1;
       }
       const efforts = response
@@ -348,10 +399,13 @@ export class AcpConfiguration {
       if (response && efforts) answeredEfforts.set(model.id, efforts);
       // An unanswered model keeps its last answer. With no answer yet, it holds the opening model's
       // options, which say nothing about this model. A listed model without efforts keeps none: the
-      // opening model had no effort option, so an Effort menu would offer a placeholder only.
-      probed.push(
-        efforts ? { ...model, ...efforts } : withoutEfforts ? model : { ...model, reasoningEffortConfigurable: true },
-      );
+      // opening model had no effort option, so an Effort menu would offer a placeholder only. A speed
+      // variant is split only from the options that named it: the answer, or the catalog of a list
+      // that declares no efforts.
+      const options = response?.configOptions ?? (withoutEfforts ? probe.configOptions : undefined) ?? [];
+      if (efforts) probed.push(...expandSpeed({ ...model, ...efforts }, options));
+      else if (withoutEfforts) probed.push(...expandSpeed(model, options));
+      else probed.push({ ...model, reasoningEffortConfigurable: true });
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
@@ -388,8 +442,20 @@ export class AcpConfiguration {
     /** A turn's prompt follows, so a model that the session does not offer fails it (#11797). */
     requireModel = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const modelOption = thread.configOptions.find(
+      (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
+        candidate.category === "model" && candidate.type === "select",
+    );
+    const resolved =
+      model && modelOption
+        ? resolveListedModel(
+            model,
+            selectValues(modelOption).map((entry) => entry.value),
+          )
+        : null;
+    const modelValue = resolved?.base ?? model;
     for (const [category, value] of [
-      ["model", model],
+      ["model", modelValue],
       ["thought_level", effort],
     ] as const) {
       if (!value) continue;
@@ -401,7 +467,7 @@ export class AcpConfiguration {
             yield* this.#timed("session/set_model", () =>
               this.#connection(thread).request("session/set_model", {
                 sessionId: thread.id,
-                modelId: thread.currentModelId,
+                modelId: resolved?.base ?? thread.currentModelId,
                 _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(effort) ?? effort },
               }),
             );
@@ -511,7 +577,8 @@ export class AcpConfiguration {
       const processWide = category === "model" && this.options.processWideModel === true;
       if (processWide) {
         if (this.#processModel?.connection === connection && this.#processModel.value === selected) {
-          thread.currentModelId = selected;
+          // The catalog id keeps fast and context. The process cache keeps the base.
+          thread.currentModelId = model ?? selected;
           thread.configOptions = thread.configOptions.map((entry) =>
             entry === option ? { ...option, currentValue: selected } : entry,
           );
@@ -533,7 +600,7 @@ export class AcpConfiguration {
             Effect.tap(() =>
               Effect.sync(() => {
                 if (!this.#modelSetsOverlapped && this.#modelSetTimedOut !== connection) {
-                  this.#processModel = { connection, value: selected };
+                  this.#processModel = { connection, value: selected, params: new Map() };
                 }
               }),
             ),
@@ -556,8 +623,86 @@ export class AcpConfiguration {
           )
         : yield* this.#confirmingSet(thread, option.id, request);
       thread.configOptions = response.configOptions;
-      if (category === "model") thread.currentModelId = selected;
+      if (category === "model") thread.currentModelId = model ?? selected;
     }
+    // A Cursor model value such as `composer-2.5[fast=false]` is the base model plus the parameters
+    // the parameterized picker lists apart from it. The model option takes the base. Each other
+    // parameter is its own option. A `reasoning` value saved inside an older id is not applied:
+    // the effort argument below is the one the user chose.
+    if (resolved) {
+      for (const [id, value] of resolved.params) {
+        if (id === "reasoning" || id === "effort") continue;
+        yield* this.#applyModelParameter(thread, id, value);
+      }
+    }
+    yield* this.#applyCursorReasoningParameter(thread, model, effort, models);
+  });
+
+  /**
+   * Cursor publishes each model's efforts as a `reasoning` or `effort` select, not as `thought_level`.
+   * The value is the effort of this turn. An id that still contains `reasoning` does not override it.
+   */
+  readonly #applyCursorReasoningParameter = Effect.fn("AcpConfiguration.applyCursorReasoningParameter")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+    model: string | null,
+    effort: string | null,
+    models: AcpModel[],
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (this.options.provider !== "cursor" || !model || !effort) return;
+    if (thoughtLevelOption(thread.configOptions)) return;
+    const row = models.find((candidate) => candidate.id === model);
+    if (!row?.reasoningEffortConfigurable) return;
+    const listed = listedEffort(effort, (level) => row.reasoningEffortWireValues.has(level));
+    const wire = listed ? row.reasoningEffortWireValues.get(listed) : undefined;
+    if (!wire) return;
+    yield* this.#applyModelParameter(thread, "reasoning", wire);
+    yield* this.#applyModelParameter(thread, "effort", wire);
+  });
+
+  /** The process cache, not the session copy: another session on this process can change the option. */
+  #rememberParameter(connection: ClientSideConnection, configId: string, value: string): void {
+    if (this.options.processWideModel !== true || this.#processModel?.connection !== connection) return;
+    this.#processModel.params.set(configId, value);
+  }
+
+  /** One parameter of a Cursor model value, such as `fast=false`, after the base model is set. */
+  readonly #applyModelParameter = Effect.fn("AcpConfiguration.applyModelParameter")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+    configId: string,
+    value: string,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const option = thread.configOptions.find((candidate) => candidate.id === configId);
+    if (!option) return;
+    const connection = yield* providerSync(() => this.#connection(thread));
+    const applied =
+      this.options.processWideModel === true && this.#processModel?.connection === connection
+        ? this.#processModel.params.get(configId)
+        : undefined;
+    if (option.type === "boolean") {
+      const flag = value === "true";
+      if (applied !== undefined ? applied === value : option.currentValue === flag) return;
+      const response = yield* this.#timed("session/set_config_option", () =>
+        this.#connection(thread).setSessionConfigOption({
+          sessionId: thread.id,
+          configId,
+          value: flag,
+          type: "boolean",
+        }),
+      );
+      thread.configOptions = response.configOptions;
+      this.#rememberParameter(connection, configId, value);
+      return;
+    }
+    if (option.type !== "select") return;
+    if (!selectValues(option).some((entry) => entry.value === value)) return;
+    if (applied !== undefined ? applied === value : option.currentValue === value) return;
+    const response = yield* this.#timed("session/set_config_option", () =>
+      this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
+    );
+    thread.configOptions = response.configOptions;
+    this.#rememberParameter(connection, configId, value);
   });
 
   readonly set = Effect.fn("AcpConfiguration.set")(function* (
@@ -668,7 +813,15 @@ function isAdditionalSetting(option: SessionConfigOption, effortCategories: read
   const category = option.category?.toLowerCase();
   if (
     [category, option.id.toLowerCase()].some(
-      (value) => value === "model" || value === "thought_level" || value === "mode",
+      (value) =>
+        value === "model" ||
+        value === "thought_level" ||
+        value === "mode" ||
+        value === "fast" ||
+        value === "context" ||
+        value === "thinking" ||
+        value === "reasoning" ||
+        value === "effort",
     )
   )
     return false;
@@ -780,6 +933,15 @@ function modelsFromConfig(options: SessionConfigOption[], effortCategories: read
   }));
 }
 
+function selectOption(
+  options: readonly SessionConfigOption[],
+  match: (option: SessionConfigOption) => boolean,
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return options.find(
+    (option): option is Extract<SessionConfigOption, { type: "select" }> => option.type === "select" && match(option),
+  );
+}
+
 function reasoningFromConfig(
   options: SessionConfigOption[],
   effortCategories: readonly string[],
@@ -787,19 +949,25 @@ function reasoningFromConfig(
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
 > {
-  const thought = options.find((option) => isEffortOption(option, effortCategories));
+  // `thought_level` wins. Cursor's parameterized picker has no such option: it publishes `reasoning`,
+  // or `effort`, after the model is selected.
+  const selected =
+    thoughtLevelOption(options) ??
+    selectOption(options, (option) => isEffortOption(option, effortCategories)) ??
+    selectOption(options, (option) => option.id === "reasoning") ??
+    selectOption(options, (option) => option.id === "effort");
   const wireValues = reasoningEffortWireValues(
-    thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
+    selected ? selectValues(selected).map((option) => option.value) : ["medium"],
   );
   const supported = [...wireValues.keys()];
-  const currentEffort =
-    thought && thought.type === "select" ? (normalizeEffort(thought.currentValue) ?? "medium") : "medium";
+  const currentEffort = selected ? (normalizeEffort(selected.currentValue) ?? "medium") : "medium";
   return {
     defaultReasoningEffort: supported.includes(currentEffort) ? currentEffort : (supported[0] ?? "medium"),
     supportedReasoningEfforts: supported.length > 0 ? supported : ["medium"],
-    // With no effort option, `medium` only keeps the catalog shape that older clients read. OpenCode
-    // has none for Big Pickle, Kimi or MiMo, and the user reads "Medium" where the agent decides.
-    reasoningEffortConfigurable: thought?.type === "select" && supported.length > 0,
+    // With no effort option, or none that names a known level, `medium` only keeps the catalog shape
+    // that older clients read. OpenCode has none for Big Pickle, Kimi or MiMo, and the user reads
+    // "Medium" where the agent decides.
+    reasoningEffortConfigurable: selected !== undefined && supported.length > 0,
     reasoningEffortWireValues: wireValues.size > 0 ? wireValues : new Map([["medium", "medium"]]),
   };
 }
@@ -844,6 +1012,25 @@ function groupedModelOption(response: SessionSetupResponse): Extract<SessionConf
   const values = new Set(selectValues(option).map((entry) => entry.value));
   const ids = new Set(listed.map((model) => model.id));
   return values.size === ids.size && [...values].every((value) => ids.has(value)) ? null : option;
+}
+
+/**
+ * The `thought_level` option of a session, when the agent publishes one. An agent that does already
+ * answers which effort each model supports, so Cursor's parameterized sweep adds nothing.
+ */
+function thoughtLevelOption(
+  options: readonly SessionConfigOption[],
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return options.find(
+    (option): option is Extract<SessionConfigOption, { type: "select" }> =>
+      option.type === "select" && option.category === "thought_level",
+  );
+}
+
+/** True when a Cursor model id already names one effort, as the one-variant catalog does. */
+function modelIdFixesReasoning(id: string): boolean {
+  const params = parseModelParameters(id)?.params;
+  return params?.has("reasoning") === true || params?.has("effort") === true;
 }
 
 /**
@@ -919,6 +1106,90 @@ function availableModels(response: SessionSetupResponse): Array<{
 
 function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) {
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
+}
+
+/** Parameters that Cursor lists beside the model once `parameterizedModelPicker` is set. */
+const SPEED_PARAMETER_ORDER = ["context", "thinking", "fast"] as const;
+
+/**
+ * One catalog row for each speed Cursor offers, and for each context or thinking value that has
+ * more than one choice. The id keeps those parameters (`composer-2.5[fast=false]`) so the picker
+ * can show them. Reasoning stays off the id: the effort control owns it.
+ *
+ * A model with no fast choice is unchanged. Variant mode has no fast option, so its ids stay whole.
+ */
+function speedVariants(models: readonly AcpModel[], options: readonly SessionConfigOption[]): AcpModel[] {
+  return models.flatMap((model) => expandSpeed(model, options));
+}
+
+function expandSpeed(model: AcpModel, options: readonly SessionConfigOption[]): AcpModel[] {
+  const fast = parameterValues(options, "fast");
+  if (!fast.includes("true") || !fast.includes("false")) return [model];
+  const choices = SPEED_PARAMETER_ORDER.flatMap((id) => {
+    const values = parameterValues(options, id);
+    return values.length > 1 ? [{ id, values }] : [];
+  });
+  const parsed = parseModelParameters(model.id);
+  const base = parsed?.base ?? model.id;
+  const kept = new Map(parsed?.params ?? []);
+  kept.delete("reasoning");
+  kept.delete("effort");
+  let rows = [kept];
+  for (const choice of choices) {
+    rows = rows.flatMap((row) => choice.values.map((value) => new Map(row).set(choice.id, value)));
+  }
+  const seen = new Set<string>();
+  return rows.flatMap((params) => {
+    const id = formatModelParameters(base, params);
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ ...model, id }];
+  });
+}
+
+function parameterValues(options: readonly SessionConfigOption[], id: string): string[] {
+  const option = options.find((candidate) => candidate.id === id);
+  if (!option) return [];
+  if (option.type === "boolean") return ["false", "true"];
+  if (option.type !== "select") return [];
+  return [...new Set(selectValues(option).map((entry) => entry.value))];
+}
+
+function parseModelParameters(value: string): { base: string; params: Map<string, string> } | null {
+  const open = value.indexOf("[");
+  if (open <= 0 || !value.endsWith("]")) return null;
+  const params = new Map<string, string>();
+  for (const pair of value.slice(open + 1, -1).split(",")) {
+    if (!pair) continue;
+    const separator = pair.indexOf("=");
+    if (separator <= 0) return null;
+    params.set(pair.slice(0, separator), pair.slice(separator + 1));
+  }
+  return { base: value.slice(0, open), params };
+}
+
+function formatModelParameters(base: string, params: ReadonlyMap<string, string>): string {
+  const parts = SPEED_PARAMETER_ORDER.flatMap((key) => {
+    const value = params.get(key);
+    return value === undefined ? [] : [`${key}=${value}`];
+  });
+  return parts.length > 0 ? `${base}[${parts.join(",")}]` : base;
+}
+
+/**
+ * The model option value to send, and the parameters to set after it.
+ *
+ * An id the option lists is sent whole. A parameterized id is sent as its base when that base is
+ * listed, and its parameters follow. Anything else is left for the caller's own model set.
+ */
+function resolveListedModel(
+  value: string,
+  listed: readonly string[],
+): { base: string; params: Map<string, string> } | null {
+  if (listed.includes(value)) return { base: value, params: new Map() };
+  const parsed = parseModelParameters(value);
+  if (!parsed || !listed.includes(parsed.base)) return null;
+  return parsed;
 }
 
 /**
