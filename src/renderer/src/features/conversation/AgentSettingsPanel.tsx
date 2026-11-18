@@ -517,9 +517,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   // A setting card opens the page of a link row here, and gives each other row to the shared panel.
   const settingReveal = createMemo(() => props.settingReveal);
   const [panelReveal, setPanelReveal] = createSignal<AgentSettingReveal | null>(null);
+  // The routines page can already show one routine, so the card also asks it for the list.
+  const [routinesListRequest, setRoutinesListRequest] = createSignal<number | null>(null);
   createEffect(settingReveal, (request) => {
     if (!request) return;
     const detail = revealDetail(request.settingId);
+    if (detail === "routines") setRoutinesListRequest(request.nonce);
     setDraft((state) => {
       state.instructions.open = detail === "instructions";
       state.memories.open = detail === "memories";
@@ -719,6 +722,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               })
             }
             onClose={props.onClose}
+            listRequest={routinesListRequest()}
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}

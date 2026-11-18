@@ -131,6 +131,8 @@ interface AgentRoutinesSettingsProps {
   onCountChange: (count: number) => void;
   onBack?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
+  /** A new value shows the list of routines, as Back does, such as for a setting card of the routines. */
+  listRequest?: number | null | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
@@ -313,6 +315,18 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         }
         requestRoutineSelection(request, currentRoutines.find((routine) => routine.id === request.routineId) ?? null);
       });
+    },
+  );
+
+  // A request that was set before this page opened is not new: the page already shows the list.
+  let lastListRequest = untrack(() => props.listRequest);
+  createEffect(
+    () => props.listRequest,
+    (request) => {
+      if (request == null || request === lastListRequest) return;
+      lastListRequest = request;
+      // Back asks before it discards an edit of the routine.
+      if (draft()) requestExit("list");
     },
   );
 
