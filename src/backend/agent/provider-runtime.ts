@@ -1138,16 +1138,21 @@ export class ProviderRuntime implements ProviderPort {
    * keeps watchers in each folder that one of its sessions used until its process ends, also after
    * `session/close`, and Windows refuses to remove a watched folder (`EBUSY`, #7029). A process that
    * a turn of another agent uses stays: the delete fails, and a retry after that turn can succeed.
+   * True when work keeps the process: a turn, a start, or work that a turn left running.
    */
   readonly releaseSharedProcess = Effect.fn("ProviderRuntime.releaseSharedProcess")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const client = this.#clients.get(provider);
-    if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return;
-    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) return;
+    if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return false;
+    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) {
+      logger.info("Kept a provider CLI that holds a deleted agent's folder, because work uses it.", { provider });
+      return true;
+    }
     logger.info("Stopped a provider CLI that holds a deleted agent's folder.", { provider });
     yield* this.#releaseClient(provider, client);
+    return false;
   }, Effect.uninterruptible).bind(this);
 
   /** Closes the idle threads of each client and each Workspace only process, when memory is low. */

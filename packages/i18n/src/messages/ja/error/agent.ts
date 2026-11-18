@@ -131,6 +131,8 @@ export const messages = {
   "error.agent.stopBeforeDelete": "削除する前に、エージェントを停止し、キュー内のメッセージをキャンセルしてください。",
   "error.agent.deleteIncomplete":
     "エージェントのデータを完全には削除できませんでした。エージェントの削除を再試行してください。",
+  "error.agent.deleteFolderInUse":
+    "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わったとき、または OpenBot を再起動したあとに、もう一度削除してください。",
   "error.agent.duplicationBusy": "このエージェントはすでに複製中です。",
   "error.agent.waitBeforeDuplicate": "複製する前に、エージェントが終わるまで待ち、キューを空にしてください。",
   "error.agent.saveOtherAgent": "この保存は別のエージェントのものです。",

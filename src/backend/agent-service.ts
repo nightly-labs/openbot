@@ -2076,12 +2076,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             yield* this.#providers
               .stopAgentProcess(agentId)
               .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
-            if (process.platform !== "win32") return;
+            if (process.platform !== "win32") return false;
             const release = yield* Effect.try({
               try: () => this.#releasesSharedOpenCode(agentId),
               catch: (cause) => new AgentRemovalFailed({ cause }),
             });
-            if (release) yield* this.#providers.releaseSharedProcess("opencode");
+            return release ? yield* this.#providers.releaseSharedProcess("opencode") : false;
           }),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),

@@ -117,6 +117,8 @@ export const messages = {
   "error.agent.deletionBusy": "에이전트를 이미 삭제하는 중이에요.",
   "error.agent.stopBeforeDelete": "삭제하기 전에 에이전트를 중지하고 대기 중인 메시지를 취소해 주세요.",
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
+  "error.agent.deleteFolderInUse":
+    "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",
   "error.agent.waitBeforeDuplicate": "복제하기 전에 에이전트가 끝나고 대기열이 비워질 때까지 기다려 주세요.",
   "error.agent.saveOtherAgent": "이 저장은 다른 에이전트의 것이에요.",

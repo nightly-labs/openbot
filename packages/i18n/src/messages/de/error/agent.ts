@@ -140,6 +140,8 @@ export const messages = {
     "Stoppe den Agenten und storniere seine Nachrichten in der Warteschlange, bevor du ihn löschst.",
   "error.agent.deleteIncomplete":
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
+  "error.agent.deleteFolderInUse":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",
   "error.agent.waitBeforeDuplicate":
     "Warte, bis der Agent fertig ist, und leere seine Warteschlange, bevor du ihn duplizierst.",
