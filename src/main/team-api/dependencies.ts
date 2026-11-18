@@ -693,6 +693,7 @@ export type TeamApiBrowser = Pick<
   | "takeUserControl"
   | "releaseUserControl"
   | "releaseUserControlHeldBy"
+  | "releaseUserControlRefused"
   // A task that a person shows, behind `browser-teach-v1`.
   | "startTeach"
   | "stopTeach"
@@ -708,7 +709,13 @@ export type TeamApiBrowser = Pick<
 >;
 export type TeamApiBrowserView = Pick<
   BrowserViewGateway,
-  "handlesUpgrade" | "handleUpgrade" | "stop" | "createSession" | "closeMemberSession" | "revokeTeamSession"
+  | "handlesUpgrade"
+  | "handleUpgrade"
+  | "stop"
+  | "createSession"
+  | "closeMemberSession"
+  | "revokeTeamSession"
+  | "closeRefusedSessions"
 >;
 export type TeamApiRemoteScreen = Pick<
   RemoteScreenGateway,

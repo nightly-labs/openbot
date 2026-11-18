@@ -366,7 +366,7 @@ import { routeAgentWaits } from "./team-api/route-agent-waits";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBackgroundProcesses } from "./team-api/route-background-processes";
 import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
-import { routeBrowser } from "./team-api/route-browser";
+import { hiddenTabTest, routeBrowser, visibleControlState } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeBrowserProxies } from "./team-api/route-browser-proxies";
 import { routeBrowsingMemory } from "./team-api/route-browsing-memory";
@@ -487,6 +487,12 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
 const logger = createOpenBotLogger("team-api-server");
 
 type AccessMember = Pick<TeamMemberSummary, "id" | "role">;
+
+/** The member of a connection and the agents at `none` for that member. */
+interface EventAccess {
+  member: AccessMember;
+  blocked: ReadonlySet<string>;
+}
 
 interface EventClientState {
   token: string;
@@ -1820,7 +1826,7 @@ export class TeamApiServer {
     };
     for (const [client, connection] of this.#eventClients) {
       if (memberId !== undefined && connection.memberId !== memberId) continue;
-      const event = this.#eventFor(connection, broadcast);
+      const event = this.#eventFor(connection, broadcast, () => accessFor(connection));
       // Only accounts after the first: a client reads an empty reading as no provider reporting.
       if (event !== broadcast && event.type === "usage-changed" && event.usage.limits.length === 0) continue;
       if (event.type === "conversation") {
@@ -2091,16 +2097,16 @@ export class TeamApiServer {
    * A member does not see an administrator's private MCP sign-in tab, or a tab of an agent that the
    * roles close to that member, the same as on the browser routes. A usage reading keeps the
    * provider's own sign-in only, as `GET /v1/agents/usage` does: a released client reads one limit per
-   * provider.
+   * provider. A broadcast gives `access`, which it reads once for each member.
    */
-  #eventFor(connection: EventClientState, event: AgentEvent): AgentEvent {
+  #eventFor(connection: EventClientState, event: AgentEvent, access?: () => EventAccess): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
       return {
         ...event,
         usage: { ...event.usage, limits: event.usage.limits.filter((limit) => limit.accountId === undefined) },
       };
     if (event.type === "browser-user-control-changed") {
-      const hidden = this.#hiddenTab(connection, event.tabIds);
+      const hidden = this.#hiddenTab(connection, event.tabIds, access);
       if (!hidden) return event;
       return { ...event, tabIds: event.tabIds.filter((tabId) => !hidden(tabId)) };
     }
@@ -2108,14 +2114,22 @@ export class TeamApiServer {
       const hidden = this.#hiddenTab(
         connection,
         event.tabs.map((tab) => tab.tabId),
+        access,
       );
       if (!hidden) return event;
       return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
+    }
+    if (event.type === "browser-control-changed") {
+      const tabIds = event.state.sessions.flatMap((session) => (session.tabId === null ? [] : [session.tabId]));
+      const hidden = this.#hiddenTab(connection, tabIds, access);
+      if (!hidden) return event;
+      return { ...event, state: visibleControlState(event.state, hidden) };
     }
     if (event.type !== "browser-changed") return event;
     const hidden = this.#hiddenTab(
       connection,
       event.tabs.map((tab) => tab.id),
+      access,
       new Map(event.tabs.map((tab) => [tab.id, tab.ownerAgentId])),
     );
     if (!hidden) return event;
@@ -2124,27 +2138,23 @@ export class TeamApiServer {
   }
 
   /**
-   * The test of `routeBrowser` for the tabs of an event: a private tab, or a tab of an agent at `none`
-   * for this member. Undefined when the event has no tab that this connection must not see.
+   * The `routeBrowser` test for the tabs of an event. Undefined when the event has no tab that this
+   * connection must not see.
    */
   #hiddenTab(
     connection: EventClientState,
     tabIds: readonly string[],
+    access?: () => EventAccess,
     owners?: ReadonlyMap<string, string | null>,
   ): ((tabId: string) => boolean) | undefined {
-    const { browser } = this.#options;
     if (tabIds.length === 0) return undefined;
-    const member = this.#connectionMember(connection);
-    if (canAdministerServer(member.role)) return undefined;
-    const blocked = this.#blockedAgentIds(member);
-    if (blocked.size === 0 && !tabIds.some((tabId) => browser.isPrivate(tabId))) return undefined;
-    // The owners are read only when an agent is closed to this member.
-    const tabOwners =
-      blocked.size === 0 ? undefined : (owners ?? new Map(browser.listTabs().map((tab) => [tab.id, tab.ownerAgentId])));
-    const hidden = (tabId: string) => {
-      const owner = tabOwners?.get(tabId);
-      return browser.isPrivate(tabId) || (typeof owner === "string" && blocked.has(owner));
-    };
+    const resolved =
+      access?.() ??
+      (() => {
+        const member = this.#connectionMember(connection);
+        return { member, blocked: this.#blockedAgentIds(member) };
+      })();
+    const hidden = hiddenTabTest(this.#options.browser, resolved.member.role, () => resolved.blocked, owners);
     return tabIds.some(hidden) ? hidden : undefined;
   }
 
@@ -2749,6 +2759,40 @@ export class TeamApiServer {
           this.#liveVoiceSessions.remove(voice.sessionId);
           void runCauseEffect(liveVoice.stopLiveVoice(voice.sessionId, voice.memberId)).catch(() => undefined);
         }
+    this.#endClosedAgentTabs();
+  }
+
+  /**
+   * After a change of the roles, a member gives back the tabs of an agent that is now at `none` for
+   * them: the hold and its recording end, the browser views close, and each client gets the tab list
+   * that it may see.
+   */
+  #endClosedAgentTabs(): void {
+    const { browser, browserView } = this.#options;
+    const owners = new Map(browser.listTabs().map((tab) => [tab.id, tab.ownerAgentId]));
+    if (owners.size === 0) return;
+    const blocked = new Map<string, ReadonlySet<string>>();
+    const refused = (memberId: string, tabId: string) => {
+      const owner = owners.get(tabId);
+      if (typeof owner !== "string") return false;
+      let agents = blocked.get(memberId);
+      if (!agents) {
+        agents = this.#blockedAgentIds(memberId);
+        blocked.set(memberId, agents);
+      }
+      return agents.has(owner);
+    };
+    browser.releaseUserControlRefused((tabId, holder) => holder.kind === "member" && refused(holder.memberId, tabId));
+    if (browserView)
+      void runCauseEffect(browserView.closeRefusedSessions((view) => refused(view.memberId, view.tabId))).catch(
+        () => undefined,
+      );
+    const display = browser.getDisplayState();
+    this.#broadcastAgentEventToClients({
+      type: "browser-changed",
+      tabs: display.tabs,
+      activeTabId: display.activeTabId,
+    });
   }
 
   /**

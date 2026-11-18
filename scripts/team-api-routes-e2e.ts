@@ -1857,13 +1857,13 @@ const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0]
 const releasedSession = (sessionId: string | undefined) =>
   releasedHolders.some((holder) => holder.kind === "session" && holder.sessionId === sessionId);
 
-// The tabs of the host. Only the check of the tabs of a closed agent sets them; before and after it,
-// a read of the tab list fails, as it did before.
-let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> | undefined;
-const unusedListTabs = unused("listTabs");
+// The tabs of the host, and the tabs that people hold. Only the check of the tabs of a closed agent
+// sets them.
+let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> = [];
+let userControlHolds: [string, Parameters<Parameters<TeamApiBrowser["releaseUserControlRefused"]>[0]>[1]][] = [];
 
 const browser: TeamApiBrowser = {
-  listTabs: () => browserTabs ?? unusedListTabs(),
+  listTabs: () => browserTabs,
   getControlState: unused("getControlState"),
   open: unused("open"),
   activate: unused("activate"),
@@ -1884,10 +1884,18 @@ const browser: TeamApiBrowser = {
   releaseUserControlHeldBy: (holder) => {
     releasedHolders.push(holder);
   },
+  releaseUserControlRefused: (refused) => {
+    record(
+      "releaseUserControlRefused",
+      userControlHolds
+        .filter(([tabId, holder]) => refused(tabId, holder))
+        .map(([tabId, holder]) => `${tabId}:${holder.kind === "member" ? holder.memberId : "local"}`),
+    );
+  },
   close: unused("close"),
   capturePreview: unused("capturePreview"),
   setVisible: unused("setVisible"),
-  getDisplayState: unused("getDisplayState"),
+  getDisplayState: () => ({ tabs: browserTabs, activeTabId: null }),
   loadUrl: unused("loadUrl"),
   // Only the browser-profiles tab route asks. `tab-private` holds an administrator's MCP sign-in.
   isPrivate: (tabId) => tabId === "tab-private",
@@ -6523,9 +6531,29 @@ try {
       token: bobToken,
       json: { url: "https://shop.example/", ownerThreadId: null, ownerAgentId: "agent-ada" },
     });
+    // The access change ends Bob's hold of the closed agent's tab, not his other hold or the holds of others.
+    userControlHolds = [
+      ["tab-ada", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-oc", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-ada", { kind: "member", memberId: adaId, sessionId: "ada-session" }],
+      ["tab-ada", { kind: "local" }],
+    ];
+    const notifyAccess = () => {
+      for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    };
+    notifyAccess();
+    const releasedOnClose = callsOf("releaseUserControlRefused").at(-1);
     accessLevels = { revision: 94, everyone: {}, roles: [] };
+    notifyAccess();
+    const releasedOnOpen = callsOf("releaseUserControlRefused").at(-1);
+    userControlHolds = [];
     const reopened = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
-    browserTabs = undefined;
+    browserTabs = [];
+    check(
+      "when the roles close an agent to a member, the host gives back only that member's hold of the agent's tab; when they open it again, no hold",
+      isDeepStrictEqual(releasedOnClose, [[`tab-ada:${bobId}`]]) && isDeepStrictEqual(releasedOnOpen, [[]]),
+      { releasedOnClose, releasedOnOpen },
+    );
     check(
       "a member does not see or use a tab of an agent at none, and cannot open one for it; an admin sees it; the member sees it again when the access opens",
       isDeepStrictEqual(ids(memberTabs), ["tab-oc"]) &&
