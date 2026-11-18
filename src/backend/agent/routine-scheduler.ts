@@ -107,7 +107,7 @@ export interface RoutineHooks {
   excludedAgents(): ReadonlySet<string>;
   /** The timer only arms while the service is initialized and not stopping. */
   isRunning(): boolean;
-  /** Whether a spent provider plan holds this agent's queue. */
+  /** Whether a spent provider plan holds this agent's queue, and no ready backup model or account can take it. */
   usageLimited(agentId: string): boolean;
   /**
    * The open side thread that takes the runs of this routine, created or restored here. Null when the

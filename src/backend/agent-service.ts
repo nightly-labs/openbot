@@ -971,7 +971,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
-        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+        // A ready backup model or pool account takes the run: the drain moves the agent to it, as it
+        // does for a chat message. Only an agent with no ready backup skips the run (#11785).
+        usageLimited: (agentId) =>
+          !this.#usageLimits.mayDrain(agentId) &&
+          this.#usageLimitBackup(agentId) === undefined &&
+          !this.#poolBackup(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
           const thread = this.#tasks.threadOfRoutine(agentId, routineId);
