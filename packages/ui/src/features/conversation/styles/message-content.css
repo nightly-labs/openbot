@@ -222,6 +222,10 @@
   text-align: right;
 }
 
+/* The selection of message text has the color of the highlight that keeps it after the
+   instruction field takes focus, so the passage keeps one color. */
+:is([data-selection-message-id], [data-selection-file-quote])::selection,
+:is([data-selection-message-id], [data-selection-file-quote]) ::selection,
 ::highlight(openbot-message-selection) {
   background: var(--openbot-accent-strong);
   color: inherit;
