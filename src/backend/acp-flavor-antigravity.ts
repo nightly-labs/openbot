@@ -452,7 +452,8 @@ function folderNames(folder: string): string[] {
 /**
  * Whether `parameters` has the field that Google refused at `path`: a missing key, an empty value, or
  * a key in a schema of a type other than the one that Google asks for. An index in a step reads an
- * array, and a property name reads an object.
+ * array, and a property name reads an object. The CLI sends each number or boolean in an `enum` as an
+ * empty value, such as the `limit` of Aave's `get_reserve_holders`, `[10, 50]` (#9544, #12358).
  */
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
@@ -482,6 +483,7 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     // The field is refused only beside another type. A schema of the asked type with the same field is accepted.
     return node.type !== type && !(Array.isArray(node.type) && node.type.includes(type));
   }
+  if (last.key === "enum" && (typeof node === "number" || typeof node === "boolean")) return true;
   return node === "" || (Array.isArray(node) && node.length === 0);
 }
 

@@ -23,6 +23,8 @@
 // tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
 // out its server, and the turn answers.
 // From #11746: Google refuses `items` on a field that is not an array. Its server is left out the same way.
+// From #12358: the CLI sends a number `enum`, such as Aave's `limit: [10, 50]`, as empty values. Its
+// server is left out the same way.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -65,6 +67,7 @@ interface Report {
   refusedDrops?: McpServerDrop[];
   googleDrops?: McpServerDrop[];
   blingDrops?: McpServerDrop[];
+  aaveDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -449,6 +452,39 @@ try {
     ["bling", null],
     "The prompt runs once more, and then without the refused server.",
   );
+
+  // 11. The CLI sends a number `enum` as empty values, and Google refuses them (#12358). `atlas` has a
+  // field with the same name and a text `enum`, which Google accepts.
+  const aaveDrops: McpServerDrop[] = [];
+  const aaveClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+        httpServer("aave", "aave", "https://aave.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => aaveDrops.push(...dropped),
+    },
+  );
+  clients.push(aaveClient);
+  aaveClient.start();
+  const aaveWorkspace = join(root, "aave-workspace");
+  await mkdir(aaveWorkspace, { recursive: true });
+  const aaveThread = await startThread(aaveClient, { cwd: aaveWorkspace });
+  const aaveTurn = await runTurn(aaveClient, aaveThread, { text: "Reply with OK only.", timeoutMs: 30_000 });
+  report.turns.googleRefusedNumberEnum = aaveTurn;
+  report.aaveDrops = aaveDrops;
+  assert.equal(aaveTurn.error, null, "The turn that Google refused for a number enum has no error.");
+  assert.equal(aaveTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    aaveDrops.map((drop) => drop.name),
+    ["aave"],
+    "Only the server whose enum holds numbers is left out.",
+  );
+  assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
