@@ -174,6 +174,10 @@ export const messages = {
     "{provider}이(가) 제시간에 응답하지 않았어요. 컴퓨터가 바쁜 것 같아요. OpenBot이 다시 시도할게요.",
   "error.provider.cliTimedOutRefresh":
     "{provider}이(가) 제시간에 응답하지 않았어요. 컴퓨터가 바쁜 것 같아요. 제공자를 새로 고쳐 다시 시도해 주세요.",
+  "error.provider.serviceUnreachable":
+    "{provider}이(가) 서비스에 연결할 수 없어요. 인터넷 연결을 확인해 주세요. OpenBot이 다시 시도할게요.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider}이(가) 서비스에 연결할 수 없어요. 인터넷 연결을 확인한 다음 제공자를 새로 고쳐 주세요.",
   "error.provider.acpStartTimedOut":
     "{provider}이(가) {seconds}초 안에 시작을 마치지 못했어요. 컴퓨터가 바쁜 것 같아요.",
   "error.provider.acpModelsTimedOut":

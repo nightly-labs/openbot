@@ -160,6 +160,10 @@ export const messages = {
   "error.provider.cliTimedOut": "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. سيعيد OpenBot المحاولة.",
   "error.provider.cliTimedOutRefresh":
     "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.serviceUnreachable":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
+  "error.provider.serviceUnreachableRefresh":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت، ثم حدّث المزوّدين.",
   "error.provider.acpStartTimedOut": "لم يكتمل تشغيل {provider} خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.acpModelsTimedOut": "لم يعرض {provider} نماذجه خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.startStopped":

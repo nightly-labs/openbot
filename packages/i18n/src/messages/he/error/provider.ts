@@ -162,6 +162,10 @@ export const messages = {
   "error.provider.cliNotReady": "ה-CLI של {provider} אינו מוכן או שאינו מחובר.",
   "error.provider.cliTimedOut": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. OpenBot ינסה שוב.",
   "error.provider.cliTimedOutRefresh": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. יש לרענן את הספקים כדי לנסות שוב.",
+  "error.provider.serviceUnreachable":
+    "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט. OpenBot ינסה שוב.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט ואז לרענן את הספקים.",
   "error.provider.acpStartTimedOut": "{provider} לא סיים להתחיל תוך {seconds} שניות. ייתכן שהמחשב עמוס.",
   "error.provider.acpModelsTimedOut": "{provider} לא הציג את המודלים שלו תוך {seconds} שניות. ייתכן שהמחשב עמוס.",
   "error.provider.startStopped":

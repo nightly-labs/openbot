@@ -170,6 +170,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliTimedOut": "{provider} did not answer in time. The computer may be busy. OpenBot will try again.",
   "error.provider.cliTimedOutRefresh":
     "{provider} did not answer in time. The computer may be busy. Refresh the providers to try again.",
+  "error.provider.serviceUnreachable":
+    "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} cannot connect to its service. Check your internet connection, then refresh the providers.",
   "error.provider.acpStartTimedOut": "{provider} did not finish starting within {seconds} s. The computer may be busy.",
   "error.provider.acpModelsTimedOut":
     "{provider} did not list its models within {seconds} s. The computer may be busy.",

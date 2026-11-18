@@ -182,6 +182,10 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。OpenBot が再試行します。",
   "error.provider.cliTimedOutRefresh":
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
+  "error.provider.serviceUnreachable":
+    "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} がサービスに接続できません。インターネット接続を確認してから、プロバイダーを更新してください。",
   "error.provider.acpStartTimedOut":
     "{provider} の起動が {seconds} 秒以内に完了しませんでした。コンピューターの負荷が高い可能性があります。",
   "error.provider.acpModelsTimedOut":
