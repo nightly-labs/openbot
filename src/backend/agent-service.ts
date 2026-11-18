@@ -1066,7 +1066,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             // The drains also run when a step above fails, so no settled lane stays idle.
             Effect.ensuring(
               Effect.sync(() => {
-                for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
+                this.#drain.scheduleDrains(this.#store.list().map((agent) => agent.id));
                 // An edit from before the restart holds its message for a new time.
                 for (const agentId of this.#mailbox.agentsWithEditHolds()) this.#queue.wakeAfterEditHold(agentId);
               }),
@@ -1171,9 +1171,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
           this.#drain.providerResumed(provider);
-          for (const agent of this.#store.list()) {
-            if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
-          }
+          this.#drain.scheduleDrains(
+            this.#store
+              .list()
+              .filter((agent) => providerForAgent(agent) === provider)
+              .map((agent) => agent.id),
+          );
           this.#retryHeldMoves();
         },
         onAccountsChanged: () => this.#retryHeldMoves(),
@@ -1783,9 +1786,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memory: hostMemory,
       chosenTurnLimit: () => hostTurnLimits?.turnLimit() ?? null,
       hooks: {
-        scheduleAll: () => {
-          for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
-        },
+        scheduleAll: () => this.#drain.scheduleDrains(this.#store.list().map((agent) => agent.id)),
         retryWaiting: () => this.#drain.retrySlotWaiters(),
         releaseIdleThreads: () =>
           Effect.sync(() => this.#codexIdleSessions.releaseIdle()).pipe(
@@ -2492,10 +2493,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * stops no running turn, and the next turn waits.
    */
   turnLimitsChanged(): void {
-    for (const agent of this.#store.list()) {
-      this.#tasks.changed(agent.id);
-      this.#drain.scheduleDrain(agent.id);
-    }
+    const agentIds = this.#store.list().map((agent) => agent.id);
+    for (const agentId of agentIds) this.#tasks.changed(agentId);
+    this.#drain.scheduleDrains(agentIds);
     this.#drain.retrySlotWaiters();
   }
 

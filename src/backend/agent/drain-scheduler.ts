@@ -572,6 +572,16 @@ export class DrainScheduler {
   }
 
   /**
+   * Schedules each agent with one read of each lane. Each `scheduleDrain` alone reads all lanes of all
+   * agents again, also for the slot retry that it starts (#11710).
+   */
+  scheduleDrains(agentIds: Iterable<string>): void {
+    this.#slots.round(() => {
+      for (const agentId of agentIds) this.scheduleDrain(agentId);
+    });
+  }
+
+  /**
    * Drains the agent again after a wait, once for all its lanes that the busy session refused or
    * whose session did not open in time. A turn that starts, `forgetAgent` and `dispose` end the retry.
    */
@@ -622,7 +632,10 @@ export class DrainScheduler {
     try {
       const waiters = [...this.#slotWaiters];
       this.#slotWaiters.clear();
-      for (const key of waiters) this.#scheduleLane(laneOf(key));
+      // Each lane schedules its drain in a microtask, so no lane starts during this loop.
+      this.#slots.round(() => {
+        for (const key of waiters) this.#scheduleLane(laneOf(key));
+      });
     } finally {
       this.#wakingSlotWaiters = false;
     }
