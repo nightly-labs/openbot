@@ -1693,7 +1693,15 @@ function RuntimeSection(props: SectionProps) {
   const versionLine = () => {
     const current = runtime();
     if (!current) return null;
-    if (current.phase === "not-downloaded") return t("provider.status.notDownloaded");
+    if (current.phase === "not-downloaded") {
+      // The user's own CLI runs until the offered copy is downloaded, so the line names it (#11854).
+      const version = props.option.incompleteCliVersion;
+      return version
+        ? t("provider.settings.versionInstalledByUser", {
+            version: providerVersionLabel({ ...current, version }, { t }) ?? version,
+          })
+        : t("provider.status.notDownloaded");
+    }
     if (current.phase === "download-error")
       return current.message ?? providerStatusLabel(t, format, row().state(), false, current);
     if (current.phase === "downloading" || current.phase === "finishing") {
@@ -1745,6 +1753,9 @@ function RuntimeSection(props: SectionProps) {
                   {(other) => (
                     <ItemDescription>{t(OTHER_VERSION[other().source], { version: other().version })}</ItemDescription>
                   )}
+                </Show>
+                <Show when={runtime()?.phase === "not-downloaded" && props.option.incompleteCliVersion}>
+                  <ItemDescription>{t("provider.settings.installedVersionIncomplete")}</ItemDescription>
                 </Show>
                 <Show when={progress() !== null}>
                   <Progress

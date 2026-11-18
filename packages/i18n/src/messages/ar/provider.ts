@@ -357,6 +357,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
   "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
   "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "تحتاج بعض النماذج إلى جزء غير موجود في هذا الإصدار. نزّل إصدار OpenBot لاستخدامها.",
   "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
   "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",
