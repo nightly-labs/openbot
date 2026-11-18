@@ -217,7 +217,7 @@ try {
   // 7. A running turn blocks a delete, in the menu and on the host.
   await tab(title).click();
   const composer = page.getByRole("textbox", {
-    name: english("conversation.threads.view.placeholder", { name: agent.name, title }),
+    name: english("conversation.threads.view.placeholder", { name: agent.name }),
   });
   await composer.fill(LONG_PROMPT);
   await composer.press("Enter");

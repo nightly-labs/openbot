@@ -135,6 +135,7 @@
     "./features/conversation/VideoGeneration": "./src/features/conversation/VideoGeneration.tsx",
     "./features/conversation/VoicePlayer": "./src/features/conversation/VoicePlayer.tsx",
     "./features/conversation/branch-points": "./src/features/conversation/branch-points.ts",
+    "./features/conversation/chat-grouping": "./src/features/conversation/chat-grouping.ts",
     "./features/conversation/threads/AgentThreadView": "./src/features/conversation/threads/AgentThreadView.tsx",
     "./features/conversation/threads/BranchDivider": "./src/features/conversation/threads/BranchDivider.tsx",
     "./features/conversation/threads/ThreadHeader": "./src/features/conversation/threads/ThreadHeader.tsx",

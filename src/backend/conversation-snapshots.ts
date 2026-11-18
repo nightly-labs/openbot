@@ -350,8 +350,11 @@ function reconcileClaudeHistoryMessages(
      recorded, and the imported copy is dropped rather than stored a second time on every restart. */
   const storedNarrationTurns = new Set<string>();
   for (const message of stored) {
-    if (!isClaudeNarration(message) || !message.turnId) continue;
-    storedNarrationTurns.add(message.turnId);
+    if (!message.turnId) continue;
+    // A quiet turn kept its narration as a quiet answer, under the ID of the narration.
+    const quietNarration =
+      message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE && message.id.startsWith(`${message.turnId}:narration:`);
+    if (isClaudeNarration(message) || quietNarration) storedNarrationTurns.add(message.turnId);
   }
   const storedReasoning = new Map<string, ConversationMessage>();
   for (const message of stored) {

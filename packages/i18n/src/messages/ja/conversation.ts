@@ -87,7 +87,7 @@ export const messages = {
   "conversation.threads.branch.from": "{title} から分岐",
   "conversation.threads.branch.fromDeleted": "削除されたスレッドから分岐",
   "conversation.threads.view.newPlaceholder": "{name} との新しいスレッド",
-  "conversation.threads.view.placeholder": "{title} で {name} にメッセージを送る",
+  "conversation.threads.view.placeholder": "このスレッドで {name} にメッセージを送る",
   "conversation.threads.view.queued": "このスレッドで待機中のメッセージ",
   "conversation.threads.view.failed": "スレッドが失敗しました",
   "conversation.threads.error.load": "このエージェントのスレッドを読み込めませんでした。",

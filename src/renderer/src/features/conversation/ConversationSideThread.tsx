@@ -59,6 +59,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     openWaitingAgent,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
+  const threadBackgroundWorkSince = (taskId: string | undefined) =>
+    taskId === undefined ? undefined : view.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -254,6 +256,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             factsAbove={turnSteps.factsAbove}
             traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
+            backgroundWorkSince={threadBackgroundWorkSince(current().thread.task?.id)}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}

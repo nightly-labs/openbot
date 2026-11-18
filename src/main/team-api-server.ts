@@ -33,6 +33,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
@@ -1649,6 +1650,7 @@ export class TeamApiServer {
         browserSignIn: capabilities.has(BROWSER_SIGN_IN_CAPABILITY),
         browserVaultSkip: capabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+        backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         // Only the V7 and V8 encoders read them.
@@ -3172,6 +3174,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
+  AGENT_BACKGROUND_WORK_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,

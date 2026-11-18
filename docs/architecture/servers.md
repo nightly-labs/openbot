@@ -703,6 +703,17 @@ comes back after a reconnect. The WebRTC host peer encodes the events again with
 Compacting the context of a joined server's agent stays local only: the Team API has no route for it.
 The iPhone app advertises the capability through the shared team client, but it shows no meter.
 
+### Background work
+
+`agent-background-work-v1` (protocol 10) tells a client that an agent waits for its own background
+work after its turn ended (see `team-protocol/agent-background-work-v1.ts`). It adds `backgroundWork`
+beside the frozen keys of the `snapshot` of the `runtime-snapshot` event: one entry for each waiting
+chat or thread, with `botId`, `taskId` (`null` for the agent's chat) and `since`. The host adds it only
+for a connection that advertises the capability, and filters it as the rest of the snapshot. The
+desktop and the web client show a waiting row with a timer in the chat or the thread until the job
+wakes the agent. A host without the capability never sends it, so the client shows no row. Only a
+Claude agent reports background work. The iPhone app does not show the row.
+
 ### Queue window
 
 `queue-window-v1` keeps the queue snapshot of a long-lived agent inside one WebRTC frame. The
