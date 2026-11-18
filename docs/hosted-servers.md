@@ -1054,7 +1054,8 @@ Leaseweb accounts use one scheme:
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
 traffic in and out of each VPS on the four accounts, from the first day of this month (UTC) to today,
-and the part of the traffic pack of its contract. The output has the reference with no email, and
+and the part of the traffic pack of its contract that the outgoing traffic used. Leaseweb counts only
+the outgoing traffic of a VPS against the pack. The output has the reference with no email, and
 `server` for a hosted server.
 
 To take a VPS:
