@@ -44,12 +44,18 @@ export const NoBillingCountry: Story = {
   render: () => <PricingStory details={{ country: null, vatId: "" }} />,
 };
 
-/** A buyer in Germany. The optional EU VAT ID shows, with DE as its placeholder. */
+/**
+ * A consumer in Germany. The optional EU VAT ID shows, with DE as its placeholder. A server order also asks that the
+ * hosting service begin before the withdrawal period ends: the order button stays off until both boxes are ticked.
+ */
 export const EuCountry: Story = {
   render: () => <PricingStory details={{ country: "DE", vatId: "" }} />,
 };
 
-/** A VAT ID that is not one of the country. The error shows when the field loses focus. */
+/**
+ * A VAT ID that is not one of the country. The error shows when the field loses focus. A buyer with a VAT ID is a
+ * business, so the early start box does not show.
+ */
 export const EuCountryWrongVatId: Story = {
   render: () => <PricingStory details={{ country: "FR", vatId: "DE123456789" }} />,
 };

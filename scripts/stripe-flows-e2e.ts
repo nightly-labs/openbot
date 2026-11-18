@@ -119,7 +119,7 @@ import {
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
-import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
+import { EARLY_START_METADATA, STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -565,12 +565,22 @@ class Account {
     return createdSchema.parse(response.body);
   }
 
-  /** A server create request, monthly in EUR, with a license order when one is given. */
-  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder) {
+  /**
+   * A server create request, monthly in EUR, with a license order when one is given. `earlyStart` is the
+   * value that the client sends for the early start request of a consumer in the EU.
+   */
+  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder, earlyStart?: unknown) {
     return this.request(
       "POST",
       "v2/hosting/servers",
-      { name, plan, interval: "month", currency: "eur", ...(license ? { license } : {}) },
+      {
+        name,
+        plan,
+        interval: "month",
+        currency: "eur",
+        ...(license ? { license } : {}),
+        ...(earlyStart === undefined ? {} : { earlyStart }),
+      },
       { "Idempotency-Key": `e2e-${this.scenario}-${randomBytes(8).toString("hex")}` },
     );
   }
@@ -3861,6 +3871,35 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       "a buyer in Germany with no VAT ID pays Polish VAT: the seller is not in the One Stop Shop",
       consumer.status === 200 && addsPolishVat(consumerPage) && vatView(consumerPage)?.country === "DE",
       { status: consumer.status, vat: vatView(consumerPage) },
+    );
+
+    // The early start request of a consumer in the EU is the record on the page. A reopened page keeps its time.
+    const asked = createdSchema.safeParse(
+      (await account.orderServer("Early start server", "standard", undefined, true)).body,
+    ).data;
+    const askedPage = asked?.checkoutUrl ? await licenseSession(asked.checkoutUrl) : null;
+    const askedAt = askedPage?.metadata?.[EARLY_START_METADATA];
+    const reopened = asked ? await account.checkout(asked.server.serverId) : null;
+    const reopenedPage = reopened?.checkoutUrl ? await licenseSession(reopened.checkoutUrl) : null;
+    const notTrue = createdSchema.safeParse(
+      (await account.orderServer("No early start server", "standard", undefined, "yes")).body,
+    ).data;
+    const notTruePage = notTrue?.checkoutUrl ? await licenseSession(notTrue.checkoutUrl) : null;
+    record(
+      "vat",
+      "an early start request is on the page with its time, a reopened page keeps the same time, and a page with no request or a value other than true has none",
+      askedAt !== undefined &&
+        Number.isFinite(Date.parse(askedAt)) &&
+        reopenedPage?.metadata?.[EARLY_START_METADATA] === askedAt &&
+        consumerPage?.metadata?.[EARLY_START_METADATA] === undefined &&
+        notTruePage !== null &&
+        notTruePage.metadata?.[EARLY_START_METADATA] === undefined,
+      {
+        asked: askedPage?.metadata,
+        reopened: reopenedPage?.metadata,
+        none: consumerPage?.metadata,
+        notTrue: notTruePage?.metadata,
+      },
     );
 
     const outside = await save({ country: "US" });
