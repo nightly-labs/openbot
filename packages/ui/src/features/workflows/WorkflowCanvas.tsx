@@ -1485,21 +1485,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   /**
-   * The place in the view nearest to its centre where a new node covers no card, on the grid. The size
-   * of the new node is the rendered size of a node of the same kind, or NEW_NODE. The margin of a fit
-   * stays free at the edges, so the bars over the canvas do not hide the node.
+   * The place in the view nearest to its centre where a box of this size covers no card, on the grid.
+   * The margin of a fit stays free at the edges, so the bars over the canvas do not hide the box. When
+   * the view has no free place, the box goes to the centre. The view is where the camera stops after a
+   * glide.
    */
-  const freePlace = (kind: WorkflowNodeKind): WfnPoint => {
+  const freePlace = (size: { width: number; height: number }, except?: string): WfnPoint => {
     const { width, height } = view();
     const { x, y, scale } = target();
     const cards = untrack(() =>
-      boxesOf(live().flatMap((node) => (node.kind === "text" || node.kind === "shape" ? [] : [node.id]))),
+      boxesOf(
+        live().flatMap((node) =>
+          node.kind === "text" || node.kind === "shape" || node.id === except ? [] : [node.id],
+        ),
+      ),
     );
-    const size = untrack(() => {
-      const same = live().find((node) => node.kind === kind && !sizes[node.id] && slotSizes[node.id]);
-      const rendered = same && slotSizes[same.id];
-      return rendered ? { width: rendered.width, height: rendered.height } : NEW_NODE;
-    });
     const margin = FIT_MARGIN / scale;
     const left = -x / scale + margin;
     const top = -y / scale + margin;
@@ -1525,19 +1525,32 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   /**
-   * Adds a node with its top-left corner at a world point, or in the view. A node without a point goes
-   * to the free place in the view that is nearest to its centre, so it does not hide a card. When the
-   * view has no free place, it goes to the centre. The view is where the camera stops after a glide.
+   * Adds a node with its top-left corner at a world point, or in a free place in the view. Before the
+   * node renders, its size is that of a node of the same kind, or NEW_NODE. After the first layout,
+   * the place uses the measured size, before the node shows.
    */
   const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
     const id = `${kind}-${crypto.randomUUID()}`;
-    const at = point ? snapPoint(point) : freePlace(kind);
+    const guess = untrack(() => {
+      const same = live().find((node) => node.kind === kind && !sizes[node.id] && slotSizes[node.id]);
+      return (same && slotSizes[same.id]) ?? NEW_NODE;
+    });
+    const at = point ? snapPoint(point) : freePlace(guess);
     setPositions((draft) => {
       draft[id] = at;
     });
     canvas.putFields(id, { ...fields, ...hostDefaults(kind, props.catalogs, props.features, fields) });
     setNodes((list) => [...list, kind === "trigger" ? { id, kind, schedule: newTriggerSchedule() } : { id, kind }]);
+    if (!point)
+      afterLayout(() => {
+        const element = slot(id);
+        if (!element || (element.offsetWidth === guess.width && element.offsetHeight === guess.height)) return;
+        const next = freePlace({ width: element.offsetWidth, height: element.offsetHeight }, id);
+        setPositions((draft) => {
+          draft[id] = next;
+        });
+      });
     return id;
   };
 
