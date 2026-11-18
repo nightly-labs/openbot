@@ -75,6 +75,7 @@ import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/ca
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_WEB_CLIENT_PROTOCOL,
   TEAM_WEBRTC_CLIENT_PROTOCOL,
   teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol/current";
@@ -92,6 +93,7 @@ import {
   TEAM_PROTOCOL_V9,
   TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -1496,7 +1498,8 @@ try {
     };
     // The bootstrap list of a protocol 9 client has the marker, so its first read is complete.
     const first = decodeTeamProtocolSupportV9(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
-    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V9);
+    // The host speaks protocol 10 too. A protocol 9 client reads the maximum and stays on 9.
+    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V10);
     assert.ok(first.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
     // A protocol 9 request may carry more than 128 capabilities.
     const full = decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)));
@@ -1532,9 +1535,14 @@ try {
     const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
     assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
     const host = decodeTeamProtocolSupportV9(record(frame.result, "RPC result").body).protocol;
-    // This host is in the support window and advertises 1-9: it works as before, on protocol 9.
-    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 });
+    // This host advertises 1-10. A client of protocol 9, such as mobile, works as before, on protocol 9.
+    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 });
     assert.deepEqual(teamWebRtcClientProtocol(host), { protocol: TEAM_PROTOCOL_V9, update: null });
+    // The web client speaks protocol 10 with it.
+    assert.deepEqual(teamWebRtcClientProtocol(host, TEAM_WEB_CLIENT_PROTOCOL), {
+      protocol: TEAM_PROTOCOL_V10,
+      update: null,
+    });
     // A host that raised its minimum to 9 still serves a client that speaks 9.
     const raised = { minimum: TEAM_PROTOCOL_V9, maximum: TEAM_PROTOCOL_V9 };
     assert.deepEqual(teamWebRtcClientProtocol(raised), { protocol: TEAM_PROTOCOL_V9, update: null });

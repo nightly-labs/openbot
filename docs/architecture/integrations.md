@@ -660,12 +660,10 @@ Team API adapters stay while a release in the support window speaks them (see [T
    [`packages/contracts/package.json`](../../packages/contracts/package.json).
 3. **Codecs.** Spread the codec map into `CODECS` in
    [`optional-routes.ts`](../../packages/contracts/src/team-protocol/optional-routes.ts).
-4. **Capability list.** Add the capability to `TEAM_CURRENT_CAPABILITIES` in
-   [`current.ts`](../../packages/contracts/src/team-protocol/current.ts), and exclude it from
-   `TEAM_BOOTSTRAP_CAPABILITIES` and `legacyTeamCapabilities`. Older peers read a limited number of
-   bootstrap capabilities, so a new optional one stays out of bootstrap. Protocols 7 and 8 read at
-   most 128 capabilities and their lists are full, so add it to `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`
-   too: only a protocol 9 peer then sends or gets it.
+4. **Capability list.** Add the capability at the end of `TEAM_CAPABILITY_REGISTRY` in
+   [`current.ts`](../../packages/contracts/src/team-protocol/current.ts), with the `V10` placement.
+   Every capability list comes from this table. Protocols 7 to 9 read a limited number of
+   capabilities and their lists are full, so only a protocol 10 peer sends or gets a new capability.
 5. **Host route.** Add `src/main/team-api/route-<name>.ts`. Return `"unmatched"` for other paths,
    refuse with `400` when the capability is off, and call `requireAdmin` for admin routes. Register
    it in `TeamApiServer.#handle` in [`team-api-server.ts`](../../src/main/team-api-server.ts), and

@@ -94,7 +94,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); the share sender step needs a store build |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); step 2 (protocol 10) in review on `t3/protocol-10-capability-registry-1`; the share sender step needs a store build |
 | 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
@@ -158,9 +158,17 @@ Prerequisite steps, in this order:
 Not confirmed: mobile store release dates (the repo has only the prepare commits), the mobile window
 policy (no repo source), and whether the web client is served from the latest `main`.
 
-Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by the version. Only
-new capabilities go in the list. When no release in the window speaks protocol 9, delete those
-capabilities from the lists.
+Step 2: protocol 10 (`packages/contracts/src/team-protocol/v10.ts`) has a fixed capability baseline,
+the frozen protocol 9 list (`fixtures/v10/baseline-capabilities.json`). A protocol 10 peer sends two
+lists, in both directions: `capabilities`, with the names after protocol 9 and the markers, and
+`absent`, with the baseline names that it does not serve. The receiver's set is
+`(baseline - absent) + capabilities`. The version does not imply a baseline capability, because a
+peer can lack one: a Mac host does not serve `mac-apps-limit-v1`, and a host with no channel service
+does not serve the channel capabilities. A host ignores an unknown name in `absent` and refuses a
+malformed list with `protocol_error`. `absent` has at most as many names as the baseline. Protocols
+1-9 do not change. The host speaks 1-10; the desktop and web clients speak 10 when the host does, and
+mobile stays on 9 until a capability after protocol 9 needs it there. When no release in the window
+speaks protocol 9, the baseline stays: it is the protocol 10 wire contract.
 
 The protocol 9 list is full since #11930 (2026-11-18): 256 of the 256 capabilities that it can
 have. A new optional capability needs protocol 10 first.
@@ -227,7 +235,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | DONE (#10806, `6b2da3b900`; no `name` column: the check stops a renumber) |
 | 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | DROPPED: developer decision, 2026-11-17 (#10805 closed) |
 | 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | DONE (#10801, `511572aee3`) |
-| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | TODO |
+| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | IN REVIEW: `TEAM_CAPABILITY_REGISTRY` and `supportsTeamCapability`, with item 2 step 2 on `t3/protocol-10-capability-registry-1` |
 | 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | DONE (#10818; 1.96 GB: 25.5 s, v39 needs about 2x the file in free disk) |
 
 ## Phase 3: durable state
