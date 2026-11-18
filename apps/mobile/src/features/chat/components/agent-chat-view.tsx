@@ -39,6 +39,7 @@ import { useAgentBackdrops } from "./use-agent-backdrops";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useComposerContextMeter } from "./use-context-usage";
+import { useCoveredByScreen } from "./use-covered-by-screen";
 import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
@@ -77,8 +78,16 @@ export function MobileChatView({
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
   );
+  // Under a full screen, such as a subagent, a streamed reply does not render the hidden chat on
+  // each chunk. The store keeps the chat current, and the chat renders it once when it shows again.
+  const covered = useCoveredByScreen();
+  const coveredRef = useRef(covered);
+  coveredRef.current = covered;
   const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agent.id, notify),
+    (notify: () => void) =>
+      conversationStore.subscribe(agent.id, () => {
+        if (!coveredRef.current) notify();
+      }),
     [agent.id, conversationStore],
   );
   const snapshot = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);

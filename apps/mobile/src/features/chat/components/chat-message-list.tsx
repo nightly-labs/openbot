@@ -165,6 +165,8 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
+/** While the reply is short, the latest user message shows at most this part of the screen height. */
+const ANCHOR_SHOWN_SHARE = 0.25;
 /** A user's text bubble is at most this part of the list width, as `max-w-[92%]` on its row. */
 const USER_BUBBLE_WIDTH = 0.92;
 
@@ -1768,18 +1770,31 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
   }, [unreadRowMissing, shownWithoutUnread]);
   const header = topInset + 84;
+  const screen = useWindowDimensions();
+  // A long message, such as pasted text, shows only its end under the header, so the reply starts
+  // on the screen. A message with files is not cut: the top of its images stays in view.
+  const tailRow = rows[tailIndex];
+  const tailHasFiles = tailRow?.kind === "message" && Boolean(tailRow.attachments?.length);
+  const anchorMaxSize = tailHasFiles ? undefined : Math.round(screen.height * ANCHOR_SHOWN_SHARE);
+  const onAnchorReady = motion.onAnchorReady;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.
   const anchoredEndSpace = useMemo<AnchoredEndSpaceConfig | undefined>(
     () =>
-      tailIndex >= 0 ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady } : undefined,
-    [tailIndex, header, motion.onAnchorReady],
+      tailIndex >= 0
+        ? {
+            anchorIndex: tailIndex,
+            anchorOffset: header,
+            anchorMaxSize,
+            onReady: (info) => onAnchorReady(info, anchorMaxSize),
+          }
+        : undefined,
+    [tailIndex, header, anchorMaxSize, onAnchorReady],
   );
   const sharedValues = useMemo(
     () => ({ scrollOffset: motion.scrollOffset, isAtEnd: motion.atEnd }),
     [motion.scrollOffset, motion.atEnd],
   );
-  const screen = useWindowDimensions();
   const columnWidth = useColumnWidth();
   const insets = useSafeAreaInsets();
   const estimatedListSize = useMemo(
