@@ -183,12 +183,14 @@ export function isUsageReadDiagnostic(message: string): boolean {
  * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
  * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
  * Windows computer without Git. Grok continues without the repository state. The user met the line
- * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
+ * as a "Grok error" toast with nothing failing (#4789). Grok CLI 1.0.89 writes the same failure as
+ * `ERROR git_cli: spawn failed error=program not found error_kind=NotFound` (#11788). It belongs in
+ * the log.
  *
  * Only a spawn failure counts. A `git` command that ran and failed stays visible.
  */
 export function isGitSpawnDiagnostic(message: string): boolean {
-  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
+  return /\bERROR\s+git_cli:\s+(?:Command::output\(\) FAILED \(spawn error\)|spawn failed\b)/.test(message);
 }
 
 /**
