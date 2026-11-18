@@ -34,6 +34,7 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
 } from "./delivery-content";
@@ -1103,7 +1104,7 @@ export class DrainScheduler {
       const promptInput = (executionText: string | undefined) => {
         // The deliveries of one interrupted turn share its continuation, so the prompt states it once.
         const continued = new Set<string>();
-        return combinedPromptInput(
+        const input = combinedPromptInput(
           batch.map((item) => {
             const { resumeAfterUsageLimit, ...rest } = item;
             const repeated = resumeAfterUsageLimit !== undefined && continued.has(resumeAfterUsageLimit.turnId);
@@ -1126,6 +1127,7 @@ export class DrainScheduler {
           [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
           agentNames,
         );
+        return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
       };
       // The request is already in the session, so a plan continuation sends only its note. A new
       // session, which gets the history handoff, gets the request again before the note (#8779).
@@ -1733,20 +1735,22 @@ const { sync: drainStep, rewrap: toDeliveryStartFailed } = causeHelpers(Delivery
 
 /**
  * The Codex or Claude service tier of a turn. The provider keeps the tier for the next turns of the
- * thread. An agent that never set fast mode sends nothing, so the provider keeps its own tier; `null`
- * returns the thread to the standard tier, also for a model with no fast tier. While the catalog does
- * not know the model, such as before the CLI lists its models, the turn sends nothing and keeps the
- * tier of the thread.
+ * thread. `null` returns the thread to the standard tier, also for a model with no fast tier. A Claude
+ * agent that never set fast mode sends nothing, so the provider keeps its own tier. A Codex agent that
+ * never set it also sends `null` when its model has a fast tier: the picker shows Standard for it, and
+ * a `service_tier` in the Codex config must not run the turn at a faster, more expensive tier (#11879).
+ * While the catalog does not know the model, such as before the CLI lists its models, the turn sends
+ * nothing and keeps the tier of the thread.
  */
 function serviceTier(
   agent: Pick<AgentSummary, "fastMode" | "ultrafast" | "model">,
   provider: "codex" | "claude",
   models: readonly AgentModelOption[],
 ): { serviceTier?: string | null } {
-  if (agent.fastMode === undefined) return {};
-  if (!agent.fastMode) return { serviceTier: null };
+  if (agent.fastMode === false) return { serviceTier: null };
   const model = models.find((candidate) => candidate.provider === provider && candidate.id === agent.model);
   if (!model) return {};
+  if (agent.fastMode === undefined) return provider === "codex" && model.fastServiceTier ? { serviceTier: null } : {};
   // Ultrafast on a model or account without the tier runs at Fast, the next fastest tier.
   if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? model.fastServiceTier ?? null };
   return { serviceTier: model.fastServiceTier ?? null };

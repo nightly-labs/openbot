@@ -1186,6 +1186,14 @@ All notable changes to OpenBot will be documented here. The project follows
   terminal or over SSH. You no longer need to click Connect or restart OpenBot.
 - Retry after a failed provider CLI update no longer downloads the CLI again. It installs the copy
   that the first try downloaded.
+- An agent now continues with its teammates' results after OpenBot or a provider stops unexpectedly
+  while the agent works with them, before the agent starts its answer. Before, the results showed "Interrupted" in the chat, and the agent
+  stopped until you sent it a message. Now each result goes back to the queue one time, and the agent
+  continues with it. The agent first checks what it already did, so that it does not do an action
+  two times.
+- A Codex agent that shows the Standard speed now runs at the standard speed. Before, it used a fast
+  tier from the Codex settings file (`service_tier` in `~/.codex/config.toml`), which uses more of the
+  plan's limits. On a joined server, the server must also be on this version.
 
 ## [0.72.0] - 2026-11-16
 

@@ -67,6 +67,8 @@ const FAILED_REQUEST_REASON_LIMIT = 2_000;
 const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
 /** The key of the result that OpenBot relays when a requested turn ends. Stored keys use it. */
 export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
+/** The key of a teammate's result that went back to the queue after a restart (`requeueResultAfterRestart`). */
+const RESTARTED_RESULT_KEY_PREFIX = "restarted-result:";
 /** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
@@ -253,6 +255,8 @@ export interface DeliveryContext {
   channelId?: string;
   /** The side thread that an agent sent the message from. */
   senderTaskId?: string;
+  /** A teammate's result that went back to the queue after a restart stopped its turn. */
+  restartedResult?: true;
 }
 
 const EMPTY_STATE: StoredState = {
@@ -3167,6 +3171,37 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   /**
+   * A teammate's result whose turn stopped when OpenBot or its provider restarted, back at its place in
+   * the queue, so the agent that asked continues with it (#11857). The result has no side effect of its
+   * own, and no turn reads it again otherwise. Only once for each delivery, so a turn that stops at each
+   * start does not run again with no end. Returns whether it went back to the queue.
+   */
+  requeueResultAfterRestart = Effect.fn("MailboxStore.requeueResultAfterRestart")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const message = delivery && this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    const key = `${RESTARTED_RESULT_KEY_PREFIX}${deliveryId}`;
+    if (
+      !delivery ||
+      !message ||
+      (delivery.status !== "starting" && delivery.status !== "running") ||
+      message.sender.kind !== "agent" ||
+      message.sender.agentId === delivery.recipientAgentId ||
+      message.replyToMessageId === null ||
+      message.expectsReply !== false ||
+      message.channelId ||
+      this.#state.idempotency[key] !== undefined
+    )
+      return false;
+    // Before the update, so that its write stores the key too.
+    this.#state.idempotency[key] = message.id;
+    yield* this.requeueRefused(deliveryId);
+    return true;
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * A delivery whose turn ended with open plan steps, back in the queue for one more turn. It keeps
    * the turn id until that turn starts, and the queue shows it as running.
    */
@@ -3671,6 +3706,12 @@ export class MailboxStore {
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
+      // A later usage-limit or plan continuation of the requeued turn has its own note.
+      ...(this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
+      !delivery.resumeAfterUsageLimit &&
+      !delivery.planContinuation
+        ? { restartedResult: true as const }
+        : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
         path: attachment.path,
