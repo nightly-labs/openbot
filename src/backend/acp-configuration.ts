@@ -91,6 +91,8 @@ export interface AcpConfigurationOptions {
   setsConfigOnlyOnChange?: boolean;
   /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  /** `AcpFlavor.unlistedModelFailure`. */
+  unlistedModelFailure?: ((model: string, listed: readonly string[]) => string | null) | undefined;
   /** `AcpFlavor.configSetUnsaved`. */
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /**
@@ -425,7 +427,18 @@ export class AcpConfiguration {
       const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
-      if (!selected) continue;
+      if (!selected) {
+        // A model that the account of this session does not serve, such as one that only another
+        // account of the provider lists, would run the turn on the session's model without notice.
+        const failure =
+          category === "model" &&
+          this.options.unlistedModelFailure?.(
+            value,
+            values.map((entry) => entry.value),
+          );
+        if (failure) return yield* providerFailure(new Error(failure));
+        continue;
+      }
       // The session's options follow the agent's `config_option_update`, so they hold its value.
       if (
         this.options.setsConfigOnlyOnChange &&

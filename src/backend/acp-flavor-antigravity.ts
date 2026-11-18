@@ -503,6 +503,14 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
   },
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
+  // Each Google account lists its own models, and the picker also shows the models of the first
+  // account. A model that this account does not list ran the turn on the session's Gemini model
+  // without notice (#11808). A 1.3 ID with its effort, such as `gemini-3.8-flash-high`, names a listed
+  // model and keeps the session's model, as before.
+  unlistedModelFailure: (model, listed) =>
+    listed.length === 0 || listed.some((entry) => model.startsWith(`${entry}-`))
+      ? null
+      : sourceText("error.provider.antigravityModelUnavailable", { detail: shownFailureDetail(model) }),
   // The 1.5.4 CLI refreshes the Google token when a session opens. When Google refuses it, the CLI
   // answers `authRequired` and opens no browser.
   authRequiredSignsOut: true,

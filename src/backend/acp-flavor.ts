@@ -188,6 +188,12 @@ export interface AcpFlavor {
    */
   modelSetUnsaved?(error: RequestError): boolean;
   /**
+   * The failure text for a model that the session's model option does not list, or null to keep the
+   * session on its own model. Without it, the model is not sent and the turn runs on the session's
+   * model, which the user does not see (#11808).
+   */
+  unlistedModelFailure?(model: string, listed: readonly string[]): string | null;
+  /**
    * A `session/set_config_option` failure after which the session already has the new value. The
    * agent changes the session first and then fails to save the value as its default.
    */
