@@ -416,8 +416,10 @@ const findServer = (servers: AgentMcpServers, name: string) => {
   return Effect.fail(new ToolOperationFailed({ cause: new Error(sourceText(key, { name })) }));
 };
 
+// Only the user sees the card. An agent that got needs_sign_in again can take it for a card that did
+// not show, and report an OpenBot bug (#9184).
 const SIGN_IN_NEXT =
-  "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
+  "A Sign in card is in this conversation. Only the user sees it: do not check it, and do not test again in this turn. Tell the user to press Sign in on it, end your turn, and test again when the user says it is done. Another needs_sign_in means only that the sign-in is not done; it is not an OpenBot fault. If the user sees no card, tell them to sign in from Marketplace, Apps, the server's page.";
 
 /**
  * A silent test of each saved http server that a tool search names and that has no sign-in on this
