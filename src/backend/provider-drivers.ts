@@ -73,7 +73,7 @@ import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import { kimiSavedSignInCheck } from "./kimi-sign-in-check";
-import { readKimiUsage } from "./kimi-usage";
+import { kimiSavedSignInVersion, readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
@@ -158,6 +158,12 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | readonly string[]
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
+  /**
+   * The version of the CLI's saved sign-in, or null with none. `env` is the environment of the
+   * sign-in process. When the process fails after the version changed, the sign-in still counts:
+   * for a CLI that can crash as it exits (`orNewSavedSignIn`).
+   */
+  readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -523,6 +529,10 @@ function kimiLoginEnv(
 ): Record<string, string> {
   return isPythonKimiCli(cli) ? { ...base, ...kimiPythonLoginEnv(region) } : { ...base };
 }
+
+/** Kimi Code 2.x on Windows can stop with a failure code after `kimi login` saved the sign-in (#11615). */
+const kimiSavedSignIn = (cli: AgentCliInfo, env: NodeJS.ProcessEnv) =>
+  kimiSavedSignInVersion(isPythonKimiCli(cli), env);
 
 /**
  * A Python CLI signed in on kimi.ai needs the global hosts in each process; Kimi Code 2.x keeps
@@ -1513,6 +1523,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       command: {
         argv: (cli, region) => kimiLoginArgs(cli, kimiLoginEnv(KIMI_ENV, cli, region), { code: false, region }),
         env: (cli, region) => kimiLoginEnv(KIMI_ENV, cli, region),
+        savedSignIn: kimiSavedSignIn,
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
@@ -1523,6 +1534,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: (cli, region) =>
           kimiLoginArgs(cli, kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region), { code: true, region }),
         env: (cli, region) => kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region),
+        savedSignIn: kimiSavedSignIn,
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },

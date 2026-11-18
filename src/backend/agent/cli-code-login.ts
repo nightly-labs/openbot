@@ -6,7 +6,7 @@ import { Deferred, Effect, Fiber, Option, Schema } from "effect";
 import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
-import { waitForSuccessfulProcess } from "./provider-status";
+import { orNewSavedSignIn, waitForSuccessfulProcess, watchSavedSignIn } from "./provider-status";
 
 /**
  * What a provider CLI prints for a sign-in the user finishes on another device.
@@ -60,6 +60,8 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   timeoutMs: number;
   /** Closes the CLI's input at once: see `ProviderCliCommand.closeInput`. */
   closeInput?: boolean;
+  /** The version of the CLI's saved sign-in: see `ProviderSignInCommand.savedSignIn`. */
+  savedSignIn?: Effect.Effect<string | null>;
   platform?: NodeJS.Platform;
 }) {
   const platform = options.platform ?? process.platform;
@@ -67,6 +69,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     try: () => (options.flow === "paste" ? terminalCommand(platform, options.argv) : null),
     catch: (cause) => new CliCodeLoginFailed({ cause }),
   });
+  const watch = yield* watchSavedSignIn(options.savedSignIn);
   const child = yield* Effect.acquireRelease(
     Effect.try({
       try: () => {
@@ -96,7 +99,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
   const done = yield* Effect.forkScoped(
-    waitForSuccessfulProcess(child, options.timeoutMs).pipe(
+    orNewSavedSignIn(waitForSuccessfulProcess(child, options.timeoutMs), watch, undefined).pipe(
       Effect.mapError(
         (failure) =>
           new CliCodeLoginFailed({
@@ -111,9 +114,13 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     ),
     { startImmediately: true },
   );
-  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow)), {
-    startImmediately: true,
-  });
+  // A CLI that saved a new sign-in and then failed signed in with no prompt, as one that exits with success.
+  yield* Effect.forkScoped(
+    Deferred.complete(prompt, orNewSavedSignIn(readCodePrompt(child, options.flow), watch, null)),
+    {
+      startImmediately: true,
+    },
+  );
   return {
     child,
     done: Fiber.join(done),
