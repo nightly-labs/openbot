@@ -14,8 +14,8 @@ export const messages = {
   "routine.feed.eventAgent": "Agent: {name}",
   "routine.feed.eventChannel": "Kênh: {name}",
   "routine.feed.eventTimezone": "Múi giờ: {timezone}",
-  "routine.clock.am": "SA",
-  "routine.clock.pm": "CH",
+  "routine.clock.am": "AM",
+  "routine.clock.pm": "PM",
   "routine.clock.withMeridiem": "{time} {meridiem}",
 
   "routine.summary.hourly": "Mỗi giờ vào phút :{minute}",
@@ -85,7 +85,7 @@ export const messages = {
   "routine.time.chipLabel": "{label}: {time}",
   "routine.time.hour": "Giờ của {label}",
   "routine.time.minute": "Phút của {label}",
-  "routine.time.meridiem": "SA hoặc CH của {label}",
+  "routine.time.meridiem": "AM hoặc PM của {label}",
 
   "routine.weekday.chipLabel": "Ngày: {days}",
   "routine.weekday.choose": "Chọn ngày",
