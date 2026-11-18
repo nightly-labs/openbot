@@ -67,10 +67,18 @@ interface CardFill {
   serverId: string;
   /** The server whose card is in place. Until it is `serverId`, the part is clear. */
   cardServer: SharedValue<string>;
+  /**
+   * The list reveal has ended, after the card top is in place. The part then takes a plain opaque
+   * style: a later render cannot put back the clear first-render value of the animated style.
+   */
+  settled: boolean;
 }
 
-function useCardFill({ background, serverId, cardServer }: CardFill) {
-  return useAnimatedStyle(() => ({ backgroundColor: cardServer.get() === serverId ? background : "transparent" }));
+function useCardFill({ background, serverId, cardServer, settled }: CardFill) {
+  const fill = useAnimatedStyle(() => ({
+    backgroundColor: cardServer.get() === serverId ? background : "transparent",
+  }));
+  return settled ? { backgroundColor: background } : fill;
 }
 
 /**

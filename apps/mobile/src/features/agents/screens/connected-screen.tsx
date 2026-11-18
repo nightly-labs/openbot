@@ -772,11 +772,17 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // In card mode each row is opaque, so the fixed backdrop under the clear list does not show through.
   const renderItem = useCallback(
     (info: { item: MobileSidebarItem; index: number }) => (
-      <HomeCardRow card={homeCard} background={cardBackground} serverId={serverId} cardServer={cardServer}>
+      <HomeCardRow
+        card={homeCard}
+        background={cardBackground}
+        serverId={serverId}
+        cardServer={cardServer}
+        settled={listReveal.finished}
+      >
         {renderRow(info)}
       </HomeCardRow>
     ),
-    [renderRow, homeCard, cardBackground, serverId, cardServer],
+    [renderRow, homeCard, cardBackground, serverId, cardServer, listReveal.finished],
   );
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
@@ -1095,6 +1101,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                       background={cardBackground}
                       serverId={activeServer.id}
                       cardServer={cardServer}
+                      settled={listReveal.finished}
                     />
                   </View>
                 }
