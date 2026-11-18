@@ -3519,13 +3519,14 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** The content digest of a staged or saved generated attachment, or null for any other file. */
-  generatedAttachmentSha256(attachmentId: string): string | null {
-    return (
-      this.#stagedGeneratedAttachments.get(attachmentId)?.sha256 ??
-      this.#state.generatedAttachments.find((candidate) => candidate.id === attachmentId)?.sha256 ??
-      null
-    );
+  /**
+   * The content digest of a staged or saved generated attachment, or of a file that a message keeps,
+   * such as a teammate's (#11589). Null for a deleted or unknown file: the chat does not show it.
+   */
+  attachmentSha256(attachmentId: string): string | null {
+    const staged = this.#stagedGeneratedAttachments.get(attachmentId);
+    if (staged) return staged.sha256;
+    return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.sha256 ?? null;
   }
 
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
