@@ -278,6 +278,8 @@ export const messages = {
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
+  "error.backend.mcpSignInRefused":
+    "De inlogpagina gaf geen toegang. Log opnieuw in of controleer je account bij die dienst.",
   "error.backend.mcpSignInResponseTimedOut": "Het antwoord op het inloggen kwam niet op tijd.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot kon de inloggegevens van deze server niet lezen. Controleer het serveradres en probeer het opnieuw.",

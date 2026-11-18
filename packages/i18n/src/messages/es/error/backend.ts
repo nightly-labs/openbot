@@ -280,6 +280,8 @@ export const messages = {
     "Este servidor pide un inicio de sesión, y OpenBot solo inicia sesión por https. Cambia la URL a {url}.",
   "error.backend.mcpSignInCancelled": "Se canceló el inicio de sesión.",
   "error.backend.mcpSignInTimedOut": "El inicio de sesión no se completó en el navegador.",
+  "error.backend.mcpSignInRefused":
+    "La página de inicio de sesión no dio acceso. Inicia sesión de nuevo o revisa tu cuenta en ese servicio.",
   "error.backend.mcpSignInResponseTimedOut": "La respuesta del inicio de sesión no llegó a tiempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot no pudo leer la información de inicio de sesión de este servidor. Revisa la dirección del servidor y vuelve a intentarlo.",

@@ -3485,6 +3485,7 @@ export async function createApplicationServices({
     providers: providerSignIns,
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
+    receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
     // The search ignores case, so the exact address is checked again on each agent message it finds.
     printedLink: (agentId, url) =>
       agentPrintedLink(

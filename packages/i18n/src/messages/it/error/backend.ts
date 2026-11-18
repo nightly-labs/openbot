@@ -278,6 +278,8 @@ export const messages = {
     "Questo server richiede l'accesso e OpenBot accede solo tramite https. Cambia l'URL in {url}.",
   "error.backend.mcpSignInCancelled": "L'accesso è stato annullato.",
   "error.backend.mcpSignInTimedOut": "L'accesso non è stato completato nel browser.",
+  "error.backend.mcpSignInRefused":
+    "La pagina di accesso non ha dato l'accesso. Accedi di nuovo o controlla il tuo account su quel servizio.",
   "error.backend.mcpSignInResponseTimedOut": "La risposta dell'accesso non è arrivata in tempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot non ha potuto leggere le informazioni di accesso di questo server. Controlla l’indirizzo del server e riprova.",

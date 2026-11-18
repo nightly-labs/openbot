@@ -264,6 +264,8 @@ export const messages = defineMessages("error.backend", {
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
+  "error.backend.mcpSignInRefused":
+    "The sign-in page did not give access. Sign in again, or check your account on that service.",
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot could not read the sign-in information of this server. Check the server address and try again.",

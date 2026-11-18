@@ -285,6 +285,8 @@ export const messages = {
     "Ce serveur demande une connexion, et OpenBot ne se connecte qu’en https. Remplacez l’URL par {url}.",
   "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
   "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
+  "error.backend.mcpSignInRefused":
+    "La page de connexion n’a pas donné l’accès. Reconnectez-vous ou vérifiez votre compte sur ce service.",
   "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot n’a pas pu lire les informations de connexion de ce serveur. Vérifiez l’adresse du serveur et réessayez.",
