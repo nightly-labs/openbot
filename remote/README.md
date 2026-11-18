@@ -299,6 +299,49 @@ each relay every 5 minutes.
 Production uses `turn2.openbot.run` on the second Signal machine as the second relay; see
 [the deployment procedure](../docs/remote-session-deployment.md#second-signal-machine).
 
+## TURN on port 443
+
+Some networks (hotels, offices, schools, some countries) allow only TCP 80 and 443. There the relay
+URLs on 3478 and 5349 fail, and a connection that needs a relay fails with `webrtc/ice/failed`.
+`TURN_TLS_PORT=443` makes Signal give `turns:<relay>:443` in place of `turns:<relay>:5349`. The number
+of URLs, and so of allocations, does not change. The default stays 5349.
+
+Signal gives one port for all its relays, so set 443 only when the machine of each relay in
+`TURN_HOST` and `TURN_EXTRA_HOSTS` has this setup:
+
+1. `apt install libnginx-mod-stream`. Copy `nginx/openbot-remote-stream.conf` to `/etc/nginx/` and add
+   `include /etc/nginx/openbot-remote-stream.conf;` to `/etc/nginx/nginx.conf`, at the top level, after
+   the `modules-enabled` include.
+2. In each HTTPS server of the machine, replace the `listen 443` lines with these three:
+
+   ```nginx
+   listen 127.0.0.1:8444 ssl proxy_protocol;
+   set_real_ip_from 127.0.0.1;
+   real_ip_header proxy_protocol;
+   ```
+
+   nginx then gives the client address in `$remote_addr` and `X-Forwarded-For` as before.
+3. `nginx -t`, then `systemctl reload nginx`. If the reload fails, nginx keeps the old configuration.
+4. Check `/health/ready` and `/health/turn` on the machine, and that the access log shows client
+   addresses, not `127.0.0.1`. Then allocate through 443 without changing a client. On the machine,
+   from a checkout of the release:
+
+   ```sh
+   docker exec -i openbot-remote-remote-api-1 sh -c 'cd /app/remote/api && bun -e "$(cat)" turn-<home>.openbot.run 443' < remote/scripts/turn-tls-probe.ts
+   ```
+
+   It sends the relay name as SNI, makes one allocation, frees it, and never prints the secret.
+5. Set `TURN_TLS_PORT=443` in `/opt/openbot/remote/.env.production` and recreate only `remote-api`.
+
+The stream reads only the server name of each TLS connection and does not decrypt it, so it adds
+almost no CPU. Each proxied connection uses two nginx connections, and a TURN one uses three, so
+check `worker_connections` (see "Production requirements"). coturn reads only the binary PROXY
+protocol, which nginx cannot send, so coturn sees `127.0.0.1` as the client of each TLS connection
+on 443. Port 5349 stays open.
+
+To roll back, set `TURN_TLS_PORT` back to 5349 and recreate `remote-api` first; then restore the
+`listen 443` lines and remove the include.
+
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
 Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device
 must not end another device's session. Legacy hosts that omit `multiplex` keep the one-client limit:
