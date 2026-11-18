@@ -361,6 +361,7 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -1749,10 +1750,13 @@ export async function createApplicationServices({
   });
   // A hosted server waits for its disk restore before its first update check; the stop ends the wait.
   let updateCheckWait: Fiber.Fiber<void> | null = null;
+  // The start asks the model servers which models cannot reason, and asks again while one is not up.
+  let modelReasoningWait: Fiber.Fiber<void> | null = null;
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
     runCauseEffect(
       Effect.gen(function* () {
         if (updateCheckWait) yield* Fiber.interrupt(updateCheckWait);
+        if (modelReasoningWait) yield* Fiber.interrupt(modelReasoningWait);
         yield* providerRuntimes.stop();
       }),
     ),
@@ -1762,6 +1766,7 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
     cipher: secretCipher,
   });
+  const modelReasoning = createModelReasoningSupport(() => customProviders.configs());
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   // The same reasons as the endpoints: before the service, and a file this build cannot read only
@@ -2390,7 +2395,8 @@ export async function createApplicationServices({
       providerEnvironment: (provider) => providerEnvironmentSetting.resolve(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
-      customProviders: () => customProviders.configs(),
+      // With the models that an Ollama server reports as not able to reason (#8381).
+      customProviders: () => modelReasoning.configs(),
       // The same rule: `configs()`, with the environment values, goes to the agent process only.
       customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
@@ -3175,7 +3181,25 @@ export async function createApplicationServices({
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("connected", (memberId) => browser.forgetComputerFailures(memberId));
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
+  const customProviderChanges = createCustomProviderChanges({
+    service,
+    customProviders,
+    providerRuntimes,
+    refreshModelReasoning: () => modelReasoning.refresh().pipe(Effect.map(({ changed }) => changed)),
+  });
+  // The endpoints saved before this start. The start does not wait for their servers: an OpenCode
+  // that started before the answer restarts with it, after a turn in progress. A server that starts
+  // with the computer can come up after OpenBot, so the question is asked again a few times.
+  modelReasoningWait = Effect.runFork(
+    Effect.gen(function* () {
+      for (const wait of MODEL_REASONING_RETRY_WAITS_MS) {
+        yield* Effect.sleep(wait);
+        const { changed, unreachable } = yield* modelReasoning.refresh();
+        if (changed) yield* service.reloadCustomProviderConfig("opencode").pipe(Effect.ignore);
+        if (!unreachable) return;
+      }
+    }),
+  );
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),

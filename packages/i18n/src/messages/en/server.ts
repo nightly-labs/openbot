@@ -126,6 +126,7 @@ export const messages = defineMessages("server", {
   "server.local.create": "Create server",
   "server.local.creating": "Creating server…",
   "server.local.createFailed": "Could not create the server.",
+  "server.local.createFailedRetry": "Something went wrong. Try again. If it fails again, restart OpenBot.",
   "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
   "server.local.deleteConfirmTitle": "Delete {name}?",
   "server.local.deleteConfirmDescription":

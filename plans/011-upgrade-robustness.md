@@ -94,7 +94,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); step 2 (protocol 10) in review on `t3/protocol-10-capability-registry-1`; the share sender step needs a store build |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); no mobile build has it yet (1.4.11 does not), so no deletion before the first store build with it plus 60 days; step 2 (protocol 10) done (#12111, `78ad15d100`); prerequisite steps 2 and 3 in review (#12139); the share sender step needs a store build |
 | 3 | A server stops a start loop and reports the reason through the Team API | IN REVIEW: the loop stops (#10775, `932be637d6`); safe mode in #12185; `copy_release` stays a copy (see below) |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
@@ -262,7 +262,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | DONE (#10806, `6b2da3b900`; no `name` column: the check stops a renumber) |
 | 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | DROPPED: developer decision, 2026-11-17 (#10805 closed) |
 | 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | DONE (#10801, `511572aee3`) |
-| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | IN REVIEW: `TEAM_CAPABILITY_REGISTRY` and `supportsTeamCapability`, with item 2 step 2 on `t3/protocol-10-capability-registry-1` |
+| 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | DONE: `TEAM_CAPABILITY_REGISTRY` and `supportsTeamCapability`, with item 2 step 2 (#12111, `78ad15d100`) |
 | 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | DONE (#10818; 1.96 GB: 25.5 s, v39 needs about 2x the file in free disk) |
 
 ## Phase 3: durable state
@@ -330,9 +330,36 @@ macOS Host Manager. Each claim below was checked in the code.
 |---|---|---|
 | 18 | Durable event cursor resume for clients | TODO |
 | 19 | Mailbox unit of work | TODO |
-| 20 | Tables that can be rebuilt move to a separate database | TODO |
+| 20 | Tables that can be rebuilt move to a separate database | DROPPED: audit of 2026-11-18 (see below); item 23 removed most of the size |
 | 21 | Effect Schema for new codecs | TODO |
+| 26 | Give free pages back to the disk after the item 23 compaction | TODO: not measured at 17 GB yet (see item 20) |
 | 22 | Split `scripts/team-api-routes-e2e.ts` | NOT DONE: audit of 2026-11-18 (see below); new route areas go in their own script |
+
+### 20. Separate database for tables that can be rebuilt (dropped)
+
+Audit of 2026-11-18 (`main` at `6a5f3fab5b`):
+
+- **Few tables can be rebuilt.** The `projection_*` tables are the source of truth: the thread replay
+  (`thread-replay.ts:41`) and `ChannelStore.rebuild` (`channel-store.ts:1113`) have no production
+  caller. Only the FTS index `agent_memory_search` and the provider history staging cache can be
+  rebuilt, and both are small.
+- **`orchestration_events` is not a full event log.** The code deletes old events (for example
+  `agent-roster.ts:399-402`, `conversation-writer.ts:1042`, `memory-store.ts:298-312`), and production
+  code reads events (`agent-roster.ts:110`, `routine-store.ts:207`, `hosted-site-event-log.ts:71-135`).
+- **Item 23 (#11872, v0.73.0) already removes most of the size.** On a copy of the developer's
+  profile: `orchestration_events` 326.3 MB to 32.3 MB, in 1.6 s. The file stays 384.8 MB because the
+  free pages stay in it; `VACUUM INTO` gives 88.8 MB.
+- **A second file costs too much.** `dispatch` writes events, projections and the receipt in one
+  transaction (`database-core.ts:139-191`); across two WAL files a commit is atomic for each file only
+  (SQLite documentation), so a crash can run a retried command two times, and privacy deletes
+  (`deleted-thread-messages.ts:105-134`, `agent-roster.ts:178-243`) can leave deleted text. Migrations,
+  the frozen-file check, the harness, the 42 released schema fixtures, backups and hosted saves all
+  work on one file. The move copies about 12 GB on the largest hosted server.
+
+Item 26 takes the real gap that is left: the file does not get smaller on disk. A one-time `VACUUM`
+needs about 2x the file in free disk and holds the write lock for its full time; measure it with
+`bun scripts/migration-large-db-e2e.ts --full` on a large server first. Not confirmed: hosted
+servers after v0.73.0 were not measured.
 
 ### 22. Routes E2E split (not done)
 
