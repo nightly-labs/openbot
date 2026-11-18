@@ -814,7 +814,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       found_by: z
         .enum(FEEDBACK_FINDERS)
         .describe(
-          "Default user. agent: you found it yourself; send that unasked only when OpenBot fails again after one retry, not for the user's code, network, accounts or provider limits, and not for a result that waits for the user, such as needs_sign_in or needs_key.",
+          "Default user. agent: you found it yourself; send that unasked only when OpenBot fails again after one retry, not for the user's code, network, accounts or provider limits.",
         )
         .optional(),
       surface: z.enum(FEEDBACK_SURFACES).describe("Where the user saw it, when the chat makes it clear.").optional(),
