@@ -2952,7 +2952,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 ? { causeCode: "billing" }
                 : turn.stalled
                   ? { causeCode: "stalled" }
-                  : {}),
+                  : // The end of the turn continues it once, as after a provider exit (#12175).
+                    claudeCrashed(error)
+                    ? { causeCode: "provider_exited" }
+                    : {}),
         },
       });
     }
@@ -3460,7 +3463,33 @@ function claudeTurnError(error: unknown, apiKey: boolean): string {
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
-  return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
+  if (CLAUDE_SANDBOX_UNAVAILABLE.test(text)) return sourceText("error.agent.claudeNoSandbox");
+  // The exit code and the CLI's stderr, such as Bun's panic, stay in the log.
+  return claudeCrashed(error) ? sourceText("error.agent.answerCutOff") : text;
+}
+
+/**
+ * The CLI process exited during the turn for no reason that `claudeTurnError` names, as when Claude
+ * Code 2.1.327 stopped with a Bun "Segmentation fault" and exit code 3 on Windows (#12175). The SDK
+ * marks its exit error with `errorClass`, also inside the error that adds the stderr. A Stop ends the
+ * process with an abort error instead.
+ */
+function claudeCrashed(error: unknown): boolean {
+  const text = String(error);
+  if (
+    [CLAUDE_API_CREDIT_EMPTY, CLAUDE_CLOUDFLARE_BLOCK, CLAUDE_NOT_LOGGED_IN, CLAUDE_SANDBOX_UNAVAILABLE].some((rule) =>
+      rule.test(text),
+    )
+  )
+    return false;
+  for (let cause = error, depth = 0; cause instanceof Error && depth < 3; cause = cause.cause, depth += 1) {
+    if (
+      "errorClass" in cause &&
+      (cause.errorClass === "process_exited_nonzero" || cause.errorClass === "process_killed_by_signal")
+    )
+      return true;
+  }
+  return false;
 }
 
 /**
