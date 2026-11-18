@@ -163,6 +163,12 @@ interface TasksViewState {
 /** The key of the start composer's files in `TasksViewState.files`. A task id never has this form. */
 const START_FILES = "start";
 
+/**
+ * The client ids of task messages: a send again after a failure sends the same id, as a start does.
+ * It is outside the view, so a retry after the view opens again keeps the id.
+ */
+const sendIds = retryOperationIds(() => crypto.randomUUID());
+
 function toastError(error: unknown, fallback: AppTextKey): void {
   const { t, errorMessage } = currentText();
   actionToast.error(errorMessage(error, t(fallback)));
@@ -568,9 +574,6 @@ export function TasksView(props: TasksViewProps) {
       return false;
     }
   }
-
-  /** The client ids of task messages: a send again after a failure sends the same id, as a start does. */
-  const sendIds = retryOperationIds(() => crypto.randomUUID());
 
   /** Sends a message to a task. An archived task is restored first, as in a thread tab. */
   async function sendToTask(taskId: string, text: string): Promise<boolean> {

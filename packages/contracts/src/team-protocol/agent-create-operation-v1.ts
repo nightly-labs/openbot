@@ -8,10 +8,10 @@ import { isUuidV4 } from "../validation";
 // gets lost, the client sends the same create again with the same `operationId`. Within one day, the
 // host then answers with the agent that the first create made, as the released route answers, and
 // makes no second agent and sends no second initial message. The id is scoped to the member who sends
-// it. When the first create failed, or its agent was deleted, the host makes a new agent. A host that
-// sends it reads the field; a client sends the field only to a host that sends it. Without it, each
-// create makes a new agent, as before. The response keeps the frozen shape. A protocol 9 capability
-// only. Widening any of it needs a second capability string.
+// it. When the first create failed, or its agent or its initial message was deleted, the host makes a
+// new agent. A host that sends it reads the field; a client sends the field only to a host that sends
+// it. Without it, each create makes a new agent, as before. The response keeps the frozen shape. A
+// protocol 9 capability only. Widening any of it needs a second capability string.
 
 export const AGENT_CREATE_OPERATION_CAPABILITY = "agent-create-operation-v1";
 

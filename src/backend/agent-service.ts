@@ -3517,7 +3517,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const createdId = this.#mailbox.receiptForKey(key)?.deliveries[0]?.recipientAgentId;
     const created = createdId ? this.#store.get(createdId) : undefined;
     if (created) return created;
-    // The first create failed after its message was stored, or its agent was deleted: this create makes a new one.
+    // The first create failed, or its agent or its initial message was deleted: this create makes a
+    // new one. The key lives with the initial message, so deleting the message forgets it too.
     this.#mailbox.forgetIdempotencyKey(key);
     const start = Deferred.makeUnsafe<AgentSummary, AgentLifecycleFailed>();
     this.#pendingAgentCreates.set(key, start);
