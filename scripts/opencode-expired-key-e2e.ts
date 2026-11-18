@@ -190,15 +190,20 @@ try {
     insert.run(`${session}-2`, session, "idle", 2, JSON.stringify({ outcome: "failed", error }));
     return (await runTurn(sixth, session)).error;
   };
-  const refused401 = await refusal(401);
-  assert.equal(refused401, sourceText("error.provider.opencodeKeyRefused"), "A 401 names the refused key.");
-  const refused403 = await refusal(403);
-  assert.equal(
-    refused403,
-    sourceText("error.provider.opencodeGoRequestRefused"),
-    "A 403 with a saved key does not ask for a new key.",
-  );
-  sessions.close();
+  let refused401: string | null;
+  let refused403: string | null;
+  try {
+    refused401 = await refusal(401);
+    assert.equal(refused401, sourceText("error.provider.opencodeKeyRefused"), "A 401 names the refused key.");
+    refused403 = await refusal(403);
+    assert.equal(
+      refused403,
+      sourceText("error.provider.opencodeGoRequestRefused"),
+      "A 403 with a saved key does not ask for a new key.",
+    );
+  } finally {
+    sessions.close();
+  }
   await runCauseEffect(sixth.stop());
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "expired-v2";
