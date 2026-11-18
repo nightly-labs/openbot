@@ -2552,7 +2552,7 @@ export class TurnLifecycle {
             if (yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult))
               resulted.push(delivery);
         }
-        if (resulted.length > 0) this.#lastResults.set(resultsKey, resulted);
+        if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, resulted);
         else this.#lastResults.delete(resultsKey);
         // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
         // ends a request steered into the turn too, so its sender gets a note and does not wait.
@@ -2574,8 +2574,11 @@ export class TurnLifecycle {
         // The provider started this turn itself after the last turn's result went to a teammate, as
         // OpenCode does when a background task ends. Its answer finishes that request, so it goes to
         // the same teammate. Before, that teammate kept only the earlier "waiting" result (#12258).
+        const kept: DeliveryContext[] = [];
         for (const request of this.#lastResults.get(resultsKey) ?? [])
-          yield* this.#relayLaterResult(agentId, turnId, request, answerText);
+          if (yield* this.#relayLaterResult(agentId, turnId, request, answerText)) kept.push(request);
+        if (kept.length > 0) this.#lastResults.set(resultsKey, kept);
+        else this.#lastResults.delete(resultsKey);
       }
       if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
         yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
@@ -3030,7 +3033,8 @@ export class TurnLifecycle {
 
   /**
    * Sends the answer of a turn that the provider started itself to the teammate whose request the last
-   * turn answered (#12258). Not when the turn sent that teammate a message itself.
+   * turn answered (#12258). Not when the turn sent that teammate a message itself: the agent then
+   * answers that teammate itself, so a later turn sends it nothing either. Whether the request stays open.
    */
   readonly #relayLaterResult = Effect.fn("TurnLifecycle.relayLaterResult")(function* (
     this: TurnLifecycle,
@@ -3039,9 +3043,10 @@ export class TurnLifecycle {
     { delivery }: DeliveryContext,
     text: string,
   ) {
-    if (delivery.sender.kind !== "agent" || !this.#store.has(delivery.sender.agentId)) return;
-    if (this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, delivery.sender.agentId, new Set())) return;
+    if (delivery.sender.kind !== "agent" || !this.#store.has(delivery.sender.agentId)) return false;
+    if (this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, delivery.sender.agentId, new Set())) return false;
     yield* this.#sendResult(agentId, turnId, delivery, text);
+    return true;
   });
 
   readonly #sendResult = Effect.fn("TurnLifecycle.sendResult")(function* (
