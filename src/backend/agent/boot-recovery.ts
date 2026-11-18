@@ -6,7 +6,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
@@ -527,6 +527,13 @@ export class BootRecovery {
                 this.#refreshBackfilledConversation(agent.id, publicThreadId);
               } catch (refreshFailure) {
                 this.#hooks.emitError("provider_history_backfill_pending", refreshFailure, agent.id);
+              }
+              // A provider that did not answer in time, such as Pi on a long chat (#11859), loses
+              // nothing: the chat comes from the database, and the import is not complete, so the
+              // next start reads it again. The user cannot act on it, so only the log keeps it.
+              if (containsCause(failure, (cause) => cause instanceof RequestTimeoutError)) {
+                logger.warn("A provider history read timed out.", { provider: session.provider, agentId: agent.id });
+                return;
               }
               // No rollout, or none saved yet, means no history to import, so it is not an error to show.
               if (!containsCause(failure, (cause) => isCodexMissingRollout(cause) || isCodexRolloutPending(cause)))
