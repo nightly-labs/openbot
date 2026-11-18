@@ -88,7 +88,7 @@ export const messages = {
   "conversation.threads.branch.from": "Dallandırıldığı yer: {title}",
   "conversation.threads.branch.fromDeleted": "Silinmiş bir mesaj dizisinden dallandırıldı",
   "conversation.threads.view.newPlaceholder": "{name} ile yeni mesaj dizisi",
-  "conversation.threads.view.placeholder": "{title} içinde {name} adlı ajana mesaj yaz",
+  "conversation.threads.view.placeholder": "Bu mesaj dizisinde {name} adlı ajana mesaj yaz",
   "conversation.threads.view.queued": "Bu mesaj dizisinde bekleyen mesajlar",
   "conversation.threads.view.failed": "Mesaj dizisi başarısız oldu",
   "conversation.threads.error.load": "Bu ajanın mesaj dizileri yüklenemedi.",

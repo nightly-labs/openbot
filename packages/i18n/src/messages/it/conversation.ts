@@ -88,7 +88,7 @@ export const messages = {
   "conversation.threads.branch.from": "Ramificato da {title}",
   "conversation.threads.branch.fromDeleted": "Ramificato da un thread eliminato",
   "conversation.threads.view.newPlaceholder": "Nuovo thread con {name}",
-  "conversation.threads.view.placeholder": "Scrivi a {name} in {title}",
+  "conversation.threads.view.placeholder": "Scrivi a {name} in questo thread",
   "conversation.threads.view.queued": "Messaggi in attesa in questo thread",
   "conversation.threads.view.failed": "Il thread non è riuscito",
   "conversation.threads.error.load": "Impossibile caricare i thread di questo agente.",

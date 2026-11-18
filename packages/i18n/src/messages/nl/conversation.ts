@@ -88,7 +88,7 @@ export const messages = {
   "conversation.threads.branch.from": "Afgetakt van {title}",
   "conversation.threads.branch.fromDeleted": "Afgetakt van een verwijderde thread",
   "conversation.threads.view.newPlaceholder": "Nieuwe thread met {name}",
-  "conversation.threads.view.placeholder": "Bericht aan {name} in {title}",
+  "conversation.threads.view.placeholder": "Bericht aan {name} in deze thread",
   "conversation.threads.view.queued": "Berichten die in deze thread wachten",
   "conversation.threads.view.failed": "De thread is mislukt",
   "conversation.threads.error.load": "Kan de threads van deze agent niet laden.",

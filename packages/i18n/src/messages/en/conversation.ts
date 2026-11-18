@@ -87,7 +87,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.branch.from": "Branched from {title}",
   "conversation.threads.branch.fromDeleted": "Branched from a deleted thread",
   "conversation.threads.view.newPlaceholder": "New thread with {name}",
-  "conversation.threads.view.placeholder": "Message {name} in {title}",
+  "conversation.threads.view.placeholder": "Message {name} in this thread",
   "conversation.threads.view.queued": "Messages that wait in this thread",
   "conversation.threads.view.failed": "The thread failed",
   "conversation.threads.error.load": "Could not load the threads of this agent.",

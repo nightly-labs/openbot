@@ -88,7 +88,7 @@ export const messages = {
   "conversation.threads.branch.from": "Dérivé de {title}",
   "conversation.threads.branch.fromDeleted": "Dérivé d’un fil supprimé",
   "conversation.threads.view.newPlaceholder": "Nouveau fil avec {name}",
-  "conversation.threads.view.placeholder": "Écrire à {name} dans {title}",
+  "conversation.threads.view.placeholder": "Écrire à {name} dans ce fil",
   "conversation.threads.view.queued": "Messages en attente dans ce fil",
   "conversation.threads.view.failed": "Le fil a échoué",
   "conversation.threads.error.load": "Impossible de charger les fils de cet agent.",

@@ -89,7 +89,7 @@ export const messages = {
   "conversation.threads.branch.from": "הסתעפות מ-{title}",
   "conversation.threads.branch.fromDeleted": "הסתעפות משרשור שנמחק",
   "conversation.threads.view.newPlaceholder": "שרשור חדש עם {name}",
-  "conversation.threads.view.placeholder": "הודעה אל {name} ב-{title}",
+  "conversation.threads.view.placeholder": "הודעה אל {name} בשרשור הזה",
   "conversation.threads.view.queued": "הודעות שממתינות בשרשור הזה",
   "conversation.threads.view.failed": "השרשור נכשל",
   "conversation.threads.error.load": "לא ניתן לטעון את השרשורים של הסוכן הזה.",

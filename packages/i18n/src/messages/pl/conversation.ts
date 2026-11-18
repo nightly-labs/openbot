@@ -90,7 +90,7 @@ export const messages = {
   "conversation.threads.branch.from": "Odgałęzienie z: {title}",
   "conversation.threads.branch.fromDeleted": "Odgałęzienie z usuniętego wątku",
   "conversation.threads.view.newPlaceholder": "Nowy wątek z: {name}",
-  "conversation.threads.view.placeholder": "Napisz do: {name} w wątku {title}",
+  "conversation.threads.view.placeholder": "Napisz do: {name} w tym wątku",
   "conversation.threads.view.queued": "Wiadomości czekające w tym wątku",
   "conversation.threads.view.failed": "Wątek nie powiódł się",
   "conversation.threads.error.load": "Nie udało się wczytać wątków tego agenta.",

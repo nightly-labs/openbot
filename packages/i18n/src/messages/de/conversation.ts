@@ -88,7 +88,7 @@ export const messages = {
   "conversation.threads.branch.from": "Abgezweigt von {title}",
   "conversation.threads.branch.fromDeleted": "Abgezweigt von einem gelöschten Thread",
   "conversation.threads.view.newPlaceholder": "Neuer Thread mit {name}",
-  "conversation.threads.view.placeholder": "Nachricht an {name} in {title}",
+  "conversation.threads.view.placeholder": "Nachricht an {name} in diesem Thread",
   "conversation.threads.view.queued": "Nachrichten, die in diesem Thread warten",
   "conversation.threads.view.failed": "Der Thread ist fehlgeschlagen",
   "conversation.threads.error.load": "Die Threads dieses Agenten konnten nicht geladen werden.",

@@ -529,7 +529,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
-      ? t("conversation.threads.view.placeholder", { name: props.agent.name, title: props.task.title })
+      ? // The tab already names the thread, and a title can be a whole message.
+        t("conversation.threads.view.placeholder", { name: props.agent.name })
       : t("conversation.threads.view.newPlaceholder", { name: props.agent.name });
   const voicePhase = () => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";

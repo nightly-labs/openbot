@@ -92,7 +92,7 @@ export const messages = {
   "conversation.threads.branch.from": "متفرّعة من {title}",
   "conversation.threads.branch.fromDeleted": "متفرّعة من سلسلة محذوفة",
   "conversation.threads.view.newPlaceholder": "سلسلة جديدة مع {name}",
-  "conversation.threads.view.placeholder": "راسل {name} في {title}",
+  "conversation.threads.view.placeholder": "راسل {name} في هذه السلسلة",
   "conversation.threads.view.queued": "رسائل تنتظر في هذه السلسلة",
   "conversation.threads.view.failed": "فشلت السلسلة",
   "conversation.threads.error.load": "تعذّر تحميل سلاسل هذا الوكيل.",
