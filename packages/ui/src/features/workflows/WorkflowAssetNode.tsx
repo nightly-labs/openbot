@@ -24,6 +24,9 @@ const ASSET_FILTERS: readonly { value: AssetFilter; label: AppTextKey }[] = [
 /** The files of the library: the files from the computer of this board, newest first, then the workspace files. */
 const libraryFiles = (board: WfnBoard) => [...board.uploads(), ...board.catalogs().files];
 
+/** How long a library tile stays near the view before it loads its picture, so a scroll that passes it does not. */
+const TILE_SETTLE_MS = 250;
+
 const PICTURE_ACCEPT = [...WORKFLOW_PICTURE_TYPES].join(",");
 
 /** The files of a drag from the computer, or none when the drag holds no files. */
@@ -120,14 +123,19 @@ function LibraryGrid(props: {
   const observer = new ResizeObserver(measure);
   onCleanup(() => observer.disconnect());
   /**
-   * The tiles that came near the visible part of the grid. Only these show their picture: a joined
-   * server sends each picture whole, two at a time, so a picture out of view made the picked one wait.
-   * The browser's own lazy loading measures from the window, so it loaded almost the whole grid.
+   * The tiles that stayed near the visible part of the grid. Only these show their picture: a joined
+   * server sends each picture whole, two at a time, so a picture out of view, or one that a scroll only
+   * passed, made the picked one wait. The browser's own lazy loading measures from the window, so it
+   * loaded almost the whole grid.
    */
   const [near, setNear] = createSignal<ReadonlySet<string>>(new Set());
   const tiles = new Map<Element, string>();
+  const waits = new Map<Element, ReturnType<typeof setTimeout>>();
   let nearby: IntersectionObserver | undefined;
-  onCleanup(() => nearby?.disconnect());
+  onCleanup(() => {
+    nearby?.disconnect();
+    for (const wait of waits.values()) clearTimeout(wait);
+  });
   const watch = (element: Element, id: string) => {
     tiles.set(element, id);
     nearby?.observe(element);
@@ -176,10 +184,20 @@ function LibraryGrid(props: {
           observer.observe(element);
           nearby = new IntersectionObserver(
             (entries) => {
-              const shown = entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target);
-              if (shown.length === 0) return;
-              for (const target of shown) nearby?.unobserve(target);
-              setNear((ids) => new Set([...ids, ...shown.flatMap((target) => tiles.get(target) ?? [])]));
+              for (const { target, isIntersecting } of entries) {
+                clearTimeout(waits.get(target));
+                waits.delete(target);
+                const id = tiles.get(target);
+                if (!isIntersecting || id === undefined) continue;
+                waits.set(
+                  target,
+                  setTimeout(() => {
+                    waits.delete(target);
+                    nearby?.unobserve(target);
+                    setNear((ids) => new Set([...ids, id]));
+                  }, TILE_SETTLE_MS),
+                );
+              }
             },
             { root: element, rootMargin: "160px 0px" },
           );
