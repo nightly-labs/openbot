@@ -21,6 +21,7 @@ export const messages = {
   "island.badge.takeover": "引き継ぐ",
   "island.badge.failed": "失敗",
   "island.status.replied": "返信しました",
+  "island.header.app": "OpenBot",
   "island.status.failed": "失敗しました",
   "island.status.needsYou": "対応が必要です",
   "island.status.needsApproval": "承認が必要です",
