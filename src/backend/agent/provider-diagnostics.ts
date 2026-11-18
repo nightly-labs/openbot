@@ -461,10 +461,11 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
  * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
  * at position 124 with role 'user' contains an invalid part type: file" (#8654). Z.ai's text-only
  * GLM models refuse an image with error 1210: "messages.content.type is invalid, allowed values:
- * ['text']" (#10012).
+ * ['text']" (#10012). A local server refuses a screenshot that a tool returned to a text-only model:
+ * "MiniMax-M2.7-AWQ-4bit is not a multimodal model" (#11679).
  */
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }
