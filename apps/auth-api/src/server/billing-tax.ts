@@ -234,6 +234,14 @@ const paidCheckoutSchema = Schema.Struct({
 });
 
 /**
+ * The Discord form of a VAT text (`VAT check: ...` or `VAT limit: ...`): an emoji and the bold label.
+ * The log keeps the plain text.
+ */
+export function vatAlertText(text: string): string {
+  return text.replace(/^(VAT check|VAT limit): /, "🧾 **$1** · ");
+}
+
+/**
  * The operator text for a paid Checkout page whose billing address is in another country than the one
  * that decided its VAT. Null when they agree, or for a page from before the billing details step.
  */
