@@ -9,7 +9,7 @@ import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentStore } from "../agent-store";
-import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
+import type { AgentThreadRecord, ThreadListPosition } from "../agent-threads/agent-thread-store";
 import { HistoryReferenceUnavailable } from "../database/agent-history-queries";
 import type { ProviderSession } from "../database/provider-sessions";
 import { openBotToolResult } from "./routine-tools";
@@ -124,14 +124,47 @@ const readShape = {
   includeWorkSteps: z.boolean().optional(),
   workStepsOffset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 };
-// A search cursor continues one query. Without a query, the cursor fits no call of this tool (#6995).
+/**
+ * A cursor of the chat list: the side thread that the earlier page ended with, or null when that page
+ * held only the main chat. The list continues after it, so a size cut leaves no thread out (#11877).
+ * It keeps the time window of the first page: the next call sends only the cursor.
+ */
+const listCursorSchema = z.strictObject({
+  version: z.literal(1),
+  list: z.literal("threads"),
+  after: z.string().nullable(),
+  last: z.strictObject({ updatedAt: id, threadId: id }).nullable(),
+});
+
+/** The fields of a chat list cursor, or null for text that is not one. */
+function readListCursor(text: string) {
+  try {
+    return listCursorSchema.parse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+  } catch {
+    return null;
+  }
+}
+
+function listCursor(after: string | null, last: ThreadListPosition | null): string {
+  return Buffer.from(JSON.stringify({ version: 1, list: "threads", after, last }), "utf8").toString("base64url");
+}
+
+// A search cursor continues one query, and a chat list cursor continues the list with no query and no
+// taskId. Another cursor fits no call of this tool (#6995).
 const searchSchema = z
   .strictObject(searchShape)
-  .refine((value) => value.cursor === undefined || value.query !== undefined, {
-    path: ["cursor"],
-    message:
-      "A cursor continues the call that gave it. Send a history_search cursor with the same query, and a history_read cursor to history_read as before.",
-  });
+  .refine(
+    (value) =>
+      value.cursor === undefined ||
+      (readListCursor(value.cursor) === null
+        ? value.query !== undefined
+        : value.query === undefined && value.taskId === undefined),
+    {
+      path: ["cursor"],
+      message:
+        "A cursor continues the call that gave it. Send a history_search cursor with the same query, a chat list cursor with no query, and a history_read cursor to history_read as before.",
+    },
+  );
 const readSchema = z
   .strictObject(readShape)
   .refine(
@@ -221,8 +254,16 @@ interface HistoryToolOptions {
   capturedSteps(session: ProviderSession): Effect.Effect<Map<string, string> | null, ToolOperationFailed>;
   /** The text of a visual reply page, or null when its file is deleted or not readable. */
   pageText(attachmentId: string): Effect.Effect<string | null>;
-  /** The agent's side threads, open and archived, with activity at or after `after`. The latest first. */
-  recentThreads(agentId: string, after: string | null, limit: number): readonly AgentThreadRecord[];
+  /**
+   * The agent's side threads, open and archived, with activity at or after `after`. The latest first.
+   * With `last`, the threads after it: the next page of a list.
+   */
+  recentThreads(
+    agentId: string,
+    after: string | null,
+    limit: number,
+    last: ThreadListPosition | null,
+  ): readonly AgentThreadRecord[];
 }
 
 /**
@@ -295,22 +336,21 @@ export class HistoryTools {
     args: unknown,
   ) {
     const input = yield* toolStep(() => searchSchema.parse(args ?? {}));
-    if (input.query !== undefined || input.taskId !== undefined || input.cursor !== undefined)
+    if (input.query !== undefined || input.taskId !== undefined)
       throw new Error(sourceText("error.agent.historyUnavailable"));
+    // The schema accepts only a chat list cursor here.
+    const cursor = input.cursor === undefined ? null : readListCursor(input.cursor);
     const now = Date.now();
-    const after = input.after === undefined ? null : windowBound(input.after, now);
+    const after = cursor ? cursor.after : input.after === undefined ? null : windowBound(input.after, now);
     const limit = input.limit ?? 8;
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
     // Redact the whole message before the cut, so that a cut never splits a secret out of a match.
     const latest = (threadId: string, author: "user" | "assistant") =>
       store.database.readAgentHistory(agentId, threadId, { author, limit: 1 }).messages[0]?.message ?? null;
+    const shown = (entry: ThreadEntry) => after === null || (entry.lastActivityAt ?? "") >= after;
     const listed = yield* toolStep(() => {
-      const conversations = this.#conversations(agentId, after, limit + 1);
-      const records = conversations.filter((conversation) => conversation.record !== null);
-      // The conversation of this call is listed too: after a new provider session, such as a rotation,
-      // its earlier messages are not in context, and a list without it looked empty (#8127).
-      const entries = conversations.map(({ taskId, threadId, record }): ThreadEntry => {
+      const entry = (taskId: string, threadId: string, record: AgentThreadRecord | null): ThreadEntry => {
         const request = latest(threadId, "user");
         const reply = latest(threadId, "assistant");
         // Messages give the activity: an archive, a reopen or an outcome also moves `updatedAt`.
@@ -323,7 +363,7 @@ export class HistoryTools {
         const title = record ? excerptText(redact(record.title), REQUEST_EXCERPT) : "Main chat";
         const lastRequest = request ? excerptText(redact(request.text), REQUEST_EXCERPT) : null;
         return {
-          taskId: taskId ?? MAIN_CHAT_TASK_ID,
+          taskId,
           title,
           ...(kind ? { kind } : {}),
           ...(record?.closedAt ? { archived: true as const } : {}),
@@ -334,25 +374,50 @@ export class HistoryTools {
           ...(lastRequest && lastRequest !== title ? { lastRequest } : {}),
           ...(reply ? { lastReply: excerptText(redact(reply.text), REPLY_EXCERPT) } : {}),
         };
-      });
-      // The own chat has no row: it is older than every side thread, so only its activity is checked.
-      const shown = entries
-        .filter((entry) => after === null || (entry.lastActivityAt ?? "") >= after)
-        .sort((left, right) => (right.lastActivityAt ?? "").localeCompare(left.lastActivityAt ?? ""));
-      return { threads: shown.slice(0, limit), more: records.length > limit || shown.length > limit };
+      };
+      // The main chat has no row: it is older than every side thread, so only the first page shows it,
+      // and only its activity is checked. The conversation of this call is listed too: after a new
+      // provider session, such as a rotation, its earlier messages are not in context, and a list
+      // without it looked empty (#8127).
+      const mainThreadId =
+        input.cursor === undefined ? (store.list().find((agent) => agent.id === agentId)?.threadId ?? null) : null;
+      const main = mainThreadId ? entry(MAIN_CHAT_TASK_ID, mainThreadId, null) : null;
+      const mainShown = main !== null && shown(main) ? main : null;
+      const records = this.#options.recentThreads(agentId, after, limit + 1, cursor?.last ?? null);
+      // A page takes the side threads in the order of the list query, so that the next page continues
+      // after its last one; the answer shows them by their latest message.
+      const page = records
+        .slice(0, limit - (mainShown ? 1 : 0))
+        .map((record) => ({ record, entry: entry(record.taskId, record.threadId, record) }));
+      return { main: mainShown, page, more: records.length > page.length };
     });
-    const result = {
-      now: new Date(now).toISOString(),
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      threads: listed.threads,
-      more: listed.more,
-      next: "history_read with a taskId reads one.",
+    const { main, page } = listed;
+    let more = listed.more;
+    const answer = () => {
+      const last = page.at(-1)?.record;
+      return openBotToolResult({
+        now: new Date(now).toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        threads: [...(main ? [main] : []), ...page.map((item) => item.entry).filter(shown)].sort((left, right) =>
+          (right.lastActivityAt ?? "").localeCompare(left.lastActivityAt ?? ""),
+        ),
+        more,
+        ...(more
+          ? { nextCursor: listCursor(after, last ? { updatedAt: last.updatedAt, threadId: last.threadId } : null) }
+          : {}),
+        next: more
+          ? "Send nextCursor as cursor, with no query, for older chats. history_read with a taskId reads one."
+          : "history_read with a taskId reads one.",
+      });
     };
-    while (JSON.stringify(openBotToolResult(result)).length > THREADS_RESULT_CHARACTERS && result.threads.length > 1) {
-      result.threads.pop();
-      result.more = true;
+    let result = answer();
+    // Cut the last side threads of the page, so that the cursor continues with them.
+    while (JSON.stringify(result).length > THREADS_RESULT_CHARACTERS && page.length > (main ? 0 : 1)) {
+      page.pop();
+      more = true;
+      result = answer();
     }
-    return openBotToolResult(result);
+    return result;
   }).bind(this);
 
   /** One search or read of one conversation, as a tool answer. */
@@ -442,7 +507,7 @@ export class HistoryTools {
     return [
       ...(mainThreadId ? [{ taskId: MAIN_CHAT_TASK_ID, threadId: mainThreadId, record: null }] : []),
       ...this.#options
-        .recentThreads(agentId, after, limit)
+        .recentThreads(agentId, after, limit, null)
         .map((record) => ({ taskId: record.taskId, threadId: record.threadId, record })),
     ];
   }

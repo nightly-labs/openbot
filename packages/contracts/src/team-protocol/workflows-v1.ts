@@ -38,7 +38,7 @@ import {
   string,
 } from "./admin-wire";
 import { routineSchedule, routineTime } from "./events-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const WORKFLOWS_CAPABILITY = "workflows-v1";
 

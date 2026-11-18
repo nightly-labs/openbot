@@ -79,6 +79,12 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     return known ? t(known.title) : (plugin()?.name ?? props.appId);
   };
   const open = (connect: boolean) => props.onOpenMarketplaceApp?.({ appId: props.appId, connect });
+  /** Why the user cannot connect it: a computer-only app, a member's role, or a host without it. */
+  const unavailableText = () => {
+    if (connector()?.access === "local-only") return t("chat.suggestion.localOnly", { name: name() });
+    if (props.connectors && !props.connectors.canManage()) return t("chat.suggestion.notAllowed", { name: name() });
+    return t("chat.suggestion.unavailable", { name: name() });
+  };
   return (
     <MarketplaceSuggestionCard
       kind="app"
@@ -87,11 +93,7 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
       iconUrl={plugin()?.iconUrl ?? null}
       mark={listing()?.Mark()}
       state={state()}
-      unavailableText={
-        connector()?.access === "local-only"
-          ? t("chat.suggestion.localOnly", { name: name() })
-          : t("chat.suggestion.unavailable", { name: name() })
-      }
+      unavailableText={unavailableText()}
       dismissed={marketplaceSuggestionDismissed(props.messageId)}
       onConnect={props.onOpenMarketplaceApp ? () => open(true) : undefined}
       onOpenDetails={props.onOpenMarketplaceApp && state() !== "unavailable" ? () => open(false) : undefined}

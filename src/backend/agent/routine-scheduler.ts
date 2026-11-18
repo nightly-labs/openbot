@@ -22,7 +22,7 @@ import { routineConversationEventItemType, routineRunConversationEventItemType }
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
@@ -45,7 +45,7 @@ import {
   type ConversationTransaction,
   withDatabaseTransaction,
 } from "./conversation-runtime";
-import { routineStatusForDelivery } from "./delivery-content";
+import { failedRunReason, routineStatusForDelivery } from "./delivery-content";
 import { quietRoutineRun } from "./routine-quiet-runs";
 import {
   localTimezone,
@@ -107,7 +107,7 @@ export interface RoutineHooks {
   excludedAgents(): ReadonlySet<string>;
   /** The timer only arms while the service is initialized and not stopping. */
   isRunning(): boolean;
-  /** Whether a spent provider plan holds this agent's queue. */
+  /** Whether a spent provider plan holds this agent's queue, and no ready backup model or account can take it. */
   usageLimited(agentId: string): boolean;
   /**
    * The open side thread that takes the runs of this routine, created or restored here. Null when the
@@ -667,12 +667,17 @@ export class RoutineScheduler implements RoutineDueSource {
       const args = routineToolArguments(params.arguments, ["agentId"]);
       const agentId = this.#toolAgentId(args, senderAgentId);
       return openBotToolResult({
-        routines: this.list(agentId),
-        webhookRoutines: this.#routines
-          .listRecords(agentId)
-          .flatMap((routine) =>
-            routine.trigger.kind === "webhook" ? [webhookRoutineSummary({ ...routine, trigger: routine.trigger })] : [],
-          ),
+        routines: this.list(agentId).map((routine) => ({ ...routine, lastRun: this.#lastRun(agentId, routine.id) })),
+        webhookRoutines: this.#routines.listRecords(agentId).flatMap((routine) =>
+          routine.trigger.kind === "webhook"
+            ? [
+                {
+                  ...webhookRoutineSummary({ ...routine, trigger: routine.trigger }),
+                  lastRun: this.#lastRun(agentId, routine.id),
+                },
+              ]
+            : [],
+        ),
       });
     }
 
@@ -915,9 +920,10 @@ export class RoutineScheduler implements RoutineDueSource {
     if (!run || run.status === "cancelled") return false;
     const status = routineStatusForDelivery(delivery);
     if (run.status === "needs-attention" && ["starting", "running"].includes(delivery.status)) return false;
-    if (run.status === status && run.error === delivery.error) return false;
-    if (status === "queued") this.#routines.updateRunStatus(run.id, status, delivery.error);
-    else this.#transitionRunWithConversation(run, status, delivery.error);
+    const error = status === "failed" ? failedRunReason(delivery.error, run) : delivery.error;
+    if (run.status === status && run.error === error) return false;
+    if (status === "queued") this.#routines.updateRunStatus(run.id, status, error);
+    else this.#transitionRunWithConversation(run, status, error);
     return true;
   }
 
@@ -1336,6 +1342,20 @@ export class RoutineScheduler implements RoutineDueSource {
     };
     snapshot.messages.push(message);
     return { run: updated, message };
+  }
+
+  /**
+   * The newest run of a routine for list_routines. Without it, an agent that watches its routines saw
+   * "Routine failed" in the chat and could not read why (#11627).
+   */
+  #lastRun(agentId: string, routineId: string) {
+    const run = this.#routines.listRuns(agentId, routineId, 1)[0];
+    if (!run) return null;
+    return {
+      status: run.status,
+      at: run.updatedAt,
+      ...(run.error ? { reason: redactText(run.error) } : {}),
+    };
   }
 
   /**

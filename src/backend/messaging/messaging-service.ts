@@ -35,7 +35,7 @@ import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
 import { WHATSAPP_ORCHESTRATOR_AVATAR } from "@openbot/contracts/whatsapp-app";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactPostText, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Result, Schedule, Schema, Scope } from "effect";
 import type { AgentLifecycleFailed } from "../agent-service";
 import { causeHelpers } from "../effect-boundary";
@@ -326,6 +326,9 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
+    this.#threads.setOwnerPostSource(
+      (link) => this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true,
+    );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
@@ -360,6 +363,7 @@ export class MessagingService {
     // The kept deliveries that wait for a connection go now: nothing will start it.
     for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
+    this.#threads.setOwnerPostSource(null);
     this.#threads.setHistorySource(null);
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
@@ -1579,6 +1583,9 @@ export class MessagingService {
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
     if (!agentId) {
+      // On WhatsApp, only the owner can add the orchestrator, and only in their own chat do they write
+      // as the number. A contact or a group that the owner allowed gets no setup text from their number.
+      if (live.record.platform === "whatsapp" && message.authorId !== live.identity.botUserId) return;
       const noAgent =
         live.record.platform === "discord"
           ? "status.messaging.discordNoAgent"
@@ -1866,8 +1873,9 @@ export class MessagingService {
       };
     // A Discord workspace id is the guild id, which a link to the post needs.
     const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
-    // The place is outside this computer, so a secret in the text must not reach it.
-    const text = redactText(markdown);
+    // The place is outside this computer, so a secret in the text must not reach it. An email
+    // address stays: the agent wrote it for the people in that place.
+    const text = redactPostText(markdown);
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
@@ -1893,6 +1901,20 @@ export class MessagingService {
         ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
       };
+    }
+    // One file takes the text as its caption: apart, the text can go missing while the file arrives.
+    const single = files.length === 1 && !embeds.length ? files[0] : undefined;
+    if (single && live.adapter.postFileWithText) {
+      const captioned = yield* Effect.result(live.adapter.postFileWithText(target, text, single));
+      if (Result.isFailure(captioned))
+        return {
+          error: refusal(captioned.failure),
+          failure: "unknown" as const,
+        };
+      if (captioned.success) {
+        live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
+        return { posted: true as const, messageId: captioned.success };
+      }
     }
     const posted = yield* (
       postEmbeds && embeds.length
@@ -2038,7 +2060,7 @@ export class MessagingService {
       // request that already ended, or whose status post failed, gets no edit.
       if (!live || !post?.messageId || !post.stopToken || post.final) return;
       // Only the host makes a platform mention, so the mention markers go.
-      const text = redactText(activity.text).replace(MENTION_MARKERS, "");
+      const text = redactPostText(activity.text).replace(MENTION_MARKERS, "");
       yield* live.adapter
         .edit(target, post.messageId, {
           text: text.length > PROGRESS_TEXT_LIMIT ? `${text.slice(0, PROGRESS_TEXT_LIMIT - 1)}…` : text,
@@ -2567,7 +2589,7 @@ function linkTarget(link: MessagingLink): MessageTarget {
  * that the mask breaks, so the post fails and the secret stays here.
  */
 function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
-  const mask = (value: string | undefined) => (value === undefined ? undefined : redactText(value));
+  const mask = (value: string | undefined) => (value === undefined ? undefined : redactPostText(value));
   return {
     title: mask(embed.title),
     description: mask(embed.description),
@@ -2575,16 +2597,16 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
     color: embed.color,
     timestamp: embed.timestamp,
     author: embed.author && {
-      name: redactText(embed.author.name),
+      name: redactPostText(embed.author.name),
       url: mask(embed.author.url),
       icon_url: mask(embed.author.icon_url),
     },
-    footer: embed.footer && { text: redactText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
-    thumbnail: embed.thumbnail && { url: redactText(embed.thumbnail.url) },
-    image: embed.image && { url: redactText(embed.image.url) },
+    footer: embed.footer && { text: redactPostText(embed.footer.text), icon_url: mask(embed.footer.icon_url) },
+    thumbnail: embed.thumbnail && { url: redactPostText(embed.thumbnail.url) },
+    image: embed.image && { url: redactPostText(embed.image.url) },
     fields: embed.fields?.map((field) => ({
-      name: redactText(field.name),
-      value: redactText(field.value),
+      name: redactPostText(field.name),
+      value: redactPostText(field.value),
       inline: field.inline,
     })),
   };
@@ -2609,6 +2631,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
+  [
+    "not_confirmed",
+    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+  ],
 ]);
 
 const DISCORD_NOT_LINKED =
@@ -2682,8 +2708,9 @@ function finalPost(
   const reaction = reacts ? "done" : null;
   // A quiet answer posts nothing: an empty text takes back the status post.
   if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
-  // The platform is outside this computer, so a secret in the answer must not reach it.
-  if (activity.answer) return { answer: true, text: redactText(activity.answer), reaction };
+  // The platform is outside this computer, so a secret in the answer must not reach it. An email
+  // address that the agent wrote stays.
+  if (activity.answer) return { answer: true, text: redactPostText(activity.answer), reaction };
   if (answerOnly) return { answer: false, text: "", reaction };
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
   if (!activity.followUp && awaitsTeammate)

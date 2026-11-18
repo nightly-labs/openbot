@@ -13,6 +13,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -35,8 +36,9 @@ import {
   AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
+  readTeamHostCompatibility,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
-  teamWebRtcClientProtocol,
+  TEAM_WEB_CLIENT_PROTOCOL,
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -70,6 +72,11 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
+import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -81,11 +88,11 @@ import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skil
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -112,6 +119,7 @@ import type {
   RemoteLargeDownload,
   RemoteTeamEvent,
 } from "@openbot/team-client/remote-peer";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -140,7 +148,7 @@ import {
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import * as Crypto from "expo-crypto";
-import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import { agentInitialMessage, type NewAgentInput } from "@/features/agents/model/agent-initial-message";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -155,6 +163,7 @@ import { NotificationAvatarSync } from "@/features/push-notifications/notificati
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { forgetAgentBackdrops, retainAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
@@ -192,9 +201,11 @@ import {
   agentAvatarDataUrl,
   deleteServerAvatars,
   saveAgentAvatar,
+  savedAgentAvatarCount,
+  subscribeSavedAgentAvatars,
 } from "@/features/workspace/model/agent-avatar-cache";
 import {
-  canToggleAgentPin,
+  canToggleChatPin,
   phoneSidebarPins,
   reconcileAgentPins,
   reconcileChannelPins,
@@ -207,6 +218,7 @@ import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { NO_CONTEXT_STATES, reduceContextStates } from "@/features/workspace/model/context-states";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import { keepDirectoryAgents } from "@/features/workspace/model/directory-agents";
 import {
   drawerSnapshot,
   forgetDrawerSnapshots,
@@ -292,6 +304,8 @@ export type {
 } from "@/features/workspace/model/workspace-types";
 
 const NO_IDS: string[] = [];
+/** A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`). */
+const createOperationId = retryOperationIds(() => Crypto.randomUUID());
 const NO_AGENTS: MobileAgent[] = [];
 /** The longest that the servers which are not selected wait for the selected one on a return to the app. */
 const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
@@ -304,6 +318,12 @@ const STARTUP_SERVER_WAIT_MS = 4_000;
  * the app or select another server.
  */
 const FIRST_CONNECTION_WAIT_MS = 5_000;
+/**
+ * How often streamed text reaches an open chat. Each change makes the chat do its work over all of
+ * its messages, and a reply shows its words at their own pace (`useReplyPlayback`), so a change on
+ * each frame costs the phone much and shows nothing more.
+ */
+const STREAM_FLUSH_MS = 100;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -416,6 +436,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [agents, setAgents] = useState<MobileAgent[]>([]);
   const agentsRef = useRef(agents);
   agentsRef.current = agents;
+  // The parts that do not show the latest message get a list that a message does not change. A new
+  // saved photo changes their pictures, so it gives a new list.
+  const savedAvatars = useSyncExternalStore(subscribeSavedAgentAvatars, savedAgentAvatarCount);
+  const directoryAgentsRef = useRef<{ agents: readonly MobileAgent[]; savedAvatars: number }>({
+    agents,
+    savedAvatars,
+  });
+  if (directoryAgentsRef.current.savedAvatars !== savedAvatars)
+    directoryAgentsRef.current = { agents: [...agents], savedAvatars };
+  else if (directoryAgentsRef.current.agents !== agents)
+    directoryAgentsRef.current = {
+      agents: keepDirectoryAgents(directoryAgentsRef.current.agents, agents),
+      savedAvatars,
+    };
+  const directoryAgents = directoryAgentsRef.current.agents;
   // Keep former agent IDs too, so leaving also removes cached chats of deleted agents.
   const serverAgentIds = useRef(new Map<string, Set<string>>());
   const removedServers = useRef(new Set<string>());
@@ -434,8 +469,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const conversationStore = useMemo(
     () =>
       new MobileConversationStore((flush) => {
-        const frame = requestAnimationFrame(flush);
-        return () => cancelAnimationFrame(frame);
+        const timer = setTimeout(flush, STREAM_FLUSH_MS);
+        return () => clearTimeout(timer);
       }),
     [],
   );
@@ -454,6 +489,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
   /** Servers whose cache this run read, once each. */
   const restoredServers = useRef(new Set<string>());
+  /**
+   * The values of the last cache write of each server. A write with the same values is not done
+   * again: it would make the same file with JSON, encryption and file writes for each server.
+   */
+  const persistedInputs = useRef(new Map<string, readonly unknown[]>());
   /** Servers shown from the cache whose connection did not register yet. */
   const quietStarts = useRef(new Set<string>());
   /**
@@ -594,6 +634,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         cachedSummaries.current.delete(serverId);
         keptCapabilities.current.delete(serverId);
         void workspaceCache?.remove(serverId).catch(() => undefined);
+        persistedInputs.current.delete(serverId);
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
@@ -606,6 +647,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryClient.removeQueries({ queryKey });
       }
       forgetDrawerSnapshots(serverIds);
+      forgetAgentBackdrops(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       hostColors.current = withoutKeys(hostColors.current, serverIds);
@@ -640,6 +682,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
         // Also the copies of servers that the account left while the app was closed.
         void workspaceCache?.retain([...available]).catch(() => undefined);
+        retainAgentBackdrops([...available]);
         for (const host of hosts) removedServers.current.delete(host.hostId);
         keepHosts(hosts);
       }
@@ -775,7 +818,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const applyLiveActivityEvent = useLiveActivity({
     servers,
     activeServerId,
-    agents,
+    agents: directoryAgents,
     liveState,
     foreground,
     post: postLiveActivityAction,
@@ -1012,6 +1055,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string) => {
       const agents = cachedSummaries.current.get(serverId);
       if (!workspaceCache || !agents || removedServers.current.has(serverId)) return;
+      const capabilities = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null;
+      // Each store gives a new object when its data changes, so the same objects give the same file.
+      const inputs = [
+        agents,
+        hostHiddenRef.current[serverId],
+        hostColors.current[serverId],
+        sidebarByServerRef.current[serverId]?.layout,
+        capabilities,
+        drawerSnapshot(serverId),
+        channelStore.peek(serverId),
+        ...agents.map((agent) => conversationStore.get(agent.id)),
+      ];
+      const previous = persistedInputs.current.get(serverId);
+      if (previous?.length === inputs.length && previous.every((input, index) => input === inputs[index])) return;
+      persistedInputs.current.set(serverId, inputs);
       void workspaceCache
         .write(serverId, {
           agents,
@@ -1019,11 +1077,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           colors: colorList(hostColors.current[serverId]),
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
-          capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
+          capabilities,
           drawer: drawerSnapshot(serverId),
           channels: channelStore.cachedChannels(serverId),
         })
-        .catch(() => undefined);
+        .catch(() => false)
+        .then((written) => {
+          // With no key or after a failure, the next save writes the file again.
+          if (!written && persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
+        });
     },
     [workspaceCache, conversationStore, channelStore],
   );
@@ -1031,11 +1093,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   // replace it. Its first attempt is then quiet, as a return to the app.
   useEffect(() => {
     if (!workspaceCache) return;
-    for (const { id } of servers) {
-      if (restoredServers.current.has(id)) continue;
+    // The active server reads first, and the others one at a time after it. Each file can be some
+    // megabytes of JSON, and parallel reads would hold the JS thread while home first shows.
+    const activeId = activeServerIdRef.current;
+    const pending = servers
+      .map(({ id }) => id)
+      .filter((id) => !restoredServers.current.has(id))
+      .sort((a, b) => Number(b === activeId) - Number(a === activeId));
+    let previousRead: Promise<unknown> = Promise.resolve();
+    for (const id of pending) {
       restoredServers.current.add(id);
-      void workspaceCache
-        .read(id)
+      previousRead = previousRead
+        .then(() => workspaceCache.read(id))
         .then((cached) => {
           if (!cached || removedServers.current.has(id)) return;
           // A connection that checked its capabilities in this run uses its own.
@@ -1239,7 +1308,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
-      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
+      // A host of protocol 10 answers the first read as protocol 9, so the read can ask again.
+      const compatibilityRead = readTeamHostCompatibility(
+        () => client.request("GET", TEAM_API_ROUTES.compatibility, (value) => value),
+        TEAM_WEB_CLIENT_PROTOCOL,
+      );
       // At a return, the connection from before the background stays, and its event stream
       // delivered every event or reset, which asks for a full load. The compatibility read checks
       // the path; a dead path fails it, and the next attempt loads all.
@@ -1279,7 +1352,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ? { capabilities: known, reads: startWorkspaceReads(client, known), conversationReads: loadReads() }
         : null;
       early?.conversationReads.catch(() => undefined);
-      const compatibility = await compatibilityRead;
+      const { support: compatibility, negotiated } = await compatibilityRead;
       if (!context.isCurrent()) return;
       supportLog.add(
         "info",
@@ -1288,12 +1361,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       );
       // The host range is compared with the protocols that this app speaks, so a host that raised its
       // minimum still connects, and the side that is too old is named.
-      const negotiated = teamWebRtcClientProtocol(compatibility.protocol);
       if (negotiated.update === "client_update_required") {
         throw new Error(sourceText("error.remote.mobileUpdateRequired"));
       }
       if (negotiated.update === "host_update_required") {
         throw new Error(sourceText("error.team.hostUpdateRequired"));
+      }
+      // A server in safe mode answers only with the reason. Each member sees it.
+      if (compatibility.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY)) {
+        const reason = await client
+          .request("GET", SERVER_SAFE_MODE_ROUTES.reason, decodeServerSafeModeReason)
+          .catch(() => null);
+        throw new Error(
+          reason === null
+            ? sourceText("error.team.serverSafeMode")
+            : sourceText(
+                reason.reason === "newer_database"
+                  ? "error.team.serverSafeModeNewerDatabase"
+                  : "error.team.serverSafeModeStartFailed",
+                { version: reason.appVersion },
+              ),
+        );
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
@@ -1668,7 +1756,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return;
       }
       syncEventQueries(queryClient, queryScope, serverId, event);
-      if (event.type === "channels-changed") void channelStore.refresh(serverId, event.channelId);
+      if (event.type === "channels-changed") channelStore.changed(serverId, event.channelId);
       if (
         event.type === "channels-changed" ||
         event.type === "channel-memories-changed" ||
@@ -2170,7 +2258,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const serverId = currentActiveServer().id;
         const firstTask = input.firstTask?.trim() ?? "";
         const welcome = hasCapability(serverCapabilities.current, serverId, AGENT_WELCOME_CAPABILITY);
-        const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
+        const body = {
           name: input.name,
           description: input.description,
           avatarSeed: input.avatarSeed,
@@ -2191,6 +2279,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
                 ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
               }
             : {}),
+        };
+        const operation = hasCapability(serverCapabilities.current, serverId, AGENT_CREATE_OPERATION_CAPABILITY)
+          ? createOperationId([serverId, body])
+          : null;
+        const created = await request(
+          "POST",
+          TEAM_API_ROUTES.agents.all,
+          decodeAgent,
+          operation ? { ...body, operationId: operation.id } : body,
+        ).catch((error: unknown) => {
+          operation?.failed();
+          throw error;
         });
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== created.id),
@@ -2421,7 +2521,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         let result: "pinned" | "unpinned" = "pinned";
         const saved = updatePreferences(serverId, (current) => {
           const pinned = current.pinnedChannels ?? [];
-          if (!canToggleAgentPin([...current.pinned, ...pinned], channelId)) return current;
+          if (!canToggleChatPin(pinned, current.pinned, channelId)) return current;
           result = pinned.includes(channelId) ? "unpinned" : "pinned";
           return {
             ...current,
@@ -2473,7 +2573,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const pinned = currentPinnedAgentIds();
         const serverId = currentActiveServer().id;
         const pinnedChannels = preferencesRef.current[serverId]?.pinnedChannels ?? NO_IDS;
-        if (!canToggleAgentPin([...pinned, ...pinnedChannels], agentId)) return "error";
+        if (!canToggleChatPin(pinned, pinnedChannels, agentId)) return "error";
         if (pinned.includes(agentId)) {
           return updatePreferences(serverId, (current) => ({
             ...current,
@@ -2656,6 +2756,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageMissedRuns: (serverId) =>
           administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_RECOVERY_CAPABILITY),
         canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
+        canGiveWebhookSecretToAgent: (serverId) => administers(serverId, WEBHOOK_AGENT_SECRET_CAPABILITY),
         canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
         canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
         canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
@@ -2745,7 +2846,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             servers={servers}
             serversReady={serverDirectoryState === "ready"}
             activeServerId={activeServerId}
-            agents={agents}
+            agents={directoryAgents}
             preferences={visiblePreferences}
           />
           <ShareExtensionSync
@@ -2754,17 +2855,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             sessionToken={session.sessionToken}
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
-            agents={agents}
+            agents={directoryAgents}
           />
           <ShortcutsSync
             apiUrl={session.apiUrl}
             userId={session.user.id}
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
-            agents={agents}
+            agents={directoryAgents}
             preferences={visiblePreferences}
           />
-          <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
+          <NotificationAvatarSync
+            servers={servers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={directoryAgents}
+          />
           {servers.map((server) => (
             <ServerConnection
               key={server.id}

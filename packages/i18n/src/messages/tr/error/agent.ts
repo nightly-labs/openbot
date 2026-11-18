@@ -14,6 +14,8 @@ export const messages = {
     "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
   "error.agent.toolCallEnvelopeKeys":
     "Araç çalışmadı. tool_call yalnızca name ve arguments alır. Aracın bağımsız değişkenlerini arguments içine nesne olarak koyun ve çağrıyı yeniden gönderin.",
+  "error.agent.toolCallMissingName":
+    "Araç çalışmadı. tool_call içinde name yok. name alanına tool_search'ün verdiği tam nitelikli adı yazın, örneğin openbot.history_read, ve çağrıyı yeniden gönderin.",
   "error.agent.toolCallUnknownTool":
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -121,6 +123,8 @@ export const messages = {
   "error.agent.deletionBusy": "Ajan silme işlemi zaten devam ediyor.",
   "error.agent.stopBeforeDelete": "Ajanı silmeden önce durdurun ve kuyruğa alınmış mesajlarını iptal edin.",
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
+  "error.agent.deleteFolderInUse":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
   "error.agent.waitBeforeDuplicate": "Ajanı kopyalamadan önce bitmesini ve kuyruğunu temizlemesini bekleyin.",
   "error.agent.saveOtherAgent": "Bu kayıt başka bir ajana ait.",

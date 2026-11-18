@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nadat je deze versie hebt geïnstalleerd, kun je niet meer terug naar een oudere OpenBot-versie op deze computer of server. Deze versie maakt de database kleiner, en een oudere versie kan die niet openen.",
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken eigen afbeeldingsformaten, de Sunra- en Higgsfield-modellen en -prijzen, en het sneller laden van veel agents alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bekijk de zijthreads van elke agent in de zijbalk. Selecteer de pijl aan het eind van een agentrij, of houd de aanwijzer op de rij om al zijn threads te zien.",
+          "Filter de zijbalk met de filterknop aan het einde van het zoekveld. Toon alleen agents of kanalen, alleen ongelezen chats of agents die aan het werk zijn, of alleen de chats in de mappen die je selecteert.",
+          "Geef een afbeeldingsstap op het workflowcanvas een eigen formaat in pixels, of gebruik de beeldverhouding 4:5 of 5:4.",
+          "Het workflowcanvas toont alle afbeeldings- en videomodellen van Sunra en Higgsfield, en de knop Uitvoeren toont de prijs in credits.",
+          "Zet Achtergrondvervaging en Bewegende agentgezichten uit bij Instellingen → Weergave → Beweging om OpenBot sneller te maken op een trage computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Meerdere mensen kunnen tegelijk dezelfde workflow bewerken. Het canvas voegt de wijzigingen van de anderen toe zodra ze opslaan.",
+          "OpenBot gebruikt veel minder CPU terwijl veel agents werken, en je kunt typen zonder vertraging.",
+          "Agents ronden een betaling af wanneer de bank om een 3-D Secure-code vraagt. Staat de code in een e-mail of sms die de agent kan lezen, dan typt de agent hem in.",
+          "Serverinstellingen → Overdracht → Kopiëren naar een andere server kopieert nu ook de workflows en routinestromen van de agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De OpenBot-database neemt veel minder ruimte in. Na de update verwijdert OpenBot in kleine stappen oude kopieën van chatberichten.",
+          "Op Windows toont een update weer de voortgang.",
+          "Een aangesloten server met veel agents en een groot kanaal openen sneller.",
+          "Gemini-chats met veel afbeeldingen of een lange geschiedenis blijven werken, en Gemini vraagt niet meer om opnieuw in te loggen wanneer een nieuwe chat begint.",
+          "De desktopapp maakt weer verbinding met een server op OpenBot v0.34.1 of ouder."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

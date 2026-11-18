@@ -72,6 +72,8 @@ export const messages = {
     "マイクへのアクセスがブロックされています。システム設定で OpenBot にマイクの使用を許可してください。",
   "composer.voice.noMicrophone": "使用できるマイクがありません。",
   "composer.voice.startFailed": "OpenBot は音声の録音を開始できませんでした。",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot はマイクを開けませんでした。マイクを使用している他のアプリを閉じ、マイクが接続され、システム設定で許可されていることを確認してから、もう一度お試しください。",
   "composer.voice.transcribeFailed": "OpenBot はこの録音を文字起こしできませんでした。",
   "composer.reply.toYou": "あなたのメッセージに返信しています",
   "composer.reply.toAgent": "エージェントに返信しています",
@@ -131,6 +133,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "音声が録音されませんでした。",
   "composer.voice.noSpeechDetected": "音声が検出されませんでした。",
   "composer.voice.readFailed": "返信を読み上げられませんでした。",
+  "composer.voice.languageUnsupported": "返信を読み上げられませんでした。この言語にはまだ対応していません。",
   "composer.error.saveEditTryAgain": "このコンピューターに編集を保存できませんでした。もう一度お試しください。",
   "composer.error.saveUnconfirmed": "保存は確認されていません。結果を確認するには、もう一度保存してください。",
   "composer.error.changeModel": "モデルを変更できませんでした。もう一度お試しください。",

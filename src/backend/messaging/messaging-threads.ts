@@ -365,6 +365,11 @@ export class MessagingThreads {
         origin: MessagingOrigin,
       ) => Effect.Effect<MessagingPromptContext, MessagingOperationFailed>)
     | null = null;
+  /**
+   * True for another person's chat on the owner's personal WhatsApp number, where an answer shows as
+   * the owner. It is a local fact, so a slow or failed context read does not lose it.
+   */
+  #ownerPosts: ((link: MessagingLink) => boolean) | null = null;
   #historySource:
     | ((
         link: MessagingLink,
@@ -401,6 +406,10 @@ export class MessagingThreads {
       | null,
   ): void {
     this.#contextSource = source;
+  }
+
+  setOwnerPostSource(source: ((link: MessagingLink) => boolean) | null): void {
+    this.#ownerPosts = source;
   }
 
   /** The source answers null when the connection does not run now. */
@@ -828,6 +837,7 @@ export class MessagingThreads {
       // Only the "Message yourself" chat has the linked number as the author of a direct message:
       // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
       fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
+      postsAsOwner: this.#ownerPosts?.(link) === true,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,

@@ -69,6 +69,11 @@ export interface WorkerBindings {
    * home gets one near the place that Cloudflare gives for its request. Empty = any home.
    */
   REMOTE_SIGNAL_HOME_LOCATIONS?: string;
+  /**
+   * The homes of the hosts in a country, as `CC=id+id,CC=id`, with the Cloudflare country code. They
+   * replace the distance rule for that country. Empty = the distance rule for each country.
+   */
+  REMOTE_SIGNAL_HOME_COUNTRIES?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
   /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
   REMOTE_AUTH_WEBHOOK_URLS?: string;

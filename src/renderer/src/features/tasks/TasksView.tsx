@@ -16,6 +16,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -48,6 +49,7 @@ import { insertAtSelection, insertPastedText, rowAttachments } from "../conversa
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { useTurnTrace } from "../conversation/turn-trace";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
@@ -161,6 +163,12 @@ interface TasksViewState {
 
 /** The key of the start composer's files in `TasksViewState.files`. A task id never has this form. */
 const START_FILES = "start";
+
+/**
+ * The client ids of task messages: a send again after a failure sends the same id, as a start does.
+ * It is outside the view, so a retry after the view opens again keeps the id.
+ */
+const sendIds = retryOperationIds(() => crypto.randomUUID());
 
 function toastError(error: unknown, fallback: AppTextKey): void {
   const { t, errorMessage } = currentText();
@@ -575,18 +583,20 @@ export function TasksView(props: TasksViewProps) {
     const target = { agentId: task.agentId, taskId: task.id };
     const serverId = untrack(() => props.serverId);
     const files = untrack(() => filesOf(taskId));
+    const message = sendIds([serverId, taskId, text, files.map((file) => file.id)]);
     const sent = await runAction(async () => {
       if (taskOf(taskId)?.state === "closed") await props.source.reopen(target, serverId);
       await props.source.send(
         {
           ...target,
           text,
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: message.id,
           ...(files.length ? { attachmentDraftIds: files.map((file) => file.id) } : {}),
         },
         serverId,
       );
     }, "conversation.tasks.error.send");
+    if (!sent) message.failed();
     if (sent) {
       const sentIds = new Set(files.map((file) => file.id));
       setState((draft) => {
@@ -796,6 +806,11 @@ export function TasksView(props: TasksViewProps) {
       lines: () => undefined,
       activeTurnId: () => hosted()?.activeTurnId,
     });
+    const turnTrace = useTurnTrace({
+      turnSteps,
+      agentName: () => (owner() ?? props.agents[0])?.name,
+      agents: () => props.agents,
+    });
     const input = () => {
       const current = hosted();
       return current ? { agentId: current.agentId, taskId: current.id } : null;
@@ -902,6 +917,7 @@ export function TasksView(props: TasksViewProps) {
               attention={answerCard(agent().name)}
               stepsAbove={turnSteps.stepsAbove}
               factsAbove={turnSteps.factsAbove}
+              traceAbove={turnTrace}
               activeSteps={turnSteps.activeSteps()}
               stepsOpenByDefault={showAgentSteps()}
               sendShortcut={props.sendShortcut}

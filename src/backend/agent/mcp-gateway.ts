@@ -194,12 +194,8 @@ export class McpGateway {
     config: McpServerConfig,
     agentId: string | null = null,
   ): Effect.fn.Return<McpEndpoint | McpEndpointRefusal, McpGatewayFailed> {
-    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID) {
-      const github = this.#githubConnector;
-      const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
-      if (token) this.#handoff.recordSecret(token);
-      return { url: config.url, authorization: token, proxied: false };
-    }
+    if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID)
+      return { url: config.url, authorization: yield* this.#githubAuthorization(), proxied: false };
     if (!this.#proxied(config))
       return { url: withoutMcpAccountFragment(config.url), authorization: null, proxied: false };
     const route = yield* this.#proxy
@@ -211,6 +207,14 @@ export class McpGateway {
     }
     this.#handoff.recordSecret(route.success.bearer);
     return { url: route.success.url, authorization: route.success.bearer, proxied: true };
+  });
+
+  /** The bearer of the GitHub connection, recorded so that `redact` masks it. */
+  readonly #githubAuthorization = Effect.fnUntraced(function* (this: McpGateway) {
+    const github = this.#githubConnector;
+    const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
+    if (token) this.#handoff.recordSecret(token);
+    return token;
   });
 
   /**
@@ -464,8 +468,9 @@ export class McpGateway {
   });
 
   /**
-   * One tool of a saved server, for an agent whose provider left the tool out. Silent like `inspect`:
-   * the sign-in of the row's address, which is also the token that the agent's own route spends.
+   * One tool of a saved server or of the GitHub connection, for an agent whose provider left the tool
+   * out. Silent like `inspect`: the sign-in of the row's address, which is also the token that the
+   * agent's own route spends. The GitHub connection uses the bearer that `endpoint` gives (#12035).
    */
   readonly callTool = Effect.fnUntraced(function* (
     this: McpGateway,
@@ -473,13 +478,18 @@ export class McpGateway {
     name: string,
     args: McpToolArguments,
   ) {
+    const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
     const stored = this.#oauth;
     return yield* callMcpServerTool(
       config,
       name,
       args,
       this.#toolRuntimes(),
-      stored ? { accessToken: (url) => stored.accessToken(url) } : undefined,
+      config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
+        ? { accessToken: () => Effect.succeed(github) }
+        : stored
+          ? { accessToken: (url) => stored.accessToken(url) }
+          : undefined,
     ).pipe(toMcpGatewayFailed);
   });
 
@@ -700,7 +710,9 @@ export class McpGateway {
       });
       this.#hooks.emitError(
         "mcp_server_not_started",
-        `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
+        drop.reason === "failed_in_provider"
+          ? drop.detail
+          : `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
       );
     }
   }

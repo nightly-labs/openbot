@@ -1,8 +1,9 @@
 import { RequestError, type SessionUpdate } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
-import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
+import { type AcpCustomEndpoint, type AcpFlavor, type AcpRetryCause, shownFailureDetail } from "./acp-flavor";
 import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
@@ -11,6 +12,9 @@ import {
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
+
+// The ACP client's name, so the line also goes to the provider log (`src/main/provider-log.ts`).
+const logger = createOpenBotLogger("acp-client");
 
 /**
  * OpenCode 2.2.5 to 2.3.0 wait 300 s for a model's response headers, the stall limit, then retry.
@@ -39,15 +43,29 @@ const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["provider.transport", true],
 ]);
 
+/**
+ * A local model server that ran out of memory for the request, such as Ollama's MLX runner on a Mac:
+ * "mlx: [METAL] Command buffer execution failed: Insufficient Memory", or llama.cpp's "cudaMalloc
+ * failed: out of memory". The server sends it as a 5xx, which OpenCode retries with the same prompt,
+ * so the chat showed "busy" and then "Try again later" (#11385). A long chat needs the most memory.
+ * Words for memory only, never for tokens: a context-window refusal is `OPENCODE_CONTEXT_TOO_SMALL`.
+ */
+const OPENCODE_OUT_OF_MEMORY = /\bout of memory\b|\binsufficient memory\b|\bmemory limit exceeded\b/iu;
+
 /** OpenCode counts the first request as attempt 1, so its first retry is attempt 2. */
-function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; unreachable: boolean } | null {
+function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; cause: AcpRetryCause } | null {
   if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return null;
   const retry = update._meta["opencode/retry"];
   if (!isRecord(retry) || !isRecord(retry.error) || typeof retry.attempt !== "number") return null;
   const type = retry.error.type;
   const unreachable = typeof type === "string" ? OPENCODE_RETRY_TYPES.get(type) : undefined;
   if (unreachable === undefined) return null;
-  return { attempt: Math.max(1, retry.attempt - 1), unreachable };
+  const cause = unreachable
+    ? "unreachable"
+    : OPENCODE_OUT_OF_MEMORY.test(String(retry.error.message ?? ""))
+      ? "outOfMemory"
+      : "serverError";
+  return { attempt: Math.max(1, retry.attempt - 1), cause };
 }
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
@@ -101,7 +119,9 @@ function isOpenCodeServerLost(error: unknown): boolean {
  *
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
- * OpenCode sign-in sent the user to the wrong place.
+ * OpenCode sign-in sent the user to the wrong place. OpenCode 2.2.7 also answers an HTTP 403 or a
+ * `permission_denied` this way, with empty data: the key can be correct while the endpoint's account
+ * cannot use the model. With no status, the text names both causes (#7691).
  *
  * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
  * user's country: `opencode run` shows "This model is not available in your country". A free model
@@ -127,7 +147,9 @@ function openCodeAuthRequired(
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
-      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      endpoint.hasCredentials
+        ? "error.provider.customEndpointAccessRefused"
+        : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
@@ -149,6 +171,15 @@ function openCodeAuthRequired(
  */
 const OPENCODE_CONTEXT_TOO_SMALL =
   /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+
+/**
+ * NVIDIA's model API answers a model that it does not serve to the account with a 404 and
+ * `Function '<id>': Not found for account '<id>'`, and a model that it cannot run now with a 400 and
+ * "DEGRADED function cannot be invoked". OpenCode 2.2.7 passes both on as invalid requests, so the
+ * chat showed NVIDIA's IDs with no next step (#8699).
+ */
+const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
+const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -217,11 +248,23 @@ function openCodeRequestFailure(
     log(`OpenCode could not read the model's reasoning stream: ${reason}`);
     return sourceText("error.provider.opencodeReasoningOverlap");
   }
+  // Before the list, which reads a 5xx as a provider failure that waiting fixes; a new chat fixes this one.
+  // To the log only: a diagnostic with "failed" in it shows the server's own text in a toast too.
+  if (OPENCODE_OUT_OF_MEMORY.test(reason)) {
+    logger.warn("A model server ran out of memory for an OpenCode request.", { reason: redact(reason) });
+    return sourceText("error.provider.opencodeOutOfMemory");
+  }
   // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
   if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }
+  if (NVIDIA_MODEL_NOT_SERVED.test(reason)) {
+    log(`The model provider does not serve this model to the account: ${reason}`);
+    return sourceText("error.provider.opencodeModelNotServed");
+  }
+  if (NVIDIA_MODEL_DEGRADED.test(reason))
+    return sourceText("error.provider.opencodeProviderFailed", { detail: shownFailureDetail(redact(reason)) });
   // OpenCode 2 names a provider's 5xx `provider.internal`, with text such as "Provider request failed
   // with HTTP 504" or the provider's own reason, which the OpenCode 1 texts above do not match (#10129).
   // It names a model that it cannot find or set up `provider.no-route` ("Model unavailable: …").
@@ -263,7 +306,11 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 };
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return null;
+  if (!(error instanceof RequestError)) return null;
+  // OpenCode names both as invalid requests. A degraded model is an outage, so a backup model can take the turn.
+  if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
+  if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
+  if (!isRecord(error.data)) return null;
   const name = error.data.errorName;
   return typeof name === "string" && Object.hasOwn(OPENCODE_ERROR_CAUSES, name)
     ? (OPENCODE_ERROR_CAUSES[name] ?? null)

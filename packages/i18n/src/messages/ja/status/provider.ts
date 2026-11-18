@@ -14,6 +14,8 @@ export const messages = {
     "{provider} がモデルプロバイダーに接続できません。再試行しています: {attempt} 回目。",
   "status.provider.modelRetryServerError":
     "モデルプロバイダーが混雑しているか、エラーが発生しています。{provider} が再試行しています: {attempt} 回目。",
+  "status.provider.modelRetryOutOfMemory":
+    "モデルサーバーのメモリーがこのチャットには足りません。{provider} が再試行しています: {attempt} 回目。新しいチャットなら必要なメモリーが少なくなります。",
   "status.provider.modelRetryRecovered": "モデルプロバイダーが再び応答しています。",
   "status.provider.retryRecovered": "{provider} がサーバーから再び応答を受け取っています。",
   "status.provider.claudeFastModeNeedsUsageCredits":

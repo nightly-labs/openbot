@@ -507,7 +507,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "connector.whatsapp.add": "Ekle",
   "connector.whatsapp.groupTitle": "Bir grup ekleyin",
-  "connector.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "connector.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "connector.whatsapp.groupSearch": "Grup ara",
   "connector.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
@@ -669,9 +670,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Siz yeniden oturum açana kadar ajanlar paylaşılan oturum bilgilerinizle oturum açamaz.",
   "connector.protonPass.reconnect": "Yeniden bağla",
-  "connector.protonPass.planTitle": "Proton Pass ücretli bir plan gerektirir",
+  "connector.protonPass.planTitle": "Proton Pass, Pass Plus içeren bir plan gerektirir",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI yalnızca ücretli bir Proton planıyla çalışır. Planınızı değiştirin, sonra yeniden bağlanın.",
+    "Proton Pass CLI, Pass Plus içeren bir Proton planı gerektirir. Mail Plus gibi diğer ücretli planlar bunu içermez. Planınızı değiştirin, sonra yeniden bağlanın.",
   "connector.protonPass.vaultTitle": "Paylaşılan kasa",
   "connector.protonPass.vaultDescription":
     "Ajanlar bu kasadaki oturum bilgileriyle oturum açabilir. Paylaşmak için bir oturum bilgisini buraya taşıyın.",

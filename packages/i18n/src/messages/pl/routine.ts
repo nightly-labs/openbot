@@ -185,6 +185,8 @@ export const messages = {
   "routine.card.open": "Otwórz rutynę {name}",
   "routine.card.webhookCreated": "Utworzono rutynę webhook",
   "routine.card.webhookSecretNote": "Aby zobaczyć sekret podpisu, wygeneruj go ponownie. Agent nie dostaje sekretu.",
+  "routine.card.webhookSecretAgentNote":
+    "Aby zobaczyć sekret podpisu, wygeneruj go ponownie lub przekaż go agentowi {name}.",
   "routine.card.webhookUpdated": "Zaktualizowano rutynę webhook",
   "routine.card.webhookChanged": "Zmiany niezapisane",
   "routine.card.webhookSaveFailed": "Nie udało się zapisać zdarzeń.",
@@ -364,6 +366,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Sekret nadawcy",
   "routine.webhook.senderSecretConfirm": "Użyj",
   "routine.webhook.senderSecretFailed": "Nie udało się zapisać sekretu nadawcy.",
+  "routine.webhook.giveSecret": "Przekaż sekret podpisu agentowi {name}",
+  "routine.webhook.giveSecretTitle": "Przekazać nowy sekret podpisu agentowi {name}?",
+  "routine.webhook.giveSecretDescription":
+    "Obecny sekret natychmiast przestanie działać. Agent {name} zapisze nowy sekret jako klucz API i może dodać go u nadawcy. Nie musisz go kopiować.",
+  "routine.webhook.giveSecretConfirm": "Przekaż",
+  "routine.webhook.giveSecretFailed": "Nie udało się przekazać sekretu podpisu agentowi {name}.",
+  "routine.webhook.secretGiven": "Agent {name} ma nowy sekret podpisu.",
   "routine.webhook.statusFailed": "Nie udało się sprawdzić, czy host jest połączony z przekaźnikiem.",
 
   "routine.settings.instruction": "Instrukcja",

@@ -69,6 +69,8 @@ export const messages = {
   "composer.voice.blocked": "마이크 접근이 차단되어 있어요. 시스템 설정에서 OpenBot의 마이크 사용을 허용해 주세요.",
   "composer.voice.noMicrophone": "사용할 수 있는 마이크가 없어요.",
   "composer.voice.startFailed": "OpenBot이 음성 녹음을 시작하지 못했어요.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot이 마이크를 열지 못했어요. 마이크를 사용하는 다른 앱을 닫고, 마이크가 연결되어 있고 시스템 설정에서 허용되어 있는지 확인한 뒤 다시 시도해 주세요.",
   "composer.voice.transcribeFailed": "OpenBot이 이 녹음을 받아쓰지 못했어요.",
   "composer.reply.toYou": "내 메시지에 답장하는 중",
   "composer.reply.toAgent": "에이전트에게 답장하는 중",
@@ -126,6 +128,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "녹음된 음성이 없어요.",
   "composer.voice.noSpeechDetected": "감지된 음성이 없어요.",
   "composer.voice.readFailed": "답장을 소리 내어 읽을 수 없었어요.",
+  "composer.voice.languageUnsupported": "답장을 소리 내어 읽을 수 없었어요. 이 언어는 아직 지원하지 않아요.",
   "composer.error.saveEditTryAgain": "이 컴퓨터에 수정 내용을 저장할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.saveUnconfirmed": "저장 여부를 확인하지 못했어요. 저장을 다시 시도해 결과를 확인하세요.",
   "composer.error.changeModel": "모델을 변경할 수 없었어요. 다시 시도해 주세요.",

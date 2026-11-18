@@ -224,6 +224,13 @@ export const messages = {
     "O segredo atual para de funcionar. O computador anfitrião rejeita requisições que o usam.",
   "mobile.agent.webhook.rotateConfirm": "Regenerar",
   "mobile.agent.webhook.rotateFailed": "Não foi possível regenerar o segredo. Tente de novo.",
+  "mobile.agent.webhook.giveToAgent": "Dar o segredo de assinatura a {name}",
+  "mobile.agent.webhook.giveTitle": "Dar um novo segredo de assinatura a {name}?",
+  "mobile.agent.webhook.giveBody":
+    "O segredo atual para de funcionar. {name} salva o novo segredo como chave de API e pode adicioná-lo ao remetente.",
+  "mobile.agent.webhook.giveConfirm": "Dar segredo",
+  "mobile.agent.webhook.giveFailed": "Não foi possível dar o segredo de assinatura ao agente. Tente de novo.",
+  "mobile.agent.webhook.given": "{name} tem o novo segredo de assinatura.",
   "mobile.agent.webhook.activity": "Atividade",
   "mobile.agent.webhook.activityFailed": "Não foi possível carregar a atividade. Tente de novo.",
   "mobile.agent.webhook.activity.ignored": "Ignorada",

@@ -31,6 +31,10 @@ const logger = createOpenBotLogger("agent-dock-window");
  */
 const AGENT_DOCK_WINDOW_SIZE = { width: 502, height: 640 } as const;
 
+/** A dock window whose page stopped opens again, as many times as this in `DOCK_REOPEN_WINDOW_MS`. */
+const DOCK_REOPEN_MAX = 3;
+const DOCK_REOPEN_WINDOW_MS = 60_000;
+
 export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" }>;
 
 /** An agent dock operation that failed. The cause is what the dock window reads. */
@@ -92,6 +96,8 @@ export class AgentDockWindowController {
   #drag: { rendererId: number; pointerY: number; windowY: number } | null = null;
   /** The main windows whose moves the dock follows. A new main window is added when it publishes. */
   readonly #followedWindows = new WeakSet<BrowserWindow>();
+  /** When a dock window was opened again after its page stopped. */
+  #reopens: number[] = [];
   #destroyed = false;
 
   constructor(options: AgentDockWindowControllerOptions) {
@@ -435,8 +441,13 @@ export class AgentDockWindowController {
           this.#release(entry);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
         });
+        // A stopped page shows nothing, but its window still takes the pointer if the pointer was on the
+        // dock: a clear window above the other apps then catches their clicks (#11606). A new window lets
+        // the pointer through until its page loads.
         window.webContents.on("render-process-gone", () => {
-          if (owned()) this.#release(entry);
+          if (!owned()) return;
+          this.#closeWindow(window);
+          if (this.#mayReopen()) void Effect.runPromise(this.reconcileWindow());
         });
         window.once("ready-to-show", () => {
           if (!owned() || this.#presentation === null) return;
@@ -465,6 +476,15 @@ export class AgentDockWindowController {
         }).pipe(Effect.tapError(() => Effect.sync(() => this.#closeWindow(window)))),
       ),
     );
+  }
+
+  /** A dock page that stops each time it loads stays closed until the dock moves or the app starts again. */
+  #mayReopen(): boolean {
+    const now = Date.now();
+    this.#reopens = this.#reopens.filter((time) => now - time < DOCK_REOPEN_WINDOW_MS);
+    if (this.#reopens.length >= DOCK_REOPEN_MAX) return false;
+    this.#reopens.push(now);
+    return true;
   }
 
   #show(window: BrowserWindow): void {

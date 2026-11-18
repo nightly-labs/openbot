@@ -127,7 +127,13 @@ export interface ChannelHooks {
     messageId: string,
     text: string,
   ): Effect.Effect<"accepted" | "rejected" | "uncertain", ChannelOperationError>;
-  changed(channelId: string, revision: number): void;
+  /** Closes the open questions of the turn, as a person's message in the agent's own chat closes them. */
+  releaseQuestions?(agentId: string, threadId: string, turnId: string): void;
+  /**
+   * `messagesOnly` is true when the change wrote messages and no task or assignment, such as a delta
+   * of a member's streamed reply. Such a change cannot move a routine run or a timer.
+   */
+  changed(channelId: string, revision: number, messagesOnly?: boolean): void;
   /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
   queueHoldChanged?(): void;
   /** A memory is not part of the channel revision, so a tool write needs its own notification. */
@@ -1083,6 +1089,30 @@ export class ChannelService {
       for (const item of tasks) this.#tryTasks.add(item.id);
       if (current.leadAgentId && tasks.some((item) => !item.ownerAgentId)) this.hooks.retry?.(current.leadAgentId);
       this.publish(current.id);
+      // A new task waits for the turn that its member runs, and a turn that waits on a question reads
+      // nothing until the question is answered: each would wait for the other, as in the member's own
+      // chat. When the same person asked for that turn's work, its question closes as a message in that
+      // chat closes it (#11467). A continued task closes it with its steer.
+      // The message is stored already, so a failed read only goes to the log.
+      const queuedFor = new Set(
+        tasks.flatMap((item) =>
+          item.ownerAgentId && !continued.some((entry) => entry.id === item.id) ? [item.ownerAgentId] : [],
+        ),
+      );
+      const releaseQuestions = this.hooks.releaseQuestions;
+      if (queuedFor.size && releaseQuestions)
+        yield* Effect.gen({ self: this }, function* () {
+          const blocked = (yield* channelSync(() => this.store.assignments(current.id))).filter(
+            (item) => item.state === "running" && queuedFor.has(item.agentId),
+          );
+          for (const { agentId, turnId, requestMessageId } of blocked) {
+            if (!turnId || !requestMessageId) continue;
+            const request = yield* channelSync(() => this.store.message(current.id, requestMessageId));
+            if (request?.author.kind !== "member" || request.author.id !== actor.id) continue;
+            const { threadId } = yield* channelSync(() => this.store.context(current.id, agentId));
+            yield* channelSync(() => releaseQuestions(agentId, threadId, turnId));
+          }
+        }).pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))));
       yield* this.interruptTasks(
         current.id,
         affected.filter((item) => !continued.some((entry) => entry.id === item.id)),
@@ -2946,12 +2976,20 @@ export class ChannelService {
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
-    const assignments = this.store.assignments(channelId);
+    // A delta reads only its member's assignments: each message of a delta has the delta's turn, and
+    // only the member's own assignment has that turn. A late turn's assignment is read by its id.
+    const assignments =
+      turnId === undefined
+        ? this.store.assignments(channelId)
+        : this.store.agentAssignments(channelId, snapshot.agentId);
     const name = this.hooks.agents().find((agent) => agent.id === snapshot.agentId)?.name ?? "Former member";
-    // Indexed once, not per message: a streaming turn calls this for every delta, and the thread
-    // holds every message of the whole conversation. A read of the task table and two scans of the
-    // channel history for each of them made one capture cost the square of the transcript.
-    const tasks = new Map(this.store.tasks(channelId).map((task) => [task.id, task] as const));
+    // Each task is read once by its key, when a message needs it. A streaming turn calls this for
+    // every delta, and to read the whole task table for each one made a large channel use most of a core.
+    const taskReads = new Map<string, ChannelTask | null>();
+    const taskOf = (id: string): ChannelTask | undefined => {
+      if (!taskReads.has(id)) taskReads.set(id, this.store.task(channelId, id));
+      return taskReads.get(id) ?? undefined;
+    };
     // A delta reads the few messages of its turn by id. A whole snapshot reads the history once.
     const history =
       turnId === undefined
@@ -2981,7 +3019,11 @@ export class ChannelService {
       )
         continue;
       const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);
-      const late = lateId === undefined ? undefined : assignments.find((item) => item.id === lateId);
+      const late =
+        lateId === undefined
+          ? undefined
+          : (assignments.find((item) => item.id === lateId) ??
+            (turnId === undefined ? undefined : (this.store.assignment(channelId, lateId) ?? undefined)));
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const original = existing(message.id);
@@ -3003,7 +3045,7 @@ export class ChannelService {
       // task is not reopened and the channel is open. It gets its row when it completes: a turn that
       // fails or stops leaves its row at streaming, and such a row stopped the channel's history (#3673).
       if (!original && !activeAssignment(assignment)) {
-        const task = tasks.get(assignment.taskId);
+        const task = taskOf(assignment.taskId);
         if (
           !late ||
           message.status === "streaming" ||
@@ -3041,7 +3083,7 @@ export class ChannelService {
         provisionalAnswers()
       )
         continue;
-      const task = tasks.get(assignment.taskId);
+      const task = taskOf(assignment.taskId);
       const result = existing(channelResultId(assignment));
       // A repeat of the result adds nothing. But a row that streamed before its text matched still
       // completes: a row left at streaming stopped every later assignment in the channel (#3673).
@@ -3055,7 +3097,7 @@ export class ChannelService {
         result?.message.turnId === message.turnId
           ? result
           : task?.dependencies
-              .map((id) => tasks.get(id))
+              .map((id) => taskOf(id))
               .flatMap((child) => (child && isReplyTask(child) ? [existing(child.requestMessageId)] : []))
               .find((reply) => reply?.message.turnId === message.turnId);
       if (
@@ -3111,9 +3153,14 @@ export class ChannelService {
     if (messages.length) {
       const channel = this.store.get(channelId);
       const [only] = messages;
-      if (messages.length === 1 && only) this.store.captureMessage(channel, only);
-      else this.store.update(channel, { messages });
-      this.publish(channelId);
+      const written =
+        messages.length === 1 && only
+          ? this.store.captureMessage(channel, only)
+          : this.store.update(channel, { messages });
+      this.hooks.changed(channelId, written.revision, true);
+      // Only messages changed, so no assignment started or ended. A channel that this process has not
+      // seen yet still sets its first holds here, as each publish did before.
+      if (!this.#activeAssignments.has(channelId)) this.#syncQueueHolds(channelId);
     }
     return true;
   }
@@ -4325,8 +4372,7 @@ export class ChannelService {
    */
   #syncQueueHolds(channelId: string): void {
     const active = this.store
-      .assignments(channelId)
-      .filter(activeAssignment)
+      .assignmentsInStates(channelId, ACTIVE_ASSIGNMENT_STATES)
       .map((assignment) => `${assignment.id}:${assignment.agentId}`)
       .join(",");
     // A channel with no assignment has nothing to report, so an unseen channel counts as empty.

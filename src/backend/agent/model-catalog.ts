@@ -279,12 +279,13 @@ export class ModelCatalog {
    *
    * `quiet`: a read that the user did not cause. A failed one goes only to the log, and the provider
    * row keeps the list that it has, with no error. An empty one is not fresh: a running CLI that lists
-   * no model for a moment must not empty the picker.
+   * no model for a moment must not empty the picker. `onQuietFailure` runs only when a quiet read
+   * fails, not when it is empty or its client was replaced.
    */
   readonly relist = Effect.fn("ModelCatalog.relist")(function* (
     this: ModelCatalog,
     provider: AgentProvider,
-    options: { quiet?: boolean } = {},
+    options: { quiet?: boolean; onQuietFailure?: () => void } = {},
   ) {
     const client = this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
@@ -295,6 +296,7 @@ export class ModelCatalog {
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {
       if (!options.quiet) this.#options.recordProviderError(provider, result.failure.cause);
+      else options.onQuietFailure?.();
       logger.warn("A provider did not list its models.", {
         provider,
         durationMs,

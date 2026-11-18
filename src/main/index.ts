@@ -35,7 +35,7 @@ import {
 import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { NewerDatabaseError } from "../backend/openbot-database-schema";
+import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -160,10 +160,21 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { type ServerSafeMode, safeModeMarkerDirectory, startServerSafeMode } from "./server-safe-mode";
+import {
+  START_LOOP_EXIT_CODE,
+  type StartHaltReason,
+  type StartHaltRecord,
+  startHaltReason,
+  takeServerStartGuardTest,
+  takeStartHalt,
+  writeStartHalt,
+} from "./server-start-halt";
 import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
 import { systemHourCycle } from "./system-hour-cycle";
@@ -189,6 +200,17 @@ let runMarker: RunMarker | null = null;
 let previousUncleanExit: UncleanExitProperties | null = null;
 /** The failed starts of this version in a row (`start-attempts.ts`). Only the process with the lock has one. */
 let startAttempts: StartAttempts | null = null;
+/** The reason file of the previous run, when that run stopped a server start loop (`server-start-halt.ts`). */
+let previousStartHalt: StartHaltRecord | null = null;
+/** Set when this run stops a server start loop. The process then exits with this code after the teardown. */
+let startHaltExitCode: number | null = null;
+/** The minimal Team API of a server that stopped its start loop (`server-safe-mode.ts`). */
+let serverSafeMode: ServerSafeMode | null = null;
+/**
+ * Where no update script restarts the safe mode, it ends after this time with the start-loop exit
+ * code, and the restart policy, such as the one of Docker, tries the start again.
+ */
+const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
@@ -212,7 +234,16 @@ function hideExceptionErrorBox(): void {
  * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
  * app, or a system logout on macOS.
  */
-type ExitReason = "main_window_closed" | "signal" | "session_end" | "menu" | "shortcut" | "tray" | "update" | "quit";
+type ExitReason =
+  | "main_window_closed"
+  | "signal"
+  | "session_end"
+  | "menu"
+  | "shortcut"
+  | "tray"
+  | "update"
+  | "quit"
+  | "start_loop";
 let exitRecorded = false;
 
 /**
@@ -277,6 +308,10 @@ const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env,
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 // Development builds only: `scripts/start-recovery-e2e.ts` makes the start fail.
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
+// A server stops its start loop; the desktop shows its recovery window. Development builds only:
+// `scripts/server-start-loop-e2e.ts` turns on the server behavior, because server mode needs a packaged build.
+const serverStartGuard =
+  serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
   ? openLocalServerControl(process.platform, (cause) =>
       logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
@@ -407,10 +442,18 @@ if (hasSingleInstanceLock) {
       userDataPath: app.getPath("userData"),
       crashDumpsPath: app.getPath("crashDumps"),
       appVersion: app.getVersion(),
+      schemaVersion: LATEST_SCHEMA_VERSION,
       now: Date.now(),
       bootedAt: Date.now() - uptime() * 1_000,
     });
     const attempts = startAttempts.summary();
+    if (serverStartGuard) {
+      previousStartHalt = takeStartHalt(app.getPath("userData"));
+      if (previousStartHalt)
+        logger.warn(
+          `The previous run of OpenBot ${previousStartHalt.appVersion} stopped its start loop (${previousStartHalt.reason}). This start tries again.`,
+        );
+    }
     if (attempts.consecutiveFailures > 0)
       logger.warn(
         `OpenBot ${attempts.appVersion} did not finish its start ${attempts.consecutiveFailures} times in a row (previous start: ${attempts.previousOutcome}, last failure: ${attempts.lastFailure ?? "none"}).`,
@@ -1217,23 +1260,81 @@ function requestDesktopNotificationPermission(
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
 /** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
 /**
+ * A server stops its start loop: it records the reason and exits with `START_LOOP_EXIT_CODE` after
+ * the teardown, and systemd does not start it again (`server-start-halt.ts`).
+ */
+function haltServerStart(reason: StartHaltReason): Omit<StartHaltRecord, "version"> {
+  const appVersion = app.getVersion();
+  logger.error(
+    `OpenBot ${appVersion} stopped its start loop (${reason}). It starts again after an update or a restart of the server or of the service.`,
+  );
+  const record = { reason, appVersion, haltedAt: Date.now() };
+  writeStartHalt(app.getPath("userData"), record);
+  startHaltExitCode = START_LOOP_EXIT_CODE;
+  recordExit("start_loop");
+  return record;
+}
+
+/**
+ * After `haltServerStart`, and after the teardown of any service that started: keeps the safe mode
+ * open so that members read the reason. When it cannot start (no team, no host credential), the
+ * server quits with the start-loop exit code, as before.
+ */
+async function enterServerSafeMode(halt: Omit<StartHaltRecord, "version">): Promise<void> {
+  if (shutdownStarted) return;
+  const markerDirectory = safeModeMarkerDirectory(process.env, process.platform);
+  try {
+    serverSafeMode = await runCauseEffect(
+      startServerSafeMode({ userDataPath: app.getPath("userData"), reason: halt, markerDirectory }),
+    );
+    // A quit that came during the start: its teardown did not see the safe mode.
+    if (shutdownStarted) await Effect.runPromise(serverSafeMode.stop);
+  } catch (error) {
+    logger.warn("The safe mode did not start. OpenBot quits.", toLogValue(error));
+    app.quit();
+    return;
+  }
+  if (markerDirectory === null) setTimeout(() => app.quit(), SERVER_SAFE_MODE_LIFETIME_MS);
+}
+
+/**
  * Shows the recovery window when this version did not finish its start several times in a row.
  * Resolves with the window to close after "Try again", with "quit", or with null when no loop is
- * found. A server has no window and nobody to read it: it logs the loop and starts as before.
+ * found. A server has no window and nobody to read it: it stops the loop, except in the one start
+ * after a halt, which tries again.
  */
-async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
+async function recoverFromStartLoop(): Promise<
+  StartRecovery | "quit" | { halt: Omit<StartHaltRecord, "version"> } | null
+> {
   if (!startAttempts?.loopDetected) return null;
   const summary = startAttempts.summary();
-  if (serverMode || hostedServer) {
-    logger.warn(
-      `OpenBot ${summary.appVersion} is in a start loop. A server shows no recovery window and starts again.`,
-    );
-    return null;
+  if (serverStartGuard) {
+    if (previousStartHalt) {
+      logger.warn(`OpenBot ${summary.appVersion} is in a start loop. It stopped the loop before, so it tries again.`);
+      return null;
+    }
+    return { halt: haltServerStart("start_failed") };
   }
   logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
+  // An earlier release that cannot open the data would install this release again over it.
+  const databaseSchemaVersion = readDatabaseSchemaVersion(app.getPath("userData"));
+  const previousRelease = compatiblePreviousRelease({
+    summary,
+    databaseSchemaVersion,
+    appSchemaVersion: LATEST_SCHEMA_VERSION,
+  });
+  logger.info(
+    `Recovery window: database schema ${databaseSchemaVersion ?? "unknown"}, last good version ${summary.lastGoodVersion ?? "none"} (schema ${summary.lastGoodSchemaVersion ?? "unknown"}), offered release: ${previousRelease ?? "latest"}.`,
+  );
   // The saved language is in the database, which this window must not need.
   const locale = resolveLocale("system", app.getLocale());
-  const recovery = openStartRecoveryWindow({ summary, locale, translate: translateFor(locale), iconPath: appIconPath });
+  const recovery = openStartRecoveryWindow({
+    summary,
+    previousRelease,
+    locale,
+    translate: translateFor(locale),
+    iconPath: appIconPath,
+  });
   const choice = await recovery.choice;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
@@ -1567,6 +1668,13 @@ if (!hasSingleInstanceLock) {
         quitFor("quit");
         return;
       }
+      if (recovery && "halt" in recovery) {
+        // The bridge window of the safe mode is the only page. It gets the policy of each page.
+        configureContentSecurityPolicy();
+        configureRendererPermissions();
+        await enterServerSafeMode(recovery.halt);
+        return;
+      }
       if (forcedStartFailure === "crash") process.crash();
       if (forcedStartFailure === "hang") await new Promise<never>(() => {});
       configureContentSecurityPolicy();
@@ -1780,6 +1888,7 @@ if (!hasSingleInstanceLock) {
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
+      built.requiredUpdate?.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
@@ -2044,6 +2153,25 @@ if (!hasSingleInstanceLock) {
       logger.error("OpenBot failed to start:", toLogValue(error));
       // Data that a newer version saved has its own recovery, and a new release ends that loop.
       if (!(error instanceof NewerDatabaseError)) startAttempts?.failed("error");
+      // A server stops its start loop when a restart cannot help (data from a newer version), or at the
+      // third failed start in a row. A failed migration counts as a failed start.
+      if (serverStartGuard) {
+        const reason = startHaltReason(error);
+        if (reason !== "newer_database" && !startAttempts?.failureLimitReached) {
+          app.quit();
+          return;
+        }
+        const halt = haltServerStart(reason);
+        // The services that started stop first: the safe mode takes their Signal host connection.
+        void teardown
+          .runAll()
+          .then(() => enterServerSafeMode(halt))
+          .catch((teardownError) => {
+            logger.error("The teardown before the safe mode failed:", toLogValue(teardownError));
+            app.quit();
+          });
+        return;
+      }
       // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
       // server on this computer has no window: the app that started it reports the failed start.
       if (!serverMode && !hostedServer && !localServerChild) {
@@ -2056,6 +2184,7 @@ if (!hasSingleInstanceLock) {
             window: windowHolder.current,
             translate,
             beforeInstall: prepareForUpdateInstall,
+            loopVersion: startAttempts?.summary().loopVersion ?? null,
           }).catch((recoveryError) => {
             logger.error("The update over newer data failed:", toLogValue(recoveryError));
             app.quit();
@@ -2097,7 +2226,8 @@ app.on("before-quit", (event) => {
   // through `window-all-closed` right after the first. Electron would end the process on it at
   // once, in the middle of the teardown, and the next start would count an unclean exit.
   if (shutdownStarted) return;
-  void prepareForShutdown().finally(() => app.quit());
+  // A halted server start exits with its own code, which `app.quit()` cannot give.
+  void prepareForShutdown().finally(() => (startHaltExitCode === null ? app.quit() : exitAfterLogFlush()));
 });
 
 /** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
@@ -2149,7 +2279,7 @@ function exitAfterLogFlush(): void {
     Effect.all([flushMainLog(), services ? services.updater.flushLog() : Effect.void], {
       concurrency: "unbounded",
     }).pipe(Effect.timeoutOption(LOG_FLUSH_DEADLINE_MS)),
-  ).finally(() => app.exit(0));
+  ).finally(() => app.exit(startHaltExitCode ?? 0));
 }
 
 /**
@@ -2191,6 +2321,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     services?.agentDock.destroy();
     macHapticFeedback.destroy();
     await teardown.runAll();
+    if (serverSafeMode) await Effect.runPromise(serverSafeMode.stop);
     runMarker?.clean();
   } finally {
     shutdownDone = true;

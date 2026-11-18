@@ -2,10 +2,12 @@
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
 // alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
 // guard against another OpenBot on the same number and against a loop in the owner's own chat,
-// numbered approval answers, the saved history and its search, held messages after a wake, the
-// journal replay after a restart, each close code, the send queue while the socket is down, and the
-// disconnect. Runs the real agent service, messaging service, WhatsApp driver, runtime, session and
-// store on a temporary profile. Only the Baileys socket is fake: no message leaves this computer.
+// numbered approval answers, an answer with an email address, the saved history and its search,
+// held messages after a wake, the journal replay after a restart, each close code, the send queue
+// while the socket is down, a post sent again when its socket closed before the ack, a file with its
+// text as the caption, and the disconnect. Runs the real agent service, messaging service, WhatsApp
+// driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
+// message leaves this computer.
 // `bun scripts/messaging-whatsapp-e2e.ts`.
 // Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
@@ -201,6 +203,13 @@ class FakeSocket implements WhatsAppSocket {
   async sendMessage(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions) {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
+    if (this.#phone.dropNext === jid) {
+      // The socket took the bytes, and then the network went down: WhatsApp never got the message.
+      this.#phone.dropNext = null;
+      this.#phone.lost.push({ jid, content, id, quotedId: null });
+      setTimeout(() => this.close(428), 0);
+      return { key: { remoteJid: jid, id, fromMe: true }, message: {} } satisfies WAMessage;
+    }
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
     // WhatsApp's server answers each message with an ack, after the send returns.
     const error = this.#phone.refused.get(jid);
@@ -263,6 +272,9 @@ class FakePhone {
   readonly sent: Sent[] = [];
   /** The chats whose posts the server refuses in its ack, with the error code. */
   readonly refused = new Map<string, string>();
+  /** The chat whose next message is lost with its socket, which then closes. */
+  dropNext: string | null = null;
+  readonly lost: Sent[] = [];
   logouts = 0;
   /** WhatsApp cannot be reached: each socket closes before it shows a code. */
   offline = false;
@@ -398,6 +410,7 @@ interface Booted {
   messaging: MessagingService;
   runtime: WhatsAppRuntime;
   mailbox: MailboxStore;
+  database: OpenBotDatabase;
 }
 
 async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
@@ -438,7 +451,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   });
   await runCauseEffect(messaging.start());
   try {
-    return await use({ agents, messaging, runtime, mailbox });
+    return await use({ agents, messaging, runtime, mailbox, database });
   } finally {
     await runCauseEffect(messaging.stop());
     await runCauseEffect(agents.stop());
@@ -579,7 +592,7 @@ try {
     return { sealed: true };
   });
 
-  await boot(async ({ agents, messaging, runtime, mailbox }) => {
+  await boot(async ({ agents, messaging, runtime, mailbox, database }) => {
     await step("link without network: the link fails as unavailable, not as an expired code", async () => {
       phone.offline = true;
       await runCauseEffect(messaging.startWhatsAppLink(parseStartWhatsAppLinkInput({ method: "qr", ownNumber: true })));
@@ -630,6 +643,26 @@ try {
       const account = messaging.whatsappOverview().accounts[0];
       assert.equal(account?.ownNumber, true);
       return { workspaceName: live.workspaceName, state: live.state };
+    });
+
+    await step("no orchestrator: an allowed contact gets no setup text from the owner's number (#11438)", async () => {
+      const input = parseWhatsAppSenderInput({
+        workspaceId: OWNER,
+        sender: { id: FRIEND, kind: "contact", name: "Ewa" },
+      });
+      await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+      const friendJid = `${FRIEND}@s.whatsapp.net`;
+      const ownBefore = phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      phone.current().receive([message({ chat: friendJid, text: "Is the meeting still on?" })]);
+      // The owner's own chat still gets the notice, and it comes after the contact's message.
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "marker 0" })]);
+      await until(
+        () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length > ownBefore,
+        "the notice in the owner's own chat",
+      );
+      assert.equal(phone.textsTo(friendJid).length, 0, "OpenBot wrote setup text to an allowed contact.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, input.sender.id));
+      return { contactPosts: 0 };
     });
 
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
@@ -804,6 +837,51 @@ try {
       return { reason: signIn, general };
     });
 
+    await step("answer: an email address and a link stay, and a secret is masked", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-answer-with-address" };
+      agents.messaging.event({ type: "turn-started", ...turn }, scope);
+      // No provider runs here, so the step stores the agent's answer as the turn lifecycle does.
+      const answer = "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2";
+      const snapshot = database.readConversation(link.agentId, link.threadId);
+      snapshot.messages.push({
+        id: `${turn.turnId}:answer`,
+        turnId: turn.turnId,
+        author: "assistant",
+        text: answer,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+      database.persistStreamingMessage({ snapshot, messageId: `${turn.turnId}:answer`, eventType: "item.completed" });
+      await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+      agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+      const expected =
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=[redacted]";
+      // Posts and edits: the answer takes the place of the status post.
+      const texts = () =>
+        phone.sent.flatMap((sent) =>
+          sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
+            ? [sent.content.text]
+            : [],
+        );
+      await until(() => texts().some((text) => text.includes("kontakt")), "the answer");
+      const posted = texts().find((text) => text.includes("kontakt"));
+      assert.equal(posted, expected, "The answer changed on its way to WhatsApp.");
+      assert.ok(!texts().some((text) => text.includes("hunter2")), "A secret reached WhatsApp.");
+      // The steps below expect the owner to have as many waiting requests as the limit permits.
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `answer request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `answer request again ${index}`);
+      }
+      return { posted };
+    });
+
     await step(
       "personal number: other chats, the owner's own messages in them, and strangers stay untouched",
       async () => {
@@ -859,6 +937,39 @@ try {
         phone.current().receive([allowed]);
         await until(() => received(agents, strangerJid, allowed.key.id ?? ""), "the allowed person's message");
         return { code: request.code };
+      },
+    );
+
+    await step(
+      "prompt: an allowed person on a personal number writes to the owner, not to the agent (#11470)",
+      async () => {
+        const strangerJid = `${STRANGER}@s.whatsapp.net`;
+        const link = agents.messaging.store.linkByKey(connectionId(agents), strangerJid, "dm");
+        assert.ok(link, "No conversation for the allowed person.");
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the allowed person's chat.");
+        const prompt = async () =>
+          (await runCauseEffect(agents.messaging.prepare({ delivery: request.delivery, managedAttachments: [] })))
+            ?.text ?? "";
+        const dedicated = await prompt();
+        assert.ok(dedicated.includes("Place: a direct message to you."), "A dedicated number lost its own framing.");
+        assert.ok(!dedicated.includes("message from the OpenBot user"), "A dedicated number answers as the owner.");
+        await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, true));
+        try {
+          const personal = await prompt();
+          assert.ok(
+            personal.includes("The person writes to the OpenBot user, not to you."),
+            "The agent reads a message to the owner as a message to itself.",
+          );
+          assert.ok(
+            personal.includes("WhatsApp shows your answer as a message from the OpenBot user."),
+            "The agent does not know that its answer shows as the owner.",
+          );
+          assert.ok(!personal.includes("Place: a direct message to you."), "The personal number kept the bot framing.");
+        } finally {
+          await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, false));
+        }
+        return { dedicated: "direct message to you", personal: "writes to the OpenBot user" };
       },
     );
 
@@ -947,6 +1058,139 @@ try {
         return { threadKey: link.threadKey };
       },
     );
+
+    await step(
+      "posts: one file takes the text as its caption, and a post lost with its socket goes again (#12211)",
+      async () => {
+        const folder = await mkdtemp(join(tmpdir(), "openbot-wa-post-"));
+        const png = join(folder, "offer.png");
+        // A 1×1 PNG.
+        writeFileSync(
+          png,
+          Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            "base64",
+          ),
+        );
+        const post = (args: { text: string; files?: string[] }) =>
+          runCauseEffect(
+            agents.messaging.outboundTool(
+              "agent-whatsapp-e2e",
+              { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+              "messaging_post",
+              { connection: connectionId(agents), place: GROUP, ...args },
+              (paths) => Effect.succeed(paths.map(() => ({ name: "offer.png", path: png, mimeType: "image/png" }))),
+            ),
+          );
+        const toGroup = (from: number) => phone.sent.slice(from).filter((sent) => sent.jid === GROUP);
+        try {
+          let from = phone.sent.length;
+          const captioned = await post({ text: "**Offer**: 1.299 TL", files: ["offer.png"] });
+          assert.ok(captioned.success, captioned.contentItems[0]?.text);
+          const media = toGroup(from).filter((sent) => "image" in sent.content);
+          assert.equal(media.length, 1, "The file was not sent once.");
+          const content = media[0]?.content;
+          assert.ok(
+            content && "caption" in content && content.caption === "*Offer*: 1.299 TL",
+            "The text is not the caption.",
+          );
+          assert.ok(!phone.textsTo(GROUP).includes("*Offer*: 1.299 TL"), "The text went apart from the file.");
+          assert.ok(
+            captioned.contentItems[0]?.text?.includes(media[0]?.id ?? "-"),
+            "The result names another message.",
+          );
+
+          // A text that is too long for a caption goes before the file, as before.
+          from = phone.sent.length;
+          const long = "Long ".repeat(300).trim();
+          const apart = await post({ text: long, files: ["offer.png"] });
+          assert.ok(apart.success, apart.contentItems[0]?.text);
+          const order = toGroup(from).filter(
+            (sent) => "image" in sent.content || ("text" in sent.content && sent.content.text === long),
+          );
+          assert.deepEqual(
+            order.map((sent) => ("image" in sent.content ? "file" : "text")),
+            ["text", "file"],
+          );
+
+          // WhatsApp refuses the captioned post: it fails, and no second post goes, which WhatsApp would count too.
+          phone.refused.set(GROUP, "463");
+          from = phone.sent.length;
+          const refusedPost = await post({ text: "Refused", files: ["offer.png"] }).finally(() =>
+            phone.refused.delete(GROUP),
+          );
+          assert.equal(refusedPost.success, false, "A refused post counted as sent.");
+          assert.ok(refusedPost.contentItems[0]?.text?.includes("whatsapp_463"), refusedPost.contentItems[0]?.text);
+          assert.equal(
+            toGroup(from).filter((sent) => "image" in sent.content || "text" in sent.content).length,
+            1,
+            "A refused post was sent again apart.",
+          );
+
+          // The socket closes after it took the text, before WhatsApp's ack: the text goes again with its id.
+          const sockets = phone.sockets.length;
+          phone.dropNext = GROUP;
+          const resent = await post({ text: "Lost once" });
+          assert.ok(resent.success, resent.contentItems[0]?.text);
+          const lostId = phone.lost.at(-1)?.id;
+          assert.ok(lostId, "No message was lost.");
+          const again = phone.sent.filter((sent) => sent.jid === GROUP && sent.id === lostId);
+          assert.equal(again.length, 1, "The lost text was not sent again with its id.");
+          assert.ok(phone.sockets.length > sockets, "The socket did not close.");
+          await until(() => connection(messaging)?.state === "connected", "connected after the lost post");
+          return { captionId: media[0]?.id, resentId: lostId };
+        } finally {
+          phone.dropNext = null;
+          await rm(folder, { recursive: true, force: true });
+        }
+      },
+    );
+
+    await step("HD photo: the normal copy gets an answer, and its HD copy gets none (#11764)", async () => {
+      const author = `${FRIEND}@s.whatsapp.net`;
+      const image: proto.IMessage = {
+        imageMessage: {
+          mimetype: "image/jpeg",
+          caption: "@48600100200 what is on this photo?",
+          contextInfo: { mentionedJid: [OWNER_JID] },
+        },
+      };
+      const photo = (id: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: image,
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // WhatsApp sends the HD copy about 1 s later, with its own id, and names the normal copy.
+      const hdCopy = (id: string, firstId: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: {
+          messageContextInfo: {
+            messageAssociation: {
+              associationType: proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+              parentMessageKey: { remoteJid: GROUP, fromMe: false, id: firstId, participant: author },
+            },
+          },
+          associatedChildMessage: { message: image },
+        },
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // Each message that the service takes gets a reaction: 👀, or ❌ when the agent's queue is full.
+      phone.current().receive([photo("IN-HD-NORMAL")]);
+      await until(() => phone.reactedTo("IN-HD-NORMAL"), "the answer to the normal copy");
+      // The messages are read in order, so the HD copy is read before the last one. An HD copy of a photo
+      // that this number never read is still a message.
+      phone.current().receive([hdCopy("IN-HD-COPY", "IN-HD-NORMAL"), hdCopy("IN-HD-ALONE", "IN-HD-NEVER-SEEN")]);
+      await until(() => phone.reactedTo("IN-HD-ALONE"), "the answer to the HD copy of an unread photo");
+      assert.equal(phone.reactedTo("IN-HD-COPY"), false, "The HD copy got a second answer.");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), GROUP, "IN-HD-COPY"),
+        null,
+        "The HD copy started a second conversation.",
+      );
+      return { normal: "answered", hdCopy: "skipped", hdCopyOfUnreadPhoto: "answered" };
+    });
 
     await step(
       "saved history: the oldest copies go over the size limit, a delete for everyone deletes, an edit changes",

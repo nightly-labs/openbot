@@ -319,6 +319,14 @@ export function isEuVatCountry(country: string): boolean {
   return EU_VAT_COUNTRY_SET.has(country);
 }
 
+/**
+ * A buyer in the EU with no VAT ID is a consumer, with a 14-day right of withdrawal. A hosting service begins at
+ * once only when the consumer asks for it. A saved VAT ID is one that the EU VAT system confirmed.
+ */
+export function isEuConsumer(details: { country: string | null; vatId: string | null } | null | undefined): boolean {
+  return details?.country != null && isEuVatCountry(details.country) && !details.vatId?.trim();
+}
+
 /** The prefix of an EU VAT ID of `country`: its ISO code, or EL for Greece. */
 export function vatIdPrefix(country: string): string {
   return VAT_ID_PREFIX[country] ?? country;

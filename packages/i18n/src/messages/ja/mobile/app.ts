@@ -62,6 +62,9 @@ export const messages = {
   "mobile.app.update.group.removed": "削除",
   "mobile.app.update.group.deprecated": "非推奨",
   "mobile.app.update.group.security": "セキュリティ",
+  "mobile.app.update.requiredTitle": "アップデートが必要です",
+  "mobile.app.update.requiredBody":
+    "OpenBot {version} はサポートが終了しました。続けるには {minimum} 以降にアップデートしてください。",
   "mobile.app.update.notesFailed": "リリースノートを読み込めませんでした。",
   "mobile.app.update.notesEmpty": "このバージョンのリリースノートはまだありません。",
   "mobile.app.update.fullChangelog": "すべての変更履歴",

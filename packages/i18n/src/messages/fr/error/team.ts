@@ -56,6 +56,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Trop de tentatives de connexion. Réessayez plus tard.",
   "error.team.clientUpdateRequired": "Mettez à jour ce client OpenBot avant de vous connecter à cet hôte.",
   "error.team.hostUpdateRequired": "Mettez à jour OpenBot sur l’hôte avant de vous connecter.",
+  "error.team.serverSafeMode": "Ce serveur est en mode sans échec, car OpenBot ne démarre pas dessus.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} sur ce serveur ne peut pas ouvrir ses données, car une version plus récente d’OpenBot les a enregistrées. Une version plus récente d’OpenBot sur le serveur corrige ce problème.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} sur ce serveur s’est arrêté après de nombreux échecs de démarrage. Une version plus récente d’OpenBot sur le serveur corrige ce problème.",
   "error.team.sidebarLayoutUnavailable": "La disposition de la barre latérale n’est pas disponible.",
   "error.team.providersUnsupported": "Les réglages des fournisseurs ne sont pas pris en charge par cette connexion.",
   "error.team.providerNotManaged": "OpenBot ne gère pas la CLI de ce fournisseur.",
@@ -79,6 +84,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Les couleurs de discussion ne sont pas prises en charge par cette connexion.",
   "error.team.routineRunPlaceUnsupported": "Cette connexion ne peut pas changer l’endroit où une routine s’exécute.",
   "error.team.routinePauseReasonsUnsupported": "Cette connexion ne peut pas montrer pourquoi une routine est en pause.",
+  "error.team.activeQueuesUnsupported": "Cette connexion ne peut pas afficher les files d’attente de tous les agents.",
   "error.team.routinesOnceUnsupported":
     "Cette connexion ne peut pas enregistrer les routines qui s’exécutent une fois.",
   "error.team.routineRunCommandUnsupported":

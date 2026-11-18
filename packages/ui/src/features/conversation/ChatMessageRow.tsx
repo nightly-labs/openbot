@@ -16,7 +16,7 @@ import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
-import { useBackdropBubbles } from "./BackdropBubbles";
+import { chatBubbleColor, useBackdropBubbles } from "./BackdropBubbles";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 import { solidBubbleTakesDarkText } from "./own-bubble";
@@ -134,7 +134,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const own = () => props.author.kind === "you";
   const member = () => props.author.kind === "member";
   const person = () => own() || member();
-  // A memo, because `Bubble` reads the variant more than once and it splits the whole body.
+  // A memo, because `Bubble` reads the variant more than once.
   const variant = createMemo(() => conversationBubbleVariant(props.message));
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
@@ -143,11 +143,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // The colors of the backdrop that shows now go before the chat colors, so the scene and the
   // bubbles make one theme.
   const backdropBubbles = useBackdropBubbles();
-  const chatColor = () => {
-    const bubbles = backdropBubbles();
-    const themed = own() ? bubbles?.yours : props.author.kind === "agent" ? bubbles?.agents : undefined;
-    return themed ?? props.author.chatColor ?? props.author.agent?.chatColor;
-  };
+  const chatColor = () => chatBubbleColor(backdropBubbles(), props.author);
   const authorStyle = () => {
     const currentSeed = seed();
     const tint = chatColor();

@@ -10,6 +10,7 @@ import {
   requiredStringColumn,
 } from "../database/database-rows";
 import { withTransaction } from "../database/sqlite-transaction";
+import { cachedStatement } from "../database/statement-cache";
 import type { OpenBotDatabase } from "../openbot-database";
 
 /** One workspace of a platform, where every agent of this computer can answer. */
@@ -301,7 +302,9 @@ export class MessagingStore {
 
   linkForThread(threadId: string): MessagingLink | null {
     const row = databaseRow(
-      this.#database.connection.prepare("SELECT * FROM projection_messaging_threads WHERE thread_id = ?").get(threadId),
+      cachedStatement(this.#database.connection, "SELECT * FROM projection_messaging_threads WHERE thread_id = ?").get(
+        threadId,
+      ),
     );
     return row ? decodeLink(row) : null;
   }

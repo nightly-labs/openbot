@@ -15,6 +15,8 @@ export const messages = {
     "{provider} не может подключиться к поставщику модели. Новая попытка: {attempt}.",
   "status.provider.modelRetryServerError":
     "Поставщик модели перегружен или вернул ошибку. {provider} пробует снова: попытка {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "Серверу модели не хватило памяти для этого чата. {provider} пробует снова: попытка {attempt}. Новому чату нужно меньше памяти.",
   "status.provider.modelRetryRecovered": "Поставщик модели снова отвечает.",
   "status.provider.retryRecovered": "{provider} снова получает ответы от своего сервера.",
   "status.provider.claudeFastModeNeedsUsageCredits":

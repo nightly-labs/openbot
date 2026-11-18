@@ -11,6 +11,8 @@ export const messages = {
   "status.provider.retryServerError": "השרת של {provider} עמוס או שיש בו שגיאה. ניסיון {attempt} מתוך {maxAttempts}.",
   "status.provider.modelRetryUnreachable": "{provider} לא מצליח להתחבר לספק המודל. מנסה שוב: ניסיון {attempt}.",
   "status.provider.modelRetryServerError": "ספק המודל עמוס או שיש בו שגיאה. {provider} מנסה שוב: ניסיון {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "לשרת המודל נגמר הזיכרון עבור השיחה הזו. {provider} מנסה שוב: ניסיון {attempt}. שיחה חדשה צריכה פחות זיכרון.",
   "status.provider.modelRetryRecovered": "ספק המודל עונה שוב.",
   "status.provider.retryRecovered": "{provider} מקבל שוב תשובות מהשרת שלו.",
   "status.provider.claudeFastModeNeedsUsageCredits":

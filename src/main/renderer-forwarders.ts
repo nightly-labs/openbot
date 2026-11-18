@@ -15,6 +15,7 @@
  */
 
 import { hostname } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   type AgentEvent,
   agentNotificationLevelMap,
@@ -119,6 +120,8 @@ export interface RendererForwarderDependencies {
 const ANSWER_LOOKUP_LIMIT = 20;
 /** The longest workflow text a notification shows. */
 const WORKFLOW_NOTICE_LENGTH = 200;
+/** The shortest time from the start of one channel list read to the next, while changes keep coming. */
+const CHANNEL_READ_GAP_MS = 250;
 
 /**
  * Returns the forwarders as an object so the entry point can destructure it and keep every
@@ -247,8 +250,13 @@ export function createRendererForwarders({
     void (async () => {
       do {
         channelReads.set(serverId, false);
+        const startedAt = Date.now();
         const next = await readChannels(serverId);
         if (next) await notifyChannelReplies(serverId, next);
+        // The changes that came during the read are read together, at most once per gap: each
+        // streamed chunk of each member is a change, and a read lists every channel.
+        const gap = CHANNEL_READ_GAP_MS - (Date.now() - startedAt);
+        if (channelReads.get(serverId) && gap > 0) await delay(gap, undefined, { ref: false });
       } while (channelReads.get(serverId));
     })()
       .catch(() => undefined)

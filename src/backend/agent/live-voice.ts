@@ -124,6 +124,25 @@ const summaryPrompt = (answer: string) =>
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 /** What the relay gets for a request that the agent answered in the same turn as an earlier request. */
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
+/**
+ * How Codex gives each voice request to the relay: `<realtime_delegation>`, an optional `<source>`, then
+ * `<input>` with the request, and `<transcript_delta>` with the call. Codex escapes `&`, `<` and `>` in
+ * the text. The relay model sometimes copies all of it into `ask_agent`, and the chat then shows the tags.
+ */
+const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+
+/**
+ * The request in a copied Codex wrapper, or the text as it is. Only a complete `<input>` with text counts:
+ * Codex also saves the call in wrappers with an empty `<input>`, and such a request must not get lost.
+ */
+function relayRequest(text: string): string {
+  const input = RELAY_DELEGATION.exec(text)?.[1]
+    ?.replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .trim();
+  return input || text;
+}
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -451,7 +470,8 @@ export class LiveVoice {
       session.client.respondError(request.id, { code: -32601, message: "Live voice answers only ask_agent." });
       return;
     }
-    const text = getString(getRecord(params, "arguments"), "request")?.trim();
+    const asked = getString(getRecord(params, "arguments"), "request")?.trim();
+    const text = asked && relayRequest(asked);
     if (!text) {
       session.client.respond(request.id, toolResult({ success: false, text: "The request is empty." }));
       return;

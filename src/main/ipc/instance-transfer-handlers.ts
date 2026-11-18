@@ -4,7 +4,8 @@
 // path, and only main can reveal the saved file.
 //
 // `copy` joins the two: it exports agents from one server to a temporary file and imports that file
-// at another, with the same routes, so a host needs no new route.
+// at another, with the same routes, so a host needs no new route. Between them, main keeps only the
+// settings of the copied agents in the file: their routine flows and workflows.
 
 import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -202,11 +203,13 @@ export function instanceTransferIpcHandlers({
     );
   };
 
-  /** Writes the source server's agents to `path`, with their files and without chats or settings. Returns its warnings. */
+  /** Writes the source server's agents to `path`, with their files and settings and without chats. Returns its warnings. */
   const exportTo = async (serverId: string, agentIds: string[], path: string): Promise<string[]> => {
-    const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: false };
+    const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: true };
     if (serverId === LOCAL_SERVER_ID) {
-      const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
+      const prepared = await runCauseEffect(
+        instanceTransfer.prepareExport(input, undefined, undefined, { sharedSkills: false }),
+      );
       return (await runCauseEffect(prepared.write(path))).warnings;
     }
     requireRemote(serverId);
@@ -236,12 +239,15 @@ export function instanceTransferIpcHandlers({
     const directory = await mkdtemp(join(app.getPath("temp"), "openbot-copy-"));
     try {
       const path = join(directory, "agents.zip");
-      const exportWarnings = await exportTo(fromServerId, agentIds, path);
+      // A copy leaves the shared skills out, so the export's warning about them does not apply.
+      const sharedSkills = sourceText("error.import.transferSharedSkillsSkipped");
+      const exportWarnings = (await exportTo(fromServerId, agentIds, path)).filter((text) => text !== sharedSkills);
+      await runCauseEffect(instanceTransfer.keepCopiedSettings(path));
       const preview = await stageAt(serverId, path);
       const input: ApplyInstanceTransferInput = {
         token: preview.token,
         keys: preview.agents.map((agent) => agent.key),
-        includeSettings: false,
+        includeSettings: true,
       };
       // The apply releases the token and the staged file, also when it fails.
       const result = await routeToServer(serverId, {

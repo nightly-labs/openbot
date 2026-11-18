@@ -52,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "登录尝试次数过多，请稍后再试。",
   "error.team.clientUpdateRequired": "连接该主机前请先更新该 OpenBot 客户端。",
   "error.team.hostUpdateRequired": "连接前请先更新主机上的 OpenBot。",
+  "error.team.serverSafeMode": "此服务器处于安全模式，因为 OpenBot 无法在其上启动。",
+  "error.team.serverSafeModeNewerDatabase":
+    "此服务器上的 OpenBot {version} 无法打开其数据，因为更新版本的 OpenBot 保存过这些数据。在服务器上安装更新的 OpenBot 版本即可解决。",
+  "error.team.serverSafeModeStartFailed":
+    "此服务器上的 OpenBot {version} 多次启动失败后已停止。在服务器上安装更新的 OpenBot 版本即可解决。",
   "error.team.sidebarLayoutUnavailable": "侧边栏布局不可用。",
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
@@ -72,6 +77,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
   "error.team.routineRunPlaceUnsupported": "当前连接无法更改自动化任务的运行位置。",
   "error.team.routinePauseReasonsUnsupported": "当前连接无法显示自动化任务暂停的原因。",
+  "error.team.activeQueuesUnsupported": "此连接无法显示所有智能体的队列。",
   "error.team.routinesOnceUnsupported": "当前连接无法保存只运行一次的自动化任务。",
   "error.team.routineRunCommandUnsupported": "当前连接无法提供自动化任务的运行命令。",
   "error.team.threadQueueUnsupported": "当前连接无法显示支线对话的队列。",

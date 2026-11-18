@@ -119,6 +119,9 @@ export function MessageSelectionActions(props: {
 }) {
   const [selection, setSelection] = createSignal<MessageTextSelection | null>(null);
   const [fallbackHighlight, setFallbackHighlight] = createSignal(false);
+  // The document selection paints the passage while it holds it. The highlight takes over only when
+  // the selection moves away, such as into the instruction field, so the two never paint together.
+  const [documentHolds, setDocumentHolds] = createSignal(true);
   let lastContextKey: string | undefined;
 
   const clearSelection = () => {
@@ -154,6 +157,7 @@ export function MessageSelectionActions(props: {
       return;
     }
     showSelectionAction(clearSelection);
+    setDocumentHolds(true);
     setSelection(next);
   };
 
@@ -173,10 +177,11 @@ export function MessageSelectionActions(props: {
   );
 
   createEffect(
-    () => selection(),
+    () => (documentHolds() ? null : selection()),
     (active) => {
-      // The cleanup clears the highlight of the previous selection. Without a selection, the highlight
-      // can be of other actions, such as those of a side thread, so it stays.
+      // The cleanup clears the highlight of the previous selection. Without a selection, or while the
+      // document selection paints it, the highlight can be of other actions, such as those of a side
+      // thread, so it stays.
       if (!active) {
         setFallbackHighlight(false);
         return;
@@ -213,11 +218,17 @@ export function MessageSelectionActions(props: {
       event.preventDefault();
       quote();
     };
+    const onSelectionChange = () => {
+      const active = selection();
+      if (active) setDocumentHolds(selectionCovers(window.getSelection(), active.range));
+    };
+    document.addEventListener("selectionchange", onSelectionChange);
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("keydown", onKeyDown);
     return () => {
+      document.removeEventListener("selectionchange", onSelectionChange);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keyup", onKeyUp);
@@ -691,6 +702,20 @@ function rangeIntersectsInteractiveContent(range: Range, root: HTMLElement): boo
       return false;
     }
   });
+}
+
+/** True while the document selection still paints part of `range`. A focused text field collapses it. */
+function selectionCovers(selection: Selection | null, range: Range): boolean {
+  if (selection?.rangeCount !== 1 || selection.isCollapsed) return false;
+  const current = selection.getRangeAt(0);
+  try {
+    return (
+      current.compareBoundaryPoints(Range.END_TO_START, range) < 0 &&
+      current.compareBoundaryPoints(Range.START_TO_END, range) > 0
+    );
+  } catch {
+    return false;
+  }
 }
 
 function installPersistentHighlight(range: Range): boolean {
