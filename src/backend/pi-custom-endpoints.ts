@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CustomProviderReasoningEffort } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { type CustomProviderConfig, customModelOutputLimit } from "./opencode-config";
+import { type CustomProviderConfig, customModelOutputLimit, isMistralApi } from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
@@ -16,15 +16,16 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
 interface EndpointPayload {
   readonly id: string;
   readonly name: string;
+  readonly api: "openai-completions" | "mistral-conversations";
   readonly baseUrl: string;
   readonly apiKey: string | null;
   readonly headers: Readonly<Record<string, string>>;
   readonly models: readonly PiModelPayload[];
-  /** Absent: Pi detects the compat flags from the base URL, as for OpenAI and Azure. */
+  /** Absent: Pi detects the compat flags from the base URL. */
   readonly compat?: PiCompat;
 }
 
-/** Pi's `openai-completions` compat flags that OpenBot sets (Pi 1.1.0 `models-configuration.md`). */
+/** Pi's `openai-completions` compat flags that OpenBot sets (Pi 1.1.0 to 1.5.2 `getCompat`). */
 interface PiCompat {
   readonly supportsStore: false;
   readonly supportsDeveloperRole: false;
@@ -32,18 +33,35 @@ interface PiCompat {
 
 /**
  * Pi sends `store` and, for a reasoning model, the `developer` role to each base URL that is not on
- * its own list of other services (`detectCompat`, Pi 1.5.2). Strict endpoints refuse the request:
- * Mistral answers 422 for `store` (#11850), and EXAONE and DeepSeek hosts refuse `developer` (#7434,
- * #11328). Only OpenAI and Azure OpenAI define both, so other hosts get neither, as in OpenCode.
+ * its own list of other services (`detectCompat`, Pi 1.1.0 to 1.5.2). Strict endpoints refuse the
+ * request: EXAONE and DeepSeek hosts refuse `developer` (#7434, #11328). Only OpenAI and Azure OpenAI
+ * define both, so other hosts get neither, as in OpenCode. OpenRouter keeps Pi's own choice: Pi sends
+ * `developer` there for its OpenAI and Anthropic models only.
  */
-function isOpenAiHost(baseUrl: string): boolean {
-  const host = URL.parse(baseUrl)?.hostname.toLowerCase() ?? "";
+function keepsPiCompat(baseUrl: string): boolean {
+  const host = URL.parse(baseUrl)?.hostname ?? "";
   return (
     host === "api.openai.com" ||
     host.endsWith(".openai.azure.com") ||
     host.endsWith(".cognitiveservices.azure.com") ||
-    host.endsWith(".services.ai.azure.com")
+    host.endsWith(".services.ai.azure.com") ||
+    host === "openrouter.ai"
   );
+}
+
+/**
+ * Mistral's API refuses each field that it does not know with HTTP 422, such as `store` (#11850) and
+ * `max_completion_tokens`, and it streams thinking as a list of parts. Pi's own Mistral API sends
+ * Mistral's fields and reads those parts, as OpenCode's Mistral adapter does (`isMistralApi`). It adds
+ * `v1/chat/completions` to the base URL, so the `/v1` of the OpenAI-compatible URL goes.
+ */
+function piEndpoint(baseUrl: string): Pick<EndpointPayload, "api" | "baseUrl" | "compat"> {
+  if (isMistralApi(baseUrl)) return { api: "mistral-conversations", baseUrl: baseUrl.replace(/\/v1\/*$/u, "") };
+  return {
+    api: "openai-completions",
+    baseUrl,
+    ...(keepsPiCompat(baseUrl) ? {} : { compat: { supportsStore: false, supportsDeveloperRole: false } }),
+  };
 }
 
 interface PiModelPayload {
@@ -97,7 +115,7 @@ const SOURCE = `export default function (pi) {
     pi.registerProvider(endpoint.id, {
       name: endpoint.name,
       baseUrl: endpoint.baseUrl,
-      api: "openai-completions",
+      api: endpoint.api,
       apiKey: endpoint.apiKey ? literal(endpoint.apiKey) : "openbot",
       headers: Object.fromEntries(Object.entries(endpoint.headers).map(([name, value]) => [name, literal(value)])),
       models: endpoint.models.map((model) => ({
@@ -121,10 +139,9 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
   return {
     id: endpoint.id,
     name: endpoint.name,
-    baseUrl: endpoint.baseUrl,
+    ...piEndpoint(endpoint.baseUrl),
     apiKey: endpoint.apiKey,
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
-    ...(isOpenAiHost(endpoint.baseUrl) ? {} : { compat: { supportsStore: false, supportsDeveloperRole: false } }),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
       // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
