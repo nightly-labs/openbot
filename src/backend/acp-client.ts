@@ -1252,13 +1252,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   });
 
-  /** Marks a session that OpenBot closes, and drops the failures that wait for it. */
+  /** Marks a session that OpenBot closes. */
   #markSessionClosed(sessionId: string): void {
     const now = Date.now();
     for (const [id, at] of this.#closedSessions)
       if (now - at >= UNCLAIMED_MCP_FAILURE_MS) this.#closedSessions.delete(id);
     this.#closedSessions.set(sessionId, now);
-    this.#unclaimedMcpFailures = this.#unclaimedMcpFailures.filter((failure) => failure.sessionId !== sessionId);
+  }
+
+  /** Whether OpenBot closed this session less than `UNCLAIMED_MCP_FAILURE_MS` ago. */
+  #closedRecently(sessionId: string): boolean {
+    const at = this.#closedSessions.get(sessionId);
+    return at !== undefined && Date.now() - at < UNCLAIMED_MCP_FAILURE_MS;
   }
 
   /**
@@ -4522,8 +4527,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const failure = this.#flavor.mcpServerFailure?.(method.replace(/^_/, ""), params);
     if (failure) {
       // A server that the agent did not start because OpenBot closed its session did not fail (#12320).
-      if (this.#closedSessions.has(failure.sessionId) || isMcpSessionClosingDiagnostic(failure.reason)) {
-        logger.info("An ACP agent did not start an MCP server of a closing session.", {
+      if (this.#closedRecently(failure.sessionId) || isMcpSessionClosingDiagnostic(failure.reason)) {
+        logger.warn("An ACP agent did not start an MCP server of a closing session.", {
           provider: this.provider,
           server: failure.name,
           reason: this.#redact(failure.reason),
