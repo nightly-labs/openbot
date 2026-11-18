@@ -1,3 +1,4 @@
+import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
@@ -685,6 +686,22 @@ export function ConversationTimeline() {
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
   const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
+  /**
+   * Only the newest note of an expired sign-in offers Sign in: a later message shows the sign-in worked.
+   * The agent must still use that provider. OpenCode signs in with a key in settings, so its note has no
+   * button, as above the composer.
+   */
+  const signInAction = (message: AgentMessage | undefined) => {
+    const signIn = props.onSignInProvider;
+    const marker = message?.actionMarker;
+    return signIn &&
+      marker?.kind === "sign-in-failure" &&
+      marker.provider !== "opencode" &&
+      marker.provider === props.agent?.provider &&
+      props.messages.at(-1)?.id === message?.id
+      ? (provider: AgentProviderId) => void signIn(provider)
+      : undefined;
+  };
   /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
   const serverInstallCard = (marker: ChatActionMarkerModel) => {
     const watch = props.serverInstall;
@@ -1156,6 +1173,7 @@ export function ConversationTimeline() {
                                                             agentMessageText={agentMessageText}
                                                             instructions={changeMarkerActions.instructions}
                                                             onOpenInstructions={changeMarkerActions.onOpenInstructions}
+                                                            onSignInProvider={signInAction(message())}
                                                           />
                                                         }
                                                       >

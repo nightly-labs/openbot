@@ -22,6 +22,7 @@ import {
   latestTurnAnswer,
   PLAN_CONTINUATION_ITEM_TYPE,
   type QueueDelivery,
+  SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -2588,6 +2589,27 @@ export class TurnLifecycle {
                   ),
         });
       }
+      // The error banner goes at the next typed letter, and the empty answer does not show, so the chat
+      // showed the message with no reply and no reason (#11815). The note keeps an expired sign-in there.
+      const provider = running?.client.provider;
+      if (
+        ownLane &&
+        outcome === "failed" &&
+        // An external conversation is not shown in the app, and it tells its sender itself (#11303).
+        !this.#hooks.inMessagingLane(agentId, publicThreadId) &&
+        provider !== undefined &&
+        failure === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) })
+      )
+        // No `turnId`, as for the continuation line: alone, the note shows after this turn.
+        snapshot.messages.push({
+          id: `${turnId}:sign-in-failure`,
+          author: "system",
+          source: "system",
+          status: "completed",
+          createdAt: new Date().toISOString(),
+          itemType: `${SIGN_IN_FAILURE_ITEM_TYPE_PREFIX}${provider}`,
+          text: failure,
+        });
       this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
       if (deliveries.length > 0) {
         try {
