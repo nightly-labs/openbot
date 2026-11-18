@@ -609,8 +609,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "Proton Pass 密钥已过期",
   "connector.protonPass.expiredDescription": "在你重新登录之前，智能体无法使用共享的登录信息登录。",
   "connector.protonPass.reconnect": "重新连接",
-  "connector.protonPass.planTitle": "Proton Pass 需要付费方案",
-  "connector.protonPass.planDescription": "Proton Pass CLI 仅适用于付费 Proton 方案。请更改方案，然后重新连接。",
+  "connector.protonPass.planTitle": "Proton Pass 需要包含 Pass Plus 的方案",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI 需要包含 Pass Plus 的 Proton 方案。Mail Plus 等其他付费方案不包含它。请更改方案，然后重新连接。",
   "connector.protonPass.vaultTitle": "共享保管库",
   "connector.protonPass.vaultDescription": "智能体可以使用此保管库中的登录信息登录。将登录信息移入其中即可共享。",
   "connector.protonPass.loginCount": { one: "{count} 条登录信息", other: "{count} 条登录信息" },

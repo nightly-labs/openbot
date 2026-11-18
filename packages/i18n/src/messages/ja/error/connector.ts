@@ -54,6 +54,8 @@ export const messages = {
     "Proton Pass CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
   "error.connector.protonPassPlan":
     "ご利用の Proton プランでは Proton Pass CLI を使用できません。プランを変更してから、もう一度接続してください。",
+  "error.connector.protonPassPlanMissing":
+    "ご利用の Proton プランには Proton Pass CLI が含まれていません。Pass Plus を含む Proton プランが必要です。プランを変更してから、もう一度接続してください。",
   "error.connector.protonPassExpired": "Proton Pass へのアクセスが終了しました。もう一度接続してください。",
   "error.connector.protonPassKeyInvalid": "pst_ で始まる Proton Pass のアクセスキーを入力してください。",
   "error.connector.protonPassExtraPassword": "追加パスワードが正しくありません。もう一度入力してください。",

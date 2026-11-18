@@ -620,9 +620,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
   "connector.protonPass.reconnect": "Opnieuw verbinden",
-  "connector.protonPass.planTitle": "Proton Pass vraagt een betaald abonnement",
+  "connector.protonPass.planTitle": "Proton Pass heeft een abonnement met Pass Plus nodig",
   "connector.protonPass.planDescription":
-    "De Proton Pass CLI werkt alleen met een betaald Proton-abonnement. Wijzig je abonnement en verbind opnieuw.",
+    "De Proton Pass CLI heeft een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig je abonnement en verbind opnieuw.",
   "connector.protonPass.vaultTitle": "Gedeelde kluis",
   "connector.protonPass.vaultDescription":
     "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",

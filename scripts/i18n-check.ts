@@ -55,6 +55,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.recipientHidden",
   // A host from v0.57.0 to v0.73.0 sends this when a custom endpoint refuses a turn.
   "error.provider.customEndpointKeyRefused",
+  // Hosts up to v0.73.0 send this when the Proton plan does not include the Proton Pass CLI.
+  "error.connector.protonPassPlan",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

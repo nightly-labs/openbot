@@ -681,6 +681,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass에서 OpenBot과 공유하는 보관함만 읽을 수 있는 액세스 키를 만든 다음 여기에 붙여 넣으세요. 키는 {host}에 보관되고 이 휴대폰에는 저장되지 않아요.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "사용 중인 Proton 플랜에는 Proton Pass 명령줄 도구가 포함되지 않아요. Pass Plus가 포함된 Proton 플랜이 필요해요. Mail Plus 같은 다른 유료 플랜에는 포함되지 않아요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.unavailable": "이 서버에서는 {name}을(를) 사용할 수 없어요.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "이 휴대폰에서 {name}에 로그인하세요. 그러면 {host}이(가) 공유 보관함과 그 보관함의 읽기 전용 액세스 키를 만들고, 그 키만 보관해요. 에이전트는 비밀번호를 볼 수 없어요.",
@@ -709,8 +711,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "읽기 전용",
   "mobile.server.connectors.passwordManager.keyExpires": "읽기 전용. {date}에 만료돼요.",
   "mobile.server.connectors.passwordManager.keyExpired": "{date}에 만료됨",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} 명령줄 도구에는 유료 플랜이 필요해요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} 키가 만료되었어요",
   "mobile.server.connectors.passwordManager.expiredBody":
     "다시 연결할 때까지 {host}의 에이전트는 공유 로그인 항목으로 로그인할 수 없어요.",

@@ -627,9 +627,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Gli agenti non possono accedere con le tue credenziali condivise finché non accedi di nuovo.",
   "connector.protonPass.reconnect": "Riconnetti",
-  "connector.protonPass.planTitle": "Proton Pass richiede un piano a pagamento",
+  "connector.protonPass.planTitle": "Proton Pass richiede un piano con Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI di Proton Pass funziona solo con un piano Proton a pagamento. Cambia piano, poi connetti di nuovo.",
+    "La CLI di Proton Pass richiede un piano Proton che includa Pass Plus. Altri piani a pagamento, come Mail Plus, non la includono. Cambia piano, poi connetti di nuovo.",
   "connector.protonPass.vaultTitle": "Cassaforte condivisa",
   "connector.protonPass.vaultDescription":
     "Gli agenti possono accedere con le credenziali di questa cassaforte. Spostaci una credenziale per condividerla.",

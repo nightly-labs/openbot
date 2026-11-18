@@ -567,9 +567,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "Proton Pass 키가 만료되었습니다",
   "connector.protonPass.expiredDescription": "다시 로그인할 때까지 에이전트가 공유 로그인 정보로 로그인할 수 없습니다.",
   "connector.protonPass.reconnect": "다시 연결",
-  "connector.protonPass.planTitle": "Proton Pass에는 유료 요금제가 필요합니다",
+  "connector.protonPass.planTitle": "Proton Pass에는 Pass Plus가 포함된 요금제가 필요합니다",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI는 유료 Proton 요금제에서만 작동합니다. 요금제를 변경한 다음 다시 연결하세요.",
+    "Proton Pass CLI에는 Pass Plus가 포함된 Proton 요금제가 필요합니다. Mail Plus 같은 다른 유료 요금제에는 포함되지 않습니다. 요금제를 변경한 다음 다시 연결하세요.",
   "connector.protonPass.vaultTitle": "공유 보관함",
   "connector.protonPass.vaultDescription":
     "에이전트는 이 보관함의 로그인 정보로 로그인할 수 있습니다. 공유할 로그인 정보를 여기로 옮기세요.",
