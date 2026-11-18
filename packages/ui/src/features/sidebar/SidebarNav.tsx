@@ -33,6 +33,7 @@ export function SidebarNav() {
     scrollFades,
     setAgentListElement,
     setListFilter,
+    shownPeople,
     startCreateSection,
     unreadChats,
     updateSidebarNativeDrag,
@@ -58,7 +59,7 @@ export function SidebarNav() {
       onScroll={scrollFades.measure}
     >
       <div ref={scrollFades.watch} class="agent-list-content">
-        <Show when={listFiltered() && noChatShows()}>
+        <Show when={listFiltered() && noChatShows() && (props.showPeople === false || shownPeople().length === 0)}>
           <div class="sidebar-filter-empty">
             <p class="empty-search">{t("sidebar.filter.noMatch")}</p>
             <Button variant="secondary" size="sm" onClick={() => setListFilter(SIDEBAR_NO_LIST_FILTER)}>

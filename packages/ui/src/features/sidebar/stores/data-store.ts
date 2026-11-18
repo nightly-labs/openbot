@@ -414,6 +414,29 @@ export function createSidebarDataStore(deps: {
         (orderIndex.get(right.id) ?? props.peopleOrder.length + (naturalIndex.get(right.id) ?? 0)),
     );
   });
+  /**
+   * The people that the filter shows. A direct chat is not an agent or a channel and is in no folder.
+   * Thus only "All chats" with no folder shows people, and then only when "Unread" is on: the people
+   * with unread messages. As in `shownKey`, the open direct chat stays while the pointer is over the list.
+   */
+  let heldPeopleIds = new Set<string>();
+  const shownPeople = createMemo(() => {
+    const filter = listFilter();
+    if (!listFiltered()) {
+      heldPeopleIds = new Set();
+      return orderedPeople();
+    }
+    const people =
+      filter.show !== "all" || filter.folders.length > 0 || !filter.unread
+        ? []
+        : orderedPeople().filter(
+            (member) =>
+              (directThreadByMember().get(member.id)?.unreadCount ?? 0) > 0 ||
+              (member.id === props.activeDirectMemberId && heldPeopleIds.has(member.id) && deps.pointerInList()),
+          );
+    heldPeopleIds = new Set(people.map((member) => member.id));
+    return people;
+  });
   const customSectionById = createMemo(() => new Map(props.layout.sections.map((section) => [section.id, section])));
   const collapsedSectionIds = createMemo(() => new Set(props.collapsedSectionIds));
   // A section has to be in `order` as well as in `sections` for its group to be drawn, because
@@ -450,7 +473,7 @@ export function createSidebarDataStore(deps: {
   const visibleSectionIds = createMemo(() =>
     props.layout.order.filter((sectionId) => {
       if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) {
-        return props.showPeople !== false && !listFiltered() && orderedPeople().length > 0;
+        return props.showPeople !== false && shownPeople().length > 0;
       }
       if (customSectionById().has(sectionId)) return foldersWithShownChats()?.has(sectionId) ?? true;
       if (sectionId !== SIDEBAR_UNASSIGNED_SECTION_ID) return false;
@@ -609,6 +632,13 @@ export function createSidebarDataStore(deps: {
       if (chat.kind === "agent" && agentIsUserHidden(chat.id) && !hiddenAgentWaits(chat.id)) continue;
       if (sidebarChatMatchesFilter(chat, filter)) count += 1;
     }
+    // The people, by the rule of `shownPeople`.
+    if (props.showPeople !== false && filter.show === "all" && filter.folders.length === 0) {
+      for (const member of props.people) {
+        const unread = (directThreadByMember().get(member.id)?.unreadCount ?? 0) > 0;
+        if (filter.unread ? unread : !filter.working) count += 1;
+      }
+    }
     return count;
   }
 
@@ -649,6 +679,7 @@ export function createSidebarDataStore(deps: {
     sectionPosition,
     sectionUnreadCount,
     setListFilter,
+    shownPeople,
     unreadChats,
     visiblePinnedKeys,
     userHiddenAgentList,
