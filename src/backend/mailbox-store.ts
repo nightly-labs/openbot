@@ -3706,7 +3706,10 @@ export class MailboxStore {
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
-      ...(this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined
+      // A later usage-limit or plan continuation of the requeued turn has its own note.
+      ...(this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
+      !delivery.resumeAfterUsageLimit &&
+      !delivery.planContinuation
         ? { restartedResult: true as const }
         : {}),
       managedAttachments: message.attachments.map((attachment) => ({

@@ -349,7 +349,8 @@ export class BootRecovery {
         (yield* this.#mailbox.requeueResultAfterRestart(id).pipe(toBootRecoveryFailed))
       )
         requeued.add(id);
-      // A failed provider read keeps the conservative interrupted result; never replay side effects.
+      // Any other delivery keeps the conservative result, also after a failed provider read; never replay
+      // its side effects. A result has none of its own, and its new turn gets a note to check what ran.
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);

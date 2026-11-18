@@ -226,6 +226,18 @@ export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
 
 const RESTARTED_RESULT_NOTE =
   "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
+
+/**
+ * The input of a turn that starts again with a teammate's result after a restart stopped the turn that
+ * read it (#11857). The note goes in front as a handoff, so `teammatePrompts` still finds the teammate
+ * messages after it when the history is imported.
+ */
+export function restartedResultInput(input: readonly DeliveryInputItem[]): DeliveryInputItem[] {
+  const note = `${HANDOFF_START}\n\n${RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+  return input.map((item, index) =>
+    index === 0 && item.type === "text" ? { ...item, text: `${note}${item.text}` } : item,
+  );
+}
 const TEAMMATE_PROMPT = new RegExp(
   `^${TEAMMATE_HEADER} [^\\n]* \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)\\n(?:This replies to message: (\\S+)\\n)?`,
   "gm",
@@ -506,8 +518,6 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
   }
-  // The turn that read this result stopped before it ended, so part of the work for it can be done (#11857).
-  if (context.restartedResult) text = `${RESTARTED_RESULT_NOTE}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   if (context.resumeAfterUsageLimit) {
     const continuationState = context.resumeAfterUsageLimit;
     const progress = redactSecrets(
