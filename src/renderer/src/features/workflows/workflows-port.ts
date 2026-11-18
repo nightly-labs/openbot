@@ -10,6 +10,7 @@ import {
   WORKFLOW_PICTURE_TYPES,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
@@ -118,6 +119,11 @@ export interface WorkflowHost {
   uploadPicture(file: File): Promise<StoredFileRow>;
   /** The address of an image or a video that a media step made, from its attachment id. */
   mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | undefined;
+  /**
+   * The address of a small copy of a picture, for a card that shows it small (`attachment-preview-v1`).
+   * The file itself when the host makes no copy, or on this computer, which reads it from its disk.
+   */
+  mediaPreviewUrl(attachmentId: string): string | undefined;
   /** The GitHub connection that the host's GitHub triggers and outputs use. */
   githubConnector: GitHubConnectorPort;
   /** The joined server, as its server row names it, or undefined for this computer. */
@@ -207,6 +213,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     local()
       ? `openbot-attachment://file/${encodeURIComponent(attachmentId)}`
       : `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  const mediaPreviewUrl = (attachmentId: string) =>
+    !local() && serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
+      ? `${mediaUrl(attachmentId)}?preview=1`
+      : mediaUrl(attachmentId);
   return {
     workflows: {
       list: () => api().list(serverId),
@@ -350,6 +360,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaTransparentSupported,
     mediaSizeSupported,
     mediaUrl,
+    mediaPreviewUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
     },

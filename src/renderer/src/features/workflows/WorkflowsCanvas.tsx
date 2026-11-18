@@ -153,6 +153,9 @@ export function WorkflowsCanvas(props: {
     get media() {
       return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
     },
+    get mediaPreview() {
+      return props.host.mediaSupported() ? props.host.mediaPreviewUrl : undefined;
+    },
     // The Library pictures that an asset step can use. A picture with no preview address, as the
     // browser gets, reads its file only when the canvas shows it.
     get files() {

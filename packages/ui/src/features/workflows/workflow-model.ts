@@ -159,6 +159,12 @@ export interface WorkflowCatalogs {
    */
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | undefined) | undefined;
   /**
+   * The address of a small copy of a picture, from its attachment id, for a card, a strip or a
+   * thumbnail. Undefined while it loads. The viewer and a download read `media`. Without it, the
+   * cards show `media` and the `previewUrl` of `files`.
+   */
+  mediaPreview?: ((attachmentId: string) => string | undefined) | undefined;
+  /**
    * Sends a picture from the computer to the host and answers it as a Library file. The host shows
    * why it refused one. Without it, a file from the computer stays in the page.
    */

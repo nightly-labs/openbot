@@ -50,6 +50,7 @@ import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
+import { AttachmentPreviews } from "./attachment-previews";
 import {
   type BrowserProfileService,
   browserProxyConnection,
@@ -3577,6 +3578,8 @@ export async function createApplicationServices({
   // start gives it to Sunshine again. So it stays in memory: the remote desktop also starts when the
   // system keyring or the macOS Keychain is not available.
   const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
+  // Small copies of image attachments, for the cards of the Workflows canvas here and on joined clients.
+  const attachmentPreviews = new AttachmentPreviews(join(app.getPath("userData"), "attachment-previews"));
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3587,6 +3590,7 @@ export async function createApplicationServices({
     skills,
     sidebarLayout,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: teamChatStore,
     channels: service.channels,
@@ -4108,6 +4112,8 @@ export async function createApplicationServices({
   );
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
+  // Development only: the speed of the link from a host, for `scripts/workflow-canvas-pictures-perf-e2e.ts`.
+  const developmentDownlinkKbps = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_DOWNLINK_KBPS) || 0);
   installRemoteSyncProfileSink(
     remoteSyncProfileFile({
       isPackaged: app.isPackaged,
@@ -4190,6 +4196,7 @@ export async function createApplicationServices({
         connectTrace,
         sessionCache: remoteSessionCache,
         developmentRoundTripMs,
+        developmentDownlinkKbps,
       }),
     },
   );

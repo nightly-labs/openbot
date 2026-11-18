@@ -165,6 +165,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     // A story makes no files.
     mediaUrl: () => undefined,
+    mediaPreviewUrl: () => undefined,
     githubConnector: createMockGitHubConnector(),
     hostName: () => undefined,
     // A story opens no browser.

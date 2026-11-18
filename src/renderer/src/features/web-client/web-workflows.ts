@@ -12,6 +12,7 @@ import {
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
@@ -101,6 +102,8 @@ export interface WebWorkflowHostOptions {
   githubConnector: GitHubConnectorPort;
   /** The object URLs of the chat's host files. A media step shows its file through them. */
   attachmentMedia: AttachmentMediaSource | undefined;
+  /** The object URLs of the small copies of host pictures (`attachment-preview-v1`). */
+  previewMedia: AttachmentMediaSource | undefined;
 }
 
 /** The host sends only the id of a media step's file, so the name and type come from the step kind. */
@@ -125,6 +128,12 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
+  const mediaUrl = (attachmentId: string, kind: WorkflowMediaKind) => {
+    const media = options.attachmentMedia;
+    if (!media) return undefined;
+    void media.load(mediaSummary(attachmentId, kind));
+    return media.url(attachmentId);
+  };
 
   const post = async <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> => {
     if (!has(WORKFLOWS_CAPABILITY)) throw tooOld();
@@ -306,11 +315,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
-    mediaUrl(attachmentId, kind) {
-      const media = options.attachmentMedia;
-      if (!media) return undefined;
-      void media.load(mediaSummary(attachmentId, kind));
-      return media.url(attachmentId);
+    mediaUrl,
+    mediaPreviewUrl(attachmentId) {
+      const previews = options.previewMedia;
+      if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY)) return mediaUrl(attachmentId, "image");
+      // A host that makes no copy sends the file itself, which can be larger than a thumbnail.
+      void previews.load(mediaSummary(attachmentId, "image"), "generated");
+      return previews.url(attachmentId);
     },
     githubConnector: options.githubConnector,
     hostName: options.hostName,

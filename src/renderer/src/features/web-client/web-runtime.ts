@@ -446,6 +446,8 @@ export interface WebWorkspaceRuntime {
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
   download(attachmentId: string): Promise<WebFile>;
+  /** A small copy of an image attachment (`attachment-preview-v1`), or the file when the host makes none. */
+  downloadPreview(attachmentId: string): Promise<WebFile>;
   /** A file under the host's shared folder. */
   sharedFile(path: string): Promise<WebFile>;
   /** A file in one agent's workspace on the host. */
@@ -1712,6 +1714,11 @@ export function createWebWorkspaceRuntime(
     },
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
+    },
+    async downloadPreview(id) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachmentPreview(id), {}, undefined, WEB_FILE_DOWNLOAD),
+      );
     },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });

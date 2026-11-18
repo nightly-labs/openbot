@@ -135,6 +135,33 @@ interface TeamWebRtcClientTransportOptions {
    * direction, and each account service read waits all of it. The Signal socket does not wait.
    */
   developmentRoundTripMs?: number;
+  /**
+   * Development only (`OPENBOT_DEV_DOWNLINK_KBPS`, 0 in a packaged app): the speed of the link from the
+   * host, in kilobits per second, to measure a large download on a real network. A message waits until
+   * the bytes before it and its own bytes have come in at this speed, in order.
+   */
+  developmentDownlinkKbps?: number;
+}
+
+type DataListener = (
+  hostId: string,
+  channel: "rpc" | "events" | "files" | "desktop",
+  data: string | ArrayBuffer,
+) => void;
+
+/**
+ * Development only: delays each message by half the added round trip and, with a speed, by the time
+ * that its bytes take on that link after the bytes before it. The order stays.
+ */
+function developmentLink(listener: DataListener, halfRoundTripMs: number, downlinkKbps: number): DataListener {
+  if (halfRoundTripMs <= 0 && downlinkKbps <= 0) return listener;
+  let linkFreeAt = 0;
+  return (hostId, channel, data) => {
+    const now = performance.now();
+    const bytes = typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
+    linkFreeAt = Math.max(now, linkFreeAt) + (downlinkKbps > 0 ? (bytes * 8) / downlinkKbps : 0);
+    setTimeout(() => listener(hostId, channel, data), linkFreeAt - now + halfRoundTripMs);
+  };
 }
 
 interface ActiveHost {
@@ -256,10 +283,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
     options.bridge.on("connected", this.#onConnected);
     options.bridge.on("disconnected", this.#onDisconnected);
-    options.bridge.on(
-      "data",
-      half > 0 ? (...args) => void setTimeout(() => this.#onData(...args), half) : this.#onData,
-    );
+    options.bridge.on("data", developmentLink(this.#onData, half, options.developmentDownlinkKbps ?? 0));
     options.bridge.on("path", this.#onPath);
     options.bridge.on("error", this.#onError);
     options.bridge.on("signalReady", this.#onSignalReady);
