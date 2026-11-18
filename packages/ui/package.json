@@ -393,6 +393,7 @@
     "./features/sidebar/SidebarViewSwitch": "./src/features/sidebar/SidebarViewSwitch.tsx",
     "./features/sidebar/sidebar-views.css": "./src/features/sidebar/sidebar-views.css",
     "./features/sidebar/sidebar-working-badge.css": "./src/features/sidebar/sidebar-working-badge.css",
+    "./features/sidebar/sidebar-filter.css": "./src/features/sidebar/sidebar-filter.css",
     "./features/sidebar/sidebar-felt-badges.css": "./src/features/sidebar/sidebar-felt-badges.css",
     "./features/sidebar/sidebar-tooltips.css": "./src/features/sidebar/sidebar-tooltips.css",
     "./features/sidebar/createSidebarDragEngine": "./src/features/sidebar/createSidebarDragEngine.ts",

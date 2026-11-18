@@ -1133,7 +1133,8 @@ textarea {
 }
 
 .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-server-name,
-.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button,
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-filter-button {
   display: none;
 }
 
@@ -1412,7 +1413,7 @@ textarea {
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
-/* The search field, then the New button. */
+/* The search field, then the filter and New buttons. */
 .sidebar-search-wrap {
   position: relative;
   display: flex;
@@ -3449,7 +3450,7 @@ textarea {
   pointer-events: none;
 }
 
-.sidebar-compact .sidebar-new-button {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button) {
   opacity: 0;
   pointer-events: none;
   transform: translateX(6px) scale(0.92);
@@ -3543,7 +3544,7 @@ textarea {
 
 /* Right to left, the compact offsets above go the other way. `:dir()` keeps the specificity under the
  * macOS rules for the compact top row. */
-.sidebar-compact .sidebar-new-button:dir(rtl) {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button):dir(rtl) {
   transform: translateX(-6px) scale(0.92);
 }
 
