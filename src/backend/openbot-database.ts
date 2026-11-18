@@ -40,6 +40,7 @@ import {
   unpinThreadMessage,
 } from "./database/pinned-thread-messages";
 import {
+  type ProviderHistoryCompactionBatch,
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
   type ProviderHistoryStagedItem,
@@ -63,6 +64,7 @@ export type {
   PendingHostedSiteTerminalEvent,
 } from "./database/hosted-site-event-log";
 export type {
+  ProviderHistoryCompactionBatch,
   ProviderHistoryImportState,
   ProviderHistorySessionInput,
   ProviderHistoryStagedItem,
@@ -444,6 +446,8 @@ export class OpenBotDatabase {
     messages: readonly ConversationMessage[];
     throughItemIndex?: number;
     complete: boolean;
+    /** Keep only hashes of the turn's items once it is imported (Codex and Claude only). */
+    compact?: boolean;
     detail?: unknown;
   }): void {
     withTransaction(this.connection, () => {
@@ -459,7 +463,10 @@ export class OpenBotDatabase {
       if (input.throughItemIndex !== undefined) {
         this.#providerHistory.markItemsImportedThrough(input.sessionId, input.turnId, input.throughItemIndex);
       }
-      if (input.complete) this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+      if (input.complete) {
+        this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+        if (input.compact) this.#providerHistory.compactImportedTurn(input.sessionId, input.turnId);
+      }
     });
   }
 
@@ -618,6 +625,15 @@ export class OpenBotDatabase {
     pendingOnly?: boolean;
   }): ProviderHistoryStagedItem[] {
     return this.#providerHistory.readStagedItems(input);
+  }
+
+  /** Compacts one batch of imported Codex and Claude items after `afterRowId`. */
+  compactImportedProviderHistory(afterRowId: number): ProviderHistoryCompactionBatch {
+    return this.#providerHistory.compactImportedItems(afterRowId);
+  }
+
+  dropCompactedProviderHistoryItems(sessionId: string, turnId: string): void {
+    this.#providerHistory.dropCompactedItems(sessionId, turnId);
   }
 
   markProviderHistoryTurnImported(sessionId: string, turnId: string): void {

@@ -92,7 +92,7 @@ function pinTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 64 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -139,9 +139,9 @@ describe("pinned thread messages migration", () => {
     seed(db);
     seedDeletedRecord(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(65,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=65; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(pinTables(db)).toEqual([]);
@@ -156,8 +156,8 @@ describe("pinned thread messages migration", () => {
        VALUES ('thread-chief', 'message-1', '2026-01-02', 'person')`,
     ).run();
     const after = contents(db);
-    // The next release adds 64: this application is the older one for that database.
-    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
+    // The next release adds 65: this application is the older one for that database.
+    db.exec("INSERT INTO schema_migrations VALUES(65,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

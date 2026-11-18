@@ -80,6 +80,9 @@ a new install's, and that a second start changes nothing.
 One user database is 17 GB: `orchestration_events` 11.9 GB, `provider_history_staging` 2.9 GB, and
 `projection_thread_messages`. Nothing copies the file first, so a migration runs on that file on the
 user's computer, and it must finish with the disk that is free.
+After start, OpenBot replaces each imported Codex and Claude row of `provider_history_staging` with a
+hash, in small transactions, only at schema 64 or later: an older release cannot read a hash row, so
+the marker migration 64 makes it refuse the file. The file keeps its size; SQLite uses the free pages again.
 
 - Do not rebuild, rewrite every row of, or `VACUUM` because of a large table unless the change needs
   it. Prefer `ADD COLUMN` with no default or a constant default, a new table, or a partial index.
