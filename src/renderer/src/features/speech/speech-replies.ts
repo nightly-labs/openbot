@@ -471,7 +471,7 @@ async function speak(
   try {
     const input = speechInput(markdown, fallback);
     if (!input) {
-      if (markdown && speechTextFromMarkdown(markdown)) reportUnreadableLanguage(trigger, analytics);
+      if (markdown && speechTextFromMarkdown(markdown)) reportUnreadableLanguage();
       return;
     }
     spoken = own;
@@ -497,8 +497,7 @@ async function speak(
  * Tells the user that the reply has text but no voice of theirs reads its language. Each part of a
  * reply in a voice conversation can come here, so all of them share one toast.
  */
-function reportUnreadableLanguage(trigger: SpeechTrigger, analytics: ReturnType<typeof desktopAnalytics.scope>): void {
-  analytics.track("speech_reply", { trigger, result: "failed", failure_code: "unsupported_language" });
+function reportUnreadableLanguage(): void {
   toast.warning(currentText().t("composer.voice.languageUnsupported"), {
     id: "speech-unsupported-language",
     report: { operation: "voice", source: "system", cause_code: "unknown" },
