@@ -288,6 +288,7 @@ export const messages = {
   "mobile.settings.conversations.media": "写真とファイル",
   "mobile.settings.conversations.swipeLeft": "エージェントのチャットで左にスワイプ",
   "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
+  "mobile.settings.conversations.swipeQuestion": "サイド質問",
   "mobile.settings.conversations.swipeThreads": "スレッド",
   "mobile.settings.conversations.swipeBrowser": "ブラウザー",
   "mobile.settings.conversations.swipeOff": "オフ",

@@ -4,19 +4,19 @@ import { create } from "zustand";
 const key = "openbot.mobile.chatSwipe.v1";
 
 /**
- * What a swipe away from Back opens in an agent's chat: its threads, its browser, or nothing ("off").
- * The pull past the latest message opens the agent's info. A stored choice that is not here gets the
- * default.
+ * What a swipe away from Back opens in an agent's chat: its side question, its threads, its browser, or
+ * nothing ("off"). The pull past the latest message opens the agent's info. A stored choice that is
+ * not here gets the default. An older app reads a stored "question" as no choice, and uses its default.
  */
-const CHAT_SWIPE_ACTIONS = ["threads", "browser", "off"] as const;
+const CHAT_SWIPE_ACTIONS = ["question", "threads", "browser", "off"] as const;
 export type ChatSwipeAction = (typeof CHAT_SWIPE_ACTIONS)[number];
 
 /**
  * The swipe of an agent's chat. Each phone keeps its own choice: it is not synced to the host or to
- * the other devices. The default is the thread list.
+ * the other devices. The default is the side question.
  */
 export const useChatSwipePreference = create<{ action: ChatSwipeAction; ready: boolean }>(() => ({
-  action: "threads",
+  action: "question",
   ready: false,
 }));
 

@@ -283,6 +283,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.media": "Photos and files",
   "mobile.settings.conversations.swipeLeft": "Swipe left in an agent chat",
   "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
+  "mobile.settings.conversations.swipeQuestion": "Side question",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Off",

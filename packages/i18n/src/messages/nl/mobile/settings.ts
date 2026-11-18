@@ -285,6 +285,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Foto's en bestanden",
   "mobile.settings.conversations.swipeLeft": "Naar links vegen in een agentchat",
   "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
+  "mobile.settings.conversations.swipeQuestion": "Zijvraag",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Uit",

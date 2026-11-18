@@ -279,6 +279,7 @@ export const messages = {
   "mobile.settings.conversations.media": "תמונות וקבצים",
   "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
   "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeQuestion": "שאלת צד",
   "mobile.settings.conversations.swipeThreads": "שרשורים",
   "mobile.settings.conversations.swipeBrowser": "דפדפן",
   "mobile.settings.conversations.swipeOff": "כבוי",

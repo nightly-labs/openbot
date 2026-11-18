@@ -283,6 +283,7 @@ export const messages = {
   "mobile.settings.conversations.media": "사진 및 파일",
   "mobile.settings.conversations.swipeLeft": "에이전트 채팅에서 왼쪽으로 스와이프",
   "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
+  "mobile.settings.conversations.swipeQuestion": "곁다리 질문",
   "mobile.settings.conversations.swipeThreads": "스레드",
   "mobile.settings.conversations.swipeBrowser": "브라우저",
   "mobile.settings.conversations.swipeOff": "끔",

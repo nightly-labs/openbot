@@ -295,6 +295,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Zdjęcia i pliki",
   "mobile.settings.conversations.swipeLeft": "Przesunięcie w lewo w czacie agenta",
   "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
+  "mobile.settings.conversations.swipeQuestion": "Pytanie poboczne",
   "mobile.settings.conversations.swipeThreads": "Wątki",
   "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
   "mobile.settings.conversations.swipeOff": "Wyłączone",

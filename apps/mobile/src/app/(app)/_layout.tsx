@@ -351,6 +351,17 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="side-question/[agentId]"
+        // A side question is a chat of its own beside the agent's chat, so it opens as a thread does.
+        options={{
+          animation: chatAnimation,
+          contentStyle: { backgroundColor: background },
+          fullScreenGestureEnabled: true,
+          gestureEnabled: true,
+          ...nativeBarOptions,
+        }}
+      />
+      <Stack.Screen
         name="task/[taskId]"
         // A task is a chat of its own, so it opens as the agent's chat does.
         options={{

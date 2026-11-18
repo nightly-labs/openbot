@@ -287,6 +287,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Foto e file",
   "mobile.settings.conversations.swipeLeft": "Scorri a sinistra in una chat",
   "mobile.settings.conversations.swipeRight": "Scorri a destra in una chat",
+  "mobile.settings.conversations.swipeQuestion": "Domanda a parte",
   "mobile.settings.conversations.swipeThreads": "Thread",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Disattivato",

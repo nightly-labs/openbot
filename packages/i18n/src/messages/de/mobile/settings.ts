@@ -292,6 +292,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Fotos und Dateien",
   "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
   "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
+  "mobile.settings.conversations.swipeQuestion": "Nebenfrage",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Aus",

@@ -295,6 +295,7 @@ export const messages = {
   "mobile.settings.conversations.media": "الصور والملفات",
   "mobile.settings.conversations.swipeLeft": "السحب لليسار في محادثة وكيل",
   "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
+  "mobile.settings.conversations.swipeQuestion": "سؤال جانبي",
   "mobile.settings.conversations.swipeThreads": "السلاسل",
   "mobile.settings.conversations.swipeBrowser": "المتصفح",
   "mobile.settings.conversations.swipeOff": "إيقاف",
