@@ -731,17 +731,23 @@ export function createConversationViewScope(props: ConversationProps) {
   );
   /** The subagent that the side panel shows now, or null. */
   const shownSubagentId = () => (activeRightPanel() === "subagent" ? panelSubagentId() : null);
-  /** A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. */
+  /**
+   * A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. The
+   * click is in the transcript, so the focus stays there.
+   */
   function toggleSubagentPanel(subagentId: string) {
-    if (shownSubagentId() === subagentId) closeSidePanelPane("subagent");
+    if (shownSubagentId() === subagentId) closeSidePanelPane("subagent", false);
     else openSubagentPanel(subagentId);
   }
-  /** Closes the tab of a pane. The next tab takes its place; with no tab, the panel closes. */
-  function closeSidePanelPane(pane: SidePanelPane) {
+  /**
+   * Closes the tab of a pane. The next tab takes its place; with no tab, the panel closes. See
+   * `closeEmptySidePanel` for `focusComposer`.
+   */
+  function closeSidePanelPane(pane: SidePanelPane, focusComposer = true) {
     sidePanelPaneActions[pane]?.release?.();
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
-    if (shown) showSidePanelInPlaceOf(next);
+    if (shown) showSidePanelInPlaceOf(next, focusComposer);
   }
   /**
    * Closes the browser pane when its last tab closes. The full view and picture in picture are outside the
@@ -749,14 +755,17 @@ export function createConversationViewScope(props: ConversationProps) {
    * panel mode that a write sets does not show yet, so this does not read the mode.
    */
   function closeBrowserPane() {
-    // The closed browser tab left the page before this effect, so the focus is lost only when it was there.
-    const focusLost = document.activeElement === null || document.activeElement === document.body;
+    // An agent can close the tab too. The closed tab left the page before this effect, so the composer
+    // takes the focus only when no element has it, and not when the user selected text.
+    const focusLost =
+      (document.activeElement === null || document.activeElement === document.body) &&
+      (document.getSelection()?.isCollapsed ?? true);
     showSidePanelInPlaceOf(removeSidePanelPane("browser"), focusLost);
   }
   /**
    * The last tab of the side panel closed, so the panel closes too, as the panel button closes it. The
-   * pane list shows only when the user opens a panel that has no tab. The closed tab took the focus with
-   * it, so the focus goes to the composer.
+   * pane list shows only when the user opens a panel that has no tab. With `focusComposer`, the composer
+   * takes the focus, which the closed tab took with it. A close from outside the panel keeps the focus.
    */
   function closeEmptySidePanel(focusComposer = true) {
     hideBrowserPanel();
