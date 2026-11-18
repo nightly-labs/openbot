@@ -201,6 +201,17 @@ function signInFileVersion(paths: readonly string[]): string {
     })
     .join("|");
 }
+
+/**
+ * Whether a sign-in that a host starts for a client (`signInProviderOnHost`) runs as one for a user
+ * at another device. `atHost`: the user is at this computer, such as the desktop app that runs a
+ * server on this computer. Only Gemini on Windows then signs in as a Connect here: its CLI opens the
+ * Google page on this computer by itself, so `startAcpAuthentication` refuses it for another device,
+ * and the user at this computer could not connect (#11677). Every other sign-in keeps its page.
+ */
+function fromAnotherDevice(provider: AgentProvider, atHost: boolean): boolean {
+  return !(atHost && provider === "antigravity" && process.platform === "win32");
+}
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
  * that times out, or whose process ends within `STABLE_RUN_MS` counts. Only a user action starts the
@@ -2054,18 +2065,22 @@ export class ProviderRuntime implements ProviderPort {
    * Signs a provider account after the first in through the page that its CLI prints, which
    * `openPage` shows, and waits until the sign-in ends. For a host whose browser the user reaches only
    * through a live view (`provider-accounts-v1`). An interrupt cancels the sign-in.
+   * `atHost`: the user who started it is at this computer (`fromAnotherDevice`).
    */
   readonly signInProviderAccountOnHost = Effect.fn("ProviderRuntime.signInProviderAccountOnHost")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     accountId: string | null,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ) {
     yield* providerStep(() => this.requireProviderOn(provider));
     const accounts = yield* this.#requireAccounts(provider);
     // The start runs uninterruptible, so an interrupt at any point cancels the sign-in it started.
     const error = yield* Effect.acquireUseRelease(
-      accounts.connect(provider, accountId, openPage, true).pipe(toProviderOperationFailed),
+      accounts
+        .connect(provider, accountId, openPage, fromAnotherDevice(provider, atHost))
+        .pipe(toProviderOperationFailed),
       (signIn) => signIn.ended,
       (signIn, exit) =>
         Exit.hasInterrupts(exit) ? accounts.cancel(provider, signIn.accountId, signIn.signIn) : Effect.void,
@@ -2296,13 +2311,15 @@ export class ProviderRuntime implements ProviderPort {
    * Signs `provider` in through the page that its CLI prints, which `openPage` shows, and waits until
    * the sign-in ends. For a host whose browser the user reaches only through a live view
    * (`provider-host-sign-in-v1`). Fails with the reason when the provider is not signed in at the end.
+   * `atHost`: the user who started it is at this computer (`fromAnotherDevice`).
    */
   readonly signInProviderOnHost = Effect.fn("ProviderRuntime.signInProviderOnHost")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ) {
-    yield* this.#connectProvider(provider, openPage, true);
+    yield* this.#connectProvider(provider, openPage, fromAnotherDevice(provider, atHost));
     // A sign-in that ended before this read leaves no task; the clients then tell how it ended.
     const pending =
       requireProviderDriver(provider).signIn.kind === "browser"
