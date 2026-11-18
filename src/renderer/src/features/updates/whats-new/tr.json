@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Bu sürümü kurduktan sonra bu bilgisayarda veya sunucuda OpenBot'un eski bir sürümüne dönemezsiniz. Bu sürüm veritabanını küçültür ve eski bir sürüm onu açamaz.",
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda özel resim boyutları, Sunra ve Higgsfield modelleri ile fiyatları ve çok sayıda ajanın daha hızlı yüklenmesi yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Her ajanın yan ileti dizilerini kenar çubuğunda görün. Bir ajan satırının sonundaki oku seçin ya da tüm ileti dizilerini görmek için imleci satırın üzerinde tutun.",
+          "Kenar çubuğunu arama alanının sonundaki filtre düğmesiyle süzün. Yalnızca ajanları veya kanalları, yalnızca okunmamış sohbetleri veya çalışan ajanları ya da yalnızca seçtiğiniz klasörlerdeki sohbetleri gösterin.",
+          "İş akışı tuvalindeki bir Görsel adımına piksel cinsinden özel bir boyut verin ya da 4:5 veya 5:4 en-boy oranını kullanın.",
+          "İş akışı tuvali Sunra ve Higgsfield'in tüm görsel ve video modellerini gösterir. Çalıştır düğmesi fiyatı kredi olarak gösterir.",
+          "Yavaş bir bilgisayarda OpenBot'u daha hızlı yapmak için Ayarlar → Görünüm → Hareket bölümünden Arka plan bulanıklığı ile Hareketli ajan yüzleri seçeneklerini kapatın."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Birden fazla kişi aynı iş akışını aynı anda düzenleyebilir. Tuval, diğer kişilerin değişikliklerini kaydettikçe ekler.",
+          "OpenBot, birçok ajan çalışırken çok daha az CPU kullanır ve gecikme olmadan yazabilirsiniz.",
+          "Ajanlar, banka 3-D Secure kodu istediğinde ödemeyi tamamlar. Kod, ajanın okuyabildiği bir e-postada ya da SMS'te olduğunda ajan kodu yazar.",
+          "Sunucu ayarları → Aktarım → Başka bir sunucuya kopyala artık ajanların iş akışlarını ve rutin akışlarını da kopyalar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot veritabanı çok daha az yer kaplar. Güncellemeden sonra OpenBot, eski sohbet iletilerinin kopyalarını küçük adımlarla kaldırır.",
+          "Windows'ta bir güncelleme ilerlemesini yeniden gösterir.",
+          "Katıldığınız, çok sayıda ajanı olan bir sunucu ve büyük bir kanal daha hızlı açılır.",
+          "Çok sayıda görsel içeren ya da uzun geçmişi olan Gemini sohbetleri artık durmaz ve yeni bir sohbet başladığında Gemini sizden yeniden oturum açmanızı istemez.",
+          "Masaüstü uygulaması, OpenBot v0.34.1 veya daha eski bir sürümdeki sunucuya yeniden bağlanır."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

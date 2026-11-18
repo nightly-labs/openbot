@@ -75,6 +75,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
   "error.team.routinePauseReasonsUnsupported": "Deze verbinding kan niet tonen waarom een routine is gepauzeerd.",
+  "error.team.activeQueuesUnsupported": "Deze verbinding kan de wachtrijen van alle agents niet tonen.",
   "error.team.routinesOnceUnsupported": "Deze verbinding kan geen eenmalige routines opslaan.",
   "error.team.routineRunCommandUnsupported": "Deze verbinding kan de uitvoeropdracht van een routine niet geven.",
   "error.team.threadQueueUnsupported": "Deze verbinding kan de wachtrij van een zijthread niet tonen.",

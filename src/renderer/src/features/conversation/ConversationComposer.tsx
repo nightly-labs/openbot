@@ -509,7 +509,10 @@ export function ConversationComposer() {
   const SendControl = () => (
     <ComposerSendControl
       stop={Boolean(
-        props.activeTurnId && !editingDeliveryId() && !composerHasContent() && voicePhase() !== "recording",
+        (props.activeTurnId || props.subagentTurnId) &&
+          !editingDeliveryId() &&
+          !composerHasContent() &&
+          voicePhase() !== "recording",
       )}
       onStop={props.onStop}
       voice={sendVoice()}

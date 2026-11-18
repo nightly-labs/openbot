@@ -632,6 +632,26 @@ try {
       return { workspaceName: live.workspaceName, state: live.state };
     });
 
+    await step("no orchestrator: an allowed contact gets no setup text from the owner's number (#11438)", async () => {
+      const input = parseWhatsAppSenderInput({
+        workspaceId: OWNER,
+        sender: { id: FRIEND, kind: "contact", name: "Ewa" },
+      });
+      await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+      const friendJid = `${FRIEND}@s.whatsapp.net`;
+      const ownBefore = phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      phone.current().receive([message({ chat: friendJid, text: "Is the meeting still on?" })]);
+      // The owner's own chat still gets the notice, and it comes after the contact's message.
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "marker 0" })]);
+      await until(
+        () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length > ownBefore,
+        "the notice in the owner's own chat",
+      );
+      assert.equal(phone.textsTo(friendJid).length, 0, "OpenBot wrote setup text to an allowed contact.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, input.sender.id));
+      return { contactPosts: 0 };
+    });
+
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
       const added = await runCauseEffect(messaging.addWhatsAppOrchestrator({}));
       const agent = agents.listAgents().find((candidate) => candidate.id === added.agentId);
@@ -862,6 +882,39 @@ try {
       },
     );
 
+    await step(
+      "prompt: an allowed person on a personal number writes to the owner, not to the agent (#11470)",
+      async () => {
+        const strangerJid = `${STRANGER}@s.whatsapp.net`;
+        const link = agents.messaging.store.linkByKey(connectionId(agents), strangerJid, "dm");
+        assert.ok(link, "No conversation for the allowed person.");
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the allowed person's chat.");
+        const prompt = async () =>
+          (await runCauseEffect(agents.messaging.prepare({ delivery: request.delivery, managedAttachments: [] })))
+            ?.text ?? "";
+        const dedicated = await prompt();
+        assert.ok(dedicated.includes("Place: a direct message to you."), "A dedicated number lost its own framing.");
+        assert.ok(!dedicated.includes("message from the OpenBot user"), "A dedicated number answers as the owner.");
+        await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, true));
+        try {
+          const personal = await prompt();
+          assert.ok(
+            personal.includes("The person writes to the OpenBot user, not to you."),
+            "The agent reads a message to the owner as a message to itself.",
+          );
+          assert.ok(
+            personal.includes("WhatsApp shows your answer as a message from the OpenBot user."),
+            "The agent does not know that its answer shows as the owner.",
+          );
+          assert.ok(!personal.includes("Place: a direct message to you."), "The personal number kept the bot framing.");
+        } finally {
+          await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, false));
+        }
+        return { dedicated: "direct message to you", personal: "writes to the OpenBot user" };
+      },
+    );
+
     await step("pairing limit: at most three requests wait, and the fourth person gets no answer", async () => {
       for (const suffix of ["01", "02", "03", "04"])
         phone.current().receive([message({ chat: `486009999${suffix}@s.whatsapp.net`, text: "hi" })]);
@@ -947,6 +1000,52 @@ try {
         return { threadKey: link.threadKey };
       },
     );
+
+    await step("HD photo: the normal copy gets an answer, and its HD copy gets none (#11764)", async () => {
+      const author = `${FRIEND}@s.whatsapp.net`;
+      const image: proto.IMessage = {
+        imageMessage: {
+          mimetype: "image/jpeg",
+          caption: "@48600100200 what is on this photo?",
+          contextInfo: { mentionedJid: [OWNER_JID] },
+        },
+      };
+      const photo = (id: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: image,
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // WhatsApp sends the HD copy about 1 s later, with its own id, and names the normal copy.
+      const hdCopy = (id: string, firstId: string): WAMessage => ({
+        key: { remoteJid: GROUP, fromMe: false, id, participant: author },
+        message: {
+          messageContextInfo: {
+            messageAssociation: {
+              associationType: proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+              parentMessageKey: { remoteJid: GROUP, fromMe: false, id: firstId, participant: author },
+            },
+          },
+          associatedChildMessage: { message: image },
+        },
+        messageTimestamp: Math.floor(Date.now() / 1_000),
+        pushName: "Ewa",
+      });
+      // Each message that the service takes gets a reaction: 👀, or ❌ when the agent's queue is full.
+      phone.current().receive([photo("IN-HD-NORMAL")]);
+      await until(() => phone.reactedTo("IN-HD-NORMAL"), "the answer to the normal copy");
+      // The messages are read in order, so the HD copy is read before the last one. An HD copy of a photo
+      // that this number never read is still a message.
+      phone.current().receive([hdCopy("IN-HD-COPY", "IN-HD-NORMAL"), hdCopy("IN-HD-ALONE", "IN-HD-NEVER-SEEN")]);
+      await until(() => phone.reactedTo("IN-HD-ALONE"), "the answer to the HD copy of an unread photo");
+      assert.equal(phone.reactedTo("IN-HD-COPY"), false, "The HD copy got a second answer.");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), GROUP, "IN-HD-COPY"),
+        null,
+        "The HD copy started a second conversation.",
+      );
+      return { normal: "answered", hdCopy: "skipped", hdCopyOfUnreadPhoto: "answered" };
+    });
 
     await step(
       "saved history: the oldest copies go over the size limit, a delete for everyone deletes, an edit changes",

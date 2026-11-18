@@ -184,7 +184,7 @@ function recognizerConfig(
       modelConfig: {
         whisper: {
           encoder: file("turbo-encoder.int8.onnx"),
-          decoder: file("turbo-decoder.int8.onnx"),
+          decoder: file("turbo-decoder.onnx"),
           language,
           task: "transcribe",
           tailPaddings: -1,

@@ -335,10 +335,19 @@ Server settings > Transfer > Copy to another server joins the two directions in 
 desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
 this computer's included. `instance-transfer:copy` is scoped to the destination and takes
 `{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
-without chat history or server settings to a temporary file. As in a file export, the file also has
+server settings and without chat history to a temporary file. As in a file export, the file also has
 the channels that have a selected agent as a member and the Shared folder. Each apply adds the
-channels again as new channels. Main then stages the file at the destination, applies all of its
-agents, and removes the file. Each side uses the routes above, in parts when its host has
+channels again as new channels. Main then keeps only the settings of the copied agents in the file
+(`InstanceTransferService.keepCopiedSettings`, with `@openbot/team-client/instance-transfer-copy`): the
+routine flows between them, the places on their routine canvas, and the workflows with a step for one
+of them or an output to one of their channels. MCP servers, custom providers and agents, sidebar
+sections and shared skills stay out. It writes a new manifest and a new central directory over the old
+directory, so the other entries are not copied; nothing reads the old manifest that stays in the file.
+This computer's export leaves the shared skills out; a joined source server still puts them in the
+file, and the new directory leaves them out. The manifest must be stored, not compressed, as every
+export writes it. Each host
+in the support window reads the result, so the copy needs no new capability. Main stages the file at
+the destination, applies all of its agents with the settings, and removes the file. Each side uses the routes above, in parts when its host has
 `instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
@@ -346,7 +355,9 @@ added beside it. The browser client has no copy: it connects to one host at a ti
 The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
 is the server of the page, and the destination is another online server that the user administers
 with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
-sends it to the destination with the upload route, and applies all of its agents. The phone uses
+keeps the same settings as the desktop (`copiedTransferUpload` in `@openbot/team-client`, which decodes
+only the Base64 of the manifest and the end of the file), sends it to the destination with the upload
+route, and applies all of its agents with the settings. The phone uses
 only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
 is not written to its storage. A token that the destination keeps when the page closes before the
 apply is discarded.
@@ -704,6 +715,18 @@ Every current client sends `teamCapabilitiesForProtocol(7)`, so the phone, the w
 joined desktop get the window without other client code. A released phone keeps the full list
 until it updates. `scripts/queue-window-e2e.ts` checks the frame size with and without the
 capability.
+
+### Open queues of all agents
+
+`agent-active-queues-v1` adds `POST /v1/agent-active-queues/list`. A client reads the open work of
+each visible agent (queued, starting and running deliveries, the failed deliveries of a failed turn,
+and the welcome mark) in one request, not one `GET /v1/agents/:id/queue` for each agent. On a server
+with many agents, those reads filled the data channel after connect and delayed the chat. The
+answer has no finished history; agents that do not fit in one WebRTC frame, or that have more than 200
+open deliveries, are in `omitted`, and the client reads them on the released route. The web client and a joined desktop use the route on
+connect, resync, agent changes and `queue-invalidated`, and read the full queue of an agent when the
+user opens its chat. A host without the capability gets the released per-agent reads.
+`scripts/team-api-routes-e2e.ts` checks the route.
 
 ### Browser control and page state
 

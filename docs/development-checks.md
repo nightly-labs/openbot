@@ -89,7 +89,7 @@ an output is missing. File times do not decide: a checkout changes them, and Uni
 file whose content is the same.
 
 In CI, `check:desktop:static` (the UI check, lint, desktop typecheck, build and preload check) takes
-about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
+about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, a file in `src/backend/migrations/`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
 `check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
@@ -107,7 +107,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check`, `bun run types:ratchet`, `bun run check:agent-context` and `bun scripts/whats-new-translations.ts` in parallel |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check`, `bun run types:ratchet`, `bun run check:agent-context`, `bun run check:migrations` and `bun scripts/whats-new-translations.ts` in parallel |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser`, then `xvfb-run -a bun run test:browser-agent-session` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Signal E2E | `ubuntu-latest` | `bun run test:signal`, when `remote/` or `scripts/` changes |
@@ -411,6 +411,15 @@ skills, or connected vault, so the counts measure only OpenBot's own text:
 The script writes the counts to `.openbot-build/agent-context-budget/report.json`. It does not
 measure the schemas that the Claude Agent SDK makes from the Zod shapes of Claude's visible tools.
 CI runs it in the `check` job.
+
+### Frozen migrations
+
+`bun run check:migrations` compares `src/backend/migrations/` with the newest `v*` tag on origin.
+CI checks out one commit and no tags, so the script fetches only that tag commit (`--depth=1`).
+`--tag <tag>` compares with another tag. The rules and the fix for a released bug are in
+[src/backend/AGENTS.md](../src/backend/AGENTS.md#frozen-migrations); the rule fixtures are in
+`scripts/check-frozen-migrations.test.ts`. A tag from before the folder (v0.72.0 and earlier) has
+no frozen files, so only the rules on the current folder apply.
 
 ### Plugin cost
 

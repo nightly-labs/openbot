@@ -84,6 +84,33 @@ const OPENCODE_SESSION_META = "ai.opencode/sessionID";
  */
 const DROP_JUDGE_MARGIN_MS = 2_000;
 
+/**
+ * How long the bridge keeps an idle connection. Go's HTTP client, which Antigravity uses, keeps one for
+ * up to 90 seconds and does not read `Keep-Alive: timeout=5`. With Node's 5-second default, it can send
+ * a tool call into a connection that the bridge just closed, and the call fails (#11465).
+ */
+const LOCAL_MCP_KEEP_ALIVE_MS = 95_000;
+
+/**
+ * Keeps idle connections for `LOCAL_MCP_KEEP_ALIVE_MS`. `close` ends only the connections idle at that
+ * moment, so a connection ends after its last response once the server stops listening. Otherwise it
+ * would hold the close for the whole keep-alive time.
+ */
+function keepIdleConnections(server: HttpServer): HttpServer {
+  server.keepAliveTimeout = LOCAL_MCP_KEEP_ALIVE_MS;
+  const inFlight = new WeakMap<object, number>();
+  server.on("request", (request: IncomingMessage, response: ServerResponse) => {
+    const socket = request.socket;
+    inFlight.set(socket, (inFlight.get(socket) ?? 0) + 1);
+    response.once("close", () => {
+      const left = (inFlight.get(socket) ?? 1) - 1;
+      inFlight.set(socket, left);
+      if (left === 0 && !server.listening) socket.end();
+    });
+  });
+  return server;
+}
+
 /** One session that a token serves. A token shared by a directory serves each session in it. */
 interface BridgeMember {
   threadId: string;
@@ -309,7 +336,9 @@ export class LocalMcpBridge {
   ): Effect.fn.Return<void, McpOperationError> {
     let retained = false;
     yield* Effect.acquireUseRelease(
-      mcpSync(() => createServer((request, response) => void runCauseEffect(this.#handle(request, response)))),
+      mcpSync(() =>
+        keepIdleConnections(createServer((request, response) => void runCauseEffect(this.#handle(request, response)))),
+      ),
       (server) =>
         Effect.gen({ self: this }, function* () {
           yield* mcpCall(

@@ -172,10 +172,17 @@ export const messages = {
   "error.provider.cliTimedOut": "{provider} не ответил вовремя. Возможно, компьютер занят. OpenBot повторит попытку.",
   "error.provider.cliTimedOutRefresh":
     "{provider} не ответил вовремя. Возможно, компьютер занят. Обновите провайдеров, чтобы повторить попытку.",
+  "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
+  "error.provider.serviceUnreachable":
+    "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету, затем обновите провайдеров.",
   "error.provider.acpStartTimedOut": "{provider} не завершил запуск за {seconds} с. Возможно, компьютер занят.",
   "error.provider.acpModelsTimedOut": "{provider} не вывел список моделей за {seconds} с. Возможно, компьютер занят.",
   "error.provider.startStopped":
     "{provider} несколько раз подряд не запустился, поэтому OpenBot перестал пытаться. Обновите провайдеров, чтобы повторить попытку.",
+  "error.provider.startPaused":
+    "{provider} не запустился несколько раз подряд. OpenBot попробует снова при следующем сообщении или автозадаче. Чтобы попробовать сейчас, обновите провайдеров.",
   "error.provider.tempDiskSpace":
     "Для запуска {provider} нужно не меньше 1 ГБ свободного места на диске. Освободите место, затем обновите провайдеров.",
   "error.provider.noCodeSignIn": "В {provider} нельзя войти с помощью кода.",
@@ -260,6 +267,8 @@ export const messages = {
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.acpNoAnswer":
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} выполнил несколько шагов, а затем завершил ход без ответа. Прежде чем снова отправить тот же запрос, спросите агента, что он сделал.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -357,6 +366,8 @@ export const messages = {
     "Codex не смог продолжить этот чат, потому что в его сохранённой истории не хватает элемента. OpenBot начал новую сессию Codex с историей чата. Повторите попытку.",
   "error.provider.codexRequestRefused":
     "{provider} отклонил запрос этого чата и не указал причину. Это может произойти в длинном чате с большим количеством изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.codexAudioRefused":
+    "Модель не приняла аудио в этом чате. OpenBot начал новый сеанс Codex с историей чата. Попробуйте снова.",
   "error.provider.imageTooSmall":
     "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooLarge":
@@ -485,12 +496,16 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpModelNotOffered":
+    "{provider} сейчас не предлагает {model}. Выберите другую модель для этого агента и попробуйте снова.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",
   "error.provider.piSessionIdentity": "Pi вернул другую сессию. Сохранённая сессия не заменена.",
   "error.provider.piExtensionFailed":
     "Pi остановился, потому что не смог загрузить расширение. Удалите или обновите это расширение и повторите попытку. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi неожиданно остановился, не завершив этот ход. Отправьте сообщение, чтобы продолжить.",
   "error.provider.piModelInvalid": "Выберите модель Pi с указанием её провайдера.",
   "error.provider.piToolInvalid": "Инструмент вернул некорректный результат.",
   "error.provider.piSignIn": "Выполните /login в Pi на компьютере-хосте. Закройте Pi, когда вход завершится.",

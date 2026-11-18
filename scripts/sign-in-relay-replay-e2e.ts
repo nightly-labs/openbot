@@ -77,6 +77,7 @@ async function runCase(name: string, successAt: (port: number, otherPort: number
       providers: { startRelay: unused, relayStatus: noPage, cancel: unused },
       accounts: { startRelay: unused, relayStatus: noPage, cancelSignIn: unused },
       receiveMcpGrant: () => false,
+      receiveMcpRefusal: () => false,
       printedLink: () => false,
     });
     const { flowId } = host.startReplay(MEMBER, {

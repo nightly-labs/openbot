@@ -393,6 +393,12 @@ interface WorkflowRunScope {
   agentIds: string[];
 }
 
+/** Whether `notice` sweeps after this event. A caller checks it first, so most events start no fiber. */
+export function workflowNoticeEvent(event: AgentEvent): boolean {
+  // A deleted agent leaves the steps it was answering without an answer.
+  return event.type === "turn-completed" || event.type === "queue-changed" || event.type === "agents-changed";
+}
+
 interface WorkflowsShape {
   list(): Effect.Effect<WorkflowSummary[], WorkflowFailed>;
   /** Every workflow with its graph, in one read. */
@@ -1402,9 +1408,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         );
 
         const notice = Effect.fn("Workflows.notice")(function* (event: AgentEvent) {
-          // A deleted agent leaves the steps it was answering without an answer.
-          if (event.type !== "turn-completed" && event.type !== "queue-changed" && event.type !== "agents-changed")
-            return;
+          if (!workflowNoticeEvent(event)) return;
           yield* requestSweep();
         });
 

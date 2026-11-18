@@ -84,7 +84,8 @@ export function AgentDockSurface() {
   /** The pointer is close to the edge strip. */
   let near = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
-  let sent = { interactive: false, keyboard: false };
+  /** Null until the first send: a reloaded page cannot know what the window takes (#11606). */
+  let sent: { interactive: boolean; keyboard: boolean } | null = null;
   /** The dock parts at rest, or null while the dock moves. */
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
@@ -187,7 +188,7 @@ export function AgentDockSurface() {
   const sync = () => {
     updateTuck();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
-    if (next.interactive === sent.interactive && next.keyboard === sent.keyboard) return;
+    if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
     void agentDockPort()
       .agentDock.setInteractive(next)

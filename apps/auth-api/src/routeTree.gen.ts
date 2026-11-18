@@ -84,6 +84,7 @@ import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug
 import { Route as V1AgentTemplatesIndexRouteImport } from './routes/v1/agent-templates/index'
 import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agent-templates/$templateId'
 import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
+import { Route as V1AppMinimumVersionRouteImport } from './routes/v1/app/minimum-version'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
@@ -594,6 +595,11 @@ const V1AgentTemplatesTemplateIdRoute =
 const V1AgentTemplatesMineRoute = V1AgentTemplatesMineRouteImport.update({
   id: '/v1/agent-templates/mine',
   path: '/v1/agent-templates/mine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1AppMinimumVersionRoute = V1AppMinimumVersionRouteImport.update({
+  id: '/v1/app/minimum-version',
+  path: '/v1/app/minimum-version',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1AuthLogoutRoute = V1AuthLogoutRouteImport.update({
@@ -1411,6 +1417,7 @@ export interface FileRoutesByFullPath {
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
+  '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
@@ -1620,6 +1627,7 @@ export interface FileRoutesByTo {
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
+  '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
@@ -1834,6 +1842,7 @@ export interface FileRoutesById {
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
+  '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
@@ -2045,6 +2054,7 @@ export interface FileRouteTypes {
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
+    | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
@@ -2254,6 +2264,7 @@ export interface FileRouteTypes {
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
+    | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
@@ -2467,6 +2478,7 @@ export interface FileRouteTypes {
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
+    | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
@@ -2669,6 +2681,7 @@ export interface RootRouteChildren {
   PluginsIconSlugRoute: typeof PluginsIconSlugRoute
   V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
   V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
+  V1AppMinimumVersionRoute: typeof V1AppMinimumVersionRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
@@ -3304,6 +3317,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/agent-templates/mine'
       fullPath: '/v1/agent-templates/mine'
       preLoaderRoute: typeof V1AgentTemplatesMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/app/minimum-version': {
+      id: '/v1/app/minimum-version'
+      path: '/v1/app/minimum-version'
+      fullPath: '/v1/app/minimum-version'
+      preLoaderRoute: typeof V1AppMinimumVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/auth/logout': {
@@ -4547,6 +4567,7 @@ const rootRouteChildren: RootRouteChildren = {
   PluginsIconSlugRoute: PluginsIconSlugRoute,
   V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,
   V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,
+  V1AppMinimumVersionRoute: V1AppMinimumVersionRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,

@@ -1,7 +1,7 @@
 import { avatarHeadColor, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { GestureStateManager, type PanGestureConfig, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
@@ -295,6 +295,14 @@ export function ChatEndPullRing({
     [target],
   );
   const pop = useSharedValue(1);
+  // The ring is transparent until a pull, so its face holds still until then and draws no frames.
+  const [pulling, setPulling] = useState(false);
+  useAnimatedReaction(
+    () => progress.get() > 0,
+    (now, previous) => {
+      if (now !== previous) scheduleOnRN(setPulling, now);
+    },
+  );
   useAnimatedReaction(
     () => armed.get(),
     (now, previous) => {
@@ -350,6 +358,7 @@ export function ChatEndPullRing({
               color={target.avatarColor}
               seed={target.avatarSeed}
               size={AVATAR_SIZE}
+              paused={!pulling}
             />
           ) : (
             <ChannelAvatar

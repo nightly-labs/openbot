@@ -23,6 +23,11 @@ export const messages = {
   "settings.codeFont.title": "גופן הקוד",
   "settings.codeFont.description": "הגופן של הקוד, המסופים ונתיבי הקבצים.",
   "settings.codeFont.default": "ברירת מחדל",
+  "settings.motion.title": "תנועה",
+  "settings.backgroundBlur.title": "טשטוש רקע",
+  "settings.backgroundBlur.description": "טשטוש מאחורי תפריטים ותיבות דו-שיח. כבוי בהתחלה במחשב בלי GPU.",
+  "settings.movingFaces.title": "פני סוכנים זזות",
+  "settings.movingFaces.description": "פני הסוכנים ממצמצות וזזות. בהתחלה הן נייחות במחשב בלי GPU.",
   "settings.logoColor.title": "צבע הלוגו",
   "settings.logoColor.description": "מוצג ב-Dock, בשורת המשימות וב-Dynamic Island.",
   "settings.logoColor.buildNote": "הגרסה הזו שומרת על צבע לוגו משלה. הבחירה חלה על אפליקציית ההפצה.",
@@ -826,7 +831,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "אין סוכנים בשרת הזה.",
   "settings.transfer.copy.new": "חדש",
   "settings.transfer.copy.notCopied":
-    "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+    "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "settings.transfer.copy.submit": { one: "העתקת סוכן אחד", two: "העתקת שני סוכנים", other: "העתקת {count} סוכנים" },
   "settings.transfer.copy.copying": "מעתיק…",
   "settings.transfer.copy.done": {

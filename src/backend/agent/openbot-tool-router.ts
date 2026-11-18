@@ -66,6 +66,7 @@ import {
   mcpSignInItemType,
   SETTING_LINK_SCOPES,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
+  sameAgentModelChoice,
   settingLinkItemType,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
@@ -638,7 +639,7 @@ export class OpenBotToolRouter {
           Effect.map((html) => (html === null ? null : visualPageText(html))),
           Effect.catch(() => Effect.succeed(null)),
         ),
-      recentThreads: (agentId, after, limit) => options.tasks.recent(agentId, after, limit),
+      recentThreads: (agentId, after, limit, last) => options.tasks.recent(agentId, after, limit, last),
     });
     this.#store = options.store;
     this.#mailbox = options.mailbox;
@@ -3500,13 +3501,22 @@ export class OpenBotToolRouter {
         this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
       );
       requireRunnableChange(target, runtime, this.#hooks.providerStatuses());
-      // The model and account the agent has after this call.
+      // The model and account the agent has after this call. While a usage limit or a provider error
+      // keeps the agent on a backup, its own model is the one it goes back to, as on the settings page:
+      // the backup in use stays in the order, and the model it goes back to is no backup (#11741).
       const ownProvider = runtime.provider ?? target.provider;
-      const own: AgentModelChoice = {
+      const after: AgentModelChoice = {
         provider: ownProvider,
         model: runtime.model ?? target.model,
         providerAccountId: accountFor(ownProvider),
       };
+      const current: AgentModelChoice = {
+        provider: target.provider,
+        model: target.model,
+        providerAccountId: target.providerAccountId,
+      };
+      // A change of model or account ends the way back, so the new model is then the agent's own.
+      const own = target.usageLimitReturn && sameAgentModelChoice(after, current) ? target.usageLimitReturn : after;
       const backups =
         backupModels === undefined
           ? undefined

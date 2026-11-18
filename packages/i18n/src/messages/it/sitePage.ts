@@ -91,6 +91,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Dichiaro di accettare {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "l'informativa sulla privacy",
   "sitePage.pricing.consent.terms": "i termini e il diritto di recesso",
+  "sitePage.pricing.consent.earlyStart":
+    "Chiedo che il servizio di hosting inizi prima della scadenza del periodo di recesso di 14 giorni. Riconosco che, se recedo dal contratto prima che il servizio sia stato interamente prestato, dovrò pagare i servizi forniti fino al momento del recesso e che, una volta prestato interamente il servizio, perderò il diritto di recesso.",
   "sitePage.marketplace.agents.title": "Agenti — OpenBot Marketplace",
   "sitePage.marketplace.agents.description":
     "Agenti creati da altre persone in OpenBot. Aggiungine uno a OpenBot con le sue skill e routine.",

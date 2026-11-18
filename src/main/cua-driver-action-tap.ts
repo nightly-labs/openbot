@@ -345,16 +345,19 @@ class CallAnswerLines extends Transform {
   #heldBytes = 0;
   readonly #answered: (tool: string, ms: number) => void;
   readonly #captured: (windowId: number, width: number) => void;
+  readonly #refused: () => void;
   readonly #now: () => number;
 
   constructor(
     answered: (tool: string, ms: number) => void,
     captured: (windowId: number, width: number) => void,
+    refused: () => void,
     now: () => number,
   ) {
     super();
     this.#answered = answered;
     this.#captured = captured;
+    this.#refused = refused;
     this.#now = now;
   }
 
@@ -419,8 +422,11 @@ class CallAnswerLines extends Transform {
     this.#heldBytes = 0;
     if (!whole) this.push(line);
     else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
-    else
+    else {
+      // The answer goes to the agent first; the refusal then takes the tools back.
       this.push(withCopy(line, SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined));
+      if (isAccessibilityRefusal(line)) this.#refused();
+    }
   }
 
   /** Keeps the width of a window screenshot, which scales the pixels a later click names. */
@@ -428,6 +434,19 @@ class CallAnswerLines extends Transform {
     const screenshot = screenshotOf(answer);
     if (screenshot) this.#captured(screenshot.windowId, screenshot.width);
   };
+}
+
+/**
+ * True when a failed call says that macOS refused the Accessibility API itself (#10658).
+ *
+ * The driver names the code as `AXError -25211` and `kAXErrorAPIDisabled`. macOS gives it when the
+ * calling process is not trusted for Accessibility, although `AXIsProcessTrusted()`, which the
+ * permission check reads, can still say that it is. Only a failed call counts, so a window title
+ * that holds the same text does not.
+ */
+function isAccessibilityRefusal(line: Buffer): boolean {
+  if (!line.includes("kAXErrorAPIDisabled") && !line.includes("AXError -25211")) return false;
+  return line.includes('"ok":false') || line.includes('"isError":true');
 }
 
 /** One whole tool list answer line, ending in its newline, less the tools in `DRIVER_CURSOR_TOOLS`. */
@@ -469,10 +488,16 @@ export class CuaDriverActionTap {
   #address: string | null = null;
   #now: () => number;
   #logger: Logger;
+  #onAccessibilityRefused: (() => void) | null = null;
 
   constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
     this.#now = now;
     this.#logger = logger;
+  }
+
+  /** Told each time a call fails because macOS refused the Accessibility API. See `isAccessibilityRefusal`. */
+  onAccessibilityRefused(listener: () => void): void {
+    this.#onAccessibilityRefused = listener;
   }
 
   /** The address to hand the providers, or `null` while nothing listens. */
@@ -564,6 +589,7 @@ export class CuaDriverActionTap {
     const answers = new CallAnswerLines(
       (tool, ms) => this.#logAnswered(tool, ms),
       (windowId, width) => this.#keepScreenshotWidth(windowId, width),
+      () => this.#onAccessibilityRefused?.(),
       this.#now,
     );
     const end = () => {

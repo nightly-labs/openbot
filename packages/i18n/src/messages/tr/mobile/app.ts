@@ -62,6 +62,9 @@ export const messages = {
   "mobile.app.update.group.removed": "Kaldırıldı",
   "mobile.app.update.group.deprecated": "Kullanımdan kalktı",
   "mobile.app.update.group.security": "Güvenlik",
+  "mobile.app.update.requiredTitle": "Güncelleme gerekli",
+  "mobile.app.update.requiredBody":
+    "OpenBot {version} artık desteklenmiyor. Devam etmek için {minimum} veya daha yeni bir sürüme güncelleyin.",
   "mobile.app.update.notesFailed": "Sürüm notları yüklenemedi.",
   "mobile.app.update.notesEmpty": "Bu sürüm için henüz sürüm notu yok.",
   "mobile.app.update.fullChangelog": "Tüm değişiklikler",

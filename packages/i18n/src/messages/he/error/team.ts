@@ -72,6 +72,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "צבעי צ'אטים אינם נתמכים בחיבור הזה.",
   "error.team.routineRunPlaceUnsupported": "החיבור הזה אינו יכול לשנות היכן שגרה רצה.",
   "error.team.routinePauseReasonsUnsupported": "החיבור הזה אינו יכול להציג מדוע שגרה מושהית.",
+  "error.team.activeQueuesUnsupported": "חיבור זה לא יכול להציג את התורים של כל הסוכנים.",
   "error.team.routinesOnceUnsupported": "החיבור הזה אינו יכול לשמור שגרות חד-פעמיות.",
   "error.team.routineRunCommandUnsupported": "החיבור הזה אינו יכול לתת את פקודת ההרצה של שגרה.",
   "error.team.threadQueueUnsupported": "החיבור הזה אינו יכול להציג את התור של שרשור צדדי.",

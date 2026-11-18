@@ -136,10 +136,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.bubbleStyle": "نمط الفقاعات",
+  "mobile.settings.appearance.bubbleStyleSolid": "مصمت",
+  "mobile.settings.appearance.bubbleStyleTint": "خفيف",
+  "mobile.settings.appearance.seeThroughBubbles": "فقاعات شفافة",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "تُظهر فقاعات الوكيل والفقاعات غير الملوّنة الخلفية من خلالها. بدون خلفية، تبقى الفقاعات مصمتة دائمًا.",
+  "mobile.settings.appearance.tab.colors": "الألوان",
+  "mobile.settings.appearance.tab.chat": "الدردشة",
+  "mobile.settings.appearance.preview.routines": "3 تشغيلات روتينية",
+  "mobile.settings.appearance.preview.thinking": "فكّر لمدة 4 ثوانٍ",
+  "mobile.settings.appearance.preview.memory": "حُفظت ذكرى واحدة",
+  "mobile.settings.appearance.backdrop.title": "الخلفية",
+  "mobile.settings.appearance.backdrop.footer":
+    "تظهر خلف الشاشة الرئيسية ودردشاتك على هذا الهاتف. يمكن لوكيل تعيينها لك، ويعيد «تراجع» في الدردشة الخلفية السابقة.",
+  "mobile.settings.appearance.backdrop.none": "بلا",
+  "mobile.settings.appearance.backdrop.pond": "بركة الكوي",
+  "mobile.settings.appearance.backdrop.jellyfish": "قناديل البحر",
+  "mobile.settings.appearance.backdrop.sunset": "غروب قديم الطراز",
+  "mobile.settings.appearance.backdrop.snowfall": "تساقط الثلج",
+  "mobile.settings.appearance.backdrop.fireflies": "اليراعات",
+  "mobile.settings.appearance.backdrop.agentPage": "صفحة الوكيل",
+  "mobile.settings.appearance.backdrop.agentPageNote": "عيّنها وكيل",
+  "mobile.settings.appearance.backdrop.photo": "صورة",
+  "mobile.settings.appearance.backdrop.photoChoose": "اختر من صورك",
+  "mobile.settings.appearance.backdrop.photoChange": "اضغط مرة أخرى لاختيار صورة أخرى",
+  "mobile.settings.appearance.backdrop.strength": "شدة الخلفية",
+  "mobile.settings.appearance.backdrop.calm": "هادئة",
+  "mobile.settings.appearance.backdrop.vivid": "زاهية",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "تُبقي الخلفية الهادئة الردود الطويلة سهلة القراءة. يظهر معظمها في أعلى الشاشة الرئيسية.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "هل يمكنك كتابة ملاحظة الإصدار؟",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "إليك مسودة: الخلفية التي يعيّنها الوكيل تظهر الآن على هاتفك أيضًا.",
   "mobile.settings.appearance.chatBackground": "خلفية الدردشة",
   "mobile.settings.appearance.chatBackgroundDefault": "الافتراضي",
   "mobile.settings.appearance.chatBackgroundFooter":
     "يحتفظ كل مظهر بلونه الخاص. يصبح اللون الذي يصعّب قراءة النص أغمق أو أفتح.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "تحل الخلفية محل خلفية الدردشة. لاستخدام لون، اختر «بلا» للخلفية.",
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
@@ -562,7 +597,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "اختيار وكيل",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot مقفل",
   "mobile.settings.shortcuts.card.locked.action": "فتح OpenBot",
-  "mobile.settings.shortcuts.footer": "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق.",
+  "mobile.settings.shortcuts.footer":
+    "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق. ويفتح Open Agent محادثته.",
   "mobile.settings.shortcuts.send.sent": "تم الإرسال",
   "mobile.settings.shortcuts.send.failed": "تعذّر على OpenBot إرسال هذا.",
   "mobile.settings.shortcuts.send.unconfirmed": "لا رد من الخادم. قد تكون الرسالة في المحادثة.",

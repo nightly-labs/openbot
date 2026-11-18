@@ -1571,7 +1571,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "받을 곳",
   "mobile.server.transfer.copyNoAgents": "이 서버에는 에이전트가 없어요.",
   "mobile.server.transfer.copyNotMoved":
-    "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+    "에이전트의 채널, 루틴 흐름, 워크플로, 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
   "mobile.server.transfer.copying": "복사하는 중…",
   "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",

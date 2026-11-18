@@ -237,15 +237,18 @@ export class SignInRelayClient {
   #openPage(key: string, chosen: ChosenSignInPage | null) {
     const waiting = this.#waiting.get(key);
     if (!waiting) return Effect.void;
-    const open = () => this.#dependencies.openExternal(waiting.url);
-    if (chosen !== null) {
-      chosen.onWaiting(waiting.page);
-      return Effect.promise(open);
-    }
-    // The dialog shows the page, so the user can open it again when the browser did not open.
-    return Effect.tryPromise(open).pipe(
+    // The dialog shows the page, so the user can open it again when the browser did not open. A chat
+    // shows the page only while this computer does not take the callback, so it also shows it then.
+    return Effect.tryPromise(() => this.#dependencies.openExternal(waiting.url)).pipe(
+      Effect.as(true),
       Effect.catch((error) =>
-        Effect.sync(() => logger.warn("OpenBot could not open a relayed sign-in page:", toLogValue(error.cause))),
+        Effect.sync(() => {
+          logger.warn("OpenBot could not open a relayed sign-in page:", toLogValue(error.cause));
+          return false;
+        }),
+      ),
+      Effect.flatMap((opened) =>
+        Effect.sync(() => chosen?.onWaiting({ ...waiting.page, listening: waiting.page.listening && opened })),
       ),
     );
   }

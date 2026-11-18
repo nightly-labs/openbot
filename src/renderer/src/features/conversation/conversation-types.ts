@@ -256,6 +256,8 @@ export interface ConversationProps {
   loadingOlder?: boolean | undefined;
   olderError?: string | null | undefined;
   activeTurnId: string | null | undefined;
+  /** An ended turn whose subagents still work. Stop shows for it, as for a running turn. */
+  subagentTurnId?: string | null | undefined;
   activityDetail?: string | undefined;
   /** A tool step of the running turn still runs, so a long silence is work, not a wait for the provider. */
   activityRunning?: boolean | undefined;

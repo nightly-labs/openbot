@@ -1133,7 +1133,8 @@ textarea {
 }
 
 .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-server-name,
-.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button,
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-filter-button {
   display: none;
 }
 
@@ -1412,7 +1413,7 @@ textarea {
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
-/* The search field, then the New button. */
+/* The search field, then the filter and New buttons. */
 .sidebar-search-wrap {
   position: relative;
   display: flex;
@@ -2067,6 +2068,12 @@ textarea {
   position: relative;
   transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+  /* A row out of view is not drawn. With 100 working agents, the style and paint work of the rows
+     scrolled away kept the window about 65% busy. The size keeps the scroll height; the margin keeps
+     the focus ring of the row, which the paint containment would clip. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 62px;
+  overflow-clip-margin: 8px;
 }
 
 .sidebar-agent-item + .sidebar-agent-item {
@@ -3443,7 +3450,7 @@ textarea {
   pointer-events: none;
 }
 
-.sidebar-compact .sidebar-new-button {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button) {
   opacity: 0;
   pointer-events: none;
   transform: translateX(6px) scale(0.92);
@@ -3537,7 +3544,7 @@ textarea {
 
 /* Right to left, the compact offsets above go the other way. `:dir()` keeps the specificity under the
  * macOS rules for the compact top row. */
-.sidebar-compact .sidebar-new-button:dir(rtl) {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button):dir(rtl) {
   transform: translateX(-6px) scale(0.92);
 }
 
