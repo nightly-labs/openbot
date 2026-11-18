@@ -125,10 +125,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosité",
   "mobile.settings.appearance.messageColorFooter":
     "Avec Couleur de l’agent, vos messages dans une discussion avec un agent prennent la couleur de cet agent. Avec Couleur personnalisée, vos messages dans toutes les discussions prennent la couleur choisie. La couleur du texte change pour rester lisible.",
+  "mobile.settings.appearance.bubbleStyle": "Style des bulles",
+  "mobile.settings.appearance.bubbleStyleSolid": "Plein",
+  "mobile.settings.appearance.bubbleStyleTint": "Teinte",
+  "mobile.settings.appearance.seeThroughBubbles": "Bulles transparentes",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Les bulles de l’agent et les bulles sans couleur laissent voir l’arrière-plan. Sans arrière-plan, les bulles restent toujours opaques.",
+  "mobile.settings.appearance.tab.colors": "Couleurs",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 exécutions de routine",
+  "mobile.settings.appearance.preview.thinking": "A réfléchi 4 secondes",
+  "mobile.settings.appearance.preview.memory": "1 souvenir enregistré",
+  "mobile.settings.appearance.backdrop.title": "Arrière-plan",
+  "mobile.settings.appearance.backdrop.footer":
+    "S’affiche derrière l’accueil et vos chats sur ce téléphone. Un agent peut en choisir un pour vous. Annuler dans le chat remet l’ancien.",
+  "mobile.settings.appearance.backdrop.none": "Aucun",
+  "mobile.settings.appearance.backdrop.pond": "Bassin à koïs",
+  "mobile.settings.appearance.backdrop.jellyfish": "Méduses",
+  "mobile.settings.appearance.backdrop.sunset": "Coucher de soleil rétro",
+  "mobile.settings.appearance.backdrop.snowfall": "Chute de neige",
+  "mobile.settings.appearance.backdrop.fireflies": "Lucioles",
+  "mobile.settings.appearance.backdrop.agentPage": "Page de l’agent",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Défini par un agent",
+  "mobile.settings.appearance.backdrop.photo": "Photo",
+  "mobile.settings.appearance.backdrop.photoChoose": "Choisir dans vos photos",
+  "mobile.settings.appearance.backdrop.photoChange": "Touchez de nouveau pour choisir une autre photo",
+  "mobile.settings.appearance.backdrop.strength": "Intensité de l’arrière-plan",
+  "mobile.settings.appearance.backdrop.calm": "Doux",
+  "mobile.settings.appearance.backdrop.vivid": "Vif",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Un arrière-plan doux garde les longues réponses lisibles. C’est en haut de l’accueil qu’il se voit le plus.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Pouvez-vous rédiger la note de version ?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Voici un brouillon : l’arrière-plan défini par un agent s’affiche maintenant aussi sur votre téléphone.",
   "mobile.settings.appearance.chatBackground": "Arrière-plan du chat",
   "mobile.settings.appearance.chatBackgroundDefault": "Par défaut",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Chaque thème garde sa propre couleur. Une couleur qui rend le texte difficile à lire devient plus foncée ou plus claire.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "L’arrière-plan remplace l’arrière-plan du chat. Choisissez Aucun comme arrière-plan pour utiliser une couleur.",
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",

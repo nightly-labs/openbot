@@ -133,10 +133,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Jasność",
   "mobile.settings.appearance.messageColorFooter":
     "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
+  "mobile.settings.appearance.bubbleStyle": "Styl dymków",
+  "mobile.settings.appearance.bubbleStyleSolid": "Pełny",
+  "mobile.settings.appearance.bubbleStyleTint": "Odcień",
+  "mobile.settings.appearance.seeThroughBubbles": "Przezroczyste dymki",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Przez dymki agenta i dymki bez koloru widać tło. Bez tła dymki są zawsze nieprzezroczyste.",
+  "mobile.settings.appearance.tab.colors": "Kolory",
+  "mobile.settings.appearance.tab.chat": "Czat",
+  "mobile.settings.appearance.preview.routines": "3 uruchomienia rutyny",
+  "mobile.settings.appearance.preview.thinking": "Myślał przez 4 sekundy",
+  "mobile.settings.appearance.preview.memory": "Zapisano 1 wspomnienie",
+  "mobile.settings.appearance.backdrop.title": "Tło",
+  "mobile.settings.appearance.backdrop.footer":
+    "Widać je za ekranem głównym i czatami na tym telefonie. Agent może je dla ciebie ustawić; Cofnij w czacie przywraca poprzednie.",
+  "mobile.settings.appearance.backdrop.none": "Brak",
+  "mobile.settings.appearance.backdrop.pond": "Staw z karpiami koi",
+  "mobile.settings.appearance.backdrop.jellyfish": "Meduzy",
+  "mobile.settings.appearance.backdrop.sunset": "Retro zachód słońca",
+  "mobile.settings.appearance.backdrop.snowfall": "Opady śniegu",
+  "mobile.settings.appearance.backdrop.fireflies": "Świetliki",
+  "mobile.settings.appearance.backdrop.agentPage": "Strona agenta",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Ustawione przez agenta",
+  "mobile.settings.appearance.backdrop.photo": "Zdjęcie",
+  "mobile.settings.appearance.backdrop.photoChoose": "Wybierz ze zdjęć",
+  "mobile.settings.appearance.backdrop.photoChange": "Stuknij ponownie, aby wybrać inne zdjęcie",
+  "mobile.settings.appearance.backdrop.strength": "Intensywność tła",
+  "mobile.settings.appearance.backdrop.calm": "Spokojne",
+  "mobile.settings.appearance.backdrop.vivid": "Żywe",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Spokojne tło ułatwia czytanie długich odpowiedzi. Najwięcej widać je u góry ekranu głównego.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Napiszesz informację o wydaniu?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Oto szkic: tło ustawione przez agenta widać teraz także na telefonie.",
   "mobile.settings.appearance.chatBackground": "Tło czatu",
   "mobile.settings.appearance.chatBackgroundDefault": "Domyślne",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Tło zastępuje tło czatu. Aby użyć koloru, wybierz Brak jako tło.",
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
