@@ -1,8 +1,9 @@
 import { createSignal } from "solid-js";
 
 /**
- * The root attribute that a desktop window sets when Chromium draws it on the CPU. `primitives.css`
- * then turns off each backdrop blur.
+ * The root attribute that a desktop window sets when Chromium draws it on the CPU, and that the web
+ * client sets when the browser does (`web-software-rendering.ts`). `primitives.css` then turns off
+ * each backdrop blur.
  */
 export const SOFTWARE_RENDERING_ATTRIBUTE = "data-openbot-software-rendering";
 
