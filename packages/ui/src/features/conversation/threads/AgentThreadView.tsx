@@ -10,7 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
-import { Button } from "@openbot/ui";
+import { Button, CopyButton, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
@@ -339,7 +339,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -698,6 +698,18 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
+  /**
+   * The reason of the failed turn, as the main chat shows it. A thread keeps the provider's text (#5220),
+   * which can be technical; the notice then shows the general sentence, and Copy details keeps the
+   * text, which the host redacted, for a report (#10888).
+   */
+  const failure = (error: string | null) => {
+    const reason = error?.trim() ?? "";
+    if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
+    const fallback = t("agent.error.continueFailed");
+    const body = errorMessage(reason, fallback);
+    return { body, details: body === fallback ? reason : null };
+  };
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
@@ -956,13 +968,29 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
           <ComposerStackCard when={failed()}>
-            {(task) => (
-              <ComposerNotice
-                tone="danger"
-                title={t("conversation.threads.view.failed")}
-                body={task().error || t("conversation.threads.view.failedBody")}
-              />
-            )}
+            {(task) => {
+              const shown = () => failure(task().error);
+              return (
+                <ComposerNotice
+                  tone="danger"
+                  title={t("conversation.threads.view.failed")}
+                  body={shown().body}
+                  action={
+                    <Show when={shown().details}>
+                      {(details) => (
+                        <CopyButton
+                          value={details()}
+                          variant="outline"
+                          size="sm"
+                          label={t("agent.error.copyDetails")}
+                          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+                        />
+                      )}
+                    </Show>
+                  }
+                />
+              );
+            }}
           </ComposerStackCard>
           <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
             {(items) => <AwaitingReplies items={items()} onOpenAgent={props.onSelectAgent} />}
