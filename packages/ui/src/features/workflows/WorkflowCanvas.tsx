@@ -740,7 +740,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     running,
     toolbarBelow: (id, bar) => toolbarBelow(id, bar),
-    anchor: (port, other) => groupAnchor(port, other),
+    anchor: (port, other, slot) => groupAnchor(port, other, slot),
     hides: (edge) => hiddenLine(edge),
     dropFiles: (id, files) => dropOnAsset(id, files),
     release: (start, at, event) => {
@@ -1796,9 +1796,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /**
    * Where the line of a port of a member starts or ends. A collapsed group takes all the lines of its
    * members. An open group takes the lines of an output type that two or more members send to the same
-   * node, and the line that the user drags from its port. Else the line stays on the member.
+   * node, and the line that the user drags from its port. Else the line stays on the member, as a line to a
+   * named input does.
    */
-  const groupAnchor = (port: PortRef, other: string | undefined): WfnAnchor | undefined => {
+  const groupAnchor = (port: PortRef, other: string | undefined, slot?: string): WfnAnchor | undefined => {
     const entry = groupIndex().get(port.node);
     if (!entry || (other !== undefined && groupIndex().get(other)?.id === entry.id)) return undefined;
     const types = groupTypes(entry);
@@ -1814,7 +1815,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         at: at((box) => portPoint(box, Math.max(index, 0), index < 0 ? 1 : types.length, true)),
       };
     }
-    if (port.side === "in" || port.branch !== undefined || index < 0) return undefined;
+    if (port.side === "in" || port.branch !== undefined || slot !== undefined || index < 0) return undefined;
     const many =
       other === undefined
         ? typeMembers(entry, port.type).every((id) => board.isSelected(id))
@@ -1838,7 +1839,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             (edge) =>
               members.includes(edge.from) &&
               edge.type === type &&
-              groupAnchor({ node: edge.from, side: "out", type, branch: edge.branch }, edge.to) !== undefined,
+              groupAnchor(
+                { node: edge.from, side: "out", type, branch: edge.branch },
+                edge.to,
+                canvas.slots(edge)[0],
+              ) !== undefined,
           ),
         armed: members.length > 0 && members.every((id) => board.armed(id, "out", type)),
       };

@@ -336,9 +336,10 @@ export interface BoardOptions {
   loops?: () => ReadonlyMap<string, WorkflowLoop>;
   /**
    * Where the lines of a node port end in its place, such as at the port of its group. `other` is the
-   * node at the other end of the line, or undefined for a line that the user drags now.
+   * node at the other end of the line, or undefined for a line that the user drags now. `slot` is the
+   * named input that a line from an output ends on, or undefined for the input with no name.
    */
-  anchor?: (port: PortRef, other: string | undefined) => WfnAnchor | undefined;
+  anchor?: (port: PortRef, other: string | undefined, slot?: string) => WfnAnchor | undefined;
   /** Connections that do not show, such as the connections inside a collapsed group. */
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
@@ -1404,8 +1405,8 @@ export function createBoard(options: BoardOptions) {
     const slots = slotsOf(edge);
     return slots.length > 0 ? slots : [undefined];
   };
-  const outAnchor = (edge: WfnEdge) =>
-    options.anchor?.({ node: edge.from, side: "out", type: edge.type, branch: edge.branch }, edge.to);
+  const outAnchor = (edge: WfnEdge, slot: string | undefined = targets(edge)[0]) =>
+    options.anchor?.({ node: edge.from, side: "out", type: edge.type, branch: edge.branch }, edge.to, slot);
   const inAnchor = (edge: WfnEdge, slot: string | undefined) =>
     options.anchor?.({ node: edge.to, side: "in", type: edge.type, branch: slot }, edge.from);
   const lineId = (edge: WfnEdge, slot: string | undefined) => `${edge.id}\u0000${slot ?? ""}`;
@@ -1421,7 +1422,7 @@ export function createBoard(options: BoardOptions) {
       for (const edge of state.edges) {
         if (options.hides?.(edge)) continue;
         for (const slot of targets(edge)) {
-          const from = outAnchor(edge)?.key ?? `${edge.from}\u0000${edge.branch ?? ""}`;
+          const from = outAnchor(edge, slot)?.key ?? `${edge.from}\u0000${edge.branch ?? ""}`;
           const to = inAnchor(edge, slot)?.key ?? `${edge.to}\u0000${slot ?? ""}`;
           const key = `${from}>${to}:${edge.type}`;
           const bundle = lines.get(key) ?? [];
@@ -1448,7 +1449,7 @@ export function createBoard(options: BoardOptions) {
   function Edges() {
     /** The line of an edge to one input. A source that fills two named inputs has a line to each. */
     const endsAt = (edge: WfnEdge, slot: string | undefined) => {
-      const from = outAnchor(edge)?.at() ?? point(edge.from, "out", edge.type, edge.branch);
+      const from = outAnchor(edge, slot)?.at() ?? point(edge.from, "out", edge.type, edge.branch);
       const to = inAnchor(edge, slot)?.at() ?? point(edge.to, "in", edge.type, slot);
       return from && to ? shapeOf(edge, from, to) : null;
     };
