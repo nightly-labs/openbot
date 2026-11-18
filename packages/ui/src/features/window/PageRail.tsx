@@ -23,7 +23,7 @@ import {
   Workflow,
 } from "@openbot/ui";
 import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/features/account/AccountUsageDetails";
-import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
+import type { AccountUsageProviderRow } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
@@ -517,13 +517,38 @@ function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) 
 
 export function PageRail(props: PageRailProps) {
   const { t } = useText();
+  /**
+   * One ring per provider. All accounts of one provider, plus any reading that counts the quota of
+   * that provider (such as Cursor on a merged Grok plan), are grouped into that provider's single
+   * ring and hover card.
+   */
   const rings = createMemo((): UsageRing[] => {
     const rows = props.usageRows.filter((row) => row.reportsUsage && row.windows.length > 0);
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
-    return rows
-      .filter((row) => !owner(row))
-      .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
+
+    const providerGroups = new Map<string, AccountUsageProviderRow[]>();
+    for (const row of rows) {
+      const parent = owner(row);
+      const targetProvider = parent ? parent.provider : row.provider;
+      const group = providerGroups.get(targetProvider);
+      if (group) {
+        group.push(row);
+      } else {
+        providerGroups.set(targetProvider, [row]);
+      }
+    }
+
+    const result: UsageRing[] = [];
+    for (const [, group] of providerGroups) {
+      if (group.length === 0) continue;
+      // Prefer the provider's own sign-in (accountId === null) as primary row, or the first row
+      const primaryIndex = group.findIndex((r) => r.accountId === null);
+      const primaryRow = primaryIndex >= 0 ? group[primaryIndex] : group[0];
+      const shared = group.filter((r) => r !== primaryRow);
+      result.push({ row: primaryRow, shared });
+    }
+    return result;
   });
   const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
   const ringLayout = createMemo(() => {
@@ -666,7 +691,8 @@ export function PageRail(props: PageRailProps) {
             endGroup = element;
           }}
         >
-          <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
+          {/* One ring per provider. Keyed by provider so each provider ring stays mounted. */}
+          <For each={ringLayout().shown} keyed={(ring) => ring.row.provider}>
             {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
           </For>
           <Show when={ringLayout().more.length > 0}>

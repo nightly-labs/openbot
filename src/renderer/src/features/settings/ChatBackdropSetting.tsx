@@ -7,10 +7,10 @@ import { setChatBackdrop, useChatBackdrop } from "../../chat-backdrop-preference
 import {
   addCustomBackdrop,
   CUSTOM_BACKDROP_IMAGE_TYPES,
-  customBackdropKind,
   removeCustomBackdrop,
   useCustomBackdrops,
 } from "../../custom-backdrops";
+import { prepareBackdropImage } from "./backdrop-compressor";
 
 export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) {
   const { t } = useText();
@@ -19,20 +19,17 @@ export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) 
   const [busy, setBusy] = createSignal(false);
 
   const upload = async (file: File) => {
-    if (customBackdropKind(file.type, file.size) !== "image") {
-      actionToast.error(t("settings.chatBackdrop.uploadRefused"));
-      return;
-    }
     setBusy(true);
     try {
-      const id = await addCustomBackdrop({
-        name: file.name,
-        mimeType: file.type,
-        bytes: new Uint8Array(await file.arrayBuffer()),
-      });
+      const prepared = await prepareBackdropImage(file);
+      const id = await addCustomBackdrop(prepared);
       setChatBackdrop(customBackdropChoice(id));
-    } catch {
-      actionToast.error(t("settings.chatBackdrop.saveFailed"));
+    } catch (error) {
+      if (error instanceof Error && error.message === "UNSUPPORTED_TYPE") {
+        actionToast.error(t("settings.chatBackdrop.uploadRefused"));
+      } else {
+        actionToast.error(t("settings.chatBackdrop.saveFailed"));
+      }
     } finally {
       setBusy(false);
     }
@@ -56,7 +53,7 @@ export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) 
       value={choice()}
       onChange={setChatBackdrop}
       custom={custom()}
-      accept={CUSTOM_BACKDROP_IMAGE_TYPES.join(",")}
+      accept={[...CUSTOM_BACKDROP_IMAGE_TYPES, "image/*"].join(",")}
       onUpload={(file) => void upload(file)}
       onRemove={(id) => void remove(id)}
       busy={busy()}

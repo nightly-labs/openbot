@@ -25,8 +25,10 @@ export const CUSTOM_BACKDROP_IMAGE_TYPES = [
   "image/webp",
   "image/avif",
 ] as const;
-const IMAGE_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_IMAGE_TYPES);
-const CUSTOM_BACKDROP_IMAGE_LIMIT = 20 * 1_024 * 1_024;
+export const IMAGE_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_IMAGE_TYPES);
+/** A larger picture fills the disk and slows each window start. */
+export const CUSTOM_BACKDROP_IMAGE_LIMIT = 20 * 1_024 * 1_024;
+/** The most backdrops on one device. Adding one more removes the oldest. */
 const CUSTOM_BACKDROP_CAPACITY = 12;
 const NAME_LIMIT = 80;
 
