@@ -1,8 +1,13 @@
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { createEffect, createSignal, Show } from "solid-js";
 import { ServerPlushLogo } from "../../server-plush-logo";
 
 /** A server logo, or the server's plush when there is no logo or it does not load. */
-export function ServerLogo(props: { serverId: string; url: string | null }) {
+export function ServerLogo(props: {
+  serverId: string;
+  url: string | null;
+  appearance?: ServerAppearance | null | undefined;
+}) {
   const [failed, setFailed] = createSignal(false);
   createEffect(
     () => props.url,
@@ -13,7 +18,7 @@ export function ServerLogo(props: { serverId: string; url: string | null }) {
   return (
     <Show
       when={!failed() ? props.url : null}
-      fallback={<ServerPlushLogo class="server-settings-plush" seed={props.serverId} />}
+      fallback={<ServerPlushLogo class="server-settings-plush" seed={props.serverId} appearance={props.appearance} />}
     >
       {(url) => (
         <span class="server-settings-logo" aria-hidden="true">

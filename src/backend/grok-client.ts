@@ -59,7 +59,10 @@ export class GrokAgentClient extends AcpAgentClient {
             ]
           : profileGeneration
             ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"]
-            : []),
+            : // Grok asks OpenBot before a tool that needs approval, and the agent's access decides.
+              // Before, a `dontAsk` mode in the user's Grok or Claude settings refused OpenBot's tools
+              // without a request (#9435), and an always-approve mode skipped Ask first.
+              ["--permission-mode", "default"]),
         "agent",
         "stdio",
       ],

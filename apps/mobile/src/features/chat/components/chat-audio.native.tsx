@@ -15,6 +15,7 @@ import { useText } from "@/shared/lib/text";
 import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
 import { playbackTime } from "../model/playback-time";
+import { shareTypeOptions } from "../model/share-file-type";
 import type { AttachmentTint } from "./chat-attachment";
 import { runFileAction } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
@@ -213,7 +214,7 @@ function AudioCard({
     await runFileAction(
       async () => {
         if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { mimeType: attachment.mimeType, dialogTitle: attachment.name });
+        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
       },
       t("mobile.chat.attachment.openFailed"),
       text,

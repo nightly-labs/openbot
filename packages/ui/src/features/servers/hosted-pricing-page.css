@@ -214,6 +214,11 @@
   gap: 8px;
 }
 
+/* The billing details sit above the consent, a little apart from it. */
+.hosted-pricing-consent-action .billing-details-fields {
+  margin-bottom: var(--openbot-space-2);
+}
+
 .hosted-pricing-consent {
   display: flex;
   align-items: flex-start;

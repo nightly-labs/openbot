@@ -38,7 +38,12 @@ import {
   secureOAuthFetch,
 } from "../src/backend/mcp-oauth-provider";
 import type { McpOAuthProxySettings } from "../src/backend/mcp-oauth-proxy";
-import { claudeMcpServers, codexMcpServers, usableMcpServers } from "../src/backend/mcp-provider-shapes";
+import {
+  claudeMcpServers,
+  codexMcpServerKey,
+  codexMcpServers,
+  usableMcpServers,
+} from "../src/backend/mcp-provider-shapes";
 import { McpServerStore } from "../src/backend/mcp-server-store";
 import { AddressLookupError, isPublicAddress } from "../src/backend/network-address";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -48,7 +53,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/mcp-oauth-e2e");
 const REDIRECT_URL = "http://127.0.0.1:28417/mcp-auth";
 const DEADLINE_MS = 10_000;
 
-type TokenMode = "rotate" | "invalid_grant" | "invalid_client" | "drop";
+type TokenMode = "rotate" | "invalid_grant" | "invalid_client" | "unsupported_grant_type" | "server_error" | "drop";
 
 interface Hit {
   method: string;
@@ -107,6 +112,8 @@ async function startAuthorizationServer() {
       if (tokenMode === "drop") return request.socket.destroy();
       if (tokenMode === "invalid_grant") return json(response, 400, { error: "invalid_grant" });
       if (tokenMode === "invalid_client") return json(response, 401, { error: "invalid_client" });
+      if (tokenMode === "unsupported_grant_type") return json(response, 400, { error: "unsupported_grant_type" });
+      if (tokenMode === "server_error") return json(response, 503, { error: "temporarily_unavailable" });
       return json(response, 200, {
         access_token: "access-rotated",
         token_type: "Bearer",
@@ -342,6 +349,34 @@ async function main() {
     return { token: "access-on-file", tokensKept: true, needsSignIn: false };
   });
 
+  // An OAuth error that comes back on each refresh, such as `unsupported_grant_type`, cannot pass
+  // later: the server's refusal of the token ends the sign-in (#10135). A thread start alone does not.
+  auth.setTokenMode("unsupported_grant_type");
+  const refusedForGood = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
+    assert.equal(await runCauseEffect(oauth.accessToken(mcpUrl)), "access-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), true);
+    const token = await runCauseEffect(oauth.refreshAccessToken(mcpUrl, "access-on-file"));
+    const stored = records.get(mcpUrl);
+    assert.equal(token, null);
+    assert.equal(stored?.tokens, undefined);
+    assert.equal(stored?.client?.client_id, "client-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), false);
+    assert.equal(oauth.needsSignIn(mcpUrl), true);
+    return { token, signedIn: false, needsSignIn: true };
+  });
+
+  // `temporarily_unavailable` can pass later: the refused token keeps its sign-in.
+  auth.setTokenMode("server_error");
+  const unavailable = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
+    const token = await runCauseEffect(oauth.refreshAccessToken(mcpUrl, "access-on-file"));
+    assert.equal(token, null);
+    assert.equal(records.get(mcpUrl)?.tokens?.refresh_token, "refresh-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), true);
+    assert.equal(oauth.needsSignIn(mcpUrl), false);
+    assert.ok(auth.hits.some((hit) => hit.path === "/token"));
+    return { token, tokensKept: true, needsSignIn: false };
+  });
+
   // Sign-out deletes the tokens first, then revokes the refresh token and the access token.
   auth.setRevokeStatus(200);
   const signOut = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
@@ -385,6 +420,8 @@ async function main() {
     signInDuringRefresh,
     invalidClient,
     networkError,
+    refusedForGood,
+    unavailable,
     signOut,
     revokeRefused,
     ...proxy,
@@ -709,7 +746,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const port = saved.value?.port;
     assert.ok(port);
     assert.match(directRoute.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}$`, "u"));
-    const codexDirect = codex.servers.Resource;
+    const codexDirect = codex.servers[codexMcpServerKey(direct)];
     assert.ok(codexDirect && "url" in codexDirect);
     assert.match(codexDirect.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}/[0-9a-f]{32}$`, "u"));
     assert.equal(codexDirect.url, chiefRoute.url);
@@ -858,16 +895,39 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(refusal.code, -32001);
     assert.ok(refusal.message.includes(sourceText("error.backend.mcpOAuthRequestRefused")), refusal.message);
     assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated", "The refusal ended the sign-in.");
-    // A renewal that does not reach the authorization server proves nothing: the sign-in has ended for now.
+    // A renewal that does not reach the authorization server fails for now: the sign-in stays, the
+    // agent reads that the next request tries again, and it does.
     staleToken();
     auth.setTokenMode("drop");
     const unrenewed = await refusedCall("unrenewed");
     auth.setTokenMode("rotate");
     resource.setRefusing(false);
     assert.ok(unrenewed instanceof McpError, "The unrenewed call did not fail with a JSON-RPC error.");
-    assert.ok(unrenewed.message.includes(sourceText("error.backend.mcpOAuthSignInNeeded")), unrenewed.message);
+    assert.ok(unrenewed.message.includes(sourceText("error.backend.mcpOAuthRenewalFailed")), unrenewed.message);
+    assert.equal(records.get(direct.url)?.tokens?.access_token, "access-stale", "A failed renewal ended the sign-in.");
+    assert.equal(oauth.signedIn(direct.url), true);
     assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "again" } })), "again");
-    const refusedWithSignIn = { code: refusal.code, signInKept: true, unrenewedSaysEnded: true };
+    const refusedWithSignIn = { code: refusal.code, signInKept: true, unrenewedKeepsSignIn: true };
+
+    // A sign-in that cannot be renewed - here no client is on file - ends at the refusal (#10135). The
+    // row then asks for a new sign-in, so the test of the server shows the Sign in card.
+    const beforeUnusable = records.get(direct.url);
+    assert.ok(beforeUnusable?.tokens);
+    const { client: _client, ...withoutClient } = beforeUnusable;
+    records.set(direct.url, { ...withoutClient, tokens: { ...beforeUnusable.tokens, access_token: "access-stale" } });
+    assert.equal(oauth.signedIn(direct.url), true);
+    auth.reset();
+    const unusable = await refusedCall("unusable");
+    assert.ok(unusable instanceof McpError, "The unusable call did not fail with a JSON-RPC error.");
+    assert.ok(unusable.message.includes(sourceText("error.backend.mcpOAuthSignInNeeded")), unusable.message);
+    assert.equal(auth.hits.filter((hit) => hit.path === "/token").length, 0, "A refresh ran without a client.");
+    assert.equal(records.get(direct.url)?.tokens, undefined);
+    assert.equal(typeof records.get(direct.url)?.lostAt, "number");
+    assert.equal(oauth.signedIn(direct.url), false);
+    assert.equal(oauth.needsSignIn(direct.url), true);
+    records.set(direct.url, beforeUnusable);
+    assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "restored" } })), "restored");
+    const unusableSignInEnded = { tokenRequests: 0, signedIn: false, needsSignIn: true };
 
     // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
@@ -896,7 +956,9 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       }),
     );
     assert.equal(oauth.signedIn(away.url), false);
-    assert.deepEqual(await endpointOf(gateway, away), awayRoute);
+    // The 502 above was a failed `initialize` on this route: the next hand-off has a new address
+    // with the same bearer, so a provider that keeps a failed server connects again (#9526).
+    assert.deepEqual(await endpointOf(gateway, away), { ...awayRoute, url: `${awayRoute.url}?attempt=1` });
     assert.equal(await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled())), fingerprintBeforeExpiry);
     const expiredWithoutRefresh = { sameRoute: true, sameFingerprint: true };
 
@@ -948,6 +1010,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       midSessionRefresh,
       accountRefresh,
       refusedWithSignIn,
+      unusableSignInEnded,
       signedOut,
       expiredWithoutRefresh,
       restart,

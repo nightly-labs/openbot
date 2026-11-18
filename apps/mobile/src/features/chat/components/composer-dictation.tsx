@@ -19,6 +19,8 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
 
+/** A hold this long on the mic opens the voice settings. The tap gives up at 500 ms. */
+export const LONG_PRESS_MS = 400;
 const PRESS_IN = { duration: 100, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 /** One bar of the wave, the space after it, and the box it moves in. */
 const WAVE_BAR = 3;
@@ -43,6 +45,8 @@ export function DictationMic({
   label,
   foreground,
   onPress,
+  onLongPress,
+  longPressLabel,
 }: {
   active: boolean;
   /** 0 with the mic, 1 with Stop. */
@@ -51,6 +55,9 @@ export function DictationMic({
   label: string;
   foreground: string;
   onPress: () => void;
+  /** A press and hold on the mic, not on Stop, opens the voice settings. */
+  onLongPress: () => void;
+  longPressLabel: string;
 }) {
   const reducedMotion = useReducedMotion();
   const danger = String(useThemeColor("danger"));
@@ -61,21 +68,36 @@ export function DictationMic({
     handler.current = onPress;
   });
   const press = useCallback(() => handler.current(), []);
+  const longHandler = useRef(onLongPress);
+  useEffect(() => {
+    longHandler.current = onLongPress;
+  });
+  const longPress = useCallback(() => longHandler.current(), []);
   const gesture = useMemo(
     () =>
-      Gesture.Tap()
-        .enabled(enabled)
-        .hitSlop(4)
-        .onBegin(() => {
-          pressed.set(withTiming(1, PRESS_IN));
-        })
-        .onEnd((_event, success) => {
-          if (success) scheduleOnRN(press);
-        })
-        .onFinalize(() => {
-          pressed.set(withTiming(0, PRESS_IN));
-        }),
-    [enabled, pressed, press],
+      Gesture.Race(
+        // The hold activates before the tap's 500 ms limit, so it cancels the tap.
+        Gesture.LongPress()
+          .enabled(enabled && !active)
+          .minDuration(LONG_PRESS_MS)
+          .hitSlop(4)
+          .onStart(() => {
+            scheduleOnRN(longPress);
+          }),
+        Gesture.Tap()
+          .enabled(enabled)
+          .hitSlop(4)
+          .onBegin(() => {
+            pressed.set(withTiming(1, PRESS_IN));
+          })
+          .onEnd((_event, success) => {
+            if (success) scheduleOnRN(press);
+          })
+          .onFinalize(() => {
+            pressed.set(withTiming(0, PRESS_IN));
+          }),
+      ),
+    [enabled, active, pressed, press, longPress],
   );
   const bodyStyle = useAnimatedStyle(() => ({
     transform: reducedMotion ? [] : [{ scale: 1 - 0.06 * pressed.get() }],
@@ -95,9 +117,15 @@ export function DictationMic({
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: !enabled, selected: active }}
-        accessibilityActions={[{ name: "activate" }]}
+        accessibilityActions={
+          enabled && !active
+            ? [{ name: "activate" }, { name: "longpress", label: longPressLabel }]
+            : [{ name: "activate" }]
+        }
         onAccessibilityAction={({ nativeEvent }) => {
-          if (enabled && nativeEvent.actionName === "activate") onPress();
+          if (!enabled) return;
+          if (nativeEvent.actionName === "activate") onPress();
+          else if (nativeEvent.actionName === "longpress" && !active) onLongPress();
         }}
         style={[{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" }, bodyStyle]}
       >

@@ -335,8 +335,11 @@ export class AgentMemories {
         return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
       const text = args.text.trim();
       if (!text) return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
+      // Give the numbers, so the agent can save a shorter memory on the next try (#10762).
       if (text.length > INPUT_LIMITS.agentMemoryText)
-        return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryTextTooLong")} A memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
+        );
       if (args.inclusion !== undefined && args.inclusion !== "essential" && args.inclusion !== "searchable")
         return openBotToolFailure("inclusion must be essential or searchable.");
       const site = isString(args.site) ? normalizeMemorySite(args.site) : undefined;

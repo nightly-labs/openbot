@@ -165,6 +165,7 @@ export function ServerTurnLimitsSetting(
           {(current) => (
             <ItemActions>
               <Select<TurnLimitChoice>
+                class="settings-modal-select"
                 options={TURN_LIMIT_CHOICES}
                 value={turnLimitChoice(current().turnLimit)}
                 disabled={props.disabled || !loaded()}
@@ -194,6 +195,7 @@ export function ServerTurnLimitsSetting(
             </ItemContent>
             <ItemActions>
               <Select<LimitChoice>
+                class="settings-modal-select"
                 options={AGENT_TASK_LIMIT_CHOICES}
                 value={agentTaskLimitChoice(current().agentTaskLimit)}
                 disabled={props.disabled || !loaded()}

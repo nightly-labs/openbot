@@ -28,7 +28,7 @@ import {
 import { createSignal, For, Show } from "solid-js";
 import { isApiKeyAccount, providerAccountName } from "../../components/provider-accounts";
 import { useText } from "../../text";
-import { type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
+import { createPickerFades, type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
 import { Hint } from "./workflow-board";
 import type { WorkflowImageModel } from "./workflow-model";
 
@@ -298,10 +298,13 @@ function RowList(props: {
   onChoose: (value: string) => void;
 }) {
   const { t } = useText();
+  const fades = createPickerFades();
   return (
     <Show when={props.rows.length} fallback={<p class="wfn-picker-empty">{t("workflow.picker.noMatches")}</p>}>
       <Listbox.Root<PickerOption<string>>
-        class="wfn-picker-list wfn-model-list"
+        ref={fades.bind}
+        class={["wfn-picker-list wfn-model-list", fades.classes()]}
+        onScroll={fades.measure}
         aria-label={props.label}
         options={[...props.rows]}
         optionValue={(option) => option.value}

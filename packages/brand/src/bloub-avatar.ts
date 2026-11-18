@@ -156,6 +156,14 @@ export function serverPlushColor(serverId: string): ServerPlushColor {
   return automaticColor(serverId);
 }
 
+/**
+ * The `#rrggbb` body colour of a server plush: the colour an owner or admin chose, or the automatic
+ * colour of the server ID.
+ */
+export function serverPlushHex(serverId: string, color: string | null | undefined): string {
+  return (color ?? colorHex(automaticColor(serverId))).toLowerCase();
+}
+
 function automaticColor(seed: string): ServerPlushColor {
   return requiredItem(AUTOMATIC_COLORS, stableIndex(`${seed}:color`, AUTOMATIC_COLORS.length));
 }

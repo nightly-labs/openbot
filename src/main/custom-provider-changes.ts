@@ -33,6 +33,11 @@ export interface CustomProviderChangeDependencies {
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
   providerRuntimes: Pick<ProviderRuntimeManager, "startCustomProviderHarness">;
+  /**
+   * Asks the endpoints which models cannot reason, before the restart that reads the answer
+   * (#8381). True: the answer changed. Absent: nothing is asked.
+   */
+  refreshModelReasoning?: () => Effect.Effect<boolean>;
 }
 
 export interface CustomProviderChanges {
@@ -46,6 +51,14 @@ export interface CustomProviderChanges {
    * settings, so the endpoint keeps its harness and each kept model id keeps its saved settings.
    */
   peerUpdate(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
+  /**
+   * A joined admin's edit that names the harness (`custom-provider-harness-choice-v1`): as
+   * `peerUpdate`, and the endpoint moves to that harness, with the agents on each kept model.
+   */
+  peerHarnessUpdate(
+    input: UpdateCustomProviderInput,
+    harness: CustomProviderHarness,
+  ): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
   remove(id: string): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
 }
 
@@ -53,6 +66,7 @@ export function createCustomProviderChanges({
   service,
   customProviders,
   providerRuntimes,
+  refreshModelReasoning,
 }: CustomProviderChangeDependencies): CustomProviderChanges {
   /**
    * One endpoint change at a time, from the first read to the last write.
@@ -93,7 +107,12 @@ export function createCustomProviderChanges({
     previous: CustomProviderHarness | undefined,
   ) {
     const current = harnessOf(id);
+    const reasoningChanged = refreshModelReasoning ? yield* refreshModelReasoning() : false;
     const outcome = yield* restart(current, previous);
+    // Only OpenCode reads that answer. When this change did not restart it, the answer of another
+    // endpoint can still be new, for example after its server started.
+    if (reasoningChanged && (current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) !== "opencode" && previous !== "opencode")
+      yield* service.reloadCustomProviderConfig("opencode");
     yield* providerRuntimes.startCustomProviderHarness(current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     return outcome;
   });
@@ -182,6 +201,7 @@ export function createCustomProviderChanges({
     // The saved settings are read inside the permit, so a change that waits for this one cannot
     // replace them between the read and the write.
     peerUpdate: (input) => serialize(() => update(withSavedModelSettings(input))),
+    peerHarnessUpdate: (input, harness) => serialize(() => update({ ...withSavedModelSettings(input), harness })),
     /**
      * Agents move off the endpoint's models *before* it is removed, so no agent is left naming a
      * model the restarted CLI does not list.
@@ -213,5 +233,11 @@ export function createCustomProviderChanges({
   };
 }
 
-/** What a joined admin may change through the Team API. An edit keeps the harness and model settings. */
-export type PeerCustomProviderChanges = Pick<CustomProviderChanges, "list" | "save" | "peerUpdate" | "remove">;
+/**
+ * What a joined admin may change through the Team API. An edit keeps the model settings, and keeps
+ * the harness unless it names one.
+ */
+export type PeerCustomProviderChanges = Pick<
+  CustomProviderChanges,
+  "list" | "save" | "peerUpdate" | "peerHarnessUpdate" | "remove"
+>;

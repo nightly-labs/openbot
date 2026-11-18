@@ -19,8 +19,12 @@ export const PASSWORD_MANAGER_TEXT = {
     description: "mobile.server.connectors.protonPass.description",
     keyHelp: "mobile.server.connectors.protonPass.keyHelp",
     keyPlaceholder: "mobile.server.connectors.protonPass.keyPlaceholder",
+    plan: "mobile.server.connectors.protonPass.plan",
   },
-} as const satisfies Record<MobilePasswordManagerId, Record<"description" | "keyHelp" | "keyPlaceholder", string>>;
+} as const satisfies Record<
+  MobilePasswordManagerId,
+  Record<"description" | "keyHelp" | "keyPlaceholder" | "plan", string>
+>;
 
 /**
  * The site of each manager's sign-in page. A joined server names the page that the phone opens, so

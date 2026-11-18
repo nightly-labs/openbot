@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Gives the data folder to the user of the OpenBot image (UID 1000) before its first start. The
+# container stops when it cannot write to /data. Only the folder itself changes owner: the files in it
+# already belong to that user, and a recursive change on each start would be slow on a large folder.
+set -euo pipefail
+
+DATA_DIR="${APP_DATA_ROOT:-${APP_DATA_DIR}/data}"
+
+mkdir -p "${DATA_DIR}"
+if [[ "$(stat -c '%u:%g' "${DATA_DIR}")" != "1000:1000" ]]; then
+  chown 1000:1000 "${DATA_DIR}"
+fi
+chmod 0700 "${DATA_DIR}"

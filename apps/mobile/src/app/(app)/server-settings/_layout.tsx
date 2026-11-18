@@ -67,7 +67,8 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="custom-agent" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its endpoint, or says Add custom provider. */}
       <Stack.Screen name="custom-provider" options={{ title: t("mobile.server.route.provider") }} />
-      <Stack.Screen name="mcp" options={{ title: t("mobile.server.route.mcp") }} />
+      {/* The page names its provider. */}
+      <Stack.Screen name="provider-environment" options={{ title: t("mobile.server.environment.title") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
       {/* The page names its MCP server. */}
       <Stack.Screen name="mcp-server-agents" options={{ title: t("mobile.server.mcp.access.agents") }} />
@@ -75,6 +76,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       {/* The page names its item. */}
       <Stack.Screen name="vault-item" options={{ title: t("mobile.server.route.vault") }} />
+      <Stack.Screen name="vault-item-agents" options={{ title: t("mobile.server.vault.agents") }} />
       <Stack.Screen name="vault-two-step" options={{ title: t("mobile.server.vault.twoStep.setupTitle") }} />
       <Stack.Screen name="vault-two-step-scan" options={{ title: t("mobile.server.vault.twoStep.scan") }} />
       <Stack.Screen name="vault-two-step-check" options={{ title: t("mobile.server.vault.twoStep.checkTitle") }} />

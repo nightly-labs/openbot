@@ -169,6 +169,17 @@ export function finishedTurnSummaries(
 }
 
 /**
+ * The steps rows of the turns with no answer. With the thinking display off, they stay: the row is
+ * the only sign of such a turn in the chat.
+ */
+export function answerlessTurnSummaries(
+  summaries: ReadonlyMap<string, TurnStepsSummary> | undefined,
+): ReadonlyMap<string, TurnStepsSummary> | undefined {
+  if (!summaries) return undefined;
+  return new Map([...summaries].filter(([rowId, summary]) => rowId === thinkingRowId(summary.turnId)));
+}
+
+/**
  * The steps row of each finished channel turn with no answer, by the row of its first thought. A
  * channel has no thinking sheet, so a turn with an answer shows only the answer. `running` names
  * the turns that the activity rows show.

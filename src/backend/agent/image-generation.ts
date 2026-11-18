@@ -35,9 +35,22 @@ export function generatedImageName(savedPath: string): string {
   return `generated-image.${extension}`;
 }
 
-export function generatedVideoName(savedPath: string): string {
+const VIDEO_NAME_WORDS = 6;
+const VIDEO_NAME_LENGTH = 48;
+
+/**
+ * The file name of a generated video: the first words of its prompt, so that the chat and a download
+ * show what the video is. Without a prompt, or with one that has no letters, the name is "generated-video".
+ */
+export function generatedVideoName(savedPath: string, prompt?: string | null): string {
   const extension = savedPath.match(/\.(mp4|webm|mov)$/i)?.[1]?.toLowerCase() ?? "mp4";
-  return `generated-video.${extension}`;
+  const words =
+    (prompt ?? "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
+  const stem = words.slice(0, VIDEO_NAME_WORDS).join("-").slice(0, VIDEO_NAME_LENGTH).replace(/-+$/, "");
+  return `${stem || "generated-video"}.${extension}`;
 }
 
 export function decodeGeneratedImage(value: string): Uint8Array {

@@ -234,12 +234,15 @@ async function runOnce(
   { label, authApiUrl, cpuProfile, frames, callCounts }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
+  const scenarioEnvironment = scenario.prepare
+    ? await scenario.prepare(join(BENCH_ROOT, "scenarios", `${label}-${scenario.id}`))
+    : {};
   const spawnedAt = Date.now();
   const app = await launchBenchApp({
     projectRoot: PROJECT_ROOT,
     instanceId: INSTANCE_ID,
     logger,
-    environment: { OPENBOT_AUTH_API_URL: authApiUrl },
+    environment: { ...scenarioEnvironment, OPENBOT_AUTH_API_URL: authApiUrl },
     logPath: join(BENCH_ROOT, "logs", `${label}-${scenario.id}-${index + 1}.log`),
   });
   let browser: Browser | null = null;

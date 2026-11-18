@@ -12,6 +12,8 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
+import { type CrmEvent, crmEvent } from "./crm-v1";
+import { type HostAppearanceEvent, hostAppearanceEvent } from "./host-appearance-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
@@ -38,6 +40,7 @@ export type OptionalTeamEvent =
   | BrowserUserControlEvent
   | AgentTasksEvent
   | ChannelEvent
+  | HostAppearanceEvent
   | HostRestartEvent
   | LibraryFoldersEvent
   | LiveVoiceEvent
@@ -50,7 +53,8 @@ export type OptionalTeamEvent =
   | RoutineFlowsEvent
   | UsageCreditsEvent
   | VaultEvent
-  | WorkflowsEvent;
+  | WorkflowsEvent
+  | CrmEvent;
 
 export interface OptionalTeamEventOptions {
   /**
@@ -74,6 +78,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
     channelEvent(value) ??
+    hostAppearanceEvent(value) ??
     hostRestartEvent(value) ??
     libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??
@@ -86,7 +91,8 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     routineFlowsEvent(value) ??
     usageCreditsEvent(value) ??
     vaultEvent(value) ??
-    workflowsEvent(value);
+    workflowsEvent(value) ??
+    crmEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
 }
 

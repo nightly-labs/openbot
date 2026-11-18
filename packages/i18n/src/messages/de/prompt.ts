@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Eine Idee? Lass sie uns umsetzen.",
   "prompt.approval.report.dontSend": "Nicht jetzt",
   "prompt.approval.report.send": "An das OpenBot-Team senden",
+  "prompt.approval.report.phoneOnly":
+    "Öffne diesen Chat in der OpenBot-Telefon-App und sende den Bericht dort. Das Telefon fügt seine Version, sein System und sein Supportprotokoll hinzu. Wenn sich das Telefon nicht verbinden kann, öffne in der Telefon-App Einstellungen > Support und melde das Problem auf GitHub.",
   "prompt.approval.title.command": "Befehl ausführen",
   "prompt.approval.title.fileChange": "Dateien ändern",
   "prompt.approval.title.permissions": "Berechtigungen erteilen",
@@ -43,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Schließe den Schritt auf {host} ab",
   "prompt.browser.cancelled": "Abgebrochen",
   "prompt.browser.reload":
-    "Schließe die Anmeldung ab und lade die Browserseite neu, bevor du „Fertig“ wählst. Die Seitenprüfung bleibt gesperrt, bis die Seite neu geladen wurde.",
+    "OpenBot konnte das Passwort oder den Code nicht vollständig eingeben. Prüfe die Seite und gib ein, was fehlt. Schließe die Anmeldung ab und lade die Browserseite neu, bevor du „Fertig“ wählst. Die Seitenprüfung bleibt gesperrt, bis die Seite neu geladen wurde.",
   "prompt.browser.continuing": "{name} fährt fort.",
   "prompt.browser.cancelledBody": "Der Browserschritt wurde abgebrochen.",
   "prompt.browser.pendingBody":
     "Öffne die Seite, um die Anmeldung, Verifizierung oder Zustimmung abzuschließen. Lass {name} danach fortfahren.",
   "prompt.browser.openPage": "{title} öffnen",
+  "prompt.browser.openFailed": "Die Seite konnte nicht im Hauptfenster geöffnet werden. Versuche es erneut.",
   "prompt.browser.done": "Fertig",
   "prompt.browser.pageFallback": "Browserseite",
   "prompt.browser.hostFallback": "dem Browser",
@@ -56,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Anmeldung bei {host} abgebrochen",
   "prompt.browser.signInBlocked.body":
     "Melde dich auf diesem Computer an. OpenBot sendet nur die Anmeldung für {host} an {server}, und {name} fährt fort.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an. Dann fährt {name} fort.",
   "prompt.browser.signInBlocked.cancelledBody": "Die Anmeldung wurde abgebrochen.",
   "prompt.browser.signInBlocked.waiting": "Warten auf die Anmeldung",
   "prompt.browser.signInBlocked.waitingButton": "Warten auf die Anmeldung…",

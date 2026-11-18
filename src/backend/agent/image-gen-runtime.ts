@@ -1,13 +1,19 @@
-import type { AttachmentSummary, ImageGenerationInfo, VideoGenerationInfo } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationInfo,
+  imageAspectRatioOf,
+  imagePixelSizeText,
+  type VideoGenerationInfo,
+} from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
+import { type ImageSize, imageSize, imageSizeOfBytes } from "../image-size";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { lastUserPrompt } from "./delivery-content";
 import {
   decodeGeneratedImage,
   type GeneratedMediaKind,
@@ -164,11 +170,12 @@ export class ImageGenRuntime {
 
     const previous =
       generatedMediaInfo(message)?.kind === kind ? (message.imageGeneration ?? message.videoGeneration) : undefined;
+    // Codex app-server sends `revisedPrompt`; the Responses API item sends `revised_prompt`.
     const prompt =
+      getString(item, "revisedPrompt") ??
       getString(item, "revised_prompt") ??
       getString(item, "prompt") ??
       previous?.prompt ??
-      lastUserPrompt(snapshot) ??
       undefined;
     // A video model makes a wide clip unless the call asks for another frame.
     const aspectRatio =
@@ -194,11 +201,9 @@ export class ImageGenRuntime {
       message.videoGeneration = video;
       info = video;
     } else {
+      // The size that the agent asked for, until the file gives the real size. Codex and Grok give none.
       const resolution =
-        getString(item, "resolution") ??
-        getString(item, "size") ??
-        message.imageGeneration?.resolution ??
-        "1024 × 1024";
+        getString(item, "resolution") ?? getString(item, "size") ?? message.imageGeneration?.resolution ?? "";
       message.itemType = "image_generation";
       delete message.videoGeneration;
       const image: ImageGenerationInfo = {
@@ -232,6 +237,8 @@ export class ImageGenRuntime {
     const result = kind === "image" ? getString(item, "result") : null;
     yield* Effect.gen({ self: this }, function* () {
       let attachment: AttachmentSummary;
+      /** The real pixel size of the stored image. */
+      let size: ImageSize | null = null;
       const storeBytes = Effect.gen({ self: this }, function* () {
         if (!result)
           return yield* new GeneratedImageFailed({
@@ -242,6 +249,7 @@ export class ImageGenRuntime {
             ),
           });
         const bytes = yield* imageStep(() => decodeGeneratedImage(result));
+        size = imageSizeOfBytes(bytes);
         return yield* this.#mailbox
           .storeGeneratedAttachment({
             bytes,
@@ -258,14 +266,17 @@ export class ImageGenRuntime {
             .storeGeneratedAttachment({
               sourcePath: savedPath,
               kind,
-              name: kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+              name: kind === "video" ? generatedVideoName(savedPath, prompt) : generatedImageName(savedPath),
               ownerAgentId: agentId,
               ownerThreadId: threadId,
             })
             .pipe(toGeneratedImageFailed),
         );
-        if (Result.isSuccess(saved)) attachment = saved.success;
-        else {
+        if (Result.isSuccess(saved)) {
+          attachment = saved.success;
+          if (kind === "image")
+            size = yield* Effect.tryPromise(() => imageSize(savedPath)).pipe(Effect.orElseSucceed(() => null));
+        } else {
           if (!result) return yield* saved.failure;
           attachment = yield* storeBytes;
         }
@@ -289,6 +300,10 @@ export class ImageGenRuntime {
         latestMessage.attachments = [attachment];
         latestMessage.status = "completed";
         delete latestMedia.info.error;
+        if (size && latestMessage.imageGeneration) {
+          latestMessage.imageGeneration.resolution = imagePixelSizeText(size);
+          latestMessage.imageGeneration.aspectRatio = imageAspectRatioOf(size);
+        }
         this.#conversation.emitConversation(latestSnapshot);
         return;
       });

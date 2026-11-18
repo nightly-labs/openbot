@@ -87,6 +87,8 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
+/** What tar and the system write for ENOSPC, when the failure has no error code. */
+const DISK_FULL_OUTPUT = /no space left on device|not enough space on the disk/iu;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -118,6 +120,13 @@ const OWN_STAMP_PRECISION_MS = 1;
  * failing says so rather than looping.
  */
 const COMMIT_ATTEMPTS = 3;
+/**
+ * How long a download waits for its next bytes. Only silence stops it: a total deadline would stop
+ * a slow but working connection. A connection that stalls, for example after the computer sleeps,
+ * otherwise kept the update, and every agent on the provider that waits for it, waiting with no end
+ * (#11613). The next try resumes from the bytes already saved.
+ */
+const DOWNLOAD_STALL_MS = 60_000;
 /**
  * How long a move waits, in turn, for a file in its source that another program still holds open.
  * About a second and a half, the same budget Node gives `rm` with `maxRetries: 5`.
@@ -247,6 +256,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #cancelled = new Set<ManagedRuntimeId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the update target. */
   readonly #systemVersions = new Map<ManagedProviderId, string>();
+  /** Providers whose installed CLI lacks a part that some models need (#9139). */
+  readonly #incompleteSystemClis = new Set<ManagedProviderId>();
+  /**
+   * Runtimes whose newest copy in the store failed its check at start, so no checked copy runs. The
+   * next update check downloads each one again, once, so it is not left "not installed" (#10909).
+   */
+  readonly #rejected = new Set<ManagedRuntimeId>();
   /** The latest upstream release of each provider CLI, as the last check found it. */
   readonly #latest = new Map<ManagedProviderId, RuntimeSpec>();
   /** What each running download installs, so a cancel removes the right partial file. */
@@ -327,7 +343,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
       yield* runtimeIO(async () => await mkdir(this.#root, { recursive: true }));
       yield* this.#removeAbandonedStagingEffect();
-      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime), {
+      yield* Effect.forEach(RUNTIMES, (runtime) => this.#inspectEffect(runtime, true), {
         concurrency: "unbounded",
         discard: true,
       });
@@ -355,7 +371,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const system = this.#systemVersions.get(provider);
         const copy = providers[provider].phase === "ready" ? providers[provider].version : null;
         const installed = system && copy && olderVersion(system, copy) ? copy : (system ?? providers[provider].version);
-        const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
+        // An incomplete CLI of the user's gives way to the copy, so a missing copy is offered (#9139).
+        const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
+        const offer =
+          missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
         // After an app upgrade the first check updates an installed CLI itself, so it is not offered
         // until that check has started its download.
         const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
@@ -593,6 +612,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         );
         this.#updateInstalled = false;
       }
+      // A copy that failed its check at start is downloaded again, once, unless the provider runs
+      // nothing from the store here. The changed copy itself never runs (#10909).
+      const repairs = PROVIDERS.filter(
+        (provider) =>
+          this.#rejected.has(provider) &&
+          this.#statuses[provider].phase === "not-downloaded" &&
+          this.#cliInUse(provider) &&
+          !configuredCliPath(provider),
+      );
+      this.#rejected.clear();
+      yield* Effect.forEach(
+        this.#stopping ? [] : repairs,
+        (provider) => Effect.ignore(this.#startDownload(provider, target)),
+        { discard: true },
+      );
       this.#revision += 1;
       this.emit("status", this.getStatus());
       const now = Date.now();
@@ -656,10 +690,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    *
    * True when the provider runs its copy in the store again. The caller then runs
    * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
+   *
+   * `incomplete`: that CLI lacks a part that some models need. A copy that is not downloaded is then
+   * offered, as the copy runs in its place once downloaded (#9139).
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+  setSystemVersion(provider: ManagedProviderId, version: string | null, incomplete = false): boolean {
     const previous = this.#systemVersions.get(provider) ?? null;
-    if (previous === version) return false;
+    const flagged = Boolean(version) && incomplete;
+    if (previous === version && flagged === this.#incompleteSystemClis.has(provider)) return false;
+    if (flagged) this.#incompleteSystemClis.add(provider);
+    else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
@@ -966,11 +1006,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #inspectEffect(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+  /** `atStart`: a copy that fails its check is downloaded again by the first update check. */
+  #inspectEffect(
+    runtime: ManagedRuntimeId,
+    atStart = false,
+  ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       if (!this.#target) return this.#statuses[runtime];
       const pinned = runtimeSpec(runtime, this.#target, this.#lock);
-      const installed = yield* this.#newestInstalledEffect(pinned);
+      const { installed, rejected } = yield* this.#newestInstalledEffect(pinned);
+      if (atStart && !installed && rejected) this.#rejected.add(runtime);
       this.#statuses[runtime] = installed
         ? readyStatus(installed)
         : { ...emptyStatus(), version: yield* this.#previousVersionEffect(pinned) };
@@ -984,10 +1029,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * That is the pinned version, checked against the lock, or a newer upstream release, checked
    * against the record its install wrote. A directory with neither is an older pin this build has no
    * hashes for; `#previousVersion` still lends it out until an update replaces it.
+   *
+   * `rejected`: the pinned version, or a newer one with its install record, is in the store but
+   * failed its check, for example after a file in it changed. It does not run, and the log keeps
+   * the reason.
    */
 
-  #newestInstalledEffect(pinned: RuntimeSpec): Effect.Effect<string | null, ProviderRuntimeFailure> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string | null, ProviderRuntimeFailure> {
+  #newestInstalledEffect(
+    pinned: RuntimeSpec,
+  ): Effect.Effect<{ installed: string | null; rejected: boolean }, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<
+      { installed: string | null; rejected: boolean },
+      ProviderRuntimeFailure
+    > {
       const targetRoot = dirname(this.#installRoot(pinned));
       const entries = yield* runtimeIO(async () => await readdir(targetRoot, { withFileTypes: true }).catch(() => []));
       const versions = entries
@@ -995,14 +1049,34 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .map((entry) => entry.name)
         // Of two builds that the release does not order, the pinned one comes first.
         .sort((a, b) => compareReleases(b, a) || Number(b === pinned.version) - Number(a === pinned.version));
+      let rejected = false;
       for (const version of versions) {
         const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
         const installRoot = join(targetRoot, version);
-        if (!(yield* this.#verifiesUnlessUnchangedEffect(installRoot, spec))) continue;
+        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+          Effect.as(null),
+          Effect.catch((error) => Effect.succeed(error)),
+        );
+        if (failure) {
+          // Only a copy that this build can check counts: the pinned version, or a newer one with the
+          // record of its install. An older pin, or the pin of a newer build, has no hashes here.
+          const checkable =
+            version === pinned.version ||
+            (!olderVersion(version, pinned.version) && (yield* pathExists(join(installRoot, INSTALL_RECORD))));
+          if (checkable) {
+            rejected = true;
+            logger.warn("Provider runtime check failed.", {
+              runtime: pinned.runtime,
+              version,
+              cause: logCause(failure.cause),
+            });
+          }
+          continue;
+        }
         yield* this.#stampInUseEffect(pinned.runtime, installRoot);
-        return version;
+        return { installed: version, rejected };
       }
-      return null;
+      return { installed: null, rejected };
     });
   }
 
@@ -1118,32 +1192,47 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* () {
       let installed = false;
       const result = yield* Effect.result(
-        this.#updateRuntime(
-          spec.runtime,
-          () =>
-            Effect.gen({ self: this }, function* () {
-              // The wait for the provider's turns, if there was one, is over.
+        Effect.gen({ self: this }, function* () {
+          // The download runs before `updateRuntime`, which holds new turns of every agent on the
+          // provider. Its agents keep working on the installed version while the bytes arrive, and
+          // only the swap waits for their turns (#11613).
+          // The archive stays until the new copy runs. A copy that installs but does not connect,
+          // such as one that answers too late, is removed below, and a Retry installs it again from
+          // the archive when it still verifies, without a second download (#11713).
+          if (download) installed = yield* this.#runDownloadEffect(spec, signal);
+          yield* this.#updateRuntime(
+            spec.runtime,
+            () =>
+              Effect.sync(() => {
+                // The wait for the provider's turns, if there was one, is over.
+                const status = this.#statuses[spec.runtime];
+                if (download) this.#setFinishing(spec.runtime);
+                else if (status.message !== null) this.#setStatus(spec.runtime, { ...status, message: null });
+                this.#stages.set(spec.runtime, "activate");
+                return join(this.#installRoot(spec), "bin", spec.executableName);
+              }),
+            signal,
+            () => {
               const status = this.#statuses[spec.runtime];
-              if (status.message !== null) this.#setStatus(spec.runtime, { ...status, message: null });
-              if (download) {
-                installed = yield* this.#runDownloadEffect(spec, signal);
-                yield* this.#removePartialEffect(spec);
-              }
-              this.#stages.set(spec.runtime, "activate");
-              return join(this.#installRoot(spec), "bin", spec.executableName);
-            }),
-          signal,
-          () =>
-            this.#setStatus(spec.runtime, {
-              ...this.#statuses[spec.runtime],
-              message: sourceText("status.provider.updateWaiting"),
-            }),
-        ),
+              // A downloaded update shows its wait as the row always did: a download with a message.
+              this.#setStatus(spec.runtime, {
+                ...status,
+                ...(download ? { phase: "downloading" as const, progress: 100 } : {}),
+                message: sourceText("status.provider.updateWaiting"),
+              });
+            },
+          );
+        }),
       );
       if (Result.isFailure(result)) {
-        if (installed) yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
+        // An install that verified stays when the app stops while the update waits for the provider's
+        // turns: the next start runs it, as it runs one that a sibling installed, and nothing downloads again.
+        if (installed && !this.#stopping)
+          yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
         return yield* result.failure;
       }
+      // Also the archives of other versions, such as one that a failed update kept and that no Retry used.
+      if (download) yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
       // This instance runs the version now. Its stamp is also what lets `removeDownload` remove an
       // install it made itself: the install leaves the directory with a time no stamp recorded.
       yield* this.#stampInUseEffect(spec.runtime, this.#installRoot(spec));
@@ -1232,7 +1321,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
 
       return yield* this.#installEffect(spec, partialPath);
-    }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.mapError(diskFullFailure));
   }
 
   /** Answers whether this instance committed the install, or adopted the one it found. */
@@ -1426,13 +1515,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
   }
 
-  #verifiesUnlessUnchangedEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean> {
-    return verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
-      Effect.as(true),
-      Effect.catch(() => Effect.succeed(false)),
-    );
-  }
-
   #downloadSmallFileEffect(
     url: string,
     expectedSha256: string | null,
@@ -1478,7 +1560,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
             ...(offset > 0 ? { Range: `bytes=${offset}-`, ...(etag ? { "If-Range": etag } : {}) } : {}),
           },
         }),
-      ).pipe(Effect.mapError(({ cause }) => requestFailure(spec.url, cause)));
+      ).pipe(
+        Effect.mapError(({ cause }) => requestFailure(spec.url, cause)),
+        failWhenStalled,
+      );
     });
   }
 
@@ -1556,6 +1641,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   #partialMetadataPath(spec: RuntimeSpec): string {
     return `${this.#partialPath(spec)}.json`;
+  }
+
+  /**
+   * Removes the partial downloads of each version of a runtime for a target. The download root
+   * belongs to this profile, and one runtime downloads one version at a time. A file that does not
+   * go stays: the copy runs, and a later removal tries again.
+   */
+  #removeRuntimePartialsEffect(runtime: ManagedRuntimeId, target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const prefix = `${runtime}-${target}-`;
+      const downloads = yield* runtimeIO(async () => await readdir(this.#downloadRoot()).catch(() => []));
+      yield* Effect.forEach(
+        downloads.filter((name) => name.startsWith(prefix) && /\.partial(?:\.json)?$/u.test(name)),
+        (name) => runtimeIO(() => rm(join(this.#downloadRoot(), name), { force: true })).pipe(Effect.ignore),
+        { concurrency: "unbounded", discard: true },
+      );
+    }).pipe(Effect.ignore);
   }
 
   #removePartialEffect(spec: RuntimeSpec): Effect.Effect<void, ProviderRuntimeFailure> {
@@ -1759,13 +1861,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           }),
         { concurrency: "unbounded" },
       );
-      const prefix = `${provider}-${target}-`;
-      const downloads = yield* runtimeIO(async () => await readdir(this.#downloadRoot()).catch(() => []));
-      yield* Effect.forEach(
-        downloads.filter((name) => name.startsWith(prefix) && /\.partial(?:\.json)?$/u.test(name)),
-        (name) => runtimeIO(() => rm(join(this.#downloadRoot(), name), { force: true })).pipe(Effect.ignore),
-        { concurrency: "unbounded", discard: true },
-      );
+      yield* this.#removeRuntimePartialsEffect(provider, target);
       const status = yield* this.#inspectEffect(provider).pipe(
         Effect.catch(() => Effect.succeed(this.#statuses[provider])),
       );
@@ -1808,9 +1904,13 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
-        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
-      )).stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1839,6 +1939,25 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * A disk that fills during the download or the install. The space check runs before both, but it
+ * cannot see every write, so the failure itself also names the cause: a Retry on the same disk fails
+ * in the same way, and "Try again" does not tell the user to free space (#10191). tar reports a full
+ * disk in its output, not as an error code. The log keeps the original failure.
+ */
+function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  const diskFull = (error: unknown, depth: number): boolean =>
+    error instanceof Error &&
+    (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
+      DISK_FULL_OUTPUT.test(error.message) ||
+      ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
+      (depth < 3 && diskFull(error.cause, depth + 1)));
+  if (!diskFull(cause, 0)) return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.diskSpace"), { cause }) });
 }
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */
@@ -2089,6 +2208,20 @@ function releaseDownloadResponse(response: Response): Effect.Effect<void> {
   }).pipe(Effect.catch(() => Effect.void));
 }
 
+/**
+ * Fails a download step that gets no answer for `DOWNLOAD_STALL_MS`. Its interruption aborts the request.
+ * The step is interruptible also where it runs as the acquire step of `acquireRelease`.
+ */
+const failWhenStalled = <A>(step: Effect.Effect<A, ProviderRuntimeFailure>): Effect.Effect<A, ProviderRuntimeFailure> =>
+  step.pipe(
+    Effect.interruptible,
+    Effect.timeoutOrElse({
+      duration: DOWNLOAD_STALL_MS,
+      orElse: () =>
+        Effect.fail(new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadStalled")) })),
+    }),
+  );
+
 const streamResponse = Effect.fn("ProviderRuntime.streamResponse")(function* (
   response: Response,
   path: string,
@@ -2110,7 +2243,7 @@ const streamResponse = Effect.fn("ProviderRuntime.streamResponse")(function* (
         let received = offset;
         while (true) {
           if (signal.aborted) return yield* new ProviderRuntimeFailure({ cause: abortError() });
-          const chunk = yield* runtimeIO(() => reader.read());
+          const chunk = yield* runtimeIO(() => reader.read()).pipe(failWhenStalled);
           if (chunk.done) break;
           yield* Effect.callback<void, ProviderRuntimeFailure>((resume) => {
             writer.write(chunk.value, (error) =>

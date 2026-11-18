@@ -19,6 +19,7 @@ export const messages = {
   "error.host.publishFailed": "无法发布该 OpenBot。",
   "error.host.mobileConnectPublishFailed": "无法为该 OpenBot 启用手机连接发布。",
   "error.host.mobileConnectHostChanged": "手机连接的主机已更改，请重试。",
+  "error.host.mobileConnectHostMismatch": "你的账户中此服务器的密钥不同，请重试。",
   "error.host.noServer": "这台电脑没有可更改的服务器。",
   "error.host.identityLocalOnly": "服务器名称和标志只能在运行它的电脑上更改。",
   "error.host.timezoneInvalid": "未知的时区。",

@@ -329,6 +329,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeUpdateStatus,
     { ...updateStatus, phase: "up-to-date", stagedVersion: "0.68.0" } satisfies UpdateStatus,
   ],
+  [
+    "update status below the minimum version",
+    decodeUpdateStatus,
+    { ...updateStatus, phase: "downloading", requiredVersion: "0.70.0" } satisfies UpdateStatus,
+  ],
   ["update preference", decodeUpdatePreference, { autoDownload: true, allowRemoteUpdates: true, autoInstall: false }],
   ["notification preference", decodeNotificationPreference, { desktopNotifications: true, messagePreview: false }],
   [
@@ -535,6 +540,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["update status in an unknown phase", decodeUpdateStatus, { ...updateStatus, phase: "done" }],
   ["update status with an unknown failure", decodeUpdateStatus, { ...updateStatus, errorCode: "boom" }],
   ["update status with a staged release that is not text", decodeUpdateStatus, { ...updateStatus, stagedVersion: 68 }],
+  [
+    "update status with a minimum version that is not text",
+    decodeUpdateStatus,
+    { ...updateStatus, requiredVersion: 70 },
+  ],
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],

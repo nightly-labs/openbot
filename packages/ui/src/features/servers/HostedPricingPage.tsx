@@ -1,4 +1,5 @@
 import { BILLING_PLANS, type BillingCurrency, type BillingPlanId } from "@openbot/contracts/billing";
+import { isEuConsumer } from "@openbot/contracts/billing-details";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { LICENSE_MAX_USERS, type LicenseTier, type PricingOrder } from "@openbot/contracts/license";
 import {
@@ -18,8 +19,9 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { type Accessor, createSignal, createUniqueId, Show, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type BillingDetailsDraft, BillingDetailsFields, billingDetailsRequest } from "../billing/BillingDetailsFields";
 import { OrderForm, type OrderFormOrder } from "../billing/OrderForm";
 import { PageHeader, type PageHeaderFrame } from "../window/PageHeader";
 import { AddServerOtherOptions } from "./AddServerDialog";
@@ -72,7 +74,15 @@ export interface HostedPricingPageProps {
   error: UserErrorDetails | null;
   /** The title of the error. Without it, the title says that the server could not be created. */
   errorTitle?: string | undefined;
-  onSubmit: (order: PricingOrder) => void;
+  /**
+   * The billing country and EU VAT ID of the form. An order needs a country: it decides the VAT. Without it, the page
+   * does not ask for them.
+   */
+  billingDetails?: BillingDetailsDraft | undefined;
+  /** The first choices, such as the order of the web pricing page. Without it, the page starts with its defaults. */
+  initialOrder?: PricingOrder | undefined;
+  onBillingDetailsChange?: ((details: BillingDetailsDraft) => void) | undefined;
+  onSubmit: (order: PricingOrder, consent: OrderConsent) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
@@ -83,19 +93,37 @@ export interface HostedPricingPageProps {
   onJoinWithInvite?: (() => void) | undefined;
 }
 
+/** What the buyer asked for with the order, in addition to the Terms. */
+export interface OrderConsent {
+  /** A consumer in the EU asks that the hosting service begin before the 14-day withdrawal period ends. */
+  earlyStart: boolean;
+}
+
 /**
  * The web pricing page in the app window, with the same layout: the switches, the order form, and Enterprise. The
  * app's page header takes the place of the site header and the big heading. The app is already on the user's computer, so it does not say that personal use is free.
  */
 export function HostedPricingPage(props: HostedPricingPageProps) {
   const { t } = useText();
-  const initialLicense = untrack(() => (props.offerLicense ? FIRST_LICENSE : null));
+  const initialOrder = untrack(() => props.initialOrder);
+  const initialServer = initialOrder ? initialOrder.server : FIRST_SERVER;
+  const initialLicense = untrack(() =>
+    props.offerLicense ? (initialOrder ? (initialOrder.license?.tier ?? null) : FIRST_LICENSE) : null,
+  );
   const [order, setOrder] = createSignal<{ server: BillingPlanId | null; license: LicenseTier | null }>({
-    server: FIRST_SERVER,
+    server: initialServer,
     license: initialLicense,
   });
   // The tick stays when the buyer changes the order.
   const [accepted, setAccepted] = createSignal(false);
+  // A server order that the server limit blocks cannot go on, so the page does not ask for the request.
+  const earlyStartAsked = () =>
+    order().server !== null && props.serverLimit == null && isEuConsumer(props.billingDetails);
+  // The box starts clear each time it shows, as the law asks: the consumer must tick it.
+  const [earlyStart, setEarlyStart] = createSignal(false);
+  createEffect(earlyStartAsked, (asked) => {
+    if (!asked) setEarlyStart(false);
+  });
   /** The switches of the order go in the header, as the filters of the usage page do. */
   const [controlsMount, setControlsMount] = createSignal<HTMLElement>();
 
@@ -110,9 +138,14 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
       order={current}
       accepted={accepted}
       onAccept={setAccepted}
+      earlyStartAsked={earlyStartAsked()}
+      earlyStart={earlyStart}
+      onEarlyStart={setEarlyStart}
       busy={props.busy}
       serverBlocked={props.serverLimit != null}
       thisComputer={props.thisComputer}
+      billingDetails={props.billingDetails}
+      onBillingDetailsChange={props.onBillingDetailsChange}
       onSubmit={props.onSubmit}
       onClose={props.onClose}
       onOpenPrivacy={props.onOpenPrivacy}
@@ -210,8 +243,10 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
             currencyLocked={props.currencyLocked}
             used={props.used}
             licenseTrialEnd={props.licenseTrialEnd}
-            initialServer={FIRST_SERVER}
+            initialServer={initialServer}
             initialLicense={initialLicense}
+            initialInterval={initialOrder?.interval}
+            initialUsers={initialOrder?.license?.users}
             noServerTitle={noServerTitle()}
             controlsMount={controlsMount()}
             action={action}
@@ -247,11 +282,17 @@ function OrderAction(props: {
   order: Accessor<OrderFormOrder>;
   accepted: Accessor<boolean>;
   onAccept: (accepted: boolean) => void;
+  /** True when the order must ask for the early start, before the buyer can order. */
+  earlyStartAsked: boolean;
+  earlyStart: Accessor<boolean>;
+  onEarlyStart: (asked: boolean) => void;
   busy: boolean;
   /** At the server limit, an order with a server cannot go on. */
   serverBlocked: boolean;
   thisComputer: boolean;
-  onSubmit: (order: PricingOrder) => void;
+  billingDetails: BillingDetailsDraft | undefined;
+  onBillingDetailsChange: ((details: BillingDetailsDraft) => void) | undefined;
+  onSubmit: (order: PricingOrder, consent: OrderConsent) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
@@ -260,7 +301,14 @@ function OrderAction(props: {
   const id = `hosted-pricing-consent-${createUniqueId()}`;
   const buying = () => props.order().server !== null || props.order().license !== null;
   const label = () => (props.order().server === null ? t("billing.order.cta.license") : t("billing.order.cta.server"));
-  const blocked = () => !props.accepted() || props.busy || (props.serverBlocked && props.order().server !== null);
+  const detailsMissing = () =>
+    props.billingDetails !== undefined && billingDetailsRequest(props.billingDetails) === null;
+  const blocked = () =>
+    !props.accepted() ||
+    (props.earlyStartAsked && !props.earlyStart()) ||
+    props.busy ||
+    detailsMissing() ||
+    (props.serverBlocked && props.order().server !== null);
   const keepContent = () =>
     props.thisComputer ? (
       <>
@@ -303,6 +351,15 @@ function OrderAction(props: {
   return (
     <Show when={buying()} fallback={keep()}>
       <div class="hosted-pricing-consent-action">
+        <Show when={props.billingDetails}>
+          {(details) => (
+            <BillingDetailsFields
+              value={details()}
+              disabled={props.busy}
+              onChange={(next) => props.onBillingDetailsChange?.(next)}
+            />
+          )}
+        </Show>
         <div class="hosted-pricing-consent">
           <Checkbox
             id={id}
@@ -314,11 +371,22 @@ function OrderAction(props: {
             {pieces().map(part)}
           </label>
         </div>
+        <Show when={props.earlyStartAsked}>
+          <div class="hosted-pricing-consent">
+            <Checkbox
+              id={`${id}-early-start`}
+              checked={props.earlyStart()}
+              disabled={props.busy}
+              onChange={(event) => props.onEarlyStart(event.currentTarget.checked)}
+            />
+            <label for={`${id}-early-start`}>{t("sitePage.pricing.consent.earlyStart")}</label>
+          </div>
+        </Show>
         <Button
           class="hosted-pricing-pill hosted-pricing-cta"
           disabled={blocked()}
           aria-describedby={`${id}-label`}
-          onClick={() => props.onSubmit(props.order())}
+          onClick={() => props.onSubmit(props.order(), { earlyStart: props.earlyStartAsked && props.earlyStart() })}
         >
           {label()}
           <ArrowRight aria-hidden="true" />

@@ -951,10 +951,19 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
           yield* writeFiles(stage, files, executable);
           if (backup) yield* renameSkillFolder(target, backup);
           const moved = yield* Effect.result(renameSkillFolder(stage, target));
-          if (Result.isFailure(moved)) {
-            if (backup) yield* renameSkillFolder(backup, target);
-            return yield* moved.failure;
+          if (Result.isSuccess(moved)) return;
+          // On some Windows computers a program holds every new folder, so no retry renames the stage,
+          // but a new folder takes the files (#10008). Only a free target gets them: an old copy stays.
+          if (isHeldTargetError(moved.failure.cause) && !(yield* pathExists(target))) {
+            const written = yield* Effect.result(writeFiles(target, files, executable));
+            if (Result.isSuccess(written)) {
+              yield* skillIO(() => rm(stage, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore);
+              return;
+            }
+            yield* skillIO(() => rm(target, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore);
           }
+          if (backup) yield* renameSkillFolder(backup, target);
+          return yield* moved.failure;
         }).pipe(
           // A stage left beside the skill folder holds a SKILL.md, and a provider can load it as a skill.
           Effect.onError(() =>

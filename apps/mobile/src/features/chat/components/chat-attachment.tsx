@@ -14,6 +14,7 @@ import ImageOff from "lucide-react-native/icons/image-off";
 import { useEffect, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
@@ -30,6 +31,12 @@ import { useAttachmentPreview } from "./use-attachment-preview";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
+
+/**
+ * The last height that each visual page reported, by attachment, so a row that the chat list
+ * mounts again keeps its height and the chat does not move while the page loads again.
+ */
+const reportedVisualHeights = new Map<string, number>();
 
 // The width reserved while the shape is still unknown: a portrait phone photo.
 const UNKNOWN_RATIO = 3 / 4;
@@ -52,7 +59,10 @@ interface ChatAttachmentProps {
   upload?: number;
   /** The message color for the controls of a player. Unset when the user's messages have no color. */
   tint?: AttachmentTint;
-  /** The page of a visual reply, which shows in the chat as desktop shows it, at the agent's height. */
+  /**
+   * The page of a visual reply, which shows in the chat at the agent's height, or at the full height
+   * of its page when the user turns that on in Settings.
+   */
   visual?: { height?: number } | undefined;
   /** The width over height of a video frame until the video gives its first frame. */
   videoRatio?: number;
@@ -103,7 +113,16 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
   const settled = useListSettled();
   // A web view starts only once the chat shows its history, so it does not slow the chat that opens.
   const historyShown = useHistoryShown();
-  const pageHeight = chatVisualFrameHeight(undefined, props.visual?.height);
+  const full = useFullVisualPreference((state) => state.enabled);
+  // The height that the page reports. Until then, the agent's height keeps the space.
+  const [reported, setReported] = useState(() => reportedVisualHeights.get(attachment.id));
+  const report = (height: number) => {
+    reportedVisualHeights.set(attachment.id, height);
+    setReported(height);
+  };
+  const pageHeight = full
+    ? chatVisualFrameHeight(reported ?? props.visual?.height)
+    : chatVisualFrameHeight(undefined, props.visual?.height);
   const file = useMediaFile(serverId, attachment, true);
   const [page, setPage] = useState<{ uri: string; source: string } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -139,7 +158,15 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
-        style={{ width: width - 80, maxWidth: "100%", height: pageHeight }}
+        // The page ends with the rounded corners of the other chat frames, not a straight edge where it is cut.
+        style={{
+          width: width - 80,
+          maxWidth: "100%",
+          height: pageHeight,
+          borderBottomLeftRadius: FRAME_RADIUS,
+          borderBottomRightRadius: FRAME_RADIUS,
+          overflow: "hidden",
+        }}
         onPress={() => {
           void haptics.impact("soft");
           const local = { uri: page.uri, name: attachment.name, mimeType: attachment.mimeType };
@@ -149,7 +176,9 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       >
         {/* The page takes no touches, so the chat scrolls over it and a tap opens it. */}
         <View pointerEvents="none" style={FILL}>
-          {settled && historyShown ? <HtmlPage source={page.source} title={attachment.name} mode="chat" /> : null}
+          {settled && historyShown ? (
+            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={full ? report : undefined} />
+          ) : null}
         </View>
       </Pressable>
     );

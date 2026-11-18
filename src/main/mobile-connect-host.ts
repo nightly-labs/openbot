@@ -1,6 +1,7 @@
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { CentralAuthManager } from "./central-auth-manager";
 import { RemoteWorkflowError } from "./remote-service-effects";
 
@@ -10,6 +11,7 @@ interface MobileConnectHostDependencies<Operation extends keyof CentralAuthManag
     configure(input: { serverName: string }): Effect.Effect<unknown, RemoteWorkflowError>;
     getStatus(): { configured: boolean };
     getMobileConnectHost(): MobileConnectHostBinding | null;
+    refreshRegistration(): Effect.Effect<void, RemoteWorkflowError>;
     start(): Effect.Effect<
       {
         serverId: string | null;
@@ -27,15 +29,43 @@ export const createHostedMobileConnect = Effect.fn("MobileConnectHost.create")(f
   centralAuth,
   host,
 }: MobileConnectHostDependencies<"createMobileConnect">) {
-  return yield* centralAuth.createMobileConnect(yield* publishMobileConnectHost(host));
+  return yield* withRegisteredHost(host, (binding) => centralAuth.createMobileConnect(binding));
 });
 
 export const createHostedMobileConnectLink = Effect.fn("MobileConnectHost.createLink")(function* ({
   centralAuth,
   host,
 }: MobileConnectHostDependencies<"createMobileConnectLink">) {
-  return yield* centralAuth.createMobileConnectLink(yield* publishMobileConnectHost(host));
+  return yield* withRegisteredHost(host, (binding) => centralAuth.createMobileConnectLink(binding));
 });
+
+/**
+ * A start of a running host does not register it, so the account service can keep another key for it,
+ * for example after a key change whose answer was lost. Then the host registers again, which sends that
+ * change first, and the request runs one more time (#9369).
+ */
+function withRegisteredHost<A, R>(
+  host: MobileConnectHostDependencies<never>["host"],
+  request: (binding: MobileConnectHostBinding) => Effect.Effect<A, CentralAuthOperationError, R>,
+): Effect.Effect<A, CentralAuthOperationError | RemoteWorkflowError, R> {
+  return Effect.flatMap(publishMobileConnectHost(host), request).pipe(
+    Effect.catchIf(isHostMismatch, () =>
+      host.refreshRegistration().pipe(
+        Effect.andThen(publishMobileConnectHost(host)),
+        Effect.flatMap(request),
+        Effect.catchIf(
+          isHostMismatch,
+          () => new RemoteWorkflowError({ cause: new Error(sourceText("error.host.mobileConnectHostMismatch")) }),
+        ),
+      ),
+    ),
+  );
+}
+
+function isHostMismatch(error: CentralAuthOperationError | RemoteWorkflowError): boolean {
+  const { cause } = error;
+  return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "mobile_host_mismatch";
+}
 
 /** Starts the host, so the phone that uses the code can reach it, and returns its identity. */
 const publishMobileConnectHost = Effect.fn("MobileConnectHost.publish")(function* (

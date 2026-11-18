@@ -11,7 +11,7 @@
  * browse.
  */
 
-import { Alert, AlertDescription, Button, Field, Input, ShieldCheck, Text } from "@openbot/ui";
+import { Alert, AlertDescription, Button, CopyButton, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import BrowserLiveView, { type BrowserViewRuntime } from "../browser/BrowserLiveView";
@@ -69,7 +69,10 @@ export interface McpSignInPageDialogProps {
   onCancel: () => void;
 }
 
-/** The page in its own dialog, for the MCP list. It is there for as long as the sign-in waits. */
+/**
+ * The page in its own dialog, for a sign-in page that only the joined server can reach, such as an
+ * MCP server on the host's own loopback address. It is there for as long as the sign-in waits.
+ */
 export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
   const { t } = useText();
   const [cancelling, setCancelling] = createSignal(false);
@@ -110,6 +113,8 @@ function CancelSignIn(props: { cancelling: boolean; onCancel: () => void }) {
 export interface McpSignInRelaySource {
   /** The host name of the sign-in page, so the user can check it before they sign in. */
   authorizeHost: string;
+  /** The whole address of the page, for the copy button. `null` shows no button. */
+  url: string | null;
   /** Whether this computer takes the callback. When it does not, only a pasted address ends the sign-in. */
   listening: boolean;
   /** Whether a pasted address can end the sign-in. A device page returns nowhere, so it has no field. */
@@ -174,9 +179,15 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
   };
   return (
     <>
-      <Button type="button" class="mcp-sign-in-relay-open" onClick={() => void openPage()}>
-        {t("mcp.signIn.relayOpen")}
-      </Button>
+      {/* The link also works in another browser or on another device: the host waits for the sign-in. */}
+      <div class="mcp-sign-in-relay-open">
+        <Button type="button" onClick={() => void openPage()}>
+          {t("mcp.signIn.relayOpen")}
+        </Button>
+        <Show when={props.page.url}>
+          {(url) => <CopyButton value={url()} label={t("mcp.signIn.relayCopy")} iconOnly size="icon" />}
+        </Show>
+      </div>
       <Show
         when={props.page.pasteable}
         fallback={

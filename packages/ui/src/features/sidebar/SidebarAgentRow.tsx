@@ -17,6 +17,8 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { agentAccessLockLabel } from "../agents/agent-access";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
+import { SidebarAgentThreads } from "./SidebarAgentThreads";
+import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -67,6 +69,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   // The state label already reads the question, so the label does not say it twice.
   const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [rowElement, setRowElement] = createSignal<HTMLElement>();
+  // The thread card covers the row's tooltip, so the tooltip does not open while the card shows.
+  const [threadCardOpen, setThreadCardOpen] = createSignal(false);
+  const coverOpen = () => menuOpen() || threadCardOpen();
+  // A drag starts on the item, also from a thread under the row. Only the agent row moves the agent.
+  let dragFromThreads = false;
+  /** The side threads show in the full sidebar, and not for an agent that the host stops while hidden. */
+  const threads = () => (props.compact || paused() ? undefined : props.agentThreads);
   const limit = () => {
     const current = state();
     return current?.kind === "limited" ? current : undefined;
@@ -78,10 +88,12 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       : "";
   };
   const routineLabel = () => (state()?.kind === "routine" || limit() ? stateLabel() : "");
-  // Only a waiting row has a tooltip, so the rows in the sections do not each carry one.
+  // In the full sidebar, only a waiting row has a tooltip, so the rows in the sections do not each
+  // carry one. The compact sidebar shows only the avatar, so each row names its agent.
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
       <ContextMenu.Trigger
+        ref={setRowElement}
         as="button"
         type="button"
         class={[
@@ -93,7 +105,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
           },
         ]}
         aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}${windowLabel()}${labelDetail()}${stateLabel() ? `. ${stateLabel()}` : ""}`}
-        title={routineLabel() || undefined}
+        title={props.compact ? undefined : routineLabel() || undefined}
         aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
         data-cuelume-navigate=""
         onClick={(event: MouseEvent) => {
@@ -180,14 +192,52 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       style={`--sidebar-drag-y: ${dragOffset(rowProps.agent.id).y}px;`}
       data-chat-id={rowProps.waiting || rowProps.userHidden ? undefined : rowProps.agent.id}
       draggable={draggable() ? "true" : "false"}
-      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.agent.id)}
+      onPointerDown={(event: PointerEvent) => {
+        dragFromThreads = event.target instanceof Element && event.target.closest(".sidebar-threads") !== null;
+      }}
+      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => {
+        if (dragFromThreads) {
+          event.preventDefault();
+          return;
+        }
+        startChatDragging(event, rowProps.agent.id);
+      }}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip
+            name={rowProps.agent.name}
+            title={title()}
+            preview={detail()}
+            detail={routineLabel()}
+            menuOpen={coverOpen()}
+          >
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
-          <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
+          <SidebarWaitTooltip
+            wait={current()}
+            menuOpen={coverOpen()}
+            name={props.compact ? rowProps.agent.name : undefined}
+          >
             {row()}
           </SidebarWaitTooltip>
+        )}
+      </Show>
+      <Show when={threads()}>
+        {(model) => (
+          <SidebarAgentThreads
+            model={model()}
+            agentId={rowProps.agent.id}
+            agentName={rowProps.agent.name}
+            row={rowElement()}
+            menuOpen={menuOpen()}
+            onCardChange={setThreadCardOpen}
+          />
         )}
       </Show>
     </div>

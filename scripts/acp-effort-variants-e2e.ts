@@ -3,7 +3,8 @@
 // of its own, and `configOptions` offers each family once, with a `thought_level` option. Checks that
 // the picker gets one model for each family with that family's efforts, that the discovery session
 // goes back to the exact model it opened on, that a selected family and effort reach the session, and
-// that an agent whose option lists the same models keeps today's catalog, also with a provider option.
+// that an agent whose option lists the same models keeps today's catalog, also with a provider option,
+// and is asked for each model's efforts only when its opening model has no effort option (#10976).
 // Like the Antigravity CLI 1.5.4, the fake offers its Claude and GPT models to every client, so OpenBot
 // sends its own name (`openbot`), not `zed` as it did for Antigravity 1.4.
 // `bun scripts/acp-effort-variants-e2e.ts`. Writes .openbot-build/acp-effort-variants-e2e/report.json.
@@ -295,14 +296,18 @@ try {
   }
   report.grouped = { clientNames, models: grouped, discoveryEndsOn, turns };
 
-  // 4. An agent whose option lists the same models keeps the listed catalog, and is not asked again.
-  // A provider option of the model category before the model option (Cline) changes nothing.
+  // 4. An agent whose option lists the same models keeps the listed catalog. When its session opened
+  // on a model with no effort option, each model is asked for its own (#10976): this fake has none,
+  // so no model gets an Effort menu, and the session goes back to its opening model. A provider
+  // option of the model category before the model option (Cline) is not asked.
   await runCauseEffect(client.stop());
   for (const mode of ["flat", "provider"] as const) {
     await rm(log, { force: true });
     process.env.FAKE_AGY_MODE = mode;
-    const listed = (await listModels(open(cli))).map((model) => model.model ?? "");
-    const discoveryRequests = (await readLog()).filter((entry) => entry.event === "set").length;
+    const catalog = await listModels(open(cli));
+    const listed = catalog.map((model) => model.model ?? "");
+    const sets = (await readLog()).filter((entry) => entry.event === "set");
+    const discoveryRequests = sets.length;
     assert.deepEqual(
       listed,
       [
@@ -318,7 +323,20 @@ try {
       ],
       `An agent that does not group (${mode}) keeps its listed models.`,
     );
-    assert.equal(discoveryRequests, 0, `An agent that does not group (${mode}) is not asked for each model's efforts.`);
+    assert.ok(
+      catalog.every((model) => model.reasoningEffortConfigurable === false),
+      `No model of an agent without effort options (${mode}) gets an Effort menu.`,
+    );
+    if (mode === "flat") {
+      assert.ok(discoveryRequests > 0, "An agent whose opening model has no effort option is asked for each model's.");
+      const endsOn: Record<string, string | null> = {};
+      for (const entry of sets) endsOn[entry.sessionId] = entry.model;
+      for (const [session, model] of Object.entries(endsOn)) {
+        assert.equal(model, "gemini-3.8-flash-high", `Discovery session ${session} goes back to its opening model.`);
+      }
+    } else {
+      assert.equal(discoveryRequests, 0, "An agent whose first model option is a provider is not asked.");
+    }
     report[mode] = { models: listed, discoveryRequests };
   }
   report.passed = true;

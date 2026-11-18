@@ -30,6 +30,7 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
+import { deleteCachedWorkflows, keepCachedWorkflows } from "../workflows/workflow-cache";
 import {
   deleteRemoteWorkspaceFrame,
   deleteRemoteWorkspaceFrames,
@@ -436,11 +437,14 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    // The frames go with the account, with a server that leaves the list, and with ended access.
+    // The frames and the cached workflows go with the account, with a server that leaves the list, and
+    // with ended access.
     createEffect(
       () => centralAuth().status === "signed_out",
       (signedOut) => {
-        if (signedOut) deleteRemoteWorkspaceFrames(null);
+        if (!signedOut) return;
+        deleteRemoteWorkspaceFrames(null);
+        keepCachedWorkflows(null);
       },
     );
     createEffect(
@@ -453,6 +457,7 @@ const ServerScope = createSimpleContext({
         if (!key) return;
         const [account = "", ...serverIds] = key.split("\0");
         deleteRemoteWorkspaceFrames(account, serverIds);
+        keepCachedWorkflows(account, serverIds);
       },
     );
     createEffect(
@@ -467,6 +472,7 @@ const ServerScope = createSimpleContext({
         if (!key) return;
         const [account = "", serverId = ""] = key.split("\0");
         deleteRemoteWorkspaceFrame(account, serverId);
+        deleteCachedWorkflows(serverId);
       },
     );
 

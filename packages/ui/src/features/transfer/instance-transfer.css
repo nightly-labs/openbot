@@ -12,6 +12,20 @@
   justify-content: flex-start;
 }
 
+.instance-transfer-upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  max-width: 320px;
+}
+
+.instance-transfer-upload-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 .instance-transfer-back {
   align-self: flex-start;
   padding-inline: 0;

@@ -110,36 +110,50 @@ export async function routeChannels(
     // The codec drops the field for a peer without the capability, so the frame budget leaves it out too.
     const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
     const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
-    // The tasks of a page do not change with its message limit, so the waits are read once.
-    let pageWaits: ChannelTaskWait[] | undefined;
+    // The newest 100 messages, the tasks and the waits are read once. A smaller page only keeps fewer of
+    // these messages, and the older messages are counted only for the page that is sent: the count reads
+    // the whole older history, and before, each smaller page read and counted everything again (#10187).
+    const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, 100);
+    const tasks =
+      seenSubtasks && input.beforeSequence === undefined
+        ? channels.store.withSeenDependencies(input.channelId, newest.tasks)
+        : newest.tasks;
+    const waits = taskWaits
+      ? visibleWaits(channels, channels.taskWaits(input.channelId, newest.tasks), hiddenAgentIds, channelHiddenAgentIds)
+      : [];
+    // channel-task-waits-v1 names only tasks of the page.
+    const withWaits = <Page extends { tasks: ChannelTask[] }>(value: Page): Page & { waits?: ChannelTaskWait[] } => {
+      const kept = waits.filter((wait) => value.tasks.some((task) => task.id === wait.taskId));
+      return kept.length ? { ...value, waits: kept } : value;
+    };
     // Long messages, such as a member's thinking, make a page of fewer messages, so it fits one WebRTC
     // frame. The client reads the rest as older pages. A page larger than the frame cannot reach a
     // remote client.
     for (let limit = 100; ; limit = Math.floor(limit / 2)) {
-      const page = channels.store.page(input.channelId, input.beforeSequence, limit);
-      pageWaits ??= taskWaits
-        ? visibleWaits(channels, channels.taskWaits(input.channelId, page.tasks), hiddenAgentIds, channelHiddenAgentIds)
-        : [];
-      const waits = pageWaits;
+      const messages = newest.messages.slice(-limit);
+      const hasOlder = newest.olderCursor !== null || newest.messages.length > limit;
+      const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
       const base = {
-        ...page,
-        tasks:
-          seenSubtasks && input.beforeSequence === undefined
-            ? channels.store.withSeenDependencies(input.channelId, page.tasks)
-            : page.tasks,
-        channel: peerChannel(page.channel),
-        messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
+        ...newest,
+        tasks,
+        olderCursor,
+        channel: peerChannel(newest.channel),
+        messages: messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
       };
-      // channel-task-waits-v1 names only tasks of the page.
-      const withWaits = (value: typeof base): typeof base & { waits?: ChannelTaskWait[] } => {
-        const kept = waits.filter((wait) => value.tasks.some((task) => task.id === wait.taskId));
-        return kept.length ? { ...value, waits: kept } : value;
+      // The count only adds bytes, so it is read only for a page that fits without it, and once per page.
+      let extent: { olderCount: number; oldestAt?: string } | undefined;
+      const sized = <Page extends typeof base>(value: Page) => {
+        if (olderCursor !== null) extent ??= channels.store.olderExtent(input.channelId, olderCursor);
+        const page = extent ? { ...value, ...extent } : value;
+        return { body: page, bytes: Buffer.byteLength(JSON.stringify(page)) };
       };
       let body = withWaits(base);
       let bytes = Buffer.byteLength(JSON.stringify(body));
+      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) ({ body, bytes } = sized(body));
       if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
         body = withWaits({ ...base, tasks: pageTasks(base.tasks, base.messages) });
         bytes = Buffer.byteLength(JSON.stringify(body));
+        if (bytes <= WEBRTC_FRAME_BODY_BUDGET || limit === 1) ({ body, bytes } = sized(body));
       }
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, body);
       if (limit === 1) {

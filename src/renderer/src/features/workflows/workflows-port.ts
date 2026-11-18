@@ -10,7 +10,9 @@ import {
   WORKFLOW_PICTURE_TYPES,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import type {
   WorkflowChannel,
@@ -29,8 +31,8 @@ import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability 
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
 /** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits";
-/** Each method with its input only; `list`, `githubCatalog`, `mediaProviders` and `mediaCredits` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog";
+/** Each method with its input only; the methods of `NoInputMethod` take none. */
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
@@ -99,6 +101,12 @@ export interface WorkflowHost {
    */
   mediaTransparentSupported(): boolean;
   /**
+   * Whether an image step can have a custom size in pixels or the aspect ratios 4:5 and 5:4: this
+   * computer always, and a joined server only when it advertises `workflows-media-size-v1`. An older
+   * host reads them as the first aspect ratio of the model.
+   */
+  mediaSizeSupported(): boolean;
+  /**
    * The pictures of the host's Library that an asset step can use: this computer's, or a joined
    * server's when it serves `storage-v1`. The host gives a member only the files of the agents that
    * they see. A host without image and video steps gives none.
@@ -109,8 +117,17 @@ export interface WorkflowHost {
    * agent, and answers it as a Library file. Only a host with image and video steps keeps one.
    */
   uploadPicture(file: File): Promise<StoredFileRow>;
-  /** The address of an image or a video that a media step made, from its attachment id. */
-  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | undefined;
+  /**
+   * The address of an image or a video that a media step made, from its attachment id. Undefined
+   * while it loads, null when it cannot show here.
+   */
+  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
+  /**
+   * The address of a small copy of a picture, for a card that shows it small (`attachment-preview-v1`).
+   * The file itself when the host makes no copy, or on this computer, which reads it from its disk.
+   * Undefined and null as for `mediaUrl`.
+   */
+  mediaPreviewUrl(attachmentId: string): string | null | undefined;
   /** The GitHub connection that the host's GitHub triggers and outputs use. */
   githubConnector: GitHubConnectorPort;
   /** The joined server, as its server row names it, or undefined for this computer. */
@@ -119,11 +136,14 @@ export interface WorkflowHost {
   openUrl(url: string): Promise<void>;
 }
 
-/** The pictures of a Library scan that the host can send to an image or video model. */
+/**
+ * The pictures of a Library scan that the host can send to an image or video model, newest first.
+ * The scan lists the largest file first, which would put a new upload out of Recent.
+ */
 export function libraryPictures(usage: StorageUsage | null): readonly StoredFileRow[] {
-  return (usage?.files ?? []).filter(
-    (file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType),
-  );
+  return (usage?.files ?? [])
+    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 /** Refuses a file that the host does not keep as a picture, before its bytes come into memory. */
@@ -171,13 +191,25 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   /** The host runs Telegram and Slack nodes, and their chats and workspaces come from its connections. */
   const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
   const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
-  const options = () => window.openbot.routineResults.options(serverId);
+  /**
+   * The places, Discord servers, Telegram chats and Slack workspaces read the connections at the same
+   * time, so they share one call while it runs.
+   */
+  let optionsCall: ReturnType<OpenBotDesktopApi["routineResults"]["options"]> | undefined;
+  const options = () => {
+    optionsCall ??= window.openbot.routineResults.options(serverId).finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
   const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
   const mediaAccountSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
   const mediaTransparentSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+  const mediaSizeSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
   // A joined server without GitHub workflows gets no call: its port rejects before main.
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   // A joined server's attachment comes through main, which downloads it from the host.
@@ -185,6 +217,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     local()
       ? `openbot-attachment://file/${encodeURIComponent(attachmentId)}`
       : `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  const mediaPreviewUrl = (attachmentId: string) =>
+    !local() && serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
+      ? `${mediaUrl(attachmentId)}?preview=1`
+      : mediaUrl(attachmentId);
   return {
     workflows: {
       list: () => api().list(serverId),
@@ -210,10 +246,14 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
       keepPicture: (draftId) => api().keepPicture(draftId, serverId),
-      // Main answers `{ sunra: false }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: false` for a joined server without `workflows-sunra-v1`, and
+      // `higgsfield: false` for one without `workflows-higgsfield-v1`.
       mediaProviders: () => api().mediaProviders(serverId),
-      // Main answers `{ sunra: null }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: null` or `higgsfield: null` for a joined server without that capability.
       mediaCredits: () => api().mediaCredits(serverId),
+      // Main answers no models and no quote for a joined server without `workflows-media-catalog-v1`.
+      mediaCatalog: () => api().mediaCatalog(serverId),
+      mediaPrice: (input) => api().mediaPrice(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -322,7 +362,9 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported,
     mediaAccountSupported,
     mediaTransparentSupported,
+    mediaSizeSupported,
     mediaUrl,
+    mediaPreviewUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
     },

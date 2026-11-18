@@ -6,7 +6,11 @@ import type {
   ConversationSnapshot,
   QueueDelivery,
 } from "@openbot/contracts/ipc";
-import { AGENT_EXCHANGE_ITEM_TYPE, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
+import {
+  AGENT_EXCHANGE_ITEM_TYPE,
+  mergeImageGenerationInfo,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
 import {
@@ -110,12 +114,15 @@ export function messagesFromThreadItems(
         status: failed ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "image_generation",
         imageGeneration: {
-          ...(isString(item.revised_prompt)
-            ? { prompt: item.revised_prompt }
-            : isString(item.prompt)
-              ? { prompt: item.prompt }
-              : {}),
-          resolution: isString(item.resolution) ? item.resolution : "1024 × 1024",
+          ...(isString(item.revisedPrompt)
+            ? { prompt: item.revisedPrompt }
+            : isString(item.revised_prompt)
+              ? { prompt: item.revised_prompt }
+              : isString(item.prompt)
+                ? { prompt: item.prompt }
+                : {}),
+          // The stored message has the real size (`image-gen-runtime.ts`); the merge keeps it.
+          resolution: isString(item.resolution) ? item.resolution : "",
           aspectRatio: imageGenerationAspectRatio(item) ?? "square",
           ...(failure ? { error: failure } : {}),
         },
@@ -321,7 +328,7 @@ function mergeConversationMessages(
             ...message,
             ...(exchange ? { exchange } : {}),
             attachments: message.attachments ?? previous.attachments,
-            imageGeneration: message.imageGeneration ?? previous.imageGeneration,
+            imageGeneration: mergeImageGenerationInfo(previous.imageGeneration, message.imageGeneration),
             videoGeneration: message.videoGeneration ?? previous.videoGeneration,
           }
         : message,
@@ -534,11 +541,13 @@ function isProviderAssistantMessage(message: ConversationMessage): boolean {
 }
 
 function providerMessageIdentity(message: ConversationMessage): string {
+  // The live message has the size of the file; provider history does not.
+  const image = message.imageGeneration;
   return JSON.stringify([
     message.turnId,
     message.itemType ?? null,
     message.text,
-    message.imageGeneration ?? null,
+    image ? { ...image, resolution: null, aspectRatio: null } : null,
     ...(message.videoGeneration ? [message.videoGeneration] : []),
   ]);
 }

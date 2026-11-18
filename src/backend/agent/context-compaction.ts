@@ -578,6 +578,7 @@ export class ContextCompaction {
     const client = agent ? this.#providers.clientForAgent(agent) : null;
     if (
       budget?.phase !== "requested" ||
+      !agent ||
       !client ||
       !compactsOnRequest(client.contextCompaction) ||
       !this.#providers.isReady()
@@ -614,10 +615,12 @@ export class ContextCompaction {
           }
           // After the load, which has the request timeout of the client: the deadline is for the compaction.
           this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
+          // A `request` client opens a closed session again for the compaction. After a provider
+          // restart it has no saved settings, so it needs the folder that thread start uses (#10107).
           return client
             .request(
               "thread/compact/start",
-              { threadId },
+              runsInRequest ? { threadId, cwd: agent.workspacePath } : { threadId },
               decodeRecordResponse,
               runsInRequest ? this.#runTimeoutMs : undefined,
             )

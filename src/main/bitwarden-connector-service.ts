@@ -6,6 +6,7 @@ import type { BitwardenConnectorStatus, BitwardenHostConnectInput } from "@openb
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
+import { cliSpawnTarget } from "../backend/cli";
 import { causeHelpers } from "../backend/effect-boundary";
 import {
   type PasswordVault,
@@ -14,6 +15,7 @@ import {
   websiteMatchesOrigin,
   websiteUrl,
 } from "../backend/password-vault";
+import { stopWindowsProcessTree } from "../backend/windows-process-tree";
 import type { BitwardenConnectorRecord, BitwardenConnectorStore } from "./bitwarden-connector-store";
 
 const logger = createOpenBotLogger("bitwarden-connector");
@@ -80,8 +82,24 @@ export interface BitwardenHostOptions {
 function failure(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFailed")) });
 }
+function cliMissing(): PasswordVaultError {
+  return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
+}
 
-/** No shell, inherited credentials, or command output in an error. */
+/**
+ * `bw unlock` unlocked, then failed in its user key id backfill, which a server without that route
+ * (Vaultwarden before 1.37.4) refuses. `bw` then pauses the backfill for 24 hours in its data folder,
+ * so the next `unlock` works (bitwarden/clients#23937).
+ */
+export class BitwardenKeyIdBackfillError extends Error {}
+
+const CLI_TIMEOUT_MS = 30_000;
+
+/**
+ * No inherited credentials or command output in an error. An npm install on Windows gives `bw.cmd`,
+ * which only `cmd.exe` runs; the arguments hold no secret. Its `cmd.exe` and `node` read `PATHEXT`
+ * and `ComSpec`. A stop or a timeout ends the whole tree, or `node` keeps running after `cmd.exe`.
+ */
 const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
   const env: NodeJS.ProcessEnv = { BITWARDENCLI_INTERACTIVE: "false" };
   for (const name of [
@@ -90,6 +108,8 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
     "APPDATA",
     "LOCALAPPDATA",
     "SystemRoot",
+    "ComSpec",
+    "PATHEXT",
     "TEMP",
     "TMP",
     "TMPDIR",
@@ -99,32 +119,95 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
     if (process.env[name]) env[name] = process.env[name];
   }
   Object.assign(env, extra);
+  const target = cliSpawnTarget(executable, args);
+  const wrapper = target.windowsVerbatimArguments;
   return new Promise((resolve, reject) => {
-    execFile(
-      executable,
-      args,
-      { env, signal, timeout: 30_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => {
-        if (error) reject(new Error(sourceText("error.connector.bitwardenFailed")));
-        else resolve(stdout);
+    const child = execFile(
+      target.command,
+      target.args,
+      {
+        env,
+        ...(wrapper ? {} : { signal, timeout: CLI_TIMEOUT_MS }),
+        maxBuffer: 8 * 1024 * 1024,
+        windowsHide: true,
+        windowsVerbatimArguments: wrapper,
+      },
+      (error, stdout, stderr) => {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", stop);
+        if (!error) resolve(stdout);
+        else if (stderr.includes("KeyIdBackfillError"))
+          reject(new BitwardenKeyIdBackfillError(sourceText("error.connector.bitwardenFailed")));
+        else reject(new Error(sourceText("error.connector.bitwardenFailed")));
       },
     );
+    const stop = () => Effect.runFork(stopWindowsProcessTree(child).pipe(Effect.ignore));
+    const timer = wrapper ? setTimeout(stop, CLI_TIMEOUT_MS).unref() : undefined;
+    if (!wrapper) return;
+    if (signal.aborted) stop();
+    else signal.addEventListener("abort", stop, { once: true });
   });
 };
 
-async function findCli(): Promise<string> {
-  const name = process.platform === "win32" ? "bw.exe" : "bw";
-  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+async function firstCli(names: string[], directories: string[]): Promise<string | null> {
   for (const directory of new Set(directories.filter(isAbsolute))) {
-    try {
-      const path = await realpath(join(directory, name));
-      await access(path, constants.X_OK);
-      return path;
-    } catch {
-      /* Try the next installation directory. */
+    for (const name of names) {
+      try {
+        const path = await realpath(join(directory, name));
+        await access(path, constants.X_OK);
+        return path;
+      } catch {
+        /* Try the next name, then the next installation directory. */
+      }
     }
   }
-  throw new Error(sourceText("error.connector.bitwardenFailed"));
+  return null;
+}
+
+/** Where Windows keeps the user and the system `Path` that a new process gets. */
+const WINDOWS_PATH_KEYS = [
+  "HKCU\\Environment",
+  "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+];
+
+/**
+ * The folders of the Windows `Path` as it is now, and the folders where winget links its tools.
+ * OpenBot's own `PATH` is the one it got at start, so a CLI installed after that is not on it.
+ * A key that cannot be read adds no folders.
+ */
+async function currentWindowsPathFolders(): Promise<string[]> {
+  const reg = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "reg.exe");
+  const values = await Promise.all(
+    WINDOWS_PATH_KEYS.map(
+      (key) =>
+        new Promise<string>((resolve) => {
+          execFile(reg, ["query", key, "/v", "Path"], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
+            resolve(error ? "" : (/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/imu.exec(stdout)?.[1] ?? ""));
+          });
+        }),
+    ),
+  );
+  const folders = values
+    .flatMap((value) => value.split(";"))
+    .map((folder) => folder.trim().replace(/%([^%]+)%/gu, (text, name: string) => process.env[name] ?? text));
+  const { LOCALAPPDATA, ProgramFiles } = process.env;
+  if (LOCALAPPDATA) folders.push(join(LOCALAPPDATA, "Microsoft", "WinGet", "Links"));
+  if (ProgramFiles) folders.push(join(ProgramFiles, "WinGet", "Links"));
+  return folders;
+}
+
+/**
+ * The first `bw` on the `PATH`. On Windows `bw.exe` goes before the `bw.cmd` that npm installs, as in
+ * a terminal. The bare `bw` beside that `bw.cmd` is a shell script, which Windows cannot start.
+ */
+async function findCli(): Promise<string> {
+  const names = process.platform === "win32" ? ["bw.exe", "bw.cmd"] : ["bw"];
+  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+  const found =
+    (await firstCli(names, directories)) ??
+    (process.platform === "win32" ? await firstCli(names, await currentWindowsPathFolders()) : null);
+  if (found) return found;
+  throw new Error(sourceText("error.connector.bitwardenCliMissing"));
 }
 
 /** An `https:` server address without a trailing slash, or null. `bw status` reports it as it was set. */
@@ -221,7 +304,7 @@ export class BitwardenConnectorService implements PasswordVault {
     yield* this.disconnect();
     const attempt = this.#attempt;
     registerSecretValue(key);
-    const executable = yield* Effect.tryPromise({ try: this.#find, catch: failure });
+    const executable = yield* Effect.tryPromise({ try: this.#find, catch: cliMissing });
     const session: Session = { executable, env: { BW_SESSION: key }, folderId: "", abort: new AbortController() };
     // Keep the pending session so disconnect can cancel the CLI while connect is waiting.
     if (attempt !== this.#attempt) return this.status();
@@ -441,9 +524,18 @@ export class BitwardenConnectorService implements PasswordVault {
           BW_CLIENTSECRET: record.clientSecret,
         });
       }
-      const key = (yield* this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
+      const unlock = this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
         BW_PASSWORD: record.masterPassword,
-      })).trim();
+      });
+      const key = (yield* unlock.pipe(
+        Effect.catchIf(
+          ({ cause }) => cause instanceof BitwardenKeyIdBackfillError,
+          () => {
+            logger.info("The Bitwarden CLI failed its user key id backfill. Unlocking again.");
+            return unlock;
+          },
+        ),
+      )).trim();
       if (!key) return yield* failure();
       registerSecretValue(key);
       session.env = { ...env, BW_SESSION: key };
@@ -466,7 +558,8 @@ export class BitwardenConnectorService implements PasswordVault {
       catch: failure,
     });
     const shared = folders.filter((folder) => folder.name === "Shared with OpenBot");
-    if (shared.length !== 1 || !shared[0]?.id) return yield* failure();
+    if (shared.length !== 1 || !shared[0]?.id)
+      return yield* new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFolderMissing")) });
     session.folderId = shared[0].id;
     this.#error = null;
     this.#touch();
@@ -539,7 +632,8 @@ export class BitwardenConnectorService implements PasswordVault {
           this.#running.add(pending);
           return pending.finally(() => this.#running.delete(pending));
         },
-        catch: failure,
+        catch: (error) =>
+          error instanceof BitwardenKeyIdBackfillError ? new PasswordVaultError({ cause: error }) : failure(),
       });
       if (this.#session !== session) return yield* failure();
       this.#touch();

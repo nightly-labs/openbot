@@ -1,5 +1,4 @@
 import type { AgentStatus, BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
-import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -53,10 +52,18 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const connectors = useConnectors();
   const { selectAgent, messageFocusRequest, globalSearchOpen } = useNavigation();
   const auth = useAuth();
-  const { teamPresence, currentTeamMember } = usePresence();
+  const { teamPresence, readerMemberId } = usePresence();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
-  const { serverSettingsOpen, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
+  const { serverSettingsOpen } = useServerSettings();
+  const {
+    appSettingsOpen,
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    setPendingMcpSignIn,
+    mcpSignIns,
+    refreshMcpSignIns,
+    generalSettings,
+  } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
@@ -72,7 +79,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });
@@ -156,6 +163,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       responseStyle={responseStyle()}
       presence={teamPresence()}
       currentUserEmail={props.account().email}
+      currentUserChatColor={props.account().chatColor}
       isOwnSender={isOwnSender}
       browserEnabled={!platform.landingPreview && activeServerSupportsCapability("browser-control")}
       openLinksInBrowser={generalSettings().externalLinkTarget.kind === "openbot"}
@@ -169,14 +177,13 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       browserTakeover={view.browserTakeover()}
       activeTurnId={view.activeTurnId()}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
-      mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
+      mcpSettingsOpen={skillsMarketplaceOpen()}
       globalOverlayOpen={
         globalSearchOpen() ||
         joinServerOpen() ||
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts() ||
         quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
@@ -201,16 +208,20 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onStop={view.onStop}
       onDeleteMessage={view.deleteMessageAction()}
       canDeleteMessage={view.canDeleteMessage}
-      // A member's Sign in card signs in as the agent chat's does: on this computer, or through a host
-      // that relays its sign-in page.
+      // A member's Sign in card opens the server's Marketplace page, as the agent chat's does.
       onOpenMcpSignIn={(() => {
         const server = activeServer();
         if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
-        return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
+        return (mcpServerId: string) => {
+          setPendingMcpSignIn(mcpServerId);
+          setSkillsMarketplaceOpen(true);
+        };
       })()}
-      mcpSignedIn={(mcpServerId) =>
-        serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
-      }
+      mcpSignedIn={(mcpServerId) => {
+        const known = mcpSignIns();
+        return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
+      }}
+      refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
     />
   );
 }

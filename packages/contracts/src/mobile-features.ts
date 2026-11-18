@@ -1,3 +1,4 @@
+import { compareReleaseVersions, type ReleaseVersion } from "./release-version";
 import { isBoolean, isDynamicRecord, isString } from "./runtime-values";
 
 /** The mobile features that the account server can turn on and off for each platform and app version. */
@@ -34,26 +35,23 @@ export function mobileFeaturesOff(): MobileFeatureFlags {
   return { cloudServers: false, browser: false };
 }
 
-function versionParts(value: string): number[] | null {
+/**
+ * A mobile app version. This is a released contract of the feature gates, the changelog and the
+ * update prompt, and it is not SemVer: an over-the-air update adds a fourth part ("1.4.8.1"), and
+ * there is no pre-release. So it keeps its own grammar. The order is the shared one, so "1.10.0" is
+ * after "1.9.0", "1.2" equals "1.2.0" and "1.4.8.1" is after "1.4.8".
+ */
+function versionParts(value: string): ReleaseVersion | null {
   if (!/^\d{1,6}(\.\d{1,6}){0,3}$/u.test(value)) return null;
-  return value.split(".").map(Number);
+  return { parts: value.split(".").map(Number), prerelease: [] };
 }
 
-/** Compares two versions part by part, so "1.10.0" is after "1.9.0" and "1.2" equals "1.2.0". */
-function compareVersions(version: number[], other: number[]): number {
-  for (let index = 0; index < Math.max(version.length, other.length); index += 1) {
-    const difference = (version[index] ?? 0) - (other[index] ?? 0);
-    if (difference !== 0) return difference;
-  }
-  return 0;
-}
-
-function hasFeature(versions: MobileFeatureVersions, version: number[]): boolean {
+function hasFeature(versions: MobileFeatureVersions, version: ReleaseVersion): boolean {
   const last = versionParts(versions.upTo);
-  if (!last?.some((part) => part > 0) || compareVersions(version, last) > 0) return false;
+  if (!last?.parts.some((part) => part > 0) || compareReleaseVersions(version, last) > 0) return false;
   return !versions.except?.some((value) => {
     const excluded = versionParts(value);
-    return excluded !== null && compareVersions(version, excluded) === 0;
+    return excluded !== null && compareReleaseVersions(version, excluded) === 0;
   });
 }
 
@@ -96,7 +94,7 @@ export function parseMobileLatestVersion(value: unknown): string | null {
 export function isNewerMobileVersion(candidate: string, current: string): boolean {
   const next = versionParts(candidate);
   const now = versionParts(current);
-  return next !== null && now !== null && compareVersions(next, now) > 0;
+  return next !== null && now !== null && compareReleaseVersions(next, now) > 0;
 }
 
 export const MOBILE_CHANGELOG_PATH = "/v1/mobile/changelog";
