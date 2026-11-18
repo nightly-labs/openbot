@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { setAgentBackdrop, useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/workspace-store";
 import { largeDownloadOf } from "../model/large-files";
+import { HtmlPage } from "./html-page";
 
 /** The message ids that wait or run now. A second update of the chat does not add them again. */
 const pending = new Set<string>();
@@ -56,7 +57,8 @@ export function useAgentBackdrops({
     };
   }, []);
   useEffect(() => {
-    if (!ready || !messages) return;
+    // A build with no web view cannot show a page: the backdrop that the user picked stays.
+    if (!ready || !messages || !HtmlPage) return;
     const reader = memberId || null;
     const readerAccount = accountUserId ? `local-user:${accountUserId}` : null;
     const isReader = (id: string) => id === reader || id === readerAccount;
