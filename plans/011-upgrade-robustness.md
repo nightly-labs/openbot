@@ -95,7 +95,7 @@ Not confirmed: desktop users other than the developer (no central source).
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
 | 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); step 2 (protocol 10) in review on `t3/protocol-10-capability-registry-1`; the share sender step needs a store build |
-| 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
+| 3 | A server stops a start loop and reports the reason through the Team API | IN REVIEW: the loop stops (#10775, `932be637d6`); safe mode in #12185; `copy_release` stays a copy (see below) |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
@@ -181,7 +181,7 @@ Evidence: `src/main/index.ts` `recoverFromStartLoop` only logs for a server;
 
 Change: after repeated failed starts, or a `NewerDatabaseError`, the server stops the loop, keeps a
 minimal Team API up that tells all members the reason, and clients (desktop with a joined
-server, web client, mobile) show it. The release copy becomes atomic.
+server, web client, mobile) show it. The release copy is safe after a stop or a failure.
 
 Decisions (developer, 2026-11-18): all members see the reason. The safe mode has no install and no
 rollback action, on servers and on Docker: a newer release, through the existing update path, is the
@@ -200,8 +200,15 @@ Done in the safe-mode PR (stacked on protocol 10):
   after 1 h with exit 78.
 - `scripts/server-safe-mode-e2e.ts`.
 
-Not done: the atomic `copy_release`. A rename of a release directory conflicts with boat, which
-loses renamed directories on archive. It needs a decision on the method.
+Not changed: `copy_release` stays a copy (decision, 2026-11-18). A rename of a release directory is
+not safe on boat: a directory moved with `mv` into `/opt` is empty after the next stop and resume.
+The copy is already safe without a rename:
+- `stage_release` writes `staged.ready` only after the copy is complete, so `apply` never uses a
+  partial `staged`.
+- `swap_in` writes `.applying` first and keeps `staged` until `finish_swap`, so a stop or a failure
+  during the copy makes the next `apply` copy again.
+- `swap_in` removes `app` before the copy, so the copy needs about the same free disk space that the
+  removal gives back.
 
 ### 4. Schema-aware desktop recovery
 
