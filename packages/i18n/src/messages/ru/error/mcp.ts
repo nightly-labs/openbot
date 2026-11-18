@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "Вход отклонён. Вернитесь в OpenBot и повторите попытку.",
   "error.mcp.redirectNoSignIn": "Нет входа, который ждал бы этого. Возможно, он уже завершён.",
   "error.mcp.redirectSignedIn": "OpenBot выполнил вход. Это окно можно закрыть.",
+  "error.mcp.redirectNotSaved": "Вход не завершён. Вернитесь в OpenBot, чтобы узнать причину.",
   "error.mcp.signInFileUnreadable": "Файл входа MCP не читается.",
   "error.mcp.signInFileTooLarge": "Файл входа MCP слишком большой.",
   "error.mcp.unsupported": "Этот сервер не поддерживает серверы MCP.",

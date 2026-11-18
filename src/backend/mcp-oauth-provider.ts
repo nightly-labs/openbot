@@ -344,6 +344,11 @@ export class McpOAuth implements McpOAuthAuthority {
   /** The waiting sign-ins whose page an opener of their own showed, not the user's browser. */
   readonly #openedElsewhere = new Set<string>();
   /**
+   * For each waiting `state`, whether its grant became a saved sign-in. The browser page waits for
+   * it, so it does not say "signed in" for a grant that the token endpoint then refuses (#12017).
+   */
+  readonly #exchanges = new Map<string, Deferred.Deferred<boolean>>();
+  /**
    * The cancel of the sign-in still running for each server. A user who presses Cancel names the
    * server, not the `state`, and one attempt per server is kept: a second Sign in replaces the
    * first rather than leaving two browser tabs that race to answer.
@@ -532,6 +537,8 @@ export class McpOAuth implements McpOAuthAuthority {
       );
     });
     if (open) this.#openedElsewhere.add(state);
+    const exchanged = Deferred.makeUnsafe<boolean>();
+    this.#exchanges.set(state, exchanged);
     // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
     // browser afterwards nor wait out a grant nobody will answer.
     let abandoned = false;
@@ -547,6 +554,9 @@ export class McpOAuth implements McpOAuthAuthority {
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
+      // After a saved sign-in this does nothing: the exchange already answered true.
+      Deferred.doneUnsafe(exchanged, Effect.succeed(false));
+      this.#exchanges.delete(state);
       if (this.#attempts.get(key) === cancel) this.#attempts.delete(key);
     };
     // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
@@ -617,6 +627,7 @@ export class McpOAuth implements McpOAuthAuthority {
               this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
               sourceText("error.backend.mcpSignInResponseTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
+            Deferred.doneUnsafe(exchanged, Effect.succeed(true));
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {
@@ -670,6 +681,16 @@ export class McpOAuth implements McpOAuthAuthority {
    */
   openedElsewhere(state: string): boolean {
     return this.#openedElsewhere.has(state);
+  }
+
+  /**
+   * Whether the grant for this `state` became a saved sign-in: true when the token endpoint
+   * accepted it, false when the attempt ended without one. `null` when no sign-in waits for this
+   * `state`. Read it before `receiveAuthorizationCode`, which ends the wait.
+   */
+  grantExchange(state: string): Effect.Effect<boolean> | null {
+    const exchanged = this.#exchanges.get(state);
+    return exchanged ? Deferred.await(exchanged) : null;
   }
 
   cancelSignIn(url: string): boolean {

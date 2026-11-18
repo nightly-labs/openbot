@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "Het inloggen is geweigerd. Ga terug naar OpenBot en probeer het opnieuw.",
   "error.mcp.redirectNoSignIn": "Er wacht geen inlog op dit adres. Misschien is de inlog afgelopen.",
   "error.mcp.redirectSignedIn": "OpenBot is ingelogd. Je kunt dit venster sluiten.",
+  "error.mcp.redirectNotSaved": "Het inloggen is niet voltooid. Ga terug naar OpenBot om te zien waarom.",
   "error.mcp.signInFileUnreadable": "Het MCP-inlogbestand is onleesbaar.",
   "error.mcp.signInFileTooLarge": "Het MCP-inlogbestand is te groot.",
   "error.mcp.unsupported": "Deze server ondersteunt geen MCP-servers.",

@@ -108,6 +108,8 @@ export interface AgentMcpServers {
   /** The servers that OpenBot gives the agents itself and no row holds: the GitHub connection, Computer Use. */
   builtIn(): readonly McpServerConfig[];
   signIns(): McpSignInState[];
+  /** Why the user's last sign-in to this http server failed in this run, or `null`. */
+  signInFailure(config: McpServerConfig): string | null;
   save(config: McpServerConfig): Effect.Effect<unknown, ToolOperationFailed>;
   setEnabled(mcpServerId: string, enabled: boolean): Effect.Effect<unknown, ToolOperationFailed>;
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
@@ -206,6 +208,7 @@ export function mcpServersFromGateway(
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
     signIns: () => gateway.signIns(),
+    signInFailure: (config) => gateway.signInFailure(config.url),
     save: (config) => gateway.save({ config }).pipe(toToolFailure),
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
@@ -420,6 +423,19 @@ const SIGN_IN_NEXT =
   "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
 
 /**
+ * The fields of a `needs_sign_in` answer. After a failed sign-in, the reason that only the sign-in
+ * page showed, so the agent tells the user why instead of asking for the same sign-in again (#12017).
+ */
+function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, next = SIGN_IN_NEXT) {
+  const failure = servers.signInFailure(config);
+  if (failure === null) return { next };
+  return {
+    lastSignInError: servers.redact(failure),
+    next: `The user's last sign-in to this server failed with lastSignInError. Tell the user this reason in plain words first. ${next}`,
+  };
+}
+
+/**
  * A silent test of each saved http server that a tool search names and that has no sign-in on this
  * computer. A provider that reaches such a server tries its own sign-in and fails, so the search is
  * where the agent looks for its tools. A server that needs a sign-in gets its card; others are left out.
@@ -445,7 +461,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
         return {
           status: "needs_sign_in",
           server: describeServer(config, signIns),
-          next: `When the user's request needs this server: ${SIGN_IN_NEXT}`,
+          ...signInNeeded(servers, config, `When the user's request needs this server: ${SIGN_IN_NEXT}`),
         };
       }),
     { concurrency: "unbounded" },
@@ -479,7 +495,7 @@ const report = Effect.fnUntraced(function* (
     return openBotToolResult({
       status: "needs_sign_in",
       server,
-      next: SIGN_IN_NEXT,
+      ...signInNeeded(servers, saved),
     });
   }
   if (outcome.needs === "key")

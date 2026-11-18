@@ -1948,12 +1948,14 @@ export async function createApplicationServices({
     preferredPort: MCP_OAUTH_REDIRECT_PORT,
     deliver: (state, code, query) => {
       const elsewhere = mcpOAuthAuthority?.openedElsewhere(state) ?? false;
+      // Read before the grant is handed over, which ends the wait that holds it.
+      const exchange = elsewhere ? null : (mcpOAuthAuthority?.grantExchange(state) ?? null);
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code))
         return signInRelayClient.deliver(state, query) ? "relayed" : false;
       if (elsewhere) return true;
       const current = windows.getMainWindow();
       if (current && !current.isDestroyed()) showMainWindow(current);
-      return true;
+      return exchange ? Effect.runPromise(exchange) : true;
     },
     relayRefusal: (state, query) => {
       signInRelayClient.deliver(state, query);
