@@ -122,6 +122,7 @@ export interface RoutineInputFields {
 
 export interface RoutineUpdateFields {
   routineId: string;
+  timezone?: string;
   name?: string;
   instruction?: string;
   active?: boolean;
@@ -327,12 +328,14 @@ export class RoutineStore {
     const name = input.name ?? current.name;
     const instruction = input.instruction ?? current.instruction;
     const schedule = normalizeRoutineSchedule(input.schedule ?? current.trigger.schedule, now);
-    this.#validateInput(name, instruction, current.timezone, schedule, current.trigger.schedule);
+    const timezone = input.timezone ?? current.timezone;
+    const timezoneChanged = timezone !== current.timezone;
+    this.#validateInput(name, instruction, timezone, schedule, current.trigger.schedule);
     const active = input.active ?? current.active;
     const limitPolicy = limitPolicyFor(schedule, input.limitPolicy ?? current.limitPolicy);
     const missedPolicy = input.missedPolicy ?? current.missedPolicy ?? "skip";
     const reactivating = !current.active && active;
-    if (active && (input.schedule || reactivating)) assertOnceAhead(schedule, current.timezone, now);
+    if (active && (input.schedule || timezoneChanged || reactivating)) assertOnceAhead(schedule, timezone, now);
     const updatedAt = now.toISOString();
     const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, ownerColumn } = this.tables;
     return this.database.dispatch(
@@ -349,13 +352,14 @@ export class RoutineStore {
         const sequence = sequences[0] ?? 0;
         db.prepare(
           `UPDATE ${routineTable}
-           SET name = ?, instruction = ?, active = ?, limit_policy = ?, missed_policy = ?, updated_at = ?,
+           SET name = ?, instruction = ?, active = ?, timezone = ?, limit_policy = ?, missed_policy = ?, updated_at = ?,
                last_event_sequence = ?
            WHERE routine_id = ? AND ${ownerColumn} = ?`,
         ).run(
           name.trim(),
           instruction.trim(),
           active ? 1 : 0,
+          timezone,
           limitPolicy,
           missedPolicy,
           updatedAt,
@@ -364,16 +368,16 @@ export class RoutineStore {
           ownerId,
         );
         if (input.runIn) this.#writeRunIn(db, input.routineId, input.runIn);
-        if (input.schedule) {
+        if (input.schedule || timezoneChanged) {
           db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
-          this.#insertTrigger(db, input.routineId, current.timezone, schedule, updatedAt, sequence, now);
+          this.#insertTrigger(db, input.routineId, timezone, schedule, updatedAt, sequence, now);
         } else if (reactivating) {
           db.prepare(
             `UPDATE ${triggerTable}
              SET next_run_at = ?, updated_at = ?, last_event_sequence = ?
              WHERE trigger_id = ? AND routine_id = ?`,
           ).run(
-            nextRoutineOccurrence(schedule, current.timezone, now).toISOString(),
+            nextRoutineOccurrence(schedule, timezone, now).toISOString(),
             updatedAt,
             sequence,
             current.trigger.id,

@@ -16,7 +16,6 @@ import type {
   RoutineRun,
   RoutineRunConversationEventStatus,
   TestRoutineInput,
-  UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
 import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
@@ -25,7 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
-import { AgentRoutineStore } from "../agent-routine-store";
+import { AgentRoutineStore, type AgentRoutineUpdateInput } from "../agent-routine-store";
 import type { AgentStore } from "../agent-store";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { causeHelpers } from "../effect-boundary";
@@ -40,6 +39,7 @@ import type {
   RoutineRecordInput,
 } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
+import { updateRoutineTimezonesToolSchema } from "../routine-tool-schema";
 import {
   type ConversationRuntime,
   type ConversationTransaction,
@@ -310,7 +310,7 @@ export class RoutineScheduler implements RoutineDueSource {
     return routine;
   }
 
-  update(input: UpdateRoutineInput, options: RoutineMutationOptions = {}): Routine {
+  update(input: AgentRoutineUpdateInput, options: RoutineMutationOptions = {}): Routine {
     this.#conversation.requireKnownAgent(input.agentId);
     const routine =
       options.recordConversationEvent === false
@@ -612,7 +612,7 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   /**
-   * The eight `openbot` routine tools. Returns null when `tool` is not one of them.
+   * The `openbot` routine tools. Returns null when `tool` is not one of them.
    *
    * A request the model can correct is a tool failure, not a throw: a throw becomes a provider error
    * toast, although the model's corrected retry then creates the routine. Other errors are faults
@@ -818,13 +818,14 @@ export class RoutineScheduler implements RoutineDueSource {
         "name",
         "instruction",
         "schedule",
+        "timezone",
         "active",
         "limitPolicy",
         "missedPolicy",
         "runIn",
       ]);
       const policies = { ...routineToolPolicies(args), ...routineToolRunPlace(args) };
-      const input: UpdateRoutineInput = {
+      const input: AgentRoutineUpdateInput = {
         agentId: this.#toolAgentId(args, senderAgentId),
         routineId: routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
         ...policies,
@@ -852,11 +853,48 @@ export class RoutineScheduler implements RoutineDueSource {
         input.schedule = routineToolSchedule(args.schedule);
         hasUpdate = true;
       }
+      if (args.timezone !== undefined) {
+        input.timezone = routineToolString(args.timezone, "timezone", 128, "A routine timezone is required.");
+        hasUpdate = true;
+      }
       if (!hasUpdate) throw new RoutineInputError("At least one routine update is required.");
       if (this.#requireToolRoutine(input.agentId, input.routineId).trigger.kind === "webhook") {
         throw new RoutineInputError(`Routine ${input.routineId} is a webhook routine. Use update_webhook_routine.`);
       }
       return openBotToolResult(this.update(input, this.#toolMutationOptions(input.agentId, senderAgentId, params)));
+    }
+
+    if (params.tool === "update_routine_timezones") {
+      const parsed = updateRoutineTimezonesToolSchema.safeParse(params.arguments);
+      if (!parsed.success) throw new RoutineInputError(parsed.error.message);
+      const { routines, timezone } = parsed.data;
+      const targets = routines.map((entry) => ({ ...entry, agentId: entry.agentId ?? senderAgentId }));
+      const ids = targets.map((entry) => JSON.stringify([entry.agentId, entry.routineId]));
+      if (new Set(ids).size !== ids.length) throw new RoutineInputError("Pass each routine once.");
+      const results: Array<
+        { agentId: string; routineId: string } & ({ ok: true; routine: Routine } | { ok: false; error: string })
+      > = [];
+      for (const target of targets) {
+        try {
+          const agentId = this.#toolAgentId(target, senderAgentId);
+          if (this.#requireToolRoutine(agentId, target.routineId).trigger.kind === "webhook") {
+            throw new RoutineInputError(
+              `Routine ${target.routineId} is a webhook routine. Use update_webhook_routine.`,
+            );
+          }
+          const routine = this.update(
+            { ...target, timezone },
+            this.#toolMutationOptions(agentId, senderAgentId, params),
+          );
+          results.push({ ...target, ok: true, routine });
+        } catch (error) {
+          // Bad targets are independent; unexpected storage faults still fail the tool call.
+          if (!(error instanceof RoutineInputError)) throw error;
+          results.push({ ...target, ok: false, error: error.message });
+        }
+      }
+      const updated = results.filter((entry) => entry.ok).length;
+      return openBotToolResult({ updated, failed: results.length - updated, results });
     }
 
     if (params.tool === "delete_routine") {

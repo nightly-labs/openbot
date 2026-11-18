@@ -59,6 +59,9 @@ table, IPC channel or product string, or when a term in the code disagrees with 
 - **routine**: a saved instruction for an agent or channel, with one schedule or webhook trigger
   (`EventRoutineTrigger`). Agent routines use `projection_agent_routines`. This is not Claude Code
   `/schedule`.
+- **routine time zone**: the named time zone in which a routine's calendar dates and clock times
+  are interpreted. Moving a routine to another time zone keeps those local values; a fixed interval
+  keeps its original absolute anchor and elapsed duration.
 - **webhook routine**: a routine with a webhook trigger (`RoutineWebhookTrigger`). A signed request
   to its URL starts a run. The trigger can require one event type and data filters
   (`projection_routine_webhooks`, `projection_channel_routine_webhooks`). There is no shared event

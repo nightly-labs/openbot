@@ -22,6 +22,11 @@ import { ROUTINE_TABLES } from "./routine-tables";
 // from running again, so the id never changes.
 const HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID = "routine:hidden-agent-pause:v1";
 
+/** The host's tools may change timezones; released IPC and Team API update inputs stay unchanged. */
+export interface AgentRoutineUpdateInput extends UpdateRoutineInput {
+  timezone?: string;
+}
+
 export interface DueRoutineTrigger {
   routine: Routine;
   triggerId: string;
@@ -77,7 +82,7 @@ export class AgentRoutineStore extends RoutineStore {
     return toRoutine(this.createRoutine(agentId, fields, now));
   }
 
-  update(input: UpdateRoutineInput, now = new Date()): Routine {
+  update(input: AgentRoutineUpdateInput, now = new Date()): Routine {
     const { agentId, ...fields } = input;
     return toRoutine(this.updateRoutine(agentId, fields, now));
   }
