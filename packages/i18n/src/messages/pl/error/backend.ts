@@ -260,7 +260,7 @@ export const messages = {
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
   "error.backend.mcpRegistrationUnavailable":
-    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, otwórz ten serwer w Marketplace, Aplikacje i dodaj aplikację logowania.",
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
   "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
   "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",

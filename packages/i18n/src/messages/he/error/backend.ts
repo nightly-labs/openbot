@@ -242,7 +242,7 @@ export const messages = {
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
   "error.backend.mcpRegistrationUnavailable":
-    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לפתוח את השרת הזה בחנות, אפליקציות, ולהוסיף אפליקציית התחברות.",
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",

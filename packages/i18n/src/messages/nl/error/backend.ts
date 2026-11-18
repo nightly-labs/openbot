@@ -267,7 +267,7 @@ export const messages = {
   "error.backend.mcpRegistrationRefused":
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
   "error.backend.mcpRegistrationUnavailable":
-    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Open deze server in Marktplaats, Apps, en voeg een inlog-app toe om te verbinden.",
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",

@@ -254,7 +254,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
   "error.backend.mcpRegistrationUnavailable":
-    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, open this server in Marketplace, Apps, and add a sign-in app.",
+    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, save this server in Marketplace, Apps, then add a sign-in app to it.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
   "error.backend.mcpSignInForgotten": "The MCP sign-in was forgotten while it was running.",
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
