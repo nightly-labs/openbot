@@ -574,10 +574,11 @@ export class ProviderRuntime implements ProviderPort {
   /** The providers whose model list is read again: after it timed out, or because it is old. */
   readonly #relisting = new Set<AgentProvider>();
   /**
-   * The serial of the last 5 s list timeout that a pass recorded while another read of the provider
-   * ran. That read can list the models after the timeout, so its fresh list clears the timeout too.
+   * The timeout of a 5 s list pass that ran while a read of `#relisting` held the provider. That read
+   * owns the result: a fresh list makes the timeout void, and a full read that fails records its own
+   * failure. Only the quiet read of `#rereadModels` records the timeout, when it fails.
    */
-  readonly #passTimeoutSerials = new Map<AgentProvider, number>();
+  readonly #heldListTimeouts = new Map<AgentProvider, unknown>();
   /** When the model lists were last read, for `MODEL_LIST_REREAD_MS`. */
   #modelsReadAt = 0;
   /** The clients whose failed model list was read again. Each client gets these reads one time. */
@@ -4919,13 +4920,10 @@ export class ProviderRuntime implements ProviderPort {
       changed = true;
     }
     // A list that timed out gets one more read below, which keeps its own failure. A provider that a
-    // read holds already gets none, and the quiet read of `#rereadModels` keeps no error.
-    for (const [provider, cause] of timedOut) {
-      if (!this.#relisting.has(provider)) continue;
-      this.#recordProviderError(provider, cause);
-      this.#passTimeoutSerials.set(provider, this.#errorSerial);
-      changed = true;
-    }
+    // read holds already gets none: that read owns the result. Recorded here, the timeout stayed on
+    // the row as "Error" after that read listed the models (#12166).
+    for (const [provider, cause] of timedOut)
+      if (this.#relisting.has(provider)) this.#heldListTimeouts.set(provider, cause);
     if (changed || sourceChanged) this.#setStatus({});
     // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
     // the picker kept the built-in models until a provider started again (#6212).
@@ -4933,7 +4931,7 @@ export class ProviderRuntime implements ProviderPort {
       if (this.#relisting.has(provider)) continue;
       this.#relisting.add(provider);
       yield* this.#relistModels(provider).pipe(
-        Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider))),
+        Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider))),
         Effect.forkIn(this.#scope),
       );
     }
@@ -4969,25 +4967,11 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const errorSerialAtStart = this.#errorSerial;
     if (!(yield* this.#modelCatalog.relist(provider))) return false;
-    this.#clearErrorAfterFreshList(provider, errorSerialAtStart);
+    const lastError = this.#lastErrors.get(provider);
+    if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
     return true;
   });
-
-  /**
-   * Clears the provider's last error after a read that started at `errorSerialAtStart` gave a fresh
-   * model list: an error older than the read, or the timeout of a pass that ran during the read.
-   * Before, that timeout kept "Error" on the row after the read listed the models (#12166). Answers
-   * whether it cleared an error.
-   */
-  #clearErrorAfterFreshList(provider: AgentProvider, errorSerialAtStart: number): boolean {
-    const lastError = this.#lastErrors.get(provider);
-    if (!lastError) return false;
-    if (lastError.serial > errorSerialAtStart && lastError.serial !== this.#passTimeoutSerials.get(provider))
-      return false;
-    this.#lastErrors.delete(provider);
-    return true;
-  }
 
   /**
    * Reads the model list of each running provider with `relistWhileRunning` again when the last read
@@ -5023,14 +5007,31 @@ export class ProviderRuntime implements ProviderPort {
       (provider) =>
         Effect.gen({ self: this }, function* () {
           const before = listOf(provider);
-          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) return;
+          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) {
+            // The quiet read keeps no error of its own, so the timeout of a pass that it held shows now.
+            if (this.#heldListTimeouts.has(provider)) {
+              this.#recordProviderError(provider, this.#heldListTimeouts.get(provider));
+              changed = true;
+            }
+            return;
+          }
           if (listOf(provider) !== before) changed = true;
-          if (this.#clearErrorAfterFreshList(provider, errorSerialAtStart)) changed = true;
-        }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
+          const lastError = this.#lastErrors.get(provider);
+          if (lastError && lastError.serial <= errorSerialAtStart) {
+            this.#lastErrors.delete(provider);
+            changed = true;
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider)))),
       { concurrency: "unbounded", discard: true },
     );
     if (changed) this.#setStatus({});
   });
+
+  /** Ends the read that held the provider's model list, and the pass timeouts that it held. */
+  #releaseRelisting(provider: AgentProvider): void {
+    this.#relisting.delete(provider);
+    this.#heldListTimeouts.delete(provider);
+  }
 
   /** Shows a provider failure to the user and keeps it on the provider row. */
   #emitProviderError(provider: AgentProvider, kind: string, error: unknown, agentId?: string): void {

@@ -8,7 +8,7 @@
 // - the model catalog on a Pi that answers after its 5 s pass, then the full read again;
 // - the model catalog on a Pi that never answers: the error must still show;
 // - the provider runtime, with a second 5 s pass that times out while the full read of the first runs.
-//   The full read lists the models, so the row must not keep "Error" (#12166).
+//   That read owns the result and lists the models, so the row must not show "Error" (#12166).
 // `bun run test:pi-slow-start`. Writes .openbot-build/pi-slow-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -45,7 +45,12 @@ interface Report {
   account?: { email: string | null; type: string | null } | null;
   slowCatalog?: CatalogCase;
   brokenCatalog?: CatalogCase;
-  overlap?: { errorAfterSecondPass: string | null; errorAfterFullRead: string | null; models: string[] };
+  overlap?: {
+    errorAfterSecondPass: string | null;
+    errorAfterFullRead: string | null;
+    shownErrors: string[];
+    models: string[];
+  };
   failure?: string;
 }
 
@@ -92,90 +97,110 @@ async function readCatalog(client: AgentClient, requestTimeoutMs: number): Promi
 }
 
 /**
- * The Pi row of the real provider runtime over a Pi that needs `delayMs` for each start. A pass gives
- * 5 s, so it times out and starts the full read. A second pass then times out while that read runs.
+ * The Pi row of the real provider runtime over a Pi that answers only while the gate file exists. With
+ * the gate closed, a pass times out after 5 s and starts the full read, which waits for the gate. A
+ * second pass then times out while that read runs. When the gate opens, the read lists a new model.
  */
-async function readOverlappingPasses(delayMs: number, requestTimeoutMs: number): Promise<Report["overlap"]> {
+async function readOverlappingPasses(requestTimeoutMs: number): Promise<Report["overlap"]> {
   const pi = join(root, "runtime", "pi");
-  await installFakeAgent(pi, "pi-slow-start", { FAKE_START_DELAY_MS: String(delayMs) });
+  const gate = join(root, "runtime", "gate");
+  const model = join(root, "runtime", "model");
   const piDirectory = join(root, "runtime", "pi-agent");
-  await mkdir(piDirectory, { recursive: true });
-  await writeFile(join(piDirectory, "auth.json"), JSON.stringify({ openrouter: { type: "api_key", key: "fake" } }));
   const names = ["OPENBOT_PI_PATH", "PI_CODING_AGENT_DIR"] as const;
   const saved = names.map((name) => [name, process.env[name]] as const);
-  process.env.OPENBOT_PI_PATH = pi;
-  process.env.PI_CODING_AGENT_DIR = piDirectory;
   const listeners = new Set<() => void>();
-  const profile = join(root, "runtime", "profile");
-  const store = new AgentStore(profile, join(root, "runtime", "home"), new OpenBotDatabase(profile));
-  const providers = new ProviderRuntime({
-    offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "pi"),
-    conversation: new ConversationRuntime(
-      store,
-      () => undefined,
-      () => store.list(),
-    ),
-    hooks: {
-      bindClient: () => undefined,
-      onProvidersReady: () => Effect.void,
-      onProviderLost: () => undefined,
-      onClientStopped: () => Effect.void,
-      isStopping: () => false,
-      isProviderBusy: () => false,
-      isAgentBusy: () => false,
-      isProviderAssigned: () => true,
-      onAgentClientLost: () => Effect.void,
-      sharedRoot: () => join(root, "runtime", "shared"),
-      onProviderResumed: () => undefined,
-      onProviderActivated: () => Effect.void,
-      captureConfigRevision: () => 0,
-    },
-    emit: () => {
-      for (const listener of listeners) listener();
-    },
-    emitError: () => undefined,
-    requestTimeoutMs,
-    preferredProvider: "pi",
-    bundledExecutables: {},
-    credentials: NO_PROVIDER_CREDENTIALS,
-    redactMcp: (text) => text,
-    clientFactory: (provider, cli) =>
-      requireProviderDriver(provider).createClient(cli, requestTimeoutMs, NO_PROVIDER_CREDENTIALS),
-  });
-  const lastError = () => providers.status().providers?.find((row) => row.id === "pi")?.lastError ?? null;
-  const models = () =>
-    providers
-      .listModels()
-      .filter((model) => model.provider === "pi")
-      .map((model) => model.id);
-  /** Resolves at the first status event, or now, at which `ready` holds. Fails after `requestTimeoutMs`. */
-  const waitFor = (ready: () => boolean, what: string) =>
-    new Promise<void>((resolve, reject) => {
-      const check = () => {
-        if (!ready()) return;
-        clearTimeout(timer);
-        listeners.delete(check);
-        resolve();
-      };
-      const timer = setTimeout(() => {
-        listeners.delete(check);
-        reject(new Error(`Timed out waiting for ${what}.`));
-      }, requestTimeoutMs);
-      listeners.add(check);
-      check();
-    });
+  const shownErrors: string[] = [];
+  let database: OpenBotDatabase | null = null;
+  let providers: ProviderRuntime | null = null;
   try {
-    await runCauseEffect(providers.start());
-    // The start's own pass also times out; its full read lists the models.
-    await waitFor(() => models().length > 0 && lastError() === null, "the models after the start");
-    // The first pass times out and starts the full read. The second pass times out while that read runs.
-    await runCauseEffect(providers.refreshModels());
-    await runCauseEffect(providers.refreshModels());
+    await installFakeAgent(pi, "pi-slow-start", { FAKE_GATE_FILE: gate, FAKE_MODEL_FILE: model });
+    await mkdir(piDirectory, { recursive: true });
+    await writeFile(join(piDirectory, "auth.json"), JSON.stringify({ openrouter: { type: "api_key", key: "fake" } }));
+    await writeFile(model, "fake/before");
+    await writeFile(gate, "");
+    process.env.OPENBOT_PI_PATH = pi;
+    process.env.PI_CODING_AGENT_DIR = piDirectory;
+    const profile = join(root, "runtime", "profile");
+    database = new OpenBotDatabase(profile);
+    const store = new AgentStore(profile, join(root, "runtime", "home"), database);
+    const runtime = new ProviderRuntime({
+      offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "pi"),
+      conversation: new ConversationRuntime(
+        store,
+        () => undefined,
+        () => store.list(),
+      ),
+      hooks: {
+        bindClient: () => undefined,
+        onProvidersReady: () => Effect.void,
+        onProviderLost: () => undefined,
+        onClientStopped: () => Effect.void,
+        isStopping: () => false,
+        isProviderBusy: () => false,
+        isAgentBusy: () => false,
+        isProviderAssigned: () => true,
+        onAgentClientLost: () => Effect.void,
+        sharedRoot: () => join(root, "runtime", "shared"),
+        onProviderResumed: () => undefined,
+        onProviderActivated: () => Effect.void,
+        captureConfigRevision: () => 0,
+      },
+      emit: () => {
+        for (const listener of listeners) listener();
+      },
+      emitError: () => undefined,
+      requestTimeoutMs,
+      preferredProvider: "pi",
+      bundledExecutables: {},
+      credentials: NO_PROVIDER_CREDENTIALS,
+      redactMcp: (text) => text,
+      clientFactory: (provider, cli) =>
+        requireProviderDriver(provider).createClient(cli, requestTimeoutMs, NO_PROVIDER_CREDENTIALS),
+    });
+    providers = runtime;
+    const lastError = () => runtime.status().providers?.find((row) => row.id === "pi")?.lastError ?? null;
+    const models = () =>
+      runtime
+        .listModels()
+        .filter((option) => option.provider === "pi")
+        .map((option) => option.id);
+    /** Resolves at the first status event, or now, at which `ready` holds. Fails after `requestTimeoutMs`. */
+    const waitFor = (ready: () => boolean, what: string) =>
+      new Promise<void>((resolve, reject) => {
+        const check = () => {
+          if (!ready()) return;
+          clearTimeout(timer);
+          listeners.delete(check);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          listeners.delete(check);
+          reject(new Error(`No ${what} within ${requestTimeoutMs} ms.`));
+        }, requestTimeoutMs);
+        listeners.add(check);
+        check();
+      });
+
+    await runCauseEffect(runtime.start());
+    await waitFor(() => models().includes("openrouter/fake/before"), "model list after the start");
+    // Each error that the Pi row shows from here on.
+    listeners.add(() => {
+      const shown = lastError();
+      if (shown && shownErrors.at(-1) !== shown) shownErrors.push(shown);
+    });
+    await rm(gate);
+    // The first pass times out and starts the full read, which waits for the gate. The second pass
+    // times out while that read runs.
+    await runCauseEffect(runtime.refreshModels());
+    await runCauseEffect(runtime.refreshModels());
     const errorAfterSecondPass = lastError();
-    await waitFor(() => lastError() === null, "the full read to clear the timeout").catch(() => undefined);
-    return { errorAfterSecondPass, errorAfterFullRead: lastError(), models: models() };
+    await writeFile(model, "fake/after");
+    await writeFile(gate, "");
+    await waitFor(() => models().includes("openrouter/fake/after"), "model list from the full read");
+    return { errorAfterSecondPass, errorAfterFullRead: lastError(), shownErrors, models: models() };
   } finally {
-    for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
+    if (providers) for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
+    database?.close();
     for (const [name, value] of saved) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
@@ -213,12 +238,12 @@ try {
   assert.equal(report.brokenCatalog.recordedAfterRelist.length, 1, "A list that fails again must show its error.");
   assert.match(report.brokenCatalog.recordedAfterRelist[0] ?? "", /timed out/u);
 
-  // 8 s per Pi start: each pass times out at 5 s, and the full read of the first pass ends after the
-  // second pass timed out.
-  report.overlap = await readOverlappingPasses(8_000, 20_000);
-  assert.match(report.overlap?.errorAfterSecondPass ?? "", /timed out/u, "The second pass must time out.");
-  assert.equal(report.overlap?.errorAfterFullRead, null, "The full read that listed the models must clear it.");
-  assert.deepEqual(report.overlap?.models, ["openrouter/fake/slow-start"]);
+  // A pass that times out while the full read runs leaves the result to that read, which lists the models.
+  report.overlap = await readOverlappingPasses(20_000);
+  assert.equal(report.overlap?.errorAfterSecondPass, null, "A pass that a running read holds shows no error.");
+  assert.deepEqual(report.overlap?.shownErrors, [], "The row must not show Error while the full read runs.");
+  assert.equal(report.overlap?.errorAfterFullRead, null);
+  assert.deepEqual(report.overlap?.models, ["openrouter/fake/after"]);
 
   report.passed = true;
 } catch (error) {
