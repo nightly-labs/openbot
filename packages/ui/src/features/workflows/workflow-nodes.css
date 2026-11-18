@@ -1641,6 +1641,27 @@ fieldset.wfn-picker-group {
   z-index: 1;
 }
 
+/*
+ * The reference lines of a hovered or selected asset draw again in a layer above the other nodes. The
+ * asset and the nodes that it connects to go above that layer, so the lines end under their ports.
+ */
+.wfn-edges-focus {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-slot[data-focus] > :is(.wfn-node, .wfn-text) {
+  z-index: 2;
+}
+
+/* The other nodes fade a little, so the asset and its references stay clear on a full board. */
+.wfn-stage .wfn-slot {
+  transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.wfn-stage .wfn-slot[data-dim] {
+  opacity: 0.9;
+}
+
 .wfn-edges {
   position: absolute;
   top: 0;
@@ -1670,6 +1691,11 @@ fieldset.wfn-picker-group {
   --wfn-edge: var(--openbot-text-primary);
 }
 
+/* The reference lines of the focused asset are solid, in the highlight colour. */
+.wfn-edge[data-focus] {
+  --wfn-edge: var(--openbot-chart-storage-downloads);
+}
+
 .wfn-edge[data-removing] {
   --wfn-edge: var(--openbot-danger);
 }
@@ -1689,7 +1715,7 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   stroke-dasharray: none;
 }
 
@@ -1697,8 +1723,12 @@ fieldset.wfn-picker-group {
   animation: wfn-march 1.2s linear infinite;
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   animation: none;
+}
+
+.wfn-edge[data-focus] .wfn-edge-line {
+  stroke-width: 2;
 }
 
 @keyframes wfn-march {

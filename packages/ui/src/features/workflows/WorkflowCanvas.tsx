@@ -630,8 +630,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** The trigger whose schedule the open undo step changes. */
   let scheduleEdit: string | undefined;
   const [dropHeight, setDropHeight] = createSignal(0);
+  /** The node under the pointer. */
+  const [hoveredNode, setHoveredNode] = createSignal<string | null>(null);
 
   const canvas = createBoard({
+    focus: () => focusAsset(),
     catalogs: () => props.catalogs,
     buildState: (id) => buildState(id),
     github: () => props.github,
@@ -900,6 +903,27 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** The nodes on the canvas. Many views read the list, so it is made once for each change. */
   const live = createMemo(() => nodes().filter((node) => !board.isRemoved(node.id)));
   const kindOf = (id: string) => nodes().find((node) => node.id === id)?.kind;
+  /**
+   * The asset that the user works on: the hovered asset, else the selected one. Its reference lines
+   * draw above the other nodes, and the nodes that it does not connect to fade a little.
+   */
+  const focusAsset = createMemo(() => {
+    const hovered = hoveredNode();
+    if (hovered !== null && kindOf(hovered) === "asset" && !board.isRemoved(hovered)) return hovered;
+    const selected = board.selected();
+    return selected !== null && kindOf(selected) === "asset" ? selected : null;
+  });
+  /** The nodes that the focused asset connects to, with the asset itself. */
+  const focusSet = createMemo(() => {
+    const focus = focusAsset();
+    if (focus === null) return null;
+    const linked = new Set([focus]);
+    for (const edge of canvas.edges()) {
+      if (edge.from === focus) linked.add(edge.to);
+      else if (edge.to === focus) linked.add(edge.from);
+    }
+    return linked;
+  });
   /** The saved trigger of each trigger node, by node id. The first trigger of a node wins, as before. */
   const triggers = createMemo(() => {
     const byNode = new Map<string, WorkflowDetail["triggers"][number]>();
@@ -3013,6 +3037,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       data-kind={node().kind}
                       data-peer={ringOn(node().id) ? "" : undefined}
                       data-build={buildState(node().id)}
+                      data-focus={focusSet()?.has(node().id) ? "" : undefined}
+                      data-dim={focusSet()?.has(node().id) === false ? "" : undefined}
+                      onPointerEnter={() => setHoveredNode(node().id)}
+                      onPointerLeave={() => {
+                        if (hoveredNode() === node().id) setHoveredNode(null);
+                      }}
                       style={{
                         left: `${positions[node().id]?.x ?? 0}px`,
                         top: `${positions[node().id]?.y ?? 0}px`,

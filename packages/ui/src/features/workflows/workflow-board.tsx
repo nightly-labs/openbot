@@ -334,6 +334,11 @@ export interface BoardOptions {
   stretch?: (id: string) => WfnStretch;
   resetSize?: (id: string) => void;
   edgeTone?: (edge: WfnEdge) => WfnEdgeTone;
+  /**
+   * The node that the user works on, such as a hovered or selected asset. Its connections draw again
+   * above the other nodes, in the highlight colour.
+   */
+  focus?: () => string | null;
   /** The results that the steps have before the story opens. */
   results?: Record<string, readonly WfnResult[]> | undefined;
   /**
@@ -1395,6 +1400,12 @@ export function createBoard(options: BoardOptions) {
       if (reason) return { text: reason, tone: "refused" };
       return draftLoops() ? { text: t("workflow.board.loop.makes"), tone: "loop" } : null;
     };
+    /** The connections of the focused node. A second layer draws them above the other nodes. */
+    const isFocusEdge = (edge: WfnEdge) => {
+      const focus = options.focus?.() ?? null;
+      return focus !== null && (edge.from === focus || edge.to === focus);
+    };
+    const focusEdges = () => state.edges.filter(isFocusEdge);
     return (
       <>
         <svg ref={edgeLayer} class="wfn-edges" aria-hidden="true">
@@ -1409,6 +1420,7 @@ export function createBoard(options: BoardOptions) {
                         data-type={edge.type}
                         data-tone={tone(edge)}
                         data-selected={state.edge === edge.id ? "" : undefined}
+                        data-focus={isFocusEdge(edge) ? "" : undefined}
                         data-removing={
                           state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
                         }
@@ -1443,6 +1455,36 @@ export function createBoard(options: BoardOptions) {
           </Show>
           <For each={companionPaths()}>
             {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path} />}
+          </For>
+        </svg>
+        {/* The lines only: the hit paths stay in the layer under the nodes. */}
+        <svg class="wfn-edges wfn-edges-focus" aria-hidden="true">
+          <For each={focusEdges()}>
+            {(edge) => (
+              <For each={targets(edge)}>
+                {(slot) => (
+                  <Show when={endsAt(edge, slot)}>
+                    {(line) => (
+                      <g
+                        class="wfn-edge"
+                        data-type={edge.type}
+                        data-tone={tone(edge)}
+                        data-focus=""
+                        data-removing={
+                          state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
+                        }
+                        data-build={options.buildState?.(edge.id)}
+                      >
+                        <path class="wfn-edge-line" d={line().path} />
+                        <Show when={tone(edge) === "run"}>
+                          <path class="wfn-edge-comet" d={line().path} pathLength="1" />
+                        </Show>
+                      </g>
+                    )}
+                  </Show>
+                )}
+              </For>
+            )}
           </For>
         </svg>
         <Show when={draftNote()}>
