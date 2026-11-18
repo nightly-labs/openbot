@@ -15,7 +15,8 @@
 //   bun scripts/hosting/leaseweb-pool.ts traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>]
 //       Read only. The public traffic in and out of each VPS on the four accounts, from the first day of
 //       this month (UTC) to today, the most first. Also the traffic pack of the contract, and the part of
-//       it that in and out together used. Then the sum of each account.
+//       it that the outgoing traffic used: Leaseweb counts only that against the pack of a VPS. Then the
+//       sum of each account.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
 //       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
 //       with no reference gets `pool`. The reference does not say whether a server has the machine: D1 does.
@@ -1281,7 +1282,8 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     rows.sort((a, b) => b.down + b.up - (a.down + a.up) || a.vps.id.localeCompare(b.vps.id));
     logger.info(`Public traffic from ${start} to ${end} (UTC days), the most first:`);
     for (const { vps, down, up, pack: packSize } of rows) {
-      const pack = packSize ? `, ${Math.round(((down + up) / packSize) * 100)}% of the ${packSize / 1e12} TB pack` : "";
+      // Leaseweb counts only the outgoing traffic of a VPS against its pack (kb.leaseweb.com, "Metering and Billing").
+      const pack = packSize ? `, out is ${Math.round((up / packSize) * 100)}% of the ${packSize / 1e12} TB pack` : "";
       logger.info(
         `VPS ${vps.id} (${vps.account}, ${vps.location}, ${referenceLabel(vps.reference)}): in ${gigabytes(down)}, out ${gigabytes(up)}${pack}.`,
       );

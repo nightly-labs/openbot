@@ -281,7 +281,10 @@ and only a loopback `http:` origin is accepted.
     `signal_sockets` and `signal_peer_connections`. coturn adds relayed bytes to its metrics only
     when an allocation closes, so the event has no live traffic value. From generation 2, the sum of
     `webhook_answers_429` and `webhook_answers_503` per hour shows senders that the relay or the hosts
-    refused, and `webhook_wait_ms_avg` the host answer time.
+    refused, and `webhook_wait_ms_avg` the host answer time. From generation 3, the sum of
+    `network_in_bytes` and of `network_out_bytes` per day by `turn_host` ("Public traffic per Signal
+    host"). The values are the traffic of the whole machine: `turn.openbot.run` and
+    `turn2.openbot.run` share their machines with other services, so their values are not only Signal.
 12. Performance: `hosted_server_action` `ready` (`account_api` generation 15 and later) average
     and maximum `duration_ms` by `reason` and the count per day; `system_remote_connect`
     (`desktop_host` generation 15 and later) average `total_ms`, `wait_ms` and
