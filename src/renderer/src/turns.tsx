@@ -620,9 +620,17 @@ const Turns = createSimpleContext({
         });
     }
 
+    /**
+     * The ended turn whose Codex subagents still work, which Stop stops. Main can stop only Codex
+     * subagents after their turn; a background subagent of another provider has no Stop (#11871).
+     */
+    function stoppableSubagentTurn(agent: { id: string; provider: string } | undefined): string | null {
+      return agent?.provider === "codex" ? (subagentTurns()[agent.id] ?? null) : null;
+    }
+
     function stopActiveTurn() {
       const agent = activeAgent();
-      const turnId = agent ? activeTurns()[agent.id] : null;
+      const turnId = agent ? (activeTurns()[agent.id] ?? stoppableSubagentTurn(agent)) : null;
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
@@ -723,6 +731,7 @@ const Turns = createSimpleContext({
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,
+      stoppableSubagentTurn,
     };
   },
 });
