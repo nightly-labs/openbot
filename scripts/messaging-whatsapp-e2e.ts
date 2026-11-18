@@ -1003,15 +1003,16 @@ try {
 
     await step("HD photo: the normal copy gets an answer, and its HD copy gets none (#11764)", async () => {
       const author = `${FRIEND}@s.whatsapp.net`;
+      const image: proto.IMessage = {
+        imageMessage: {
+          mimetype: "image/jpeg",
+          caption: "@48600100200 what is on this photo?",
+          contextInfo: { mentionedJid: [OWNER_JID] },
+        },
+      };
       const photo = (id: string): WAMessage => ({
         key: { remoteJid: GROUP, fromMe: false, id, participant: author },
-        message: {
-          imageMessage: {
-            mimetype: "image/jpeg",
-            caption: "@48600100200 what is on this photo?",
-            contextInfo: { mentionedJid: [OWNER_JID] },
-          },
-        },
+        message: image,
         messageTimestamp: Math.floor(Date.now() / 1_000),
         pushName: "Ewa",
       });
@@ -1025,7 +1026,7 @@ try {
               parentMessageKey: { remoteJid: GROUP, fromMe: false, id: firstId, participant: author },
             },
           },
-          associatedChildMessage: { message: photo(id).message },
+          associatedChildMessage: { message: image },
         },
         messageTimestamp: Math.floor(Date.now() / 1_000),
         pushName: "Ewa",
