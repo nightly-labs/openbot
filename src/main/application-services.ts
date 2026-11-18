@@ -286,7 +286,12 @@ import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
-import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
+import {
+  agentWebhookRoutineWriter,
+  HostEventsService,
+  hostAgentWebhookKeys,
+  type WebhookDeliveryReport,
+} from "./host-events-service";
 import { HostService } from "./host-service";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
@@ -3057,6 +3062,10 @@ export async function createApplicationServices({
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
+    agentKeys: hostAgentWebhookKeys(
+      agentApiKeys,
+      (agentId) => store.list().find((agent) => agent.id === agentId)?.name,
+    ),
     workflows: {
       receive: (delivery) => workflowRuntime.receiveWebhook(delivery),
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),

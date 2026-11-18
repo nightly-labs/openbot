@@ -92,6 +92,7 @@ import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -2755,6 +2756,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageMissedRuns: (serverId) =>
           administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_RECOVERY_CAPABILITY),
         canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
+        canGiveWebhookSecretToAgent: (serverId) => administers(serverId, WEBHOOK_AGENT_SECRET_CAPABILITY),
         canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
         canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
         canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),

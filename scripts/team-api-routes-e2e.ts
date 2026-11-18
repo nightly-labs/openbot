@@ -423,6 +423,10 @@ import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-pr
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import {
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
+import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
@@ -493,6 +497,7 @@ import {
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
+import type { HostEventsApi } from "../src/main/host-events-api";
 import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
 import {
   INSTANCE_TRANSFER_FORMAT,
@@ -1138,6 +1143,29 @@ const fakeRoutineRunPlaces: TeamApiRoutineRunPlaces = {
     routineRecords = routineRecords.map((routine) => (routine.id === routineId ? saved : routine));
     return saved;
   },
+};
+
+/**
+ * The events host that the routes reach. Only the call of `webhook-agent-secret-v1` answers; the
+ * check reads what it got. The other calls are not part of this check.
+ */
+const notInThisCheck = () => Effect.die(new Error("Not used by this check."));
+const fakeEvents: HostEventsApi = {
+  getStatus: notInThisCheck,
+  listRoutines: notInThisCheck,
+  saveRoutine: notInThisCheck,
+  deleteRoutine: notInThisCheck,
+  testRoutine: notInThisCheck,
+  rotateSecret: notInThisCheck,
+  setSecret: notInThisCheck,
+  giveSecretToAgent: (input) =>
+    Effect.sync(() => {
+      record("giveSecretToAgent", input);
+      return { name: `WEBHOOK_SECRET_${input.id.replaceAll("-", "").toUpperCase()}` };
+    }),
+  sendTestEvent: notInThisCheck,
+  listActivity: notInThisCheck,
+  listRoutineRuns: notInThisCheck,
 };
 
 /** The pins that the fake host answers: one pin by default, or the given messages. */
@@ -2971,6 +2999,7 @@ try {
       subscribe: (listener) => agentLevels.subscribe(listener),
     },
     routineRunPlaces: fakeRoutineRunPlaces,
+    events: fakeEvents,
     hiddenAgents: {
       listHiddenAgents: () => hidden,
       setAgentHidden: (input) =>
@@ -10767,6 +10796,38 @@ try {
       "a file that is not a password export gets the Vault's own sentence",
       errorIs(notCsv, 400, sourceText("error.vault.csvInvalid")),
       summary(notCsv),
+    );
+  }
+
+  // ---- Give a webhook routine's signing secret to its agent (webhook-agent-secret-v1) ----
+  {
+    const capabilities = [WEBHOOK_AGENT_SECRET_CAPABILITY];
+    const json = { id: "routine-hook", owner: { kind: "agent", id: "agent-ada" } };
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises webhook-agent-secret-v1 to a protocol 10 peer and not to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: adaToken, json });
+    const member = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: bobToken, json, capabilities });
+    check(
+      "a peer without the capability gets 400 eventsUnavailable, a member gets 403, and the host gives no secret",
+      errorIs(unsupported, 400, sourceText("error.backend.eventsUnavailable")) &&
+        member.status === 403 &&
+        callsOf("giveSecretToAgent").length === 0,
+      [summary(unsupported), summary(member)],
+    );
+    const given = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: adaToken, json, capabilities });
+    check(
+      "an admin gives the secret to the agent; the answer has only the key name",
+      given.status === 200 &&
+        isDeepStrictEqual(given.body, { name: "WEBHOOK_SECRET_ROUTINEHOOK" }) &&
+        isDeepStrictEqual(callsOf("giveSecretToAgent"), [[json]]),
+      summary(given),
     );
   }
 

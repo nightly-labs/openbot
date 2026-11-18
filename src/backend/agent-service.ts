@@ -285,7 +285,7 @@ import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-c
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
-import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { removeWebhookSecretKey, type WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import { workflowGenerationError } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
@@ -360,6 +360,7 @@ import {
 } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
+
 /** Its lines also go to `main.log`, so a support report can show why channel routing failed (#3041). */
 const routingLogger = createOpenBotLogger("channel-routing");
 /** Its lines also go to `providers.log`: the screen can show a general sentence in place of the cause (#5222). */
@@ -982,13 +983,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           !this.#poolBackup(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
+          const keys = options.agentApiKeys;
+          const removeKey = keys ? removeWebhookSecretKey(keys, agentId, routineId) : Effect.void;
           const thread = this.#tasks.threadOfRoutine(agentId, routineId);
-          if (thread?.closedAt !== null) return Effect.void;
+          if (thread?.closedAt !== null) return removeKey;
           // The routine is gone already, so a thread that does not close stays open for the user.
           return this.closeTask({ agentId, taskId: thread.taskId }).pipe(
             Effect.catch((failure) =>
               Effect.sync(() => this.#emitError("routine_thread_archive_failed", failure.cause, agentId)),
             ),
+            Effect.andThen(removeKey),
           );
         },
       },

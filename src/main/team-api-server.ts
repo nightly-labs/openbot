@@ -178,6 +178,7 @@ import {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -2926,6 +2927,7 @@ export class TeamApiServer {
         if (capability === ROUTINE_PAUSE_REASONS_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
         if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
+        if (capability === WEBHOOK_AGENT_SECRET_CAPABILITY) return this.#options.events !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY || capability === AGENT_IMPORT_V2_CAPABILITY)
           return this.#options.agentImport !== undefined;
         if (capability === HERMES_IMPORT_CAPABILITY) return this.#options.hermesImport !== undefined;

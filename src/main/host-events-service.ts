@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WorkflowTriggerInput, WorkflowWebhookSecret } from "@openbot/contracts/ipc";
 import type {
+  AgentWebhookSecret,
   EventFilter,
   EventJsonValue,
   EventRoutine,
@@ -26,7 +27,12 @@ import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Semaphore } from "effect";
 import { RoutineOperationFailed } from "../backend/agent/routine-scheduler";
-import type { WebhookRoutineWriter } from "../backend/agent/webhook-routine-tool";
+import {
+  removeWebhookSecretKey,
+  type WebhookRoutineWriter,
+  webhookSecretKeyName,
+} from "../backend/agent/webhook-routine-tool";
+import type { AgentApiKeys } from "../backend/agent-api-keys";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { RoutineRecords } from "../backend/routine-records";
 import type { OwnedRoutineRecord, RoutineRecordInput, WebhookReceiveResult } from "../backend/routine-store";
@@ -107,8 +113,35 @@ export interface WebhookDeliveryReport {
   test: boolean;
 }
 
+/**
+ * The API keys of the agents. A webhook routine of an agent can give its signing secret to that agent
+ * as a key for it only; the key then follows the routine secret until the routine goes.
+ */
+export interface HostAgentWebhookKeys {
+  /** Saves the key for this agent only, or replaces its value. */
+  save(agentId: string, name: string, value: string): Effect.Effect<void, { readonly cause: unknown }>;
+  /** True when the agent has a key with this name for it only. */
+  has(agentId: string, name: string): Effect.Effect<boolean, { readonly cause: unknown }>;
+  remove(agentId: string, name: string): Effect.Effect<void, { readonly cause: unknown }>;
+}
+
+/** The agent keys of the host, in `AgentApiKeys`. `agentName` gives the Vault the agent's name. */
+export function hostAgentWebhookKeys(
+  keys: AgentApiKeys,
+  agentName: (agentId: string) => string | undefined,
+): HostAgentWebhookKeys {
+  return {
+    save: (agentId, name, value) =>
+      keys.save({ id: agentId, name: agentName(agentId) }, name, value).pipe(Effect.asVoid),
+    has: (agentId, name) => keys.has(agentId, name),
+    remove: (agentId, name) => keys.remove(agentId, name).pipe(Effect.asVoid),
+  };
+}
+
 export interface HostEventsServiceOptions {
   routines: RoutineRecords;
+  /** Without it, a person cannot give a signing secret to an agent. */
+  agentKeys?: HostAgentWebhookKeys;
   workflows?: HostWorkflowWebhooks;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
@@ -321,6 +354,7 @@ export class HostEventsService implements HostEventsApi {
   /** Deletes the routine. The routine change event starts the sync that revokes its route. */
   readonly deleteRoutine = Effect.fn("HostEvents.deleteRoutine")(
     function* (this: HostEventsService, input: EventRoutineRef) {
+      // The agent service removes the signing secret key that the agent got for the routine.
       yield* toHostEventsFailure(this.#options.routines.delete(input.owner, input.id));
     },
     (operation) => this.#writes.withPermit(operation),
@@ -339,12 +373,74 @@ export class HostEventsService implements HostEventsApi {
       if (routine.trigger.kind !== "webhook")
         return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
       const secret = newWebhookSecret();
-      const secretCiphertext = yield* this.#encrypt(secret);
-      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
+      yield* this.#replaceSecret(input, secret, false);
       return { secret };
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
+
+  /**
+   * Gives the agent of a webhook routine a new signing secret as an API key for it only, so that the
+   * agent can give it to the sender. When the key is not saved, the old secret stays.
+   * The result has only the key name; the secret does not leave the host. A channel routine has no
+   * single agent to get the key.
+   */
+  readonly giveSecretToAgent = Effect.fn("HostEvents.giveSecretToAgent")(
+    function* (
+      this: HostEventsService,
+      input: EventRoutineRef,
+    ): Effect.fn.Return<AgentWebhookSecret, HostEventsFailure> {
+      const keys = this.#options.agentKeys;
+      if (input.owner.kind !== "agent" || !keys)
+        return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
+      const routine = yield* this.#requireRoutine(input);
+      if (routine.trigger.kind !== "webhook")
+        return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
+      yield* this.#replaceSecret(input, newWebhookSecret(), true);
+      return { name: webhookSecretKeyName(input.id) };
+    },
+    (operation) => this.#writes.withPermit(operation),
+  ).bind(this);
+
+  /**
+   * Gives the routine the new secret. The agent key gets it too when `give` is true, or when the agent
+   * has the key already. When the key is not saved, the routine gets its old secret back, so that the
+   * sender and the agent keep one secret.
+   */
+  readonly #replaceSecret = Effect.fn("HostEvents.replaceSecret")(function* (
+    this: HostEventsService,
+    input: EventRoutineRef,
+    secret: string,
+    give: boolean,
+  ) {
+    const routes = this.#options.routines.routes;
+    const old = yield* this.#requireRoute(input);
+    const keys = input.owner.kind === "agent" ? this.#options.agentKeys : undefined;
+    const name = webhookSecretKeyName(input.id);
+    const keep = keys !== undefined && (give || (yield* toHostEventsFailure(keys.has(input.owner.id, name))));
+    const secretCiphertext = yield* this.#encrypt(secret);
+    yield* eventStep(() => routes.rotateSecret(input.owner, input.id, secretCiphertext));
+    if (!keys || !keep) return;
+    yield* toHostEventsFailure(keys.save(input.owner.id, name, secret)).pipe(
+      Effect.tapError(() =>
+        eventStep(() => routes.rotateSecret(input.owner, input.id, old.secretCiphertext)).pipe(
+          Effect.catch(() =>
+            Effect.sync(() => logger.warn("A webhook routine did not get its old signing secret back.")),
+          ),
+        ),
+      ),
+    );
+  });
+
+  /** Removes the key that an agent got for a routine secret that is gone. A key that stays does no harm. */
+  readonly #dropAgentKey = Effect.fn("HostEvents.dropAgentKey")(function* (
+    this: HostEventsService,
+    input: EventRoutineRef,
+  ) {
+    const keys = this.#options.agentKeys;
+    if (input.owner.kind !== "agent" || !keys) return;
+    yield* removeWebhookSecretKey(keys, input.owner.id, input.id);
+  });
 
   /**
    * Replaces the signing secret of a webhook routine with one that the sender made, for a sender
@@ -358,8 +454,7 @@ export class HostEventsService implements HostEventsApi {
       const routine = yield* this.#requireRoutine(input);
       if (routine.trigger.kind !== "webhook")
         return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
-      const secretCiphertext = yield* this.#encrypt(secret);
-      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
+      yield* this.#replaceSecret(input, secret, false);
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
@@ -418,15 +513,7 @@ export class HostEventsService implements HostEventsApi {
     const routine = yield* this.#requireRoutine(input);
     if (routine.trigger.kind !== "webhook")
       return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
-    const route = yield* eventStep(() =>
-      this.#options.routines.routes
-        .list()
-        .find(
-          (item) =>
-            item.routineId === input.id && item.owner.kind === input.owner.kind && item.owner.id === input.owner.id,
-        ),
-    );
-    if (!route) return yield* eventFailure(sourceText("error.backend.routineGone"));
+    const route = yield* this.#requireRoute(input);
     const secret = yield* eventStep(() => {
       const value = this.#options.cipher.decrypt(Buffer.from(route.secretCiphertext, "base64"));
       registerSecretValue(value);
@@ -682,6 +769,9 @@ export class HostEventsService implements HostEventsApi {
           ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
         }),
       );
+      // A trigger change removes the old route or makes a new secret, so a key that the agent has is old.
+      if (existing && (existing.trigger.kind === "webhook") !== (trigger.kind === "webhook"))
+        yield* this.#dropAgentKey({ owner, id: existing.id });
       return { saved, secret };
     },
     (operation) => this.#writes.withPermit(operation),
@@ -720,6 +810,21 @@ export class HostEventsService implements HostEventsApi {
   ) {
     const routine = yield* eventStep(() => this.#options.routines.get(ref.owner, ref.id));
     if (routine) return routine;
+    return yield* eventFailure(sourceText("error.backend.routineGone"));
+  });
+
+  readonly #requireRoute = Effect.fn("HostEvents.requireRoute")(function* (
+    this: HostEventsService,
+    ref: EventRoutineRef,
+  ) {
+    const route = yield* eventStep(() =>
+      this.#options.routines.routes
+        .list()
+        .find(
+          (item) => item.routineId === ref.id && item.owner.kind === ref.owner.kind && item.owner.id === ref.owner.id,
+        ),
+    );
+    if (route) return route;
     return yield* eventFailure(sourceText("error.backend.routineGone"));
   });
 

@@ -1207,6 +1207,7 @@ export function ConversationTimeline() {
                                                     action={card().action}
                                                     routine={card().routine}
                                                     connected={webhookRoutines.state.connected}
+                                                    agentName={props.agent?.name}
                                                     secret={webhookRoutines.state.secrets[card().routine.id] ?? null}
                                                     onSecret={(secret) =>
                                                       webhookRoutines.setSecret(card().routine.id, secret)

@@ -49,7 +49,10 @@ import {
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
 import { RoutineTriggerMenu } from "@openbot/ui/features/conversation/RoutineTriggerMenu";
-import { RoutineWebhookTrigger } from "@openbot/ui/features/conversation/RoutineWebhookTrigger";
+import {
+  RoutineWebhookTrigger,
+  type RoutineWebhookTriggerProps,
+} from "@openbot/ui/features/conversation/RoutineWebhookTrigger";
 import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
@@ -140,6 +143,11 @@ interface AgentRoutinesSettingsProps {
    * example on a host that runs routines in the agent's own chat.
    */
   onOpenThread?: ((routineId: string) => Promise<boolean>) | undefined;
+  /**
+   * The name of the agent that owns the routines. A channel passes nothing: a channel routine has no
+   * single agent that can keep its signing secret as an API key.
+   */
+  agentName?: string | undefined;
 }
 
 function codeUnitOrder(a: string, b: string): number {
@@ -772,6 +780,26 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     };
   }
 
+  /** Gives a new secret to the agent that owns the routine. Undefined when the host cannot do this. */
+  function agentSecret(): RoutineWebhookTriggerProps["agentSecret"] {
+    const events = props.port.events;
+    const give = events?.api.giveSecretToAgent;
+    const agentName = props.agentName;
+    const id = draft()?.id;
+    if (!events || !give || !agentName || !id || events.owner.kind !== "agent") return undefined;
+    return {
+      routineId: id,
+      agentName,
+      give: async () => {
+        await give({ id, owner: events.owner });
+        if (draft()?.id !== id) return;
+        setWebhook((state) => {
+          state.secret = null;
+        });
+      },
+    };
+  }
+
   /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
   const savedRoutine = () => {
     const id = draft()?.id;
@@ -1056,6 +1084,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       onSecretDismiss={resetWebhookState}
                       onRegenerateSecret={regenerateSecret}
                       onUseSenderSecret={senderSecret()}
+                      agentSecret={agentSecret()}
                       onSave={() => void saveDraft()}
                       saving={saving()}
                       onSendTest={sendTestEvent()}
