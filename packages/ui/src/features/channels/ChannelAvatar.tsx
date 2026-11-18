@@ -90,8 +90,13 @@ function MemberFaces(props: ChannelAvatarProps) {
   return (
     <span class={["channel-avatar", { "channel-avatar-cluster": cluster() }]} aria-hidden="true">
       <Show when={props.members.length} fallback={<UsersRound />}>
-        <For each={shown()}>
-          {(member) => <AgentAvatar agent={agentFor(member)} seed={agentFor(member)?.avatarSeed ?? member.agentId} />}
+        {/* Keyed by agent: the members come as new objects on each channel update. With 100 working
+            agents, the header made each face again about 20 times a second, and each new face plays its
+            entry. */}
+        <For each={shown()} keyed={(member) => member.agentId}>
+          {(member) => (
+            <AgentAvatar agent={agentFor(member())} seed={agentFor(member())?.avatarSeed ?? member().agentId} />
+          )}
         </For>
         <Show when={cluster() && hidden() > 0}>
           <span class="channel-avatar-count">+{hidden()}</span>

@@ -166,12 +166,16 @@ interface AgentAvatarProps {
 }
 
 export function AgentAvatar(props: AgentAvatarProps) {
-  const seed = () => props.seed ?? props.agent?.avatarSeed ?? "agent";
-  const hue = () => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null));
-  const color = () =>
-    props.color !== undefined || props.hue !== undefined ? (props.color ?? null) : (props.agent?.avatarColor ?? null);
+  // Memos, so that a new `agent` object with the same values changes nothing: each update of a list
+  // brings new objects, and an effect runs again also on an equal value. With 100 working agents, the
+  // idle avatars of the channel header and of the messages woke their animation 17-34 times in 2 s.
+  const seed = createMemo(() => props.seed ?? props.agent?.avatarSeed ?? "agent");
+  const hue = createMemo(() => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null)));
+  const color = createMemo(() =>
+    props.color !== undefined || props.hue !== undefined ? (props.color ?? null) : (props.agent?.avatarColor ?? null),
+  );
   const motion = () => props.motion ?? "hover";
-  const url = () => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null));
+  const url = createMemo(() => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null)));
   const mood = (): AvatarMood => props.mood ?? "idle";
   const [imageFailed, setImageFailed] = createSignal(false);
   createEffect(
@@ -283,34 +287,40 @@ function GeneratedAvatar(props: {
   const [hoverFace, setHoverFace] = createSignal<HoverFace | null>(null);
   // The silhouette and the colour are identity and come only from the seed. The mood may lend the
   // face an expression; when it does not, the seeded one is the resting face, or the hover face.
-  const appearance = createMemo(() => {
-    const hover = hovered() ? hoverFace() : null;
-    return {
-      shape: props.shape ?? profile().shape,
-      color: profile().color,
-      expression: plushMood().expression ?? hover?.expression ?? restingExpression(),
-      state: hover?.state ?? plushMood().state,
-    };
-  });
+  const appearance = createMemo(
+    () => {
+      const hover = hovered() ? hoverFace() : null;
+      return {
+        shape: props.shape ?? profile().shape,
+        color: profile().color,
+        expression: plushMood().expression ?? hover?.expression ?? restingExpression(),
+        state: hover?.state ?? plushMood().state,
+      };
+    },
+    { equals: sameAppearance },
+  );
   // A seed that `avatarSeedForFace` made for the flat style draws the Bloub that agents had before the
   // plush. It shows each mood with the flat faces, and a busy one breathes. It has no orbit rings, as
   // the plush has none.
   const flat = createMemo(() => avatarStyleForSeed(props.seed) === "flat");
-  const flatAppearance = createMemo(() => {
-    const presentation = avatarMoodPresentation(props.mood);
-    const hover = hovered() ? hoverFace() : null;
-    // The flat Bloub takes the face of a step, and of its states only `wide` and `wink`, which keep the body.
-    const stepMood = activityMood();
-    const working = cyclesFaces() ? plushMood().expression : (stepMood?.expression ?? null);
-    const motionState = stepMood?.state === "wide" || stepMood?.state === "wink" ? stepMood.state : null;
-    const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
-    return {
-      shape: props.shape ?? profile().shape,
-      color: profile().color,
-      expression: working ?? presentation.expression ?? hover?.expression ?? restingExpression(),
-      state,
-    };
-  });
+  const flatAppearance = createMemo(
+    () => {
+      const presentation = avatarMoodPresentation(props.mood);
+      const hover = hovered() ? hoverFace() : null;
+      // The flat Bloub takes the face of a step, and of its states only `wide` and `wink`, which keep the body.
+      const stepMood = activityMood();
+      const working = cyclesFaces() ? plushMood().expression : (stepMood?.expression ?? null);
+      const motionState = stepMood?.state === "wide" || stepMood?.state === "wink" ? stepMood.state : null;
+      const state: ShapeSafeStateId = hover?.state === "wink" ? "wink" : (motionState ?? presentation.state);
+      return {
+        shape: props.shape ?? profile().shape,
+        color: profile().color,
+        expression: working ?? presentation.expression ?? hover?.expression ?? restingExpression(),
+        state,
+      };
+    },
+    { equals: sameAppearance },
+  );
   const flatBreathe = () => {
     const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
@@ -539,6 +549,14 @@ function createHeldActivity(value: () => AgentStepActivity | null, holdMs: numbe
     return () => window.clearTimeout(timer);
   });
   return shown;
+}
+
+/** An equal appearance must not notify: each prop of the plush wakes its animation loop. */
+function sameAppearance(
+  a: { shape: string; color: string; expression: string; state: string },
+  b: { shape: string; color: string; expression: string; state: string },
+): boolean {
+  return a.shape === b.shape && a.color === b.color && a.expression === b.expression && a.state === b.state;
 }
 
 function avatarAnimationPhase(seed: string): number {
