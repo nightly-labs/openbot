@@ -69,6 +69,7 @@ import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
+import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
@@ -1556,6 +1557,7 @@ export async function createApplicationServices({
         Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
+    hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
