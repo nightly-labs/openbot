@@ -439,6 +439,116 @@ try {
     return answer;
   });
 
+  await step(
+    "a sign-in of another username than the only saved login gets the card, not that login (#12070)",
+    async () => {
+      const vaultFills: string[] = [];
+      const vaultEvents: AgentEvent[] = [];
+      let savedUsername: string | null = "a@example.test";
+      const vaultRegistry = new AttentionRegistry({
+        conversation: {
+          agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+          publicThreadId: (_agentId, threadId) => threadId,
+          ensureSnapshot: () => snapshot,
+          emitConversation: () => {
+            snapshot.revision += 1;
+          },
+        },
+        browser: {
+          listTabs: () => tabs,
+          prepareSecret: () =>
+            Effect.sync(() => ({
+              ...preparedSecret(),
+              vaultFillable: true,
+              submit: (secret: string) =>
+                Effect.sync(() => {
+                  vaultFills.push(secret);
+                  return "submitted" as const;
+                }),
+            })),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
+        hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+        emit: (event) => vaultEvents.push(event),
+        emitError: () => {},
+        emitRuntimeSnapshot: () => {},
+        lateAnswerTarget: () => ({}),
+        passwordVault: {
+          connected: () => true,
+          loginsFor: () =>
+            Effect.succeed([
+              { id: "openbot:a", title: "Account A", username: savedUsername, hasOneTimePassword: false },
+            ]),
+          secretFor: (loginId) => Effect.succeed(loginId === "openbot:a" ? VAULT_SECRET : null),
+        },
+      });
+      const cards = () => vaultEvents.filter((event) => event.type === "browser-takeover-requested").length;
+      const signIn = (username?: string) => {
+        const id = nextRequest++;
+        return runCauseEffect(
+          vaultRegistry.surfaceBrowserTakeover(client, {
+            id,
+            method: "item/tool/call",
+            params: {
+              threadId: THREAD,
+              turnId: `turn-vault-${id}`,
+              callId: `call-${id}`,
+              namespace: "openbot_browser",
+              tool: "submit_secret",
+              arguments: {
+                tabId: TAB,
+                method: "password",
+                targets: [{ kind: "css", selector: "#password" }],
+                submission: "click",
+                submitTarget: { kind: "css", selector: "#submit" },
+                ...(username === undefined ? {} : { username }),
+              },
+            },
+          }),
+        );
+      };
+      // Account B: the card opens, and the password of account A does not go in.
+      const shown = cards();
+      const other = signIn("b@example.test");
+      let answered = false;
+      void other.finally(() => {
+        answered = true;
+      });
+      while (cards() === shown && !answered) await new Promise((done) => setImmediate(done));
+      assert.deepEqual(vaultFills, [], "the password of the other account was filled");
+      const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
+      assert(card?.secret, "no password card for the other account");
+      assert.equal(card.vaultSkip, undefined, "the card names a vault reason for another account");
+      await runCauseEffect(
+        vaultRegistry.respondToBrowserSecret({
+          requestId: card.requestId,
+          agentId: AGENT,
+          decision: "submit",
+          secret: SECRET,
+        }),
+      );
+      const typed = answerOf(await other);
+      assert.equal(typed.status, "completed");
+      assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
+      // The same account, written in another case, and a call with no username: the saved login goes in.
+      const same = answerOf(await signIn(" A@Example.test"));
+      const unnamed = answerOf(await signIn());
+      assert.equal(same.status, "completed");
+      assert.equal(unnamed.status, "completed");
+      assert.deepEqual(vaultFills, [SECRET, VAULT_SECRET, VAULT_SECRET], "the saved login was not filled");
+      assert.equal(cards(), shown + 1, "a card opened for the saved account");
+      // A login saved with no username names no account, so it is filled as before.
+      savedUsername = null;
+      const noSavedUsername = answerOf(await signIn("b@example.test"));
+      assert.equal(noSavedUsername.status, "completed");
+      assert.equal(vaultFills.at(-1), VAULT_SECRET, "the login with no username was not filled");
+      assert.equal(cards(), shown + 1, "a card opened for the login with no username");
+      return { typed, same, unnamed, noSavedUsername };
+    },
+  );
+
   await writeFile(resolve(OUT, "report.json"), `${JSON.stringify({ ok: true, steps, browserLog }, null, 2)}\n`);
   process.stdout.write(`browser-takeover-deadline-e2e: ${steps.length} steps passed\n`);
 } catch (error) {

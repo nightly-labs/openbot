@@ -68,6 +68,8 @@ export const messages = {
   "composer.voice.blocked": "הגישה למיקרופון חסומה. יש לאפשר ל-OpenBot להשתמש במיקרופון בהגדרות המערכת.",
   "composer.voice.noMicrophone": "אין מיקרופון זמין.",
   "composer.voice.startFailed": "OpenBot לא הצליח להתחיל הקלטת קול.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot לא הצליח לפתוח את המיקרופון. יש לסגור אפליקציות אחרות שמשתמשות בו, לוודא שהוא מחובר ומותר בהגדרות המערכת, ולנסות שוב.",
   "composer.voice.transcribeFailed": "OpenBot לא הצליח לתמלל את ההקלטה הזו.",
   "composer.reply.toYou": "משיב להודעה שלך",
   "composer.reply.toAgent": "משיב לסוכן",
@@ -126,6 +128,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "לא הוקלט דיבור.",
   "composer.voice.noSpeechDetected": "לא זוהה דיבור.",
   "composer.voice.readFailed": "לא ניתן להקריא את התשובה.",
+  "composer.voice.languageUnsupported": "לא ניתן להקריא את התשובה. השפה הזו עדיין לא זמינה.",
   "composer.error.saveEditTryAgain": "לא ניתן לשמור את העריכה הזו במחשב הזה. יש לנסות שוב.",
   "composer.error.saveUnconfirmed": "השמירה לא אושרה. יש לנסות לשמור שוב כדי לבדוק את התוצאה.",
   "composer.error.changeModel": "לא ניתן לשנות מודל. יש לנסות שוב.",

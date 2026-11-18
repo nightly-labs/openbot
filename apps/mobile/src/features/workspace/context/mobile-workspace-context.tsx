@@ -36,8 +36,9 @@ import {
   AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
+  readTeamHostCompatibility,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
-  teamWebRtcClientProtocol,
+  TEAM_WEB_CLIENT_PROTOCOL,
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -71,6 +72,11 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
+import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -82,7 +88,6 @@ import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skil
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -1303,7 +1308,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
-      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
+      // A host of protocol 10 answers the first read as protocol 9, so the read can ask again.
+      const compatibilityRead = readTeamHostCompatibility(
+        () => client.request("GET", TEAM_API_ROUTES.compatibility, (value) => value),
+        TEAM_WEB_CLIENT_PROTOCOL,
+      );
       // At a return, the connection from before the background stays, and its event stream
       // delivered every event or reset, which asks for a full load. The compatibility read checks
       // the path; a dead path fails it, and the next attempt loads all.
@@ -1343,7 +1352,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ? { capabilities: known, reads: startWorkspaceReads(client, known), conversationReads: loadReads() }
         : null;
       early?.conversationReads.catch(() => undefined);
-      const compatibility = await compatibilityRead;
+      const { support: compatibility, negotiated } = await compatibilityRead;
       if (!context.isCurrent()) return;
       supportLog.add(
         "info",
@@ -1352,12 +1361,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       );
       // The host range is compared with the protocols that this app speaks, so a host that raised its
       // minimum still connects, and the side that is too old is named.
-      const negotiated = teamWebRtcClientProtocol(compatibility.protocol);
       if (negotiated.update === "client_update_required") {
         throw new Error(sourceText("error.remote.mobileUpdateRequired"));
       }
       if (negotiated.update === "host_update_required") {
         throw new Error(sourceText("error.team.hostUpdateRequired"));
+      }
+      // A server in safe mode answers only with the reason. Each member sees it.
+      if (compatibility.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY)) {
+        const reason = await client
+          .request("GET", SERVER_SAFE_MODE_ROUTES.reason, decodeServerSafeModeReason)
+          .catch(() => null);
+        throw new Error(
+          reason === null
+            ? sourceText("error.team.serverSafeMode")
+            : sourceText(
+                reason.reason === "newer_database"
+                  ? "error.team.serverSafeModeNewerDatabase"
+                  : "error.team.serverSafeModeStartFailed",
+                { version: reason.appVersion },
+              ),
+        );
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);

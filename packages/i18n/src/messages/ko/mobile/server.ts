@@ -937,7 +937,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "mobile.server.connectors.whatsapp.add": "추가",
   "mobile.server.connectors.whatsapp.groupTitle": "그룹 추가",
-  "mobile.server.connectors.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "mobile.server.connectors.whatsapp.groupSearch": "그룹 검색",
   "mobile.server.connectors.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",

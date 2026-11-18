@@ -416,6 +416,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
@@ -3107,7 +3108,7 @@ try {
       "compatibility answers without protocol headers and names the supported range",
       compatibility.status === 200 &&
         field(compatibility.body, "protocol", "minimum") === 1 &&
-        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V9,
+        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V10,
       summary(compatibility),
     );
     const noHeaders = await call("GET", TEAM_API_ROUTES.identity, { protocol: null });
@@ -3124,12 +3125,12 @@ try {
       badHeader.status === 400 && field(badHeader.body, "code") === "protocol_error",
       summary(badHeader),
     );
-    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V9 + 1 });
+    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V10 + 1 });
     check(
       "a newer protocol gets 426 host_update_required with the client version",
       newer.status === 426 &&
         field(newer.body, "code") === "host_update_required" &&
-        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V9 + 1,
+        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V10 + 1,
       summary(newer),
     );
     const zero = await call("GET", TEAM_API_ROUTES.identity, { protocol: 0 });
@@ -10802,10 +10803,11 @@ try {
   {
     const capabilities = [WEBHOOK_AGENT_SECRET_CAPABILITY];
     const json = { id: "routine-hook", owner: { kind: "agent", id: "agent-ada" } };
-    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
-    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     check(
-      "the host advertises webhook-agent-secret-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      "the host advertises webhook-agent-secret-v1 to a protocol 10 peer and not to a protocol 9 peer",
       list(field(compatibility.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY) &&
         !list(field(older.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY),
       [summary(compatibility), summary(older)],

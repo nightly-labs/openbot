@@ -1,5 +1,5 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, IconButton, Input, Search, UserAvatar, UserRound, X } from "@openbot/ui";
+import { Button, ChevronRight, Input, Search, UserAvatar, UserRound, X } from "@openbot/ui";
 import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { useText } from "@openbot/ui/text";
@@ -67,16 +67,17 @@ export function SettingsPageFrame(props: {
         <div class="settings-page-footer">{props.footer}</div>
       </div>
       <div class="settings-page-path-row" ref={path} />
-      <IconButton
-        variant="secondary"
+      {/* A plain X needs no tooltip, so this is a Button and not an IconButton. */}
+      <Button
+        variant="ghost"
         size="icon-sm"
         class="settings-page-close"
-        label={t("common.close")}
+        aria-label={t("common.close")}
         data-cuelume-tap="close"
         onClick={() => props.onClose()}
       >
         <X aria-hidden="true" />
-      </IconButton>
+      </Button>
       <div class="settings-page-content" ref={content} />
     </div>
   );

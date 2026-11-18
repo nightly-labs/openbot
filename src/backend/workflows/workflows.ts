@@ -606,10 +606,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             return settle(step, { status: "done", output });
           }
           if (delivery.status === "cancelled") return settle(step, { status: "stopped", error: delivery.error });
+          // A turn that stopped, or failed with no reason, gives no error; its message is still there (#11508).
           if (delivery.status === "failed" || delivery.status === "interrupted")
             return settle(step, {
               status: "failed",
-              error: delivery.error ?? sourceText("error.workflow.agentStepEnded"),
+              error: delivery.error ?? sourceText("error.workflow.agentStepStopped"),
             });
           return false;
         };

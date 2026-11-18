@@ -1001,7 +1001,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Añadir",
   "mobile.server.connectors.whatsapp.groupTitle": "Añadir un grupo",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "Las personas de este grupo pueden asignar trabajo a tus agentes.",
+    "Las personas de este grupo pueden asignar trabajo a tus agentes cuando mencionan el número o responden a sus mensajes.",
   "mobile.server.connectors.whatsapp.groupSearch": "Buscar grupos",
   "mobile.server.connectors.whatsapp.groupsLoading": "Leyendo los grupos…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot no pudo leer los grupos",

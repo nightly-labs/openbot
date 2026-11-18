@@ -1282,7 +1282,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, ברשימה יוצג מספר הטלפון.",
   "mobile.server.connectors.whatsapp.add": "הוספה",
   "mobile.server.connectors.whatsapp.groupTitle": "הוספת קבוצה",
-  "mobile.server.connectors.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "mobile.server.connectors.whatsapp.groupSearch": "חיפוש קבוצות",
   "mobile.server.connectors.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",

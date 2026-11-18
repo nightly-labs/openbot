@@ -507,7 +507,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "connector.whatsapp.add": "Ekle",
   "connector.whatsapp.groupTitle": "Bir grup ekleyin",
-  "connector.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "connector.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "connector.whatsapp.groupSearch": "Grup ara",
   "connector.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",

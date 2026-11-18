@@ -1252,7 +1252,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "mobile.server.connectors.whatsapp.add": "Add",
   "mobile.server.connectors.whatsapp.groupTitle": "Add a group",
-  "mobile.server.connectors.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "mobile.server.connectors.whatsapp.groupSearch": "Search groups",
   "mobile.server.connectors.whatsapp.groupsLoading": "Reading the groups…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
