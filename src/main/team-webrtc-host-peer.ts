@@ -64,11 +64,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { createTeamProtocolV2Event } from "@openbot/contracts/team-protocol/v2-adapter";
-import {
-  decodeTeamProtocolV3WebRtcHttpRequest,
-  encodeTeamProtocolV3WebRtcHttpResponse,
-  isTeamProtocolV3OnlyRoute,
-} from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
+import { encodeTeamProtocolV3WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
 import {
   createTeamProtocolV4Event,
   decodeTeamProtocolV4WebRtcHttpRequest,
@@ -688,12 +684,25 @@ export class TeamWebRtcHostPeer {
         cause: new GatewayError(400, "protocol_error", "Invalid Team API protocol headers."),
       });
     const peerCapabilities = new Set(lists ? expandTeamCapabilitiesV10(lists) : (input.capabilities ?? []));
+    // A request with no protocol marker comes from a release before v0.7.0 (2026-09-09), which is
+    // outside the support window. The HTTP gate refuses a request with no protocol header in the same way.
+    const protocol = webRtcPeerProtocol(peerCapabilities);
+    if (protocol === null)
+      return yield* new RemoteWorkflowError({
+        cause: new GatewayError(426, "client_update_required", sourceText("error.team.clientUpdateRequired")),
+      });
     const capabilitiesChanged =
       peerCapabilities.size !== this.#peerCapabilities.size ||
       [...peerCapabilities].some((capability) => !this.#peerCapabilities.has(capability));
     this.#peerCapabilities = peerCapabilities;
     if (capabilitiesChanged) this.#sendAgentEventScope();
-    const request = { url, peerId, peerCapabilities, preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities) };
+    const request = {
+      url,
+      peerId,
+      peerCapabilities,
+      protocol,
+      preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities),
+    };
     // An uploaded body stays on disk: the request reads it from the file, and the file is removed
     // after the response is complete.
     if (input.bodyTransferId) {
@@ -711,31 +720,12 @@ export class TeamWebRtcHostPeer {
       url,
       peerId,
       peerCapabilities,
+      protocol,
       preserveSemanticTags,
-    }: { url: URL; peerId: string; peerCapabilities: Set<string>; preserveSemanticTags: boolean },
+    }: { url: URL; peerId: string; peerCapabilities: Set<string>; protocol: number; preserveSemanticTags: boolean },
     uploaded: ReceivedWebRtcFile | null,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, HostPeerTransport> {
     const sideRoute = teamSideRouteCodec(input.path);
-    // Protocol 9 is the protocol 8 wire. Its marker is in the bootstrap list too, so the first
-    // compatibility read of a protocol 9 peer gets the full capability list. Protocol 10 is the
-    // protocol 9 wire with the two capability lists.
-    const protocol = peerCapabilities.has(TEAM_CAPABILITY_BASELINE_CAPABILITY)
-      ? TEAM_PROTOCOL_V10
-      : peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-        ? 9
-        : peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-          ? 8
-          : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-            ? 7
-            : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-              ? 6
-              : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                ? 5
-                : peerCapabilities.has("opencode")
-                  ? 4
-                  : isTeamProtocolV3OnlyRoute(input.method, input.path)
-                    ? 3
-                    : 1;
     const decodeRequest =
       protocol >= 9
         ? decodeTeamProtocolV9WebRtcHttpRequest
@@ -747,9 +737,7 @@ export class TeamWebRtcHostPeer {
               ? decodeTeamProtocolV6WebRtcHttpRequest
               : protocol === 5
                 ? decodeTeamProtocolV5WebRtcHttpRequest
-                : protocol === 4
-                  ? decodeTeamProtocolV4WebRtcHttpRequest
-                  : decodeTeamProtocolV3WebRtcHttpRequest;
+                : decodeTeamProtocolV4WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined
@@ -1242,6 +1230,22 @@ interface HttpRequestPayload {
   capabilities?: string[];
   /** The baseline capabilities that a protocol 10 peer does not serve. Released hosts ignore it. */
   absent?: string[];
+}
+
+/**
+ * The protocol of a WebRTC request, from the markers in its capability list. Protocol 9 is the
+ * protocol 8 wire. Its marker is in the bootstrap list too, so the first compatibility read of a
+ * protocol 9 peer gets the full capability list. Protocol 10 is the protocol 9 wire with the two
+ * capability lists. A list with no marker gives `null`: each release since v0.7.0 sends one.
+ */
+function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {
+  if (capabilities.has(TEAM_CAPABILITY_BASELINE_CAPABILITY)) return TEAM_PROTOCOL_V10;
+  if (capabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)) return 9;
+  if (capabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)) return 8;
+  if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
+  if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
+  if (capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)) return 5;
+  return capabilities.has("opencode") ? 4 : null;
 }
 
 function isCompatibilityRead(method: string, path: string, status: number): boolean {

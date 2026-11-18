@@ -94,7 +94,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); step 2 (protocol 10) in review on `t3/protocol-10-capability-registry-1`; the share sender step needs a store build |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); step 2 (protocol 10) in review on `t3/protocol-10-capability-registry-1`; prerequisite steps 2 and 3 in review on `t3/plan-011-item-2-steps-2-3`; the share sender step needs a store build |
 | 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
@@ -154,6 +154,43 @@ Prerequisite steps, in this order:
 2. Move the protocol 2 framing and the v3 GET codec into the current adapter, so that deleting the
    old adapters does not delete code that the current protocol uses.
 3. The host refuses an unmarked WebRTC request with `client_update_required`.
+
+Prerequisite steps 2 and 3 (branch `t3/plan-011-item-2-steps-2-3`, 2026-11-18):
+
+- Step 2. The WebRTC framing of every protocol is in
+  `packages/contracts/src/team-protocol/webrtc-framing.ts`; `v2.ts` only re-exports it. The bodyless
+  request frame (GET, DELETE, the routine test POST, the remote viewer routes) that protocols 4 to 10
+  sent through the v3 WebRTC codec is in `webrtc-bodyless-requests.ts`. The v4 to v8 WebRTC adapters
+  no longer import the v3 WebRTC codec. `scripts/team-webrtc-wire-parity-e2e.ts --before=<ref>`
+  compares each codec, framing and transcript output of protocols 1 to 10 with the base commit:
+  38904 cases against `6ea0807f6a`, 0 differences.
+- Step 3. `TeamWebRtcHostPeer` refuses an `http.request` with no protocol marker with status 426,
+  `client_update_required` and `error.team.clientUpdateRequired`, as the HTTP gate refuses a request
+  with no protocol header. `scripts/team-api-legacy-clients-e2e.ts` proves that an unmarked request
+  is refused and that a protocol 4 request still works.
+
+Step 3 evidence: the last release that sends an unmarked WebRTC request.
+
+| Surface | Releases in the window | Unmarked sender | Result |
+|---|---|---|---|
+| Desktop and host | v0.14.0 (2026-09-19) to v0.73.0 | v0.6.1 (2026-09-08) is the last one; v0.7.0 (2026-09-09) adds `opencode` | v0.6.1 left the window on 2026-11-07 |
+| Mobile | 1.0.0 (2026-09-28) to 1.4.11 (2026-11-17) | none: `remote-peer` is the only `http.request` sender, and the share sender (1.4.3+) uses it | no unmarked sender |
+| Web client | `remote-peer` of `main` | none | no unmarked sender |
+
+Where I looked: `git show <tag>:` of `team-webrtc-client-transport.ts` and
+`packages/team-client/src/remote-peer.ts` for each tag, and the mobile release commits. Not confirmed:
+the mobile store dates (from `apps/mobile/CHANGELOG.md` only), that 1.0.0 (`192540e9b2`) is the store
+build, the OTA bundles, and the commit that `openbot.run/app` serves.
+
+What the deletion PR must still move, because current code uses it:
+
+- 31 files outside the contracts package import `@openbot/contracts/team-protocol/v2`. Point them at
+  `team-protocol/webrtc-framing` before `v2.ts` goes.
+- The WebRTC response chain in `src/main/team-webrtc-host-peer.ts` ends with the v3 WebRTC response
+  encoder. No `http.request` reaches it now, but the import stays.
+- `current.ts`, `current-agent-keys.ts`, `current-adapter-routes.ts`, `analytics-v1.ts`,
+  `host-analytics-v1.ts`, `channels-v1.ts`, `routines-once-v1.ts`, `profile-v1.ts` and
+  `http-codecs.ts` import from `v1`, `v1-adapter`, `v3` or `v3-adapter`.
 
 Not confirmed: mobile store release dates (the repo has only the prepare commits), the mobile window
 policy (no repo source), and whether the web client is served from the latest `main`.

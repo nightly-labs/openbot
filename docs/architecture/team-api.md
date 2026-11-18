@@ -320,6 +320,15 @@ two lists, and a client expands it (`decodeTeamProtocolSupportExpanded`). The de
 web client speak 10. Mobile stays on 9 until a capability after protocol 9 needs it there. The
 `agent-event-scope` message has no length limit and always sends the full list.
 
+All WebRTC frames of protocols 1 to 10 use one framing (`webrtc-framing.ts`; the names keep the
+`V2` spelling, and `v2.ts` only re-exports it). The bodyless request frame of protocols 4 to 10 (a
+GET, a DELETE, the routine test POST and the remote viewer routes) is in
+`webrtc-bodyless-requests.ts`. Both are current code: deleting an old protocol does not delete them.
+`scripts/team-webrtc-wire-parity-e2e.ts --before=<ref>` compares their bytes with a base commit. On
+WebRTC, the host reads the protocol of an `http.request` from the capability markers. A request
+with no marker comes from a release before v0.7.0, and the host refuses it with status 426 and
+`client_update_required`, as the HTTP gate refuses a request with no protocol header.
+
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
 The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
