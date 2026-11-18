@@ -80,11 +80,15 @@ interface CardFill {
   settled: boolean;
 }
 
+// Keep one animated style, also when settled. Reanimated keeps the last value an animated style set on
+// the view, so a plain style after it cannot change the color: a theme change kept the old fill.
 function useCardFill({ background, serverId, cardServer, settled }: CardFill) {
-  const fill = useAnimatedStyle(() => ({
-    backgroundColor: cardServer.get() === serverId ? background : "transparent",
-  }));
-  return settled ? { backgroundColor: background } : fill;
+  return useAnimatedStyle(
+    () => ({
+      backgroundColor: settled || cardServer.get() === serverId ? background : "transparent",
+    }),
+    [background, serverId, settled],
+  );
 }
 
 /**
