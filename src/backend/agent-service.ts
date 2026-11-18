@@ -7408,6 +7408,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "load interrupted agent", cause: failure.cause }),
         ),
       );
+    // The turn ended, and only its Codex subagents work on: Codex stops a subagent only with a Stop of
+    // its own turn (#11871). The client then also stops the subagents of that subagent.
+    const children = executionThreadId || mayStop ? [] : this.#turn.workingCodexChildren(agentId, turnId);
+    if (children.length > 0 && this.#turn.turnStartedAt(turnId) === null) {
+      // Each subagent stops on its own: one that ended meanwhile does not keep the others working.
+      const exits = yield* Effect.forEach(
+        children,
+        (child) =>
+          Effect.exit(
+            child.client.request(
+              "turn/interrupt",
+              { threadId: child.threadId, turnId: child.turnId },
+              decodeRecordResponse,
+            ),
+          ),
+        { concurrency: "unbounded" },
+      );
+      const failure = exits.every(Exit.isFailure) ? exits.find(Exit.isFailure) : undefined;
+      if (failure) {
+        return yield* new AgentLifecycleFailed({
+          operation: "interrupt subagent turn",
+          cause: Cause.squash(failure.cause),
+        });
+      }
+      return true;
+    }
     // No provider runs a turn whose end failed part way or whose provider exited, so it has nothing to
     // stop. The Stop then settles what OpenBot still holds for the turn, and the queue frees (#2214).
     // A turn that the drain started can wait for its `turn/started` with a snapshot already on it:
