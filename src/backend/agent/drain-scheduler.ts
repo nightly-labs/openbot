@@ -88,6 +88,16 @@ const PROVIDER_SESSION_BUSY_RETRY_MAX_MS = 2 * 60_000;
 /** How many times in a row a session that did not open in time tries again before its message fails. */
 const SESSION_RESUME_TIMEOUT_RETRIES = 3;
 
+/**
+ * The retries of an agent whose provider could not open a session: the busy refusals in a row, whether
+ * a retry waits, and the sessions in a row that did not open in time (#11607).
+ */
+interface SessionRetry {
+  refusals: number;
+  waiting: boolean;
+  resumeTimeouts: number;
+}
+
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
@@ -264,9 +274,9 @@ export class DrainScheduler {
   /**
    * Agents whose provider refused to open a session because a stopped prompt still runs in it, with
    * the refusals in a row and whether a retry waits. No event tells when that prompt ends (#9938).
-   * `resumeTimeouts` counts the sessions in a row that did not open in time (#11607).
+   * A session that did not open in time waits here too (#11607).
    */
-  readonly #busyRetries = new Map<string, { refusals: number; waiting: boolean; resumeTimeouts: number }>();
+  readonly #busyRetries = new Map<string, SessionRetry>();
   /**
    * The `scheduleDrain` calls of each agent. A start that a call overtook is not held: the call can
    * be the end of the provider's turn, and no later one would come.
@@ -596,7 +606,7 @@ export class DrainScheduler {
     return true;
   }
 
-  #busyRetryEntry(agentId: string): { refusals: number; waiting: boolean; resumeTimeouts: number } {
+  #busyRetryEntry(agentId: string): SessionRetry {
     const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: 0 };
     this.#busyRetries.set(agentId, entry);
     return entry;
