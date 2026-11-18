@@ -18,7 +18,7 @@ import type {
 } from "../conversation/conversation-types";
 import type { AgentThreadTabsState } from "./agent-thread-tabs";
 
-export type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
+type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 
 export interface ConversationThreadsInput {
   agent: { id: string; updatedAt: string };
