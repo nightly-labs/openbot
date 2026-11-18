@@ -101,7 +101,7 @@ async function readCatalog(client: AgentClient, requestTimeoutMs: number): Promi
  * the gate closed, a pass times out after 5 s and starts the full read, which waits for the gate. A
  * second pass then times out while that read runs. When the gate opens, the read lists a new model.
  */
-async function readOverlappingPasses(requestTimeoutMs: number): Promise<Report["overlap"]> {
+async function readOverlappingPasses(requestTimeoutMs: number): Promise<NonNullable<Report["overlap"]>> {
   const pi = join(root, "runtime", "pi");
   const gate = join(root, "runtime", "gate");
   const model = join(root, "runtime", "model");
@@ -240,10 +240,10 @@ try {
 
   // A pass that times out while the full read runs leaves the result to that read, which lists the models.
   report.overlap = await readOverlappingPasses(20_000);
-  assert.equal(report.overlap?.errorAfterSecondPass, null, "A pass that a running read holds shows no error.");
-  assert.deepEqual(report.overlap?.shownErrors, [], "The row must not show Error while the full read runs.");
-  assert.equal(report.overlap?.errorAfterFullRead, null);
-  assert.deepEqual(report.overlap?.models, ["openrouter/fake/after"]);
+  assert.equal(report.overlap.errorAfterSecondPass, null, "A pass that a running read holds shows no error.");
+  assert.deepEqual(report.overlap.shownErrors, [], "The row must not show Error while the full read runs.");
+  assert.equal(report.overlap.errorAfterFullRead, null);
+  assert.deepEqual(report.overlap.models, ["openrouter/fake/after"]);
 
   report.passed = true;
 } catch (error) {
