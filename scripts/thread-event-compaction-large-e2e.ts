@@ -14,7 +14,8 @@
 // script kills it with SIGKILL after 30 batches, starts it again to the end, and starts it a third time,
 // which must rewrite nothing. It samples the free disk and the WAL during each run. At the end it
 // rebuilds each thread again and compares the hashes, and checks that each event row keeps its sequence,
-// id, command, type, time and every payload key other than `changedMessages`.
+// id, command, type, time and every payload key other than `changedMessages`. Last, one VACUUM gives the
+// freed pages back to the disk (item 26); the script records its cost and checks the rows and replays again.
 //
 // Writes `.openbot-build/thread-event-compaction-large/report.json` and exits non-zero on a failure. The
 // report holds sizes, times and counts only, no message text.
@@ -121,6 +122,20 @@ if (child === "compact") {
   if (!root) throw new Error("The child needs --root.");
   const result = await runCompactionChild(root, Number(flag("pause-ms") ?? "5"));
   process.stdout.write(`result ${JSON.stringify(result)}\n`);
+  process.exit(0);
+}
+// The compaction leaves the freed pages in the file. One VACUUM gives them back to the disk (plan 011,
+// item 26). SQLite writes its copy to `SQLITE_TMPDIR`, on the same volume.
+if (child === "vacuum") {
+  const path = flag("database");
+  if (!path) throw new Error("The child needs --database.");
+  const db = new DatabaseSync(path);
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  const started = performance.now();
+  db.exec("VACUUM");
+  const seconds = (performance.now() - started) / 1000;
+  db.close();
+  process.stdout.write(`result ${JSON.stringify({ seconds, maxRssBytes: process.resourceUsage().maxRSS * 1024 })}\n`);
   process.exit(0);
 }
 
@@ -506,6 +521,62 @@ after.close();
 const replaysAfter = await replayHashes();
 const replayDifferences = [...replaysBefore].filter(([threadId, hash]) => replaysAfter.get(threadId) !== hash).length;
 
+/** Runs one VACUUM in a child and samples the free disk and the WAL until it ends. */
+function runVacuum(): Promise<{
+  seconds: number;
+  maxRssBytes: number;
+  peakExtraDiskBytes: number;
+  peakWalBytes: number;
+}> {
+  return new Promise((resolvePromise, reject) => {
+    const freeBefore = freeBytes(OUT);
+    let peakExtraDiskBytes = 0;
+    let peakWalBytes = 0;
+    const sample = () => {
+      peakExtraDiskBytes = Math.max(peakExtraDiskBytes, freeBefore - freeBytes(OUT));
+      peakWalBytes = Math.max(peakWalBytes, fileBytes(`${databasePath}-wal`));
+    };
+    const timer = setInterval(sample, 25);
+    const vacuum = spawn(process.execPath, [import.meta.filename, "--child=vacuum", `--database=${databasePath}`], {
+      env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    let output = "";
+    vacuum.stdout.setEncoding("utf8");
+    vacuum.stdout.on("data", (chunk: string) => {
+      output += chunk;
+    });
+    vacuum.on("error", reject);
+    vacuum.on("close", (code) => {
+      clearInterval(timer);
+      sample();
+      const line = output.split("\n").find((value) => value.startsWith("result "));
+      const value = line ? JSON.parse(line.slice(7)) : null;
+      if (code !== 0 || !isDynamicRecord(value)) {
+        reject(new Error(`The VACUUM child exited with ${code}.`));
+        return;
+      }
+      resolvePromise({
+        seconds: Number(value.seconds),
+        maxRssBytes: Number(value.maxRssBytes),
+        peakExtraDiskBytes,
+        peakWalBytes,
+      });
+    });
+  });
+}
+
+const vacuum = await runVacuum();
+const vacuumed = new DatabaseSync(databasePath);
+const sizeAfterVacuum = tableSize(vacuumed);
+const rowsHashAfterVacuum = eventRowsHash(vacuumed);
+const integrityAfterVacuum = String(rows(vacuumed, "PRAGMA integrity_check")[0]?.integrity_check);
+vacuumed.close();
+const replaysAfterVacuum = await replayHashes();
+const replayDifferencesAfterVacuum = [...replaysBefore].filter(
+  ([threadId, hash]) => replaysAfterVacuum.get(threadId) !== hash,
+).length;
+
 const report = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
@@ -524,6 +595,7 @@ const report = {
   threadsDone,
   integrityAfter,
   replayDifferences,
+  vacuumAfterCompaction: { ...vacuum, after: sizeAfterVacuum, integrity: integrityAfterVacuum },
   acceptance: {
     databaseAtLeast1_4Gb: generated.fileBytes >= 1.4 * 1e9,
     killedInsideTheLongThread: killedRun.killed && progressAfterKill.longThreadDone === 0,
@@ -537,6 +609,13 @@ const report = {
     // The freed pages go to the free list; the progress rows and a few index pages can add some.
     fileGrowsAtMost1Mib: sizeAfter.fileBytes - fileBytesBeforeCompaction <= 1024 ** 2,
     integrityAfter: integrityAfter === "ok",
+    vacuumGivesBackTheFreePages:
+      sizeAfterVacuum.freelistBytes === 0 && sizeAfterVacuum.fileBytes <= sizeAfter.fileBytes - sizeAfter.freelistBytes,
+    vacuumKeepsEveryRowAndReplay:
+      integrityAfterVacuum === "ok" &&
+      rowsHashAfterVacuum === rowsHashBefore &&
+      replayDifferencesAfterVacuum === 0 &&
+      replaysAfterVacuum.size === replaysBefore.size,
   },
 };
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
