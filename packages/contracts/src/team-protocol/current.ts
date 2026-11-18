@@ -996,7 +996,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
     capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-    capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+    capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
     capability !== REMOTE_AGENT_BRIDGE_CAPABILITY,
 );
 /**
@@ -1369,7 +1369,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
       capability !== AGENT_ACTIVE_QUEUES_CAPABILITY &&
-      capability !== AGENT_CREATE_OPERATION_CAPABILITY,
+      capability !== AGENT_CREATE_OPERATION_CAPABILITY &&
       capability !== REMOTE_AGENT_BRIDGE_CAPABILITY,
   );
 }

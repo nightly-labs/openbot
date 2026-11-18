@@ -79,7 +79,7 @@ describe("remote agent bridge migration", () => {
 
     migrateOpenBotDatabase(db);
 
-    expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+    expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 66 });
     expect(
       db
         .prepare("SELECT message_id, sender_kind, message_json FROM projection_mailbox_messages ORDER BY message_id")
