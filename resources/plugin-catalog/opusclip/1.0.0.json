@@ -1,0 +1,33 @@
+{
+  "slug": "opusclip",
+  "name": "OpusClip",
+  "tagline": "Short clips from long videos",
+  "description": "OpusClip lets agents turn long videos into short clips and read the clips and projects in the user's account. Each user signs in to their own OpusClip account through the browser.",
+  "category": "design",
+  "creatorName": "OpusClip",
+  "iconUrl": "https://cdn.prod.website-files.com/6388604483b03a9ecb34d695/6435197bfb1d6e486e04c37b_webclip.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-clip", "text": "Make short clips from this podcast episode link." },
+    { "id": "prompt-projects", "text": "List my recent projects and their status." },
+    { "id": "prompt-best-clips", "text": "Which clips from my last project have the highest virality score?" }
+  ],
+  "apps": [
+    {
+      "id": "app-opusclip-mcp",
+      "name": "OpusClip",
+      "description": "Clip generation and project access, over OpusClip's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6388604483b03a9ecb34d695/6435197bfb1d6e486e04c37b_webclip.png",
+      "server": {
+        "name": "opusclip",
+        "transport": "http",
+        "url": "https://mcp.opus.pro/mcp",
+        "auth": [{ "id": "opusclip-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.opus.pro",
+  "privacyPolicyUrl": "https://www.opus.pro/privacy-policy",
+  "termsUrl": "https://www.opus.pro/terms-of-service",
+  "skills": []
+}

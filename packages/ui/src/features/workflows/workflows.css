@@ -52,14 +52,6 @@
   position: relative;
 }
 
-/* On a screen with one device pixel for each CSS pixel, a line of 1.5 in a 24px icon that shows at 14px or 16px is
- * thinner than a pixel, so it shows faint and soft. A line of 2 fills whole pixels. */
-@media (max-resolution: 1.5dppx) {
-  .wfn-stage {
-    --openbot-icon-stroke: 2;
-  }
-}
-
 /* --------------------------------------------------------------- Canvas */
 
 .wfn-stage.wfn-canvas {
@@ -154,6 +146,15 @@
   cursor: grabbing;
 }
 
+/* A press on a text field moves the node, and a click puts the caret in it, so the field shows the text cursor only while it has the focus. */
+.wfn-slot :is(textarea, input.wfn-input):not(:focus, [readonly]) {
+  cursor: grab;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input) {
+  cursor: grabbing;
+}
+
 /*
  * The HUD: every bar over the canvas is one glass bar, 40px high, with a 4px inset. Controls inside
  * are 32px with an 8px radius, so the bar radius is 8 + 4 = 12. The bars come in one after another.
@@ -221,17 +222,6 @@
 .wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] {
   background: var(--wfn-hover);
   color: var(--openbot-text-primary);
-}
-
-/* The icon of a pressed tool is full. Most icons have lines inside, which a full fill hides, so they take a part fill.
- * The Select arrow is one closed shape, so it fills whole. */
-.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.lucide {
-  fill: currentcolor;
-  fill-opacity: 0.35;
-}
-
-.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.wfn-hud-arrow {
-  fill-opacity: 1;
 }
 
 .wfn-stage .wfn-hud .wfn-hud-tool svg {
@@ -518,11 +508,13 @@
 .wfn-stage .wfn-hud-tools .wfn-hud-tool svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .wfn-stage .wfn-hud-tools .wfn-hud-add-button svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 /*
@@ -1244,11 +1236,7 @@
   visibility: hidden;
 }
 
-/* The Undo toast of a workflow delete has the 1px ring and no shadow, as the other canvas surfaces. */
-.wfn-undo-toast-host .agent-delete-undo-toast {
-  box-shadow: 0 0 0 1px var(--openbot-border);
-}
-
+/* The workflow mark of the Undo toast, in the place of the agent avatar. */
 .wfn-undo-toast-tile {
   display: grid;
   place-items: center;
@@ -1303,12 +1291,16 @@
   display: none;
 }
 
-/* The server menu keeps the start of the top row, so the bar starts after it. */
+/* The controls of the window keep the start of the top row, so the bar starts after them. A window
+ * with the page rail sets `--top-row-tabs-start`; another window has the server menu there. */
 .wfn-canvas[data-frame="window"] .wfn-hud-top {
   top: 0;
   inset-inline-end: var(--openbot-space-3);
-  inset-inline-start: calc(var(--left-panel-width) + var(--openbot-space-3));
+  inset-inline-start: var(--top-row-tabs-start, calc(var(--left-panel-width) + var(--openbot-space-3)));
+  box-sizing: border-box;
   height: var(--left-header-height);
+  /* The centre line of the buttons of the frame, as each page header has (`window.css`). */
+  padding-block: var(--top-row-padding-block, 2px 0);
   align-items: center;
 }
 
@@ -1364,11 +1356,6 @@
 .wfs-menu .ui-menu-trailing {
   flex: none;
   font-variant-numeric: tabular-nums;
-}
-
-/* The history clock has no closed shape, so it stays an outline on the highlighted row. */
-.wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
-  fill: none;
 }
 
 /* Back to the live canvas follows the reading direction. */

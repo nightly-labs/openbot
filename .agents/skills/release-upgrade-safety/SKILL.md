@@ -29,6 +29,33 @@ This runs *before* `docs/RELEASING.md`, which stays authoritative for the publis
 - It never runs `bun run dev:seed` or `dev:reset` — both destroy the developer's own profile — and
   never `pkill -f`, which kills other sessions' work mid-write.
 
+## Subagents and models
+
+Give each gate, and each release task after the audit, to its own subagent. Do not give every
+subagent the session model. Select the smallest tier that can do the task, and set the model
+explicitly on each spawn: an omitted model uses the session model. In Claude Code, set `model` on
+the `Agent` call. In a harness that has no model choice, use a lower reasoning effort.
+
+| Tier | Claude Code | Tasks |
+| --- | --- | --- |
+| Strong | the session model | Step 1 residue, gates A, B, C and E, gate F when `electron-updater` moved, the Step 3 verdict |
+| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the Step 2c failure reading, the translation wording review, the Discord announcement draft |
+| Small | `haiku` | gate H, the Step 2c start and wait, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
+
+- **Translations:** give each small-tier subagent a few locales, the English entry, and the
+  [i18n.md terms](../../../docs/i18n.md#terms). Then run `bun scripts/whats-new-translations.ts <version>`
+  once. It checks only the version, the date and the counts of notices and items, not the wording.
+  Then give all locales to one medium-tier subagent. It compares the terms, the tone, the screen
+  names and the headline endings with the i18n terms, and corrects them. Accept a translation only
+  after this review.
+- **Do not raise the tier because a gate is long.** Raise it when the task needs judgment: a hazard
+  that can lose user data, or a frozen wire format.
+- **Check the evidence of each report** before you accept it, as `AGENTS.md` says. A small-tier
+  "no hit" passes only when its command can still find a hit (see Step 2). When a report has no
+  evidence, run the task again one tier higher. Do not do it again yourself.
+- The session model writes the Step 3 table and each stop. A subagent verdict is evidence, not the
+  verdict.
+
 ## Step 1 — establish the range, then account for every file in it
 
 ```bash
@@ -128,10 +155,11 @@ a gate can be selected without opening anything:
 - **H. Signal** — no reference file.
   always triggered: an earlier release can have left Signal behind, so a range with no `remote/`
   change does not prove that Signal is current. Signal is not deployed by CI or by the release
-  workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is missing,
-  `unknown`, or not a commit in this repository, the verdict is **needs a human**. Pass when
-  `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
-  succeeds. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
+  workflow. Read `commit` from `curl -fsS https://signal1.openbot.run/health/live` and
+  `curl -fsS https://signal2.openbot.run/health/live` (not `signal.openbot.run`, which reaches only the
+  entry machine); if a commit is missing, `unknown`, or not a commit in this repository, the verdict is
+  **needs a human**. Pass when `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
+  succeeds for both commits. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
   (`docs/RELEASING.md` preflight item 16); this is not a stop for the version bump. #1661 is the
   failure this catches: v0.33.0 clients sent webhook routes to a Signal older than #1520.
 
@@ -170,6 +198,39 @@ Ask two questions and report the answers with the table:
 Moving a pin needs the version assertion on a matching host, which `pin:bun-runtime` performs only
 for the target it runs on. [docs/RELEASING.md](../../../docs/RELEASING.md) holds the procedure.
 
+## Step 2c — the live provider check
+
+Not a gate of the audit: it reads no diff. It shows that the desktop app of the audited commit gets
+an answer from the real Codex, Claude and Gemini. No other check does this: the provider fakes and
+the `Provider CLI canary` use no provider account. Run it on the pull request of the release, before
+the merge and before the tag. Start it at the same time as the gates; it takes about 3 minutes.
+
+The `Provider live E2E` workflow runs only when somebody starts it. Start it on the branch that holds
+the audited commit, which must be pushed:
+
+```bash
+gh workflow run provider-live-e2e.yml --ref <branch> -f provider=all
+gh run list --workflow provider-live-e2e.yml --branch <branch> --event workflow_dispatch --limit 1 \
+  --json databaseId,headSha,status,conclusion,url
+gh run watch <databaseId> --exit-status
+```
+
+- Confirm that `headSha` of the run is the audited commit. A run of an older commit proves nothing.
+- Each run sends two short messages to each provider from the accounts of the Mac mini runner. Do
+  not start a second run while one is in progress.
+- On a failure, read the run summary and the `provider-live-e2e` artifact: `summary.md`, and the
+  `no-answer` picture of the failed provider, which shows the error in the chat.
+
+Report one row with the table, with the run URL:
+
+- **pass** — each provider answered.
+- **needs a human** — the provider or its account refused: no sign-in, an expired sign-in, a usage
+  limit, a provider outage. The release did not cause this. Name the provider and the message.
+- **stop** — a provider is available and signed in, and the app gets no answer or shows an error of
+  its own. Find the cause in the range before the version is cut.
+
+[docs/provider-live-e2e.md](../../../docs/provider-live-e2e.md) describes the test and the runner.
+
 ## Step 3 — report and hand off
 
 Report a table:
@@ -177,6 +238,8 @@ Report a table:
 | Gate | Triggered by | Verdict |
 | --- | --- | --- |
 | A. SQLite schema | *path, or "not triggered"* | pass / stop / needs a human |
+
+Add the Step 2b answers and the Step 2c row with its run URL.
 
 Then state the stops explicitly. Any one of these means **the version is not cuttable yet**:
 
@@ -186,7 +249,8 @@ Then state the stops explicitly. Any one of these means **the version is not cut
 - a DDL migration not mirrored into `LATEST_SCHEMA_SQL`;
 - a renamed on-disk file, or a bumped stored `version`, with no read path for the old one;
 - a D1 contraction without the two-step release;
-- a changed `appId`, `ElectronTeamID`, or `publish` target.
+- a changed `appId`, `ElectronTeamID`, or `publish` target;
+- a Step 2c **stop**: a signed-in, available provider that gives no answer in the app.
 
 If every gate passes, say so and hand off: `docs/RELEASING.md` owns the publish — the preflight
 checklist, the compatibility matrix, signing, notarization, the canary update and the size gates.

@@ -199,7 +199,7 @@
 }
 
 /* The settings panel takes its own drops, so the overlay stops at its edge. */
-.conversation-panel:has(.settings-panel) .agent-folders-chat-drop {
+.conversation-panel[data-settings-panel] .agent-folders-chat-drop {
   inset-inline-end: calc(var(--settings-panel-width, 360px) + var(--openbot-space-3));
 }
 

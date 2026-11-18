@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -19,9 +19,10 @@ import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
 
@@ -56,6 +57,7 @@ export function RoutineScheduleFields({
   onChange: (draft: RoutineScheduleDraft) => void;
 }) {
   const { t, format } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const { theme } = useUniwind();
   const colorScheme = theme === "dark" ? "dark" : "light";
   const problem = routineDraftProblemCode(draft);
@@ -110,7 +112,7 @@ export function RoutineScheduleFields({
           <SettingsRow
             trailing={
               <Host matchContents colorScheme={colorScheme}>
-                <Switch
+                <AppSwitch
                   label={t("mobile.agent.record.allDay")}
                   value={draft.window === null}
                   disabled={disabled}

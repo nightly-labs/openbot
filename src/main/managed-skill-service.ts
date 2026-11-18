@@ -8,6 +8,7 @@ import { Effect, Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
+import { SKILL_OWNERSHIP_MARKER } from "../backend/home-skills";
 import { isPathInside } from "../backend/path-containment";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
@@ -19,7 +20,7 @@ export const MANAGED_SKILL_SLUGS: ReadonlySet<string> = new Set([
   SKILL_CREATOR_SKILL_SLUG,
   DATA_SKILL_SLUG,
 ]);
-export const OWNERSHIP_MARKER = ".openbot-managed.json";
+export const OWNERSHIP_MARKER = SKILL_OWNERSHIP_MARKER;
 /** The workspace skill folders OpenBot writes. Each provider reads at least one of them. */
 export const MANAGED_SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 
@@ -129,6 +130,9 @@ const syncTarget = Effect.fn("ManagedSkill.syncTarget")(function* (
   yield* rejectSymlink(marker);
   if (yield* fileExists(target)) {
     if ((yield* optionalText(marker)) !== ownershipContent) return "collision";
+    // Every start comes here for each agent. A write of the same text is a file that an antivirus
+    // scans and a provider's file watcher reports, for no change.
+    if ((yield* optionalText(target)) === content) return "synced";
     yield* atomicWrite(workspaceRoot, target, content);
     return "synced";
   }

@@ -125,14 +125,14 @@ export function telegramAction(node: WorkflowNode): WorkflowTelegramAction {
   return typeof value === "string" && isOneOf(WORKFLOW_TELEGRAM_ACTIONS, value) ? value : "reply";
 }
 
-const SLACK_ACTION_LABEL = {
+export const SLACK_ACTION_LABEL = {
   reply: "mobile.workflow.slack.action.reply",
   post: "mobile.workflow.discord.action.post",
   react: "mobile.workflow.discord.action.react",
 } as const satisfies Record<WorkflowSlackAction, MobileTextKey>;
 
 /** The action of a Slack output, as the host reads it: a reply in the thread when it has none. */
-function slackAction(node: WorkflowNode): WorkflowSlackAction {
+export function slackAction(node: WorkflowNode): WorkflowSlackAction {
   const value = node.fields.action;
   return typeof value === "string" && isOneOf(WORKFLOW_SLACK_ACTIONS, value) ? value : "reply";
 }
@@ -147,7 +147,7 @@ function triggerText(node: WorkflowNode, t: MobileTranslate): string {
     const github = githubTrigger(node);
     return github.repository
       ? t("mobile.workflow.github.summary", {
-          repository: github.repository,
+          repository: github.repositories.length > 0 ? github.repositories.join(", ") : github.repository,
           event: t(GITHUB_EVENT_LABEL[github.event]),
         })
       : t(TRIGGER_TEXT.github);
@@ -191,6 +191,8 @@ export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t:
     const model = text(node, "model");
     return model ? t("mobile.workflow.kind.llmNamed", { model }) : kindLabel(node.kind, t);
   }
+  // A video step is an image node with `media: "video"`, as on the desktop canvas.
+  if (node.kind === "image" && text(node, "media") === "video") return t("mobile.workflow.kind.video");
   return kindLabel(node.kind, t);
 }
 
@@ -199,6 +201,8 @@ function outputText(node: WorkflowNode, t: MobileTranslate): string {
   switch (text(node, "target")) {
     case "channel":
       return t("mobile.workflow.output.channel");
+    case "chat-channel":
+      return t("mobile.workflow.output.chatChannel");
     case "file":
       return t("mobile.workflow.output.file");
     case "github": {

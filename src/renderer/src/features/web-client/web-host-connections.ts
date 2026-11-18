@@ -10,8 +10,7 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
-import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
@@ -154,7 +153,10 @@ export function createWebHostConnections(options: {
   channel: BroadcastChannel;
   actions: Pick<RemoteTeamPeerActions, "getBootstrap" | "endSession">;
   createPeer: typeof createRemoteTeamPeer;
-  /** The opened host's peer options apart from `waitForHost`, so a status connection can become it. */
+  /**
+   * The opened host's peer options apart from `waitForHost`, so a status connection can become it. A
+   * status connection also waits for the host, as the opened host does.
+   */
   peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols">;
   acquireHostLock: typeof acquireWebHostLock;
   /** Throws when the host identity differs from the pinned one. */
@@ -242,6 +244,9 @@ export function createWebHostConnections(options: {
           // A resync can follow lost events, an `agents-changed` among them.
           if (update.state === "online" && update.resync && !entry.incompatible && options.onNotice)
             void readAgents(entry);
+          // Signal holds the attempt until the host connects. The attempt continues, so the recovery
+          // reports no state for this wait.
+          if (update.hostOffline) setState(host.hostId, "offline");
           if (update.state !== "offline") return;
           if (update.code === "session_revoked") options.onSessionRevoked();
           if (update.code === "protocol_error") entry.recovery?.suspend(failed(update.message, update.reference));
@@ -257,7 +262,11 @@ export function createWebHostConnections(options: {
         },
       },
     };
-    const peer = options.createPeer(actions, options.peerOptions);
+    // Signal holds the attempt while the host is offline, as for the opened host. Without the hold,
+    // each attempt failed at once, and the recovery asked for a new ticket five times in each
+    // 70 seconds for as long as the tab stayed open. The held attempt asks for a ticket only when
+    // the host can be on another Signal machine, at most each 5 minutes.
+    const peer = options.createPeer(actions, { ...options.peerOptions, waitForHost: true });
     entry.actions = actions;
     entry.peer = peer;
     const recovery = createRemoteConnectionRecovery(
@@ -293,7 +302,7 @@ export function createWebHostConnections(options: {
           );
         const support = decodeTeamProtocolSupportV9(response.body);
         // The same rule as opening the host, so the rail and the open agree.
-        if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
+        if (teamWebRtcClientProtocol(support.protocol).update) {
           entry.incompatible = true;
           recovery.suspend();
         } else {

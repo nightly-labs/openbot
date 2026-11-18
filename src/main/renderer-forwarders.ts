@@ -22,18 +22,24 @@ import {
   type ChannelSummary,
   type ClientAgentSummary,
   decodeChannelSummaries,
+  type HiddenAgentsSnapshot,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   latestTurnAnswer,
   type ServerNotificationLevel,
   type SpeechModelStatus,
+  type VoiceLiveEvent,
   type VoiceModelStatus,
   type VoiceServerSettings,
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
-import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
+  TEAM_CHANNEL_ATTENTION_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
@@ -41,10 +47,12 @@ import {
   type AgentNotificationChannel,
   agentEventAgentId,
   agentEventCanNotify,
+  agentEventNeedsUser,
   agentEventRequestThread,
   notificationForAgentEvent,
   notificationForUsageLimit,
   notificationRequestKey,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
   channelForThread,
@@ -60,20 +68,27 @@ import type { HostAnalytics } from "./analytics";
 import {
   closeRetainedNotification,
   desktopAgentEventLevel,
+  type NotificationChat,
   RETAINED_NOTIFICATION_LIMIT,
   showRetainedNotification,
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentSummaries } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeHiddenAgentsFromHost } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
+
+/** The level at which an event notifies, from the levels of the agents and the agents that the user hid. */
+type NotifyLevel = (
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  hiddenAgentIds?: ReadonlySet<string> | null,
+) => ServerNotificationLevel | null;
 
 export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
   /** Each chat window shows a live chat, so it gets the chat, server and provider events too. */
   getChatWindows: () => BrowserWindow[];
-  getAgentService: () => Pick<AgentService, "listAgents"> | null;
+  getAgentService: () => Pick<AgentService, "listAgents" | "listHiddenAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<
@@ -85,6 +100,7 @@ export interface RendererForwarderDependencies {
     | "notificationLevels"
     | "cachedNotificationLevels"
     | "knownNotificationLevels"
+    | "supportsCapability"
   > | null;
   /** The level that the user chose for each agent of this computer's server. */
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
@@ -161,6 +177,47 @@ export function createRendererForwarders({
   const channelReads = new Map<string, boolean>();
   /** The shown reply notification of each channel. A newer reply replaces it. */
   const channelNotifications = new Map<string, Notification>();
+  /**
+   * The shown notifications of each chat, by server. The user reads a chat only while they look at
+   * it, so a read closes them; otherwise they stay in the system's notification list.
+   */
+  const chatNotifications = new Map<string, Set<Notification>>();
+
+  function chatKey(serverId: string, chat: NotificationChat): string {
+    return "channelId" in chat ? `${serverId}\nchannel:${chat.channelId}` : `${serverId}\nagent:${chat.agentId}`;
+  }
+
+  function trackChatNotification(serverId: string, chat: NotificationChat, notification: Notification): void {
+    const key = chatKey(serverId, chat);
+    const shown = chatNotifications.get(key) ?? new Set<Notification>();
+    chatNotifications.set(key, shown);
+    shown.add(notification);
+    // A chat that the user does not open keeps only its newest notifications.
+    for (const oldest of shown) {
+      if (shown.size <= RETAINED_NOTIFICATION_LIMIT) break;
+      shown.delete(oldest);
+    }
+    const release = () => {
+      shown.delete(notification);
+      if (shown.size === 0 && chatNotifications.get(key) === shown) chatNotifications.delete(key);
+    };
+    notification.on("click", release);
+    notification.on("close", release);
+    notification.on("failed", release);
+  }
+
+  /** Closes the shown notifications of a chat that the user read. */
+  function closeChatNotifications(serverId: string, chat: NotificationChat): void {
+    // The agent dock reads while it is on screen, also when no app window has focus. Its notifications
+    // are then still news.
+    const window = getMainWindow();
+    if (!window || window.isDestroyed() || !appFocused(window)) return;
+    const key = chatKey(serverId, chat);
+    const shown = chatNotifications.get(key);
+    if (!shown) return;
+    chatNotifications.delete(key);
+    for (const notification of shown) closeRetainedNotification(notification);
+  }
 
   /** The notification level of a server's channel replies, or null when none can show. */
   function replyLevel(serverId: string) {
@@ -256,6 +313,7 @@ export function createRendererForwarders({
           channelId: reply.channelId,
         });
       });
+      trackChatNotification(serverId, { channelId: reply.channelId }, notification);
       showRetainedNotification(notification);
     }
   }
@@ -321,6 +379,24 @@ export function createRendererForwarders({
   }
 
   /**
+   * The agents of a server that the user hid. Only a host with `agent-hidden-work` keeps them at work,
+   * so only that host gets a request. A failed read gives none: the event then notifies at its level.
+   */
+  function userHiddenAgentIds(serverId: string): ReadonlySet<string> | Promise<ReadonlySet<string>> {
+    const ids = (snapshot: HiddenAgentsSnapshot | undefined) =>
+      new Set(snapshot?.agents.map((agent) => agent.agentId) ?? []);
+    if (serverId === LOCAL_SERVER_ID) return ids(getAgentService()?.listHiddenAgents());
+    const remoteManager = getRemoteServerManager();
+    if (!remoteManager?.supportsCapability(serverId, AGENT_HIDDEN_WORK_CAPABILITY)) return ids(undefined);
+    return runCauseEffect(
+      remoteManager.request(serverId, AGENT_HIDDEN_ROUTES.read, decodeHiddenAgentsFromHost, {
+        method: "POST",
+        body: {},
+      }),
+    ).then(ids, () => ids(undefined));
+  }
+
+  /**
    * The notifications that wait for an answer, by request. An answer on any device withdraws its
    * notification. A request whose notification is still being built has no notification yet, and an
    * answer that arrives then removes the entry, so the notification is not shown.
@@ -338,20 +414,25 @@ export function createRendererForwarders({
 
   async function notifyAgentEvent(serverId: string, received: AgentEvent): Promise<void> {
     withdrawResolvedNotification(serverId, received);
+    // A turn of a side thread that is not a routine thread shows no desktop notification, as before.
+    // The phone notifies about it (`PushNotificationService`).
+    if (received.type === "thread-turn-completed" && !received.routine) return;
+    // Work between agents stays in the chat and does not call the user.
+    if (teammateTurnCompleted(received)) return;
     // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
-    const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
-    const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
+    const routineTaskId = received.type === "thread-turn-completed" ? received.taskId : null;
+    const event = received.type === "thread-turn-completed" ? received.turn : received;
     // Most events stream while an agent works. Only these can notify, so the others skip the server list.
-    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached") return;
+    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached" && event.type !== "subagent-failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
-    const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {
+    const notifyLevel: NotifyLevel = (agentLevels, hiddenAgentIds = null) => {
       const window = getMainWindow();
       const server = getRemoteServerManager()
         ?.list()
         .find((candidate) => candidate.id === serverId);
       if (!window || window.isDestroyed() || appFocused(window) || !server) return null;
-      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels);
+      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels, hiddenAgentIds);
     };
     // The level also rules out an event before the remote lookups. The level of an agent can let more
     // through than the server level, so this first check uses the most open one.
@@ -373,7 +454,7 @@ export function createRendererForwarders({
   async function showAgentNotification(
     serverId: string,
     event: AgentEvent,
-    notifyLevel: (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => ServerNotificationLevel | null,
+    notifyLevel: NotifyLevel,
     requestKey: string | null,
     routineTaskId: string | null,
   ): Promise<void> {
@@ -390,7 +471,18 @@ export function createRendererForwarders({
     const lookup = eventChannel(serverId, event);
     const channel = lookup instanceof Promise ? await lookup : lookup;
     const levelLookup = agentNotificationLevels(serverId);
-    const level = notifyLevel(levelLookup instanceof Promise ? await levelLookup : levelLookup);
+    const levels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
+    const open = notifyLevel(levels);
+    // A hidden agent changes only the level "all" of an event that does not wait for the user (see
+    // `agentNotificationLevel`), so only that event reads the hidden agents of a remote server.
+    const hiddenLookup =
+      open === "all" && event.type !== "usage-limit-reached" && !agentEventNeedsUser(event)
+        ? userHiddenAgentIds(serverId)
+        : null;
+    const level =
+      hiddenLookup === null
+        ? open
+        : notifyLevel(levels, hiddenLookup instanceof Promise ? await hiddenLookup : hiddenLookup);
     const content = !level
       ? null
       : event.type === "usage-limit-reached"
@@ -437,6 +529,12 @@ export function createRendererForwarders({
         ...(content.channelId ? { channelId: content.channelId } : {}),
       });
     });
+    // A notification of a routine or side thread stays: reading the agent's own chat does not show that
+    // thread. An agent list from before the first turn has no thread yet.
+    const ownThreadId = agents.find((agent) => agent.id === content.agentId)?.threadId ?? null;
+    if (content.channelId) trackChatNotification(serverId, { channelId: content.channelId }, notification);
+    else if (!routineTaskId && (ownThreadId === null || ownThreadId === content.threadId))
+      trackChatNotification(serverId, { agentId: content.agentId }, notification);
     showRetainedNotification(notification);
   }
 
@@ -470,7 +568,10 @@ export function createRendererForwarders({
     }
   }
 
-  /** A workflow step that waits for the user, or a workflow output. A click shows the main window. */
+  /**
+   * A workflow step that waits for the user, or a workflow output. A click shows the main window with
+   * the workflow, where the user approves the step or reads the output.
+   */
   function forwardWorkflowNotice(notice: WorkflowNotice): void {
     if (!desktopNotificationsEnabled()) return;
     const translate = getTranslate();
@@ -486,7 +587,13 @@ export function createRendererForwarders({
     const notification = new Notification({ title: notice.workflowTitle, body });
     notification.on("click", () => {
       const current = getMainWindow();
-      if (current && !current.isDestroyed()) showMainWindow(current);
+      if (!current || current.isDestroyed()) return;
+      showMainWindow(current);
+      // Workflows run on the host of this computer.
+      sendToRenderer(current, IPC_ENDPOINTS.notifications.workflowOpened, {
+        serverId: LOCAL_SERVER_ID,
+        workflowId: notice.workflowId,
+      });
     });
     showRetainedNotification(notification);
   }
@@ -567,6 +674,12 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
+  /** `memberId` is null for a session of this computer. A member's session never goes to these windows. */
+  function forwardVoiceLiveEvent(event: VoiceLiveEvent, memberId: string | null = null): void {
+    if (memberId !== null) return;
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
+  }
+
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
@@ -587,6 +700,9 @@ export function createRendererForwarders({
 
   function forwardBitwardenConnectorStatus(status: import("@openbot/contracts/ipc").BitwardenConnectorStatus): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
+  }
+  function forwardPasswordManagerStatus(status: import("@openbot/contracts/ipc").PasswordManagerStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.passwordManagers.changed, status);
   }
 
   function forwardVaultState(state: import("@openbot/contracts/ipc").VaultState): void {
@@ -652,7 +768,15 @@ export function createRendererForwarders({
     for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.attachmentImports.importProgress, progress);
   }
 
+  // Settings can open in any window; each one keeps the progress of its own server.
+  function forwardInstanceTransferUploadProgress(
+    progress: import("@openbot/contracts/ipc").InstanceTransferUploadProgress,
+  ): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.instanceTransfer.uploadProgress, progress);
+  }
+
   return {
+    closeChatNotifications,
     forwardAgentEvent,
     forwardWorkflowNotice,
     forwardMachineAlert,
@@ -661,6 +785,7 @@ export function createRendererForwarders({
     forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardVoiceStreamTranscript,
+    forwardVoiceLiveEvent,
     forwardSpeechModelStatus,
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
@@ -668,6 +793,7 @@ export function createRendererForwarders({
     forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
+    forwardPasswordManagerStatus,
     forwardVaultState,
     forwardHostStatus,
     forwardRemoteDesktopSessions,
@@ -677,5 +803,6 @@ export function createRendererForwarders({
     forwardDirectTyping,
     forwardAttachmentDownload,
     forwardAttachmentImportProgress,
+    forwardInstanceTransferUploadProgress,
   };
 }

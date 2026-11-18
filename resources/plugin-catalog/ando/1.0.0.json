@@ -1,0 +1,33 @@
+{
+  "slug": "ando",
+  "name": "Ando",
+  "tagline": "Team chat with agents",
+  "description": "Ando lets agents join a workspace as a member, read channels and threads, and post messages. Each user signs in to their own Ando account through the browser.",
+  "category": "productivity",
+  "creatorName": "Ando",
+  "iconUrl": "https://www.ando.so/icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-catch-up", "text": "Summarize what happened in the product channel today." },
+    { "id": "prompt-mentions", "text": "Which threads mention me and still need an answer?" },
+    { "id": "prompt-draft-update", "text": "Draft a status update for the launch thread." }
+  ],
+  "apps": [
+    {
+      "id": "app-ando-mcp",
+      "name": "Ando",
+      "description": "Channel, thread, and message tools, over Ando's MCP server with browser sign-in.",
+      "iconUrl": "https://www.ando.so/icon.png",
+      "server": {
+        "name": "ando",
+        "transport": "http",
+        "url": "https://mcp.ando.so/mcp",
+        "auth": [{ "id": "ando-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.ando.so",
+  "privacyPolicyUrl": "https://www.ando.so/security/privacy-policy",
+  "termsUrl": "https://www.ando.so/security/terms-of-service",
+  "skills": []
+}

@@ -90,6 +90,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "Größere Server, mehr als {count} Mitglieder oder alles andere, was du brauchst. Mit Enterprise-Support.",
   "sitePage.pricing.enterprise.contact": "Vertrieb kontaktieren",
+  "sitePage.pricing.consent.statement": "Ich erkläre, dass ich {policy}, {terms} akzeptiere.",
+  "sitePage.pricing.consent.policy": "die Datenschutzerklärung",
+  "sitePage.pricing.consent.terms": "die Nutzungsbedingungen und das Widerrufsrecht",
   "sitePage.marketplace.agents.title": "Agenten — OpenBot Marketplace",
   "sitePage.marketplace.agents.description":
     "Agenten, die andere in OpenBot erstellt haben. Füge einen mit seinen Fähigkeiten und Routinen zu OpenBot hinzu.",

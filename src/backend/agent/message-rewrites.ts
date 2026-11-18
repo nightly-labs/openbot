@@ -63,7 +63,7 @@ export class MessageRewrites {
     if (!threadId) throw new Error(sourceText("error.backend.threadNotFound"));
     const busy = task
       ? this.#tasks.publicTask(task).state !== "idle"
-      : this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agent.id) || this.#threads.mainContextBusy(agent);
+      : this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agent.id, false) || this.#threads.mainContextBusy(agent);
     if (busy) throw new Error(sourceText("error.backend.rewriteSourceBusy"));
     const message = this.#store.database
       .readConversation(agent.id, threadId)

@@ -21,6 +21,7 @@ export const ROUTINE_TABLES = {
     eventPrefix: "routine",
     limit: INPUT_LIMITS.agentRoutines,
     limitMessage: sourceText("error.backend.agentRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
+    runInColumn: true,
   },
   channel: {
     ownerKind: "channel",
@@ -36,5 +37,6 @@ export const ROUTINE_TABLES = {
     eventPrefix: "channel-routine",
     limit: INPUT_LIMITS.agentRoutines,
     limitMessage: sourceText("error.backend.channelRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
+    runInColumn: false,
   },
 } satisfies { [Kind in RoutineTables["ownerKind"]]: RoutineTables & { ownerKind: Kind } };

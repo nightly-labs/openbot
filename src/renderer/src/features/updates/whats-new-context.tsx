@@ -1,5 +1,7 @@
+import type { TranslatedLocale } from "@openbot/i18n";
 import { summarizeWhatsNew, type WhatsNewNotes, type WhatsNewRelease } from "@openbot/ui/features/updates/whats-new";
 import { createEffect, createStore, onSettled } from "solid-js";
+import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import {
@@ -13,8 +15,11 @@ import { loadWhatsNewReleases } from "./whats-new-releases";
 
 const WhatsNew = createSimpleContext({
   name: "WhatsNew",
-  init: (props: { loadReleases?: (signal: AbortSignal) => Promise<readonly WhatsNewRelease[]> }) => {
+  init: (props: {
+    loadReleases?: (signal: AbortSignal, locale: TranslatedLocale) => Promise<readonly WhatsNewRelease[]>;
+  }) => {
     const platform = usePlatform();
+    const i18n = useI18n();
     // Capture the old analytics value before Settings writes this launch's version.
     const storage = {
       getItem: (key: string) => window.localStorage.getItem(key),
@@ -30,6 +35,8 @@ const WhatsNew = createSimpleContext({
     let initialized = false;
     let request = 0;
     let pending: AbortController | undefined;
+    // The language of the notes that the dialog shows or loads. Cleared when the dialog closes.
+    let shown: { locale: TranslatedLocale; automatic: boolean } | undefined;
     onSettled(() => () => {
       request++;
       pending?.abort();
@@ -40,6 +47,8 @@ const WhatsNew = createSimpleContext({
       pending?.abort();
       const controller = new AbortController();
       pending = controller;
+      const locale = i18n.locale();
+      shown = { locale, automatic };
       setState((draft) => {
         draft.version = version;
         draft.previousVersion = from;
@@ -50,6 +59,7 @@ const WhatsNew = createSimpleContext({
       try {
         const whatsNewReleases = await (props.loadReleases ?? loadWhatsNewReleases)(
           AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+          locale,
         );
         notes = { status: "ready", releases: selectWhatsNewReleases(whatsNewReleases, version, from) };
       } catch {
@@ -57,13 +67,24 @@ const WhatsNew = createSimpleContext({
       }
       if (id !== request) return;
       // Empty releases are consumed silently. A failure opens once and can be retried in Settings.
-      if (automatic && !claimWhatsNewVersion(storage, version)) return;
+      if (automatic && !claimWhatsNewVersion(storage, version)) {
+        shown = undefined;
+        return;
+      }
       const summary = notes.status === "ready" ? summarizeWhatsNew(notes.releases) : null;
       setState((draft) => {
         draft.notes = notes;
         if (automatic) draft.open = summary === null || summary.notices.length > 0 || summary.groups.length > 0;
       });
+      if (!state.open) shown = undefined;
     }
+
+    // The saved language can finish loading after the automatic load starts, and the language can
+    // change while the dialog is open. Load the notes again, so they never stay in the old language.
+    createEffect(i18n.locale, (locale) => {
+      if (!shown || shown.locale === locale) return;
+      void load(shown.automatic && !state.open, state.version, state.previousVersion);
+    });
 
     createEffect(platform.appInfo, (info) => {
       if (initialized || platform.landingPreview || !platform.appInfoLoadedFromHost()) return;
@@ -110,6 +131,7 @@ const WhatsNew = createSimpleContext({
       close: () => {
         request++;
         pending?.abort();
+        shown = undefined;
         setState((draft) => {
           draft.open = false;
         });

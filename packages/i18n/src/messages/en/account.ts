@@ -37,7 +37,9 @@ export const messages = defineMessages("account", {
   "account.usage.window.minutes": "{minutes} min",
   "account.usage.window.cursorModels": "Cursor models",
   "account.usage.window.otherModels": "Other models",
+  "account.usage.window.total": "Total",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} left",
   "account.update.failedRetry": "Update failed. Try again.",
   "account.update.managedByHost": "Managed by host",
   "account.update.restart": "Restart",
@@ -62,6 +64,8 @@ export const messages = defineMessages("account", {
   "account.login.connectingDescription": "Starting the account service. This usually takes a moment.",
   "account.login.unavailableDescription": "OpenBot can’t reach the account service right now.",
   "account.login.signInDescription": "Use your email to sign in or create an account. We’ll send you a one-time code.",
+  "account.login.keyringChangedDescription":
+    "The system keyring lost your last sign-in. OpenBot now keeps sign-ins in its own file on this computer. Sign in one more time.",
   "account.login.codeAccepted": "Your code was accepted.",
   "account.login.codeSent": "We sent a code to {email}.",
   "account.login.connectingSecurely": "Connecting securely…",

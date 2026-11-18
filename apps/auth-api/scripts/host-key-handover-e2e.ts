@@ -31,6 +31,7 @@ const OWNER: AuthUser = {
   name: "Owner",
   avatarUrl: null,
   analyticsEnabled: null,
+  chatColor: null,
 };
 const OTHER: AuthUser = {
   id: "user-other",
@@ -38,6 +39,7 @@ const OTHER: AuthUser = {
   name: "Other",
   avatarUrl: null,
   analyticsEnabled: null,
+  chatColor: null,
 };
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];

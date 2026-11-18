@@ -40,6 +40,8 @@ export interface AwaitingReplyListProps {
   onOpenAgent?: ((agentId: string) => void) | undefined;
   /** Takes a queued reply into the running turn. Set only while a turn runs. */
   onSteer?: ((deliveryId: string) => void) | undefined;
+  /** Stops the work of a row that is asked or working. A channel sets it for its sub-tasks. */
+  onStop?: ((id: string) => void) | undefined;
   class?: string;
 }
 
@@ -112,6 +114,11 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     const steer = props.onSteer;
     if (item.state !== "replied" || !deliveryId || !steer) return undefined;
     return () => steer(deliveryId);
+  };
+  const stopAction = (item: AwaitingReplyItem) => {
+    const stop = props.onStop;
+    if ((item.state !== "asked" && item.state !== "working") || !stop) return undefined;
+    return () => stop(item.id);
   };
   // Every agent replied or failed, so nothing more comes for these rows.
   const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
@@ -208,6 +215,20 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                         onClick={() => steer()()}
                       >
                         {t("queue.item.steer")}
+                      </Button>
+                    )}
+                  </Show>
+                  <Show when={stopAction(item())}>
+                    {(stop) => (
+                      <Button
+                        id={`${rowId}-stop`}
+                        size="xs"
+                        variant="secondary"
+                        class="awaiting-replies-stop"
+                        aria-labelledby={`${rowId}-stop ${rowId}-name`}
+                        onClick={() => stop()()}
+                      >
+                        {t("chat.awaiting.stop")}
                       </Button>
                     )}
                   </Show>

@@ -1,7 +1,9 @@
 import { useRef } from "react";
-import { type ColorValue, TextInput, type TextInputInstance, useWindowDimensions } from "react-native";
+import { type ColorValue, TextInput, type TextInputInstance } from "react-native";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 
 /** The body text of a message. */
@@ -37,7 +39,7 @@ export function ChatSelectableText({
   onSelectionChange: (selected: string) => void;
 }) {
   const { t } = useText();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const input = useRef<TextInputInstance>(null);
   // The field selects all of its text at its first layout and again when it first reports the size
   // of its text. The first time a message selects, its text is not laid out yet at the first layout.
@@ -78,6 +80,10 @@ export function ChatSelectableText({
         fontSize: FONT_SIZE,
         lineHeight: LINE_HEIGHT,
         transform: isIOS ? [{ translateY: -IOS_BASELINE_SHIFT * fontScale }] : undefined,
+        // An Android field finds the direction of each paragraph from its text. An iOS field
+        // takes it from the first paragraph, as the message text does in most messages. Text with
+        // no letter keeps the layout direction, as the message text does.
+        ...fieldDirectionStyle(text),
       }}
     />
   );

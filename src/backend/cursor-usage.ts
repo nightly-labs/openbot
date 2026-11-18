@@ -6,7 +6,8 @@
 // (`autoPercentUsed`) and every other model (`apiPercentUsed`) for one billing cycle. The included
 // usage of a merged plan (`GetPlanInfo` `isMerged`) covers Grok and Composer only, so its reading is
 // the total alone, as in the Cursor app. That total is the quota of the Grok plan, so the reading
-// names Grok as sharing it, and the rail shows one ring for both.
+// names Grok as sharing it, and the rail shows one ring for both. A split plan also sends its total,
+// which the Cursor CLI shows first, as `tertiary`.
 
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -111,6 +112,42 @@ const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
   );
 });
 
+const EXCHANGE_API_KEY_PATH = "/auth/exchange_user_api_key";
+
+/**
+ * Whether Cursor accepts the API key: the request with which the Cursor CLI signs a key in. The CLI
+ * itself answers a refused key and a failed connection with the same internal error, so the account
+ * of a key asks here first. Fails when Cursor did not answer or had a server error.
+ */
+export const checkCursorApiKey = Effect.fn("Cursor.checkApiKey")(function* (key: string) {
+  const endpoint = process.env.CURSOR_API_ENDPOINT?.trim() || CURSOR_API_ENDPOINT;
+  return yield* Effect.acquireUseRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) =>
+      Effect.gen(function* () {
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            fetch(`${endpoint.replace(/\/+$/u, "")}${EXCHANGE_API_KEY_PATH}`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+              body: "{}",
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(CURSOR_USAGE_TIMEOUT_MS)]),
+            }),
+          catch: (cause) => new CursorUsageFailed({ cause }),
+        });
+        // The answer holds the tokens of the key. Nothing reads them here.
+        yield* Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore);
+        if (response.ok) return true;
+        // Only these mean a refused key. A rate limit or the answer of a proxy says nothing about the key.
+        if (response.status === 401 || response.status === 403) return false;
+        return yield* new CursorUsageFailed({
+          cause: new Error(`Cursor key check returned HTTP ${response.status}.`),
+        });
+      }),
+    (controller) => Effect.sync(() => controller.abort()),
+  );
+});
+
 const MergedPlan = Schema.Struct({ isMerged: Schema.Literal(true) });
 
 export const readCursorUsage = Effect.fn("Cursor.readUsage")(function* () {
@@ -144,8 +181,9 @@ const PlanUsage = Schema.Struct({
 
 /**
  * The primary window holds Cursor's own models and the secondary one every other model; the dock
- * names them by slot. A merged plan, or a plan that reports only the total, fills the primary
- * window with the total.
+ * names them by slot. `tertiary` holds the total of a split plan, the number that Cursor shows first.
+ * The Team API does not send `tertiary`, so a peer keeps the two windows. A merged plan, or a plan
+ * that reports only the total, fills the primary window with the total.
  */
 function cursorRateLimits(value: unknown, merged: boolean): AccountRateLimitsReadResult {
   const period = Schema.decodeUnknownOption(CurrentPeriodUsage)(value);
@@ -165,10 +203,12 @@ function cursorRateLimits(value: unknown, merged: boolean): AccountRateLimitsRea
   const split = !merged && (autoPercentUsed !== undefined || apiPercentUsed !== undefined);
   const primary = window(split ? autoPercentUsed : totalPercentUsed);
   const secondary = split ? window(apiPercentUsed) : null;
+  const total = split ? window(totalPercentUsed) : null;
   if (!primary && !secondary) return NO_USAGE;
   return {
     rateLimits: { limitId: "cursor", primary, secondary },
     rateLimitsByLimitId: null,
+    ...(total ? { tertiary: total } : {}),
     ...(merged ? { sharedQuotaWith: "grok" as const } : {}),
   };
 }

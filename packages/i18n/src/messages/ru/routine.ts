@@ -271,6 +271,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "Открыть {name}",
   "routine.calendar.completed": "Завершено",
+  "routine.calendar.new": "Новая регулярная задача",
+  "routine.calendar.newOn": "Новая регулярная задача: {day}",
+  "routine.calendar.agent": "Агент",
+  "routine.calendar.agentChoice": "Агент: {name}",
 
   "routine.settings.loadFailed": "Не удалось загрузить регулярные задачи.",
   "routine.settings.loadRunsFailed": "Не удалось загрузить историю запусков.",
@@ -287,6 +291,7 @@ export const messages = {
   "routine.settings.loading": "Загрузка регулярных задач…",
   "routine.settings.empty": "Регулярных задач пока нет.",
   "routine.settings.paused": "Приостановлена",
+  "routine.settings.pausedByRun": "Приостановлена запуском в {time}",
   "routine.settings.completed": "Завершена · {schedule}",
   "routine.settings.active": "Активна",
   "routine.settings.pauseFailed": "Не удалось приостановить эту регулярную задачу.",
@@ -372,6 +377,9 @@ export const messages = {
   "routine.settings.missedPolicy": "Если OpenBot был закрыт в запланированное время",
   "routine.settings.missedPolicy.skip": "Пропустить запуск",
   "routine.settings.missedPolicy.runOnce": "Запустить один раз при открытии OpenBot",
+  "routine.settings.runInThread": "Запускать в отдельной ветке",
+  "routine.settings.runInSaveFailed":
+    "Регулярная задача сохранена, но настройка отдельной ветки — нет. Повторите попытку.",
   "routine.settings.resultDestination": "Отправлять ответы в",
   "routine.settings.resultDestination.none": "Только этот чат",
   "routine.settings.resultDestination.place": "{connection} · {place}",

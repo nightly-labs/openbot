@@ -15,6 +15,9 @@ import { Deferred, Effect } from "effect";
  * socket holds the route again, and keeps it until the host acknowledges it, so a socket that closes
  * after the flush loses nothing. Everything here is in memory: a restart of Signal loses it. Signal
  * never keeps an event that it cannot seal.
+ *
+ * A generic webhook only starts its host (`wakeOnly`): Signal cannot check its signature, so it keeps
+ * nothing, and the sender sends the webhook again after the 503.
  */
 
 export interface RouteWake {
@@ -44,6 +47,11 @@ export interface IngressQueueLimits {
   maximumPerHost: number;
   maximumBytesPerHost: number;
   maximumBytes: number;
+  /**
+   * A generic webhook starts a host at most this often. Anyone who has a route URL can send to it, so
+   * this bounds how much of the time such requests keep a hosted server awake.
+   */
+  webhookWakeMilliseconds: number;
 }
 
 const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
@@ -55,6 +63,7 @@ const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
   // delivery, sealed, is about 160 KB.
   maximumBytesPerHost: 192 * 1024,
   maximumBytes: 256 * 1024 * 1024,
+  webhookWakeMilliseconds: 30 * 60_000,
 };
 
 /** How often expired events go when no other event or flush comes. */
@@ -102,6 +111,8 @@ export class IngressQueue {
   /** A route that asks the account service now. Concurrent events share the answer. */
   readonly #pending = new Map<string, { answer: Deferred.Deferred<RouteWake>; wake: boolean }>();
   readonly #queues = new Map<string, QueueEntry[]>();
+  /** When a generic webhook last started each host, oldest first. */
+  readonly #webhookWakes = new Map<string, number>();
   #bytes = 0;
   #order = 0;
   #expiry: ReturnType<typeof setInterval> | null = null;
@@ -162,6 +173,45 @@ export class IngressQueue {
     if (wake.state !== "starting" || !wake.hostId) return "unavailable";
     return yield* this.#add(order, wake.hostId, route, routeKey, message, telegramCallback);
   }, Effect.uninterruptible);
+
+  /**
+   * A generic webhook for a route that no socket holds. It keeps nothing. A hosted server that sleeps
+   * starts, at most once in `webhookWakeMilliseconds` for each host. A server that is `starting` is asked
+   * to start again in the same interval: a failed resume keeps it `starting`, and a webhook has no queued
+   * event that `#wakeAgain` retries for. `allowLookup` is asked before a lookup that is not cached and
+   * before each wake request, so that unknown route IDs and failed wakes cannot flood the account service.
+   * True when the host starts.
+   */
+  readonly wakeOnly = Effect.fn("IngressQueue.wakeOnly")(function* (
+    this: IngressQueue,
+    route: IngressRoute,
+    routeKey: string,
+    allowLookup: () => boolean,
+  ): Effect.fn.Return<boolean> {
+    if (!this.#waker) return false;
+    if (!this.#fresh(routeKey, this.#now()) && !this.#pending.has(routeKey) && !allowLookup()) return false;
+    const known = yield* this.#check(route, routeKey, false);
+    if ((known.state !== "sleeping" && known.state !== "starting") || !known.hostId) return false;
+    const now = this.#now();
+    const last = this.#webhookWakes.get(known.hostId);
+    if (last !== undefined && now - last < this.#limits.webhookWakeMilliseconds) return false;
+    // Each wake request is also a lookup, so wakes that fail cannot call the account service without limit.
+    if (!allowLookup()) return false;
+    this.#webhookWakes.delete(known.hostId);
+    dropOldest(this.#webhookWakes, MAXIMUM_ROUTES);
+    this.#webhookWakes.set(known.hostId, now);
+    // The cached `starting` answer would stop the wake request.
+    if (known.state === "starting" && !this.#pending.has(routeKey)) this.#routes.delete(routeKey);
+    const started = (yield* this.#check(route, routeKey, true)).state === "starting";
+    // A wake that failed does not count: the sender's next try asks again.
+    if (!started && this.#webhookWakes.get(known.hostId) === now) this.#webhookWakes.delete(known.hostId);
+    return started;
+  }, Effect.uninterruptible);
+
+  /** The account service revoked this route: the next event asks it again. */
+  forget(routeKey: string): void {
+    this.#routes.delete(routeKey);
+  }
 
   /**
    * One event for a host that Signal already knows, such as the `/start` update of a chat that the
@@ -262,13 +312,9 @@ export class IngressQueue {
     wake: boolean,
   ): Effect.fn.Return<RouteWake> {
     const now = this.#now();
-    const known = this.#routes.get(routeKey);
-    const hosted = known?.wake.state === "sleeping" || known?.wake.state === "starting";
-    const fresh =
-      known &&
-      now - known.at < (hosted ? this.#limits.routeCheckMilliseconds : this.#limits.otherRouteCheckMilliseconds);
+    const known = this.#fresh(routeKey, now);
     // A route that was only looked up asks again to start a server that sleeps.
-    if (fresh && (known.woke || !wake || known.wake.state !== "sleeping")) return known.wake;
+    if (known && (known.woke || !wake || known.wake.state !== "sleeping")) return known.wake;
     const current = this.#pending.get(routeKey);
     if (current) {
       const shared = yield* Deferred.await(current.answer);
@@ -290,6 +336,15 @@ export class IngressQueue {
     yield* Deferred.succeed(result, answer);
     return answer;
   }, Effect.uninterruptible);
+
+  /** The last answer for a route, while it is recent enough to use. */
+  #fresh(routeKey: string, now: number): { wake: RouteWake; at: number; woke: boolean } | null {
+    const known = this.#routes.get(routeKey);
+    if (!known) return null;
+    const hosted = known.wake.state === "sleeping" || known.wake.state === "starting";
+    const age = hosted ? this.#limits.routeCheckMilliseconds : this.#limits.otherRouteCheckMilliseconds;
+    return now - known.at < age ? known : null;
+  }
 
   #remove(hostId: string, entry: QueueEntry): void {
     const queue = this.#queues.get(hostId);

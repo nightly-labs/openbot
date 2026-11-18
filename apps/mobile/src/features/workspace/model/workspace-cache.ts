@@ -1,10 +1,16 @@
+import { isStorageGb } from "@openbot/contracts/billing";
 import {
   type AvatarColor,
+  type ChannelPage,
+  type ChannelSummary,
   type ConversationPage,
+  decodeChannelPage,
+  decodeChannelSummaries,
   isAvatarColor,
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { optionalServerAppearanceField } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { RemoteTeamHost } from "@openbot/team-client";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
@@ -32,6 +38,11 @@ interface CachedServer {
   capabilities: readonly string[] | null;
   /** The last values of the drawer. A file of an older build has none. */
   drawer: DrawerSnapshot | null;
+  /**
+   * The channel list and the latest messages of the loaded channels, or null for a host without
+   * channels. A file of an older build has none.
+   */
+  channels: { channels: ChannelSummary[]; pages: ChannelPage[] } | null;
 }
 
 export interface WorkspaceCache {
@@ -121,6 +132,16 @@ function decodeCachedColors(value: unknown): CachedServer["colors"] {
   );
 }
 
+/** The kept channels. A bad value drops only the channels, so the agents and chats still show. */
+function decodeCachedChannels(value: unknown): CachedServer["channels"] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.pages)) return null;
+  try {
+    return { channels: decodeChannelSummaries(value.channels), pages: value.pages.map(decodeChannelPage) };
+  } catch {
+    return null;
+  }
+}
+
 function decodeCachedServer(value: unknown): CachedServer {
   if (
     !isDynamicRecord(value) ||
@@ -139,6 +160,7 @@ function decodeCachedServer(value: unknown): CachedServer {
     // A bad list drops only the early reads: the first connection then waits for its check.
     capabilities: Array.isArray(capabilities) && capabilities.every(isString) ? capabilities : null,
     drawer: decodeDrawerSnapshot(value.drawer),
+    channels: decodeCachedChannels(value.channels),
   };
 }
 
@@ -146,6 +168,7 @@ function decodeCachedServer(value: unknown): CachedServer {
 function decodeCachedHost(value: unknown): RemoteTeamHost {
   if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
   const { hostId, name, logoKey, devicePublicKey, membershipId, role, memberLimit, hosted, keyChangedAt } = value;
+  const { restartAvailable, storageGb, appearance } = value;
   if (
     !isString(hostId) ||
     !isString(name) ||
@@ -168,6 +191,11 @@ function decodeCachedHost(value: unknown): RemoteTeamHost {
     role,
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    // A bad value drops only the flag: the next server list writes it again.
+    ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
+    ...(isStorageGb(storageGb) ? { storageGb } : {}),
+    // A file of an older build has no appearance, and a bad one is dropped: the next server list writes it again.
+    ...optionalServerAppearanceField(appearance),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
   };
 }
@@ -179,7 +207,7 @@ function decodeCachedHosts(value: unknown): RemoteTeamHost[] {
 }
 
 /**
- * The server list, and the agents, sections and recent chats of each server of one account, so the
+ * The server list, and the agents, sections, recent chats and channels of each server of one account, so the
  * app shows them at once after a start, before the account service and the connection answer. The
  * list and each server have one file in `Library/Caches`, which is not in a backup and which the
  * system can delete when the device is low on storage. The files are sealed with AES-256-GCM and
@@ -252,17 +280,31 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
           ...agent,
           provider: agent.provider ?? foreignProvider,
         }));
-        // Each page counts with its escapes and the comma before it.
+        // Each page counts with its escapes and the comma before it. Chats and channels share the
+        // limit, newest first.
         const conversations: ConversationPage[] = [];
-        let length = asciiJson({ format: FORMAT, ...value, agents, conversations }).length;
-        for (const page of [...value.conversations].sort((a, b) =>
-          (b.messages.at(-1)?.createdAt ?? "").localeCompare(a.messages.at(-1)?.createdAt ?? ""),
-        )) {
+        const channelPages: ChannelPage[] = [];
+        const channels = value.channels && { channels: value.channels.channels, pages: channelPages };
+        const file = { format: FORMAT, ...value, agents, conversations, channels };
+        let length = asciiJson(file).length;
+        const pages = [
+          ...value.conversations.map((page) => ({
+            page,
+            at: page.messages.at(-1)?.createdAt ?? "",
+            keep: () => conversations.push(page),
+          })),
+          ...(value.channels?.pages ?? []).map((page) => ({
+            page,
+            at: page.messages.at(-1)?.message.createdAt ?? "",
+            keep: () => channelPages.push(page),
+          })),
+        ].sort((a, b) => b.at.localeCompare(a.at));
+        for (const { page, keep } of pages) {
           length += asciiJson(page).length + 1;
           if (length > MAX_JSON_LENGTH) break;
-          conversations.push(page);
+          keep();
         }
-        await seal(serverId, key, asciiJson({ format: FORMAT, ...value, agents, conversations }));
+        await seal(serverId, key, asciiJson(file));
       }),
     remove: (serverId) =>
       inOrder(serverId, async () => {

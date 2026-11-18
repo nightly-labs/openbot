@@ -1,0 +1,33 @@
+{
+  "slug": "guru",
+  "name": "Guru",
+  "tagline": "Company knowledge search",
+  "description": "Guru lets agents search verified company knowledge, answer questions from it, and draft new cards in the signed-in Guru workspace. Each user signs in to their own Guru account through the browser.",
+  "category": "documents",
+  "creatorName": "Guru",
+  "iconUrl": "https://cdn.prod.website-files.com/5d8d029013ffd80bbb91320d/6216a21ee8829c7531435bc8_Guru_G_Black%202256.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-policy", "text": "What is our travel expense policy according to Guru?" },
+    { "id": "prompt-onboarding", "text": "Find the Guru cards a new support agent should read first." },
+    { "id": "prompt-draft-card", "text": "Draft a Guru card that explains how to reset a customer's password." }
+  ],
+  "apps": [
+    {
+      "id": "app-guru-mcp",
+      "name": "Guru",
+      "description": "Knowledge search, answers, and card drafts, over Guru's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/5d8d029013ffd80bbb91320d/6216a21ee8829c7531435bc8_Guru_G_Black%202256.png",
+      "server": {
+        "name": "guru",
+        "transport": "http",
+        "url": "https://mcp.api.getguru.com/mcp",
+        "auth": [{ "id": "guru-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.getguru.com",
+  "privacyPolicyUrl": "https://www.getguru.com/privacy",
+  "termsUrl": "https://www.getguru.com/terms-of-service",
+  "skills": []
+}

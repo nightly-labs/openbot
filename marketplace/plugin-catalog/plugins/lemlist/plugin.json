@@ -1,0 +1,33 @@
+{
+  "slug": "lemlist",
+  "name": "lemlist",
+  "tagline": "Sales outreach campaigns",
+  "description": "lemlist lets agents read campaigns, leads, and campaign statistics, and draft sequences and lead lists in the signed-in team. Each user signs in to their own lemlist account through the browser.",
+  "category": "productivity",
+  "creatorName": "lemlist",
+  "iconUrl": "https://www.lemlist.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaign-stats", "text": "Compare the reply rates of my active campaigns." },
+    { "id": "prompt-interested", "text": "Which leads were marked as interested this week?" },
+    { "id": "prompt-draft-sequence", "text": "Draft a four-step sequence for agency founders, but do not launch it." }
+  ],
+  "apps": [
+    {
+      "id": "app-lemlist-mcp",
+      "name": "lemlist",
+      "description": "Campaigns, leads, and statistics, over lemlist's MCP server with browser sign-in.",
+      "iconUrl": "https://www.lemlist.com/favicon.ico",
+      "server": {
+        "name": "lemlist",
+        "transport": "http",
+        "url": "https://app.lemlist.com/mcp",
+        "auth": [{ "id": "lemlist-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.lemlist.com",
+  "privacyPolicyUrl": "https://www.lemlist.com/legal/privacy-policy",
+  "termsUrl": "https://www.lemlist.com/legal/terms"
+}

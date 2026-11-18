@@ -152,6 +152,19 @@ export const WithAction: Story = {
           >
             Archive message
           </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.success("OpenBot 0.71.0 is ready", {
+                description: "Restart to apply the update.",
+                duration: Number.POSITIVE_INFINITY,
+                action: { label: "Restart to update", onClick: () => setStatus("Restarting.") },
+                cancel: { label: "Later", onClick: () => setStatus("Update postponed.") },
+              })
+            }
+          >
+            Two actions
+          </Button>
         </div>
       </ToastStory>
     );

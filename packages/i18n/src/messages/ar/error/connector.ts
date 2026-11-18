@@ -27,14 +27,25 @@ export const messages = {
     "تعذّر على OpenBot تثبيت 1Password CLI. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.connector.onePasswordCliSignedOut":
     "لم يتم تسجيل الدخول إلى 1Password CLI. فعّل تكامله في تطبيق 1Password، ثم اتصل مرة أخرى.",
+  "error.connector.onePasswordAppUnreachable":
+    "لا يستطيع OpenBot الوصول إلى تطبيق 1Password. افتح 1Password وافتح قفله. في Settings > Developer، تأكد من تشغيل «Integrate with 1Password CLI». ثم حاول مرة أخرى.",
   "error.connector.onePasswordCliFailed": "فشل 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "لا يسمح لك حساب 1Password بإنشاء الخزنة المشتركة أو حساب خدمة. اطلب هذا الإذن من مالك الحساب أو مسؤوله، أو اطلب منه رمز حساب خدمة وانقر «استخدام رمز».",
   "error.connector.onePasswordUnexpected": "أرسل 1Password إجابة غير متوقعة: {detail}",
   "error.connector.onePasswordTokenRejected": "لم يقبل 1Password رمز حساب الخدمة.",
+  "error.connector.onePasswordUnreachable":
+    "تعذّر على OpenBot الاتصال بـ 1Password. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordRateLimited": "تلقّى 1Password طلبات كثيرة جدًا. انتظر بضع دقائق، ثم حاول مرة أخرى.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
   "error.connector.onePasswordFileUnreadable": "ملف اتصال 1Password غير قابل للقراءة.",
   "error.connector.onePasswordFileTooLarge": "ملف اتصال 1Password كبير جدًا.",
   "error.connector.bitwardenFailed":
     "تعذّرت قراءة Bitwarden. ثبّت bw CLI، وسجّل الدخول، وافتح قفله، وأنشئ مجلدًا واحدًا باسم Shared with OpenBot. اتصل بمفتاح جلسة جديد.",
+  "error.connector.bitwardenCliMissing":
+    "لا يجد OpenBot واجهة سطر أوامر Bitwarden. ثبّت bw وتأكد أنه يعمل في طرفية جديدة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenFolderMissing":
+    "يجب أن يحتوي Bitwarden على مجلد واحد فقط باسم Shared with OpenBot. أنشئه أو احذف المجلد الزائد، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenHostInput":
     "أدخل عنوان خادم HTTPS، وclient_id وclient_secret لمفتاح API، وكلمة المرور الرئيسية.",
   "error.connector.bitwardenHostFailed":
@@ -42,4 +53,19 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
+  "error.connector.passwordManagerUnknown": "لا يعرف OpenBot مدير كلمات المرور هذا.",
+  "error.connector.passwordManagerMethod": "لا يمكن توصيل مدير كلمات المرور هذا بهذه الطريقة.",
+  "error.connector.passwordManagerNoSignIn": "لا توجد صفحة تسجيل دخول مفتوحة. اتصل مرة أخرى.",
+  "error.connector.protonPassFailed": "تعذّر توصيل Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassCliInstallFailed": "تعذّر تثبيت Proton Pass CLI. تحقق من اتصال الشبكة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassPlan":
+    "لا تسمح خطة Proton الخاصة بك باستخدام Proton Pass CLI. غيّر الخطة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassExpired": "انتهى الوصول إلى Proton Pass. اتصل مرة أخرى.",
+  "error.connector.protonPassKeyInvalid": "أدخل مفتاح وصول Proton Pass يبدأ بـ pst_.",
+  "error.connector.protonPassExtraPassword": "كلمة المرور الإضافية غير صحيحة. أدخلها مرة أخرى.",
+  "error.connector.protonPassExtraPasswordNotAsked": "لم يطلب Proton Pass كلمة مرور إضافية.",
+  "error.connector.protonPassFileUnreadable": "ملف اتصال Proton Pass غير قابل للقراءة.",
+  "error.connector.protonPassSignInTimeout": "استغرق تسجيل الدخول إلى Proton وقتًا طويلاً. اتصل مرة أخرى.",
+  "error.connector.protonPassSetupFailed":
+    "تعذّر إنشاء الخزنة Shared with OpenBot أو مفتاح الوصول الخاص بها في Proton Pass. اتصل مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

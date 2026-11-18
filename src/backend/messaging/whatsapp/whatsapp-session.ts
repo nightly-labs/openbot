@@ -10,6 +10,7 @@ import {
   fetchLatestWaWebVersion,
   type GroupMetadata,
   generateMessageIDV2,
+  jidNormalizedUser,
   type MiscMessageGenerationOptions,
   makeCacheableSignalKeyStore,
   proto,
@@ -19,14 +20,18 @@ import {
   type WAVersion,
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
-import { MessagingAdapterError } from "../messaging-types";
+import { MessagingAdapterError, WhatsAppRefusedError } from "../messaging-types";
+import type { WhatsAppUpsertWindow } from "./whatsapp-events";
 
 const logger = createOpenBotLogger("whatsapp");
 
 /** The calls OpenBot makes on a Baileys socket. The real socket has this shape; a test passes a fake. */
 export interface WhatsAppSocket {
   ev: { on<T extends keyof BaileysEventMap>(event: T, listener: (arg: BaileysEventMap[T]) => void): void };
-  ws: { on(event: "frame", listener: () => void): unknown };
+  ws: {
+    on(event: "frame", listener: () => void): unknown;
+    on(event: typeof MESSAGE_ACK, listener: (node: WhatsAppAck) => void): unknown;
+  };
   user?: { id: string } | undefined;
   sendMessage(
     jid: string,
@@ -38,9 +43,18 @@ export interface WhatsAppSocket {
   end(error: Error | undefined): void;
   groupFetchAllParticipating(): Promise<{ [jid: string]: GroupMetadata }>;
   groupMetadata(jid: string): Promise<GroupMetadata>;
+  onWhatsApp(...phoneNumbers: string[]): Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   updateMediaMessage(message: WAMessage): Promise<WAMessage>;
   signalRepository: { lidMapping: { getPNForLID(lid: string): Promise<string | null> } };
 }
+
+/** The server's answer to a sent message. It has an `error` when the server refused the message. */
+export interface WhatsAppAck {
+  attrs: { id?: string; error?: string };
+}
+
+/** The Baileys event of a message ack, as Baileys itself reads it. */
+export const MESSAGE_ACK = "CB:ack,class:message";
 
 export type WhatsAppSocketFactory = (config: UserFacingSocketConfig) => WhatsAppSocket;
 
@@ -48,6 +62,8 @@ export type WhatsAppSessionState =
   | "connecting"
   | "open"
   | "reconnecting"
+  /** Still reconnecting, but many attempts in a row failed: the number does not work now. */
+  | "failing"
   | "logged_out"
   | "replaced"
   /** A link could not reach WhatsApp before it showed a code. */
@@ -65,6 +81,11 @@ const BACKOFF_START_MS = 2_000;
 const BACKOFF_MAX_MS = 30_000;
 const BACKOFF_FACTOR = 1.8;
 const BACKOFF_JITTER = 0.25;
+/**
+ * After this many failed attempts in a row (about 4 minutes or more), the number shows as not working,
+ * so the owner sees it and can use Reconnect. The attempts continue, and an open socket clears it.
+ */
+const FAILING_AFTER_ATTEMPTS = 12;
 /** A connection that stayed up this long starts its backoff from the beginning again. */
 const STABLE_MS = 60_000;
 /** No frame for this long means a dead socket that did not close. */
@@ -72,6 +93,11 @@ const WATCHDOG_SILENCE_MS = 90_000;
 const WATCHDOG_INTERVAL_MS = 15_000;
 /** How long a post waits for the socket to open. */
 const SEND_DEADLINE_MS = 5 * 60_000;
+/**
+ * How long a post waits for the server's ack, which comes in well under a second. Without an ack in
+ * this time the post counts as sent, as it did before OpenBot read acks.
+ */
+const ACK_WAIT_MS = 10_000;
 /** Posts to one chat keep at least this much time between them, plus up to half of it at random. */
 const CHAT_PACING_MS = 1_000;
 /** How long OpenBot remembers the ids of its own posts, so their echoes are not read as messages. */
@@ -156,6 +182,8 @@ export class WhatsAppSession {
   readonly #qrListeners = new Set<(qr: string) => void>();
   readonly #openWaiters = new Set<() => void>();
   readonly #echoes = new Map<string, number>();
+  /** The posts that wait for their ack, by message id. */
+  readonly #acks = new Map<string, (error: string | undefined) => void>();
   readonly #chatQueues = new Map<string, Promise<unknown>>();
   readonly #lastSend = new Map<string, number>();
   readonly #groups = new Map<string, { metadata: GroupMetadata; at: number }>();
@@ -169,6 +197,13 @@ export class WhatsAppSession {
   /** A QR code was shown in this session, so a 408 means that the codes ran out. */
   #codeShown = false;
   #openedAt = 0;
+  /**
+   * WhatsApp sent this number its history already: a socket opened with the account before. Only the
+   * first socket after a link gets the history; the store was linked when an earlier run started.
+   */
+  #historySent = false;
+  /** The value of `#historySent` when the socket last opened. */
+  #historySentAtOpen = false;
   #lastFrameAt = 0;
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
   #watchdog: ReturnType<typeof setInterval> | null = null;
@@ -190,6 +225,11 @@ export class WhatsAppSession {
   /** When the socket last opened, in milliseconds; 0 before the first open. */
   get openedAt(): number {
     return this.#openedAt;
+  }
+
+  /** The facts that tell a message that WhatsApp held for this device from history, at this time. */
+  upsertWindow(): WhatsAppUpsertWindow {
+    return { openedAt: this.#openedAt, synced: this.#historySentAtOpen, now: this.#now() };
   }
 
   get store(): WhatsAppAuthStore {
@@ -233,6 +273,7 @@ export class WhatsAppSession {
   start(options: { codeLink?: boolean } = {}): void {
     if (this.#started) return;
     this.#started = true;
+    this.#historySent = this.#store.linked;
     this.#browserName = options.codeLink ? "Chrome" : "OpenBot";
     this.#attempt = 0;
     this.#setState("connecting");
@@ -318,6 +359,24 @@ export class WhatsAppSession {
     return metadata;
   });
 
+  /**
+   * The user JIDs, without a device, that WhatsApp has an account for, of the phone numbers in digits.
+   * Null when WhatsApp gave no answer, which does not say that a number has no account.
+   */
+  readonly registered = Effect.fn("WhatsAppSession.registered")(function* (
+    this: WhatsAppSession,
+    numbers: readonly string[],
+  ) {
+    const socket = this.socket();
+    if (!socket) return yield* new MessagingAdapterError({ cause: new Error("not_connected") });
+    const found = yield* Effect.tryPromise({
+      try: () => socket.onWhatsApp(...numbers),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
+    if (!found) return null;
+    return found.filter((result) => result.exists).map((result) => jidNormalizedUser(result.jid));
+  });
+
   readonly groups = Effect.fn("WhatsAppSession.groups")(function* (this: WhatsAppSession) {
     const socket = this.socket();
     if (!socket) return yield* new MessagingAdapterError({ cause: new Error("not_connected") });
@@ -379,6 +438,9 @@ export class WhatsAppSession {
     socket.ws.on("frame", () => {
       if (this.#socket === socket) this.#lastFrameAt = this.#now();
     });
+    socket.ws.on(MESSAGE_ACK, (node) => {
+      if (this.#socket === socket && node.attrs.id) this.#acks.get(node.attrs.id)?.(node.attrs.error);
+    });
   }
 
   #update(socket: WhatsAppSocket, update: Partial<ConnectionState>): void {
@@ -389,6 +451,8 @@ export class WhatsAppSession {
     }
     if (update.connection === "open") {
       this.#openedAt = this.#now();
+      this.#historySentAtOpen = this.#historySent;
+      if (this.#store.linked) this.#historySent = true;
       this.#lastFrameAt = this.#openedAt;
       this.#startWatchdog();
       this.#setState("open");
@@ -428,9 +492,9 @@ export class WhatsAppSession {
       void this.#connect();
       return;
     }
-    this.#setState("reconnecting");
     const delay = backoffDelay(this.#attempt);
     this.#attempt += 1;
+    this.#setState(this.#attempt >= FAILING_AFTER_ATTEMPTS ? "failing" : "reconnecting");
     this.#retryTimer = setTimeout(() => {
       this.#retryTimer = null;
       void this.#connect();
@@ -457,6 +521,8 @@ export class WhatsAppSession {
     const socket = this.#socket;
     this.#socket = null;
     if (!socket) return;
+    // No ack comes on a closed socket: its posts count as sent, as they did before OpenBot read acks.
+    for (const finish of this.#acks.values()) finish(undefined);
     try {
       socket.end(undefined);
     } catch {
@@ -500,11 +566,38 @@ export class WhatsAppSession {
     // The id is known before the send, so an echo that arrives first is already an own post.
     const messageId = options?.messageId ?? generateMessageIDV2(socket.user?.id);
     this.#remember(messageId);
-    const sent = await socket.sendMessage(jid, content, { ...options, messageId });
-    this.#lastSend.set(jid, this.#now());
-    if (!sent?.key.id) throw new Error("no_message_id");
-    if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
-    return sent;
+    // Before the send: the ack can come before `sendMessage` returns.
+    const ack = this.#ackOf(messageId);
+    try {
+      const sent = await socket.sendMessage(jid, content, { ...options, messageId });
+      this.#lastSend.set(jid, this.#now());
+      if (!sent?.key.id) throw new Error("no_message_id");
+      // The server takes the message first and refuses it in its ack, so a refused post is not sent.
+      const error = await ack.promise;
+      if (error) throw new WhatsAppRefusedError(error);
+      if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
+      return sent;
+    } finally {
+      ack.cancel();
+    }
+  }
+
+  /** The error of the message's ack, or undefined when the ack has none or did not come in time. */
+  #ackOf(messageId: string): { promise: Promise<string | undefined>; cancel: () => void } {
+    let finish: (error: string | undefined) => void = () => undefined;
+    const promise = new Promise<string | undefined>((resolve) => {
+      finish = resolve;
+    });
+    const timer = setTimeout(() => finish(undefined), ACK_WAIT_MS);
+    timer.unref?.();
+    this.#acks.set(messageId, finish);
+    return {
+      promise,
+      cancel: () => {
+        clearTimeout(timer);
+        if (this.#acks.get(messageId) === finish) this.#acks.delete(messageId);
+      },
+    };
   }
 
   /** The open socket, waiting for it up to the send deadline. */

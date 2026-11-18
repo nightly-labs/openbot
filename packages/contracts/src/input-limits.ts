@@ -1,5 +1,8 @@
 export const INPUT_LIMITS = {
   identifier: 128,
+  // A saved login id from `list_logins`. The longest is a Proton Pass id:
+  // `proton:` + share id (256) + `:` + item id (256).
+  vaultLoginId: 520,
   email: 254,
   accountName: 120,
   profileNameMin: 3,
@@ -20,6 +23,10 @@ export const INPUT_LIMITS = {
   serviceTier: 64,
   agentTitle: 120,
   agentDescription: 2_000,
+  // The instructions of a stored channel. New text must fit `agentDescription`, but a database can
+  // already hold a longer one (#5929), and a stricter read made that channel, and the whole channel
+  // list, unreadable. Reads accept up to this so the channel keeps working.
+  storedChannelInstructions: 32_000,
   // The instruction file at the root of an agent's workspace. Local-only, so no Team API bounds it;
   // Codex reads at most 32 KiB of `AGENTS.md` by default.
   agentInstructionsFile: 32_000,
@@ -110,7 +117,7 @@ export const INPUT_LIMITS = {
   // MCP server configuration. `identifier` covers the id and `path` covers the working directory.
   // The two value bounds are equal today and kept apart on purpose: an environment value and an
   // HTTP header are different things, and only one of them has a protocol that bounds it.
-  mcpServers: 32,
+  mcpServers: 100,
   mcpServerName: 80,
   mcpCommand: 4_096,
   mcpArgs: 64,

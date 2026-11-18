@@ -102,6 +102,11 @@ export interface PluginHttpServer {
   name: string;
   transport: "http";
   url: string;
+  /**
+   * The addresses that an earlier version of the listing saved rows on. A row with the catalog name
+   * on one of these hosts, or on a subdomain, is still the app's row.
+   */
+  earlierUrls?: string[];
   auth?: PluginAuthFlow[];
 }
 
@@ -110,6 +115,8 @@ export interface PluginStdioServer {
   transport: "stdio";
   command: string;
   args: string[];
+  /** Settings the server always starts with, such as the address of a local app. Never a credential. */
+  env?: Record<string, string>;
   auth?: PluginAuthFlow[];
 }
 
@@ -324,6 +331,8 @@ function parseServer(slug: string, value: unknown): PluginServer {
   if (!isString(value.name) || value.name.trim().length === 0) throw new Error(`Plugin ${slug} server needs a name.`);
   const auth = parseAuth(slug, value.auth, value.transport);
   if (value.transport === "http") {
+    // Only a command reads environment values, so an http listing that sets one would lose it.
+    if (value.env !== undefined) throw new Error(`Plugin ${slug} env needs a stdio server.`);
     /* Plain http leaves this computer in the clear, so only a server another app runs on this
        computer may use it, and a local flow is how a listing says so. A local flow on a remote
        address would tell the user to turn on a server that is not theirs. */
@@ -333,7 +342,20 @@ function parseServer(slug: string, value: unknown): PluginServer {
     if (!isString(url) || !(local ? isLoopbackHttpUrl(url) : url.startsWith("https://"))) {
       throw new Error(`Plugin ${slug} server needs ${local ? "a loopback http" : "an https"} url.`);
     }
-    return auth ? { name: value.name, transport: "http", url, auth } : { name: value.name, transport: "http", url };
+    const earlierUrls = value.earlierUrls;
+    if (
+      earlierUrls !== undefined &&
+      (!Array.isArray(earlierUrls) || earlierUrls.length === 0 || !earlierUrls.every(isHttpsUrl))
+    ) {
+      throw new Error(`Plugin ${slug} earlierUrls must be a list of https urls.`);
+    }
+    return {
+      name: value.name,
+      transport: "http",
+      url,
+      ...(earlierUrls ? { earlierUrls } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   if (value.transport === "stdio") {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
@@ -343,11 +365,43 @@ function parseServer(slug: string, value: unknown): PluginServer {
       throw new Error(`Plugin ${slug} server args must all be strings: ${JSON.stringify(value.args)}.`);
     }
     const args = [...value.args];
-    return auth
-      ? { name: value.name, transport: "stdio", command: value.command, args, auth }
-      : { name: value.name, transport: "stdio", command: value.command, args };
+    const env = parseServerEnv(slug, value.env, auth);
+    return {
+      name: value.name,
+      transport: "stdio",
+      command: value.command,
+      args,
+      ...(env ? { env } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   throw new Error(`Plugin ${slug} server needs a known transport.`);
+}
+
+/**
+ * The fixed settings of a stdio server. A value is listing data that every install gets, so it can
+ * be no credential: a variable that a field types stays the user's.
+ */
+function parseServerEnv(
+  slug: string,
+  value: unknown,
+  auth: PluginAuthFlow[] | undefined,
+): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  if (!isDynamicRecord(value) || Object.keys(value).length === 0) {
+    throw new Error(`Plugin ${slug} env must name one or more settings.`);
+  }
+  const typed = new Set(
+    (auth ?? []).flatMap((flow) => (flow.kind === "key" ? flow.fields.map((field) => field.env) : [])),
+  );
+  const env: Record<string, string> = {};
+  for (const [key, setting] of Object.entries(value)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) throw new Error(`Plugin ${slug} env has an invalid name.`);
+    if (typed.has(key)) throw new Error(`Plugin ${slug} env sets ${key}, which the user types.`);
+    if (!isString(setting) || !setting.trim()) throw new Error(`Plugin ${slug} env ${key} needs a value.`);
+    env[key] = setting;
+  }
+  return env;
 }
 
 function parseAuth(slug: string, value: unknown, transport: unknown): PluginAuthFlow[] | undefined {
@@ -478,7 +532,7 @@ function baseServerConfig(server: PluginServer): McpServerConfig {
     enabled: true,
     command: server.command,
     args: [...server.args],
-    env: [],
+    env: Object.entries(server.env ?? {}).map(([key, value]) => ({ key, value })),
     envPassthrough: [],
     workingDirectory: "",
     url: "",
@@ -555,7 +609,9 @@ function printLiteral(value: unknown, indent: string, mode: LiteralMode, prefixW
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
     const child = `${indent}  `;
-    return `[\n${value.map((item) => `${child}${printLiteral(item, child, mode)}`).join(",\n")}${closer}${indent}]`;
+    // The formatter counts the comma after an item in the line width.
+    const commaWidth = (index: number) => (mode === "ts" || index < value.length - 1 ? 1 : 0);
+    return `[\n${value.map((item, index) => `${child}${printLiteral(item, child, mode, commaWidth(index))}`).join(",\n")}${closer}${indent}]`;
   }
   if (isDynamicRecord(value)) {
     const entries = Object.entries(value);
@@ -603,8 +659,10 @@ function tsKey(key: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? key : JSON.stringify(key);
 }
 
+/** A slug can start with a digit (`21st`), and an identifier cannot. */
 function constName(slug: string): string {
-  return slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  const name = slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  return /^[0-9]/u.test(name) ? `PLUGIN_${name}` : name;
 }
 
 function renderRendererModule(plugins: PluginDetail[]): string {
@@ -634,8 +692,8 @@ import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/
 
 /**
  * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command and its words; the rest of the record and \`enabled\` are made here rather
- * than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
+ * an address, or a command, its words and its fixed settings; the rest of the record and \`enabled\`
+ * are made here rather than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
  *
  * A credential is never among them. What a server asks for is declared in \`server.auth\`, and the
  * value is typed by the user in the connect dialog, which hands back the configuration that
@@ -652,7 +710,10 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     enabled: true,
     command: app.server.transport === "stdio" ? app.server.command : "",
     args: app.server.transport === "stdio" ? [...app.server.args] : [],
-    env: [],
+    env:
+      app.server.transport === "stdio"
+        ? Object.entries(app.server.env ?? {}).map(([key, value]) => ({ key, value }))
+        : [],
     envPassthrough: [],
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",
@@ -673,13 +734,16 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
  * its own. The vendor icon addresses are left out: the phone loads each icon from the account
  * service's `/plugins/icon/<slug>?app=<id>`, so opening the Marketplace sends no request to a vendor.
  * The Apple apps a server drives are left out too: only the Mac that runs the server can ask for them.
+ * The phone keeps only that such an app needs a Mac, to say so for a server that is not one.
  */
 function renderMobileModule(plugins: PluginDetail[]): string {
   const listings = plugins.map((plugin) => {
     const { iconUrl: _iconUrl, updatedAt: _updatedAt, apps, ...detail } = plugin;
     return {
       ...detail,
-      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation: _macAutomation, ...app }) => app),
+      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation, ...app }) =>
+        macAutomation?.length ? { ...app, needsMac: true } : app,
+      ),
     };
   });
   return `/**
@@ -728,14 +792,23 @@ export type MobilePluginAuthFlow =
     };
 
 type MobilePluginServer =
-  | { name: string; transport: "http"; url: string; auth?: MobilePluginAuthFlow[] }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: MobilePluginAuthFlow[];
+    };
 
 export interface MobilePluginApp {
   id: string;
   name: string;
   description: string;
   server: MobilePluginServer;
+  /** The app drives Apple apps, so it runs only on a host that is a Mac. */
+  needsMac?: true;
 }
 
 export interface MobilePlugin {
@@ -807,8 +880,15 @@ export interface PluginCatalogApp {
 }
 
 export type PluginCatalogServer =
-  | { name: string; transport: "http"; url: string; auth?: unknown }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: unknown;
+    };
 
 export interface PluginCatalogDetail {
   slug: string;

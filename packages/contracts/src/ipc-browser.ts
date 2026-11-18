@@ -20,13 +20,34 @@ export interface BrowserTab {
   canGoForward?: boolean;
 }
 
+/**
+ * One thing that a person did while they showed a task in an agent's tab: a page that loaded, or a
+ * click on a control. `path` has no query and no hash. No step has typed text.
+ */
+export interface BrowserTeachStep {
+  kind: "page" | "click";
+  host: string;
+  path: string;
+  /** The title of the page. */
+  title?: string;
+  /** The role and the name of the clicked control. */
+  role?: string;
+  name?: string;
+}
+
+/** Ends the recording of a tab. Without `save` the steps are deleted. */
+export interface BrowserTeachStopInput {
+  tabId: string;
+  save: boolean;
+}
+
 export type BrowserImageMode = "auto" | "always" | "never";
 
 export type BrowserTarget =
   | { kind: "ref"; ref: string; revision: number }
-  | { kind: "role"; role: string; name?: string | undefined; exact?: boolean | undefined }
-  | { kind: "text"; text: string; exact?: boolean | undefined }
-  | { kind: "css"; selector: string }
+  | { kind: "role"; role: string; name?: string | undefined; exact?: boolean | undefined; nth?: number | undefined }
+  | { kind: "text"; text: string; exact?: boolean | undefined; nth?: number | undefined }
+  | { kind: "css"; selector: string; nth?: number | undefined }
   | { kind: "point"; x: number; y: number };
 
 export interface BrowserViewport {
@@ -90,6 +111,22 @@ export interface BrowserActionHistoryEntry {
   detail?: string | undefined;
 }
 
+/** A bot check that the snapshot found on the page, or one that passed while the snapshot waited. */
+export interface BrowserChallenge {
+  vendor: string;
+  /**
+   * `checking`: a check that passes by itself is still running after this read's time ran out.
+   * `click-once`: the agent may click `target`, the checkbox of the check, one time.
+   * `needs-user`: a person must pass it. `blocked`: the site refuses this browser.
+   */
+  status: "cleared" | "checking" | "click-once" | "needs-user" | "blocked";
+  waitedMs: number;
+  /** The checkbox to click, with `click-once` only. */
+  target?: { kind: "point"; x: number; y: number } | undefined;
+  /** What the agent does next. */
+  next: string;
+}
+
 export interface BrowserSnapshot {
   tabId: string;
   revision: number;
@@ -105,6 +142,18 @@ export interface BrowserSnapshot {
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
   image?: { included: boolean; reason: string; width: number; height: number };
+  challenge?: BrowserChallenge;
+  /**
+   * The agent's memories about the site of the page, newest first. A snapshot has them once per site
+   * in a tab and a turn.
+   */
+  siteMemories?: BrowserSiteMemory[];
+}
+
+export interface BrowserSiteMemory {
+  id: string;
+  site: string;
+  text: string;
 }
 
 export interface BrowserRecordingArtifact {
@@ -230,7 +279,7 @@ export interface BrowserLocalSignInFinish {
 }
 
 /**
- * The count of cookies that the server set in the tab's session. `signedIn` is false when a checked
+ * The count of cookies, and of page storage pairs, that the server set for the tab. `signedIn` is false when a checked
  * send left the server tab on a sign-in step.
  */
 export interface BrowserLocalSignInResult {

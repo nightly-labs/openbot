@@ -7,10 +7,12 @@ const FENCE = "```";
 
 /**
  * Markdown as Telegram HTML (`parse_mode: "HTML"`). `&`, `<` and `>` are escaped everywhere, so the
- * text cannot add markup. `@name` gets a word joiner after `@`, so an answer cannot mention or notify
- * anyone, as in Slack. A link keeps only an `http` or `https` address.
+ * text cannot add markup. A link keeps only an `http` or `https` address. Without `mentionName`,
+ * `@name` gets a word joiner after `@`, so the text cannot mention or notify anyone. With it, as for
+ * an answer, `@username` outside code and links stays a mention, and `@<user id>` becomes a link to
+ * that user with the name that `mentionName` gives. Both notify the person.
  */
-export function telegramHtml(markdown: string): string {
+export function telegramHtml(markdown: string, mentionName?: (userId: string) => string): string {
   const out: string[] = [];
   let fence: string[] | null = null;
   let language = "";
@@ -37,11 +39,11 @@ export function telegramHtml(markdown: string): string {
     }
     const quoted = /^>\s?(.*)$/u.exec(line);
     if (quoted) {
-      quote.push(inlineHtml(quoted[1] ?? ""));
+      quote.push(inlineHtml(quoted[1] ?? "", mentionName));
       continue;
     }
     flushQuote();
-    out.push(blockHtml(line));
+    out.push(blockHtml(line, mentionName));
   }
   flushQuote();
   if (fence) out.push(preHtml(fence, language));
@@ -53,9 +55,21 @@ export function telegramChunks(markdown: string): string[] {
   return slackChunks(markdown, TELEGRAM_CHUNK_CHARACTERS);
 }
 
-/** An answer as plain text, for a post that Telegram refused as HTML. */
+/** An answer as plain text, for a post that Telegram refused as HTML. It mentions nobody. */
 export function telegramPlainText(markdown: string): string {
   return inertMentions(markdown);
+}
+
+/** If an answer notifies a person: `@username` or `@<user id>` outside code and link labels. */
+export function hasTelegramMention(markdown: string): boolean {
+  let fence = false;
+  return markdown.split("\n").some((line) => {
+    if (line.trimStart().startsWith(FENCE)) {
+      fence = !fence;
+      return false;
+    }
+    return !fence && TELEGRAM_MENTION.test(line.replace(/`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\)/gu, ""));
+  });
 }
 
 /** The language after an opening fence, such as `python` in "```python". Other text gives none. */
@@ -73,15 +87,15 @@ export function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function blockHtml(line: string): string {
+function blockHtml(line: string, mentionName: ((userId: string) => string) | undefined): string {
   const heading = /^#{1,6}\s+(.*)$/u.exec(line);
-  if (heading) return `<b>${inlineHtml(heading[1] ?? "")}</b>`;
+  if (heading) return `<b>${inlineHtml(heading[1] ?? "", mentionName)}</b>`;
   const bullet = /^(\s*)[-*+]\s+(.*)$/u.exec(line);
-  if (bullet) return `${bullet[1]}• ${inlineHtml(bullet[2] ?? "")}`;
-  return inlineHtml(line);
+  if (bullet) return `${bullet[1]}• ${inlineHtml(bullet[2] ?? "", mentionName)}`;
+  return inlineHtml(line, mentionName);
 }
 
-function inlineHtml(line: string): string {
+function inlineHtml(line: string, mentionName: ((userId: string) => string) | undefined): string {
   // Code spans keep their text; everything else is converted between them.
   return line
     .split(/(`[^`]+`)/u)
@@ -93,7 +107,14 @@ function inlineHtml(line: string): string {
         links.push(`<a href="${escapeHtml(url).replaceAll('"', "&quot;")}">${escapeHtml(inertMentions(label))}</a>`);
         return `${links.length - 1}`;
       });
-      return escapeHtml(inertMentions(text))
+      // A user id becomes a link like the others, so the escape and the markup below leave it whole.
+      const mentioned = mentionName
+        ? text.replace(/(?<![\w@])@([0-9]{5,20})\b/gu, (_match, userId: string) => {
+            links.push(`<a href="tg://user?id=${userId}">${escapeHtml(mentionName(userId))}</a>`);
+            return `\uE002${links.length - 1}\uE002`;
+          })
+        : inertMentions(text);
+      return escapeHtml(mentioned)
         .replace(
           /\*\*(.+?)\*\*|__(.+?)__/gu,
           (_match, a: string | undefined, b: string | undefined) => `<b>${a ?? b}</b>`,
@@ -105,6 +126,9 @@ function inlineHtml(line: string): string {
     })
     .join("");
 }
+
+/** `@username` (5 to 32 characters) or `@<user id>` (5 to 20 digits), not in an email address. */
+const TELEGRAM_MENTION = /(?<![\w@])@(?:[0-9]{5,20}\b|[A-Za-z][A-Za-z0-9_]{4,31}\b)/u;
 
 /** `@name` with a word joiner after `@`: Telegram then sees no mention. */
 function inertMentions(text: string): string {

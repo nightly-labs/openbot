@@ -22,6 +22,55 @@ export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
   agentId?: string | undefined;
   agents: AnalyticsAgent[];
   providerDaily: AnalyticsProviderDay[];
+  /**
+   * The skills the agents loaded in the range, most tokens first. Only the local host sends it: the
+   * frozen Team API host analytics wire has no skills, so a remote report has none.
+   */
+  skills?: AnalyticsSkill[] | undefined;
+}
+/** The loads of one skill in a report. */
+export interface AnalyticsSkill {
+  /** The skill's folder name. */
+  skill: string;
+  loads: number;
+  /** The estimated tokens that the loads added to the context. Loads of a skill file that was not found add none. */
+  tokens: number;
+  /** The tokens priced as input of each turn's model. Null when no load has a price. */
+  estimatedCostUsd: number | null;
+  /** The number of agents that loaded it. */
+  agents: number;
+  /** Its part of the tokens of all skill loads in the report. */
+  share: number;
+}
+const SKILL_NAME_LIMIT = 128;
+function decodeAnalyticsSkills(value: unknown): AnalyticsSkill[] {
+  if (!Array.isArray(value)) throw new Error("Invalid skill analytics rows.");
+  return value.map((row) => {
+    if (
+      !isDynamicRecord(row) ||
+      !isString(row.skill) ||
+      !row.skill ||
+      row.skill.length > SKILL_NAME_LIMIT ||
+      !count(row.loads) ||
+      !count(row.tokens) ||
+      !count(row.agents) ||
+      !(row.estimatedCostUsd === null || (typeof row.estimatedCostUsd === "number" && row.estimatedCostUsd >= 0)) ||
+      typeof row.share !== "number" ||
+      !(row.share >= 0 && row.share <= 1)
+    )
+      throw new Error("Invalid skill analytics row.");
+    return {
+      skill: row.skill,
+      loads: row.loads,
+      tokens: row.tokens,
+      estimatedCostUsd: row.estimatedCostUsd,
+      agents: row.agents,
+      share: row.share,
+    };
+  });
+}
+function count(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 export function parseHostAnalyticsInput(value: unknown): HostAnalyticsInput {
   const range = parseAnalyticsRange(value);
@@ -38,6 +87,7 @@ export function decodeHostAnalytics(value: unknown): HostAnalytics {
     ...parseHostAnalyticsInput(value),
     agents: decodeAnalyticsAgents(value.agents),
     providerDaily: decodeAnalyticsProviderDays(value.providerDaily),
+    ...(value.skills === undefined ? {} : { skills: decodeAnalyticsSkills(value.skills) }),
   };
 }
 export function decodeOptionalHostAnalytics(value: unknown): HostAnalytics | null {

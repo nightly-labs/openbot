@@ -1,0 +1,33 @@
+{
+  "slug": "magnific",
+  "name": "Magnific",
+  "tagline": "AI image and video tools",
+  "description": "Magnific lets agents generate, upscale, and edit images and videos with the signed-in Magnific account. It needs a paid Magnific plan and uses the account's credits.",
+  "category": "design",
+  "creatorName": "Magnific",
+  "iconUrl": "https://media.magnific.com/magnific-favicons/apple-touch-icon.png?w=180&v=2",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-hero-image", "text": "Generate a hero image of a calm workspace at sunrise." },
+    { "id": "prompt-upscale", "text": "Upscale this product photo to 4K." },
+    { "id": "prompt-variations", "text": "Make three style variations of this logo sketch." }
+  ],
+  "apps": [
+    {
+      "id": "app-magnific-mcp",
+      "name": "Magnific",
+      "description": "Image and video generation and upscaling, over Magnific's MCP server with browser sign-in.",
+      "iconUrl": "https://media.magnific.com/magnific-favicons/apple-touch-icon.png?w=180&v=2",
+      "server": {
+        "name": "magnific",
+        "transport": "http",
+        "url": "https://mcp.magnific.com",
+        "auth": [{ "id": "magnific-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.magnific.com",
+  "privacyPolicyUrl": "https://www.magnific.com/legal/privacy",
+  "termsUrl": "https://www.magnific.com/legal/terms-of-use",
+  "skills": []
+}

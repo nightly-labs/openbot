@@ -2,7 +2,7 @@ import type { WorkflowSummary } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Pin from "lucide-react-native/icons/pin";
-import WorkflowIcon from "lucide-react-native/icons/workflow";
+import Waypoints from "lucide-react-native/icons/waypoints";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -12,6 +12,7 @@ import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 export type WorkflowRowAction = "pin" | "run" | "edit";
@@ -111,7 +112,7 @@ export function WorkflowRow({
             className="items-center justify-center"
             style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: String(iconBackground) }}
           >
-            <WorkflowIcon color={String(iconColor)} size={18} strokeWidth={1.9} />
+            <Waypoints color={String(iconColor)} size={18} strokeWidth={1.9} />
           </View>
           <View className="min-w-0 flex-1">
             <View className="flex-row items-center gap-1.5">
@@ -124,7 +125,7 @@ export function WorkflowRow({
               {status}
             </Typography.Paragraph>
           </View>
-          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} />
+          <ChevronRight color={String(muted)} size={18} strokeWidth={1.5} style={MIRROR_IN_RTL} />
         </Pressable>
       </MenuView>
     </View>

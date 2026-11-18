@@ -17,7 +17,10 @@ function islandCloseDuration(): number {
 interface AccountUpdateIslandProps {
   updateStatus: UpdateStatus;
   errorMessage?: string | null;
-  onUpdateAction: () => Promise<void>;
+  /** Runs the action of the button, which it gets so that it can show where the action starts. */
+  onUpdateAction: (button: HTMLButtonElement) => Promise<void>;
+  /** Gets the action button, so that an update that starts without a click can show where it starts. */
+  actionRef?: (button: HTMLButtonElement) => void;
 }
 
 interface UpdateProgressValueProps {
@@ -129,11 +132,11 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     },
   );
 
-  async function runUpdateAction(): Promise<void> {
+  async function runUpdateAction(button: HTMLButtonElement): Promise<void> {
     if (!open() || busy() || managed()) return;
     setActionPending(true);
     try {
-      await props.onUpdateAction();
+      await props.onUpdateAction(button);
     } finally {
       setActionPending(false);
     }
@@ -169,10 +172,13 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
             type="button"
             size="xs"
             class="account-update-island__action"
+            ref={(element: HTMLButtonElement) => props.actionRef?.(element)}
             aria-label={accessibleActionLabel()}
             aria-busy={busy() ? "true" : undefined}
             disabled={!open() || busy() || managed()}
-            onClick={() => void runUpdateAction()}
+            onClick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+              void runUpdateAction(event.currentTarget)
+            }
           >
             <span class="account-update-island__action-content">
               <span class="account-update-island__icon t-icon-swap" data-state={busy() ? "b" : "a"}>

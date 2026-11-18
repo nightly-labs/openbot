@@ -3,9 +3,21 @@ import { z } from "zod";
 
 const memoryId = z.string().min(1).max(INPUT_LIMITS.identifier);
 
-export const searchMemoriesInput = z.strictObject({
+const searchMemoriesInput = z.strictObject({
   query: z.string().trim().min(1).max(256),
   limit: z.number().int().min(1).max(10).optional(),
+});
+
+/**
+ * The model reads the limit range in `searchMemoriesInput`, but some models send a larger limit, such
+ * as 15 (#6933). The search then uses the nearest limit in the range, and does not fail.
+ */
+export const searchMemoriesArguments = searchMemoriesInput.extend({
+  limit: z
+    .number()
+    .int()
+    .optional()
+    .transform((limit) => (limit === undefined ? undefined : Math.min(Math.max(limit, 1), 10))),
 });
 
 export const listMemoriesInput = z.strictObject({
@@ -29,7 +41,7 @@ export const MEMORY_RECALL_TOOL_DEFINITIONS = [
   {
     name: "search_memories",
     description:
-      "Search your saved memories when a past preference, decision, or fact can help with the current task. Returns committed entries and their selection revisions. Search terms are words, not query operators. No match means the fact was not found; do not invent it.",
+      "Search your saved memories. Returns committed entries and their selection revisions. Search terms are words, not query operators.",
     shape: searchMemoriesInput.shape,
   },
   {

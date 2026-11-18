@@ -14,14 +14,20 @@ export interface UsageRefreshPollOptions {
    * so its age starts now.
    */
   refreshAtStart: boolean;
+  /** How old a reading may get before it is fetched again. The default suits the plan limits. */
+  refreshMs?: number;
+  /** How often the poll compares the age of the reading. Keep it well below `refreshMs`. */
+  checkMs?: number;
 }
 
 /**
  * Keeps a reading of the target fresh: the plan limits, on desktop and on the web, and the disk of the
- * sidebar storage card. A hidden window or tab does not poll; coming back to it refreshes at once when
+ * sidebar storage card, and the machine use in the Usage header. A hidden window or tab does not poll; coming back to it refreshes at once when
  * the interval has passed.
  */
 export function createUsageRefreshPoll(options: UsageRefreshPollOptions) {
+  const refreshMs = options.refreshMs ?? USAGE_AUTO_REFRESH_MS;
+  const checkMs = options.checkMs ?? USAGE_AUTO_REFRESH_CHECK_MS;
   let lastRefreshAt = 0;
 
   function refresh(target: string) {
@@ -35,10 +41,10 @@ export function createUsageRefreshPoll(options: UsageRefreshPollOptions) {
     if (options.refreshAtStart) untrack(() => refresh(targetKey));
     else lastRefreshAt = Date.now();
     function refreshWhenDue() {
-      if (document.hidden || Date.now() - lastRefreshAt < USAGE_AUTO_REFRESH_MS) return;
+      if (document.hidden || Date.now() - lastRefreshAt < refreshMs) return;
       refresh(targetKey);
     }
-    const timer = window.setInterval(refreshWhenDue, USAGE_AUTO_REFRESH_CHECK_MS);
+    const timer = window.setInterval(refreshWhenDue, checkMs);
     document.addEventListener("visibilitychange", refreshWhenDue);
     return () => {
       window.clearInterval(timer);

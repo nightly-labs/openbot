@@ -66,11 +66,11 @@ const POSTGRES = {
 /** A server that asks for nothing still comes through a connect step, so a dead one is found now. */
 const NOTHING_ASKED: McpKeyFlow = { id: "none", kind: "key", label: "Connect", fields: [] };
 
-/** The user's own link, which replaces the listing's address, with a key only some servers need. */
+/** The key a Composio account issues, the choice beside its sign-in. */
 const COMPOSIO = MARKETPLACE_PLUGINS.find((plugin) => plugin.slug === "composio")?.apps[0];
 if (!COMPOSIO) throw new Error("The catalog must carry the Composio plugin with an app.");
 
-/** One key for the environment, the key a server issues beside its sign-in, two values, a link, and none. */
+/** One key for the environment, the key a server issues beside its sign-in, two values, a header key, and none. */
 const SERVERS = {
   resend: () => ({ subject: subjectFor(RESEND), flow: keyFlowFor(RESEND) }),
   linear: () => ({ subject: subjectFor(LINEAR), flow: keyFlowFor(LINEAR) }),

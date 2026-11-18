@@ -1,0 +1,33 @@
+{
+  "slug": "robinhood",
+  "name": "Robinhood",
+  "tagline": "Brokerage accounts and agentic trading",
+  "description": "Robinhood lets agents read the accounts, positions, balances, transaction history and watchlists of a Robinhood customer, read market data, and place stock, options and crypto orders. Each user signs in to their own Robinhood account through the browser. At the first sign-in, Robinhood asks the user to open a separate Agentic account. Agents can trade only in that account, and by default they place orders without asking the user to approve each one.",
+  "category": "data-analytics",
+  "creatorName": "Robinhood",
+  "iconUrl": "https://robinhood.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-positions", "text": "Summarize my Robinhood positions and how they moved today." },
+    { "id": "prompt-watchlist", "text": "How did each stock on my Robinhood watchlist move this week?" },
+    { "id": "prompt-agentic-cash", "text": "How much cash is in my Robinhood Agentic account?" }
+  ],
+  "apps": [
+    {
+      "id": "app-robinhood-mcp",
+      "name": "Robinhood",
+      "description": "Accounts, positions, market data and trades, over Robinhood's MCP server with browser sign-in.",
+      "iconUrl": "https://robinhood.com/favicon.ico",
+      "server": {
+        "name": "robinhood",
+        "transport": "http",
+        "url": "https://agent.robinhood.com/mcp/trading",
+        "auth": [{ "id": "robinhood-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://robinhood.com",
+  "privacyPolicyUrl": "https://robinhood.com/us/en/support/articles/privacy-policy/",
+  "termsUrl": "https://robinhood.com/us/en/about/legal/",
+  "skills": []
+}

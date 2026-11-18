@@ -204,6 +204,11 @@ interface DialogApi {
   CloseButton: typeof DialogPrimitive.CloseButton;
 }
 
+/** True while a `Dialog` or an `AlertDialog` is open in this document. */
+export function dialogOpen(): boolean {
+  return document.querySelector(".ui-dialog-content") !== null;
+}
+
 export const Dialog: DialogApi = {
   Root: (props) => <DialogPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />,
   Portal: (props) => <DialogPrimitive.Portal {...props} />,

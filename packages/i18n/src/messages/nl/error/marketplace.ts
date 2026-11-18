@@ -47,8 +47,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "De link naar de agent is ongeldig.",
   "error.marketplace.changedSinceOpened":
     "Deze agent is gewijzigd nadat je hem hebt geopend. Open de link opnieuw om de nieuwe versie te bekijken.",
-  "error.marketplace.skillNameConflict":
-    "Je hebt al een andere lokale vaardigheid met de naam “{name}”. Wijzig de naam of verwijder deze, en voeg deze agent opnieuw toe.",
   "error.marketplace.avatarInvalid": "De avatar van de agent is ongeldig.",
   "error.marketplace.secretInName": "Verwijder het geheim of e-mailadres uit de naam voordat je publiceert.",
   "error.marketplace.secretInTitle": "Verwijder het geheim of e-mailadres uit de titel voordat je publiceert.",

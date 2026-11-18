@@ -21,7 +21,7 @@ import {
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
-import { OnePasswordMark } from "./brand-marks";
+import { OnePasswordTile } from "./brand-marks";
 import { IntegrationPage, type IntegrationPageSlots } from "./IntegrationLayout";
 import {
   SharedVaultSection,
@@ -111,7 +111,7 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
   return (
     <IntegrationPage
       class="onepassword-connector"
-      logo={<OnePasswordMark />}
+      logo={<OnePasswordTile />}
       name={t("connector.onePassword.title")}
       status={header().status}
       statusLabel={t(header().label)}

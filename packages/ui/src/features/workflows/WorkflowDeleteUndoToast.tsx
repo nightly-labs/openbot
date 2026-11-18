@@ -27,9 +27,11 @@ function WorkflowDeleteUndoToast(props: { name: string; countdown: UndoCountdown
           {t("workflow.canvas.deleteUndo.title", { name: props.name })}
         </strong>
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={() => props.onUndo()}>
-        {t("workflow.canvas.deleteUndo.action")}
-      </Button>
+      <div class="ui-toast-card-actions agent-delete-undo-toast-actions">
+        <Button type="button" variant="default" size="sm" onClick={() => props.onUndo()}>
+          {t("workflow.canvas.deleteUndo.action")}
+        </Button>
+      </div>
       <Progress
         value={props.countdown.left() * 100}
         minValue={0}
@@ -70,7 +72,7 @@ export function showWorkflowDeleteToast(title: string, handlers: { onUndo: () =>
     duration: Number.POSITIVE_INFINITY,
     unstyled: true,
     closeButton: false,
-    class: "agent-delete-undo-toast-host wfn-undo-toast-host",
+    class: "agent-delete-undo-toast-host",
   });
   return keep;
 }

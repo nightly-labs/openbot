@@ -163,6 +163,10 @@ try {
   const transferAgents: InstanceTransferOptions["agents"] = {
     listAgents: () => agents,
     listRoutines: () => [],
+    listRoutineRuns: () => [],
+    importRoutineRuns: () => [],
+    listChannelRoutineRuns: () => [],
+    importChannelRoutineRuns: () => [],
     listMemories: () => [],
     getMemorySelection: () => ({ selections: [] }),
     setMemoryInclusion: () => undefined,
@@ -191,10 +195,37 @@ try {
     initializeMemorySelection: () => undefined,
     setAvatar: () => Effect.die("The agent has no avatar."),
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
+    setAgentHidden: () => Effect.die("The agent is not hidden."),
+    readTransferHistory: () => [],
+    resolveTransferFile: () => Effect.succeed(null),
+    importTransferHistory: () => Effect.die("The export has no chat history."),
+    channels: {
+      store: {
+        ids: () => [],
+        get: () => assert.fail("The instance has no channels."),
+        messages: () => [],
+        update: () => assert.fail("The instance has no channels."),
+        context: () => assert.fail("The instance has no channels."),
+      },
+      mailbox: {
+        stageGeneratedCopy: () => Effect.die("The instance has no channels."),
+        persistGeneratedAttachmentsWith: () => assert.fail("The instance has no channels."),
+        discardStagedGeneratedAttachments: () => Effect.void,
+      },
+      images: { resolve: () => null },
+      command: () => Effect.die("The instance has no channels."),
+      setImage: () => Effect.die("The instance has no channels."),
+    },
+    listChannelMemories: () => [],
+    listChannelRoutines: () => [],
+    createChannelMemory: () => assert.fail("The instance has no channels."),
+    createChannelRoutine: () => assert.fail("The instance has no channels."),
+    deleteChannel: () => Effect.die("The instance has no channels."),
   };
   const transfer = new InstanceTransferService({
     agents: transferAgents,
     skills: { library: () => library, installLocal: (input) => skills.installLocal(input) },
+    channelActor: () => ({ id: "local", name: "You" }),
     settings: {
       mcpServers: () => [],
       saveMcpServer: () => Effect.void,

@@ -47,8 +47,6 @@ export const messages = {
   "error.marketplace.linkInvalid": "O link do agente é inválido.",
   "error.marketplace.changedSinceOpened":
     "Este agente mudou depois de você abri-lo. Abra o link novamente para revisar a nova versão.",
-  "error.marketplace.skillNameConflict":
-    'Você já tem outra habilidade local chamada "{name}". Renomeie ou remova essa habilidade e adicione este agente novamente.',
   "error.marketplace.avatarInvalid": "O avatar do agente é inválido.",
   "error.marketplace.secretInName": "Remova o segredo ou endereço de e-mail do nome antes de publicar.",
   "error.marketplace.secretInTitle": "Remova o segredo ou endereço de e-mail do título antes de publicar.",

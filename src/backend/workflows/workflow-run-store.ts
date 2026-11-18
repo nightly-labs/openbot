@@ -291,12 +291,18 @@ export class WorkflowRunStore {
 
   /**
    * The newest step of each node that ended with an answer, of runs and alone. A run from a node
-   * reads the steps before that node from here.
+   * reads the steps before that node from here. The copy of an earlier answer that a run from a node
+   * adds is left out: the step that gave the answer has the same one, and the run of that step has
+   * the graph that it was given in.
    */
   latestDone(workflowId: string): Map<string, StoredWorkflowStep> {
     const rows = databaseRows(
       this.#database.connection
-        .prepare(`${STEP_SELECT} WHERE workflow_id = ? AND status = 'done' ORDER BY created_at, attempt, step_id`)
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
         .all(workflowId),
     ).map(toStep);
     return new Map(rows.map((step) => [step.nodeId, step]));

@@ -1,4 +1,4 @@
-import { Button, ChevronRight } from "@openbot/ui";
+import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
@@ -56,7 +56,7 @@ interface SettingsDialogShellProps {
   floatingContent?: JSX.Element;
   onContentElement?: (element: HTMLElement) => void;
   restoreFocusTarget?: HTMLElement | null | undefined;
-  /** Where the settings show, or nothing while their page is not on screen. The page has no close button. */
+  /** Where the settings show, or nothing while their page is not on screen. The frame of the page owns its Close button. */
   page: SettingsPagePlacement | undefined;
 }
 
@@ -139,9 +139,27 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
   );
 }
 
+/**
+ * The label of a group in the section list, before the first section of the group. It only groups the
+ * sections on screen: screen readers read each section by its name, as the tab list has only tabs.
+ */
+export function SettingsNavGroupLabel(props: { label: string }) {
+  return (
+    <div class="settings-modal-nav-heading" aria-hidden="true">
+      {props.label}
+    </div>
+  );
+}
+
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
   const titleId = createUniqueId();
   const descriptionId = createUniqueId();
+  /** The heading names only the open page. On a detail page, the section before it goes back to its list. */
+  const pathTitle = () => props.crumb?.title ?? props.title;
+  const pathParents = (): PageHeaderParent[] => {
+    const crumb = props.crumb;
+    return crumb ? [{ title: props.title, onSelect: crumb.back }] : [];
+  };
   const [canScrollUp, setCanScrollUp] = createSignal(false);
   const [canScrollDown, setCanScrollDown] = createSignal(false);
   let shown = untrack(() => props.open);
@@ -234,30 +252,18 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               aria-describedby={descriptionId}
             >
               <div class="settings-modal-main">
-                {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
-                <Portal mount={page().path}>
-                  <div class="settings-page-path">
-                    <Show when={props.crumb}>
-                      {(crumb) => (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            class="settings-page-path-parent"
-                            onClick={() => crumb().back()}
-                          >
-                            {props.title}
-                          </Button>
-                          <ChevronRight class="settings-page-path-separator" aria-hidden="true" />
-                        </>
-                      )}
-                    </Show>
-                    <h2 id={titleId} class="settings-page-path-current">
-                      {props.crumb?.title ?? props.title}
-                    </h2>
-                  </div>
-                </Portal>
+                {/* A detail page shows its path in the top row, as a Marketplace title does; the parent before it goes
+                    back. The detail page has a header of its own, so it does not also get the large title. */}
+                <Show when={props.crumb}>
+                  <Portal mount={page().path}>
+                    <PageHeader
+                      class="settings-page-path"
+                      title={pathTitle()}
+                      headingId={titleId}
+                      path={pathParents()}
+                    />
+                  </Portal>
+                </Show>
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}
                 </p>
@@ -267,6 +273,12 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   data-scroll-down={canScrollDown() ? "" : undefined}
                 >
                   <div ref={registerScrollElement} class="settings-modal-content" onScroll={updateScrollFades}>
+                    {/* The large title of a section, at the start of the content. */}
+                    <Show when={!props.crumb}>
+                      <h2 id={titleId} class="settings-page-heading">
+                        {props.title}
+                      </h2>
+                    </Show>
                     {props.children}
                   </div>
                 </div>

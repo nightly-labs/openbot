@@ -90,6 +90,9 @@ export interface ReceivedWebRtcFile {
   path: string;
 }
 
+/** A file that the protocol cannot send. The peer gets the reason, not a generic host failure. */
+export class TeamFileTooLargeError extends Error {}
+
 export class TeamWebRtcFileTransfer {
   readonly #bridge: FileTransferBridge;
   readonly #writingAbort = new AbortController();
@@ -253,11 +256,13 @@ export class TeamWebRtcFileTransfer {
   /** `own` is the stream that asks, so its bytes on disk are not counted twice. */
   #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
-    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error(sourceText("error.remote.fileTooLarge"));
+    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
+      throw new TeamFileTooLargeError(sourceText("error.remote.fileTooLarge"));
     const activeBytes = [...this.#outgoing.values(), ...[...this.#writing].filter((stream) => stream !== own)]
       .filter((transfer) => transfer.peerId === peerId)
       .reduce((sum, transfer) => sum + transfer.size, 0);
     if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
+      // Other transfers end and free the set, so this stays a retryable host failure.
       throw new Error(sourceText("error.remote.fileSetTooLarge"));
     }
   }
@@ -632,11 +637,22 @@ export class TeamWebRtcFileTransfer {
     const chunk = yield* remoteDecode(() => decodeTeamProtocolV2FileChunk(data));
     const key = transferKey(peerId, chunk.transferId);
     const transfer = this.#incoming.get(key);
-    if (!transfer || chunk.offset !== transfer.received || transfer.received + chunk.bytes.byteLength > transfer.size) {
+    const end = chunk.offset + chunk.bytes.byteLength;
+    // A resumed sender can start at an ack from its last attempt that came late, before bytes that arrived
+    // after it. Those bytes are the same, so the part that arrived is skipped. A gap stays invalid, and the
+    // hash check at `file-complete` still checks the whole file.
+    if (!transfer || chunk.offset > transfer.received || end > transfer.size) {
       return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC file offset is invalid.") });
     }
-    yield* remoteCall(() => transfer.file.write(chunk.bytes, 0, chunk.bytes.byteLength, chunk.offset));
-    transfer.received += chunk.bytes.byteLength;
+    if (end <= transfer.received) {
+      this.#scheduleExpiration(key);
+      return;
+    }
+    const skipped = transfer.received - chunk.offset;
+    yield* remoteCall(() =>
+      transfer.file.write(chunk.bytes, skipped, chunk.bytes.byteLength - skipped, transfer.received),
+    );
+    transfer.received = end;
     this.#scheduleExpiration(key);
     for (const watch of this.#watches)
       if (watch.peerId === peerId && watch.transferId === chunk.transferId)

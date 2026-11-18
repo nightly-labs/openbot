@@ -13,6 +13,8 @@ import {
   parseHostedServerList,
   parseHostedServerStatus,
   parseHostedServerSummary,
+  parseServerClaim,
+  type ServerClaim,
 } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -74,7 +76,8 @@ export class HostedServerDesktopService {
   /**
    * `onRunning` gets each running server from a list, so the caller can refresh the joined servers
    * when a new server is ready and does not wait for the next directory poll. `onWake` gets each server
-   * that starts after a wake request, with the reply, so the caller reconnects to it soon.
+   * that starts after a wake request, with the reply, so the caller reconnects to it soon. `onClaim`
+   * gets the expiry of each new install command, so the caller can watch for its server.
    */
   constructor(
     auth: HostedServerAuthClient,
@@ -82,6 +85,7 @@ export class HostedServerDesktopService {
     private readonly now: () => number = Date.now,
     private readonly onRunning: (serverId: string) => void = () => {},
     private readonly onWake: (serverId: string, server: HostedServerSummary) => void = () => {},
+    private readonly onClaim: (expiresAt: number) => void = () => {},
   ) {
     this.#platform = AccountServicePlatform.layer(auth, openExternal);
     const wake = createHostedServerWake(
@@ -126,6 +130,16 @@ export class HostedServerDesktopService {
     return AccountServicePlatform.use((platform) =>
       platform.request("/v2/hosting/plans", { method: "GET" }, decodeCatalog),
     ).pipe(Effect.provide(this.#platform));
+  }
+
+  /** A one-time claim that signs a self-hosted server in to this account. Never log it. */
+  createServerClaim(): Effect.Effect<ServerClaim, AccountServiceFailure> {
+    return AccountServicePlatform.use((platform) =>
+      platform.request("/v2/server-claims", { method: "POST" }, decodeServerClaim),
+    ).pipe(
+      Effect.tap((claim) => Effect.sync(() => this.onClaim(claim.expiresAt))),
+      Effect.provide(this.#platform),
+    );
   }
 
   create(input: CreateHostedServerInput): Effect.Effect<HostedServerSummary, AccountServiceFailure> {
@@ -328,4 +342,10 @@ function decodeCatalog(value: unknown): HostedServerCatalog {
   const catalog = parseHostedServerCatalog(value);
   if (!catalog) throw new Error(sourceText("error.auth.invalidHostedServer"));
   return catalog;
+}
+
+function decodeServerClaim(value: unknown): ServerClaim {
+  const claim = parseServerClaim(value);
+  if (!claim) throw new Error(sourceText("error.auth.invalidServerClaim"));
+  return claim;
 }

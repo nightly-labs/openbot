@@ -141,6 +141,41 @@ export const ownerLicenseForHost = Effect.fn("Billing.ownerLicenseForHost")(func
   return { ownerId: row.owner_id, users: row.users, entitled: licenseEntitled(row, now) };
 });
 
+/**
+ * The open license of an account, or null: the newest entitled one, else the newest open one, as
+ * `ownerLicenseForHost` chooses. It reads the account, so a hosted server with no host yet gets it too.
+ */
+export const accountLicense = Effect.fn("Billing.accountLicense")(function* (
+  database: D1Database,
+  userId: string,
+  now = Date.now(),
+): Effect.fn.Return<{ users: number; entitled: boolean } | null, BillingEntitlementError> {
+  const rows = yield* Effect.tryPromise({
+    try: () =>
+      database
+        .prepare(
+          `SELECT users, status, current_period_end FROM licenses
+            WHERE user_id = ? AND status IN ${OPEN_STATUSES_SQL} ORDER BY updated_at DESC`,
+        )
+        .bind(userId)
+        .all<{ users: number; status: string; current_period_end: number | null }>(),
+    catch: () => new BillingEntitlementError({}),
+  });
+  const row = rows.results.find((license) => licenseEntitled(license, now)) ?? rows.results[0];
+  return row ? { users: row.users, entitled: licenseEntitled(row, now) } : null;
+});
+
+/**
+ * The SQL condition that the server `server` of the account `owner` has a plan that it can use now, by
+ * the rules of `getServerEntitlement`. Bind `now` one time.
+ */
+export function serverPlanEntitledSql(server: string, owner: string): string {
+  const plans = BILLING_PLANS.map((plan) => `'${plan.id}'`).join(", ");
+  return `EXISTS (SELECT 1 FROM billing_subscriptions b
+    WHERE b.server_id = ${server} AND b.user_id = ${owner} AND b.plan IN (${plans})
+      AND (b.status IN ('active', 'trialing') OR (b.status = 'past_due' AND b.current_period_end > ?)))`;
+}
+
 /** True when a license gives its users at `now`, by the same rules as a server plan. */
 export function licenseEntitled(license: { status: string; current_period_end: number | null }, now: number): boolean {
   const status = license.status;

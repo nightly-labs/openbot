@@ -26,6 +26,11 @@ const DEFAULT_POLL_INTERVAL_MS = 33;
  * target builds them again, which costs one window load.
  */
 const IDLE_OVERLAY_MS = 60_000;
+/**
+ * How long after a failed load no new overlay window is made. A page that always fails would
+ * otherwise make and close one window on each 33 ms tick.
+ */
+const LOAD_RETRY_MS = 5_000;
 /** The corner radius of a standard macOS window, which is what the rim follows by default. */
 const DEFAULT_CORNER_RADIUS = 12;
 
@@ -82,6 +87,11 @@ export interface ComputerUseHighlightControllerOptions<W extends HighlightOverla
    * the desktop would leave the rim and the cursor invisible on every other display.
    */
   displays: () => readonly HighlightDisplay[];
+  /**
+   * Whether no turn runs, so no agent can take the desktop. The poll then stops once the rim is down
+   * and its overlays are closed, and the next `start()` wakes it. With no answer it never stops.
+   */
+  idle?: () => boolean;
   cornerRadius?: number;
   pollIntervalMs?: number;
   logger?: Logger;
@@ -120,6 +130,8 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   #destroyed = false;
   /** When the rim went down, or `null` while it is up. */
   #hiddenAt: number | null = null;
+  /** When the last overlay load failed, or `null` after a load succeeds. */
+  #loadFailedAt: number | null = null;
   /**
    * Which run of the controller a placement belongs to. A tick reads the driver and loads a window,
    * and `stop()` may land between either of those and the placement that follows it. Hiding alone
@@ -207,6 +219,12 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     }
     if (!target) {
       this.#hide();
+      // A poll every 33 ms over a desktop that no turn can take wakes the process for nothing. The
+      // generation stays, because this run is not over: the next turn starts it again.
+      if (this.#overlays.size === 0 && this.#options.idle?.() && this.#timer) {
+        clearInterval(this.#timer);
+        this.#timer = null;
+      }
       return;
     }
     const displays = this.#options.displays();
@@ -217,17 +235,30 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     for (const display of displays) {
       let overlay = this.#overlays.get(display.id);
       if (!overlay || overlay.window.isDestroyed()) {
+        if (this.#loadFailedAt !== null && Date.now() - this.#loadFailedAt < LOAD_RETRY_MS) continue;
         overlay = { window: this.#options.createWindow(display.bounds), loaded: false, bounds: display.bounds };
         this.#overlays.set(display.id, overlay);
       }
       if (!overlay.loaded) {
-        overlay.loaded = true;
         const window = overlay.window;
+        const displayId = display.id;
+        // A failed load closes the window, and a tick after `LOAD_RETRY_MS` makes a new one. Marked
+        // before the load, a failed window would stay with no page until the overlay was idle for long.
         yield* Effect.tryPromise({
           try: () => this.#options.loadWindow(window),
           catch: (cause) => new HighlightOverlayLoadFailed({ cause }),
-        });
+        }).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              // A load that `stop()` cut short is not a failure of the page.
+              if (!stale()) this.#loadFailedAt = Date.now();
+              if (this.#overlays.get(displayId)?.window === window) this.#retire(displayId);
+            }),
+          ),
+        );
         if (stale() || overlay.window.isDestroyed()) return;
+        overlay.loaded = true;
+        this.#loadFailedAt = null;
       }
       // Only when the display is resized or moved. Every other tick leaves the window alone, which
       // is the whole point of an overlay the size of the display it sits on.

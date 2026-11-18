@@ -24,37 +24,7 @@
 }
 
 .tasks-page-header {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
   padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-3);
-}
-
-/* The arrow lines up with the content edge, not its hit area. */
-.tasks-page-header .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-
-/* Back and the agents panel toggle follow the reading direction. */
-.tasks-page-header svg:is([class~="lucide-arrow-left"], [class~="lucide-panel-left"]):dir(rtl) {
-  transform: scaleX(-1);
-}
-
-.tasks-page-header h2 {
-  min-width: 0;
-  flex: 1;
-  margin: 0;
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.tasks-page-agent-option > span {
-  flex: 1 1 auto;
-}
-
-.tasks-page-header h2 span {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
 }
 
 .tasks-page-avatar.agent-avatar {
@@ -75,14 +45,23 @@
   padding: var(--openbot-space-1) 0 0;
 }
 
-.tasks-page-composer .composer-notice {
-  margin-bottom: var(--openbot-space-2);
-}
-
 .tasks-page-composer-agent {
   display: flex;
   min-width: 0;
   align-items: center;
+}
+
+/* One row: the agent, the text of the task, then the microphone and Start. */
+.tasks-page-composer .composer[data-compact] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* The agent button is 32px, so 7px keeps the 48px of the chat input. */
+  padding-block: 7px;
+  padding-inline-start: var(--openbot-space-3);
+}
+
+.tasks-page-composer .composer[data-compact] .tasks-page-composer-agent {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .tasks-page-agent.ui-button {
@@ -122,16 +101,6 @@
 
 .tasks-page-agent[aria-expanded="true"] .tasks-page-agent-chevron {
   transform: rotate(180deg);
-}
-
-.tasks-page-agent-check {
-  color: var(--openbot-text-primary);
-}
-
-/* A server can have more agents than the window has rows, so the menu fits the space left and scrolls. */
-.tasks-page-agent-menu {
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
-  overflow-y: auto;
 }
 
 .tasks-page-took {
@@ -271,8 +240,7 @@ li[data-arrived] > .tasks-page-row {
  */
 .tasks-page-side {
   position: relative;
-  flex: 0 0 420px;
-  overflow: hidden;
+  flex: 0 0 var(--tasks-page-side-width, 420px);
   transition:
     flex-basis var(--openbot-duration-overlay) var(--openbot-ease-out),
     opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
@@ -292,12 +260,29 @@ li[data-arrived] > .tasks-page-row {
   transition-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
+/* The user draws the panel wider or narrower: the width follows the pointer with no transition. */
+html.panel-resizing .tasks-page-side {
+  transition: none;
+}
+
+.tasks-page-side[data-closing] > .panel-resizer {
+  visibility: hidden;
+}
+
+/* The clip of the opening and closing panel. The edge handle is outside it, so it stays whole. */
+.tasks-page-side-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
 .tasks-page-side-content {
   position: absolute;
   inset-block: 0;
   inset-inline: 0 auto;
   display: flex;
-  width: 420px;
+  width: var(--tasks-page-side-width, 420px);
   --browser-panel-width: 100%;
 }
 
@@ -308,12 +293,6 @@ li[data-arrived] > .tasks-page-row {
 
 .tasks-panel .file-preview-header {
   --task-list-glyph: 16px;
-}
-
-/* A question or a browser takeover waits: the chat answers it. */
-.tasks-panel-answer-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* A change to a different task: the new task fades in at its place. */

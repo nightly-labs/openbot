@@ -156,7 +156,9 @@ Preserve the following boundaries, and their tests where they exist:
 - Electron sandboxing, context isolation, navigation policy, and IPC sender validation.
 - Attachment realpath, MIME, size, quota, and managed-protocol checks.
 - Queue serialization, idempotency, crash reconciliation, and atomic persistence.
-- The remote browser session's lack of preload and `window.openbot` access.
+- The browser tabs' page preload (`src/preload/browser-page.ts`): it only changes page values in the
+  page world. It has no IPC and exposes no world, so a page gets no `window.openbot` and no path to
+  main. `scripts/verify-preload-bundle.ts` checks this.
 - Secret redaction and agent child-process cleanup.
 
 Full agent access is intentional today, but new privileges or network surfaces still require an
@@ -182,17 +184,18 @@ reason in the `bunfig.toml` comment. `bun pm untrusted` shows the blocked script
 ## Licensing
 
 Each author of a pull request must sign the
-[OpenBot Contributor Assignment Agreement](CLA.md). The agreement assigns the copyright in your
-contributions to Synthetify Labs spółka z ograniczoną odpowiedzialnością. Organization members,
+[OpenBot Contributor License Agreement](CLA.md). You keep the copyright in your contributions and
+give Synthetify Labs sp. z o.o. a copyright and patent license to use them. Organization members,
 users with write access to this repository and bots do not sign.
 
-To sign, tick the agreement box in the description of your pull request. The pull request template
-has no box, because most authors do not sign. When you must sign, the `CLA` workflow adds the box to
-the end of the description. A coding agent ticks the box only when you tell it to. An author of a
-commit in a pull request that a different person opened signs with a comment instead, as section 10
-of the agreement says. You sign one time for each version. The `CLA` workflow records the signature on the `cla-signatures` branch
-and sets the `CLA` status. Its rules are in `scripts/cla.ts`. Each commit author email must be
-linked to a GitHub account, so that the workflow can find who must sign.
+To sign, download the agreement as a PDF from [openbot.run/cla](https://openbot.run/cla). Fill it
+in, sign it, and send it to licenses@openbot.run with your GitHub login and the link to your pull
+request. A coding agent never signs or sends the agreement for you. You sign one time. When you
+must sign, the `CLA` workflow adds a comment to your pull request and sets the `CLA` status to
+failed. A maintainer records your signature with `bun scripts/cla.ts record <login> <pull request>`,
+which adds it to the `cla-signatures` branch and sets the status again. If you signed the OpenBot
+Contributor Assignment Agreement 1.0, you do not sign again. The rules are in `scripts/cla.ts`. Each
+commit author email must be linked to a GitHub account, so that the workflow can find who must sign.
 
 A contribution must be your original work, or you must identify the source and the license of the
 material that you did not write. Do not submit copied UI assets, proprietary code, private plugin

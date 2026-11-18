@@ -1,0 +1,33 @@
+{
+  "slug": "etoro",
+  "name": "eToro",
+  "tagline": "Portfolio and market data",
+  "description": "eToro lets agents read the user's portfolio, positions and market data through the eToro Public API, and look up the API's routes. Each user signs in to their own eToro account through the browser, and the server can also call API routes that change the account, such as orders.",
+  "category": "data-analytics",
+  "creatorName": "eToro",
+  "iconUrl": "https://www.etoro.com/wp-content/uploads/favicons/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-portfolio", "text": "Summarize my eToro portfolio and how it moved today." },
+    { "id": "prompt-copied", "text": "Which traders do I copy, and how are they doing?" },
+    { "id": "prompt-routes", "text": "Which eToro Public API routes return market data?" }
+  ],
+  "apps": [
+    {
+      "id": "app-etoro-mcp",
+      "name": "eToro",
+      "description": "Portfolio, positions, and Public API routes, over eToro's MCP server with browser sign-in.",
+      "iconUrl": "https://www.etoro.com/wp-content/uploads/favicons/favicon.ico",
+      "server": {
+        "name": "etoro",
+        "transport": "http",
+        "url": "https://mcp.public-api.etoro.com/mcp",
+        "auth": [{ "id": "etoro-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.etoro.com",
+  "privacyPolicyUrl": "https://www.etoro.com/customer-service/privacy/",
+  "termsUrl": "https://www.etoro.com/customer-service/terms-conditions/"
+}

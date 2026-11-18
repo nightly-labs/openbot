@@ -1,0 +1,33 @@
+{
+  "slug": "runpod",
+  "name": "Runpod",
+  "tagline": "GPU pods and serverless",
+  "description": "Runpod lets agents list and manage pods, serverless endpoints, templates, and network volumes in the account of the signed-in user. Pods and endpoints that an agent creates use account credit.",
+  "category": "coding",
+  "creatorName": "Runpod",
+  "iconUrl": "https://cdn.prod.website-files.com/69ce570adca53340abab8376/69e08b4ced16e020149fc61d_favicon_www_runpod_io_256x256.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-running-pods", "text": "List my running pods and their GPU types." },
+    { "id": "prompt-volumes", "text": "Which network volumes do I have, and in which data centers?" },
+    { "id": "prompt-templates", "text": "Show the templates I have created." }
+  ],
+  "apps": [
+    {
+      "id": "app-runpod-mcp",
+      "name": "Runpod",
+      "description": "Pods, serverless endpoints, templates, and volumes, over Runpod's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/69ce570adca53340abab8376/69e08b4ced16e020149fc61d_favicon_www_runpod_io_256x256.png",
+      "server": {
+        "name": "runpod",
+        "transport": "http",
+        "url": "https://mcp.runpod.io/",
+        "auth": [{ "id": "runpod-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.runpod.io",
+  "privacyPolicyUrl": "https://www.runpod.io/legal/privacy-policy",
+  "termsUrl": "https://www.runpod.io/legal/terms-of-service"
+}

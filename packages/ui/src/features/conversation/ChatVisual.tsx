@@ -1,6 +1,7 @@
 import {
   CHAT_VISUAL_FRAME_SANDBOX,
   type ChatVisualKey,
+  type ChatVisualRect,
   type ChatVisualReplyResult,
   type ChatVisualTheme,
   chatVisualDisplayModeMessage,
@@ -12,13 +13,23 @@ import {
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, Maximize2 } from "@openbot/ui";
+import { Button, Maximize2, PanelRight } from "@openbot/ui";
+import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 import { ImageLightbox, type ImageLightboxOpening } from "./ImageLightbox";
 import { safeBrowserUrl } from "./RichMessageText";
+import {
+  isQuoteShortcut,
+  QuoteSelectionButton,
+  type QuoteShortcutModifier,
+  releaseSelectionAction,
+  type SelectionActionsPosition,
+  selectionActionsPosition,
+  showSelectionAction,
+} from "./SelectionActions";
 
 /** The page variables and the app tokens that give their values. */
 const THEME_TOKENS: ReadonlyArray<readonly [`--${string}`, string]> = [
@@ -85,14 +96,26 @@ interface ChatVisualProps {
    * accepted chord to the app as a key press on the frame element. Without it, no key leaves the page.
    */
   isAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
+  /**
+   * Quotes text that the user selected in the page. The app shows the Quote action of a message
+   * selection over it, and the quote shortcut does the same. Without it, the page offers no quote.
+   */
+  onQuote?: ((text: string) => void) | undefined;
+  /**
+   * Opens the page as a file tab of the side panel. Inline only: the page shows a button for it next
+   * to full screen. Without it, the page has no such button.
+   */
+  onOpenInSidePanel?: (() => void) | undefined;
+  /** The modifier of the quote shortcut on this device. */
+  quoteShortcut?: QuoteShortcutModifier | undefined;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
 }
 
 /**
- * A visual reply: an agent's HTML page with its scripts, above the agent's reply. The page has no
- * card of its own. While the page loads or after it fails, the box keeps the agent's height, so
- * the messages below it do not move.
+ * An agent's HTML page with its scripts. With `fill`, the page fills the file preview of the side
+ * panel. Inline, the page shows in the chat and has no card of its own; while it loads or after it fails, the box keeps
+ * the agent's height, so the content below it does not move.
  */
 export function ChatVisual(props: ChatVisualProps) {
   const { t } = useText();
@@ -128,6 +151,7 @@ function VisualFrame(props: ChatVisualProps) {
   const [reported, setReported] = createSignal<number>();
   const [fullscreen, setFullscreen] = createSignal(false);
   const [image, setImage] = createSignal<ImageLightboxOpening | null>(null);
+  const [selection, setSelection] = createSignal<{ text: string; rect: ChatVisualRect } | null>(null);
   let frame: HTMLIFrameElement | undefined;
   let box: HTMLDivElement | undefined;
   let expandButton: HTMLButtonElement | undefined;
@@ -162,6 +186,27 @@ function VisualFrame(props: ChatVisualProps) {
     frame?.contentWindow?.postMessage(chatVisualDisplayModeMessage(open ? "fullscreen" : "inline"), "*");
     // The close button leaves with full screen; the expand button takes the focus back.
     if (!open && document.activeElement !== frame) expandButton?.focus({ preventScroll: true });
+  };
+
+  /**
+   * The text that the user quoted or closed the action for. The page keeps its selection and reports
+   * it again when its frame changes size or scrolls, for example when the side panel opens, so the
+   * action stays closed for this text until the selection changes.
+   */
+  let quoted: string | undefined;
+  /** Closes the action until the page selection changes. */
+  const dismiss = () => {
+    const selected = selection();
+    if (selected) quoted = selected.text;
+    setSelection(null);
+  };
+  /** Quotes the page selection. The next selection shows the action again. */
+  const quote = () => {
+    const selected = selection();
+    if (!selected || !props.onQuote) return;
+    quoted = selected.text;
+    setSelection(null);
+    props.onQuote(selected.text);
   };
 
   const onMessage = (event: MessageEvent) => {
@@ -210,10 +255,24 @@ function VisualFrame(props: ChatVisualProps) {
         frame?.blur();
         setImage({ images: [pageImage(message.src, message.name)], index: 0 });
         return;
+      case "selection":
+        if (message.text === quoted) return;
+        quoted = undefined;
+        if (!props.onQuote || !message.text) return setSelection(null);
+        showSelectionAction(dismiss);
+        setSelection({ text: message.text, rect: message.rect });
+        return;
       case "key": {
         const { key } = message;
         if (key.key === "Escape" && !key.metaKey && !key.ctrlKey) return exitFullscreen();
-        if (!frame || !userActed() || !props.isAppShortcut?.(key)) return;
+        if (!frame || !userActed()) return;
+        if (selection() && isQuoteShortcut(key, props.quoteShortcut ?? "ctrl")) {
+          // The quote goes to the message box, which takes the focus and shows under full screen.
+          exitFullscreen();
+          frame.blur();
+          return quote();
+        }
+        if (!props.isAppShortcut?.(key)) return;
         exitFullscreen();
         // The app acts on the key, so it takes the focus back first. Else the window gets its focus
         // event when the shortcut's view takes the focus, inside that view's effect.
@@ -224,6 +283,7 @@ function VisualFrame(props: ChatVisualProps) {
     }
   };
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") dismiss();
     if (event.key === "Escape" && shown() && !event.defaultPrevented) {
       event.preventDefault();
       exitFullscreen();
@@ -234,15 +294,25 @@ function VisualFrame(props: ChatVisualProps) {
     if (event.target === box) exitFullscreen();
   };
 
+  // A press in the app, outside the Quote action, closes the action. A press in the page reaches the
+  // page only, and the page reports its new selection.
+  let quoteLayer: HTMLDivElement | undefined;
+  const onPointerDown = (event: PointerEvent) => {
+    if (!(event.target instanceof Node && quoteLayer?.contains(event.target))) dismiss();
+  };
+
   onSettled(() => {
     if (frame) setTheme(visualTheme(frame));
     window.addEventListener("message", onMessage);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown);
     box?.addEventListener("toggle", onToggle);
     box?.addEventListener("click", onBoxClick);
     return () => {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+      releaseSelectionAction(dismiss);
       box?.removeEventListener("toggle", onToggle);
       box?.removeEventListener("click", onBoxClick);
     };
@@ -300,21 +370,49 @@ function VisualFrame(props: ChatVisualProps) {
           }}
         />
       </section>
-      {/* It stays in the document in full screen, so it can take the focus back when the page returns. */}
+      {/* They stay in the document in full screen, so full screen can give the focus back when the page returns. */}
       <Show when={!props.fill}>
-        <Button
-          ref={(element) => (expandButton = element)}
-          variant="secondary"
-          size="icon-sm"
-          type="button"
-          class="chat-visual-expand"
-          aria-label={t("chat.visual.fullScreen")}
-          title={t("chat.visual.fullScreen")}
-          data-cuelume-open=""
-          onClick={enterFullscreen}
-        >
-          <Maximize2 aria-hidden="true" />
-        </Button>
+        <div class="chat-visual-actions">
+          <Show when={props.onOpenInSidePanel}>
+            {(open) => (
+              <Button
+                variant="secondary"
+                size="icon-sm"
+                type="button"
+                aria-label={t("chat.visual.openInSidePanel")}
+                title={t("chat.visual.openInSidePanel")}
+                data-cuelume-open=""
+                onClick={() => open()()}
+              >
+                <PanelRight aria-hidden="true" />
+              </Button>
+            )}
+          </Show>
+          <Button
+            ref={(element) => (expandButton = element)}
+            variant="secondary"
+            size="icon-sm"
+            type="button"
+            aria-label={t("chat.visual.fullScreen")}
+            title={t("chat.visual.fullScreen")}
+            data-cuelume-open=""
+            onClick={enterFullscreen}
+          >
+            <Maximize2 aria-hidden="true" />
+          </Button>
+        </div>
+      </Show>
+      {/* The action shows above the app, so it stays in the chat's layer: full screen hides it. */}
+      <Show when={!fullscreen() && selection()}>
+        {(selected) => (
+          <PageQuoteAction
+            frame={() => frame}
+            rect={selected().rect}
+            quoteShortcut={props.quoteShortcut ?? "ctrl"}
+            layerRef={(element) => (quoteLayer = element)}
+            onQuote={quote}
+          />
+        )}
       </Show>
       <Show when={image()}>
         {(opening) => (
@@ -329,6 +427,88 @@ function VisualFrame(props: ChatVisualProps) {
         )}
       </Show>
     </div>
+  );
+}
+
+/**
+ * The Quote action of a message selection, for a selection in the page. The page gives the place of
+ * its selection in the frame, and the action shows next to it in the app window.
+ */
+function PageQuoteAction(props: {
+  frame: () => HTMLIFrameElement | undefined;
+  rect: ChatVisualRect;
+  quoteShortcut: QuoteShortcutModifier;
+  layerRef: (element: HTMLDivElement) => void;
+  onQuote: () => void;
+}) {
+  const { t } = useText();
+  const [position, setPosition] = createSignal<SelectionActionsPosition | null>(null);
+  let bar: HTMLDivElement | undefined;
+
+  const place = () => {
+    const frame = props.frame();
+    if (!bar || !frame) return;
+    // The page viewport starts inside the frame's border and padding.
+    const box = frame.getBoundingClientRect();
+    const style = getComputedStyle(frame);
+    const top = box.top + frame.clientTop + Number.parseFloat(style.paddingTop);
+    const left = box.left + frame.clientLeft + Number.parseFloat(style.paddingLeft);
+    // The page gives the box, so it is kept inside the frame. A selection that the page scrolled out
+    // of its frame has no action.
+    const selected = {
+      top: Math.max(box.top, top + props.rect.top),
+      left: Math.max(box.left, left + props.rect.left),
+      bottom: Math.min(box.bottom, top + props.rect.bottom),
+      right: Math.min(box.right, left + props.rect.right),
+    };
+    if (selected.bottom < selected.top || selected.right < selected.left) {
+      setPosition(null);
+      return;
+    }
+    setPosition(
+      selectionActionsPosition(
+        [{ ...selected, width: selected.right - selected.left, height: selected.bottom - selected.top }],
+        bar.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  };
+
+  createEffect(
+    () => props.rect,
+    () => place(),
+  );
+  onSettled(() => {
+    // The chat or the side panel scrolls the frame, so the action moves with it.
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  });
+
+  return (
+    <Portal>
+      <div
+        ref={props.layerRef}
+        class="selection-actions-layer"
+        data-placement={position()?.placement ?? "bottom"}
+        data-ready={position() ? "true" : "false"}
+        style={{ top: `${position()?.top ?? 0}px`, left: `${position()?.left ?? 0}px` }}
+      >
+        <div
+          ref={(element) => (bar = element)}
+          class="selection-actions-bar"
+          role="toolbar"
+          aria-label={t("chat.selection.label")}
+        >
+          <div class="selection-actions-content">
+            <QuoteSelectionButton quoteShortcut={props.quoteShortcut} onQuote={props.onQuote} />
+          </div>
+        </div>
+      </div>
+    </Portal>
   );
 }
 

@@ -3,8 +3,8 @@
 // resolve an `?url` specifier. That is why the font asset arrives as an argument
 // from the root route instead of as an import here.
 
-import { LANDING_FAQ_STRUCTURED_DATA } from "./landing-faq";
-import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS } from "./landing-links";
+import { faqStructuredData, type LandingQuestion } from "./landing-faq";
+import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
 export const OPENBOT_SITE_URL = "https://openbot.run/";
 export const OPENBOT_SITE_TITLE = "OpenBot: Run a team of AI agents on your computer";
@@ -34,6 +34,49 @@ export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image:height", content: "900" },
   { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
 ] as const;
+
+/** The site's card in the shape of `pageSocialImageMeta`, for a page that can have either. */
+export const OPENBOT_SOCIAL_IMAGE_TAGS = {
+  openGraph: OPENBOT_SOCIAL_IMAGE_META,
+  twitter: [
+    { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+    { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+  ],
+} as const;
+
+/** A page's own social card: a 1600x900 JPEG in `public/social/`, the size of the site's card. */
+export interface PageSocialImage {
+  /** The path from the site root, for example `/social/teams.jpg`. */
+  path: string;
+  alt: string;
+}
+
+/** The card of the terms, the privacy policy and the DPA. */
+export const OPENBOT_LEGAL_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/legal.jpg",
+  alt: "Plain terms. No surprises. OpenBot agents beside a paper map",
+};
+
+/**
+ * The Open Graph and X tags of a page's own social card. The image URL uses the site that
+ * serves the page, so a pull-request preview names an image that it has.
+ */
+export function pageSocialImageMeta(image: PageSocialImage, siteUrl: string) {
+  const url = new URL(image.path, siteUrl).toString();
+  return {
+    openGraph: [
+      { property: "og:image", content: url },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1600" },
+      { property: "og:image:height", content: "900" },
+      { property: "og:image:alt", content: image.alt },
+    ],
+    twitter: [
+      { name: "twitter:image", content: url },
+      { name: "twitter:image:alt", content: image.alt },
+    ],
+  } as const;
+}
 
 // The hosts production answers on. Both serve the same pages, and those pages go by
 // openbot.run.
@@ -116,7 +159,17 @@ const OPENBOT_ORGANIZATION = {
   name: "OpenBot",
   url: OPENBOT_SITE_URL,
   logo: OPENBOT_LOGO_URL,
-  sameAs: [OPENBOT_REPOSITORY_URL, OPENBOT_X_URL, OPENBOT_PRODUCT_HUNT_URL],
+  sameAs: [
+    OPENBOT_REPOSITORY_URL,
+    OPENBOT_X_URL,
+    OPENBOT_LINKS.threads,
+    OPENBOT_LINKS.linkedin,
+    OPENBOT_LINKS.reddit,
+    OPENBOT_LINKS.instagram,
+    OPENBOT_LINKS.tiktok,
+    OPENBOT_LINKS.facebook,
+    OPENBOT_PRODUCT_HUNT_URL,
+  ],
 } as const;
 
 const OPENBOT_WEBSITE = {
@@ -171,27 +224,59 @@ export function openBotRootHead(interLatinFont: string) {
   };
 }
 
-export function openBotHomeHead(application: OpenBotSoftwareApplication) {
+/** The home page's own social card. Other pages without a card of their own keep the site's card. */
+const OPENBOT_HOME_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/home.jpg",
+  alt: "Models come and go. Your team stays. OpenBot agents on a paper planet",
+};
+
+/** The text and the address of the home page in one language. */
+export interface HomePageHead {
+  title: string;
+  description: string;
+  questions: readonly LandingQuestion[];
+  /** The path of this language's home page, such as `/`, `/pl` or `/pt`. */
+  path: string;
+  openGraphLocale: string;
+  /** The home page in each language, for `hreflang` links. The first is also `x-default`. */
+  alternates: readonly { hreflang: string; path: string }[];
+}
+
+export function openBotHomeHead(application: OpenBotSoftwareApplication, siteUrl: string, page: HomePageHead) {
+  const image = pageSocialImageMeta(OPENBOT_HOME_SOCIAL_IMAGE, siteUrl);
+  const url = new URL(page.path, OPENBOT_SITE_URL).toString();
+  const [fallback] = page.alternates;
   return {
     meta: [
+      { title: page.title },
+      { name: "description", content: page.description },
       { "script:ld+json": application },
       { "script:ld+json": OPENBOT_ORGANIZATION },
       { "script:ld+json": OPENBOT_WEBSITE },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "OpenBot" },
-      { property: "og:locale", content: "en_US" },
-      { property: "og:url", content: OPENBOT_SITE_URL },
-      { property: "og:title", content: OPENBOT_SITE_TITLE },
-      { property: "og:description", content: OPENBOT_SITE_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      { property: "og:locale", content: page.openGraphLocale },
+      { property: "og:url", content: url },
+      { property: "og:title", content: page.title },
+      { property: "og:description", content: page.description },
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
-      { name: "twitter:title", content: OPENBOT_SITE_TITLE },
-      { name: "twitter:description", content: OPENBOT_SITE_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
-      { "script:ld+json": LANDING_FAQ_STRUCTURED_DATA },
+      { name: "twitter:title", content: page.title },
+      { name: "twitter:description", content: page.description },
+      ...image.twitter,
+      { "script:ld+json": faqStructuredData(page.questions) },
     ],
-    links: [{ rel: "canonical", href: OPENBOT_SITE_URL }],
+    links: [
+      { rel: "canonical", href: url },
+      ...page.alternates.map((alternate) => ({
+        rel: "alternate",
+        hreflang: alternate.hreflang,
+        href: new URL(alternate.path, OPENBOT_SITE_URL).toString(),
+      })),
+      ...(fallback
+        ? [{ rel: "alternate", hreflang: "x-default", href: new URL(fallback.path, OPENBOT_SITE_URL).toString() }]
+        : []),
+    ],
   };
 }

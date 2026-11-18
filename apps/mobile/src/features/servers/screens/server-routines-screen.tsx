@@ -330,7 +330,7 @@ export function ServerRoutinesScreen() {
     </Stack.Toolbar>
   );
 
-  const title = t("mobile.app.route.routines");
+  const title = t("mobile.app.route.schedule");
   if (!server)
     return (
       <LargeTitleScrollView title={title} contentContainerClassName={PAGE_CONTENT}>

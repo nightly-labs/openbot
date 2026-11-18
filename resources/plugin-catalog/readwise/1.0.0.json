@@ -1,0 +1,33 @@
+{
+  "slug": "readwise",
+  "name": "Readwise",
+  "tagline": "Highlights and saved reading",
+  "description": "Readwise lets agents search the highlights of the signed-in user and read the documents saved in Readwise Reader. Each user signs in to their own Readwise account through the browser.",
+  "category": "research",
+  "creatorName": "Readwise",
+  "iconUrl": "https://readwise.io/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-topic-highlights", "text": "Find my highlights about habit formation." },
+    { "id": "prompt-unread", "text": "What did I save to Reader this week that I have not read yet?" },
+    { "id": "prompt-book-summary", "text": "Summarize the highlights from the last book I finished." }
+  ],
+  "apps": [
+    {
+      "id": "app-readwise-mcp",
+      "name": "Readwise",
+      "description": "Highlights and Reader documents, over Readwise's MCP server with browser sign-in.",
+      "iconUrl": "https://readwise.io/favicon.ico",
+      "server": {
+        "name": "readwise",
+        "transport": "http",
+        "url": "https://mcp2.readwise.io/mcp",
+        "auth": [{ "id": "readwise-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://readwise.io",
+  "privacyPolicyUrl": "https://readwise.io/privacy-policy",
+  "termsUrl": "https://readwise.io/terms-of-service",
+  "skills": []
+}

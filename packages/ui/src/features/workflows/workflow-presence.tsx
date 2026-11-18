@@ -1,7 +1,8 @@
 /**
  * Other people on the same canvas: a cursor with a name in the colour of each person's avatar, a ring
  * on the node that the person selected, and their avatars in the top bar. A press on an avatar moves
- * the camera to that person's cursor. The host gives the places from its presence feed.
+ * the camera to that person's cursor. The host gives the places from its presence feed. An agent that
+ * builds the workflow has the same cursor while the canvas plays its change.
  */
 
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
@@ -44,9 +45,39 @@ export function peersOf(presence: Pick<WorkflowPresence, "self" | "members">): r
 }
 
 /**
- * The cursors, in world pixels, at their screen size at every zoom: a soft arrow and the full name in
- * a pill under it. They take no pointer events.
+ * A cursor, in world pixels, at its screen size at every zoom: a soft arrow and the full name in a
+ * pill under it. It takes no pointer events. `glide`: the time in which it eases to a new place.
  */
+function Cursor(props: {
+  name: string;
+  color: string;
+  at: WfnPoint;
+  glide: number;
+  /** The easing of the glide. The presence feed moves in short linear steps. */
+  ease?: string | undefined;
+  leaving?: boolean | undefined;
+}) {
+  return (
+    <div
+      class="wfn-peer-cursor"
+      data-leaving={props.leaving ? "" : undefined}
+      style={{
+        "--wfn-peer": props.color,
+        "--wfn-peer-feed": `${props.glide}ms`,
+        "--wfn-peer-ease": props.ease,
+        translate: `${props.at.x}px ${props.at.y}px`,
+      }}
+      aria-hidden="true"
+    >
+      <svg class="wfn-peer-arrow" viewBox="0 0 19 20" aria-hidden="true">
+        <path d="M3.41 2.75 15.59 9.25Q17 10 15.45 10.39L9.78 11.81Q9 12 8.6 12.69L6.31 16.62Q5.5 18 5.16 16.44L2.34 3.56Q2 2 3.41 2.75Z" />
+      </svg>
+      <span class="wfn-peer-name">{props.name}</span>
+    </div>
+  );
+}
+
+/** The cursors of the other people, each at the place from the presence feed. */
 export function PeerCursors(props: {
   peers: readonly WorkflowPeer[];
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
@@ -56,24 +87,36 @@ export function PeerCursors(props: {
       {(peer) => (
         <Show when={props.spots[peer.member.id]}>
           {(spot) => (
-            <div
-              class="wfn-peer-cursor"
-              style={{
-                "--wfn-peer": peer.color,
-                "--wfn-peer-feed": `${WORKFLOW_PRESENCE_FEED_INTERVAL}ms`,
-                translate: `${spot().at.x}px ${spot().at.y}px`,
-              }}
-              aria-hidden="true"
-            >
-              <svg class="wfn-peer-arrow" viewBox="0 0 19 20" aria-hidden="true">
-                <path d="M3.41 2.75 15.59 9.25Q17 10 15.45 10.39L9.78 11.81Q9 12 8.6 12.69L6.31 16.62Q5.5 18 5.16 16.44L2.34 3.56Q2 2 3.41 2.75Z" />
-              </svg>
-              <span class="wfn-peer-name">{peer.name}</span>
-            </div>
+            <Cursor name={peer.name} color={peer.color} at={spot().at} glide={WORKFLOW_PRESENCE_FEED_INTERVAL} />
           )}
         </Show>
       )}
     </For>
+  );
+}
+
+/** Where the cursor of an agent is while the canvas plays the change that the agent saved. */
+export interface WorkflowBuilderSpot {
+  name: string;
+  color: string;
+  at: WfnPoint;
+  /** The node that the agent works on. It has a ring in the agent's colour. */
+  on: string | undefined;
+  /** The play ended, so the cursor fades out. */
+  leaving: boolean;
+}
+
+/** The cursor of an agent that builds the workflow. It eases from node to node in `glide` milliseconds. */
+export function BuilderCursor(props: { spot: WorkflowBuilderSpot; glide: number }) {
+  return (
+    <Cursor
+      name={props.spot.name}
+      color={props.spot.color}
+      at={props.spot.at}
+      glide={props.glide}
+      ease="var(--openbot-ease-in-out)"
+      leaving={props.spot.leaving}
+    />
   );
 }
 

@@ -3,7 +3,20 @@
  * away is `SidebarMoveToSubmenu`, which the channel menu shows too; everything here is agent-only.
  */
 
-import { AppWindow, ContextMenu, Copy, MessageCirclePlus, Moon, Pin, PinOff, RotateCcw } from "@openbot/ui";
+import {
+  AppWindow,
+  Bell,
+  BellOff,
+  CheckCheck,
+  CircleDot,
+  ContextMenu,
+  Copy,
+  MessageCirclePlus,
+  Moon,
+  Pin,
+  PinOff,
+  RotateCcw,
+} from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -17,6 +30,8 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
   const { customSectionById, openDelete, props } = useSidebarScope();
   const { t } = useText();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
+  const unread = () => props.unreadAgentIds?.has(menuProps.agent.id) ?? false;
+  const muted = () => props.mutedAgentIds?.has(menuProps.agent.id) ?? false;
   const restoreLabel = () => {
     const assigned = props.layout.agentAssignments[menuProps.agent.id];
     const section = assigned ? customSectionById().get(assigned) : undefined;
@@ -34,6 +49,32 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
           </Show>
           <span>{menuProps.pinned ? t("sidebar.unpin") : t("sidebar.pin")}</span>
         </ContextMenu.Item>
+        <Show when={unread() && props.onMarkAgentRead}>
+          {(markRead) => (
+            <ContextMenu.Item onSelect={() => markRead()(menuProps.agent.id)}>
+              <CheckCheck class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{t("sidebar.agentMenu.markRead")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
+        <Show when={!unread() && props.onMarkAgentUnread}>
+          {(markUnread) => (
+            <ContextMenu.Item onSelect={() => markUnread()(menuProps.agent.id)}>
+              <CircleDot class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{t("sidebar.agentMenu.markUnread")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
+        <Show when={props.onSetAgentMuted}>
+          {(setMuted) => (
+            <ContextMenu.Item data-cuelume-tap="toggle" onSelect={() => setMuted()(menuProps.agent.id, !muted())}>
+              <Show when={muted()} fallback={<BellOff class="agent-context-icon size-4" aria-hidden="true" />}>
+                <Bell class="agent-context-icon size-4" aria-hidden="true" />
+              </Show>
+              <span>{muted() ? t("sidebar.agentMenu.unmute") : t("sidebar.agentMenu.mute")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
         <Show when={!menuProps.userHidden && props.onNewAgentThread}>
           {(start) => (
             <ContextMenu.Item onSelectAfterClose={() => start()(menuProps.agent.id)}>

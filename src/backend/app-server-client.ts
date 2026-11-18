@@ -1,10 +1,18 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Result, Schema } from "effect";
+import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
-import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { TurnContext } from "./agent/turn-context";
+import {
+  AgentProcessExitError,
+  type AgentProvider,
+  ProviderSessionBusyError,
+  RequestTimeoutError,
+} from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
@@ -25,6 +33,7 @@ import {
   type ProviderHistoryFragment,
   type ProviderHistoryRequest,
 } from "./provider-history";
+import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 import { registerProviderProcess } from "./provider-processes";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { endProcessTree } from "./windows-process-tree";
@@ -50,6 +59,69 @@ interface ClientEvents {
 const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 /** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
 const STDERR_END_WAIT_MS = 250;
+/**
+ * The output of a command that the Codex Windows sandbox could not start because Windows cannot
+ * decrypt the saved password of a sandbox account (Codex 0.169.0, `windows-sandbox-rs/src/dpapi.rs`).
+ * A shell call fails with `execution error: Io(Custom { kind: Other, error: "windows sandbox:
+ * CryptUnprotectData failed: 2148073483" })`, and an `exec_command` call with `Failed to create
+ * unified exec process: …`. Codex uses this sandbox only for a Workspace only agent, and it does not
+ * repair the password. The turn continues, so the user saw only failed commands (#9310).
+ * A `registered Core …` failure is the sandbox path of the installed Codex Windows app (#9548).
+ */
+const WINDOWS_SANDBOX_FAILURE =
+  /^(?:execution error|Failed to create unified exec process): .*\b(?:CryptUnprotectData failed|registered Core)\b/su;
+/**
+ * The output of a command that the Codex Linux sandbox (bubblewrap) could not start because the
+ * host does not let it make a user namespace or mount in one: a Docker container, or a host with
+ * AppArmor limits on user namespaces. Codex 0.169.0 gives the stderr of `bwrap` as the output of the
+ * failed command, for example `bwrap: Failed to make / slave: Operation not permitted` (#9694). The
+ * other texts are the user namespace failures that Codex's own check knows
+ * (`codex-rs/sandboxing/src/bwrap.rs`), the same failure in the words of bubblewrap before 0.11.1
+ * (`creating new namespace`, which Ubuntu 24.04 ships), and the namespace and `pivot_root` failures
+ * of a container. Codex uses this sandbox only for a Workspace only agent. Only the start of the
+ * output counts, so a command that prints such a line itself does not show the warning.
+ */
+const LINUX_SANDBOX_FAILURE =
+  /^\s*bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK))/u;
+/**
+ * Selects the sandbox path of the installed Codex Windows app (Codex 0.169.0,
+ * `windows-sandbox-rs/src/app_package.rs`). Codex keeps it in the commands that it runs, so an
+ * OpenBot that a Codex app command started has it too. The Codex that OpenBot starts is not that app,
+ * so with it each command of a Workspace only agent failed with `registered Core launch requires an
+ * installed app` (#9548). Without it, Codex uses its usual Windows sandbox.
+ */
+const CODEX_APP_SANDBOX_ENV = "CODEX_WINDOWS_REGISTERED_CORE";
+/** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
+const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
+/** The `collabAgentToolCall` tools whose receivers are subagents of the calling thread. */
+const SUBAGENT_OWNER_TOOLS: ReadonlySet<unknown> = new Set(["spawnAgent", "resumeAgent", "sendInput"]);
+/**
+ * How long Codex may take to end a stopped turn before OpenBot ends it, as for ACP and Claude. Codex
+ * answers `turn/interrupt` only when the turn ends, and a command that hangs keeps it from ending
+ * (#11100).
+ */
+const CODEX_STOP_GRACE_MS = 10_000;
+/**
+ * How long the background commands of other threads, such as a dev server, keep a process that still
+ * runs a stopped turn. An idle process keeps them as long (`PROVIDER_IDLE_RELEASE_MS`), not longer.
+ */
+const ABANDONED_PROCESS_BACKGROUND_HOLD_MS = 10 * 60_000;
+/** The requests that start or continue work on a thread. A process replaced during one would cut it. */
+const THREAD_WORK_METHODS: ReadonlySet<string> = new Set([
+  "thread/start",
+  "thread/resume",
+  "thread/fork",
+  "thread/compact/start",
+  "turn/start",
+  "turn/steer",
+]);
+
+/** The thread and turn of a notification, in the form of `#interruptedTurns`, or null. */
+function notificationTurnKey(params: unknown): string | null {
+  if (!isRecord(params) || !isString(params.threadId)) return null;
+  const turnId = isString(params.turnId) ? params.turnId : isRecord(params.turn) ? params.turn.id : null;
+  return isString(turnId) ? JSON.stringify([params.threadId, turnId]) : null;
+}
 
 export class AppServerError extends Error {
   constructor(
@@ -65,12 +137,60 @@ export class AppServerError extends Error {
 export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "codex";
+  /**
+   * The memories and section-mates go with the turns. Codex keeps the developer instructions that a
+   * session started with, also on `thread/resume`, so in the instructions a change reached only a
+   * new session, which writes the full conversation to the cache again.
+   */
+  readonly turnContext = true;
+  readonly modelAddressVariable?: string;
+  /**
+   * Kept by thread across process restarts: a resumed thread holds the blocks that it was sent.
+   * Given by the provider context, so it also outlives this client: the idle release replaces the
+   * client, and the new one resumed the thread with all blocks again (#6963). `releaseThread` ends
+   * it, as the Claude client does: a released session that comes back gets the blocks in full.
+   */
+  readonly #turnContext: TurnContext;
   readonly #executable: string;
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
   readonly #pending = new Map<RequestId, PendingRequest>();
   readonly #toolRequests = new Map<RequestId, { threadId: string; turnId: string; controller: AbortController }>();
+  /**
+   * The Codex id of each server request, by the id OpenBot gives it. Each process numbers its requests
+   * from 0, so its ids are not unique among the processes of other accounts or after a restart (#5465).
+   */
+  readonly #serverRequestIds = new Map<string, RequestId>();
   readonly #interruptedTurns = new Set<string>();
+  /**
+   * The threads with an answered turn that did not complete. A process that ends during the turn may
+   * not have saved the blocks of that turn, so the next turn sends them again.
+   */
+  readonly #openTurns = new Set<string>();
+  /** The turns that run in this process, by thread and turn, from `turn/started` to `turn/completed`. */
+  readonly #liveTurns = new Set<string>();
+  /** The stop deadline of each stopped turn, and the `turn/interrupt` requests that wait for its end. */
+  readonly #stopWatches = new Map<string, { timer: ReturnType<typeof setTimeout>; requests: RequestId[] }>();
+  /**
+   * The thread of each stopped turn that OpenBot ended after `CODEX_STOP_GRACE_MS`, by thread and turn.
+   * This process still runs the turn, and Codex adds a new turn of that thread to it.
+   */
+  readonly #abandonedTurns = new Map<string, { threadId: string; at: number }>();
+  /**
+   * The thread that started each subagent thread, from `collabAgentToolCall` and `subAgentActivity`
+   * items. Codex sends the items of every thread to each connection.
+   */
+  readonly #subagentParents = new Map<string, string>();
+  /**
+   * The threads with a stopped turn whose subagents must stop too, until the thread starts a new turn.
+   * Codex stops only the thread that `turn/interrupt` names, and its subagents worked on for hours,
+   * while the chat showed them as stopped (#11419).
+   */
+  readonly #stoppedParents = new Set<string>();
+  /** The `THREAD_WORK_METHODS` requests that wait for an answer. */
+  #threadWork = 0;
+  /** The turn of each thread that showed the sandbox warning, so that a turn shows it once. */
+  readonly #sandboxWarnings = new Map<string, string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
   #ending: Fiber.Fiber<void> | null = null;
@@ -80,12 +200,25 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
   /** Added to the inherited environment, such as the `CODEX_HOME` of an account after the first. */
   readonly #extraEnv: Readonly<Record<string, string>> | undefined;
+  readonly #configOverrides: readonly string[];
 
-  constructor(executable: string, requestTimeoutMs = 30_000, extraEnv?: Readonly<Record<string, string>>) {
+  constructor(
+    executable: string,
+    requestTimeoutMs = 30_000,
+    extraEnv?: Readonly<Record<string, string>>,
+    turnContext = new TurnContext(),
+    /** `key=value` config overrides, each given to the app-server as one `-c`. */
+    configOverrides: readonly string[] = [],
+    /** The variable whose address the overrides send the model requests to. */
+    modelAddressVariable?: string,
+  ) {
     super();
+    this.#turnContext = turnContext;
     this.#executable = executable;
     this.#requestTimeoutMs = requestTimeoutMs;
     this.#extraEnv = extraEnv;
+    this.#configOverrides = configOverrides;
+    if (modelAddressVariable) this.modelAddressVariable = modelAddressVariable;
   }
 
   get running(): boolean {
@@ -97,15 +230,24 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     this.#stopping = false;
     this.#decoder = new JsonLineDecoder();
-    const target = cliSpawnTarget(this.#executable, ["app-server", "--listen", "stdio://"]);
+    // An answer to a request of the previous process must not reach a request of this one.
+    this.#serverRequestIds.clear();
+    const target = cliSpawnTarget(this.#executable, [
+      "app-server",
+      ...this.#configOverrides.flatMap((override) => ["-c", override]),
+      "--listen",
+      "stdio://",
+    ]);
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: this.#extraEnv ? { ...process.env, ...this.#extraEnv } : process.env,
+      env: codexEnvironment(this.#extraEnv),
       windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
+      detached: PROVIDER_PROCESS_GROUP,
     });
     this.#process = child;
     registerProviderProcess(child, "codex");
+    endProcessGroupOnExit(child);
 
     child.stdin.on("error", (error) => this.#fail(error, child));
     child.stdout.on("data", (chunk: Buffer) => {
@@ -167,6 +309,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#stopping = true;
     this.#cancelToolRequests();
     this.#process = null;
+    this.#resendOpenTurns();
+    this.#forgetTurns();
     for (const pending of this.#pending.values()) pending.reject(new Error("Codex App Server stopped."));
     this.#pending.clear();
     child.stdin.end();
@@ -184,14 +328,75 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    *
    * A thread this connection never subscribed to answers `NotSubscribed`, which is not an error
    * here: either way this side has stopped using it.
+   *
+   * `resumes`: an idle release. `thread/resume` loads the same rollout, which holds the memories and
+   * section-mates that its turns were sent, so they do not go again.
    */
   readonly releaseThread = Effect.fn("CodexAppServer.releaseThread")(function* (
     this: CodexAppServerClient,
     threadId: string,
+    resumes = false,
   ) {
+    if (!resumes) this.#turnContext.forget(threadId);
     if (!this.running) return;
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
   });
+
+  /**
+   * Whether the thread has a background terminal. The unload that follows `thread/unsubscribe`
+   * ends every unified exec process of the thread, so a release would stop a dev server or a watch
+   * that the agent left running. `thread/backgroundTerminals/list` is an experimental method; the
+   * `initialize` request turns on `experimentalApi`.
+   */
+  readonly holdsBackgroundWork = Effect.fn("CodexAppServer.holdsBackgroundWork")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    const terminals = yield* this.request(
+      "thread/backgroundTerminals/list",
+      { threadId, limit: 1 },
+      decodeBackgroundTerminals,
+    );
+    return terminals.data.length > 0;
+  });
+
+  /**
+   * True when this process still runs a stopped turn that OpenBot ended (#11100), and nothing else
+   * uses it: no other turn, no session start, and no background command in `threadIds` other than in
+   * the threads of those turns. The runtime then replaces the process before the next turn. A failed
+   * check keeps the process, and background commands keep it for `ABANDONED_PROCESS_BACKGROUND_HOLD_MS`
+   * at most.
+   */
+  readonly replaceForNextTurn = Effect.fn("CodexAppServer.replaceForNextTurn")(function* (
+    this: CodexAppServerClient,
+    threadIds: readonly string[],
+  ) {
+    if (!this.#holdsOnlyAbandonedTurns()) return false;
+    const since = Math.min(...[...this.#abandonedTurns.values()].map(({ at }) => at));
+    if (Date.now() - since >= ABANDONED_PROCESS_BACKGROUND_HOLD_MS) return true;
+    const stopped = this.#abandonedThreads();
+    const checks = yield* Effect.forEach(
+      threadIds.filter((threadId) => !stopped.has(threadId)),
+      (threadId) => Effect.result(this.holdsBackgroundWork(threadId)),
+      { concurrency: "unbounded" },
+    );
+    if (checks.some((background) => Result.isFailure(background) || background.success)) return false;
+    return this.#holdsOnlyAbandonedTurns();
+  });
+
+  #abandonedThreads(): ReadonlySet<string> {
+    return new Set([...this.#abandonedTurns.values()].map(({ threadId }) => threadId));
+  }
+
+  #holdsOnlyAbandonedTurns(): boolean {
+    return (
+      this.running &&
+      this.#abandonedTurns.size > 0 &&
+      this.#liveTurns.size === 0 &&
+      this.#openTurns.size === 0 &&
+      this.#threadWork === 0
+    );
+  }
 
   /**
    * Moves a replaced thread out of the list that the Codex app and ChatGPT show. Without this, each
@@ -209,6 +414,19 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   ) {
     if (!this.running) return;
     yield* this.request("thread/archive", { threadId }, decodeRecordResponse);
+  });
+
+  /**
+   * Sets the title that the Codex app and ChatGPT show for the thread. Without a name they show the
+   * first text of the first turn, which is an OpenBot turn context block.
+   */
+  readonly nameThread = Effect.fn("CodexAppServer.nameThread")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+    name: string,
+  ) {
+    if (!this.running) return;
+    yield* this.request("thread/name/set", { threadId, name }, decodeRecordResponse);
   });
 
   /**
@@ -302,22 +520,39 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   ) {
     const id = this.#nextId++;
     const child = this.#process;
+    let answered = false;
+    if ((method === "turn/start" || method === "turn/steer") && isRecord(params) && isString(params.threadId)) {
+      // Codex would add this turn to the stopped turn that still runs in the thread. The drain tries
+      // the message again, and the next try starts it on a new process (#11100).
+      if (this.#abandonedThreads().has(params.threadId))
+        return yield* Effect.fail(new ProviderClientOperationError({ cause: new ProviderSessionBusyError("Codex") }));
+    }
+    let counted = false;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
+      if (THREAD_WORK_METHODS.has(method)) {
+        this.#threadWork += 1;
+        counted = true;
+      }
       this.#pending.set(id, {
-        resolve: (value) =>
+        resolve: (value) => {
+          answered = true;
+          this.#trackTurnContext(method, params, value);
           resume(
             Effect.try({
               try: () => decoder(value),
               catch: (cause) => new ProviderClientOperationError({ cause }),
             }),
-          ),
+          );
+        },
         reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
       try {
-        this.#write({ method, id, params: method === "thread/resume" ? metadataOnlyResumeParams(params) : params });
+        this.#write({ method, id, params: this.#wireParams(method, params) });
         if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
           this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
           this.#cancelToolRequests(params.threadId, params.turnId);
+          this.#watchStop(params.threadId, params.turnId, id, child);
+          this.#stopSubagentsOf(params.threadId);
         }
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
@@ -333,7 +568,16 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
             ),
           ),
       }),
-      Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#pending.delete(id);
+          if (counted) this.#threadWork -= 1;
+          // A turn that was refused, timed out or interrupted may not be in the history, so the
+          // next turn sends its blocks again.
+          if (method === "turn/start" && !answered && isRecord(params) && isString(params.threadId))
+            this.#turnContext.resend(params.threadId);
+        }),
+      ),
     );
   });
 
@@ -342,13 +586,102 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
-    this.#toolRequests.delete(id);
-    this.#write({ id, result });
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, result });
   }
 
   respondError(id: RequestId, error: RpcError): void {
+    const codexId = this.#takeServerRequestId(id);
+    if (codexId !== undefined) this.#write({ id: codexId, error });
+  }
+
+  /**
+   * The params as Codex gets them. The turn context fields stay on this side, and a turn takes its
+   * blocks in front of the user's input, each a text item of its own, so that history readers can
+   * tell them from the user's text.
+   */
+  #wireParams(method: string, params: unknown): unknown {
+    if (method === "thread/start") return withoutTurnContextParams(params);
+    if (method === "thread/resume") return { ...withoutTurnContextParams(params), excludeTurns: true };
+    if (method !== "turn/start" || !isRecord(params) || !isString(params.threadId) || !Array.isArray(params.input))
+      return params;
+    const blocks = this.#turnContext.take(params.threadId);
+    if (blocks.length === 0) return params;
+    return { ...params, input: [...blocks.map((text) => ({ type: "text", text })), ...params.input] };
+  }
+
+  /** Takes the turn context of a thread that Codex started or resumed, and drops it with the thread. */
+  #trackTurnContext(method: string, params: unknown, result: unknown): void {
+    if (method === "thread/start") {
+      const thread = isRecord(result) ? result.thread : undefined;
+      if (!isRecord(thread) || !isString(thread.id)) return;
+      this.#turnContext.set(thread.id, params, false);
+      return;
+    }
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "turn/start") {
+      this.#openTurns.add(params.threadId);
+      // A Stop can come before `turn/started`; the stop deadline then still knows the turn.
+      const turn = isRecord(result) ? result.turn : undefined;
+      if (isRecord(turn) && isString(turn.id)) this.#liveTurns.add(JSON.stringify([params.threadId, turn.id]));
+    } else if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
+    else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
+  }
+
+  /**
+   * A failed turn may not be kept, and a compaction summary can leave the blocks out. The next turn
+   * of the thread sends them in full.
+   */
+  #observeTurnContext(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "turn/completed") this.#openTurns.delete(params.threadId);
+    const failed = method === "turn/completed" && isRecord(params.turn) && params.turn.status === "failed";
+    const compacted =
+      method === "thread/compacted" ||
+      (method === "item/completed" && isRecord(params.item) && params.item.type === "contextCompaction");
+    if (failed || compacted) this.#turnContext.resend(params.threadId);
+  }
+
+  /** Tells the user once in a turn what to do when the Codex sandbox cannot start the agent's commands. */
+  #warnSandboxFailure(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const { threadId } = params;
+    if (method === "turn/completed") {
+      if (isRecord(params.turn) && params.turn.id === this.#sandboxWarnings.get(threadId))
+        this.#sandboxWarnings.delete(threadId);
+      return;
+    }
+    const item = params.item;
+    if (
+      method !== "item/completed" ||
+      !isString(params.turnId) ||
+      !isRecord(item) ||
+      item.type !== "commandExecution" ||
+      item.status !== "failed" ||
+      !isString(item.aggregatedOutput) ||
+      !(WINDOWS_SANDBOX_FAILURE.test(item.aggregatedOutput) || LINUX_SANDBOX_FAILURE.test(item.aggregatedOutput)) ||
+      this.#sandboxWarnings.get(threadId) === params.turnId
+    )
+      return;
+    this.#sandboxWarnings.set(threadId, params.turnId);
+    this.emit("notification", {
+      method: "warning",
+      params: { threadId, turnId: params.turnId, message: sourceText("error.agent.codexSandboxUnavailable") },
+    });
+  }
+
+  /** The process ended: a turn that did not complete may not be saved, so its thread sends its blocks again. */
+  #resendOpenTurns(): void {
+    for (const threadId of this.#openTurns) this.#turnContext.resend(threadId);
+    this.#openTurns.clear();
+  }
+
+  #takeServerRequestId(id: RequestId): RequestId | undefined {
     this.#toolRequests.delete(id);
-    this.#write({ id, error });
+    if (!isString(id)) return undefined;
+    const codexId = this.#serverRequestIds.get(id);
+    this.#serverRequestIds.delete(id);
+    return codexId;
   }
 
   #write(message: unknown): void {
@@ -361,6 +694,14 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        const requestTurn = notificationTurnKey(message.params);
+        if (requestTurn !== null && this.#abandonedTurns.has(requestTurn)) {
+          // OpenBot ended this turn: nobody answers its approvals or tool calls any more.
+          this.#write({ id: message.id, error: { code: -32_000, message: "OpenBot stopped this turn." } });
+          return;
+        }
+        const id = randomUUID();
+        this.#serverRequestIds.set(id, message.id);
         let signal: AbortSignal | undefined;
         if (
           message.method === "item/tool/call" &&
@@ -369,24 +710,33 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           isString(message.params.turnId)
         ) {
           const controller = new AbortController();
-          this.#toolRequests.set(message.id, {
+          this.#toolRequests.set(id, {
             threadId: message.params.threadId,
             turnId: message.params.turnId,
             controller,
           });
           signal = controller.signal;
           if (this.#interruptedTurns.has(JSON.stringify([message.params.threadId, message.params.turnId]))) {
-            this.#toolRequests.delete(message.id);
+            this.#toolRequests.delete(id);
             controller.abort();
           }
         }
         this.emit("request", {
           ...(signal ? { signal } : {}),
           method: message.method,
-          id: message.id,
+          id,
           params: message.params,
         });
       } else {
+        const turnKey = notificationTurnKey(message.params);
+        if (turnKey !== null && this.#abandonedTurns.has(turnKey)) {
+          // OpenBot already ended this turn; its late end only shows that it no longer runs.
+          if (message.method === "turn/completed") this.#abandonedTurns.delete(turnKey);
+          return;
+        }
+        if (turnKey !== null && message.method === "turn/started") this.#liveTurns.add(turnKey);
+        if (turnKey !== null && message.method === "turn/completed") this.#endStopWatch(turnKey);
+        this.#observeSubagents(message.method, message.params);
         if (
           message.method === "turn/completed" &&
           isRecord(message.params) &&
@@ -397,7 +747,9 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
           this.#cancelToolRequests(message.params.threadId, message.params.turn.id);
           this.#interruptedTurns.delete(JSON.stringify([message.params.threadId, message.params.turn.id]));
         }
+        this.#observeTurnContext(message.method, message.params);
         this.emit("notification", { method: message.method, params: message.params });
+        this.#warnSandboxFailure(message.method, message.params);
       }
       return;
     }
@@ -415,6 +767,126 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     }
 
     pending.resolve(message.result);
+  }
+
+  /** Starts the deadline of a stopped turn, or adds a second Stop of it to that deadline. */
+  #watchStop(threadId: string, turnId: string, requestId: RequestId, child: ChildProcessWithoutNullStreams | null) {
+    const key = JSON.stringify([threadId, turnId]);
+    const watch = this.#stopWatches.get(key);
+    if (watch) {
+      watch.requests.push(requestId);
+      return;
+    }
+    const timer = setTimeout(() => this.#abandonStoppedTurn(threadId, turnId, child), CODEX_STOP_GRACE_MS);
+    timer.unref?.();
+    this.#stopWatches.set(key, { timer, requests: [requestId] });
+  }
+
+  #endStopWatch(key: string): void {
+    this.#liveTurns.delete(key);
+    const watch = this.#stopWatches.get(key);
+    if (watch) clearTimeout(watch.timer);
+    this.#stopWatches.delete(key);
+  }
+
+  /**
+   * Ends a stopped turn that Codex did not end in `CODEX_STOP_GRACE_MS`, as a Stop that Codex
+   * confirmed does: the Stop succeeds, and the turn completes as interrupted. Without this, the chat
+   * stayed busy and the agent's queue waited until OpenBot restarted (#11100).
+   */
+  #abandonStoppedTurn(threadId: string, turnId: string, child: ChildProcessWithoutNullStreams | null): void {
+    const key = JSON.stringify([threadId, turnId]);
+    const requests = this.#stopWatches.get(key)?.requests ?? [];
+    this.#stopWatches.delete(key);
+    if (this.#process !== child || !this.#liveTurns.has(key)) return;
+    this.#handleMessage({
+      method: "turn/completed",
+      params: { threadId, turn: { id: turnId, status: "interrupted" } },
+    });
+    this.#abandonedTurns.set(key, { threadId, at: Date.now() });
+    // The process that runs the turn is replaced, and it may not have saved the turn's blocks.
+    this.#turnContext.resend(threadId);
+    for (const id of requests) {
+      const pending = this.#pending.get(id);
+      this.#pending.delete(id);
+      pending?.resolve({});
+    }
+  }
+
+  /**
+   * Keeps the link of each subagent thread to its parent. A turn that a subagent of a stopped thread
+   * starts is stopped too; a new turn of any other thread lets its own subagents work again.
+   */
+  #observeSubagents(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const threadId = params.threadId;
+    if (method === "turn/started") {
+      const turnId = isRecord(params.turn) ? params.turn.id : undefined;
+      if (!isString(turnId)) return;
+      const parent = this.#subagentParents.get(threadId);
+      if (parent !== undefined && this.#stoppedParents.has(parent)) this.#stopSubagentTurn(threadId, turnId);
+      // A Stop can come before `turn/started` of the turn that it stops.
+      else if (!this.#interruptedTurns.has(JSON.stringify([threadId, turnId]))) this.#stoppedParents.delete(threadId);
+      return;
+    }
+    if ((method !== "item/started" && method !== "item/completed") || !isRecord(params.item)) return;
+    const item = params.item;
+    const children =
+      item.type === "collabAgentToolCall" &&
+      SUBAGENT_OWNER_TOOLS.has(item.tool) &&
+      Array.isArray(item.receiverThreadIds)
+        ? item.receiverThreadIds.filter(isString)
+        : item.type === "subAgentActivity" && isString(item.agentThreadId)
+          ? [item.agentThreadId]
+          : [];
+    for (const child of children) {
+      if (this.#subagentParents.get(child) === threadId || this.#isSubagentOf(threadId, child)) continue;
+      this.#subagentParents.set(child, threadId);
+      // A subagent that the stopped turn started just before its end.
+      if (this.#stoppedParents.has(threadId)) this.#stopSubagent(child);
+    }
+  }
+
+  /** Whether `threadId` is the thread `ancestor` or one of its subagents. Keeps the links free of loops. */
+  #isSubagentOf(threadId: string, ancestor: string): boolean {
+    for (
+      let current: string | undefined = threadId;
+      current !== undefined;
+      current = this.#subagentParents.get(current)
+    )
+      if (current === ancestor) return true;
+    return false;
+  }
+
+  /** Stops the subagents of a stopped thread, and their own subagents. A second Stop sends their Stops again. */
+  #stopSubagentsOf(threadId: string): void {
+    this.#stoppedParents.add(threadId);
+    for (const [child, parent] of this.#subagentParents) if (parent === threadId) this.#stopSubagent(child);
+  }
+
+  #stopSubagent(threadId: string): void {
+    const prefix = `${JSON.stringify([threadId]).slice(0, -1)},`;
+    for (const key of this.#liveTurns) {
+      const turnId = key.startsWith(prefix) ? JSON.parse(key)[1] : undefined;
+      if (isString(turnId)) this.#stopSubagentTurn(threadId, turnId);
+    }
+    this.#stopSubagentsOf(threadId);
+  }
+
+  /** Sends the Stop of a subagent's turn. It has the same deadline as a Stop of the person's turn. */
+  #stopSubagentTurn(threadId: string, turnId: string): void {
+    if (this.#interruptedTurns.has(JSON.stringify([threadId, turnId]))) return;
+    Effect.runFork(this.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+  }
+
+  /** The process ended: none of its turns runs any more. */
+  #forgetTurns(): void {
+    for (const watch of this.#stopWatches.values()) clearTimeout(watch.timer);
+    this.#stopWatches.clear();
+    this.#liveTurns.clear();
+    this.#abandonedTurns.clear();
+    this.#subagentParents.clear();
+    this.#stoppedParents.clear();
   }
 
   #cancelToolRequests(threadId?: string, turnId?: string): void {
@@ -461,6 +933,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (this.#process !== child) return;
     this.#cancelToolRequests();
     this.#process = null;
+    this.#resendOpenTurns();
+    this.#forgetTurns();
 
     for (const pending of this.#pending.values()) {
       pending.reject(error);
@@ -488,8 +962,24 @@ interface HistoryItemPage {
   nextCursor: string | null;
 }
 
-function metadataOnlyResumeParams(params: unknown): DynamicRecord {
-  return { ...(isRecord(params) ? params : {}), excludeTurns: true };
+/** The environment of the Codex process. Windows compares variable names without case. */
+function codexEnvironment(extraEnv: Readonly<Record<string, string>> | undefined): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+  for (const key of Object.keys(env)) if (key.toUpperCase() === CODEX_APP_SANDBOX_ENV) delete env[key];
+  return env;
+}
+
+/** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
+function withoutTurnContextParams(params: unknown): DynamicRecord {
+  if (!isRecord(params)) return {};
+  const {
+    memoryContext: _memories,
+    sectionTeammates: _section,
+    savedLogins: _logins,
+    turnStyleReminder: _style,
+    ...rest
+  } = params;
+  return rest;
 }
 
 function decodeTurnHistoryPage(value: unknown): HistoryTurnPage {
@@ -529,7 +1019,17 @@ function decodeHistoryItemEntry(value: unknown): { turnId: string; item: ThreadI
   }
   // Preserve provider item fields (tool output, image metadata, command status, and so on) while
   // validating the discriminator at the untrusted app-server boundary.
-  return { turnId: value.turnId, item: { ...value.item, type: value.item.type } };
+  const item: ThreadItem = { ...value.item, type: value.item.type };
+  // The turn context blocks are text items of their own in front of the user's input. The last
+  // item is always the user's, also when the user wrote text that starts like a block.
+  if (item.type === "userMessage" && Array.isArray(item.content)) {
+    const last = item.content.length - 1;
+    item.content = item.content.filter(
+      (part, index) =>
+        index === last || !(part.type === "text" && isString(part.text) && isTurnContextBlock(part.text)),
+    );
+  }
+  return { turnId: value.turnId, item };
 }
 
 function nullableString(value: unknown, label: string): string | null {

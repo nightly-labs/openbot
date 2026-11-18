@@ -1,0 +1,33 @@
+{
+  "slug": "evernote",
+  "name": "Evernote",
+  "tagline": "Notes and notebooks",
+  "description": "Evernote lets agents read, search and create notes. Each user signs in to their own Evernote account through the browser.",
+  "category": "documents",
+  "creatorName": "Evernote",
+  "iconUrl": "https://evernote.com/images/evernote-logo-ios.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-search", "text": "Find my Evernote notes about the kitchen renovation." },
+    { "id": "prompt-summary", "text": "Summarize the notes I saved last week." },
+    { "id": "prompt-create", "text": "Create an Evernote note with these meeting notes." }
+  ],
+  "apps": [
+    {
+      "id": "app-evernote-mcp",
+      "name": "Evernote",
+      "description": "Note search, reading, and creation, over Evernote's MCP server with browser sign-in.",
+      "iconUrl": "https://evernote.com/images/evernote-logo-ios.png",
+      "server": {
+        "name": "evernote",
+        "transport": "http",
+        "url": "https://mcp.evernote.com/mcp",
+        "auth": [{ "id": "evernote-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://evernote.com",
+  "privacyPolicyUrl": "https://evernote.com/privacy/policy",
+  "termsUrl": "https://evernote.com/legal/terms-of-service",
+  "skills": []
+}

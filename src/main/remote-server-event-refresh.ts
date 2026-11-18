@@ -15,10 +15,25 @@
 // The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
 // and one page each, which is expensive, so it runs once per connection rather than per event.
 
-import type { AgentColors, AgentEvent, AvatarColor, BrowserTab, ClientAgentSummary } from "@openbot/contracts/ipc";
+import {
+  type AgentColors,
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AgentStatus,
+  type AvatarColor,
+  type BrowserTab,
+  type ChatColors,
+  type ClientAgentSummary,
+  decodeProviderModelSources,
+  type ProviderModelSourceEntry,
+  type TeamMemberSummary,
+  withModelSources,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
-import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { addRemotePreviewUrls, pageQuery } from "./remote-server-urls";
@@ -46,12 +61,21 @@ export interface RemoteEventRefreshOptions {
   /** False once the user removes a server. A refetch in flight for it stops emitting. */
   hasServer: (serverId: string) => boolean;
   emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  /** The member chat colours of a server changed, so its presence goes to the renderer again. */
+  onMemberChatColors?: (serverId: string) => void;
+  /** Whether the server sends the usage limits of its agents on their own route (`agent-usage-limit-v1`). */
+  hasUsageLimits?: (serverId: string) => boolean;
+  /** Whether the server says where its providers' models come from (`provider-model-source-v1`). */
+  hasModelSources?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
   readonly #request: RemoteRequestFn;
   readonly #hasServer: (serverId: string) => boolean;
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  readonly #onMemberChatColors: (serverId: string) => void;
+  readonly #hasUsageLimits: (serverId: string) => boolean;
+  readonly #hasModelSources: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
@@ -66,11 +90,31 @@ export class RemoteEventRefresh {
   // their own. Each server keeps its last colours and its last agent list to merge them here.
   readonly #agentColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
   readonly #agentRosters = new Map<string, ClientAgentSummary[]>();
+  // The released agent and member lists have no field for a chat colour, so `chat-colors-v1` sends the
+  // chat colours on their own. Each server keeps its last chat colours to merge them here.
+  readonly #agentChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
+  readonly #memberChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
+  // The frozen runtime snapshot has no usage limits, so `agent-usage-limit-v1` sends them on their own
+  // route. Each server keeps its last snapshot and its last usage limits to merge them here.
+  readonly #runtimeSnapshots = new Map<string, AgentRuntimeSnapshot>();
+  readonly #usageLimits = new Map<string, AgentUsageLimits>();
+  readonly #usageLimitReads = new Map<string, QueueRefresh>();
+  /**
+   * The last status of each server, and the model sources that `provider-model-source-v1` gave. The
+   * released status event carries no source (#9956), so each one goes out with the last sources, and
+   * a changed source sends the status again.
+   */
+  readonly #statuses = new Map<string, AgentStatus>();
+  readonly #modelSources = new Map<string, ProviderModelSourceEntry[]>();
+  readonly #modelSourceReads = new Map<string, QueueRefresh>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
     this.#hasServer = options.hasServer;
     this.#emit = options.emit;
+    this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
+    this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
+    this.#hasModelSources = options.hasModelSources ?? (() => false);
   }
 
   /**
@@ -93,6 +137,9 @@ export class RemoteEventRefresh {
     } else if (event.type === "agent-colors-changed") {
       // The renderer reads the colours in the agent list, so this event does not go to it.
       this.rememberAgentColors(serverId, event);
+    } else if (event.type === "chat-colors-changed") {
+      // The renderer reads the chat colours in the agent list and in the presence, so this event does not go to it.
+      this.rememberChatColors(serverId, event);
     } else if (event.type === "agents-changed") {
       this.#emitRoster(serverId, addRemotePreviewUrls(event.agents, serverId), bufferedLive);
     } else if (event.type === "browser-user-control-changed" || event.type === "browser-page-state-changed") {
@@ -101,6 +148,18 @@ export class RemoteEventRefresh {
       this.#emit(serverId, event);
       const state = this.#browserStates.get(serverId);
       if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
+    } else if (event.type === "status" && this.#hasModelSources(serverId)) {
+      // The status goes out at once with the last sources. A source change on the host sends a
+      // status, so the sources are read again after it.
+      this.#statuses.set(serverId, event.status);
+      this.#emitStatus(serverId, bufferedLive);
+      yield* this.#refreshModelSources(serverId);
+    } else if (event.type === "runtime-snapshot" && this.#hasUsageLimits(serverId)) {
+      // The snapshot goes out at once with the last usage limits. A changed hold also sends a runtime
+      // snapshot, so the limits are read again after it.
+      this.#runtimeSnapshots.set(serverId, event.snapshot);
+      this.#emitRuntimeSnapshot(serverId, bufferedLive);
+      yield* this.#refreshUsageLimits(serverId);
     } else {
       if (event.type === "browser-changed")
         this.#browserStates.set(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
@@ -188,16 +247,45 @@ export class RemoteEventRefresh {
     );
   }).bind(this);
 
-  /** The agents with the last colours that the server sent. A server without `agent-colors-v1` sends none. */
+  /**
+   * The agents with the last colours and chat colours that the server sent. A server without
+   * `agent-colors-v1` or `chat-colors-v1` sends none.
+   */
   withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
-    const colors = this.#agentColors.get(serverId);
-    return colors ? agents.map((agent) => withAgentColor(agent, colors.get(agent.id))) : agents;
+    if (!this.#agentColors.has(serverId) && !this.#agentChatColors.has(serverId)) return agents;
+    return agents.map((agent) => this.agentWithColor(serverId, agent));
   }
 
-  /** One agent with the last colour that the server sent. */
+  /** One agent with the last colour and chat colour that the server sent. */
   agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
     const colors = this.#agentColors.get(serverId);
-    return colors ? withAgentColor(agent, colors.get(agent.id)) : agent;
+    const chatColors = this.#agentChatColors.get(serverId);
+    const colored = colors ? withAgentColor(agent, colors.get(agent.id)) : agent;
+    return chatColors ? withChatColor(colored, chatColors.get(agent.id)) : colored;
+  }
+
+  /** The members with the last chat colours that the server sent. A server without `chat-colors-v1` sends none. */
+  withMemberChatColors<Member extends TeamMemberSummary>(serverId: string, members: Member[]): Member[] {
+    const chatColors = this.#memberChatColors.get(serverId);
+    return chatColors ? members.map((member) => withChatColor(member, chatColors.get(member.id))) : members;
+  }
+
+  /**
+   * Keeps the chat colours that a read, a change or an event gave. When the agent chat colours changed,
+   * the last agent list goes to the renderer again with them. When the member chat colours changed, the
+   * presence goes again.
+   */
+  rememberChatColors(serverId: string, colors: ChatColors): void {
+    const agents = new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
+    const members = new Map(colors.members.map((entry) => [entry.memberId, entry.color]));
+    const agentsChanged = !sameColors(this.#agentChatColors.get(serverId), agents);
+    const membersChanged = !sameColors(this.#memberChatColors.get(serverId), members);
+    this.#agentChatColors.set(serverId, agents);
+    this.#memberChatColors.set(serverId, members);
+    const roster = this.#agentRosters.get(serverId);
+    if (agentsChanged && roster)
+      this.#emit(serverId, { type: "agents-changed", agents: this.withAgentColors(serverId, roster) });
+    if (membersChanged) this.#onMemberChatColors(serverId);
   }
 
   /**
@@ -208,10 +296,104 @@ export class RemoteEventRefresh {
     const next = new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
     const previous = this.#agentColors.get(serverId);
     this.#agentColors.set(serverId, next);
-    if (previous && previous.size === next.size && [...next].every(([id, color]) => previous.get(id) === color)) return;
+    if (sameColors(previous, next)) return;
     const roster = this.#agentRosters.get(serverId);
     if (roster) this.#emit(serverId, { type: "agents-changed", agents: this.withAgentColors(serverId, roster) });
   }
+
+  /** The last runtime snapshot of the server, with its last usage limits. */
+  #emitRuntimeSnapshot(serverId: string, bufferedLive = false): void {
+    const snapshot = this.#runtimeSnapshots.get(serverId);
+    if (!snapshot) return;
+    const limits = this.#usageLimits.get(serverId);
+    const event = addRemotePreviewUrls(
+      { type: "runtime-snapshot" as const, snapshot: limits ? { ...snapshot, ...limits } : snapshot },
+      serverId,
+    );
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  #emitStatus(serverId: string, bufferedLive = false): void {
+    const status = this.#statuses.get(serverId);
+    if (!status) return;
+    const event = { type: "status" as const, status: withModelSources(status, this.#modelSources.get(serverId) ?? []) };
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  /** As `#refreshUsageLimits`: one read for a burst of status events. A failed read keeps the last sources. */
+  readonly #refreshModelSources = Effect.fn("RemoteEvents.refreshModelSources")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#modelSourceReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#modelSourceReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, PROVIDER_MODEL_SOURCE_ROUTES.list, decodeProviderModelSources, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#modelSources.get(serverId);
+        this.#modelSources.set(serverId, result.success);
+        if (JSON.stringify(previous ?? []) !== JSON.stringify(result.success)) this.#emitStatus(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#modelSourceReads.get(serverId) === read) this.#modelSourceReads.delete(serverId);
+        }),
+      ),
+    );
+  });
+
+  readonly #refreshUsageLimits = Effect.fn("RemoteEvents.refreshUsageLimits")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#usageLimitReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#usageLimitReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, AGENT_USAGE_LIMIT_ROUTES.list, decodeRemoteAgentUsageLimits, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#usageLimits.get(serverId);
+        this.#usageLimits.set(serverId, result.success);
+        if (JSON.stringify(previous) !== JSON.stringify(result.success)) this.#emitRuntimeSnapshot(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#usageLimitReads.get(serverId) === read) this.#usageLimitReads.delete(serverId);
+        }),
+      ),
+    );
+  });
 
   #emitRoster(serverId: string, agents: ClientAgentSummary[], bufferedLive = false): void {
     this.#agentRosters.set(serverId, agents);
@@ -224,9 +406,17 @@ export class RemoteEventRefresh {
     this.#rosterLoads.delete(serverId);
     this.#agentColors.delete(serverId);
     this.#agentRosters.delete(serverId);
+    this.#agentChatColors.delete(serverId);
+    this.#memberChatColors.delete(serverId);
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
     this.#browserStates.delete(serverId);
+    this.#runtimeSnapshots.delete(serverId);
+    this.#usageLimits.delete(serverId);
+    this.#usageLimitReads.delete(serverId);
+    this.#statuses.delete(serverId);
+    this.#modelSources.delete(serverId);
+    this.#modelSourceReads.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);
@@ -240,9 +430,14 @@ export class RemoteEventRefresh {
     this.#rosterLoads.clear();
     this.#agentColors.clear();
     this.#agentRosters.clear();
+    this.#agentChatColors.clear();
+    this.#memberChatColors.clear();
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
     this.#browserStates.clear();
+    this.#runtimeSnapshots.clear();
+    this.#usageLimits.clear();
+    this.#usageLimitReads.clear();
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();
@@ -350,4 +545,23 @@ export class RemoteEventRefresh {
 function withAgentColor(agent: ClientAgentSummary, color: AvatarColor | undefined): ClientAgentSummary {
   const { avatarColor: _, ...rest } = agent;
   return color ? { ...rest, avatarColor: color } : rest;
+}
+
+/** The agent or member with `color`, or without a chat colour. The released lists have none. */
+function withChatColor<Item extends { chatColor?: AvatarColor }>(item: Item, color: AvatarColor | undefined): Item {
+  const next = { ...item };
+  if (color) next.chatColor = color;
+  else delete next.chatColor;
+  return next;
+}
+
+function sameColors(
+  previous: ReadonlyMap<string, AvatarColor> | undefined,
+  next: ReadonlyMap<string, AvatarColor>,
+): boolean {
+  return (
+    previous !== undefined &&
+    previous.size === next.size &&
+    [...next].every(([id, color]) => previous.get(id) === color)
+  );
 }

@@ -113,6 +113,9 @@ async function check(name: string, run: () => Promise<object | undefined>) {
 const unused = () => Effect.die(new Error("Browser operation is not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  shareTab: () => {},
+  unshareThread: () => {},
+  agentTab: () => null,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -269,7 +272,7 @@ async function idle(agentId: string, taskId: string | null) {
     return (
       thread &&
       !database.readConversation(agentId, thread).activeTurnId &&
-      !mailbox.hasUnfinishedDeliveryOutsideTasks(agentId)
+      !mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, false)
     );
   });
 }
@@ -563,8 +566,14 @@ try {
         rewriteInput(agent.id, source, "MUST-NOT-RUN", taskId),
         /busy|running|queued|working|work|空闲|忙|运行/i,
       );
+      // A normal send now steers the running turn. Enqueue directly to exercise the queued lane.
       const queued = await runCauseEffect(
-        service().agents.sendMessage({ agentId: agent.id, ...(taskId ? { taskId } : {}), text: "BUSY-QUEUED" }),
+        service().mailbox.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: [agent.id],
+          ...(taskId ? { taskId } : {}),
+          text: "BUSY-QUEUED",
+        }),
       );
       const queuedId = queued.deliveries[0]?.id;
       assert.ok(queuedId);

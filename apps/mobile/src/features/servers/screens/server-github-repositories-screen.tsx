@@ -12,7 +12,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
 /**
- * Server settings › Connectors › GitHub › Repositories: the repositories where the host's GitHub App is
+ * Marketplace › Apps › GitHub › Repositories: the repositories where the host's GitHub App is
  * installed, with a filter. The host sends at most a few hundred, so `total` can be larger.
  */
 export function ServerGitHubRepositoriesScreen() {

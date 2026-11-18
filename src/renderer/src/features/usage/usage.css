@@ -36,51 +36,19 @@
   background: var(--openbot-bg-canvas);
 }
 .agent-usage-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-3);
   padding: var(--openbot-space-4) var(--openbot-space-6);
   border-bottom: 1px solid var(--openbot-border);
 }
-.agent-usage-identity,
-.agent-usage-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  min-width: 0;
-}
-.agent-usage-identity {
-  flex-wrap: wrap;
-}
-/* What lines up with the header's inset is the arrow, not the 32px hit area around it, so
-   the button hangs its padding back into the header rather than pushing the glyph right. */
-.agent-usage-identity .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-/* The back arrow points to the start of the reading direction. */
-.agent-usage-identity > .ui-icon-button > svg:dir(rtl) {
-  transform: scaleX(-1);
-}
-.agent-usage-identity h2 {
-  display: flex;
-  gap: var(--openbot-space-3);
-  font-size: var(--openbot-text-lg);
-  color: var(--openbot-text-muted);
-}
-.agent-usage-identity h2 span:last-child {
-  color: var(--openbot-text-primary);
-  overflow-wrap: anywhere;
-}
-
 /* The three filters and the refresh button need more width than the header can always
    give, so the row wraps from the right rather than clipping its last controls. */
 .agent-usage-controls {
-  margin-inline-start: auto;
+  display: flex;
+  min-width: 0;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--openbot-space-3);
+  margin-inline-start: auto;
 }
 .agent-usage-body {
   width: 100%;
@@ -124,33 +92,6 @@
   .agent-usage-body {
     padding: var(--openbot-space-8) calc(var(--openbot-space-6) * 2);
     gap: calc(var(--openbot-space-6) * 2);
-  }
-}
-/* The drop order is the reading order reversed: message counts go before token
-   categories, and the processed total is the one entry that always stays. */
-@container (max-width: 1000px) {
-  .agent-usage-totals > div:nth-child(n + 7) {
-    display: none;
-  }
-}
-@container (max-width: 820px) {
-  .agent-usage-totals > div:nth-child(n + 6) {
-    display: none;
-  }
-}
-@container (max-width: 660px) {
-  .agent-usage-totals > div:nth-child(n + 5) {
-    display: none;
-  }
-}
-@container (max-width: 540px) {
-  .agent-usage-totals > div:nth-child(n + 4) {
-    display: none;
-  }
-}
-@container (max-width: 400px) {
-  .agent-usage-totals > div:nth-child(n + 3) {
-    display: none;
   }
 }
 @container (max-width: 480px) {

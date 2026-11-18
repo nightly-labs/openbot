@@ -1,0 +1,33 @@
+{
+  "slug": "pylon",
+  "name": "Pylon",
+  "tagline": "Customer support issues",
+  "description": "Pylon lets agents look up and update support issues, accounts, and contacts in the signed-in user's Pylon workspace. A Pylon admin must turn on MCP access for the workspace first.",
+  "category": "productivity",
+  "creatorName": "Pylon",
+  "iconUrl": "https://avatars.githubusercontent.com/u/117772394?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-waiting", "text": "Which high-priority issues are still waiting on our reply?" },
+    { "id": "prompt-account-issues", "text": "Summarize the open issues for the Acme account." },
+    { "id": "prompt-draft-reply", "text": "Draft a reply to the newest issue about login errors." }
+  ],
+  "apps": [
+    {
+      "id": "app-pylon-mcp",
+      "name": "Pylon",
+      "description": "Support issues, accounts, and contacts, over Pylon's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/117772394?s=256&v=4",
+      "server": {
+        "name": "pylon",
+        "transport": "http",
+        "url": "https://mcp.usepylon.com",
+        "auth": [{ "id": "pylon-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.usepylon.com",
+  "privacyPolicyUrl": "https://www.usepylon.com/legal/privacy",
+  "termsUrl": "https://www.usepylon.com/legal/terms",
+  "skills": []
+}

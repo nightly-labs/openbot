@@ -14,6 +14,7 @@ export const APP_LANGUAGES = [
   "de",
   "es",
   "fr",
+  "he",
   "it",
   "ja",
   "ko",

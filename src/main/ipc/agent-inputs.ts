@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_PAGE_LIMIT } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
@@ -52,7 +53,10 @@ import {
   type PasteMessageLinkInput,
   type PreviewSharedFileInput,
   type PreviewWorkspaceFileInput,
+  type ReadAgentTaskAroundInput,
+  type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
+  type ReadPendingApprovalInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
@@ -61,9 +65,11 @@ import {
   type RewriteMessageInput,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineCalendarInput,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutineRunPlace,
   type RunQueuedMessageAsTaskInput,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
@@ -71,6 +77,7 @@ import {
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
   type SetChannelImageInput,
+  type SetMessagePinnedInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -83,8 +90,10 @@ import {
   type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
+  type WithdrawFeedbackInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { AGENT_ACTIVE_QUEUES_LIMIT } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { PayloadDecoder } from "../trusted-ipc";
@@ -116,12 +125,23 @@ export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
 }
 
+/** The agents of one `listActiveQueues` read. */
+export function parseAgentIdList(value: unknown): string[] {
+  return parseIdentifierList(value, "agent IDs", AGENT_ACTIVE_QUEUES_LIMIT);
+}
+
 export function parseChannelId(value: unknown): string {
   return requireString(value, "channelId", INPUT_LIMITS.identifier);
 }
 
 export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
+}
+
+/** HTML that the renderer holds. Main bounds it again by bytes when it keeps the page. */
+export function parsePreviewPageHtml(value: unknown): string {
+  if (typeof value !== "string" || value.length > CHAT_VISUAL_PAGE_LIMIT) throw new Error("Invalid preview page.");
+  return value;
 }
 
 export function parseFilePreviewPageUrl(value: unknown): string {
@@ -251,6 +271,10 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
     if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
     result.reasoningEffort = value.reasoningEffort;
   }
+  if (value.providerAccountId !== undefined) {
+    if (!isProviderAccountId(value.providerAccountId)) throw new Error("Invalid provider account.");
+    result.providerAccountId = value.providerAccountId;
+  }
   return result;
 }
 
@@ -291,6 +315,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
+    ...optionalRunPlace(value.runIn),
   };
 }
 
@@ -309,7 +334,12 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
+  Object.assign(
+    parsed,
+    optionalLimitPolicy(value.limitPolicy),
+    optionalMissedPolicy(value.missedPolicy),
+    optionalRunPlace(value.runIn),
+  );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -324,6 +354,12 @@ function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPol
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
   return { missedPolicy: value };
+}
+
+function optionalRunPlace(value: unknown): { runIn?: RoutineRunPlace } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_RUN_PLACES, value)) throw new Error("Invalid routine run place.");
+  return { runIn: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -628,6 +664,27 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    beforeMessageId: requireString(value.beforeMessageId, "beforeMessageId", INPUT_LIMITS.identifier),
+    // 0 asks only whether the thread has older messages.
+    limit: value.limit === 0 ? 0 : parsePageLimit(value.limit),
+  };
+}
+
+export function parseReadAgentTaskAround(value: unknown): ReadAgentTaskAroundInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    limit: parsePageLimit(value.limit),
+  };
+}
+
 export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
   if (!isObject(value)) throw new Error("Invalid branch request.");
   return {
@@ -692,6 +749,24 @@ export function parseDeleteConversationMessage(value: unknown): DeleteConversati
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
     ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseWithdrawFeedback(value: unknown): WithdrawFeedbackInput {
+  if (!isObject(value)) throw new Error("Invalid feedback withdraw request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseSetMessagePinned(value: unknown): SetMessagePinnedInput {
+  if (!isObject(value) || typeof value.pinned !== "boolean") throw new Error("Invalid pinned.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    pinned: value.pinned,
   };
 }
 
@@ -766,6 +841,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.fastMode)) throw new Error("Invalid fast mode value.");
     result.fastMode = value.fastMode;
   }
+  if (value.ultrafast !== undefined) {
+    if (!isBoolean(value.ultrafast)) throw new Error("Invalid fast mode value.");
+    result.ultrafast = value.ultrafast;
+  }
   if (value.providerAccountId !== undefined) {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
       throw new Error("Invalid provider account.");
@@ -810,6 +889,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.avatarColor !== undefined) {
     if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
     result.avatarColor = value.avatarColor;
+  }
+  if (value.chatColor !== undefined) {
+    if (value.chatColor !== null && !isAvatarColor(value.chatColor)) throw new Error("Invalid chat color.");
+    result.chatColor = value.chatColor;
   }
   return result;
 }
@@ -939,7 +1022,11 @@ export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
 
 export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
   if (!isObject(value)) throw new Error("Invalid workspace file request.");
-  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+  return {
+    ...parseOpenWorkspaceFile(value),
+    ...optionalPreviewByteLimit(value.maxBytes),
+    ...(value.exactPath === true ? { exactPath: true } : {}),
+  };
 }
 
 function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
@@ -1006,6 +1093,7 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 
@@ -1060,6 +1148,22 @@ export function parsePromptResponse(value: unknown): RespondToPromptInput {
     answers[key] = answer;
   }
   return { requestId: value.requestId, answers };
+}
+
+export function parseReadPendingApprovalInput(value: unknown): ReadPendingApprovalInput {
+  if (
+    !isObject(value) ||
+    !isString(value.agentId) ||
+    value.agentId.length === 0 ||
+    value.agentId.length > INPUT_LIMITS.identifier ||
+    !(
+      (isString(value.requestId) && value.requestId.length > 0 && value.requestId.length <= INPUT_LIMITS.identifier) ||
+      (isNumber(value.requestId) && Number.isFinite(value.requestId))
+    )
+  ) {
+    throw new Error("Invalid pending approval request.");
+  }
+  return { agentId: value.agentId, requestId: value.requestId };
 }
 
 export function parseApprovalResponse(value: unknown): RespondToApprovalInput {

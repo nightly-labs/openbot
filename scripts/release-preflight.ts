@@ -5,6 +5,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { roleIdProblems } from "./discord-announcement";
 import { ANNOUNCEMENT_FILE, announcementProblems, ROLE_VARIABLE } from "./discord-release-announcement";
 import { releaseNotesProblems } from "./release-notes";
+import { whatsNewTranslationProblems } from "./whats-new-translations";
 
 const logger = createOpenBotLogger("release-preflight");
 
@@ -18,6 +19,7 @@ const failures: string[] = [];
 if (!/^\d+\.\d+\.\d+$/.test(packageJson.version)) failures.push("package version is not semver");
 failures.push(...releaseNotesProblems(changelog, packageJson.version));
 failures.push(...announcementProblems(await readFile(ANNOUNCEMENT_FILE, "utf8"), packageJson.version));
+failures.push(...whatsNewTranslationProblems(packageJson.version));
 if (run("git", ["status", "--porcelain"])) failures.push("working tree is not clean");
 if (run("git", ["rev-list", "--left-right", "--count", "origin/main...HEAD"]) !== "0\t0") {
   failures.push("main is not synchronized with origin/main");

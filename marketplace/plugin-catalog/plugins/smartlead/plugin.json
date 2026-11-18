@@ -1,0 +1,36 @@
+{
+  "slug": "smartlead",
+  "name": "Smartlead",
+  "tagline": "Cold email campaigns",
+  "description": "Smartlead lets agents read and manage email campaigns, leads, and sending accounts, and check campaign statistics and deliverability, in the Smartlead account of the signed-in user.",
+  "category": "automation",
+  "creatorName": "Smartlead",
+  "iconUrl": "https://cdn.prod.website-files.com/6204a703ff61516512c04f55/6a6af43a690fcb45072c8410_512.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-reply-rates", "text": "Which campaigns had the highest reply rate last week?" },
+    { "id": "prompt-warmup", "text": "Which of my email accounts have warmup problems?" },
+    {
+      "id": "prompt-draft-sequence",
+      "text": "Draft a three-step follow-up sequence for a new campaign, but do not start it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-smartlead-mcp",
+      "name": "Smartlead",
+      "description": "Campaigns, leads, and deliverability, over Smartlead's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6204a703ff61516512c04f55/6a6af43a690fcb45072c8410_512.png",
+      "server": {
+        "name": "smartlead",
+        "transport": "http",
+        "url": "https://mcp.smartlead.ai/mcp",
+        "auth": [{ "id": "smartlead-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.smartlead.ai",
+  "privacyPolicyUrl": "https://www.smartlead.ai/privacy-policy",
+  "termsUrl": "https://www.smartlead.ai/new-terms-and-conditions"
+}

@@ -1,12 +1,11 @@
-import { type ChatWindowTarget, canAdministerServer } from "@openbot/contracts/ipc";
+import type { ChatWindowTarget } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
-import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
-import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
-import { computeSidebarAgentStates, sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
@@ -20,8 +19,7 @@ import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { useAgentActions } from "../agents/agent-actions";
-import { attentionByAgent } from "../agents/agent-runtime-snapshot";
-import { agentThreadAttention } from "../agents/agent-thread-attention";
+import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
@@ -36,10 +34,10 @@ import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
 import { createCommunityCardVisibility } from "./community-card";
-import { createMachineCard } from "./machine-card";
+import { DevWorktreeLabel } from "./DevWorktreeLabel";
+import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
 import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
-import { createStorageCard } from "./storage-card";
 
 /** Dismissing the mobile app card is a choice of this computer, like the sidebar width. The key is
  * new with the Android release, so a computer that dismissed the iPhone-only card sees it once more. */
@@ -87,20 +85,35 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
-    userHiddenAgentIds,
+    userPausedAgentIds,
+    userHiddenAgentsWork,
+    mutedAgentIds,
   } = useAgents();
-  const { editAgent, duplicateAgent, duplicateSection, duplicatingSectionIds, deleteAgent, setAgentHiddenByUser } =
-    useAgentActions();
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  const {
+    editAgent,
+    duplicateAgent,
+    duplicateSection,
+    duplicatingSectionIds,
+    deleteAgent,
+    setAgentHiddenByUser,
+    setAgentMuted,
+  } = useAgentActions();
+  // A server that keeps no levels has no mute item: the item must not fail.
+  const muteSupported = () => activeServerSupportsCapability(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
+  // The host refuses a member: an agent is hidden for every member.
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
-  const { activeTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } = useTurns();
-  const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
+  const { pendingPrompts, approvals } = useTurns();
+  const { agentUnreadReplies, markAgentChatRead, markAgentChatUnread, markAllAgentMessagesRead } = useConversation();
   const { directPeople, teamPresence } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
+  // The agent menu offers Mark read for these. The count also holds the side threads, as the badge does.
+  const unreadAgentIds = createMemo(
+    () => new Set(agentList().flatMap((agent) => ((agentUnreadReplies()[agent.id] ?? 0) > 0 ? [agent.id] : []))),
+  );
   /**
    * Opens the agent's chat with a new thread. A host without threads has no such item, and neither has a
    * chat window: another agent opens in a window of its own, which does not get the new thread.
@@ -142,42 +155,12 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     window.localStorage.getItem(MOBILE_APP_DISMISSED_STORAGE_KEY) === "true",
   );
   const communityCard = createCommunityCardVisibility();
-  const storageCard = createStorageCard(activeServer);
-  const machineCard = createMachineCard(activeServer);
+  const alertCards = createSidebarAlertCards(activeServer);
   // A clear in Server settings frees space and can change an alert level, so both cards read
   // again when settings close.
   createEffect(serverSettingsOpen, (open, wasOpen) => {
-    if (!open && wasOpen) {
-      storageCard.refresh();
-      machineCard.refresh();
-    }
+    if (!open && wasOpen) alertCards.refresh();
   });
-  // One warning card at a time. A disk machine card covers the disk, so it replaces the storage
-  // card. A memory or CPU card gives way to a full disk, unless it is critical itself.
-  const footerCard = createMemo(() => {
-    const machine = machineCard.card();
-    const storage = storageCard.card();
-    if (machine && (machine.metric === "disk" || !storage || (machine.critical && storage.level !== "full")))
-      return { kind: "machine" as const, card: machine };
-    return storage ? { kind: "storage" as const, card: storage } : null;
-  });
-  const shownMachineCard = () => {
-    const shown = footerCard();
-    return shown?.kind === "machine" ? shown.card : null;
-  };
-  const shownStorageCard = () => {
-    const shown = footerCard();
-    return shown?.kind === "storage" ? shown.card : null;
-  };
-  // As the host picks it: the responsible member while an active admin, otherwise the owner.
-  const machineRecipient = (memberId: string | null) => {
-    const members = teamPresence().members;
-    const member =
-      members.find(
-        (candidate) => candidate.id === memberId && !candidate.disabled && canAdministerServer(candidate.role),
-      ) ?? members.find((candidate) => candidate.role === "owner");
-    return member ? member.name?.trim() || member.username : null;
-  };
 
   /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
    * sections beside the agents, so the sidebar has to be able to order and group them. The Routines
@@ -203,31 +186,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     },
   );
 
-  /* The turn events of a side thread reach only its thread list, so an agent that works in a side
-   * thread is found there. */
-  const workingTurns = createMemo(() => {
-    const turns = { ...activeTurns() };
-    for (const agent of agentList()) {
-      const running = agentTasks.snapshot(agent.id)?.tasks.find((task) => task.state === "running");
-      if (running && !turns[agent.id]) turns[agent.id] = running.activeTurnId ?? running.id;
-    }
-    return turns;
-  });
-
-  /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
-   * thread stays out of "Needs you", because selecting the row cannot answer it. */
-  const sidebarAgentStates = createMemo(() =>
-    computeSidebarAgentStates({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      unreadReplies: unreadReplies(),
-      recentReplies: recentReplies(),
-      ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
-      failedTurns: failedTurns(),
-      usageLimits: usageLimits(),
-    }),
-  );
+  const { agentStates: sidebarAgentStates, agentMoods } = createAgentActivity();
 
   /* A wait in a channel thread goes to the channel instead. Selecting the channel opens the view
    * that answers it. */
@@ -240,20 +199,6 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       approvals: approvals(),
     });
   });
-
-  /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
-   * shared, and a routine mark only replaces the badge for that same agent. */
-  const agentMoods = createMemo(() =>
-    computeAgentAvatarMoods({
-      agentIds: agentList().map((agent) => agent.id),
-      activeTurns: workingTurns(),
-      queues: queues(),
-      failedTurns: failedTurns(),
-      pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
-      pendingApprovals: pendingApprovals(),
-      recentReplies: recentReplies(),
-    }),
-  );
 
   return (
     <>
@@ -273,8 +218,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           void channels.markAllRead();
         }}
         hasUnread={
-          agentList().some((agent) => !userHiddenAgentIds().has(agent.id) && (unreadReplies()[agent.id] ?? 0) > 0) ||
-          channels.hasUnread()
+          agentList().some(
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+          ) || channels.hasUnread()
         }
         view={layout.sidebarView()}
         serverName={activeServer()?.name ?? t("sidebar.topbar.localServer")}
@@ -294,6 +240,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           const badge = server ? serverUpdateBadge(server.id) : null;
           return server && badge ? { ...badge, onOpen: () => void showServerUpdate(server.id) } : undefined;
         })()}
+        topbarDetail={<DevWorktreeLabel />}
         serverMenu={
           platform.appInfo()
             ? {
@@ -303,6 +250,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
                 onSelect: serverActions.select,
                 onAdd: serverActions.add,
                 onCreateLocal: serverActions.addMenuCreateLocal(),
+                onInstallServer: serverActions.addMenuInstallServer(),
                 addCreatesServer: serverActions.addCreatesServer(),
                 hiddenLocal: serverActions.hiddenLocal(),
                 ...serverActions.callbacks,
@@ -321,6 +269,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         agentMoods={agentMoods()}
         layout={sidebarLayout()}
         layoutMutable={activeServerSupportsCapability("sidebar-layout")}
+        chatOrder={layout.sidebarChatOrder()}
+        onChatOrderChange={layout.setSidebarChatOrder}
         foldersSupported={activeServerSupportsCapability("sidebar-folders-v1")}
         collapsedSectionIds={collapsedSidebarSectionIds()}
         onMutateLayout={mutateSidebarLayout}
@@ -349,6 +299,16 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        userHiddenAgentsWork={userHiddenAgentsWork()}
+        unreadAgentIds={unreadAgentIds()}
+        onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
+        onMarkAgentUnread={
+          activeServerSupportsCapability(CONVERSATION_UNREAD_FROM_CAPABILITY)
+            ? (agentId) => void markAgentChatUnread(agentId)
+            : undefined
+        }
+        mutedAgentIds={muteSupported() ? mutedAgentIds() : undefined}
+        onSetAgentMuted={muteSupported() ? (agentId, muted) => void setAgentMuted(agentId, muted) : undefined}
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
@@ -360,39 +320,19 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         windowAgentIds={windowAgentIds()}
         compact={layout.leftPanelCompact()}
         onExpand={layout.expandSidebar}
+        onCollapse={() => layout.setSidebarClosed(true)}
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>
             {/* One card at a time. A machine over its alert level comes first, then a disk that is
              * almost full; the community card waits until the mobile app card is dismissed. */}
-            <Show when={shownMachineCard()}>
-              {(card) => (
-                <SidebarMachineCard
-                  serverName={activeServer()?.name ?? ""}
-                  metric={card().metric}
-                  percent={card().percent}
-                  level={card().level}
-                  freeBytes={card().freeBytes}
-                  critical={card().critical}
-                  recipientName={machineRecipient(card().responsibleMemberId)}
-                  onOpenDetails={() => openServerSettings(card().serverId, null, "storage")}
-                  onDismiss={() => machineCard.dismiss(card().serverId, card())}
-                />
-              )}
-            </Show>
-            <Show when={shownStorageCard()}>
-              {(card) => (
-                <SidebarStorageCard
-                  level={card().level}
-                  serverName={activeServer()?.name ?? ""}
-                  freeBytes={card().freeBytes}
-                  totalBytes={card().totalBytes}
-                  onFreeUpSpace={() => openServerSettings(card().serverId, null, "storage")}
-                  onDismiss={() => storageCard.dismiss(card().serverId)}
-                />
-              )}
-            </Show>
-            <Show when={!platform.landingPreview && !footerCard() && !mobileAppDismissed()}>
+            <SidebarAlertCards
+              cards={alertCards}
+              serverName={activeServer()?.name ?? ""}
+              members={teamPresence().members}
+              onOpenStorage={(serverId) => openServerSettings(serverId, null, "storage")}
+            />
+            <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
                 onOpenInstall={() => openAppSettings(null, "mobile-connect")}
                 onDismiss={() => {
@@ -402,7 +342,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               />
             </Show>
             <Show
-              when={!platform.landingPreview && !footerCard() && mobileAppDismissed() && !communityCard.dismissed()}
+              when={
+                !platform.landingPreview && !alertCards.shown() && mobileAppDismissed() && !communityCard.dismissed()
+              }
             >
               <SidebarCommunityCard
                 onJoinDiscord={() => void appPort().openExternal("discord")}
@@ -432,7 +374,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       />
       {/* A compact sidebar hides the footer card, so the offer is outside the footer. */}
       <ServerUpgradeOffer
-        card={storageCard.card()}
+        billing={appPort().billing}
+        card={alertCards.storageCard.card()}
         server={activeServer()}
         blocked={serverSettingsOpen()}
         onFreeUpSpace={(serverId) => openServerSettings(serverId, null, "storage")}

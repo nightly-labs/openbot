@@ -6,11 +6,12 @@ import type {
   BrowserTab,
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
-import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
+import { readSidePanelWidth } from "../../components/side-panel-width";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -19,7 +20,10 @@ import {
   EMPTY_DRAFT,
   QUEUE_EDIT_STORAGE_KEY,
   readStoredQueueEdit,
+  readStoredThreadQueueEdit,
   type StoredQueueEdit,
+  type StoredThreadQueueEdit,
+  THREAD_QUEUE_EDIT_STORAGE_KEY,
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
@@ -38,9 +42,9 @@ import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
+import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
-const BROWSER_PANEL_DEFAULT = 380;
 const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
 
 function readBrowserPipBounds(): BrowserBounds | null {
@@ -49,6 +53,25 @@ function readBrowserPipBounds(): BrowserBounds | null {
     .map((value) => Number.parseFloat(value));
   const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = values;
   return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
+}
+
+/** A request for a corrected feedback report that Fix on a thank-you card put in a composer. */
+export interface FeedbackFix {
+  number: number;
+  /** The draft text before the request. */
+  before: string;
+  /** The request line that Fix added to the draft. */
+  request: string;
+}
+
+/**
+ * The draft after Cancel: the request and the words after it go. The draft before the request comes
+ * back. When the user changed that part, only the request and what follows it go.
+ */
+function draftWithoutFix(text: string, fix: FeedbackFix): string {
+  if (text.startsWith(fix.before)) return fix.before;
+  const start = text.indexOf(fix.request);
+  return start === -1 ? text : text.slice(0, start).trimEnd();
 }
 
 interface ConversationResources {
@@ -135,8 +158,16 @@ export function createStableConversationState(
   });
   /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
   const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
-  /** The message box of each side thread, keyed by `threadDraftKey`. */
-  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.threads ?? {});
+  const restoredThreadEdit = persistDrafts ? readStoredThreadQueueEdit() : null;
+  /** The message box of each side thread, keyed by `threadDraftKey`. A restored queue edit wins, as above. */
+  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>({
+    ...storedDrafts?.threads,
+    ...(restoredThreadEdit ? { [restoredThreadEdit.draftKey]: restoredThreadEdit.draft } : {}),
+  });
+  /** The queue edit in the message box of a side thread. Its draft is the thread's draft. */
+  const [threadQueueEdit, setThreadQueueEdit] = createSignal<Omit<StoredThreadQueueEdit, "draft"> | null>(
+    restoredThreadEdit,
+  );
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
   const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
@@ -149,14 +180,34 @@ export function createStableConversationState(
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
+  // The corrected-report requests from thank-you cards, by draft key. Only in memory: after a restart,
+  // the text stays in the draft without its notice.
+  const [feedbackFixes, setFeedbackFixes] = createSignal<Record<string, FeedbackFix>>({});
+  // A fix ends when its draft is empty: the user sent the request, or deleted it.
+  createEffect(
+    () => {
+      const current = drafts();
+      return Object.keys(feedbackFixes()).filter((key) => !current[key]?.text.trim());
+    },
+    (ended) => {
+      if (ended.length === 0) return;
+      setFeedbackFixes((current) =>
+        Object.fromEntries(Object.entries(current).filter(([key]) => !ended.includes(key))),
+      );
+    },
+  );
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
   // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
-  /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
+  /**
+   * The provider and model of the run behind each conversation error, the page that fixes the
+   * account (#2419), and the provider's text behind a general sentence (#6410), keyed like
+   * `conversationErrors`.
+   */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string }>
+    Record<string, { message: string; run: string | null; link?: string; details?: string }>
   >({});
   createEffect(
     () => {
@@ -213,6 +264,35 @@ export function createStableConversationState(
       };
     },
   );
+  // The thread edit is stored with its draft, so a restart can save or cancel the edit that the host holds.
+  createEffect(
+    () => {
+      const edit = threadQueueEdit();
+      return edit ? { ...edit, draft: threadDrafts()[edit.draftKey] ?? EMPTY_DRAFT } : null;
+    },
+    (edit) => {
+      if (!edit || !persistDrafts) return;
+      const persist = () => {
+        // A newer edit, or the end of this one, owns the record. Read fresh state: a pending Save set
+        // after this effect ran must not be overwritten by the previous snapshot without it.
+        const current = threadQueueEdit();
+        if (current?.editId !== edit.editId) return;
+        try {
+          window.localStorage.setItem(
+            THREAD_QUEUE_EDIT_STORAGE_KEY,
+            JSON.stringify({ ...current, draft: threadDrafts()[current.draftKey] ?? EMPTY_DRAFT }),
+          );
+        } catch {
+          actionToast.error(currentText().t("composer.error.saveEditLocally"));
+        }
+      };
+      const timer = setTimeout(persist, 300);
+      return () => {
+        clearTimeout(timer);
+        persist();
+      };
+    },
+  );
   if (storedDrafts && persistDrafts)
     writeComposerDraftsOnChange({
       drafts,
@@ -221,6 +301,7 @@ export function createStableConversationState(
       editingAgentId,
       editingServerId,
       editingDraftBackup,
+      threadQueueEdit,
       unsentTexts: pendingSends.unsentTexts,
     });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
@@ -238,8 +319,8 @@ export function createStableConversationState(
   /** The conversation whose last recording stopped at the time limit. */
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
   const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(readBrowserPipBounds());
-  const [settingsPanelWidth, setSettingsPanelWidth] = createSignal(SETTINGS_PANEL_DEFAULT);
-  const [browserPanelWidth, setBrowserPanelWidth] = createSignal(BROWSER_PANEL_DEFAULT);
+  /** The width of the docked side panel. All its panes share it, so a change to another tab does not resize it. */
+  const [sidePanelWidth, setSidePanelWidth] = createSignal(readSidePanelWidth());
   const resources: ConversationResources = {
     agentActivityLabels: new Map(),
     turnRuntimes: new Map(),
@@ -314,6 +395,34 @@ export function createStableConversationState(
       setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
       setComposerFocusRequest((value) => value + 1);
     },
+    /**
+     * Puts the request for a corrected feedback report in the composer, and keeps what the composer had,
+     * so the composer notice can take the request out again.
+     */
+    startFeedbackFix(target: { serverId: string; agentId: string }, number: number, prompt: string) {
+      const key = composerDraftKey(target);
+      const draft = drafts()[key] ?? EMPTY_DRAFT;
+      const next = appendDraftText(draft, prompt);
+      setDrafts((current) => ({ ...current, [key]: next }));
+      setFeedbackFixes((current) => ({
+        ...current,
+        [key]: { number, before: draft.text, request: prompt.trim() },
+      }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Cancel on the notice: the request leaves the composer, so the report stays as it is. */
+    cancelFeedbackFix(target: { serverId: string; agentId: string }) {
+      const key = composerDraftKey(target);
+      const fix = feedbackFixes()[key];
+      if (!fix) return;
+      setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        return { ...current, [key]: { ...draft, text: draftWithoutFix(draft.text, fix) } };
+      });
+      setFeedbackFixes(({ [key]: _cancelled, ...rest }) => rest);
+      setComposerFocusRequest((value) => value + 1);
+    },
+    feedbackFixes,
     /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
     appendChannelText(target: { serverId: string; channelId: string }, text: string) {
       const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
@@ -327,6 +436,8 @@ export function createStableConversationState(
     setChannelDrafts,
     threadDrafts,
     setThreadDrafts,
+    threadQueueEdit,
+    setThreadQueueEdit,
     editingAgentId,
     setEditingAgentId,
     editingServerId,
@@ -370,10 +481,8 @@ export function createStableConversationState(
     setVoiceLimitReached,
     browserPipBounds,
     setBrowserPipBounds,
-    settingsPanelWidth,
-    setSettingsPanelWidth,
-    browserPanelWidth,
-    setBrowserPanelWidth,
+    sidePanelWidth,
+    setSidePanelWidth,
     resources,
   };
 }
@@ -409,7 +518,14 @@ export function createServerConversationState() {
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
+  // A chat window asked the main window to show the page of a browser takeover. The agent's view opens it.
+  const [browserTakeoverPageRequest, setBrowserTakeoverPageRequest] = createSignal<{
+    agentId: string;
+    tabId: string;
+  } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
+  // True when the user left the side panel open. Another agent or channel opens with the panel in the same state.
+  const [sidePanelShown, setSidePanelShown] = createSignal(false);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
@@ -438,6 +554,8 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  // A voice conversation lives until End, not as long as its view.
+  const voiceSessions = createVoiceSessions();
 
   return {
     showComposerActions,
@@ -454,8 +572,12 @@ export function createServerConversationState() {
     setDropActive,
     rightPanels,
     setRightPanels,
+    browserTakeoverPageRequest,
+    setBrowserTakeoverPageRequest,
     sidePanels,
     setSidePanels,
+    sidePanelShown,
+    setSidePanelShown,
     settingsProvider,
     setSettingsProvider,
     settingsModel,
@@ -488,6 +610,7 @@ export function createServerConversationState() {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    voiceSessions,
   };
 }
 

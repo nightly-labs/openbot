@@ -1,7 +1,12 @@
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
+import type { HostAppearanceEvent, ServerAppearance } from "./team-protocol/host-appearance-v1";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
+import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
+
+export type { HostAppearanceEvent, ServerAppearance, ServerAppearanceShape } from "./team-protocol/host-appearance-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
@@ -85,12 +90,27 @@ export interface ServerSummary {
   apiUrl: string | null;
   remoteDesktopAvailable: boolean;
   logoUrl: string | null;
+  /**
+   * The shape and colour that the server shows with no logo (`host-appearance-v1`). Null for the
+   * automatic look. Absent when nothing said it: an older host or account server.
+   */
+  appearance?: ServerAppearance | null;
   role: TeamRole | null;
   active: boolean;
   /** The active members that the host allows. Absent when the account server did not give one. */
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /**
+   * False for a hosted server that the account service cannot restart: an operator runs its machine. Absent
+   * for each other server, and when the account server did not say.
+   */
+  restartAvailable?: boolean;
+  /**
+   * The storage, in GB, that the plan of a hosted server gives for the files of its users. The base image of
+   * the server is not in it. Absent for a server that is not hosted, or when the account server did not say.
+   */
+  storageGb?: number;
   /**
    * When the host last changed its key, in milliseconds since the epoch. Only a change that both the
    * previous and the new key signed. Absent when the server list has no such change.
@@ -104,6 +124,11 @@ export interface ServerSummary {
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
+  /**
+   * A new connection whose capability read has not ended. The workspace load waits for it, so that one
+   * load reads all the data the host can give. Absent at all other times. Local IPC metadata.
+   */
+  capabilitiesPending?: true;
   /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
   hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
   /**
@@ -165,6 +190,8 @@ export interface HostStatus {
   serverName: string | null;
   apiUrl: string | null;
   logoUrl: string | null;
+  /** The shape and colour that this server shows with no logo. Null for the automatic look. */
+  appearance: ServerAppearance | null;
   apiOnline: boolean;
   remoteDesktopReady: boolean;
   // True once this host has refused a member because the operating system will not let OpenBot record
@@ -184,6 +211,8 @@ export interface ConfigureHostInput {
 export interface UpdateHostIdentityInput {
   serverName?: string;
   logo?: AvatarImageInput | null;
+  /** Null gives the server its automatic look again. On a joined server it needs `host-appearance-v1`. */
+  appearance?: ServerAppearance | null;
 }
 
 export interface TeamMemberSummary {
@@ -192,6 +221,8 @@ export interface TeamMemberSummary {
   email: string | null;
   name: string | null;
   avatarUrl?: string | null;
+  /** The chat colour from the member's OpenBot account. Absent means no chat colour. Peers read it through `chat-colors-v1`. */
+  chatColor?: AvatarColor;
   role: TeamRole;
   createdAt: string;
   disabled: boolean;
@@ -315,6 +346,8 @@ export type TeamRealtimeEvent =
       typing: boolean;
     }
   | HostRestartEvent
+  | HostAppearanceEvent
+  | LiveVoiceEvent
   | MachineAlertEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;
@@ -366,6 +399,7 @@ function isTeamPresenceMember(value: unknown): value is TeamPresenceMember {
     (value.email === null || isLimitedString(value.email, INPUT_LIMITS.email)) &&
     (value.name === null || isLimitedString(value.name, INPUT_LIMITS.accountName)) &&
     (value.avatarUrl === undefined || value.avatarUrl === null || isHttpUrl(value.avatarUrl, INPUT_LIMITS.avatarUrl)) &&
+    (value.chatColor === undefined || isAvatarColor(value.chatColor)) &&
     (value.role === "owner" || value.role === "admin" || value.role === "member") &&
     isTimestamp(value.createdAt) &&
     isBoolean(value.disabled) &&
@@ -506,6 +540,31 @@ export const REMOTE_DESKTOP_ERROR_CODES = [
 
 export type RemoteDesktopErrorCode = (typeof REMOTE_DESKTOP_ERROR_CODES)[number];
 
+/**
+ * Who may control this computer through remote desktop. `members` is every member, as before the
+ * setting existed; `admins` is the owner and the admins; `owner` is only the owner.
+ */
+export const REMOTE_CONTROL_ACCESS_LEVELS = ["owner", "admins", "members"] as const;
+export type RemoteControlAccess = (typeof REMOTE_CONTROL_ACCESS_LEVELS)[number];
+
+/** The host owner's remote control choices, as they are stored and as they cross IPC. */
+export interface RemoteControlPolicy {
+  access: RemoteControlAccess;
+  /** Ask the person at this computer to allow each remote control session before it starts. */
+  askOnHost: boolean;
+}
+
+export const DEFAULT_REMOTE_CONTROL_POLICY: RemoteControlPolicy = { access: "members", askOnHost: false };
+
+export function isRemoteControlAccess(value: unknown): value is RemoteControlAccess {
+  return isOneOf(REMOTE_CONTROL_ACCESS_LEVELS, value);
+}
+
+export function remoteControlAllowsRole(access: RemoteControlAccess, role: TeamRole): boolean {
+  if (access === "members") return true;
+  return access === "admins" ? canAdministerServer(role) : role === "owner";
+}
+
 export interface RemoteDesktopSession {
   id: string;
   serverId: string;
@@ -544,4 +603,4 @@ export interface RemoteDesktopSelectDisplayInput {
 }
 
 import { INPUT_LIMITS } from "./input-limits";
-import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";

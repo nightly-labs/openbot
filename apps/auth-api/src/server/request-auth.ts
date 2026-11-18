@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -16,6 +17,13 @@ import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
 import { createContactMessageDelivery, createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import {
+  COUNT_FEEDBACK,
+  DELETE_EARLIER_FEEDBACK_DAYS,
+  FEEDBACK_DAILY_LIMIT,
+  UNCOUNT_FEEDBACK,
+} from "./feedback-daily-counts";
+import { feedbackOwner } from "./feedback-owner";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
@@ -200,10 +208,116 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
+/**
+ * A few similar-issue searches for each account and minute. All accounts share the search quota of
+ * the one app installation, so one account must not use it all.
+ */
+export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackSearchRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `search:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many searches. Try again later.");
+  }
+});
+
+/** The marks that prove which reports one account sent. See `feedbackOwner`. */
+export function requestFeedbackOwner(userId: string) {
+  const privateKey = requireWorkerBindings(env).GITHUB_APP_PRIVATE_KEY?.trim();
+  if (!privateKey)
+    return Effect.fail(
+      new GitHubInstallationTokensError(503, "github_app_unavailable", "The OpenBot GitHub App is not configured."),
+    );
+  return feedbackOwner(privateKey, userId);
+}
+
+/** The private repository for withdrawn feedback issues, or null when this Worker has none. */
+export function requestFeedbackWithdrawnRepository(): string | null {
+  const repository = requireWorkerBindings(env).FEEDBACK_WITHDRAWN_REPOSITORY?.trim();
+  if (!repository || !/^[\w.-]+\/[\w.-]+$/u.test(repository)) return null;
+  // The installation token for a move covers repositories of one owner only.
+  const owner = (name: string) => name.split("/")[0]?.toLowerCase();
+  return owner(repository) === owner(FEEDBACK_REPOSITORY) ? repository : null;
+}
+
+/** A few withdrawals for each account and minute. Each one reads GitHub with the one app installation. */
+export const enforceFeedbackWithdrawRateLimit = Effect.fn("GitHub.enforceFeedbackWithdrawRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `withdraw:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many requests. Try again later.");
+  }
+});
+
+/**
+ * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
+ * that a person reads. The daily count is the only feedback data that D1 keeps. It returns the UTC day
+ * that it counted, for `uncountFeedback`.
+ */
+export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({ try: () => limiter.limit({ key: `user:${userId}` }), catch: unavailable });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too much feedback. Try again later.");
+  }
+  const day = new Date().toISOString().slice(0, 10);
+  const [, counted] = yield* Effect.tryPromise({
+    try: () =>
+      bindings.DB.batch([
+        bindings.DB.prepare(DELETE_EARLIER_FEEDBACK_DAYS).bind(userId, day),
+        bindings.DB.prepare(COUNT_FEEDBACK).bind(userId, day, FEEDBACK_DAILY_LIMIT),
+      ]),
+    catch: unavailable,
+  });
+  if (!counted?.results.length) {
+    return yield* new GitHubInstallationTokensError(
+      429,
+      "feedback_daily_limit",
+      "Too much feedback today. Try again tomorrow.",
+    );
+  }
+  return day;
+});
+
+/**
+ * Takes back the daily count of an issue that GitHub did not open, so a failed send does not use up the
+ * limit. A failure here keeps the count: the error of the send goes to the user.
+ */
+export const uncountFeedback = Effect.fn("GitHub.uncountFeedback")(function* (userId: string, day: string) {
+  const bindings = requireWorkerBindings(env);
+  yield* Effect.tryPromise(() => bindings.DB.prepare(UNCOUNT_FEEDBACK).bind(userId, day).run()).pipe(Effect.ignore);
+});
+
+/** The seconds to the next UTC day, when the daily feedback limit starts again. */
+function secondsToNextUtcDay(now = Date.now()): number {
+  const day = 86_400_000;
+  return Math.ceil((day - (now % day)) / 1000);
+}
+
 export function githubInstallationTokensErrorResponse(error: unknown): Response {
   if (error instanceof GitHubInstallationTokensError) {
     const response = apiError(error.status, error.code, error.message);
-    if (error.status === 429) response.headers.set("Retry-After", "60");
+    if (error.status === 429)
+      response.headers.set("Retry-After", String(error.code === "feedback_daily_limit" ? secondsToNextUtcDay() : 60));
     return response;
   }
   return authErrorResponse(error);

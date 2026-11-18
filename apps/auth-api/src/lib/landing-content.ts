@@ -1,5 +1,6 @@
-// The text of the landing sections under the hero. The questions are in
-// `landing-faq.ts`.
+// The parts of the landing sections that do not change with the language: ids, agents, providers,
+// times and links. The text is in the `sitePage.landing.*` catalog keys, which
+// `landing-page-text.ts` reads.
 //
 // No JSX here, for the same reason `content-collection.ts` holds none.
 
@@ -9,80 +10,16 @@ import { RIVAL_MARK_SHAPES, type RivalMarkName } from "../components/compare/riv
 import { COMPARE_COLLECTION } from "./compare";
 
 /** Each feature has its own picture, which the section draws for this id. */
-export type LandingFeatureId = "team" | "providers" | "local" | "persist" | "browser" | "queue";
-
-/** A part of a tile's sentence: plain text, or words that link to a page under /providers. */
-type LandingCopyPart = string | { readonly text: string; readonly slug: string };
-
-export interface LandingFeature {
-  id: LandingFeatureId;
-  title: string;
-  /** Plain text, or parts when some words link to a page. A tile's picture is decorative, so the links are here. */
-  description: string | readonly LandingCopyPart[];
-}
+export type LandingFeatureId = "team" | "providers" | "local" | "multiplayer" | "workflows" | "persist";
 
 /** In reading order. The bento places each tile from its id. */
-export const LANDING_FEATURES: readonly LandingFeature[] = [
-  {
-    id: "team",
-    title: "Agents work as a team",
-    description:
-      "Each agent has its own name, instructions and workspace. Agents send each other messages, hand off tasks and share files.",
-  },
-  {
-    id: "providers",
-    title: "Use the AI plan you have",
-    description: [
-      "Run ",
-      { text: "Codex", slug: "codex" },
-      ", ",
-      { text: "Claude Code", slug: "claude-code" },
-      ", ",
-      { text: "Gemini", slug: "gemini" },
-      ", ",
-      { text: "Grok", slug: "grok" },
-      ", ",
-      { text: "OpenCode", slug: "opencode" },
-      ", ",
-      { text: "Cursor", slug: "cursor" },
-      ", ",
-      { text: "Cline", slug: "cline" },
-      ", ",
-      { text: "Muse Code", slug: "muse-code" },
-      ", ",
-      { text: "Pi", slug: "pi" },
-      " or ",
-      { text: "Mercury", slug: "inception" },
-      ". Or add ",
-      { text: "an ACP agent", slug: "custom-agents" },
-      ", an OpenAI-compatible endpoint, ",
-      { text: "Ollama or LM Studio", slug: "local-models" },
-      ".",
-    ],
-  },
-  {
-    id: "local",
-    title: "Stored on your computer",
-    description:
-      "Workspaces, conversations, files and browser data stay on the computer that runs OpenBot, not on our servers.",
-  },
-  {
-    id: "persist",
-    title: "Change the provider, keep the agent",
-    description:
-      "An agent keeps its workspace and conversation when you restart the app or move it to a different provider. When a plan reaches its limit, it can move to a backup model.",
-  },
-  {
-    id: "browser",
-    title: "A built-in browser",
-    description: "Agents open, read and control pages in a browser that is built into OpenBot.",
-  },
-  {
-    id: "queue",
-    title: "Queue the next task",
-    description:
-      "Send more work while an agent is busy. Messages wait in a queue that you can pause, resume or cancel.",
-  },
+export const LANDING_FEATURE_IDS: readonly LandingFeatureId[] = [
+  "team",
+  "providers",
+  "local",
+  "workflows",
+  "multiplayer",
+  "persist",
 ];
 
 export interface LandingTeammate {
@@ -91,35 +28,110 @@ export interface LandingTeammate {
   avatarHue: AvatarHue;
 }
 
-const ADA: LandingTeammate = { name: "Ada", avatarSeed: "landing-ada", avatarHue: 245 };
-const LINUS: LandingTeammate = { name: "Linus", avatarSeed: "landing-linus", avatarHue: 150 };
+/** Also the agent who moves to a different provider in the persist picture. */
+export const ADA: LandingTeammate = { name: "Ada", avatarSeed: "landing-ada", avatarHue: 245 };
+export const LINUS: LandingTeammate = { name: "Linus", avatarSeed: "landing-linus", avatarHue: 150 };
 const GRACE: LandingTeammate = { name: "Grace", avatarSeed: "landing-grace", avatarHue: 30 };
-
-/** The agent who moves to a different provider in the persist picture. */
-export const LANDING_PERSIST_AGENT = ADA;
+const ALAN: LandingTeammate = { name: "Alan", avatarSeed: "landing-alan", avatarHue: 185 };
 
 /** The members of the channel in the team picture. */
 export const LANDING_TEAM: readonly LandingTeammate[] = [ADA, LINUS, GRACE];
 
-export interface LandingTeamMessage {
+/** Who sends each message of the team picture, and when. The text is `picture.team.messages`. */
+export interface LandingTeamSender {
   from: LandingTeammate;
   time: string;
-  text: string;
 }
 
 /** The example conversation in the team picture: one task, handed from agent to agent. */
-export const LANDING_TEAM_MESSAGES: readonly LandingTeamMessage[] = [
-  { from: ADA, time: "9:12", text: "The sign-in test fails on Safari. Linus, can you take it?" },
-  { from: LINUS, time: "9:26", text: "Fixed in session.ts. Grace, can you review it?" },
-  { from: GRACE, time: "9:31", text: "Looks good. I merged it." },
+export const LANDING_TEAM_SENDERS: readonly LandingTeamSender[] = [
+  { from: ADA, time: "9:12" },
+  { from: LINUS, time: "9:26" },
+  { from: GRACE, time: "9:31" },
 ];
 
 /** The message that replaces the typing dots when the pointer is on the tile. */
-export const LANDING_TEAM_REPLY: LandingTeamMessage = {
-  from: ADA,
-  time: "9:32",
-  text: "Thanks. I closed the issue.",
+export const LANDING_TEAM_REPLY_SENDER: LandingTeamSender = { from: ADA, time: "9:32" };
+
+/** How a drawn face wears its hair. */
+export type LandingHair = "long" | "short" | "curly";
+
+/** One more detail that makes a drawn face easy to tell apart at a small size. */
+type LandingFaceDetail = "none" | "glasses" | "freckles";
+
+/**
+ * A person in the multiplayer picture. A person has a drawn face, not an agent avatar. `id` selects
+ * the colours of the face in the stylesheet.
+ */
+export interface LandingPerson {
+  id: "maya" | "sam" | "theo";
+  name: string;
+  hair: LandingHair;
+  detail: LandingFaceDetail;
+}
+
+const MAYA: LandingPerson = { id: "maya", name: "Maya", hair: "long", detail: "none" };
+const SAM: LandingPerson = { id: "sam", name: "Sam", hair: "short", detail: "glasses" };
+
+/** Who sends each message of the multiplayer picture, and when. The text is `picture.multiplayer.messages`. */
+export type LandingMultiplayerSender =
+  | { kind: "person"; from: LandingPerson; time: string }
+  | { kind: "agent"; from: LandingTeammate; time: string };
+
+/** People and agents in one channel: Maya asks Ada, and Ada hands the result to Sam. */
+export const LANDING_MULTIPLAYER_SENDERS: readonly LandingMultiplayerSender[] = [
+  { kind: "person", from: MAYA, time: "11:02" },
+  { kind: "agent", from: ADA, time: "11:05" },
+  { kind: "person", from: SAM, time: "11:09" },
+];
+
+/** The members of the multiplayer channel. On hover, the invited person joins the stack. */
+export const LANDING_MULTIPLAYER_PEOPLE: readonly LandingPerson[] = [MAYA, SAM];
+export const LANDING_MULTIPLAYER_AGENTS: readonly LandingTeammate[] = [ADA, LINUS];
+export const LANDING_MULTIPLAYER_INVITED: LandingPerson = {
+  id: "theo",
+  name: "Theo",
+  hair: "curly",
+  detail: "freckles",
 };
+
+/** The agent steps of the workflow picture. The text of each step is `picture.workflows.<id>`. */
+type LandingWorkflowAgentId = "issues" | "usage" | "report" | "charts";
+export type LandingWorkflowStepId = "trigger" | LandingWorkflowAgentId | "approval";
+
+export interface LandingWorkflowAgent {
+  id: LandingWorkflowAgentId;
+  teammate: LandingTeammate;
+  provider: ProviderLogoVariant;
+  /** The column of the step: the first two agents run at the same time, then the next two. */
+  column: 1 | 2;
+  /** 0 is the top lane, 1 is the bottom lane. */
+  lane: 0 | 1;
+  /** How long the step runs in the hover animation, in milliseconds. */
+  runMs: number;
+}
+
+/**
+ * A weekly report with steps that run at the same time: Ada and Grace collect the facts, then Linus
+ * writes the report from both, while Alan draws the charts from Grace's numbers.
+ */
+export const LANDING_WORKFLOW_AGENTS: readonly LandingWorkflowAgent[] = [
+  { id: "issues", teammate: ADA, provider: "codex", column: 1, lane: 0, runMs: 700 },
+  { id: "usage", teammate: GRACE, provider: "antigravity", column: 1, lane: 1, runMs: 1000 },
+  { id: "report", teammate: LINUS, provider: "claude", column: 2, lane: 0, runMs: 820 },
+  { id: "charts", teammate: ALAN, provider: "grok", column: 2, lane: 1, runMs: 560 },
+];
+
+/** Each step starts when all the steps before it are done. */
+export const LANDING_WORKFLOW_EDGES: readonly (readonly [LandingWorkflowStepId, LandingWorkflowStepId])[] = [
+  ["trigger", "issues"],
+  ["trigger", "usage"],
+  ["issues", "report"],
+  ["usage", "report"],
+  ["usage", "charts"],
+  ["report", "approval"],
+  ["charts", "approval"],
+];
 
 /** The provider of each agent in the network picture. Ada starts on Codex, as in the persist picture. */
 export const LANDING_NETWORK_AGENTS: readonly { teammate: LandingTeammate; provider: ProviderLogoVariant }[] = [
@@ -128,72 +140,8 @@ export const LANDING_NETWORK_AGENTS: readonly { teammate: LandingTeammate; provi
   { teammate: GRACE, provider: "antigravity" },
 ];
 
-/** The words of the network heading appear one at a time. */
-export const LANDING_NETWORK_TITLE: readonly string[] = ["Your", "agents", "talk", "to", "each", "other."];
-export const LANDING_NETWORK_DESCRIPTION =
-  "They ask, hand off and review. Add agents, and the team grows around the work.";
 /** The name under the mark at the centre of the network picture. */
 export const LANDING_NETWORK_HUB = "OpenBot";
-
-/** What the network says in its easter eggs. Each reaction chooses one line of its list at random. */
-export const LANDING_NETWORK_EGGS = {
-  /** The visitor types "hello". */
-  greetings: ["Hi!", "Hello.", "Hey there.", "Oh, hi.", "Good to see you.", "Hello, human.", "Welcome back."],
-  /** The visitor types the Konami code. */
-  konami: ["Cheat code accepted.", "Thirty extra agents.", "Achievement unlocked."],
-  /** The visitor types "party". */
-  party: ["Party mode.", "Who brought the confetti?", "Dance break."],
-  /** The visitor types "sudo". */
-  sudo: ["This incident will be reported.", "Nice try.", "You are not in the sudoers file."],
-  /** The hub after quick clicks: 3, 5 and 8 in a row. 12 makes it sneeze. */
-  tickle: ["That tickles.", "Hey.", "I felt that."],
-  awake: ["Okay, okay. I am awake.", "Yes? Can I help you?", "I am listening."],
-  busy: ["Please. I am routing messages.", "I have work to do.", "Stop that, please."],
-  /** The agents answer the hub at 5 clicks. */
-  wonder: ["What was that?", "Did you feel that?", "Is the hub okay?"],
-  sneeze: ["Achoo!", "Ah… choo!"],
-  blessings: ["Bless you.", "Gesundheit.", "Salud.", "Bless you!"],
-  /** The agents wake up after the visitor leaves the page alone. */
-  wake: [
-    "I was not asleep.",
-    "Just resting my tokens.",
-    "Back to work.",
-    "Who turned off the lights?",
-    "Five more minutes.",
-  ],
-  /** Agents answer a click: a signal from the hub, or a new network that grows from an agent. */
-  chats: [
-    "On it.",
-    "Got it. Starting now.",
-    "Tests pass on my side.",
-    "I can take the review.",
-    "I pushed a fix.",
-    "Who has the Safari task?",
-    "Done. Over to you.",
-    "I need one more file.",
-    "Merged.",
-    "The build is green.",
-    "I found the bug.",
-    "Can someone review my branch?",
-    "Ship it.",
-    "Give me five minutes.",
-    "I wrote the release notes.",
-  ],
-  /** An agent under a still pointer. */
-  hover: [
-    "I only look busy.",
-    "Ask me about the Safari task.",
-    "I read the whole repository. Twice.",
-    "My context window has room for you.",
-    "Please do not close this tab.",
-    "I fixed one bug and found three.",
-    "I run on your computer, not in a cloud.",
-  ],
-} satisfies Record<string, readonly string[]>;
-
-/** The channel the team picture shows, and the line OpenBot writes when the task changes owner. */
-export const LANDING_TEAM_CHANNEL = "launch";
-export const LANDING_TEAM_HANDOFF = "Ada gave the task to Linus";
 
 export interface LandingProvider {
   provider: ProviderLogoVariant;
@@ -201,7 +149,7 @@ export interface LandingProvider {
 }
 
 const CODEX: LandingProvider = { provider: "codex", name: "Codex" };
-const CLAUDE_CODE: LandingProvider = { provider: "claude", name: "Claude Code" };
+export const CLAUDE_CODE: LandingProvider = { provider: "claude", name: "Claude Code" };
 
 export const LANDING_PROVIDERS: readonly LandingProvider[] = [
   CODEX,
@@ -213,60 +161,21 @@ export const LANDING_PROVIDERS: readonly LandingProvider[] = [
   { provider: "cline", name: "Cline" },
 ];
 
-export interface LandingPersistReply {
+/** The provider of a reply in the persist picture, and when it came. The text is `picture.persist`. */
+export interface LandingPersistSender {
   from: LandingProvider;
   time: string;
-  text: string;
 }
 
 /**
  * The chat in the persist picture. Ada does a task on Codex. On hover, she moves
  * to Claude Code and continues the same task.
  */
-export const LANDING_PERSIST_EARLIER: LandingPersistReply = {
-  from: CODEX,
-  time: "9:58",
-  text: "I read the billing code. Six tables use it.",
-};
-export const LANDING_PERSIST_REQUEST = "Move the billing tables to their own schema.";
-export const LANDING_PERSIST_BEFORE: LandingPersistReply = {
-  from: CODEX,
-  time: "10:04",
-  text: "Done. I changed 4 files and wrote the migration.",
-};
-export const LANDING_PERSIST_SWITCH = `${ADA.name} now uses ${CLAUDE_CODE.name}`;
-export const LANDING_PERSIST_AFTER: LandingPersistReply = {
-  from: CLAUDE_CODE,
-  time: "10:06",
-  text: "I continue from the billing migration. Next is its test.",
-};
-
-/** What stays on the computer that runs OpenBot. */
-export const LANDING_LOCAL_DATA: readonly string[] = ["Workspaces", "Conversations", "Files", "Browser data"];
-
-/**
- * The queue picture copies the app's queue panel, which sits on top of the
- * composer. On hover, the message in the composer joins the queue.
- */
-export const LANDING_QUEUE: readonly string[] = ["Summarize the support inbox", "Draft the release notes"];
-export const LANDING_QUEUE_DRAFT = "Check the new sign-ups";
-export const LANDING_QUEUE_HOLD = `Waiting - ${LINUS.name} is working in #${LANDING_TEAM_CHANNEL}`;
-export const LANDING_QUEUE_PLACEHOLDER = `Message ${LINUS.name}`;
-export const LANDING_QUEUE_STEER = "Steer";
-
-/**
- * The browser picture copies the app's browser panel. Grace checks the sign-in
- * page that Linus fixed in the team picture. The first tab is the one she controls.
- */
-export const LANDING_BROWSER_TABS: readonly string[] = ["Sign in", "Dashboard"];
-export const LANDING_BROWSER_URL = "localhost:3000/sign-in";
-export const LANDING_BROWSER_HEADING = "Sign in";
-export const LANDING_BROWSER_FIELD = "Email";
-export const LANDING_BROWSER_TYPED = "grace@acme.test";
-export const LANDING_BROWSER_SUBMIT = "Continue";
-
-/** What the folder list in the data picture shows. */
-export const LANDING_LOCAL_TITLE = "On this computer";
+export const LANDING_PERSIST_SENDERS = {
+  earlier: { from: CODEX, time: "9:58" },
+  before: { from: CODEX, time: "10:04" },
+  after: { from: CLAUDE_CODE, time: "10:06" },
+} satisfies Record<string, LandingPersistSender>;
 
 export interface LandingComparisonLink {
   slug: string;
@@ -327,37 +236,10 @@ export const LANDING_COMPARISON_LINKS: readonly LandingComparisonLink[] = COMPAR
 /** Each offer of OpenBot for Teams has its own colour and icon, which the section sets for this id. */
 export type LandingTeamsOfferId = "servers" | "environments" | "integrations" | "support";
 
-export interface LandingTeamsOffer {
-  id: LandingTeamsOfferId;
-  label: string;
-  title: string;
-  description: string;
-}
-
 /** In reading order. Each offer is one card of the stack. */
-export const LANDING_TEAMS_OFFERS: readonly LandingTeamsOffer[] = [
-  {
-    id: "servers",
-    label: "Managed servers",
-    title: "Always on",
-    description: "Agents run on managed servers, not on someone’s laptop.",
-  },
-  {
-    id: "environments",
-    label: "Team environments",
-    title: "Shared or personal",
-    description: "One company server, one per employee, or both.",
-  },
-  {
-    id: "integrations",
-    label: "Custom integrations",
-    title: "Your tools",
-    description: "We connect OpenBot to your systems, APIs and workflows.",
-  },
-  {
-    id: "support",
-    label: "Implementation and support",
-    title: "We launch it with you",
-    description: "Setup, testing, onboarding and ongoing support.",
-  },
+export const LANDING_TEAMS_OFFER_IDS: readonly LandingTeamsOfferId[] = [
+  "servers",
+  "environments",
+  "integrations",
+  "support",
 ];

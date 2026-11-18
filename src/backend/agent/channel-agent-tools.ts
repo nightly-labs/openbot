@@ -8,16 +8,18 @@ import {
   type ChannelDraft,
   isAvatarHue,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
-import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { profileToolErrorMessage } from "./profile-tools";
+import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
 
-/** The tools an agent creates and changes channels with from its own chat. */
+/** The tools an agent creates and changes channels with, from its own chat or a channel task that a person started. */
 export const CHANNEL_AGENT_TOOL_NAMES: ReadonlySet<string> = new Set(["create_channel", "update_channel"]);
 
 const agentId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
@@ -87,7 +89,7 @@ export const updateChannelToolSchema = z
     imagePath: channelFields.imagePath.nullable().describe(`${IMAGE_TEXT} null removes it.`).optional(),
     archived: z
       .boolean()
-      .describe("true archives the channel and stops its work. false brings an archived channel back.")
+      .describe("true archives the channel; it fails while a task runs there. false brings it back.")
       .optional(),
   })
   .refine(
@@ -99,16 +101,37 @@ export const updateChannelToolSchema = z
     "At least one channel change is required.",
   );
 
+const CREATE_CHANNEL_FIELDS = Object.keys(createChannelToolSchema.shape);
+const UPDATE_CHANNEL_FIELDS = Object.keys(updateChannelToolSchema.shape);
+const ICON_FIELDS = Object.keys(channelFields.icon.shape);
+
+/**
+ * Describe a failed `create_channel` or `update_channel` call. A field that the tool does not take
+ * gets the names of the fields that it takes, never the name that the call sent (#1354, #8627).
+ */
+export function channelAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    if (path.length === 0) {
+      const fields = tool === "create_channel" ? CREATE_CHANNEL_FIELDS : UPDATE_CHANNEL_FIELDS;
+      return `Remove the fields that ${tool} does not take. It takes: ${fields.join(", ")}.`;
+    }
+    if (path.length === 1 && path[0] === "icon")
+      return `Remove the fields that icon does not take. It takes: ${ICON_FIELDS.join(", ")}.`;
+    return `Remove the fields that ${path.map(String).join(".")} does not take.`;
+  });
+}
+
 type CreateChannelArgs = z.infer<typeof createChannelToolSchema>;
 type UpdateChannelArgs = z.infer<typeof updateChannelToolSchema>;
 
 const UNKNOWN_CHANNEL = "No channel has that channelId. Call openbot.list_channels.";
+const OWN_CHANNEL_IN_TASK =
+  "update_channel does not change the channel of your current task. For this channel, use channel_add_member, channel_remove_member and channel_set_instructions.";
 
-/** An agent that a channel can take: one that exists and that the user has not hidden. */
+/** An agent that a channel can take: one that exists. */
 function requireAvailable(agents: readonly AgentSummary[], id: string): AgentSummary {
   const agent = agents.find((candidate) => candidate.id === id);
   if (!agent) throw new Error(`No agent has the id ${id}. Get the ids from openbot.list_agents.`);
-  if (agent.hiddenAt !== undefined) throw new Error(`${agent.name} is hidden. Ask the user to show it again first.`);
   return agent;
 }
 
@@ -205,6 +228,11 @@ function channelResult(channel: Channel, agents: readonly AgentSummary[]) {
 export interface ChannelAgentToolDependencies {
   channels: ChannelService;
   listAgents(): AgentSummary[];
+  /**
+   * The channel of the channel task that makes the call, if any. `update_channel` does not change it:
+   * the channel tools change it, write the change note, and do not stop the work of the caller.
+   */
+  taskChannelId?: string | null;
 }
 
 /**
@@ -217,7 +245,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   senderAgentId: string,
   dependencies: ChannelAgentToolDependencies,
 ) {
-  const { channels, listAgents } = dependencies;
+  const { channels, listAgents, taskChannelId } = dependencies;
   // The drafts read the agents again at their turn in the queue. The sender and the member names
   // of the result come from this one read.
   const agents = listAgents();
@@ -255,6 +283,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
 
   const args = updateChannelToolSchema.parse(params.arguments, { reportInput: true });
   const { channelId, archived, imagePath, ...draftChange } = args;
+  if (channelId === taskChannelId) throw new Error(OWN_CHANNEL_IN_TASK);
   const image = yield* picture(imagePath);
   if (!channels.store.exists(channelId)) throw new Error(UNKNOWN_CHANNEL);
   const actor = channels.agentActor(senderAgentId);
@@ -263,6 +292,10 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   // takes the same changes as an open one and the archive stops the work they start. The changes
   // are checked first, so that a refused change does not leave the channel restored.
   const stored = channels.store.get(channelId);
+  // The archive comes last and the service refuses it while a task runs there, so this refuses first
+  // and the other changes are not saved without it.
+  if (archived === true && !stored.archived && channels.store.tasks(channelId).some((task) => task.state === "running"))
+    throw new Error(sourceText("error.backend.channelArchiveRunning"));
   if (archived === false && stored.archived) {
     if (changesDraft) updatedChannelDraft(stored, args, agents);
     yield* channels.command({ type: "restore", operationId: `${operationId}:restore`, channelId }, actor);
@@ -280,15 +313,6 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   return openBotToolResult({ status: "updated", channel: channelResult(channel, agents) });
 });
 
-/** The response to a call from a channel task: there, only a person's request changes the channel. */
-export function channelAgentToolInChannelTask(): OpenBotToolResponse {
-  return {
-    success: false,
-    contentItems: [
-      {
-        type: "inputText",
-        text: "create_channel and update_channel work only in your own chats, not in a channel task. In a channel task, use channel_add_member, channel_remove_member and channel_set_instructions when a person asks.",
-      },
-    ],
-  };
-}
+/** The refusal in a channel task that a routine run, an agent, a member reply or a team member started. */
+export const CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON =
+  "In a channel task, create_channel and update_channel work only when this computer's user made the request that started the task. This task started from a routine run, an agent, a member reply or a team member. Ask the user to request it in your own chat.";

@@ -1,0 +1,33 @@
+{
+  "slug": "openart",
+  "name": "OpenArt",
+  "tagline": "AI images and videos",
+  "description": "OpenArt lets agents generate and edit images and videos with AI models. Generation uses OpenArt credits.",
+  "category": "design",
+  "creatorName": "OpenArt",
+  "iconUrl": "https://openart.ai/pageforge-assets/favicon/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-image", "text": "Generate a watercolor illustration of a lighthouse at sunset." },
+    { "id": "prompt-video", "text": "Make a short video of this product photo rotating slowly." },
+    { "id": "prompt-variations", "text": "Create three style variations of my last image." }
+  ],
+  "apps": [
+    {
+      "id": "app-openart-mcp",
+      "name": "OpenArt",
+      "description": "Image and video generation, over OpenArt's MCP server with browser sign-in.",
+      "iconUrl": "https://openart.ai/pageforge-assets/favicon/apple-touch-icon.png",
+      "server": {
+        "name": "openart",
+        "transport": "http",
+        "url": "https://mcp.openart.ai/mcp",
+        "auth": [{ "id": "openart-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://openart.ai",
+  "privacyPolicyUrl": "https://openart.ai/privacy/",
+  "termsUrl": "https://openart.ai/terms/"
+}

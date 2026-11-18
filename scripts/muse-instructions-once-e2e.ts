@@ -1,6 +1,7 @@
 // Drives MuseAgentClient and the installed SDK over a fake Muse server to check that a session gets
 // the OpenBot instructions once and not with every turn. They must come again after a change, a
-// compaction, a failed turn and a restart.
+// compaction, a failed turn and a restart. A memory edit sends one small update block with the next
+// turn, not the instructions again.
 // `bun run test:muse-instructions-once`. Writes .openbot-build/muse-instructions-once-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -83,10 +84,11 @@ interface Report {
   passed: boolean;
   steps: Step[];
   prompts: { texts: string[] }[];
+  memoryPrompts: { texts: string[] }[];
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-muse-instructions-e2e-"));
-const report: Report = { passed: false, steps: [], prompts: [] };
+const report: Report = { passed: false, steps: [], prompts: [], memoryPrompts: [] };
 const clients: AgentClient[] = [];
 
 try {
@@ -94,17 +96,18 @@ try {
   const workspace = join(root, "workspace");
   const home = join(root, "home");
   const log = join(root, "prompts.jsonl");
+  const memoryLog = join(root, "memory-prompts.jsonl");
   await mkdir(workspace);
   await mkdir(home);
   await writeFile(executable, fixture);
   await chmod(executable, 0o700);
-  const open = () => {
+  const open = (fixtureLog = log) => {
     const client = new MuseAgentClient(
       { executable, version: "fixture" },
       {
         apiKey: () => null,
         requestTimeoutMs: 8_000,
-        env: { HOME: home, TMPDIR: root, FIXTURE_LOG: log, FIXTURE_FINGERPRINT: EXPECTED_SCHEMA_FINGERPRINT },
+        env: { HOME: home, TMPDIR: root, FIXTURE_LOG: fixtureLog, FIXTURE_FINGERPRINT: EXPECTED_SCHEMA_FINGERPRINT },
       },
     );
     clients.push(client);
@@ -147,6 +150,67 @@ try {
     report.prompts.map((prompt) => prompt.texts),
     report.steps.map((step) => (step.instructions ? [step.instructions, step.text] : [step.text])),
     "The instructions come only when the session lacks them.",
+  );
+
+  // A memory edit keeps the instructions, so the session cache stays valid.
+  const memoryClient = open(memoryLog);
+  const memory = (id: string, text: string) => ({ id, text, origin: "manual" as const });
+  // Enough memories that an update block is shorter than the full list, as in a real agent.
+  const facts = [
+    "The user likes short answers.",
+    "The user writes TypeScript and reviews pull requests every morning.",
+    "The team ships a desktop release every second Thursday.",
+    "The user prefers metric units and 24-hour times.",
+    "The staging server is called staging-eu and must not be restarted on Fridays.",
+    "The user reads changelogs before each upgrade.",
+  ];
+  const first = { memories: facts.map((text, index) => memory(`m-${index}`, text)), storedCount: 6, limit: 20 };
+  const edited = {
+    memories: [...first.memories, memory("m-new", "The user works in Kraków.")],
+    storedCount: 7,
+    limit: 20,
+  };
+  const memoryThread = await startThread(memoryClient, { ...params(INSTRUCTIONS), memoryContext: first });
+  const memoryTurn = (text: string) => runTurn(memoryClient, memoryThread, { text, timeoutMs: 15_000 });
+  await memoryTurn("one");
+  await memoryTurn("two");
+  await runCauseEffect(
+    memoryClient.request(
+      "thread/resume",
+      { threadId: memoryThread, ...params(INSTRUCTIONS), memoryContext: edited },
+      (v) => v,
+    ),
+  );
+  await memoryTurn("three");
+  await memoryTurn("four");
+  await memoryTurn("compact-now");
+  await memoryTurn("five");
+  await runCauseEffect(memoryClient.stop());
+
+  report.memoryPrompts = await readJsonl<{ texts: string[] }>(memoryLog);
+  const [one = [], two, three = [], four, compact, five = []] = report.memoryPrompts.map((prompt) => prompt.texts);
+  const [oneMemories = "", oneText] = one.slice(1);
+  const [threeUpdate = ""] = three;
+  const fiveMemories = five[1] ?? "";
+  assert.equal(one[0], INSTRUCTIONS, "memory: the first turn has the instructions.");
+  assert.ok(oneMemories.startsWith("<openbot_saved_memories>"), "memory: the first turn has all memories.");
+  assert.ok(!oneMemories.includes("Kraków"), "memory: the first block has the first list.");
+  assert.equal(oneText, "one", "memory: the user text comes last.");
+  assert.deepEqual(two, ["two"], "memory: an unchanged list sends no block.");
+  assert.equal(three.length, 2, "memory: the edit sends one block and no instructions.");
+  assert.ok(threeUpdate.startsWith("<openbot_saved_memories_update>"), "memory: the edit sends an update block.");
+  assert.ok(
+    threeUpdate.includes("Kraków") && !threeUpdate.includes("short answers"),
+    "memory: the update has only the change.",
+  );
+  assert.deepEqual(four, ["four"], "memory: the update is sent once.");
+  assert.deepEqual(compact, ["compact-now"], "memory: the compacting turn sends no block.");
+  assert.equal(five[0], INSTRUCTIONS, "memory: after a compaction, the instructions come again.");
+  assert.ok(
+    fiveMemories.startsWith("<openbot_saved_memories>") &&
+      fiveMemories.includes("short answers") &&
+      fiveMemories.includes("Kraków"),
+    "memory: after a compaction, the turn has all memories again.",
   );
   report.passed = true;
 } finally {

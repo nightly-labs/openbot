@@ -58,6 +58,8 @@ export interface AgentTasksHooks {
   emit(event: AgentEvent): void;
   /** The agent, for its provider and its task limit. */
   agent(agentId: string): AgentSummary | undefined;
+  /** The task limit of an agent that has no limit of its own on this host. */
+  defaultTaskLimit(): number;
   /** Why the drain holds the next message of this task, as the drain names it, or null. Read late. */
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
@@ -135,7 +137,7 @@ export class AgentTasks implements TaskLanes {
 
   limit(agentId: string): number {
     const agent = this.#hooks.agent(agentId);
-    return agent ? agentTaskLimit(agent) : 1;
+    return agent ? agentTaskLimit(agent, this.#hooks.defaultTaskLimit()) : 1;
   }
 
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
@@ -153,9 +155,10 @@ export class AgentTasks implements TaskLanes {
   }
 
   snapshot(agentId: string): AgentTasksSnapshot {
+    const awaited = this.#mailbox.awaitedThreadRequests();
     return {
       agentId,
-      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task)),
+      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task, awaited)),
       limit: this.limit(agentId),
     };
   }
@@ -175,6 +178,11 @@ export class AgentTasks implements TaskLanes {
     if (task.closedAt !== null) throw new Error(sourceText("error.backend.threadArchived"));
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return task;
+  }
+
+  /** The side threads of this agent, open and archived, with activity at or after `after`. The latest first. */
+  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+    return this.#store.recent(agentId, after, limit);
   }
 
   /** Whether this agent has the task, open or closed. */
@@ -471,8 +479,22 @@ export class AgentTasks implements TaskLanes {
     return [...agentIds];
   });
 
+  /**
+   * A side thread of this agent that the person opened or branched. A routine thread and a thread
+   * that the agent started with `start_task` are not.
+   */
+  isPersonThread(agentId: string, threadId: string): boolean {
+    const thread = this.#store.taskForThread(threadId);
+    return thread?.agentId === agentId && thread.origin === "user" && thread.routineId === null;
+  }
+
   isBranchThread(threadId: string): boolean {
     return Boolean(this.#store.taskForThread(threadId)?.branch);
+  }
+
+  /** Whether the thread takes the runs of a routine. One read, by thread id. */
+  isRoutineThreadId(threadId: string): boolean {
+    return (this.#store.taskForThread(threadId)?.routineId ?? null) !== null;
   }
 
   taskForThread(threadId: string): string | null {
@@ -628,10 +650,16 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
-        // A routine run in the agent's chat notified. In its own thread it notifies the same way, but
-        // through its own event, so the agent's chat keeps its turn state.
-        if (task.routineId !== null && !event.quiet && !event.continues)
-          this.#hooks.emit({ type: "routine-thread-turn-completed", taskId: task.taskId, turn: event });
+        // A turn in the agent's chat notifies. In a side thread it notifies through its own event, so
+        // the agent's chat keeps its turn state. A routine run in its own thread notifies as it did in
+        // the agent's chat; the listeners read `routine` to keep that apart from the other threads.
+        if (!event.quiet && !event.continues)
+          this.#hooks.emit({
+            type: "thread-turn-completed",
+            taskId: task.taskId,
+            routine: task.routineId !== null,
+            turn: event,
+          });
         return true;
       }
       case "queue-changed":
@@ -657,7 +685,7 @@ export class AgentTasks implements TaskLanes {
     return this.#store.taskForThread(threadId);
   }
 
-  #publicTask(task: AgentThreadRecord): AgentTask {
+  #publicTask(task: AgentThreadRecord, awaited = this.#mailbox.awaitedThreadRequests()): AgentTask {
     const snapshot = this.#conversation.loadedExecutionSnapshot(task.threadId);
     const activeTurnId = task.closedAt === null ? (snapshot?.activeTurnId ?? null) : null;
     const queuedMessages =
@@ -685,6 +713,11 @@ export class AgentTasks implements TaskLanes {
       progress: activeTurnId ? (this.#progress.get(task.taskId) ?? null) : null,
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
+      queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
+      // An answer to an archived thread goes to the agent's own chat, so only an open thread waits.
+      awaitedReplies: awaited.flatMap(({ taskId, messageId, recipientAgentId, status }) =>
+        taskId === task.taskId && task.closedAt === null ? [{ messageId, recipientAgentId, status }] : [],
+      ),
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
@@ -757,11 +790,17 @@ function taskTitle(text: string): string {
 /** The drain names more reasons than the user needs: the ones a task cannot change become "agent-busy". */
 function publicHold(reason: string | null): AgentTaskHold | null {
   switch (reason) {
+    // The providers start, restart, or cannot start at all: no task hold names that, so none shows (#8915).
     case null:
+    case "providers-not-ready":
+    // A routine run waits for its provider to start again (#6751).
+    case "provider-start":
       return null;
     case "task-limit":
       return "task-limit";
     case "agent-client-changing":
+    // The provider replaces its CLI after the running turns, and the agent's process starts again on it (#8915).
+    case "provider-cli-replaced":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";

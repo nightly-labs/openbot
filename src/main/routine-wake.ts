@@ -12,6 +12,9 @@ export interface RoutineWakeOptions {
   maxWaitMs?: number;
 }
 
+/** Awake time after a suspend with no resume event, before routines resume without one. */
+const LOST_RESUME_MS = 10 * 60_000;
+
 export class RoutineWake {
   readonly #routines: RoutineWakeOptions["routines"];
   readonly #isOnline: () => boolean;
@@ -19,6 +22,7 @@ export class RoutineWake {
   readonly #onlineReads: number;
   readonly #maxWaitMs: number;
   #poll: NodeJS.Timeout | null = null;
+  #lostResume: NodeJS.Timeout | null = null;
 
   constructor(options: RoutineWakeOptions) {
     this.#routines = options.routines;
@@ -31,6 +35,10 @@ export class RoutineWake {
   suspend(): void {
     this.dispose();
     this.#routines.suspendRoutines();
+    // The timer does not advance while the computer sleeps, so it ends only after a wake that macOS
+    // or Electron did not report. Without it, every routine would stay held until a restart.
+    this.#lostResume = setTimeout(() => this.resume(), LOST_RESUME_MS);
+    this.#lostResume.unref?.();
   }
 
   resume(): void {
@@ -53,5 +61,7 @@ export class RoutineWake {
   dispose(): void {
     if (this.#poll) clearTimeout(this.#poll);
     this.#poll = null;
+    if (this.#lostResume) clearTimeout(this.#lostResume);
+    this.#lostResume = null;
   }
 }

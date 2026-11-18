@@ -16,6 +16,10 @@ export const messages = {
   "update.provider.checking": "Zoeken naar updates voor {name}",
   "update.provider.available": "Update voor {name} beschikbaar",
   "update.provider.updating": "{name} bijwerken",
+  "update.provider.downloading": "{name} downloaden",
+  "update.provider.downloaded": "{name} is gedownload",
+  "update.provider.downloadFailed": "Download van {name} mislukt",
+  "update.provider.downloadFailedRetry": "De download is mislukt. Probeer het opnieuw.",
   "update.provider.waiting": "Wachten om {name} bij te werken",
   "update.provider.failed": "Update van {name} mislukt",
   "update.provider.settingUp": "Instellen",
@@ -61,4 +65,10 @@ export const messages = {
   "update.whatsNew.changelog": "Volledige changelog",
   "update.whatsNew.changelogFailed": "OpenBot kan de changelog niet openen.",
   "update.whatsNew.done": "Begrepen",
+  "update.required.title": "Update vereist",
+  "update.required.description":
+    "OpenBot {version} wordt niet meer ondersteund. Werk bij naar {minimum} of nieuwer om door te gaan.",
+  "update.required.download": "OpenBot downloaden",
+  "update.required.continue": "Doorgaan zonder update",
+  "update.required.failed": "De update is niet voltooid.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "リモートデスクトップのテストを利用できません。",
   "error.remote.controlUnavailable": "リモート操作を利用できません。",
   "error.remote.controlSessionNotFound": "リモート操作のセッションが見つかりません。",
+  "error.remote.controlNotAllowed": "このコンピューターのオーナーは、あなたのロールによる操作を許可していません。",
+  "error.remote.controlDeclined": "このコンピューターの前にいるユーザーがリモート操作を許可しませんでした。",
   "error.remote.testRuntimeUpdate":
     "このテストを実行するには、macOS のリモートデスクトップのランタイムを更新してください。",
   "error.remote.testOtherSessions": "テストを開始する前に、ほかのリモートデスクトップのセッションを終了してください。",
@@ -22,6 +24,8 @@ export const messages = {
   "error.remote.testActive": "リモートデスクトップのテストを実行中です。終了してから再試行してください。",
   "error.remote.screenRecordingDenied":
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
+  "error.remote.windowsSessionDisconnected":
+    "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",
@@ -150,6 +154,7 @@ export const messages = {
   "error.remote.attachmentRejected": "ホストが添付ファイルを拒否しました。",
   "error.remote.attachmentTooLarge": "添付ファイルは 10 MB 以下にしてください。",
   "error.remote.attachmentBusy": "現在の添付ファイルが完了するまでお待ちください。",
+  "error.remote.attachmentChanged": "ファイルが変更されたか、利用できません。もう一度選択してください。",
   "error.remote.uploadTimeout": "添付ファイルのアップロードがタイムアウトしました。",
   "error.remote.hostSessionActive": "ホストにはすでに有効なリモートセッションがあります。",
   "error.remote.tooManyConnections": "有効なリモート接続が多すぎます。",
@@ -191,12 +196,15 @@ export const messages = {
   "error.remote.hostNotRegistered": "このホストは OpenBot サービスに登録されなくなりました。",
   "error.remote.membershipEnded":
     "あなたはこのホストのメンバーではなくなりました。オーナーに新しい招待を依頼してください。",
+  "error.remote.membershipChanged":
+    "同時に別の人がこのメンバーを変更しました。メンバーを再読み込みして、もう一度お試しください。",
   "error.remote.accountSessionInactive": "サインインが無効になりました。もう一度サインインしてください。",
   "error.remote.hostOtherAccount": "このホストは別のアカウントのものです。",
   "error.remote.remoteNotConfigured": "この OpenBot サービスではリモート接続が設定されていません。",
   "error.remote.hostRefused": "ホストがリクエストを拒否しました ({status})。",
   "error.remote.formUnavailable": "このフォームは利用できなくなりました。",
   "error.remote.hostedServerRemoval": "ホスト型サーバーを削除するには「お支払い」を使用してください。",
+  "error.remote.hostRemoved": "所有者がこのサーバーをアカウントから削除しました。",
   "error.remote.channelsUnsupported": "チャンネルを使うには、このデスクトップサーバーを更新してください。",
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",

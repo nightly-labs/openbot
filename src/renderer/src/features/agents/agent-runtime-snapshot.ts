@@ -1,6 +1,6 @@
 import type { AgentApproval, AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { keepWholeApprovals, reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createStoredMessage } from "../../app-stored-values";
 import { promptRequestKey } from "../conversation/conversation-keys";
@@ -154,7 +154,12 @@ export function reconcileAttentionApprovals(
   current: readonly AgentApproval[],
   snapshot: Pick<AgentRuntimeSnapshot, "attentionComplete" | "pendingApprovals">,
 ): AgentApproval[] {
-  return reconcilePendingRequests(current, snapshot.pendingApprovals, snapshot.attentionComplete);
+  // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
+  return reconcilePendingRequests(
+    current,
+    keepWholeApprovals(current, snapshot.pendingApprovals),
+    snapshot.attentionComplete,
+  );
 }
 
 /**
@@ -164,6 +169,10 @@ export function reconcileAttentionApprovals(
  *
  * An appended message is only the start of the reply, so it is a stored message: the conversation
  * snapshot, delta or page that follows must be able to replace its body.
+ *
+ * A message older than the first loaded one is in the history that is not loaded, for example when
+ * routine runs push the latest reply out of the page. It is not added, because at the end it is out
+ * of order.
  */
 export function appendLatestRuntimeMessages(
   current: Record<string, AgentMessage[]>,
@@ -173,6 +182,8 @@ export function appendLatestRuntimeMessages(
   for (const message of latestMessages) {
     const messages = next[message.agentId] ?? [];
     if (messages.some((candidate) => candidate.id === message.id)) continue;
+    const oldestLoaded = messages.find((candidate) => candidate.createdAt)?.createdAt ?? "";
+    if (Date.parse(message.createdAt) < Date.parse(oldestLoaded)) continue;
     next[message.agentId] = [
       ...messages,
       createStoredMessage({

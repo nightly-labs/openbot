@@ -26,6 +26,8 @@ export interface ProviderUpdate {
   availableVersion: string | null;
   /** The user asked main whether a newer version exists, and the answer has not arrived. */
   checking?: boolean;
+  /** The first download of the CLI: no version is installed, so the words say download, not update. */
+  install?: boolean;
 }
 
 export interface ProviderUpdatePresentation {
@@ -79,8 +81,9 @@ export function presentProviderUpdate(
   if (update.checking) title = t("update.provider.checking", { name });
   else if (updatable) title = t("update.provider.available", { name });
   else if (waiting) title = t("update.provider.waiting", { name });
-  else if (busy) title = t("update.provider.updating", { name });
-  else if (failed) title = t("update.provider.failed", { name });
+  else if (busy) title = t(update.install ? "update.provider.downloading" : "update.provider.updating", { name });
+  else if (failed) title = t(update.install ? "update.provider.downloadFailed" : "update.provider.failed", { name });
+  else if (update.install) title = t("update.provider.downloaded", { name });
 
   return {
     updatable,
@@ -115,6 +118,7 @@ function versionTransition(version: string | null, availableVersion: string | nu
 
 function updateDetail(update: ProviderUpdate, updatable: boolean, text: UpdateText): string {
   const { runtime, availableVersion } = update;
+  if (update.install) return installDetail(update, text);
   if (runtime.phase === "downloading" && runtime.message !== null)
     return text.errorMessage(runtime.message, versionTransition(runtime.version, availableVersion, text));
   if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion, text);
@@ -122,6 +126,16 @@ function updateDetail(update: ProviderUpdate, updatable: boolean, text: UpdateTe
   if (runtime.phase === "download-error")
     return text.errorMessage(runtime.message, text.t("update.provider.failedRetry"));
   return formatVersion(runtime.version ?? availableVersion, text);
+}
+
+/** A first download has no version to come from, so it names only the version it gets, when known. */
+function installDetail(update: ProviderUpdate, text: UpdateText): string {
+  const { runtime, availableVersion } = update;
+  if (runtime.phase === "finishing") return text.t("update.provider.settingUp");
+  if (runtime.phase === "download-error")
+    return text.errorMessage(runtime.message, text.t("update.provider.downloadFailedRetry"));
+  const version = runtime.version ?? availableVersion;
+  return version ? formatVersion(version, text) : "";
 }
 
 function formatVersion(version: string | null, text: Pick<TextValue, "t">): string {

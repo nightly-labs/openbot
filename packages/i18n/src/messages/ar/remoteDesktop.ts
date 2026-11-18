@@ -72,4 +72,14 @@ export const messages = {
   "remoteDesktop.setup.seeDesktop": "أرى سطح المكتب",
   "remoteDesktop.setup.seeTestPanel": "أرى لوحة الاختبار",
   "remoteDesktop.setup.finishTest": "إنهاء الاختبار",
+  "remoteDesktop.host.questionTitle": "{name} يريد التحكم في هذا الحاسوب",
+  "remoteDesktop.host.questionDetail":
+    "سيرى {name} شاشتك ويمكنه استخدام الفأرة ولوحة المفاتيح. إذا لم ترد خلال 30 ثانية، يرفض OpenBot الطلب.",
+  "remoteDesktop.host.allow": "سماح",
+  "remoteDesktop.host.deny": "رفض",
+  "remoteDesktop.host.startedTitle": "بدأ التحكم عن بُعد",
+  "remoteDesktop.host.startedBody": "{name} يتحكم في هذا الحاسوب الآن.",
+  "remoteDesktop.host.trayTooltip": "OpenBot: التحكم عن بُعد قيد التشغيل",
+  "remoteDesktop.host.trayControlledBy": "{name} يتحكم في هذا الحاسوب",
+  "remoteDesktop.host.stopAll": "إيقاف كل التحكم عن بُعد",
 } as const satisfies PartialTranslation<typeof source>;

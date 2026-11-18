@@ -1,10 +1,10 @@
 {
-  "version": "0.60.0",
+  "version": "0.72.0",
   "highlights": [
-    "Talk to your agents from WhatsApp: link a number under Marketplace → Apps → WhatsApp.",
-    "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
-    "OpenBot is now available in Arabic, with a right-to-left layout.",
-    "Turn models off for each provider, and find the newest models first in the model picker.",
-    "Owners and admins can see an Audit log of member, role and agent access changes in Server settings."
+    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
+    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
+    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
+    "Answer an agent in the agent dock chat without the main window.",
+    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
   ]
 }

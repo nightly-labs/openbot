@@ -45,6 +45,8 @@ export const messages = {
   "onboarding.provider.clineAccount": "Бесплатные модели с аккаунтом Cline",
   "onboarding.provider.kimiAccount": "Модели Kimi с аккаунтом Kimi Code",
   "onboarding.provider.devinAccount": "Много моделей с аккаунтом Devin",
+  "onboarding.provider.copilotAccount": "Много моделей с планом Copilot",
+  "onboarding.provider.mistralAccount": "Модели Mistral с аккаунтом Mistral",
   "onboarding.provider.hermesNous": "Подписка Nous Portal или ваша настройка Hermes",
   "onboarding.provider.inceptionKey": "Модели Mercury с ключом API Inception",
   "onboarding.provider.deepseekKey": "Модели DeepSeek с ключом API DeepSeek",
@@ -100,7 +102,7 @@ export const messages = {
   "onboarding.action.connect": "Подключить",
   "onboarding.action.open": "Открыть OpenBot",
   "onboarding.action.next": "Далее",
-  "onboarding.server.title": "Настройка: {server}",
+  "onboarding.server.title": "Добро пожаловать на {server}",
   "onboarding.server.description":
     "OpenBot не включает подписку на ИИ. Подключите к этому серверу своего провайдера, прежде чем создавать агента.",
   "onboarding.server.label": "Выберите провайдера ИИ для этого сервера",

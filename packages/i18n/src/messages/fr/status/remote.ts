@@ -46,4 +46,6 @@ export const messages = {
     other: "Reconnexion {attempt}/{count}\n{detail}",
   },
   "status.remote.reconnecting": { one: "Reconnexion {attempt}/{count}", other: "Reconnexion {attempt}/{count}" },
+  "status.remote.messageCut":
+    "[{size} Mo de ce message ne sont pas affichés sur cet appareil. Ouvrez-le sur l’ordinateur qui exécute le serveur pour le lire en entier.]",
 } as const satisfies PartialTranslation<typeof source>;

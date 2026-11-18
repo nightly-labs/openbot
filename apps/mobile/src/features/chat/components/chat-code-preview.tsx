@@ -10,12 +10,14 @@ import { memo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useUniwind } from "uniwind";
+import type { BubbleTone } from "@/features/chat/model/bubble-tone";
 import { type CodePreviewEntry, storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import HtmlPreview from "./html-preview.dom";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
@@ -29,6 +31,12 @@ const PREVIEW_ASPECT = 2;
 const DIAGRAM_MIN_HEIGHT = 72;
 /** The card is as wide as the bubble allows, as an image attachment is. */
 const CARD_SIDE_SPACE = 80;
+/**
+ * The inner width that a card last had, by the width of the window. The list draws a card again
+ * each time its row scrolls into view. With this width the card has its picture, at its final
+ * height, from its first layout; else its row would have two heights each time.
+ */
+const knownCardWidths = new Map<number, number>();
 
 /**
  * A ```html or ```mermaid block in a reply, or the page of a visual reply: a card with a header and
@@ -42,12 +50,15 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   language,
   streaming = false,
   file,
+  tone,
 }: {
   kind: ChatPreviewKind;
   text: string;
   language?: string;
   streaming?: boolean;
   file?: CodePreviewEntry["file"];
+  /** The colors of a bubble with a message color, which the card and its header take. */
+  tone?: BubbleTone;
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
@@ -55,10 +66,13 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   const settled = useListSettled();
   // A web view starts only once the chat shows its history, so it does not slow the chat that opens.
   const historyShown = useHistoryShown();
-  const [muted, foreground] = useThemeColor(["muted", "foreground"]);
+  const [themeMuted, themeForeground] = useThemeColor(["muted", "foreground"]);
+  const muted = tone?.muted ?? themeMuted;
+  const foreground = tone?.foreground ?? themeForeground;
+  const line = tone ? { borderColor: tone.line } : undefined;
   const [pressed, setPressed] = useState(false);
-  const [width, setWidth] = useState(0);
   const screen = useWindowDimensions();
+  const [width, setWidth] = useState(() => knownCardWidths.get(screen.width) ?? 0);
   const previewHeight = Math.round(width / PREVIEW_ASPECT);
   const title = kind === "html" ? t("mobile.chat.preview.htmlTitle") : t("mobile.chat.preview.mermaidTitle");
   const lineCount = text.split("\n").length;
@@ -72,7 +86,11 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       onPressOut={() => setPressed(false)}
       style={{ width: screen.width - CARD_SIDE_SPACE, maxWidth: "100%" }}
       // The picture fills the card inside its 1-point border.
-      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width) - 2)}
+      onLayout={(event) => {
+        const inner = Math.round(event.nativeEvent.layout.width) - 2;
+        if (inner > 0) knownCardWidths.set(screen.width, inner);
+        setWidth(inner);
+      }}
       onPress={() => {
         void haptics.impact("soft");
         const previewId = storeCodePreview({ kind, source: text, language, ...(file ? { file } : {}) });
@@ -80,8 +98,10 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       }}
     >
       <Animated.View
-        className="overflow-hidden border border-separator bg-control/50"
+        className={`overflow-hidden border ${tone ? "" : "border-separator bg-control/50"}`}
         style={{
+          ...line,
+          backgroundColor: tone?.panel,
           borderRadius: 18,
           borderCurve: "continuous",
           transform: [{ scale: pressed && !reducedMotion ? 0.97 : 1 }],
@@ -90,22 +110,39 @@ export const ChatCodePreview = memo(function ChatCodePreview({
           transitionTimingFunction: PRESS_EASING,
         }}
       >
-        <View className="flex-row items-center gap-2.5 border-b border-separator px-3 py-2.5">
+        <View
+          className={`flex-row items-center gap-2.5 border-b px-3 py-2.5 ${tone ? "" : "border-separator"}`}
+          style={line}
+        >
           <Icon size={18} color={String(foreground)} />
           <View className="min-w-0 shrink grow flex-row items-baseline gap-2">
-            <Typography.Paragraph type="body-sm" className="shrink font-semibold text-foreground" numberOfLines={1}>
+            <Typography.Paragraph
+              type="body-sm"
+              className="shrink font-semibold text-foreground"
+              numberOfLines={1}
+              style={tone ? { color: tone.foreground } : undefined}
+            >
               {title}
             </Typography.Paragraph>
-            <Typography.Paragraph type="body-xs" className="text-muted" numberOfLines={1}>
+            <Typography.Paragraph
+              type="body-xs"
+              className="text-muted"
+              numberOfLines={1}
+              style={tone ? { color: tone.muted } : undefined}
+            >
               {t("mobile.chat.preview.lines", { count: lineCount })}
             </Typography.Paragraph>
           </View>
-          <ChevronRight size={18} color={String(muted)} />
+          <ChevronRight size={18} color={String(muted)} style={MIRROR_IN_RTL} />
         </View>
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {streaming ? (
-            <CodeExcerpt text={text} />
-          ) : width <= 0 ? null : !settled || (kind === "html" && !historyShown) ? (
+            <CodeExcerpt text={text} color={tone?.muted} />
+          ) : width <= 0 ? (
+            // The first card of a window width has no width yet. The space of the picture is kept by
+            // its shape, so the card does not grow when its width is known.
+            <View style={{ aspectRatio: PREVIEW_ASPECT }} />
+          ) : !settled || (kind === "html" && !historyShown) ? (
             <View style={{ height: previewHeight }} />
           ) : kind === "html" ? (
             <HtmlCardPreview text={text} title={title} height={previewHeight} />
@@ -118,7 +155,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   );
 });
 
-function CodeExcerpt({ text }: { text: string }) {
+function CodeExcerpt({ text, color }: { text: string; color?: string }) {
   // Each line keeps its row in the block, which is a stable key while the block streams.
   const excerpt = text
     .split("\n")
@@ -126,14 +163,18 @@ function CodeExcerpt({ text }: { text: string }) {
     .filter(({ line }) => line.trim())
     .slice(0, EXCERPT_LINES);
   return (
-    <View className="gap-0.5 px-3 py-2.5">
+    <View className="gap-0.5 px-3 py-2.5" style={CODE_LAYOUT_STYLE}>
       {excerpt.map(({ line, row }, index) => (
         <Typography.Code
           key={row}
           numberOfLines={1}
           className="bg-transparent p-0 text-muted"
           // The last line fades, so the excerpt reads as the start of a longer block.
-          style={{ fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 }}
+          style={[
+            CODE_TEXT_STYLE,
+            { fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 },
+            color ? { color } : undefined,
+          ]}
         >
           {line}
         </Typography.Code>

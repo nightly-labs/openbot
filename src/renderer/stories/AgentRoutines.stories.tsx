@@ -72,7 +72,7 @@ function RoutinesStory(props: {
   return (
     <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
       <AgentRoutinesSettings
-        port={agentRoutinesPort("chief", false, props.localHost === true, mock.api.agent)}
+        port={agentRoutinesPort("chief", undefined, props.localHost === true, mock.api.agent)}
         onCountChange={fn()}
         onBack={fn()}
         onClose={fn()}
@@ -137,21 +137,21 @@ function WebhookRoutineStory() {
 
 function FullSettingsPanelStory() {
   const previousApi = window.openbot;
-  const previousWidth = window.localStorage.getItem("openbot:settings-panel-width");
+  const previousWidth = window.localStorage.getItem("openbot:side-panel-width");
   const mock = createMockOpenBot({ routines: { chief: storyRoutines } });
   window.openbot = mock.api;
   mock.api.agent.listRoutineRuns = async (input) =>
     input.routineId === morningBrief.id ? structuredClone(fullPanelRuns) : [];
-  window.localStorage.setItem("openbot:settings-panel-width", "380");
+  window.localStorage.setItem("openbot:side-panel-width", "380");
 
   onCleanup(() => {
     mock.dispose();
     window.openbot = previousApi;
     if (previousWidth === null) {
-      window.localStorage.removeItem("openbot:settings-panel-width");
+      window.localStorage.removeItem("openbot:side-panel-width");
       return;
     }
-    window.localStorage.setItem("openbot:settings-panel-width", previousWidth);
+    window.localStorage.setItem("openbot:side-panel-width", previousWidth);
   });
 
   return (
@@ -184,7 +184,7 @@ function FullSettingsPanelStory() {
 const meta = {
   title: "Settings/Agent Routines",
   component: AgentRoutinesSettings,
-  args: { port: agentRoutinesPort("chief", false, false, createMockOpenBot().api.agent), onCountChange: fn() },
+  args: { port: agentRoutinesPort("chief", undefined, false, createMockOpenBot().api.agent), onCountChange: fn() },
   parameters: { layout: "centered", a11y: { test: "error" } },
 } satisfies Meta<typeof AgentRoutinesSettings>;
 

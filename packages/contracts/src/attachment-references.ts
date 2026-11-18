@@ -7,6 +7,7 @@ export interface AttachmentReference {
 }
 
 const ATTACHMENT_REFERENCE_PATTERN = /@\[([^\x5d\r\n]+)\]\(attachment:([^)\r\n]+)\)/gu;
+const ATTACHMENT_REFERENCE_AT_START = new RegExp(`^${ATTACHMENT_REFERENCE_PATTERN.source}`, "u");
 
 export function serializeAttachmentReference(name: string, attachmentId: string): string {
   const safeName = name.replace(/[\x5d\r\n]+/gu, " ").trim() || "file";
@@ -22,6 +23,13 @@ export function attachmentReferences(value: string): AttachmentReference[] {
     end: (match.index ?? 0) + match[0].length,
     marker: match[0],
   }));
+}
+
+/** The marker at the start of `value`, for a Markdown tokenizer. Only offset 0 is tested. */
+export function attachmentReferenceAt(value: string): AttachmentReference | undefined {
+  const match = ATTACHMENT_REFERENCE_AT_START.exec(value);
+  if (!match) return undefined;
+  return { attachmentId: match[2] ?? "", name: match[1] ?? "file", start: 0, end: match[0].length, marker: match[0] };
 }
 
 export function attachmentReferenceIds(value: string): Set<string> {

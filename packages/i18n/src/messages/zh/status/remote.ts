@@ -41,4 +41,5 @@ export const messages = {
     other: "正在重连 {attempt}/{count}\n{detail}",
   },
   "status.remote.reconnecting": { one: "正在重连 {attempt}/{count}", other: "正在重连 {attempt}/{count}" },
+  "status.remote.messageCut": "[此消息有 {size} MB 未在此设备上显示。请在运行服务器的电脑上打开以阅读全文。]",
 } as const satisfies PartialTranslation<typeof source>;

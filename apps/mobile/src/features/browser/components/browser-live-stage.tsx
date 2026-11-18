@@ -24,6 +24,8 @@ import {
   type LiveViewButton,
   type LiveViewGestureHost,
   type LiveViewMode,
+  type LiveViewPinch,
+  pinchedZoom,
 } from "../model/live-view-gestures";
 import { BrowserCursor } from "./browser-cursor";
 
@@ -76,8 +78,19 @@ export function BrowserLiveStage({
   const fitted = useSharedValue<Rect>(EMPTY_RECT);
   const zoom = useSharedValue<Zoom>(NO_ZOOM);
   const pointer = useSharedValue<Point>(CENTER);
+  // While two fingers zoom or pan the picture, the UI thread moves it from the touches.
+  const pinch = useSharedValue<LiveViewPinch | null>(null);
   // The gestures run on the JS thread and read these; the shared values are what the UI thread draws.
-  const current = useRef({ stage, frame, mode, zoom: NO_ZOOM, pointer: CENTER, drawnSequence, send });
+  const current = useRef({
+    stage,
+    frame,
+    mode,
+    zoom: NO_ZOOM,
+    pinching: false,
+    pointer: CENTER,
+    drawnSequence,
+    send,
+  });
   current.current.stage = stage;
   current.current.frame = frame;
   current.current.mode = mode;
@@ -87,9 +100,20 @@ export function BrowserLiveStage({
   const setZoom = useCallback(
     (next: Zoom) => {
       current.current.zoom = next;
-      zoom.value = next;
+      // A pinch computes the same zoom from the same touches on the UI thread, a frame sooner.
+      if (!current.current.pinching) zoom.value = next;
     },
     [zoom],
+  );
+  const setPinch = useCallback(
+    (start: LiveViewPinch | null) => {
+      current.current.pinching = start !== null;
+      pinch.value = start;
+      // The JS thread saw every touch of the pinch, so its zoom is the last one drawn, or a newer one
+      // when the stage changed size during the pinch.
+      if (!start) zoom.value = current.current.zoom;
+    },
+    [pinch, zoom],
   );
   const setPointer = useCallback(
     (next: Point) => {
@@ -143,6 +167,7 @@ export function BrowserLiveStage({
       press: (action, at, button, clickCount) => current.current.send(pointerInput(action, at, button, clickCount)),
       wheel: (at, deltaX, deltaY) => current.current.send(pointerInput("wheel", at, "left", 1, deltaX, deltaY)),
       setZoom,
+      pinch: setPinch,
       feedback: (kind) => {
         void (kind === "secondary-click" ? haptics.impact("medium") : haptics.selection());
       },
@@ -157,7 +182,7 @@ export function BrowserLiveStage({
         return () => cancelAnimationFrame(id);
       },
     });
-  }, [setPointer, setZoom]);
+  }, [setPinch, setPointer, setZoom]);
   useEffect(() => () => gestures.cancel(), [gestures]);
 
   useImperativeHandle(
@@ -181,6 +206,8 @@ export function BrowserLiveStage({
   const touches = useMemo(() => {
     // The callbacks run on the UI thread, where the gesture's state can change: a call to the state
     // manager from the JS thread only logs a warning. The touches go to the gestures on the JS thread.
+    // A pinch moves the picture here, so it follows the fingers at the display rate while the JS
+    // thread decodes frames.
     const { down, move, up, cancel } = gestures;
     return Gesture.Manual()
       .onTouchesDown((event, manager) => {
@@ -190,6 +217,12 @@ export function BrowserLiveStage({
       })
       .onTouchesMove((event) => {
         "worklet";
+        const started = pinch.value;
+        if (started) {
+          const first = event.allTouches.find((held) => held.id === started.ids[0]);
+          const second = event.allTouches.find((held) => held.id === started.ids[1]);
+          if (first && second) zoom.value = pinchedZoom(started, first, second);
+        }
         scheduleOnRN(move, event.allTouches.map(touch), Date.now());
       })
       .onTouchesUp((event, manager) => {
@@ -205,7 +238,7 @@ export function BrowserLiveStage({
         manager.end();
         scheduleOnRN(cancel);
       });
-  }, [gestures]);
+  }, [gestures, pinch, zoom]);
 
   const transform = useDerivedValue(() => [
     { translateX: zoom.value.x },

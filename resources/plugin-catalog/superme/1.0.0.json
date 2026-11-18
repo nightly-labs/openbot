@@ -1,0 +1,39 @@
+{
+  "slug": "superme",
+  "name": "SuperMe",
+  "tagline": "Advice from experienced people",
+  "description": "SuperMe lets agents ask questions to AI profiles that professionals train on their own writing and work, and get answers based on their experience. Each user signs in to their own SuperMe account through the browser.",
+  "category": "research",
+  "creatorName": "SuperMe",
+  "iconUrl": "https://www.superme.ai/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-pricing-advice", "text": "Ask people who have run B2B startups how they set their first prices." },
+    {
+      "id": "prompt-hiring",
+      "text": "What do experienced engineering managers say about hiring the first platform engineer?"
+    },
+    {
+      "id": "prompt-fundraise",
+      "text": "Find people who have raised a seed round and summarize their advice on investor updates."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-superme-mcp",
+      "name": "SuperMe",
+      "description": "Questions to experts' AI profiles, over SuperMe's MCP server with browser sign-in.",
+      "iconUrl": "https://www.superme.ai/apple-touch-icon.png",
+      "server": {
+        "name": "superme",
+        "transport": "http",
+        "url": "https://mcp.superme.ai/mcp",
+        "auth": [{ "id": "superme-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.superme.ai",
+  "privacyPolicyUrl": "https://www.superme.ai/privacy",
+  "termsUrl": "https://www.superme.ai/terms",
+  "skills": []
+}

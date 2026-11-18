@@ -45,7 +45,9 @@ const config = {
     const plugins = (mergedConfig.plugins ?? []).filter((plugin: PluginOption) => !isLegacySolidPlugin(plugin));
     return {
       ...mergedConfig,
-      plugins: [...plugins, solidPlugin()],
+      // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
+      // in a chat drop frames that the built app does not drop. Set this to true for a trace.
+      plugins: [...plugins, solidPlugin({ performanceTracks: false })],
     };
   },
 } satisfies StorybookConfig;

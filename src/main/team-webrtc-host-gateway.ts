@@ -1,3 +1,4 @@
+import { SIGNAL_NO_READY_CLOSE_CODE } from "@openbot/contracts/signal-protocol/messages";
 import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -12,8 +13,15 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
     hostId: string,
     failedSignalUrl?: string,
   ) => Effect.Effect<{ signalUrl: string; ticket: string }, RemoteWorkflowError>;
+  /**
+   * True when the account service refused a `renewSignal` for good, such as for a machine token that it
+   * no longer accepts. The same request cannot succeed, so the host does not send it again.
+   */
+  renewalRefused?: (cause: unknown) => boolean;
   /** `reason` names the last Signal close or error code for the log, never its text. */
   onSignalRecoveryFailure?: (error: Error, reason: string) => void;
+  /** True when devices could not reach the host through Signal for a long time; false when they can again. */
+  onSignalLost?: (lost: boolean) => void;
   /** Whether devices may connect only over a private network, such as the Wi-Fi or Tailscale. */
   privateNetwork?: () => boolean;
 }
@@ -21,8 +29,15 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
 const logger = createOpenBotLogger("team-webrtc-host");
 
 // How long the host's Signal socket can stay closed before the host asks for another Signal machine.
-// The time starts at the first close and stops when Signal accepts the host again.
+// The time starts at the first close and stops when Signal accepts the host again. Each move that does
+// not make the socket ready doubles the time, up to `SIGNAL_MOVE_LIMIT_MS`. With a fixed time, a host
+// that reached no home asked for a ticket about every 50 s (20 s here and the 30 s ready wait) without end.
 const SIGNAL_MOVE_AFTER_MS = 20_000;
+const SIGNAL_MOVE_LIMIT_MS = 10 * 60_000;
+// A host with no `ready` for this long reports the lost registration, so `openbot status` and the
+// app show it (#3749). The host stays `online`: a restart would drop the devices that are connected
+// now. It is longer than the reconnect backoff, so a Signal restart does not cause it.
+const SIGNAL_LOST_REPORT_AFTER_MS = 3 * 60_000;
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -112,12 +127,19 @@ export class TeamWebRtcHostGateway {
   // The Signal URL of the host's registration, which a move names as the failed one.
   #signalUrl: string | null = null;
   #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
+  #signalLostTimer: ReturnType<typeof setTimeout> | null = null;
+  #signalLostReported = false;
   // Set when the hidden window ends the host peer for good during a move, as it does after
   // `authentication_required` or close code 4000.
   #signalEnded = false;
   // The host's ticket names a home Signal machine. Only then can a move find another machine; the entry
   // Signal moves by DNS, and the hidden window keeps the device peers while it connects again.
   #signalHomed = false;
+  // The moves since Signal last accepted the host. Each one doubles the time before the next.
+  #signalMoves = 0;
+  // The account service refused a Signal ticket for good. No move or renewal is sent until the next start, which
+  // registers the host again and gets a new machine token.
+  #signalRenewalRefused = false;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
@@ -155,10 +177,13 @@ export class TeamWebRtcHostGateway {
     },
   ) {
     this.#hostId = input.hostId;
+    this.#signalLostReported = false;
     this.#lastSignalEnd = null;
     this.#signalUrl = input.signalUrl;
     this.#signalEnded = false;
     this.#signalHomed = ticketNamesSignalHome(input.ticket);
+    this.#signalMoves = 0;
+    this.#signalRenewalRefused = false;
     this.#localApiPort = input.localApiPort;
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
@@ -175,6 +200,14 @@ export class TeamWebRtcHostGateway {
     );
   }).bind(this);
 
+  /**
+   * Loads the bridge window before the Signal ticket exists. `start` then uses the same load, so a
+   * host start does not wait for the window after its account requests.
+   */
+  readonly prepare = Effect.fn("HostGateway.prepare")(function* (this: TeamWebRtcHostGateway) {
+    yield* this.#bridge.start();
+  }).bind(this);
+
   readonly stop = Effect.fn("HostGateway.stop")(function* (this: TeamWebRtcHostGateway) {
     if (this.#stopping) return yield* Deferred.await(this.#stopping);
     const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();
@@ -182,9 +215,13 @@ export class TeamWebRtcHostGateway {
     return yield* Effect.gen({ self: this }, function* () {
       const hostId = this.#hostId;
       this.#hostId = null;
+      this.#signalLostReported = false;
       this.#localApiPort = null;
       this.#signalUrl = null;
+      this.#signalMoves = 0;
+      this.#signalRenewalRefused = false;
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
       if (this.#signalRecovery) yield* Fiber.interrupt(this.#signalRecovery);
       yield* this.#clearPeers();
@@ -272,6 +309,7 @@ export class TeamWebRtcHostGateway {
     if (peerId === this.#hostId) {
       this.#signalEnded = true;
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
       const fiber = this.#runtime.runFork(this.#clearPeers());
       this.#operations.add(fiber);
       fiber.addObserver(() => this.#operations.delete(fiber));
@@ -297,20 +335,70 @@ export class TeamWebRtcHostGateway {
     if (terminal) {
       logger.warn(`Host Signal socket closed with code ${code}; it does not connect again.`);
       this.#cancelSignalMove();
+      this.#cancelSignalLostReport();
     } else {
-      logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
+      if (code === SIGNAL_NO_READY_CLOSE_CODE)
+        logger.warn("Host Signal socket did not answer in time; it connects again.");
+      else logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
       this.#scheduleSignalMove();
+      this.#scheduleSignalLostReport();
     }
   };
 
   readonly #onSignalReady = (peerId: string): void => {
-    if (peerId === this.#hostId) this.#cancelSignalMove();
+    if (peerId !== this.#hostId) return;
+    this.#signalMoves = 0;
+    this.#cancelSignalMove();
+    this.#cancelSignalLostReport();
+    if (this.#signalLostReported) {
+      this.#signalLostReported = false;
+      logger.info("Host Signal socket is ready again.");
+      this.#options.onSignalLost?.(false);
+    }
+  };
+
+  // One timer for each outage, as for the move.
+  #scheduleSignalLostReport(): void {
+    if (this.#signalLostTimer !== null || !this.#hostId) return;
+    this.#signalLostTimer = setTimeout(this.#reportSignalLost, SIGNAL_LOST_REPORT_AFTER_MS);
+  }
+
+  #cancelSignalLostReport(): void {
+    if (this.#signalLostTimer !== null) clearTimeout(this.#signalLostTimer);
+    this.#signalLostTimer = null;
+  }
+
+  readonly #reportSignalLost = (): void => {
+    this.#signalLostTimer = null;
+    if (!this.#hostId) return;
+    // A start or a recovery reports its own failure.
+    if (this.#connecting || this.#signalRecovery) {
+      this.#scheduleSignalLostReport();
+      return;
+    }
+    if (this.#signalLostReported) return;
+    this.#signalLostReported = true;
+    logger.warn(
+      `Host Signal socket not ready ${SIGNAL_LOST_REPORT_AFTER_MS / 60_000} minutes after ${this.#lastSignalEnd ?? "a close"}.`,
+    );
+    this.#options.onSignalLost?.(true);
   };
 
   // One timer for each outage: a later close does not start the time again.
   #scheduleSignalMove(): void {
-    if (this.#signalMoveTimer !== null || !this.#hostId || !this.#signalHomed || !this.#options.renewSignal) return;
-    this.#signalMoveTimer = setTimeout(this.#moveSignal, SIGNAL_MOVE_AFTER_MS);
+    if (
+      this.#signalMoveTimer !== null ||
+      !this.#hostId ||
+      !this.#signalHomed ||
+      this.#signalRenewalRefused ||
+      !this.#options.renewSignal
+    )
+      return;
+    this.#signalMoveTimer = setTimeout(this.#moveSignal, this.#signalMoveDelay());
+  }
+
+  #signalMoveDelay(): number {
+    return Math.min(SIGNAL_MOVE_AFTER_MS * 2 ** this.#signalMoves, SIGNAL_MOVE_LIMIT_MS);
   }
 
   #cancelSignalMove(): void {
@@ -320,7 +408,9 @@ export class TeamWebRtcHostGateway {
 
   // The home Signal machine did not accept the host again in time. The account service gets its URL
   // as the failed one and can give the host another home. When the ticket request or the new
-  // connection fails, the hidden window continues to connect and the host tries again later.
+  // connection fails, the hidden window continues to connect and the host tries again later. When the
+  // account service refuses the ticket for good, such as for a machine token that it no longer accepts
+  // (401), the host stops asking: a start registers it again.
   readonly #moveSignal = (): void => {
     this.#signalMoveTimer = null;
     const hostId = this.#hostId;
@@ -330,19 +420,28 @@ export class TeamWebRtcHostGateway {
       return;
     }
     logger.warn(`Host Signal socket is not ready after ${this.#lastSignalEnd ?? "a close"}; it asks for a new home.`);
+    // A move that succeeds but does not make the socket ready also counts: the next close starts a
+    // longer time.
+    this.#signalMoves += 1;
     const fiber = this.#runtime.runFork(
       this.#recoverSignal(hostId, this.#signalUrl ?? undefined).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
+            const refused = this.#noteRenewalRefused(cause);
             if (this.#signalEnded) {
               this.#options.onSignalRecoveryFailure?.(
                 cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
-                `move failed after ${this.#lastSignalEnd ?? "a Signal close"}`,
+                `move ${refused ? "refused" : "failed"} after ${this.#lastSignalEnd ?? "a Signal close"}`,
               );
               return;
             }
-            logger.warn("Host Signal move failed; the host tries again later.");
+            // The socket still connects again to its home, which can come back. A long outage shows as
+            // the lost registration.
+            if (refused) return;
+            logger.warn(
+              `Host Signal move failed; the host tries again in ${Math.round(this.#signalMoveDelay() / 1000)} s.`,
+            );
             this.#scheduleSignalMove();
           }),
         ),
@@ -365,6 +464,7 @@ export class TeamWebRtcHostGateway {
       peerId !== this.#hostId ||
       !this.#options.renewSignal ||
       this.#signalRecovery ||
+      this.#signalRenewalRefused ||
       (code !== "authentication_required" && code !== "session_revoked")
     )
       return;
@@ -372,11 +472,12 @@ export class TeamWebRtcHostGateway {
       this.#recoverSignal(peerId).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
-            if (this.#hostId === peerId)
-              this.#options.onSignalRecoveryFailure?.(
-                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
-                `recovery failed after ${this.#lastSignalEnd ?? "a Signal error"}`,
-              );
+            if (this.#hostId !== peerId) return;
+            this.#noteRenewalRefused(cause);
+            this.#options.onSignalRecoveryFailure?.(
+              cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+              `recovery failed after ${this.#lastSignalEnd ?? "a Signal error"}`,
+            );
           }),
         ),
       ),
@@ -386,6 +487,17 @@ export class TeamWebRtcHostGateway {
       if (this.#signalRecovery === fiber) this.#signalRecovery = null;
     });
   };
+
+  // The account service refused a Signal ticket for good. No move or renewal is sent until the next
+  // start, which registers the host again.
+  #noteRenewalRefused(cause: unknown): boolean {
+    if (this.#options.renewalRefused?.(cause) !== true) return false;
+    if (!this.#signalRenewalRefused)
+      logger.warn("The account service refused the host Signal ticket; the host does not ask again.");
+    this.#signalRenewalRefused = true;
+    this.#cancelSignalMove();
+    return true;
+  }
 
   readonly #recoverSignal = Effect.fn("HostGateway.recoverSignal")(function* (
     this: TeamWebRtcHostGateway,

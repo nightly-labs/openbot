@@ -12,6 +12,10 @@ const GROK_BOT = "Grok Bot";
 export interface AgentImportSourcesProps {
   /** The Transfer tab is there: this computer, or a server the user administers. */
   transfer: boolean;
+  /** Where the Hermes folder is read: this computer, or the joined server. Not set: Hermes offers only the export. */
+  hermesFolder?: "computer" | "server" | undefined;
+  /** The agents go to a joined server, not to this computer. */
+  onServer?: boolean | undefined;
   onHermes: () => void;
   onGrok: () => void;
   onTransfer: () => void;
@@ -21,19 +25,23 @@ export interface AgentImportSourcesProps {
 export function AgentImportSources(props: AgentImportSourcesProps) {
   const { t } = useText();
   const headingId = `agent-import-sources-${createUniqueId()}`;
+  function hermesNote() {
+    if (props.hermesFolder === "server") return "import.source.hermesNoteServer";
+    return props.hermesFolder === "computer" ? "import.source.hermesNote" : "import.source.hermesNoteExport";
+  }
   return (
     <section class="agent-import-guide" aria-labelledby={headingId}>
       <header class="agent-import-intro">
         <h3 id={headingId} class="agent-import-heading">
           {t("import.source.title")}
         </h3>
-        <p class="agent-import-lede">{t("import.source.lede")}</p>
+        <p class="agent-import-lede">{t(props.onServer ? "import.source.ledeServer" : "import.source.lede")}</p>
       </header>
       <ul class="agent-import-sources">
         <li>
           <SourceButton
             title={HERMES_AGENT}
-            note={t("import.source.hermesNote")}
+            note={t(hermesNote())}
             icon={<HermesLogo class="agent-import-source-logo" />}
             onClick={props.onHermes}
           />

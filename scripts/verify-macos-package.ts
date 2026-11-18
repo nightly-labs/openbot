@@ -48,7 +48,9 @@ const packagedIconCatalogPath = resolve(resourcesPath, "Assets.car");
 const sourceIconCatalogPath = resolve("build/macos/Assets.car");
 const plistPath = resolve(contentsPath, "Info.plist");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
-const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
+const voiceRuntimeLibraries = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
+// ONNX Runtime session settings that the voice hosts read. It is text, not a library.
+const voiceSessionSettingsPath = resolve(voiceRuntimePath, "no-arena.cfg");
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin", architecture);
 const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
 // The database host is spawned by path as its own process, so it has to survive the asar unchanged.
@@ -76,10 +78,13 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE")),
   access(resolve(resourcesPath, "licenses/Underdog-Bark-3.0-Plus-LICENSE")),
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Cohere-Transcribe-LICENSE")),
   access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
-  ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
+  ...voiceRuntimeLibraries.map((name) => access(resolve(voiceRuntimePath, name))),
+  access(voiceSessionSettingsPath),
   access(databaseHostPath),
   access(voiceHostPath),
   access(speechHostPath),
@@ -162,18 +167,23 @@ const executableArchitecture = run("file", [executablePath]);
 if (!executableArchitecture.includes(machOArchitecture)) {
   throw new Error(`Expected a ${machOArchitecture} executable: ${executableArchitecture}`);
 }
-for (const name of voiceRuntimeFiles) {
+for (const name of voiceRuntimeLibraries) {
   const path = resolve(voiceRuntimePath, name);
   const voiceArchitecture = run("file", [path]);
   if (!voiceArchitecture.includes(machOArchitecture)) {
     throw new Error(`Expected a ${machOArchitecture} voice runtime library: ${voiceArchitecture}`);
   }
 }
-// The Parakeet, Bark, Whisper and Supertonic models are downloaded on demand.
+// The dictation models and Supertonic are downloaded on demand.
 if (
-  ["voice/model", "voice/bark-3.0-plus-int8", "voice/whisper-turbo-int8", "voice/supertonic-3-int8"].some((path) =>
-    existsSync(resolve(resourcesPath, path)),
-  ) ||
+  [
+    "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
+    "voice/bark-3.0-plus-int8",
+    "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
+    "voice/supertonic-3-int8",
+  ].some((path) => existsSync(resolve(resourcesPath, path))) ||
   ["encoder.int8.onnx", "turbo-encoder.int8.onnx", "vocoder.int8.onnx"].some((name) =>
     existsSync(resolve(voiceRuntimePath, name)),
   )

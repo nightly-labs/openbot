@@ -42,6 +42,8 @@ export const messages = {
   "onboarding.provider.clineAccount": "Cline 계정으로 쓰는 무료 모델",
   "onboarding.provider.kimiAccount": "Kimi Code 계정으로 쓰는 Kimi 모델",
   "onboarding.provider.devinAccount": "Devin 계정으로 쓰는 다양한 모델",
+  "onboarding.provider.copilotAccount": "Copilot 요금제로 쓰는 다양한 모델",
+  "onboarding.provider.mistralAccount": "Mistral 계정으로 쓰는 Mistral 모델",
   "onboarding.provider.hermesNous": "Nous Portal 요금제 또는 내 Hermes 설정",
   "onboarding.provider.inceptionKey": "Inception API 키로 쓰는 Mercury 모델",
   "onboarding.provider.deepseekKey": "DeepSeek API 키로 쓰는 DeepSeek 모델",
@@ -97,7 +99,7 @@ export const messages = {
   "onboarding.action.connect": "연결",
   "onboarding.action.open": "OpenBot 열기",
   "onboarding.action.next": "다음",
-  "onboarding.server.title": "{server} 설정",
+  "onboarding.server.title": "{server}에 오신 것을 환영합니다",
   "onboarding.server.description":
     "OpenBot에는 AI 구독이 포함돼 있지 않아요. 에이전트를 만들기 전에 이 서버에 사용할 제공자를 연결해 주세요.",
   "onboarding.server.label": "이 서버의 AI 제공자 선택",

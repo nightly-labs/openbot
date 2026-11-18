@@ -21,6 +21,9 @@ import { appListings } from "../model/marketplace-listings";
 import { pluginConnectMethod } from "../model/plugin-connect";
 import { usePluginConnect } from "../model/use-plugin-connect";
 
+/** The address that the sign-in page opens at its end: a local address with the code. */
+const PASTE_PLACEHOLDER = "http://localhost/callback?code=…";
+
 /**
  * The second page of an app's sheet: the key the app asks for, or its browser sign-in. The server
  * tests the key before it saves the app; a sign-in ends on the server, which keeps the grant.
@@ -32,7 +35,7 @@ export function MarketplaceAppConnectScreen() {
   const { serverId, slug } = useLocalSearchParams<{ serverId: string; slug: string }>();
   const { session } = useMobileSession();
   const listing = session?.apiUrl ? appListings(session.apiUrl).find((item) => item.id === slug) : undefined;
-  const plugin = listing?.kind === "app" ? listing.plugin : null;
+  const plugin = listing?.kind === "app" && listing.source === "plugin" ? listing.plugin : null;
   const app = plugin?.apps[0] ?? null;
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   const method = app ? pluginConnectMethod(app, canRelay) : null;
@@ -146,6 +149,7 @@ export function MarketplaceAppConnectScreen() {
               </Typography.Paragraph>
               <SheetFormField
                 label={t("mobile.marketplace.app.pasteLabel")}
+                placeholder={PASTE_PLACEHOLDER}
                 value={address}
                 autoCapitalize="none"
                 autoCorrect={false}

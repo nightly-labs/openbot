@@ -1,0 +1,33 @@
+{
+  "slug": "planningcenter",
+  "name": "Planning Center",
+  "tagline": "Church people, services and groups",
+  "description": "Planning Center lets agents read people, service plans, groups, registrations, check-ins, calendar, and giving data in the user's organization. Each user signs in to their own Planning Center account through the browser.",
+  "category": "productivity",
+  "creatorName": "Planning Center",
+  "iconUrl": "https://avatars.githubusercontent.com/u/8658275?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-sunday", "text": "Who is scheduled to serve this Sunday, and who has not confirmed?" },
+    { "id": "prompt-checkins", "text": "How did check-in attendance change over the last two months?" },
+    { "id": "prompt-groups", "text": "List the groups that meet on weekday evenings." }
+  ],
+  "apps": [
+    {
+      "id": "app-planningcenter-mcp",
+      "name": "Planning Center",
+      "description": "People, services, groups, and giving data, over Planning Center's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/8658275?s=256&v=4",
+      "server": {
+        "name": "planningcenter",
+        "transport": "http",
+        "url": "https://mcp.planningcenteronline.com/mcp",
+        "auth": [{ "id": "planningcenter-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.planningcenter.com",
+  "privacyPolicyUrl": "https://www.planningcenter.com/privacy",
+  "termsUrl": "https://www.planningcenter.com/terms",
+  "skills": []
+}

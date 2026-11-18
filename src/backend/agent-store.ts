@@ -77,7 +77,7 @@ import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { isEmptyStoredFile, parseStoredJson, writeFileAtomically } from "./atomic-json-file";
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
-import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { type OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
@@ -107,6 +107,8 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   browserProfileId?: string;
   // Absent on every agent stored before the setting existed, which leaves the service tier to Codex.
   fastMode?: boolean;
+  // Only with `fastMode: true`. An older OpenBot drops it and runs the Fast tier.
+  ultrafast?: boolean;
   // Absent means the app default, as for every agent stored before the setting existed.
   busyMessageMode?: BusyMessageMode;
   // Absent means the default task limit, as for every agent stored before tasks existed.
@@ -119,6 +121,8 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   usageLimitReturn?: AgentUsageLimitReturn;
   // Present only while a turn or task still runs on the previous provider.
   pendingRuntime?: AgentPendingRuntime;
+  // Present only after an agent chose the account. Absent on every agent stored before the pin existed.
+  pinnedAccountId?: string;
   // Present only while a user hides the agent. Absent on every agent stored before hiding existed.
   hiddenAt?: string;
 };
@@ -157,7 +161,7 @@ const LEGACY_AVATAR_COLORS = [
 
 const NEW_AGENT_PREVIEW = "No messages yet";
 /** The longest agent preview the store keeps; a longer text is cut to it. */
-export const AGENT_PREVIEW_MAX_LENGTH = 180;
+const AGENT_PREVIEW_MAX_LENGTH = 180;
 const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 // A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
@@ -175,6 +179,9 @@ const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "low";
 const LEGACY_AGENTS_STATE_FILE = "bots.json";
 const LEGACY_AGENTS_STATE_KEY = "bots";
 const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
+// The `command_id` of the one-time reset of Claude fast mode. Its receipt stops the reset from running
+// again, so the id never changes.
+const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
@@ -207,7 +214,8 @@ export class AgentStore {
   constructor(
     userDataPath: string,
     homePath: string,
-    database = new OpenBotDatabase(userDataPath),
+    /** The one connection of the process to `openbot.db`. The caller owns it; the store does not open one. */
+    database: OpenBotDatabase,
     agentDefaults: () => AgentDefaults = () => DEFAULT_AGENT_DEFAULTS,
     /** The folder of the agents, shared files and downloads. A local server has its own. */
     openbotRoot = join(homePath, "OpenBot"),
@@ -328,6 +336,7 @@ export class AgentStore {
           this.#database.deactivateProviderSessions(threadId);
         }
       }
+      this.#resetClaudeFastModeOnce();
       yield* this.#reconcileLegacyDirectoriesEffect();
       yield* this.#recoverPendingDuplicationsEffect();
       yield* this.#profileCreationRecovery.recover(this.#database, (agentId) =>
@@ -431,9 +440,15 @@ export class AgentStore {
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
+      // A named profile carries over; "Only this agent" would give the copy a new, empty session.
+      if (source.browserProfileId !== undefined) {
+        record.browserProfileId = source.browserProfileId;
+        record.ownBrowserSession = true;
+      }
       record.avatarSeed = source.avatarSeed;
       record.avatarHue = source.avatarHue;
       if (source.avatarColor) record.avatarColor = source.avatarColor;
+      if (source.chatColor) record.chatColor = source.chatColor;
 
       const stagedWorkspace = `${record.workspacePath}.openbot-stage`;
       const avatarDirectory = join(this.#avatarsRoot, record.id);
@@ -695,6 +710,8 @@ export class AgentStore {
       usageLimitReturn?: AgentUsageLimitReturn | null;
       /** The provider to use from the next turn. `null` removes it. */
       pendingRuntime?: AgentPendingRuntime | null;
+      /** The account that an agent chose, which the pool keeps. `null` removes it. */
+      pinnedAccountId?: string | null;
       /** The shared or the agent's own session. It replaces a named profile. */
       ownBrowserSession?: boolean;
       /** The named browser profile. `null` removes it. The caller checks that the profile exists. */
@@ -784,7 +801,20 @@ export class AgentStore {
       if (input.fastMode !== undefined) {
         if (!isBoolean(input.fastMode)) throw new Error("Invalid fast mode value.");
         next.fastMode = input.fastMode;
+      } else if (input.provider !== undefined && input.provider !== agent.provider && next.fastMode) {
+        // The new provider has its own price, and Claude fast mode needs the user's confirmation.
+        next.fastMode = false;
       }
+      // Ultrafast is a fast mode tier, so it comes only with a fast mode change.
+      if (input.ultrafast !== undefined && (!isBoolean(input.ultrafast) || input.fastMode === undefined))
+        throw new Error("Invalid fast mode value.");
+      // Each fast mode change names the tier: a change from a client that does not know Ultrafast,
+      // such as a remote client, sets Fast.
+      if (input.fastMode !== undefined) {
+        if (input.fastMode && input.ultrafast) next.ultrafast = true;
+        else delete next.ultrafast;
+      }
+      if (!next.fastMode) delete next.ultrafast;
       // A provider change without an account returns the agent to the new provider's own sign-in.
       if (
         input.providerAccountId === null ||
@@ -823,6 +853,11 @@ export class AgentStore {
         const hue = input.avatarHue === undefined ? next.avatarHue : input.avatarHue;
         applyAvatarColor(next, hue, input.avatarColor, hue !== next.avatarHue);
       }
+      if (input.chatColor === null) delete next.chatColor;
+      else if (input.chatColor !== undefined) {
+        if (!isAvatarColor(input.chatColor)) throw new Error("Invalid chat color.");
+        next.chatColor = input.chatColor;
+      }
       // A model the user picks ends the way back from a usage limit.
       if (
         input.usageLimitReturn === null ||
@@ -843,6 +878,18 @@ export class AgentStore {
       } else if (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) {
         // A handover that landed ends the queued change.
         delete next.pendingRuntime;
+      }
+      if (input.pinnedAccountId === null) delete next.pinnedAccountId;
+      else if (input.pinnedAccountId !== undefined) {
+        if (!isProviderAccountId(input.pinnedAccountId)) throw new Error("Invalid pinned account.");
+        next.pinnedAccountId = input.pinnedAccountId;
+      } else if (
+        (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) &&
+        (next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) !== next.pinnedAccountId
+      ) {
+        // A move to another account, such as the pool's, ends the pin. A queued change that lands on
+        // the pinned account keeps it, also when it changes the provider.
+        delete next.pinnedAccountId;
       }
       next.updatedAt = new Date().toISOString();
       const previous = { ...agent };
@@ -870,11 +917,14 @@ export class AgentStore {
       if (next.excludedFolders === undefined) delete agent.excludedFolders;
       if (next.usageLimitReturn === undefined) delete agent.usageLimitReturn;
       if (next.pendingRuntime === undefined) delete agent.pendingRuntime;
+      if (next.pinnedAccountId === undefined) delete agent.pinnedAccountId;
       if (next.browserProfileId === undefined) delete agent.browserProfileId;
       if (next.allowAutomation === undefined) delete agent.allowAutomation;
       if (next.allowNewChat === undefined) delete agent.allowNewChat;
       if (next.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+      if (next.ultrafast === undefined) delete agent.ultrafast;
       if (next.avatarColor === undefined) delete agent.avatarColor;
+      if (next.chatColor === undefined) delete agent.chatColor;
       try {
         this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
       } catch (error) {
@@ -887,11 +937,14 @@ export class AgentStore {
         if (previous.excludedFolders === undefined) delete agent.excludedFolders;
         if (previous.usageLimitReturn === undefined) delete agent.usageLimitReturn;
         if (previous.pendingRuntime === undefined) delete agent.pendingRuntime;
+        if (previous.pinnedAccountId === undefined) delete agent.pinnedAccountId;
         if (previous.browserProfileId === undefined) delete agent.browserProfileId;
         if (previous.allowAutomation === undefined) delete agent.allowAutomation;
         if (previous.allowNewChat === undefined) delete agent.allowNewChat;
         if (previous.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+        if (previous.ultrafast === undefined) delete agent.ultrafast;
         if (previous.avatarColor === undefined) delete agent.avatarColor;
+        if (previous.chatColor === undefined) delete agent.chatColor;
         throw error;
       }
       return { ...agent };
@@ -1121,6 +1174,7 @@ export class AgentStore {
       let relocated = false;
       for (const agent of this.#state.agents) {
         relocated = (yield* this.#reconcileWorkspaceDirectoryEffect(agent)) || relocated;
+        relocated = (yield* this.#rebaseForeignWorkspaceEffect(agent)) || relocated;
         yield* this.#reconcileAvatarDirectoryEffect(agent);
       }
       if (relocated) this.#persist("agent.workspace-relocated");
@@ -1216,6 +1270,40 @@ export class AgentStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible);
+
+  /**
+   * Answers whether the agent's stored workspace path had to change. A database copied from another
+   * computer, or restored for another user, keeps the full workspace path of that home, and the folder
+   * cannot be made here: Windows refuses `mkdir` under another user's folder with `EPERM`, so the agent has
+   * no workspace and no screen can change it. Only an application-made path is changed -- `Agents/<id>` or
+   * `Bots/<id>` outside this computer's OpenBot root -- and only when nothing is there, so a path the
+   * user can still reach keeps its files. No file is moved or deleted.
+   */
+  #rebaseForeignWorkspaceEffect = Effect.fn("AgentStore.rebaseForeignWorkspace")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+  ): Effect.fn.Return<boolean> {
+    const stored = agent.workspacePath;
+    if (!isApplicationWorkspacePath(stored, agent.id) || isPathInside(dirname(this.#agentsRoot), stored)) return false;
+    const probe = yield* Effect.result(storedIO(() => lstat(stored)));
+    if (Result.isSuccess(probe) || !isRecord(probe.failure.cause) || probe.failure.cause.code !== "ENOENT") {
+      return false;
+    }
+    const targetPath = join(this.#agentsRoot, agent.id);
+    const created = yield* Effect.result(storedIO(() => mkdir(targetPath, { recursive: true, mode: 0o700 })));
+    if (Result.isFailure(created)) {
+      logger.warn(
+        "Could not create the workspace of an agent from another computer.",
+        toLogValue(created.failure.cause),
+      );
+    }
+    logger.warn("An agent workspace path from another computer was changed to this computer.");
+    // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
+    if (agent.excludedFolders)
+      agent.excludedFolders = agent.excludedFolders.map((folder) => rebasedFolder(folder, stored, targetPath));
+    agent.workspacePath = targetPath;
+    return true;
+  });
 
   /**
    * An uploaded avatar lives under the agent id, and `avatarUrl` derives that directory from the id
@@ -1522,6 +1610,11 @@ export class AgentStore {
     agent.updatedAt = updatedAt;
   }
 
+  /** The provider of an agent. It copies no agent, so a hot path can ask it. */
+  providerOf(id: string): AgentProviderId | undefined {
+    return this.#state.agents.find((agent) => agent.id === id)?.provider;
+  }
+
   /** Whether this thread is an agent's own chat. It copies no agent, so a hot path can ask it. */
   ownsThread(threadId: string): boolean {
     return this.#state.agents.some((agent) => agent.threadId === threadId);
@@ -1554,6 +1647,22 @@ export class AgentStore {
       const agent = this.#requireAgent(id);
       agent.preview = preview.slice(0, AGENT_PREVIEW_MAX_LENGTH);
       agent.updatedAt = new Date().toISOString();
+      this.#persist("agent.preview-updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * After "Delete history": the row shows the localized "no messages" text, and the agent keeps its
+   * place in the list.
+   */
+  clearPreview = Effect.fn("AgentStore.clearPreview")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#requireAgent(id).preview = "";
       this.#persist("agent.preview-updated");
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -1659,6 +1768,45 @@ export class AgentStore {
     this.#state = { ...this.#state, agents: [...this.#state.agents, ...restored] };
     this.#persist("agents.replaced");
     logger.warn("Agents were restored to the roster from the event log.", restored.length);
+  }
+
+  /**
+   * Turns fast mode off one time for each Claude agent. Before Claude fast mode existed, only Codex read
+   * `fastMode`, so a Claude agent has `true` only from a provider change. The user never confirmed the
+   * Claude price for it. The receipt of the command is the marker that stops a second run: the event of
+   * its own aggregate stays, so no roster write or sweep deletes the receipt.
+   */
+  #resetClaudeFastModeOnce(): void {
+    if (this.#database.commandResult(CLAUDE_FAST_MODE_RESET_COMMAND_ID) !== undefined) return;
+    const agentIds = this.#state.agents
+      .filter((agent) => agent.provider === "claude" && agent.fastMode)
+      .map((agent) => agent.id);
+    const previous = this.#state.agents;
+    try {
+      this.#database.dispatch(
+        CLAUDE_FAST_MODE_RESET_COMMAND_ID,
+        [
+          {
+            aggregateType: "agent-fast-mode",
+            aggregateId: "claude-reset",
+            eventType: "agent-fast-mode.claude-reset",
+            payload: { agentIds },
+          },
+        ],
+        () => {
+          if (agentIds.length === 0) return null;
+          this.#state.agents = previous.map((agent) =>
+            agentIds.includes(agent.id) ? { ...agent, fastMode: false } : agent,
+          );
+          this.#persist("agents.claude-fast-mode-reset");
+          return null;
+        },
+      );
+    } catch (cause) {
+      this.#state.agents = previous;
+      throw cause;
+    }
+    if (agentIds.length > 0) logger.info("Fast mode was turned off for Claude agents.", { count: agentIds.length });
   }
 
   #persist(eventType: string, modelChange?: AgentModelChange): void {
@@ -1860,6 +2008,30 @@ const probeDirectoryEffect = Effect.fn("AgentStore.probeDirectory")((path: strin
   ),
 );
 
+/**
+ * Whether a stored workspace has the shape this application gives one: `Agents/<id>`, or `Bots/<id>` from
+ * before the rename. Both separators are read, because the database can come from Windows or from macOS.
+ */
+function isApplicationWorkspacePath(workspacePath: string, agentId: string): boolean {
+  const parts = workspacePath.split(/[\\/]+/);
+  const name = parts.at(-1);
+  const folder = parts.at(-2);
+  if (folder === "Agents") return name === agentId;
+  return folder === "Bots" && (name === agentId || name === legacyAgentId(agentId));
+}
+
+/**
+ * `folder` moved from `from` to `to` when it is inside `from`, else `folder`. A Windows path on macOS or
+ * Linux has no native separator, so its segments are compared when the native check does not match.
+ */
+function rebasedFolder(folder: string, from: string, to: string): string {
+  if (isPathInside(from, folder)) return join(to, relative(from, folder));
+  const fromParts = from.split(/[\\/]+/);
+  const parts = folder.split(/[\\/]+/);
+  const inside = parts.length > fromParts.length && fromParts.every((part, index) => part === parts[index]);
+  return inside ? join(to, ...parts.slice(fromParts.length)) : folder;
+}
+
 function titleFromId(id: string): string {
   return id
     .split("-")
@@ -1902,16 +2074,19 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.ownBrowserSession === undefined || isBoolean(record.ownBrowserSession)) &&
     (record.browserProfileId === undefined || isBrowserProfileId(record.browserProfileId)) &&
     (record.fastMode === undefined || isBoolean(record.fastMode)) &&
+    (record.ultrafast === undefined || isBoolean(record.ultrafast)) &&
     (record.busyMessageMode === undefined || isBusyMessageMode(record.busyMessageMode)) &&
     (record.taskLimit === undefined || isAgentTaskLimit(record.taskLimit)) &&
     (record.providerAccountId === undefined || isProviderAccountId(record.providerAccountId)) &&
     (record.backupModels === undefined || isAgentBackupModels(record.backupModels)) &&
     (record.usageLimitReturn === undefined || isAgentUsageLimitReturn(record.usageLimitReturn)) &&
     (record.pendingRuntime === undefined || isAgentPendingRuntime(record.pendingRuntime)) &&
+    (record.pinnedAccountId === undefined || isProviderAccountId(record.pinnedAccountId)) &&
     (record.hiddenAt === undefined || isHiddenAt(record.hiddenAt)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     (record.avatarColor === undefined || isAvatarColor(record.avatarColor)) &&
+    (record.chatColor === undefined || isAvatarColor(record.chatColor)) &&
     isMarketplaceSource(record.marketplaceSource)
   );
 }
@@ -1998,6 +2173,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       : reset("browserProfileId", undefined);
   const fastMode =
     value.fastMode === undefined || isBoolean(value.fastMode) ? value.fastMode : reset("fastMode", undefined);
+  const ultrafast =
+    value.ultrafast === undefined || isBoolean(value.ultrafast) ? value.ultrafast : reset("ultrafast", undefined);
   const busyMessageMode =
     value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)
       ? value.busyMessageMode
@@ -2022,8 +2199,12 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)
       ? value.pendingRuntime
       : reset("pendingRuntime", undefined);
+  const pinnedAccountId =
+    value.pinnedAccountId === undefined || isProviderAccountId(value.pinnedAccountId)
+      ? value.pinnedAccountId
+      : reset("pinnedAccountId", undefined);
   // A time this build cannot read keeps the agent hidden, at the time of the read: a user hid it,
-  // and showing it again would run its routines without a decision of the user.
+  // and only the user puts it back in the list.
   const hiddenAt =
     value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)
       ? value.hiddenAt
@@ -2034,6 +2215,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.avatarColor === undefined || isAvatarColor(value.avatarColor)
       ? value.avatarColor
       : reset("avatarColor", undefined);
+  const chatColor =
+    value.chatColor === undefined || isAvatarColor(value.chatColor) ? value.chatColor : reset("chatColor", undefined);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -2072,6 +2255,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     // A released build reads only the fields it knows, so its next write removes the colour. A stored
     // colour is thus always the newest choice, and it stays even if the nearest hue changes later.
     ...(avatarColor === undefined ? {} : { avatarColor }),
+    // Only a build with chat colours keeps it. It is separate from the avatar colour.
+    ...(chatColor === undefined ? {} : { chatColor }),
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
@@ -2084,12 +2269,14 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(ownBrowserSession === undefined ? {} : { ownBrowserSession }),
     ...(browserProfileId === undefined ? {} : { browserProfileId }),
     ...(fastMode === undefined ? {} : { fastMode }),
+    ...(ultrafast && fastMode ? { ultrafast } : {}),
     ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
     ...(taskLimit === undefined ? {} : { taskLimit }),
     ...(providerAccountId === undefined ? {} : { providerAccountId }),
     ...(backupModels === undefined ? {} : { backupModels }),
     ...(usageLimitReturn === undefined ? {} : { usageLimitReturn }),
     ...(pendingRuntime === undefined ? {} : { pendingRuntime }),
+    ...(pinnedAccountId === undefined ? {} : { pinnedAccountId }),
     ...(hiddenAt === undefined ? {} : { hiddenAt }),
     ...(sessionSettingOverrides === undefined ? {} : { sessionSettingOverrides }),
     ...(sessionSettingResets === undefined ? {} : { sessionSettingResets }),

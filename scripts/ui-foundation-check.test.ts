@@ -59,13 +59,15 @@ describe("ui foundation check", () => {
         "components/branches/InlineTransition.tsx: font-size, radius and transition in an inline style must use tokens",
         "components/branches/InlineTransitionDuration.tsx: font-size, radius and transition in an inline style must use tokens",
         // The dead-rule scan reports once per class, so its whole branch set lives in one
-        // stylesheet. Two lines, and five neighbours that produce none: one named by a plain
+        // stylesheet. Three lines, and neighbours that produce none: one named by a plain
         // class attribute, one named only by preview/preview.html, one covered by a family
-        // prefix inside a multi-line class array, and .identifier-panel, which is spared by
+        // prefix inside a multi-line class array, and an icon class from a lucide-solid import
+        // path. .lucide-unimported-glyph has no import. .identifier-panel is spared by
         // neither - the template
         // literal that would cover it is an id, so a prefix taken outside a class-building
         // region would silently spare every identifier-* rule in the tree.
         "styles/unreachable.css: .identifier-panel is not reachable from any markup; delete the rule",
+        "styles/unreachable.css: .lucide-unimported-glyph is not reachable from any markup; delete the rule",
         "styles/unreachable.css: .unreachable-panel is not reachable from any markup; delete the rule",
         budget("hand-rolled composite ARIA roles", 9),
         // Six, one per value form the pattern names: a hex, a named colour, an hsl(), an

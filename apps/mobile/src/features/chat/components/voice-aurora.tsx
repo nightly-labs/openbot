@@ -1,7 +1,8 @@
 import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { type SharedValue, useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { VoicePalette } from "../model/voice-palette";
 
 // Four soft lobes rise from the bottom edge and sweep from side to side. Each
@@ -100,6 +101,8 @@ export function VoiceAurora({
   palette: VoicePalette;
 }) {
   const reducedMotion = useReducedMotion();
+  // A voice call can go on in the background, where nothing shows the aurora.
+  const foreground = useAppForeground();
   const time = useSharedValue(0);
   const smoothed = useSharedValue(0);
   const frame = useFrameCallback(({ timeSincePreviousFrame }) => {
@@ -111,19 +114,20 @@ export function VoiceAurora({
     smoothed.set(current + (target - current) * Math.min(1, seconds * rate));
   }, false);
   useEffect(() => {
-    frame.setActive(!reducedMotion);
+    frame.setActive(foreground && !reducedMotion);
     return () => frame.setActive(false);
-  }, [frame, reducedMotion]);
-  const [c0, c1, c2, c3] = palette;
+  }, [foreground, frame, reducedMotion]);
+  // The colours change with the palette, not on each frame.
+  const colors = useMemo(() => {
+    const [c0, c1, c2, c3] = palette;
+    return { c0: [...c0], c1: [...c1], c2: [...c2], c3: [...c3] };
+  }, [palette]);
   const uniforms = useDerivedValue(() => ({
     resolution: [width, height],
     time: time.get(),
     level: reducedMotion ? STILL_LEVEL : smoothed.get(),
     presence: presence.get(),
-    c0: [...c0],
-    c1: [...c1],
-    c2: [...c2],
-    c3: [...c3],
+    ...colors,
   }));
   const shader = auroraEffect();
   if (!shader) return null;

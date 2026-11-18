@@ -37,7 +37,9 @@ struct ShareDirectory: Decodable {
   /// The app's accent color, as `#rrggbb`.
   let accent: String
 
-  /// The text keys that the extension shows. The app writes all of them.
+  /// The text keys that the extension shows. The app writes all of them. The hint of the message
+  /// field, `mobile.share.extension.message`, is not in this list: the file of an app that has not
+  /// opened since the update does not have it, and the extension still sends without it.
   static let textKeys = [
     "mobile.app.route.share",
     "mobile.share.content",

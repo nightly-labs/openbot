@@ -1,0 +1,33 @@
+{
+  "slug": "datadog",
+  "name": "Datadog",
+  "tagline": "Monitoring, logs and traces",
+  "description": "Datadog lets agents search logs, metrics, traces, monitors, dashboards and incidents in the organization of the signed-in account. Each user signs in to their own Datadog account on the US1 site through the browser.",
+  "category": "coding",
+  "creatorName": "Datadog",
+  "iconUrl": "https://www.datadoghq.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-errors", "text": "Which services had the most errors in the last hour?" },
+    { "id": "prompt-monitor", "text": "Why is the checkout latency monitor alerting?" },
+    { "id": "prompt-incident", "text": "Summarize the open incidents and their status." }
+  ],
+  "apps": [
+    {
+      "id": "app-datadog-mcp",
+      "name": "Datadog",
+      "description": "Logs, metrics, traces, monitors, and incidents, over Datadog's MCP server with browser sign-in.",
+      "iconUrl": "https://www.datadoghq.com/favicon.ico",
+      "server": {
+        "name": "datadog",
+        "transport": "http",
+        "url": "https://mcp.datadoghq.com/v1/mcp",
+        "auth": [{ "id": "datadog-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.datadoghq.com",
+  "privacyPolicyUrl": "https://www.datadoghq.com/legal/privacy/",
+  "termsUrl": "https://www.datadoghq.com/legal/terms/"
+}

@@ -690,6 +690,32 @@ export class GitHubConnectorService {
     };
   });
 
+  /**
+   * Whether the user token can read `owner/name`, for the hint of the MCP proxy. GitHub answers 404 for a
+   * private repository where the app is not installed. Null for another answer or no answer.
+   */
+  readonly #canRead = Effect.fn("GitHubConnector.canRead")(
+    function* (
+      this: GitHubConnectorService,
+      owner: string,
+      name: string,
+      signal: AbortSignal,
+    ): Effect.fn.Return<boolean | null, GitHubOperationError, GitHubPlatform> {
+      const token = yield* this.accessToken();
+      if (!token) return null;
+      const response = yield* GitHubPlatform.use((platform) =>
+        platform.fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)]),
+          headers: githubApiHeaders(token),
+        }),
+      );
+      void response.body?.cancel();
+      if (response.status === 404) return false;
+      return response.ok ? true : null;
+    },
+    (operation) => this.#owned(operation).pipe(Effect.catch(() => Effect.succeed(null))),
+  ).bind(this);
+
   readonly #getGitHubEffect = Effect.fn("GitHubConnector.getGitHub")(function* <T>(
     this: GitHubConnectorService,
     url: string,
@@ -702,12 +728,7 @@ export class GitHubConnectorService {
       return yield* GitHubPlatform.use((platform) =>
         platform.fetch(url, {
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${accessToken}`,
-            "User-Agent": "OpenBot",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
+          headers: githubApiHeaders(accessToken),
         }),
       );
     }).pipe(Effect.result);
@@ -725,6 +746,7 @@ export class GitHubConnectorService {
     }
     const response = attempt2.success;
     const answer = schema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
+    if (response.status === 401) yield* this.#refused(accessToken);
     if (!response.ok || !answer.success) {
       const path = new URL(url).pathname;
       return yield* new GitHubOperationError({
@@ -786,7 +808,7 @@ export class GitHubConnectorService {
     const generation = this.#generation;
     const userToken = yield* this.accessToken();
     if (!userToken) return;
-    yield* this.#botTokens.renew(userToken);
+    if (yield* this.#botTokens.renew(userToken)) yield* this.#refused(userToken);
     // Also after a failure: a token that expired while the API was not reachable leaves the file.
     const current = yield* this.#serialize(() =>
       Effect.gen({ self: this }, function* () {
@@ -798,6 +820,16 @@ export class GitHubConnectorService {
     if (!current) return;
     if (this.#mcpProxy)
       yield* this.#mcpProxy.retain(new Set([userToken, ...this.#botTokens.entries().map(([, token]) => token)]));
+  });
+
+  /**
+   * GitHub refused `token` with HTTP 401. A revoke on GitHub does not change the expiry time of the
+   * token, so the stored user token is refreshed now. GitHub rejects the refresh of a revoked sign-in,
+   * which then shows as expired with Reconnect. A refusal of another token changes nothing.
+   */
+  readonly #refused = Effect.fn("GitHubConnector.refused")(function* (this: GitHubConnectorService, token: string) {
+    if (this.#disposed || this.#store.read()?.accessToken !== token || !this.#agentConnected()) return;
+    yield* Effect.forkIn(this.#owned(this.#refresh()), this.#scope);
   });
 
   /** One refresh at a time: a hand-off and the check can ask together, and GitHub rotates the refresh token. */
@@ -963,6 +995,8 @@ export class GitHubConnectorService {
       secret: () => this.#mcpProxySecret,
       userToken: () => this.accessToken(),
       botToken: (owner, name) => this.#botTokens.forRepository(owner, name),
+      canRead: (owner, name, signal) => this.#canRead(owner, name, signal),
+      refused: (token) => this.#refused(token),
     });
     const attempt5 = yield* Effect.gen({ self: this }, function* () {
       return yield* proxy.start(record?.mcpProxy?.port ?? null);
@@ -1072,4 +1106,13 @@ function gitConfigCount(value: string | undefined): number {
 /** One POSIX shell word. Git runs a `!` helper with `sh`, on Windows too. */
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function githubApiHeaders(accessToken: string): Record<string, string> {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${accessToken}`,
+    "User-Agent": "OpenBot",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
 }

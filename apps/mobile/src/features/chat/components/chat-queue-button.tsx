@@ -6,9 +6,9 @@ import { useThemeColor } from "heroui-native/hooks";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Clock from "lucide-react-native/icons/clock";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { memo, type ReactNode, useState } from "react";
 import { Alert, Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
@@ -17,6 +17,7 @@ import { useCSSVariable } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { QueuedUpload } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 import { ChatGlassButton } from "./chat-glass-icon-button";
@@ -77,28 +78,22 @@ export const ChatQueueButton = memo(function ChatQueueButton({
         fallbackBackground={fallbackBackground}
       />
     );
-  // A queue that failed to load reports no messages. Keep the entry, so the failure and its
-  // retry stay reachable instead of leaving the chat with nothing to press.
-  const failed = Boolean(queue.error);
   // The teammates the agent waits for are not queue rows, but the sheet shows them. Keep the
-  // entry for them alone, also before the first answer arrives.
-  if (!failed && !waiting) return null;
-  const label = failed ? t("mobile.chat.queue.unavailable") : t("mobile.chat.queue.repliesTitle");
+  // entry for them alone, also before the first answer arrives. A queue that failed to load,
+  // for example after the connection drops, shows nothing.
+  if (!waiting) return null;
+  const label = t("mobile.chat.queue.repliesTitle");
   return (
     <View className="mb-2 items-center">
       <ChatGlassButton
-        accessibilityLabel={failed ? t("mobile.chat.queue.buttonFailed") : label}
+        accessibilityLabel={label}
         className="h-11 flex-row items-center gap-2 px-4"
         fallbackBackground={fallbackBackground}
         height={44}
         liquidGlassAvailable={liquidGlassAvailable}
         onPress={() => openSheet(queue.chatId)}
       >
-        {failed ? (
-          <TriangleAlert color={String(muted)} size={16} strokeWidth={2} />
-        ) : (
-          <Clock color={String(muted)} size={16} strokeWidth={2} />
-        )}
+        <Clock color={String(muted)} size={16} strokeWidth={2} />
         <Typography.Paragraph type="body-sm" weight="semibold">
           {label}
         </Typography.Paragraph>
@@ -190,10 +185,33 @@ function ChatQueueCard({
             onPress={() => openSheet(queue.chatId)}
           >
             <Clock color={muted} size={16} strokeWidth={2} />
-            <Typography.Paragraph type="body-sm" numberOfLines={1} className="min-w-0 flex-1">
+            <Typography.Paragraph
+              type="body-sm"
+              numberOfLines={1}
+              className="min-w-0 flex-1"
+              style={lineDirectionStyle(preview)}
+            >
               {preview}
             </Typography.Paragraph>
           </Pressable>
+          {queue.activeTurnId ? (
+            <CardAction
+              accessibilityLabel={t(queue.steers ? "mobile.chat.queue.steerNext" : "mobile.chat.queue.sendNowNext")}
+              disabled={locked || editedElsewhere || queue.steerRefused}
+              onPress={() => {
+                if (!next) return;
+                void haptics.selection();
+                finish(queue.steers ? queue.steer(next) : queue.sendNow(next));
+              }}
+            >
+              <View className="flex-row items-center gap-1 px-1">
+                <CornerDownRight color={foreground} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+                <Typography.Paragraph type="body-sm" weight="semibold">
+                  {t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}
+                </Typography.Paragraph>
+              </View>
+            </CardAction>
+          ) : null}
           <CardAction
             accessibilityLabel={t("mobile.chat.queue.editNext")}
             disabled={locked || editedElsewhere || !queue.canEdit}
@@ -205,22 +223,24 @@ function ChatQueueCard({
           >
             <Pencil color={foreground} size={18} strokeWidth={2} />
           </CardAction>
-          {queue.activeTurnId ? (
+          {queue.canRunAsThread ? (
             <CardAction
-              accessibilityLabel={t("mobile.chat.queue.steerNext")}
-              disabled={locked || editedElsewhere}
+              accessibilityLabel={t("mobile.chat.queue.runNextInNewThread")}
+              disabled={locked || editedElsewhere || Boolean(locks?.heldForEdit)}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();
-                finish(queue.steer(next));
+                void queue.runAsThread(next).then((task) => {
+                  void haptics.notification(task ? "success" : "error");
+                  if (task)
+                    router.push({
+                      pathname: "/task/[taskId]",
+                      params: { taskId: task.id, agentId: task.agentId, serverId: queue.serverId },
+                    });
+                });
               }}
             >
-              <View className="flex-row items-center gap-1 px-1">
-                <CornerDownRight color={foreground} size={18} strokeWidth={2} />
-                <Typography.Paragraph type="body-sm" weight="semibold">
-                  {t("mobile.chat.queue.steer")}
-                </Typography.Paragraph>
-              </View>
+              <GitBranch color={foreground} size={18} strokeWidth={2} />
             </CardAction>
           ) : null}
           <CardAction

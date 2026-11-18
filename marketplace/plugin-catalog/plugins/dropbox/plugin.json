@@ -1,0 +1,33 @@
+{
+  "slug": "dropbox",
+  "name": "Dropbox",
+  "tagline": "Files and folders",
+  "description": "Dropbox lets agents list, search, read and upload files and folders, and create share links. Each user signs in to their own Dropbox account through the browser.",
+  "category": "documents",
+  "creatorName": "Dropbox",
+  "iconUrl": "https://cfl.dropboxstatic.com/static/metaserver/static/images/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find", "text": "Find the latest version of the Q3 report in my Dropbox." },
+    { "id": "prompt-summary", "text": "Summarize the PDFs in my Contracts folder." },
+    { "id": "prompt-save", "text": "Save this draft to my Dropbox Drafts folder." }
+  ],
+  "apps": [
+    {
+      "id": "app-dropbox-mcp",
+      "name": "Dropbox",
+      "description": "File search, reading, upload, and sharing, over Dropbox's MCP server with browser sign-in.",
+      "iconUrl": "https://cfl.dropboxstatic.com/static/metaserver/static/images/favicon.ico",
+      "server": {
+        "name": "dropbox",
+        "transport": "http",
+        "url": "https://mcp.dropbox.com/mcp",
+        "auth": [{ "id": "dropbox-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.dropbox.com",
+  "privacyPolicyUrl": "https://www.dropbox.com/privacy",
+  "termsUrl": "https://www.dropbox.com/terms"
+}

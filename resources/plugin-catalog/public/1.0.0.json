@@ -1,0 +1,33 @@
+{
+  "slug": "public",
+  "name": "Public",
+  "tagline": "Brokerage accounts and trading",
+  "description": "Public lets agents read the accounts, portfolio, order history and market quotes of a Public customer, and preview and place orders. Each user signs in to their own Public account through the browser, and an order placed through it is a real order with real money.",
+  "category": "data-analytics",
+  "creatorName": "Public",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9e/3a/fd/9e3afdec-0f26-740b-bc67-2e3c62bf8f97/AppIconProd-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-portfolio", "text": "Summarize my Public portfolio and how it moved today." },
+    { "id": "prompt-quotes", "text": "What are the latest quotes for AAPL and MSFT?" },
+    { "id": "prompt-orders", "text": "Which of my orders filled this week?" }
+  ],
+  "apps": [
+    {
+      "id": "app-public-mcp",
+      "name": "Public",
+      "description": "Accounts, portfolio, market data and orders, over Public's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9e/3a/fd/9e3afdec-0f26-740b-bc67-2e3c62bf8f97/AppIconProd-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "public",
+        "transport": "http",
+        "url": "https://mcp.public.com/mcp",
+        "auth": [{ "id": "public-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://public.com",
+  "privacyPolicyUrl": "https://public.com/privacy-policy",
+  "termsUrl": "https://public.com/terms-of-service",
+  "skills": []
+}

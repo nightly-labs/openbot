@@ -1,0 +1,33 @@
+{
+  "slug": "clerk",
+  "name": "Clerk",
+  "tagline": "Authentication and users",
+  "description": "Clerk lets agents create and configure Clerk applications, view authentication settings, manage users, and check the DNS records of production instances. Each user signs in to their own Clerk account through the browser.",
+  "category": "coding",
+  "creatorName": "Clerk",
+  "iconUrl": "https://avatars.githubusercontent.com/u/49538330?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-apps", "text": "List my Clerk applications and their instances." },
+    { "id": "prompt-signups", "text": "Who signed up to my development instance this week?" },
+    { "id": "prompt-dns", "text": "Which DNS records does my production instance still need?" }
+  ],
+  "apps": [
+    {
+      "id": "app-clerk-mcp",
+      "name": "Clerk",
+      "description": "Applications, authentication settings, and users, over Clerk's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/49538330?s=256&v=4",
+      "server": {
+        "name": "clerk",
+        "transport": "http",
+        "url": "https://mcp.clerk.com/mcp",
+        "auth": [{ "id": "clerk-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://clerk.com",
+  "privacyPolicyUrl": "https://clerk.com/legal/privacy",
+  "termsUrl": "https://clerk.com/legal/standard-terms",
+  "skills": []
+}

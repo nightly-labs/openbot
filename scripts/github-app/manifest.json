@@ -8,6 +8,7 @@
   "setup_on_update": false,
   "default_permissions": {
     "actions": "read",
+    "administration": "write",
     "checks": "read",
     "contents": "write",
     "issues": "write",

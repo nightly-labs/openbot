@@ -7,6 +7,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.desktopTestUnavailable": "Remote desktop testing is unavailable.",
   "error.remote.controlUnavailable": "Remote control is unavailable.",
   "error.remote.controlSessionNotFound": "Remote control session not found.",
+  // The host owner's remote control setting does not include the member's role.
+  "error.remote.controlNotAllowed": "The owner of this computer does not let your role control it.",
+  // The person at the host computer chose Deny, or did not answer in 30 seconds.
+  "error.remote.controlDeclined": "The person at this computer did not allow remote control.",
   "error.remote.testRuntimeUpdate": "Update the macOS remote desktop runtime to run this test.",
   "error.remote.testOtherSessions": "End other remote desktop sessions before you start a test.",
   "error.remote.testPermissions": "Check permissions and the GUI session on the host before starting the test.",
@@ -19,6 +23,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.testActive": "A remote desktop test is active. Try again when it ends.",
   "error.remote.screenRecordingDenied":
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
+  "error.remote.windowsSessionDisconnected":
+    "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",
@@ -144,6 +150,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.attachmentRejected": "The host rejected the attachment.",
   "error.remote.attachmentTooLarge": "Attachments must be 10 MB or smaller.",
   "error.remote.attachmentBusy": "Wait for the current attachment to finish.",
+  "error.remote.attachmentChanged": "The file changed or is not available. Select it again.",
   "error.remote.uploadTimeout": "The attachment upload timed out.",
   "error.remote.hostSessionActive": "The host already has an active remote session.",
   "error.remote.tooManyConnections": "Too many active remote connections.",
@@ -184,6 +191,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.memberLimitReached": "This host has reached its member limit. Ask the owner to make space.",
   "error.remote.hostNotRegistered": "This host is no longer registered with the OpenBot service.",
   "error.remote.membershipEnded": "You are no longer a member of this host. Ask the owner for a new invitation.",
+  "error.remote.membershipChanged":
+    "Someone changed this member at the same time. Load the members again and try again.",
   "error.remote.accountSessionInactive": "Your sign-in is no longer active. Sign in again.",
   "error.remote.hostOtherAccount": "This host belongs to another account.",
   "error.remote.remoteNotConfigured": "Remote connections are not set up on this OpenBot service.",
@@ -191,6 +200,7 @@ export const messages = defineMessages("error.remote", {
   // Channel actions on mobile.
   "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
+  "error.remote.hostRemoved": "The owner removed this server from the account.",
   "error.remote.channelsUnsupported": "Update this desktop server to use channels.",
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",

@@ -1,21 +1,20 @@
-// Checks the OpenBot Contributor Assignment Agreement (CLA.md) on one pull request.
+// Checks the OpenBot Contributor License Agreement (CLA.md) on one pull request.
 //
-//   bun scripts/cla.ts pr <number>   checks one open pull request
-//   --dry-run                        writes nothing to GitHub; the decisions go to REPORT_PATH
+//   bun scripts/cla.ts pr <number>                checks one open pull request
+//   bun scripts/cla.ts record <login> <number>    records the signed PDF of <login>, then checks <number>
+//   --dry-run                                     writes nothing to GitHub; the decisions go to REPORT_PATH
 //
 // The author of the pull request and each commit author must sign. Bots, organization members and
-// users with write access skip the check, as in `contribution-policy.ts`. The author of the pull
-// request signs with a ticked agreement box in the description. The pull request template has no
-// box, so that people who do not sign are not asked to tick it. When an author who must sign has no
-// box in the description, the script adds the unticked box to the end, so that the author signs with
-// one click. Each author can also sign with a comment that contains the signing line of CLA.md. A
-// box or a comment counts only when its last editor is the author: a user with write access can edit
-// the text of other people.
+// users with write access skip the check, as in `contribution-policy.ts`. An author signs the PDF
+// from CLA_PAGE_URL and sends it to LICENSES_EMAIL. A maintainer reads the email, then runs `record`
+// with a GitHub token that can write to the repository. `record` adds the signature to
+// SIGNATURES_FILE on the SIGNATURES_BRANCH branch and checks the pull request again. A closed pull
+// request is skipped.
 //
-// The script copies each new signature to SIGNATURES_FILE on the SIGNATURES_BRANCH branch, so the
-// record stays when the author edits the description or deletes the comment. Each run reads all
-// comments again, so a run that GitHub cancels loses no signature: the next run records it. A
-// closed pull request is skipped.
+// A signature of the Contributor Assignment Agreement 1.0 also passes: that agreement assigns the
+// copyright, which gives more than the license, and it continues to apply to the contributions of
+// its signers. Its signatures were a ticked box or a comment, recorded by earlier versions of this
+// script.
 //
 // No package imports: `cla.yml` runs this before `bun install`. Every GitHub read uses `gh api --jq`.
 
@@ -28,7 +27,11 @@ import { dirname } from "node:path";
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER"]);
 const TRUSTED_PERMISSIONS = new Set(["admin", "maintain", "write"]);
 const AGREEMENT_PATH = "CLA.md";
-const AGREEMENT_NAME = "OpenBot Contributor Assignment Agreement";
+const AGREEMENT_NAME = "OpenBot Contributor License Agreement";
+/** Earlier versions whose signatures still pass. See the comment at the top. */
+const EARLIER_ACCEPTED_VERSIONS = ["1.0"];
+const CLA_PAGE_URL = "https://openbot.run/cla";
+const LICENSES_EMAIL = "licenses@openbot.run";
 const SIGNATURES_BRANCH = "cla-signatures";
 const SIGNATURES_FILE = "signatures.json";
 const STATUS_CONTEXT = "CLA";
@@ -41,11 +44,10 @@ const REPORT_PATH = ".openbot-build/cla/report.json";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
-const [command, numberArgument] = args.filter((arg) => !arg.startsWith("--"));
+const [command, ...positional] = args.filter((arg) => !arg.startsWith("--"));
 
 const repository =
   process.env.GITHUB_REPOSITORY || gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
-const agreementUrl = `https://github.com/${repository}/blob/main/${AGREEMENT_PATH}`;
 const writes: string[] = [];
 
 function fail(message: string): never {
@@ -108,45 +110,13 @@ function parseNumber(value: string | undefined): number {
   return number;
 }
 
-/** The version of CLA.md and the line that signs it. The script fails when CLA.md does not contain the line. */
-function loadAgreement(): { readonly version: string; readonly signingLine: string } {
+/** The version of CLA.md. The script fails when CLA.md is not the expected agreement. */
+function loadAgreement(): string {
   const text = readFileSync(AGREEMENT_PATH, "utf8");
+  if (!text.startsWith(`# ${AGREEMENT_NAME}\n`)) fail(`${AGREEMENT_PATH} is not the ${AGREEMENT_NAME}.`);
   const version = /^Version: (\S+)$/m.exec(text)?.[1];
   if (version === undefined) fail(`${AGREEMENT_PATH} has no "Version:" line.`);
-  const signingLine = `I have read the ${AGREEMENT_NAME} ${version} and I agree to it.`;
-  if (!text.includes(signingLine)) fail(`${AGREEMENT_PATH} does not contain the signing line "${signingLine}".`);
-  return { version, signingLine };
-}
-
-/** Compares lines without links, case, extra spaces or the final full stop. */
-function normalize(line: string): string {
-  return line
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .trim()
-    .replace(/\s+/g, " ")
-    .replace(/\.$/, "")
-    .toLowerCase();
-}
-
-/** The boxes (`- [ ] label`) with the signing line in a pull request description, ticked or not. */
-function agreementBoxes(body: string, signingLine: string): { readonly line: string; readonly ticked: boolean }[] {
-  const expected = normalize(signingLine);
-  return body.split(/\r?\n/).flatMap((line) => {
-    const [, mark, label] = /^\s*[-*] \[([ xX])\] (.+)$/.exec(line) ?? [];
-    return mark !== undefined && label !== undefined && normalize(label) === expected
-      ? [{ line: line.trim(), ticked: mark !== " " }]
-      : [];
-  });
-}
-
-/** The line of a comment that signs, if there is one. */
-function signingLineIn(body: string, signingLine: string): string | undefined {
-  const expected = normalize(signingLine);
-  // A quoted line (`> ...`) does not sign: an author can quote the request to ask about it.
-  return body
-    .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^`+|`+$/g, ""))
-    .find((line) => normalize(line) === expected);
+  return version;
 }
 
 interface Person {
@@ -160,8 +130,9 @@ interface Signature {
   readonly version: string;
   readonly signedAt: string;
   readonly pullRequest: number;
-  readonly method: "checkbox" | "comment";
-  /** The pull request for a checkbox, or the comment. */
+  /** Version 1.0 signatures are a ticked box or a comment. Later signatures are a PDF sent by email. */
+  readonly method: "checkbox" | "comment" | "email";
+  /** The pull request for a checkbox or an email, or the comment. */
   readonly url: string;
   readonly text: string;
 }
@@ -194,7 +165,11 @@ function loadStore(): SignatureStore {
 }
 
 function hasSigned(signatures: readonly Signature[], id: number, version: string): boolean {
-  return signatures.some((signature) => signature.userId === id && signature.version === version);
+  return signatures.some(
+    (signature) =>
+      signature.userId === id &&
+      (signature.version === version || EARLIER_ACCEPTED_VERSIONS.includes(signature.version)),
+  );
 }
 
 /** Writes the file with the content API. A new branch gets one commit with no parent. */
@@ -255,12 +230,13 @@ interface PullRequest {
   readonly sha: string;
   readonly state: string;
   readonly commits: number;
+  readonly url: string;
 }
 
 function loadPullRequest(number: number): PullRequest {
   const row = read(
     `repos/${repository}/pulls/${number}`,
-    "[.user.login, .user.id, .user.type, .author_association, .head.sha, .state, .commits] | @tsv",
+    "[.user.login, .user.id, .user.type, .author_association, .head.sha, .state, .commits, .html_url] | @tsv",
   ).split("\t");
   return {
     number,
@@ -270,6 +246,7 @@ function loadPullRequest(number: number): PullRequest {
     sha: column(row, 4),
     state: column(row, 5),
     commits: Number(column(row, 6)),
+    url: column(row, 7),
   };
 }
 
@@ -291,133 +268,6 @@ function requiredSigners(pr: PullRequest): { readonly signers: Person[]; readonl
     (person) => !isTrusted(person.login, person.id === pr.author.id ? pr.association : ""),
   );
   return { signers, unlinked };
-}
-
-function signingComments(
-  number: number,
-  signers: readonly Person[],
-  version: string,
-  signingLine: string,
-): Signature[] {
-  const ids = new Set(signers.map((person) => person.id));
-  const found = new Map<number, Signature>();
-  const rows = readLines(
-    `repos/${repository}/issues/${number}/comments?per_page=100`,
-    '.[] | [.user.id, .user.login, .created_at, .html_url, (.body // "" | @base64), .node_id] | @tsv',
-  ).map((line) => line.split("\t"));
-  for (const row of rows) {
-    const userId = Number(column(row, 0));
-    const login = column(row, 1);
-    if (!ids.has(userId) || found.has(userId)) continue;
-    const text = signingLineIn(Buffer.from(column(row, 4), "base64").toString("utf8"), signingLine);
-    if (text === undefined) continue;
-    // A user with write access can edit the comment of a different person. As for the box, only an
-    // edit by the comment author counts.
-    const edit = gh([
-      "api",
-      "graphql",
-      "-f",
-      "query=query($id:ID!){node(id:$id){... on IssueComment{lastEditedAt editor{login}}}}",
-      "-F",
-      `id=${column(row, 5)}`,
-      "--jq",
-      '.data.node | [(.lastEditedAt // ""), (.editor.login // "")] | @tsv',
-    ]).split("\t");
-    const editor = column(edit, 1);
-    if (editor !== "" && editor !== login) continue;
-    found.set(userId, {
-      login,
-      userId,
-      version,
-      signedAt: column(edit, 0) || column(row, 2),
-      pullRequest: number,
-      method: "comment",
-      url: column(row, 3),
-      text,
-    });
-  }
-  return [...found.values()];
-}
-
-interface Description {
-  readonly body: string;
-  readonly createdAt: string;
-  /** Empty when nobody edited the description. */
-  readonly lastEditedAt: string;
-  readonly url: string;
-  /** The login of the last editor, or empty when nobody edited the description. */
-  readonly editor: string;
-}
-
-function loadDescription(number: number): Description {
-  const [owner, name] = repository.split("/");
-  const query =
-    "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){body createdAt lastEditedAt url editor{login}}}}";
-  const row = gh([
-    "api",
-    "graphql",
-    "-f",
-    `query=${query}`,
-    "-F",
-    `owner=${owner}`,
-    "-F",
-    `name=${name}`,
-    "-F",
-    `number=${number}`,
-    "--jq",
-    '.data.repository.pullRequest | [(.body // "" | @base64), .createdAt, (.lastEditedAt // ""), .url, (.editor.login // "")] | @tsv',
-  ]).split("\t");
-  return {
-    body: Buffer.from(column(row, 0), "base64").toString("utf8"),
-    createdAt: column(row, 1),
-    lastEditedAt: column(row, 2),
-    url: column(row, 3),
-    editor: column(row, 4),
-  };
-}
-
-/** The signature of the pull request author from the box in the description, if the author ticked it. */
-function checkboxSignature(
-  pr: PullRequest,
-  description: Description,
-  version: string,
-  signingLine: string,
-): Signature | undefined {
-  if (description.editor !== "" && description.editor !== pr.author.login) return undefined;
-  const text = agreementBoxes(description.body, signingLine).find((box) => box.ticked)?.line;
-  if (text === undefined) return undefined;
-  return {
-    login: pr.author.login,
-    userId: pr.author.id,
-    version,
-    signedAt: description.lastEditedAt || description.createdAt,
-    pullRequest: pr.number,
-    method: "checkbox",
-    url: description.url,
-    text,
-  };
-}
-
-/**
- * Adds an agreement section with an unticked box to the end of the description, so that the author
- * signs with one click on the box. GitHub starts no workflow for this edit, because the job token
- * makes it. A failure only goes to the log: the status and the comment must still be written.
- */
-function addBox(number: number, body: string, signingLine: string): void {
-  // The edit replaces the whole description. When the author changed it after `body` was read, do
-  // not overwrite the change: the run for that `edited` event adds the box.
-  if (loadDescription(number).body !== body) return;
-  const before = body.trimEnd() === "" ? "" : `${body.trimEnd()}\n\n`;
-  const box = `- [ ] ${signingLine.replace(AGREEMENT_NAME, `[${AGREEMENT_NAME}](${agreementUrl})`)}`;
-  try {
-    write(
-      `add the agreement box to the description of #${number}`,
-      ["api", "-X", "PATCH", `repos/${repository}/pulls/${number}`, "-F", "body=@-"],
-      `${before}## Contributor Assignment Agreement\n\n${box}\n`,
-    );
-  } catch (error) {
-    process.stderr.write(`Could not add the agreement box to #${number}: ${String(error)}\n`);
-  }
 }
 
 /** Keeps one CLA comment per pull request and edits it in place. */
@@ -455,47 +305,19 @@ function setStatus(sha: string, state: "success" | "failure", description: strin
     "-f",
     `description=${description}`,
     "-f",
-    `target_url=${agreementUrl}`,
+    `target_url=${CLA_PAGE_URL}`,
   ]);
 }
 
-function requestComment(
-  pr: PullRequest,
-  unsigned: readonly Person[],
-  unlinked: readonly string[],
-  version: string,
-  signingLine: string,
-): string {
+function requestComment(pr: PullRequest, unsigned: readonly Person[], unlinked: readonly string[]): string {
   const lines: string[] = [];
   if (unsigned.length > 0) {
-    const authorUnsigned = unsigned.some((person) => person.id === pr.author.id);
-    const others = unsigned.filter((person) => person.id !== pr.author.id);
     lines.push(
-      `${unsigned.map((person) => `@${person.login}`).join(", ")}, thank you for the contribution. Before we can merge it, each author from outside the organization must sign the [OpenBot Contributor Assignment Agreement](${agreementUrl}) ${version}. The agreement assigns the copyright in your contributions to Synthetify Labs.`,
+      `${unsigned.map((person) => `@${person.login}`).join(", ")}, thank you for the contribution. Before we can merge it, each author from outside the organization must sign the [${AGREEMENT_NAME}](${CLA_PAGE_URL}). With the agreement, you keep the copyright in your contributions and give OpenBot a license to use them.`,
       "",
-    );
-    if (authorUnsigned) {
-      lines.push(
-        `@${pr.author.login}, to sign, read the agreement. Then tick the agreement box in the description of this pull request. If the description has no box, add this line to it:`,
-        "",
-        "```markdown",
-        `- [x] ${signingLine}`,
-        "```",
-        "",
-      );
-    }
-    if (others.length > 0) {
-      lines.push(
-        `${others.map((person) => `@${person.login}`).join(", ")}, to sign, read the agreement. Then add a comment to this pull request with this line:`,
-        "",
-        "```text",
-        signingLine,
-        "```",
-        "",
-      );
-    }
-    lines.push(
-      "You sign one time for each version of the agreement. The signature applies to all your contributions to OpenBot.",
+      `To sign, download the agreement as a PDF from [openbot.run/cla](${CLA_PAGE_URL}). Fill it in, sign it, and send it to ${LICENSES_EMAIL}. In the email, write your GitHub login and the link to this pull request: ${pr.url}`,
+      "",
+      "A maintainer records your signature, and then this check runs again. You sign one time. The signature applies to all your contributions to OpenBot.",
     );
   }
   if (unlinked.length > 0) {
@@ -511,7 +333,6 @@ interface Decision {
   readonly number: number;
   readonly state: string;
   readonly signers: readonly string[];
-  readonly recorded: readonly string[];
   readonly unsigned: readonly string[];
   readonly unlinked: readonly string[];
   readonly result: "skipped" | "pass" | "fail";
@@ -519,14 +340,13 @@ interface Decision {
 }
 
 function checkPullRequest(number: number): Decision {
-  const { version, signingLine } = loadAgreement();
+  const version = loadAgreement();
   const pr = loadPullRequest(number);
   if (pr.state !== "open") {
     return {
       number,
       state: pr.state,
       signers: [],
-      recorded: [],
       unsigned: [],
       unlinked: [],
       result: "skipped",
@@ -535,24 +355,7 @@ function checkPullRequest(number: number): Decision {
   }
   const { signers, unlinked } = requiredSigners(pr);
   const store = loadStore();
-  const missing = signers.filter((person) => !hasSigned(store.signatures, person.id, version));
-  const description = missing.some((person) => person.id === pr.author.id) ? loadDescription(number) : undefined;
-  const box = description === undefined ? undefined : checkboxSignature(pr, description, version, signingLine);
-  const rest = missing.filter((person) => person.id !== box?.userId);
-  const added = [
-    ...(box === undefined ? [] : [box]),
-    ...(rest.length === 0 ? [] : signingComments(number, rest, version, signingLine)),
-  ];
-  if (added.length > 0) recordSignatures(added, version);
-  const addedIds = new Set(added.map((signature) => signature.userId));
-  const unsigned = missing.filter((person) => !addedIds.has(person.id));
-  if (
-    description !== undefined &&
-    unsigned.some((person) => person.id === pr.author.id) &&
-    agreementBoxes(description.body, signingLine).length === 0
-  ) {
-    addBox(number, description.body, signingLine);
-  }
+  const unsigned = signers.filter((person) => !hasSigned(store.signatures, person.id, version));
 
   const tooManyCommits = pr.commits > MAX_COMMITS;
   const passed = unsigned.length === 0 && unlinked.length === 0 && !tooManyCommits;
@@ -572,14 +375,13 @@ function checkPullRequest(number: number): Decision {
   } else if (tooManyCommits) {
     upsertStickyComment(number, reason, true);
   } else {
-    upsertStickyComment(number, requestComment(pr, unsigned, unlinked, version, signingLine), true);
+    upsertStickyComment(number, requestComment(pr, unsigned, unlinked), true);
   }
 
   return {
     number,
     state: pr.state,
     signers: signers.map((person) => person.login),
-    recorded: added.map((signature) => signature.login),
     unsigned: unsigned.map((person) => person.login),
     unlinked,
     result: passed ? "pass" : "fail",
@@ -587,10 +389,45 @@ function checkPullRequest(number: number): Decision {
   };
 }
 
-if (command !== "pr") fail("Usage: bun scripts/cla.ts pr <number> [--dry-run]");
-const decision = checkPullRequest(parseNumber(numberArgument));
+/** Records the signed PDF that `login` sent by email, for the pull request `number`. */
+function recordEmailSignature(login: string, number: number): string {
+  const version = loadAgreement();
+  const user = read(`users/${login}`, "[.login, .id, .type] | @tsv").split("\t");
+  if (column(user, 2) !== "User") fail(`${login} is not a GitHub user.`);
+  const pr = loadPullRequest(number);
+  recordSignatures(
+    [
+      {
+        login: column(user, 0),
+        userId: Number(column(user, 1)),
+        version,
+        signedAt: new Date().toISOString(),
+        pullRequest: number,
+        method: "email",
+        url: pr.url,
+        text: `Signed PDF of the ${AGREEMENT_NAME} ${version}, sent to ${LICENSES_EMAIL}.`,
+      },
+    ],
+    version,
+  );
+  return column(user, 0);
+}
 
-const report = { repository, command, dryRun, decision, writes };
+let recorded: string | undefined;
+let decision: Decision;
+if (command === "pr" && positional.length === 1) {
+  decision = checkPullRequest(parseNumber(positional[0]));
+} else if (command === "record" && positional.length === 2 && positional[0] !== undefined) {
+  const number = parseNumber(positional[1]);
+  recorded = recordEmailSignature(positional[0], number);
+  decision = checkPullRequest(number);
+} else {
+  fail(
+    "Usage: bun scripts/cla.ts pr <number> [--dry-run]\n       bun scripts/cla.ts record <login> <number> [--dry-run]",
+  );
+}
+
+const report = { repository, command, dryRun, recorded, decision, writes };
 if (dryRun) {
   mkdirSync(dirname(REPORT_PATH), { recursive: true });
   writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);

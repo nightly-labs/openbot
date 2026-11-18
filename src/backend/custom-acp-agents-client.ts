@@ -24,9 +24,11 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AcpHistoryPersistence } from "./acp-client";
+import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -141,6 +143,8 @@ function requiredCwd(params: unknown): string {
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "unsupported";
   readonly provider = "acp" as const;
+  /** Each child is an ACP client, which sends the memories and section-mates with the prompts. */
+  readonly turnContext = true;
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
@@ -252,6 +256,20 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       { concurrency: "unbounded", discard: true },
     );
   });
+
+  /** The rule of the custom agent that the session belongs to, from its command, as its process uses. */
+  readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
+    this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;
+
+  /** The rule of the custom agent that `model` names, from its command, as its process uses. */
+  readonly catalogAsMcpTools = (model: string): boolean =>
+    this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
+
+  /** The flavor of a saved custom agent, from its command, or undefined for an agent that is not saved. */
+  #flavorOf(agentId: string | null): AcpFlavor | undefined {
+    const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
+    return config ? customAgentFlavor(config.command) : undefined;
+  }
 
   readonly releaseThread = Effect.fn("CustomAcp.releaseThread")(function* (
     this: CustomAcpAgentsClient,
@@ -701,7 +719,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
             }),
             Effect.flatMap((response) =>
               customStep(() => {
-                const models = routedModels(config, response.data);
+                const models = routedModels(config, response.data, response.steersTurns === true);
                 this.#lastModels.set(config.id, models);
                 return models;
               }),
@@ -723,19 +741,26 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 }
 
 /**
- * The agent's models under its id. An id that the contract refuses is dropped alone: the model list
- * decoders fail closed on the whole array. An agent with no list gets the one model `default`.
+ * The agent's models under its id. An agent with no list gets the one model `default`.
+ * `steersTurns` marks each model of an agent that takes a message in its running turn (#4977).
+ *
+ * ACP lets an agent report any string as a model value, so a value that the contract charset refuses
+ * is encoded (see `encodedModelId`), and `forChild` gives the agent its own value back. An id that is
+ * still refused, as one too long, is dropped alone.
  */
-function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): ModelEntry[] {
+function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[], steersTurns: boolean): ModelEntry[] {
+  const steering = steersTurns ? { steersTurns: true } : {};
   if (data.length === 0) {
-    return [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name }];
+    return [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name, ...steering }];
   }
   return data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
-    const id = `${config.id}/${model}`;
+    const id = encodedModelId(`${config.id}/`, model);
     // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
-    return isAgentModel(id) ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }] : [];
+    return isAgentModel(id)
+      ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}`, ...steering }]
+      : [];
   });
 }
 
@@ -743,7 +768,7 @@ function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): M
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
-  const agentModel = typeof model === "string" ? model.slice(model.indexOf("/") + 1) : "";
+  const agentModel = typeof model === "string" ? providerModelValue(model.slice(model.indexOf("/") + 1)) : "";
   return {
     ...rest,
     ...(sessionId === null ? {} : { threadId: sessionId }),

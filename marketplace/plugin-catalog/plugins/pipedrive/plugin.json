@@ -1,0 +1,33 @@
+{
+  "slug": "pipedrive",
+  "name": "Pipedrive",
+  "tagline": "Sales CRM deals and contacts",
+  "description": "Pipedrive lets agents search and read deals, contacts, and activities, and create and update records in the user's CRM. Each user signs in to their own Pipedrive account through the browser.",
+  "category": "productivity",
+  "creatorName": "Pipedrive",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/7d/43/00/7d43004f-75f0-48b0-cd19-469cc0f738f3/AppIcon-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-pipeline", "text": "Summarize my open deals by stage and value." },
+    { "id": "prompt-stale", "text": "Which deals have had no activity in the last two weeks?" },
+    { "id": "prompt-activity", "text": "Add a follow-up call activity for the Acme deal next Monday." }
+  ],
+  "apps": [
+    {
+      "id": "app-pipedrive-mcp",
+      "name": "Pipedrive",
+      "description": "Deal, contact, and activity management, over Pipedrive's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/7d/43/00/7d43004f-75f0-48b0-cd19-469cc0f738f3/AppIcon-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "pipedrive",
+        "transport": "http",
+        "url": "https://mcp.pipedrive.ai/mcp",
+        "auth": [{ "id": "pipedrive-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.pipedrive.com",
+  "privacyPolicyUrl": "https://www.pipedrive.com/en/privacy",
+  "termsUrl": "https://www.pipedrive.com/en/terms-of-service"
+}

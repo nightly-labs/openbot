@@ -104,6 +104,18 @@ const threadContext = {
   compaction: null,
 };
 
+const accountError = {
+  serverId: "local",
+  event: {
+    type: "error",
+    agentId: "agent-1",
+    code: "agent_error",
+    message: "Verify the account.",
+    provider: "antigravity",
+    link: "https://accounts.google.com/signin/continue",
+  },
+} satisfies ScopedAgentEvent;
+
 function withThreadContexts(threadContextStates: unknown[]) {
   return {
     serverId: "local",
@@ -140,6 +152,12 @@ describe("decodeScopedAgentEvent", () => {
       "the pins of a user who never saved a list",
       { serverId: "local", event: { type: "sidebar-pins-changed", items: [], updatedAt: null } },
     ],
+    ["a workflow change", { serverId: "local", event: { type: "workflows-changed", workflowId: "workflow-1" } }],
+    [
+      "a workflow change that an agent saved",
+      { serverId: "local", event: { type: "workflows-changed", workflowId: "workflow-1", agentId: "agent-1" } },
+    ],
+    ["an error with the page that fixes the account", accountError],
   ] satisfies [string, ScopedAgentEvent][])("keeps %s", (_name, value) => {
     expect(decodeScopedAgentEvent(value)).toEqual(value);
   });
@@ -184,6 +202,11 @@ describe("decodeScopedAgentEvent", () => {
       },
     ],
     ["pins with a time that is not a date", { ...sidebarPins, event: { ...sidebarPins.event, updatedAt: "today" } }],
+    [
+      "a workflow change with an agent that is not an id",
+      { serverId: "local", event: { type: "workflows-changed", workflowId: "workflow-1", agentId: 7 } },
+    ],
+    ["an error with a link that is not a text", { ...accountError, event: { ...accountError.event, link: 7 } }],
     ["a bufferedLive that is not a boolean", { ...delta, bufferedLive: "yes" }],
     ["a memory change of an unknown action", withMemoryChange({ memoryId: "memory-1", action: "pinned", text: "x" })],
     [

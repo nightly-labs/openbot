@@ -31,6 +31,11 @@ export const messages = {
   "import.guide.reading": "Lettura dell'esportazione…",
   "import.guide.choose": "Scegli il file di esportazione",
   "import.guide.chooseNote": "Vedi i suoi agenti prima che cambi qualcosa.",
+  "import.guide.hermesLedeServer":
+    "Ogni profilo Hermes diventa un agente. Leggi i profili sul server, oppure lascia che la skill di esportazione in Hermes li raccolga in un unico file .zip.",
+  "import.guide.hermesLedeExport":
+    "Ogni profilo Hermes diventa un agente. La skill di esportazione in Hermes li raccoglie in un unico file .zip.",
+  "import.guide.setupServer": "Leggi il server",
   "import.review.title": "Esportazione di {source}",
   "import.review.exported": "Esportato {date}",
   "import.review.fileSize": "{size} di file",
@@ -63,4 +68,10 @@ export const messages = {
   "import.result.channel": "Canale",
   "import.result.notImportedTitle": "Non importati",
   "import.result.warnings": "Alcuni elementi non sono stati spostati",
+  "import.source.ledeServer": "OpenBot li copia sul server. Vedi ogni elemento prima che qualcosa cambi.",
+  "import.source.hermesNoteServer": "Leggi la cartella Hermes sul server, oppure esporta un file .zip da Hermes.",
+  "import.source.hermesNoteExport": "Esporta un file .zip da Hermes.",
+  "import.hermes.notFoundServer": "Nessun profilo Hermes su questo server",
+  "import.hermes.notFoundServerNote":
+    "OpenBot legge la cartella Hermes del server. Per importare Hermes da questo computer, esporta un file .zip da Hermes.",
 } as const satisfies PartialTranslation<typeof source>;

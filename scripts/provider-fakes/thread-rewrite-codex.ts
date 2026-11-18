@@ -111,6 +111,7 @@ createInterface({ input: process.stdin })
         return reply(config);
       case "config/batchWrite":
         return reply({});
+      case "thread/name/set":
       case "thread/archive":
         return reply({});
       case "thread/start": {
@@ -124,6 +125,8 @@ createInterface({ input: process.stdin })
         return reply({ thread: { id: threadId, turns: state.threads[threadId ?? ""] ?? [] } });
       case "thread/read":
         return reply({ thread: { id: threadId, turns: state.threads[threadId ?? ""] ?? [] } });
+      case "thread/backgroundTerminals/list":
+        return reply({ data: [], nextCursor: null });
       case "thread/turns/list": {
         const data = [...(state.threads[threadId ?? ""] ?? [])]
           .reverse()

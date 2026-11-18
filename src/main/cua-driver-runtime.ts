@@ -18,7 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Exit, Result } from "effect";
+import { Deferred, Effect, Exit, Result, Semaphore } from "effect";
 import { agentDisplayEnvironment } from "./agent-display";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
@@ -52,6 +52,9 @@ const READY_POLL_MS = 200;
 /** How long a daemon left by a previous run gets to release its socket. The driver's own `stop` waits as long. */
 const ORPHAN_STOP_TIMEOUT_MS = 2_000;
 const PERMISSION_TIMEOUT_MS = 10_000;
+/** Part of the permission time, so a slow answer still leaves the check time to finish. */
+const WAYLAND_INPUT_CHECK_TIMEOUT_MS = 4_000;
+const WAYLAND_BACKEND_CHECK = "wayland_backend";
 
 /**
  * Embedded mode, which is what makes the grant OpenBot's own.
@@ -309,6 +312,8 @@ export class CuaDriverRuntime {
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
   readonly #tap: CuaDriverActionTap;
+  /** What the last check read from the driver. See `waylandInputRefused`. */
+  #waylandInputRefused = false;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
@@ -320,6 +325,16 @@ export class CuaDriverRuntime {
 
   get lastState(): ComputerUseState {
     return this.#state;
+  }
+
+  /**
+   * The driver refuses keys and clicks on this Wayland desktop (#9703), as its last check said.
+   *
+   * The check reads it before the state becomes `ready`, so an agent that has the tools also has
+   * this answer.
+   */
+  waylandInputRefused(): boolean {
+    return this.#waylandInputRefused;
   }
 
   running(): boolean {
@@ -335,10 +350,10 @@ export class CuaDriverRuntime {
   /**
    * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
    *
-   * The tap forwards every request unchanged, so the agent gets the same tools either way - and a
-   * tap that failed to listen costs the rim its answer, never the agent its tools. What it does
-   * cost is the JSON copy the tap adds to each tool answer, which a provider that shows the model
-   * only the result text needs to read window ids and snapshot ids.
+   * The tap forwards every request unchanged, so a tap that failed to listen costs the rim its
+   * answer, never the agent a tool that works. What it does cost is the JSON copy the tap adds to
+   * each tool answer, which a provider that shows the model only the result text needs to read
+   * window ids and snapshot ids, and the removal of the driver's cursor tools from the tool list.
    */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();
@@ -454,7 +469,14 @@ export class CuaDriverRuntime {
     return this.#lifecycle.stop(() => this.#stop());
   }
 
-  readonly state = Effect.fn("CuaDriver.state")(function* (
+  /** One check at a time, because a check can stop the daemon that another check is asking. */
+  readonly #checks = Semaphore.makeUnsafe(1);
+
+  state(): Effect.Effect<ComputerUseState, CuaDriverFailure> {
+    return this.#checks.withPermit(this.#check());
+  }
+
+  readonly #check = Effect.fn("CuaDriver.state")(function* (
     this: CuaDriverRuntime,
   ): Effect.fn.Return<ComputerUseState, CuaDriverFailure> {
     if (!this.#options.supported) return this.#publish(this.#initialState());
@@ -480,7 +502,9 @@ export class CuaDriverRuntime {
     const injected = this.#options.readPermissions;
     const result = yield* Effect.result(
       injected
-        ? cuaIO(() => injected(config, this.#options.platform))
+        ? cuaIO(() => injected(config, this.#options.platform)).pipe(
+            Effect.map((permissions) => ({ permissions, waylandInputRefused: false })),
+          )
         : readPermissionsOverMcpEffect(config, this.#options.platform),
     );
     if (Result.isFailure(result))
@@ -489,11 +513,17 @@ export class CuaDriverRuntime {
         permissions: ungranted(this.#options.platform),
         message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(result.failure.cause) }),
       });
-    const permissions = result.success;
+    const { permissions, waylandInputRefused } = result.success;
+    this.#waylandInputRefused = waylandInputRefused;
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),
     );
-    return this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    const state = this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    // macOS keeps a "not granted" answer for the life of the process that asked (#7937), so this
+    // daemon would not see a grant the user gives now. The next check starts a new one. The stop
+    // comes after the publish, which has already taken the entry back from the agents.
+    if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
+    return state;
   }).bind(this);
 
   /**
@@ -790,6 +820,19 @@ function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
 }
 
 /**
+ * The driver drives a native Wayland desktop: its own test, on the environment the daemon gets.
+ *
+ * There, video depends on the compositor. The shipped build records only through the GNOME helper
+ * extension (GNOME 45 to 49, installed by hand) or a wlroots recorder, so on other GNOME and on KDE
+ * `start_recording` cannot start video (#9127).
+ */
+export function cuaDriverDrivesWayland(platform: NodeJS.Platform): boolean {
+  if (platform !== "linux" || !process.env.WAYLAND_DISPLAY) return false;
+  const flag = (process.env[WAYLAND_ENV] ?? waylandEnvironment(platform)[WAYLAND_ENV] ?? "").trim();
+  return flag !== "" && flag !== "0" && flag.toLowerCase() !== "false";
+}
+
+/**
  * Refuses a socket directory this user does not privately own.
  *
  * `mkdir` succeeds without complaint when the directory is already there, and applies its mode only
@@ -889,7 +932,8 @@ const waitForSocketEffect = Effect.fn("CuaDriver.waitForSocket")(function* (path
  *
  * Only macOS has a grant to report. Elsewhere the question is simply whether the daemon answers, so
  * the tool list is the probe: it proves the same connection without assuming a tool that a
- * non-macOS build may not publish.
+ * non-macOS build may not publish. On a Wayland desktop the same connection also asks whether the
+ * driver can send keys and clicks there.
  */
 const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
   (config: McpServerConfig, platform: NodeJS.Platform) =>
@@ -909,14 +953,17 @@ const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
           yield* cuaIO((signal) => client.connect(transport, { signal: AbortSignal.any([signal, timer.signal]) }));
           if (requiredPermissions(platform).length === 0) {
             yield* cuaIO((signal) => client.listTools(undefined, { signal: AbortSignal.any([signal, timer.signal]) }));
-            return [];
+            const waylandInputRefused = cuaDriverDrivesWayland(platform)
+              ? yield* readWaylandInputRefusedEffect(client, timer.signal)
+              : false;
+            return { permissions: [], waylandInputRefused };
           }
           const result = yield* cuaIO((signal) =>
             client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
               signal: AbortSignal.any([signal, timer.signal]),
             }),
           );
-          return readPermissionResult(result, platform);
+          return { permissions: readPermissionResult(result, platform), waylandInputRefused: false };
         }).pipe(
           Effect.timeoutOrElse({
             duration: PERMISSION_TIMEOUT_MS,
@@ -935,6 +982,38 @@ const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
         }),
     ),
 );
+
+/**
+ * Whether the driver refuses keys and clicks on this Wayland desktop.
+ *
+ * KWin sends portal input to the window that has focus, not to the window the agent names, so the
+ * driver refuses that input on KDE Plasma. The agent then kept trying, and showed the user the
+ * driver's error codes (#9703). The driver's own `health_report` fails its `wayland_backend` check
+ * there. That check is read here, not the desktop name, so a driver that later sends input on
+ * KWin passes it. A pass, a missing check, an error or a slow answer counts as input that works:
+ * this check never takes the tools away or blocks the state.
+ */
+const readWaylandInputRefusedEffect = Effect.fn("CuaDriver.waylandInput")((client: Client, abort: AbortSignal) =>
+  cuaIO((signal) =>
+    client.callTool({ name: "health_report", arguments: { include: [WAYLAND_BACKEND_CHECK] } }, undefined, {
+      signal: AbortSignal.any([signal, abort]),
+    }),
+  ).pipe(
+    Effect.map(waylandBackendFailed),
+    Effect.timeoutOrElse({ duration: WAYLAND_INPUT_CHECK_TIMEOUT_MS, orElse: () => Effect.succeed(false) }),
+    Effect.catch(() => Effect.succeed(false)),
+  ),
+);
+
+/** The `wayland_backend` entry of a `health_report` answer (its schema version 1) says `fail`. */
+function waylandBackendFailed(result: unknown): boolean {
+  const structured = isDynamicRecord(result) ? result.structuredContent : undefined;
+  const checks = isDynamicRecord(structured) ? structured.checks : undefined;
+  return (
+    Array.isArray(checks) &&
+    checks.some((check) => isDynamicRecord(check) && check.name === WAYLAND_BACKEND_CHECK && check.status === "fail")
+  );
+}
 
 /**
  * The grants inside a `check_permissions` answer.

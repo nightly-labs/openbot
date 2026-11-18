@@ -2,6 +2,7 @@
 //   bun scripts/landing-demo-e2e.ts [--origin=http://127.0.0.1:3100] [--browser-executable=<path>]
 // 1. Starts the site's development server on a free port, or uses `--origin`.
 // 2. Opens `/` in Chrome in the Europe/Warsaw time zone and checks, in the iframe:
+//    - each view: no startup splash or loading screen shows when the demo appears.
 //    - desktop 1440 px: exactly the four agents, no foreign helper agent, no update card and no time
 //      zone toast; the visitor answers the channel question and the launch plan uses that answer;
 //      reactions, unread replies and a fuller context meter at the end; a click on each teammate
@@ -32,7 +33,8 @@ const TIME_ZONE = "Europe/Warsaw";
 const IFRAME = 'iframe[title="Interactive OpenBot application preview"]';
 const AGENTS = ["Atlas", "Scout", "Forge", "Pulse"] as const;
 const QUESTION = "Which channels should the launch use?";
-const AUTO_ANSWER = "Blog and changelog, X, Newsletter";
+/** The first of the automatic answers. The summary shows each answer on its own row. */
+const AUTO_ANSWER = "Blog and changelog";
 const SCENE_PROMPTS: Record<string, string> = {
   Scout: "Could anything steal our news on Friday?",
   Forge: "Show me the launch banner before it ships.",
@@ -105,7 +107,10 @@ async function openDemo(
   await page.goto(`${origin}/`);
   await page.locator(".landing-app-preview").scrollIntoViewIfNeeded();
   await page.locator('.landing-app-preview[data-preview-state="shown"]').waitFor({ timeout: SCENE_TIMEOUT_MS });
-  return { page, app: page.frameLocator(IFRAME), errors };
+  const app = page.frameLocator(IFRAME);
+  // The demo opens on the workspace: no startup splash or loading screen covers it.
+  assert.equal(await app.locator(".app-loading").count(), 0, "A loading screen covers the shown demo.");
+  return { page, app, errors };
 }
 
 const contextMeter = (app: FrameLocator) => app.locator('[aria-label^="Context "]').first();
@@ -183,9 +188,9 @@ try {
     for (const channel of ["LinkedIn", "Product Hunt"]) {
       await choices.locator(`input[value="${channel}"]`).check();
     }
-    await app.getByRole("button", { name: "Submit answer" }).click();
+    await app.getByRole("button", { name: "Done", exact: true }).click();
     const sent = app.getByRole("region", { name: "Answers sent" });
-    await sent.getByText("LinkedIn, Product Hunt").waitFor();
+    for (const channel of ["LinkedIn", "Product Hunt"]) await sent.getByText(channel).waitFor();
 
     const plan = launchPlan(app);
     await plan.waitFor({ timeout: SCENE_TIMEOUT_MS });
@@ -278,7 +283,7 @@ try {
       .getByRole("group", { name: /^Reactions: / })
       .waitFor();
     await early.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await early.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await early.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await early.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await early.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-left-mid-scene.png") });
     assert.deepEqual(early.errors, []);
@@ -319,7 +324,7 @@ try {
     const stillPlan = launchPlan(still.app);
     await stillPlan.getByRole("group", { name: /^Reactions: / }).waitFor();
     await still.app.getByRole("region", { name: "Answers sent" }).getByText(AUTO_ANSWER).waitFor();
-    assert.equal(await still.app.getByRole("button", { name: "Submit answer" }).count(), 0);
+    assert.equal(await still.app.getByRole("button", { name: "Done", exact: true }).count(), 0);
     assert.equal(await still.app.getByRole("button", { name: "Stop agent" }).count(), 0);
     await still.page.locator(".landing-app-preview").screenshot({ path: resolve(OUT, "desktop-reduced-motion.png") });
     assert.deepEqual(still.errors, []);

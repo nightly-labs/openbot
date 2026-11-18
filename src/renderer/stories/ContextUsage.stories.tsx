@@ -4,7 +4,6 @@ import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import {
   ComposerCompactionNotice,
-  ComposerNewChatButton,
   ContextCompactionMarker,
   type ContextCompactionView,
   ContextUsageMeter,
@@ -72,7 +71,7 @@ const ACP_NO_SUMMARY: ContextUsageView = {
 
 /** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
 function ComposerToolbar(props: {
-  /** Undefined until the provider reports usage: the toolbar then shows only the New chat button. */
+  /** Undefined until the provider reports usage: the toolbar then shows no ring. */
   usage: ContextUsageView | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onCompact?: (() => Promise<void>) | undefined;
@@ -83,14 +82,7 @@ function ComposerToolbar(props: {
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <Show
-          when={props.usage}
-          fallback={
-            <Show when={props.onStartNewChat}>
-              {(start) => <ComposerNewChatButton agent={STORY_AGENT} start={start()} />}
-            </Show>
-          }
-        >
+        <Show when={props.usage}>
           {(usage) => (
             <ContextUsageMeter
               usage={usage()}
@@ -200,8 +192,7 @@ export const CodexTotal: Story = {
 };
 
 /**
- * A local agent: the popover ends with a New chat row. The second ring shows a failed start. Before
- * the provider reports usage, such as after a restart, the toolbar shows a New chat button.
+ * A local agent: the popover ends with a New chat row. The second ring shows a failed start.
  */
 export const NewChat: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
@@ -212,9 +203,6 @@ export const NewChat: Story = {
       </Row>
       <Row label="The agent is busy">
         <Composer usage={args.usage} onStartNewChat={() => Promise.reject(new Error("The agent is busy."))} />
-      </Row>
-      <Row label="No usage reported yet">
-        <Composer usage={undefined} onStartNewChat={() => new Promise((resolve) => setTimeout(resolve, 1500))} />
       </Row>
     </div>
   ),

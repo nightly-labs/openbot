@@ -1,3 +1,10 @@
+import {
+  heatLevel,
+  heatmapMonths,
+  heatmapWeeks,
+  type ProfileDay,
+  type ProfileStats,
+} from "@openbot/team-client/profile-stats";
 import { Button, ErrorReference, SettingsSection, Text } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
 import { createMemo, createSignal, For, Show } from "solid-js";
@@ -6,7 +13,6 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { UsageProviderMark } from "../usage/UsageProviderMark";
 import { usageCompact, usageCost, usageProviderName, usageSeriesColor } from "../usage/usage-format";
-import { heatLevel, heatmapMonths, heatmapWeeks, type ProfileDay, type ProfileStats } from "./profile-stats";
 
 export type ProfileActivityPhase = "loading" | "ready" | "error" | "unsupported";
 

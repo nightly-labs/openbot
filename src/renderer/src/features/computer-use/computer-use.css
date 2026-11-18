@@ -20,6 +20,8 @@
 .computer-use-permission-icon svg {
   width: 16px;
   height: 16px;
+  /* A 16px icon in an item row keeps the line of the small icons. */
+  stroke-width: var(--openbot-icon-stroke);
   color: var(--openbot-accent-text);
 }
 
@@ -178,9 +180,9 @@
  * own: every pixel outside the rim stays transparent, so the applications below are seen and
  * clicked exactly as before. The frame inside it is what main places over one window.
  */
-html:has(.computer-use-highlight-surface),
-body:has(.computer-use-highlight-surface),
-#root:has(.computer-use-highlight-surface) {
+:root[data-surface="computer-use-highlight"],
+:root[data-surface="computer-use-highlight"] body,
+:root[data-surface="computer-use-highlight"] #root {
   width: 100%;
   height: 100%;
   overflow: hidden;

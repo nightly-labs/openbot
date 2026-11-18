@@ -44,9 +44,20 @@
   color: var(--openbot-text-primary);
 }
 
-/* The gap after the name tab is the gap between two tabs, with the same divider in it. */
+/* The gap after the name tab is the gap between two tabs, with the same divider in it: this margin and
+   the padding of the tab list. The gap of the heading group does not apply. */
+.conversation-heading-group:has(> .conversation-title[data-tab] + .agent-threads-header) {
+  gap: 0;
+}
+
 .conversation-heading-group:has(.conversation-title[data-tab]) .agent-threads-header {
   margin-inline-start: 1px;
+}
+
+/* The agent title gives way before the tabs (see header-controls.css). When the tabs fold into one
+   button, the title hides too. */
+.conversation-heading-group:has(.agent-threads-header:not([data-mode="tabs"])) .conversation-agent-title-room {
+  display: none;
 }
 
 /*
@@ -470,6 +481,31 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--openbot-radius-pill);
+}
+
+/* Agent messages that the user has not read: a dot in the color of the "new messages" mark of the
+   timeline. A state badge outranks it. */
+.agent-threads-unread {
+  width: 8px;
+  height: 8px;
+  background: var(--openbot-unread-surface);
+}
+
+/* The same dot on the thread list button, for unread replies in a thread that the header does not show. */
+.agent-threads-menu-button.ui-button,
+.agent-threads-switcher.ui-button {
+  position: relative;
+}
+
+.agent-threads-menu-unread {
+  position: absolute;
+  inset-block-start: var(--openbot-space-0-5);
+  inset-inline-end: var(--openbot-space-0-5);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-unread-surface);
+  pointer-events: none;
 }
 
 /* The pill of the sidebar badge, with the dots while the agent works. */

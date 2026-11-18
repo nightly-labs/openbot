@@ -20,6 +20,11 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+
+/** A JSON Pointer into the event, and a value it must have. */
+const POINTER_PLACEHOLDER = "/action";
+const VALUE_PLACEHOLDER = "opened";
 
 /** A filter row in the form. The ID keeps the row and its inputs mounted while the user types. */
 export interface FilterDraft extends EventFilterDraft {
@@ -240,7 +245,9 @@ export function RoutineWebhookTrigger({
         <SettingsRow
           disclosure={false}
           expanded={eventsOpen}
-          trailing={<Disclosure size={18} color={muted} strokeWidth={1.5} />}
+          trailing={
+            <Disclosure size={18} color={muted} strokeWidth={1.5} style={eventsOpen ? undefined : MIRROR_IN_RTL} />
+          }
           onPress={() => setEventsOpen((open) => !open)}
         >
           <Typography type="body-xs" className="text-grouped-secondary">
@@ -269,6 +276,7 @@ export function RoutineWebhookTrigger({
               <SheetFormField
                 appearance="soft"
                 label={t("mobile.agent.record.eventFilterPointer")}
+                placeholder={POINTER_PLACEHOLDER}
                 hint={
                   eventFilterPointerValid(filter.pointer)
                     ? undefined
@@ -283,6 +291,7 @@ export function RoutineWebhookTrigger({
               <SheetFormField
                 appearance="soft"
                 label={t("mobile.agent.record.eventFilterValue")}
+                placeholder={VALUE_PLACEHOLDER}
                 hint={t("mobile.agent.record.eventFilterValueHint")}
                 value={filter.value}
                 editable={!disabled}

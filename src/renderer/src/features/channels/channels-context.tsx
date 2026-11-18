@@ -1,6 +1,11 @@
 import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
+import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
+import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
+import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
+import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
+import { noteAgentRequest } from "../../agent-requests";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
@@ -10,7 +15,7 @@ import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
 import { type ChannelsController, createChannelsController } from "./channels-controller";
-import { channelsPort } from "./channels-port";
+import { type ChannelsPort, channelsPort } from "./channels-port";
 
 const ChannelsContext = createContext<ChannelsController>(undefined, { name: "Channels" });
 
@@ -39,8 +44,25 @@ export function ChannelsProvider(props: ParentProps) {
     const auth = centralAuth();
     return auth.status === "signed_in" ? auth.user.id : auth.status;
   };
+  /** A message in a channel asks its members, so a workflow that one of them makes opens here (#11072). */
+  const port = (): ChannelsPort => {
+    const base = channelsPort();
+    return {
+      ...base,
+      agent: {
+        ...base.agent,
+        channelCommand: (command) => {
+          const page = controller.state.page;
+          if (command.type === "send" && page?.channel.id === command.channelId) {
+            for (const member of page.channel.members) noteAgentRequest(selectionServerId, member.agentId);
+          }
+          return base.agent.channelCommand(command);
+        },
+      },
+    };
+  };
   const controller = createChannelsController({
-    port: channelsPort,
+    port,
     agents: agentList,
     scopeKey: accountKey,
     readSelection: (account) =>
@@ -56,10 +78,16 @@ export function ChannelsProvider(props: ParentProps) {
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
+    isolationSupported: () => activeServerSupportsCapability(CHANNEL_ISOLATION_CAPABILITY),
+    browserSupported: () => activeServerSupportsCapability(CHANNEL_BROWSER_CAPABILITY),
     messageDeletionSupported: () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => activeServer()?.kind === "local" || serverRoleCanAdminister(activeServer()),
-    // The picture is a file on this computer. Until the server is known, the editor stays hidden.
-    pictureSupported: () => activeServer()?.kind === "local",
+    // A joined server keeps the picture with `channel-picture-v1`. Until the server is known, the editor stays hidden.
+    pictureSupported: () =>
+      activeServer()?.kind === "local" || activeServerSupportsCapability(CHANNEL_PICTURE_CAPABILITY),
+    // Until the server is known, the rows stay hidden.
+    contextActionsSupported: () =>
+      activeServer() !== undefined && activeServerSupportsCapability(CHAT_HISTORY_CAPABILITY),
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read

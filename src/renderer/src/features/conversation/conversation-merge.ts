@@ -1,4 +1,4 @@
-import { CONVERSATION_SNAPSHOT_MESSAGE_LIMIT, type ConversationPage } from "@openbot/contracts/ipc";
+import type { ConversationPage } from "@openbot/contracts/ipc";
 
 /**
  * Which messages a conversation shows after a page or a snapshot arrives.
@@ -82,11 +82,9 @@ export function snapshotMovesBack(
 export function windowedSnapshotMessages<Message extends { id: string }>(
   loaded: readonly Message[],
   snapshot: readonly Message[],
-  window: { mode: "latest" | "around"; snapshotMessageCount: number },
+  window: { mode: "latest" | "around"; capped: boolean },
 ): Message[] {
-  // A page loaded around a search result may have older messages, but that does not make a
-  // shorter snapshot a tail. After a rewind, the shorter snapshot is authoritative.
-  if (window.snapshotMessageCount < CONVERSATION_SNAPSHOT_MESSAGE_LIMIT) return [...snapshot];
+  if (!window.capped) return [...snapshot];
   const snapshotIds = new Set(snapshot.map((message) => message.id));
   const firstShared = loaded.findIndex((message) => snapshotIds.has(message.id));
   if (window.mode === "latest" && firstShared === -1) return [...snapshot];

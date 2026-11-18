@@ -1,0 +1,33 @@
+{
+  "slug": "hospitable",
+  "name": "Hospitable",
+  "tagline": "Short-term rental operations",
+  "description": "Hospitable lets agents read properties, reservations, calendars, and transactions, and draft replies to guest messages in the signed-in host account. Each user signs in to their own Hospitable account through the browser.",
+  "category": "productivity",
+  "creatorName": "Hospitable",
+  "iconUrl": "https://framerusercontent.com/images/JXdZWJdlR7H6AvJLRxqTcU8Qqo.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-check-ins", "text": "Which guests check in this week, and at which properties?" },
+    { "id": "prompt-guest-inbox", "text": "Summarize the guest messages that still need a reply." },
+    { "id": "prompt-draft-reply", "text": "Draft a reply to the latest guest question about parking." }
+  ],
+  "apps": [
+    {
+      "id": "app-hospitable-mcp",
+      "name": "Hospitable",
+      "description": "Properties, reservations, calendars, and guest messages, over Hospitable's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/JXdZWJdlR7H6AvJLRxqTcU8Qqo.png",
+      "server": {
+        "name": "hospitable",
+        "transport": "http",
+        "url": "https://mcp.hospitable.com/mcp",
+        "auth": [{ "id": "hospitable-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://hospitable.com",
+  "privacyPolicyUrl": "https://hospitable.com/legal/privacy-policy",
+  "termsUrl": "https://hospitable.com/legal/terms"
+}

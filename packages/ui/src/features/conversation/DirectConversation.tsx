@@ -106,6 +106,7 @@ export function DirectConversation(props: DirectConversationProps) {
   const rail = createChatScrollRail({
     rows: () => props.snapshot?.messages ?? [],
     question: (message) => (message.senderMemberId === props.currentMemberId ? message.text : undefined),
+    reply: (message) => (message.senderMemberId === props.currentMemberId ? undefined : message.text),
     unloaded: () => props.unloadedHistory,
     virtualizer: messageVirtualizer,
     onLoadOlder: () => props.onLoadOlder?.(),

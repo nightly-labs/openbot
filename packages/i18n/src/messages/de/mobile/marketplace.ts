@@ -16,6 +16,14 @@ export const messages = {
   "mobile.marketplace.kind.agent": "Agent",
   "mobile.marketplace.kind.app": "App",
   "mobile.marketplace.kind.skill": "Fähigkeit",
+  "mobile.marketplace.app.slackTagline": "Erwähnungen und Direktnachrichten in Slack",
+  "mobile.marketplace.app.discordTagline": "Erwähnungen und Direktnachrichten in Discord",
+  "mobile.marketplace.app.telegramTagline": "Gruppen und Direktchats in Telegram",
+  "mobile.marketplace.app.whatsappTagline": "Dein eigener Chat und zugelassene Personen in WhatsApp",
+  "mobile.marketplace.app.githubTagline": "Repositorys, Issues und Pull Requests",
+  "mobile.marketplace.app.onePasswordTagline": "Bei Websites mit von dir geteilten Zugangsdaten anmelden",
+  "mobile.marketplace.app.bitwardenTagline": "Bei Websites mit Zugangsdaten aus einem geteilten Ordner anmelden",
+  "mobile.marketplace.app.protonPassTagline": "Bei Websites mit Zugangsdaten aus einem geteilten Tresor anmelden",
   "mobile.marketplace.search.placeholder": "Marketplace durchsuchen",
   "mobile.marketplace.search.clear": "Suche löschen",
   "mobile.marketplace.search.close": "Suche schließen",
@@ -40,6 +48,7 @@ export const messages = {
   "mobile.marketplace.row.installed": "{name}, installiert",
   "mobile.marketplace.empty": "Keine Treffer. Lösche den Filter oder ändere die Suche.",
   "mobile.marketplace.loadFailed": "Der Marketplace konnte nicht geladen werden.",
+  "mobile.marketplace.loadMore": "Mehr laden",
   "mobile.marketplace.installFailed": "Die Installation wurde nicht abgeschlossen.",
   "mobile.marketplace.listing.notFound": "Dieser Eintrag ist nicht mehr im Marketplace.",
   "mobile.marketplace.listing.creator": "Von {name}",
@@ -53,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Anmeldung",
   "mobile.marketplace.facts.accessLocal": "Dieser Computer",
   "mobile.marketplace.facts.accessNone": "Ohne Anmeldung",
+  "mobile.marketplace.facts.accessMac": "Nur Mac",
   "mobile.marketplace.permission.admin": "Nur Eigentümer und Administratoren können aus dem Marketplace installieren.",
   "mobile.marketplace.permission.unavailable":
     "Dieser Server ist offline, oder sein OpenBot ist dafür zu alt. Aktualisiere OpenBot auf dem Computer, der ihn ausführt.",
@@ -87,6 +97,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Hilf mir, diese Fähigkeit zu nutzen.",
   "mobile.marketplace.app.add": "App hinzufügen",
+  "mobile.marketplace.app.addCustom": "Eigene hinzufügen",
   "mobile.marketplace.app.connect": "Verbinden",
   "mobile.marketplace.app.connectTitle": "{name} verbinden",
   "mobile.marketplace.app.keyIntro":
@@ -106,6 +117,8 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Verwende einen https-Link auf {hostname}.",
   "mobile.marketplace.app.docs": "Schlüssel holen",
   "mobile.marketplace.app.local": "Diese App läuft auf dem Computer mit OpenBot. Richte sie auf diesem Computer ein.",
+  "mobile.marketplace.app.needsMac":
+    "Diese App funktioniert nur auf einem Mac, auf dem OpenBot läuft, und dieser Server ist kein Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Diese App verlangt eine Anmeldung im Browser. Aktualisiere OpenBot auf dem Server oder verbinde die App auf dem Computer.",
   "mobile.marketplace.app.waiting": "Warten auf die Anmeldeseite…",

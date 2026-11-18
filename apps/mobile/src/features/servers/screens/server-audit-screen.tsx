@@ -164,7 +164,8 @@ export function ServerAuditScreen() {
 
   const agent = (agentId: string) => agents.find((item) => item.serverId === serverId && item.id === agentId);
   return (
-    <SettingsContent>
+    // The native header holds the search field, which the Android blur header cannot draw.
+    <SettingsContent androidNativeHeader>
       <Stack.SearchBar
         placeholder={t("mobile.server.audit.search")}
         autoCapitalize="none"

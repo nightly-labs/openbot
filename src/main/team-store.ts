@@ -15,15 +15,18 @@ import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@open
 import { type HostKeyHandover, hostKeyHandoverStatement } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { permanentInviteExpiresAt } from "@openbot/contracts/invite-links";
-import type {
-  AvatarImageInput,
-  CentralAuthUser,
-  TeamInviteSummary,
-  TeamMemberSummary,
-  TeamRole,
-  TeamSessionSummary,
+import {
+  type AvatarColor,
+  type AvatarImageInput,
+  type CentralAuthUser,
+  isAvatarColor,
+  type TeamInviteSummary,
+  type TeamMemberSummary,
+  type TeamRole,
+  type TeamSessionSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Layer, Result, Schema } from "effect";
@@ -116,6 +119,11 @@ interface StoredTeam {
         mimeType: AvatarImageInput["mimeType"];
       }
     | undefined;
+  /**
+   * The shape and colour that the server shows with no logo. Absent for the automatic look. Read
+   * with `serverAppearanceOrNull`, so a bad value gives the automatic look and the file still loads.
+   */
+  serverAppearance?: ServerAppearance | undefined;
   members: StoredMember[];
   invites: StoredInvite[];
   sessions: StoredSession[];
@@ -162,6 +170,7 @@ export interface TeamIdentity {
   publicKey: string;
   enabledOnLaunch: boolean;
   logoVersion: string | null;
+  appearance: ServerAppearance | null;
 }
 
 export interface CreatedInvite {
@@ -192,6 +201,8 @@ export interface RemoteDirectoryMember {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The member's account chat color. Missing: the account service is older and sends none. */
+  chatColor?: AvatarColor | null;
   role: TeamRole;
   status: "active" | "revoked";
   createdAt: number;
@@ -603,6 +614,7 @@ export class TeamStore {
             email,
             name: yield* remoteDecode(() => normalizeName(user.name)),
             avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl)),
+            ...(isAvatarColor(user.chatColor) ? { chatColor: user.chatColor } : {}),
             role: "owner",
             disabled: false,
             createdAt: new Date().toISOString(),
@@ -646,12 +658,12 @@ export class TeamStore {
   readonly updateIdentity = Effect.fn("TeamStore.updateIdentity")(
     function* (
       this: TeamStore,
-      input: { serverName?: string; logo?: AvatarImageInput | null },
+      input: { serverName?: string; logo?: AvatarImageInput | null; appearance?: ServerAppearance | null },
     ): Effect.fn.Return<TeamIdentity, RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
       const serverName = input.serverName;
       if (serverName !== undefined) yield* remoteDecode(() => validateServerName(serverName));
-      if (input.serverName === undefined && input.logo === undefined) {
+      if (input.serverName === undefined && input.logo === undefined && input.appearance === undefined) {
         const identity = this.getIdentity();
         if (!identity)
           return yield* new RemoteWorkflowError({ cause: new TeamStoreError(sourceText("error.team.notConfigured")) });
@@ -660,6 +672,7 @@ export class TeamStore {
 
       const previousName = state.serverName;
       const previousLogo = state.serverLogo;
+      const previousAppearance = state.serverAppearance;
       const nextLogo =
         input.logo === undefined
           ? previousLogo
@@ -678,6 +691,8 @@ export class TeamStore {
       if (input.serverName !== undefined) state.serverName = input.serverName.trim();
       if (nextLogo === undefined) delete state.serverLogo;
       else state.serverLogo = nextLogo;
+      if (input.appearance === null) delete state.serverAppearance;
+      else if (input.appearance !== undefined) state.serverAppearance = { ...input.appearance };
       const attempt6 = yield* Effect.gen({ self: this }, function* () {
         yield* this.#persistEffect();
       }).pipe(Effect.result);
@@ -686,6 +701,8 @@ export class TeamStore {
         state.serverName = previousName;
         if (previousLogo === undefined) delete state.serverLogo;
         else state.serverLogo = previousLogo;
+        if (previousAppearance === undefined) delete state.serverAppearance;
+        else state.serverAppearance = previousAppearance;
         if (nextLogo && nextLogo.version !== previousLogo?.version) {
           yield* this.#removeLogoEffect(nextLogo).pipe(Effect.catch(() => Effect.void));
         }
@@ -907,6 +924,16 @@ export class TeamStore {
     return this.#state?.members.map(publicMember) ?? [];
   }
 
+  /**
+   * The account of each member who has one: the same person has the same account on every server,
+   * and a member id belongs to one server. A server transfer moves a person's choices by it.
+   */
+  memberAccounts(): { memberId: string; accountId: string; owner: boolean }[] {
+    return this.#requireState().members.flatMap((member) =>
+      member.accountId ? [{ memberId: member.id, accountId: member.accountId, owner: member.role === "owner" }] : [],
+    );
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));
@@ -927,6 +954,9 @@ export class TeamStore {
    * The directory is the authority for live sessions too: a session whose membership is gone,
    * disabled or has another role closes here, and the ids come back so the caller can close the
    * connections. The account service has already ended those sessions.
+   *
+   * `keepOwner` leaves the owner's row as it is. A server on this computer has a password owner, and
+   * the desktop app logs in to it with that username: the account's email in its place would lock it out.
    */
 
   readonly syncRemoteDirectory = Effect.fn("TeamStore.syncRemoteDirectory")(
@@ -934,6 +964,7 @@ export class TeamStore {
       this: TeamStore,
       serverId: string,
       remoteMembers: RemoteDirectoryMember[],
+      options: { keepOwner?: boolean } = {},
     ): Effect.fn.Return<string[], RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
       if (state.serverId !== serverId) {
@@ -941,7 +972,7 @@ export class TeamStore {
       }
       const remoteOwner = remoteMembers.find((member) => member.role === "owner");
       const localOwner = state.members.find((member) => member.role === "owner");
-      if (remoteOwner && localOwner && remoteOwner.membershipId !== localOwner.id) {
+      if (!options.keepOwner && remoteOwner && localOwner && remoteOwner.membershipId !== localOwner.id) {
         if (state.members.some((member) => member.id === remoteOwner.membershipId)) {
           return yield* new RemoteWorkflowError({
             cause: new TeamStoreError(sourceText("error.team.ownerMembershipConflict")),
@@ -955,6 +986,7 @@ export class TeamStore {
       }
       const remoteIds = new Set(remoteMembers.map((member) => member.membershipId));
       for (const remote of remoteMembers) {
+        if (options.keepOwner && remote.role === "owner") continue;
         const member = state.members.find((candidate) => candidate.id === remote.membershipId);
         if (!member) {
           if (remote.role === "owner")
@@ -967,6 +999,7 @@ export class TeamStore {
             email: yield* remoteDecode(() => normalizeEmail(remote.email)),
             name: yield* remoteDecode(() => normalizeName(remote.name)),
             avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(remote.avatarUrl)),
+            ...(isAvatarColor(remote.chatColor) ? { chatColor: remote.chatColor } : {}),
             role: remote.role,
             disabled: remote.status !== "active",
             createdAt: new Date(remote.createdAt).toISOString(),
@@ -977,6 +1010,7 @@ export class TeamStore {
         member.email = yield* remoteDecode(() => normalizeEmail(remote.email));
         member.name = yield* remoteDecode(() => normalizeName(remote.name));
         member.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(remote.avatarUrl));
+        applyChatColor(member, remote.chatColor);
         member.role = remote.role;
         member.disabled = remote.status !== "active";
       }
@@ -1040,6 +1074,19 @@ export class TeamStore {
     for (const [tokenHash, session] of this.#remoteSessions) {
       if (session.sessionId === sessionId) this.#remoteSessions.delete(tokenHash);
     }
+  }
+
+  /**
+   * Whether `sessionId` is a session of the owner that a sign-in to this store made, not one of a
+   * Signal connection (`openRemoteSession`). On a server on this computer, the owner has a password
+   * that only the desktop app here knows, and the owner's other devices connect through Signal.
+   */
+  isStoredOwnerSession(sessionId: string): boolean {
+    const ownerId = this.getOwnerMemberId();
+    return (
+      ownerId !== null &&
+      (this.#state?.sessions.some((session) => session.id === sessionId && session.memberId === ownerId) ?? false)
+    );
   }
 
   getMember(memberId: string): TeamMemberSummary | null {
@@ -1180,6 +1227,7 @@ export class TeamStore {
         existingMember.username = email;
         existingMember.name = yield* remoteDecode(() => normalizeName(user.name));
         existingMember.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl));
+        applyChatColor(existingMember, user.chatColor);
         this.#consumeInvite(invite);
         const result = yield* remoteDecode(() => this.#createSession(existingMember));
         yield* this.#persistEffect();
@@ -1193,6 +1241,7 @@ export class TeamStore {
         email,
         name: yield* remoteDecode(() => normalizeName(user.name)),
         avatarUrl: yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl)),
+        ...(isAvatarColor(user.chatColor) ? { chatColor: user.chatColor } : {}),
         role: invite.role,
         disabled: false,
         createdAt: new Date().toISOString(),
@@ -1224,6 +1273,7 @@ export class TeamStore {
       member.username = email;
       member.name = yield* remoteDecode(() => normalizeName(user.name));
       member.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl));
+      applyChatColor(member, user.chatColor);
       const result = yield* remoteDecode(() => this.#createSession(member));
       yield* this.#persistEffect();
       return result;
@@ -1447,12 +1497,14 @@ export class TeamStore {
     if (!member) return false;
     const name = normalizeName(user.name);
     const avatarUrl = normalizeAvatarUrl(user.avatarUrl);
+    const chatColor = user.chatColor === undefined ? member.chatColor : user.chatColor;
     if (
       member.email === email &&
       member.accountId === user.id &&
       member.username === email &&
       member.name === name &&
-      (member.avatarUrl ?? null) === avatarUrl
+      (member.avatarUrl ?? null) === avatarUrl &&
+      (member.chatColor ?? null) === (chatColor ?? null)
     ) {
       return false;
     }
@@ -1461,6 +1513,7 @@ export class TeamStore {
     member.username = email;
     member.name = name;
     member.avatarUrl = avatarUrl;
+    applyChatColor(member, user.chatColor);
     return true;
   }
 
@@ -1638,6 +1691,16 @@ function safeTextEqual(left: string, right: string): boolean {
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
 
+/**
+ * Copies the account chat color onto a stored member. Null removes it. Undefined keeps the stored
+ * value: an account service from before chat colors sends none.
+ */
+function applyChatColor(member: StoredMember, chatColor: AvatarColor | null | undefined): void {
+  if (chatColor === undefined) return;
+  if (isAvatarColor(chatColor)) member.chatColor = chatColor;
+  else delete member.chatColor;
+}
+
 function publicMember(member: StoredMember): TeamMemberSummary {
   return {
     id: member.id,
@@ -1645,6 +1708,9 @@ function publicMember(member: StoredMember): TeamMemberSummary {
     email: member.email ?? null,
     name: member.name ?? null,
     avatarUrl: member.avatarUrl ?? null,
+    // Optional: a file written before chat colours has none. An invalid value counts as no colour, so the
+    // file still loads and keeps its other data.
+    ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
     role: member.role,
     createdAt: member.createdAt,
     disabled: member.disabled,
@@ -1706,6 +1772,7 @@ function identityOf(host: StoredTeam): TeamIdentity {
     publicKey: host.publicKey,
     enabledOnLaunch: host.enabledOnLaunch,
     logoVersion: host.serverLogo?.version ?? null,
+    appearance: serverAppearanceOrNull(host.serverAppearance),
   };
 }
 
@@ -1751,6 +1818,9 @@ function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTea
   const serverLogo = pickChanged(baseline.serverLogo, mine.serverLogo, theirs.serverLogo);
   if (serverLogo === undefined) delete merged.serverLogo;
   else merged.serverLogo = serverLogo;
+  const serverAppearance = pickChanged(baseline.serverAppearance, mine.serverAppearance, theirs.serverAppearance);
+  if (serverAppearance === undefined) delete merged.serverAppearance;
+  else merged.serverAppearance = serverAppearance;
   return merged;
 }
 

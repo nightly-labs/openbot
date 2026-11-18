@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "トークン",
   "usage.column.date": "日付",
   "usage.column.costUsd": "コスト · USD",
+  "usage.column.loads": "読み込み",
+  "usage.column.agents": "エージェント",
   "usage.empty": "この期間の使用量は記録されていません。",
   "usage.partial":
     "一部のデータ · {turns} 件のターンに使用量の報告がありません。{unpriced} 件の記録にコストの推定がありません。{incomplete} 件の記録のトークンデータが不完全です。",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "モデル",
   "usage.breakdown.agent": "エージェント",
   "usage.breakdown.day": "日",
+  "usage.breakdown.skill": "スキル",
   "usage.breakdown.byModel": "モデル別の使用量",
   "usage.breakdown.byAgent": "エージェント別の使用量",
   "usage.breakdown.byDay": "日別の使用量とコスト",
+  "usage.breakdown.bySkill": "スキル別の使用量",
+  "usage.breakdown.skillEmpty": "この期間に読み込まれたスキルはありません。",
   "usage.unknownModel": "不明なモデル",
   "usage.footer": "収集開始 {started} · 更新 {updated}",
   "usage.updatedNever": "なし",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "このホストはエージェントの分析に対応していません。このビューを使うにはホストをアップデートしてください。",
   "usage.panel.loadFailed": "使用量を読み込めませんでした。接続と期間を確認してください。",
+  "usage.machine.label": "マシンの使用状況。CPU: {cpu}、メモリ: {memory}",
+  "usage.machine.openStorage": "ストレージを開く。ディスク: {percent}、{detail}",
 } as const satisfies PartialTranslation<typeof source>;

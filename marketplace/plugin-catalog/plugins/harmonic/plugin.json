@@ -1,0 +1,36 @@
+{
+  "slug": "harmonic",
+  "name": "Harmonic",
+  "tagline": "Company and investor data",
+  "description": "Harmonic lets agents search companies, people, and investors and read their funding and headcount data with the signed-in Harmonic account. Each user signs in to their own Harmonic account through the browser.",
+  "category": "research",
+  "creatorName": "Harmonic",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/84/11/02/8411025a-7712-ec5b-cbe7-9b5039030f94/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-find-startups",
+      "text": "Find seed-stage climate startups in Europe that raised in the last six months."
+    },
+    { "id": "prompt-company-profile", "text": "Summarize the funding history and headcount growth of Acme Robotics." },
+    { "id": "prompt-founders", "text": "Who are the founders of Acme Robotics and where did they work before?" }
+  ],
+  "apps": [
+    {
+      "id": "app-harmonic-mcp",
+      "name": "Harmonic",
+      "description": "Company, people, and investor search, over Harmonic's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/84/11/02/8411025a-7712-ec5b-cbe7-9b5039030f94/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "harmonic",
+        "transport": "http",
+        "url": "https://mcp.api.harmonic.ai",
+        "auth": [{ "id": "harmonic-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://harmonic.ai",
+  "privacyPolicyUrl": "https://harmonic.ai/legal/privacy-policy",
+  "termsUrl": "https://harmonic.ai/legal/terms-of-service"
+}

@@ -671,3 +671,10 @@
 .files-story-chat {
   height: 100vh;
 }
+
+/* The Library fills the window card, so its story gives it the full viewport. */
+.library-story-stage {
+  height: 100vh;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}

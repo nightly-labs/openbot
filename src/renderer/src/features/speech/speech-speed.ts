@@ -1,15 +1,9 @@
-import { type OpenBotDesktopApi, SPEECH_SPEEDS, type SpeechSettings, type SpeechSpeed } from "@openbot/contracts/ipc";
+import { nextSpeechSpeed, type OpenBotDesktopApi, type SpeechSettings, type SpeechSpeed } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { setReplyPlaybackRate } from "./speech-playback";
 import { speechPort } from "./speech-port";
-
-/** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
-export const SPEED_CYCLE: readonly SpeechSpeed[] = [
-  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
-  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
-];
 
 const [speed, setSpeed] = createSignal<SpeechSpeed>(1);
 let loading: Promise<void> | undefined;
@@ -91,7 +85,6 @@ export function changeSpeechSpeed(next: SpeechSpeed): void {
  */
 export function cycleSpeechSpeed(): void {
   void loadSpeechSpeed().then(() => {
-    const index = SPEED_CYCLE.indexOf(speed());
-    changeSpeechSpeed(SPEED_CYCLE[(index + 1) % SPEED_CYCLE.length] ?? 1);
+    changeSpeechSpeed(nextSpeechSpeed(speed()));
   });
 }

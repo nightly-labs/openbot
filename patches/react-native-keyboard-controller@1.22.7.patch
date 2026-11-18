@@ -1,3 +1,92 @@
+diff --git a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
+index ff483614f48c538275e449a29544394fbc11efa0..d1b44931a2237bd2a1a8f07013631392140070ea 100644
+--- a/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
++++ b/android/src/main/java/com/reactnativekeyboardcontroller/interactive/KeyboardAnimationController.kt
+@@ -139,6 +139,8 @@ internal class KeyboardAnimationController {
+         )
+ 
+     InteractiveKeyboardProvider.isInteractive = true
++    // The finger takes control from the spring of the previous gesture.
++    stopSpringAnimation()
+     // Call updateInsetTo() with the new inset value
+     return insetTo(controller.currentInsets.bottom - dy)
+   }
+@@ -159,6 +161,12 @@ internal class KeyboardAnimationController {
+             "This should only be called if isAnimationInProgress() returns true",
+         )
+ 
++    // `onFinished` and `onCancelled` can arrive after the controller ends, and the ended controller
++    // throws on `setInsetsAndAlpha`.
++    if (controller.isFinished || controller.isCancelled) {
++      return 0
++    }
++
+     val hiddenBottom = controller.hiddenStateInsets.bottom
+     val shownBottom = controller.shownStateInsets.bottom
+     val startBottom = if (isImeShownAtStart) shownBottom else hiddenBottom
+@@ -208,8 +216,8 @@ internal class KeyboardAnimationController {
+     insetsAnimationController?.finish(isImeShownAtStart)
+     pendingRequestCancellationSignal?.cancel()
+ 
+-    // Cancel the current spring animation
+-    currentSpringAnimation?.cancel()
++    // Cancel the current spring animation. Its end listener must not finish the controller again.
++    stopSpringAnimation()
+ 
+     reset()
+   }
+@@ -333,8 +341,7 @@ internal class KeyboardAnimationController {
+ 
+     isImeShownAtStart = false
+ 
+-    currentSpringAnimation?.cancel()
+-    currentSpringAnimation = null
++    stopSpringAnimation()
+ 
+     pendingRequestOnReady = null
+ 
+@@ -345,6 +352,15 @@ internal class KeyboardAnimationController {
+     InteractiveKeyboardProvider.isInteractive = false
+   }
+ 
++  /**
++   * Cancel the current spring animation without finishing the controller from its end listener.
++   */
++  private fun stopSpringAnimation() {
++    val springAnimation = currentSpringAnimation ?: return
++    currentSpringAnimation = null
++    springAnimation.cancel()
++  }
++
+   /**
+    * Animate the IME to a given visibility.
+    *
+@@ -362,6 +378,10 @@ internal class KeyboardAnimationController {
+       insetsAnimationController
+         ?: throw IllegalStateException("Controller should not be null")
+ 
++    // A gesture can end while the spring of the previous gesture still runs. Stop that spring:
++    // otherwise it moves the IME after the controller is reset and `insetTo` throws.
++    stopSpringAnimation()
++
+     currentSpringAnimation =
+       springAnimationOf(
+         setter = {
+@@ -385,11 +405,12 @@ internal class KeyboardAnimationController {
+           setStartVelocity(velocityY)
+         }
+         addEndListener { anim, _, _, _ ->
++          // A replaced spring must not finish the controller of the spring that replaced it.
+           if (anim == currentSpringAnimation) {
+             currentSpringAnimation = null
++            // Once the animation has ended, finish the controller
++            finish()
+           }
+-          // Once the animation has ended, finish the controller
+-          finish()
+         }
+       }.also { it.start() }
+   }
 diff --git a/lib/commonjs/components/KeyboardAwareScrollView/index.js b/lib/commonjs/components/KeyboardAwareScrollView/index.js
 index 07e7294cf395103e39c55d9b3f230c1bfa72ec4c..15edd0a2ab8865906ac2ae9906f83fd0e414f994 100644
 --- a/lib/commonjs/components/KeyboardAwareScrollView/index.js

@@ -26,6 +26,7 @@ export function hostProviderKeyApi(
   openExternal: ProviderKeyApi["openExternal"] = (destination) => window.openbot.openExternal(destination),
 ): ProviderKeyApi {
   return {
+    onHost: true,
     getProviderApiKeyState: (provider) => admin().getApiKeyState(provider, serverId),
     setProviderApiKey: (input) => admin().setApiKey(input, serverId),
     clearProviderApiKey: (provider) => admin().clearApiKey(provider, serverId),

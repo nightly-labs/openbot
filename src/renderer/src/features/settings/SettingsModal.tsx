@@ -1,6 +1,7 @@
 import type {
   AccountSession,
   AppInfo,
+  AvatarColor,
   AvatarImageInput,
   BillingDesktopApi,
   CentralAuthUser,
@@ -31,7 +32,11 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
+import {
+  SettingsDialogShell,
+  SettingsNavGroupLabel,
+  type SettingsPagePlacement,
+} from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -42,11 +47,12 @@ import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
+import type { CodexLiveAccess } from "../speech/codex-live-access";
 import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
 import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
-import { createSettingsAgentsSection } from "./SettingsAgentsSection";
+import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
@@ -67,6 +73,8 @@ export interface SettingsModalProps {
   chatWindow?: boolean;
   /** The built-in display's notch, null when it has none, or undefined before main answers. */
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
+  /** The agents of the active server for the Agent dock tab. Without it, the tab does not show. */
+  agentDock?: AgentDockSettingsModel | undefined;
   /** The servers that the Notifications and Dynamic Island tabs list. */
   servers?: readonly ServerSummary[];
   /** Writes the notification level of a server. Resolves after `servers` shows it. */
@@ -84,6 +92,8 @@ export interface SettingsModalProps {
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
+  /** Saves the chat color of the account. Members of each server of the user see it. */
+  onSetChatColor: (color: AvatarColor | null) => Promise<void>;
   onCreateMobileConnect?: () => Promise<MobileConnectTicket>;
   onCancelMobileConnect?: () => Promise<void>;
   onGetMobileConnectLink?: () => Promise<MobileConnectLink | null>;
@@ -106,6 +116,10 @@ export interface SettingsModalProps {
   hostedServersApi?: HostedServersDesktopApi | undefined;
   /** Opens the add server dialog from the Hosted servers tab. */
   onAddHostedServer?: (() => void) | undefined;
+  /** Whether Codex on this computer can open live voice. Undefined while it is not known. */
+  codexLiveAccess?: CodexLiveAccess | undefined;
+  /** Opens the Providers section of this computer, where Codex signs in for live voice. */
+  onConnectCodex?: (() => void) | undefined;
   /** A hosted server that the server menu asked to delete. Each nonce opens its confirmation once. */
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
   onTestNotification?: () => void | Promise<void>;
@@ -155,11 +169,6 @@ export function SettingsModal(props: SettingsModalProps) {
     visible: () => props.open && activeTab() === "notifications",
     servers: () => props.servers ?? [],
   });
-  const agents = createSettingsAgentsSection({
-    visible: () => props.open && activeTab() === "agents",
-    value: () => props.value,
-    onValueChange: (value) => props.onValueChange(value),
-  });
   let handledHostedServerDeleteNonce = 0;
   createEffect(
     () => (props.open ? props.hostedServerDeleteRequest : null),
@@ -179,13 +188,19 @@ export function SettingsModal(props: SettingsModalProps) {
     (tab) => {
       if (!tab) return;
       setActiveTab(tab);
-      agents.showList();
     },
   );
-  const visibleNavItems = () => navItems.filter((item) => settingsTabShown(item.value, dynamicIslandShown()));
+  const agentDockShown = () =>
+    settingsTabShown("agent-dock", { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
+    props.agentDock !== undefined;
+  const visibleNavItems = () =>
+    navItems.filter(
+      (item) =>
+        settingsTabShown(item.value, { platform: props.appInfo?.platform, chatWindow: props.chatWindow === true }) &&
+        (item.value !== "agent-dock" || props.agentDock !== undefined),
+    );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
-  const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
@@ -195,10 +210,12 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
-        value === "agents" ||
+        value === "appearance" ||
+        value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
+        (value === "agent-dock" && agentDockShown()) ||
         value === "computer-use" ||
         value === "profile" ||
         value === "billing" ||
@@ -250,24 +267,27 @@ export function SettingsModal(props: SettingsModalProps) {
         page={props.page}
         open={props.open}
         title={title()}
-        crumb={agentsCrumb()}
         description={description()}
-        contentKey={`${activeTab()}:${agents.crumb()?.title ?? ""}`}
+        contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {visibleNavItems().map((item) => {
+            {visibleNavItems().map((item, index, items) => {
               const NavIcon = item.icon;
+              const group = item.group !== items[index - 1]?.group ? item.group : undefined;
               return (
-                <Tabs.Trigger
-                  class="settings-modal-nav-item"
-                  value={item.value}
-                  aria-current={activeTab() === item.value ? "page" : undefined}
-                >
-                  <NavIcon aria-hidden="true" />
-                  <span>{i18n.t(item.titleKey)}</span>
-                </Tabs.Trigger>
+                <>
+                  {group ? <SettingsNavGroupLabel label={i18n.t(group)} /> : null}
+                  <Tabs.Trigger
+                    class="settings-modal-nav-item"
+                    value={item.value}
+                    aria-current={activeTab() === item.value ? "page" : undefined}
+                  >
+                    <NavIcon aria-hidden="true" />
+                    <span>{i18n.t(item.titleKey)}</span>
+                  </Tabs.Trigger>
+                </>
               );
             })}
           </Tabs.List>
@@ -276,18 +296,46 @@ export function SettingsModal(props: SettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel" data-tab="general">
           {preferencesLoadError()}
           <SettingsGeneralTab
+            part="general"
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
             platform={props.appInfo?.platform}
             onUpdateSetting={updateSetting}
             onUpdateSettings={updateSettings}
             selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
           />
         </Tabs.Content>
 
-        <Tabs.Content value="agents" class="settings-modal-tab-panel" data-tab="agents">
+        <Tabs.Content value="appearance" class="settings-modal-tab-panel" data-tab="appearance">
           {preferencesLoadError()}
-          <agents.Panel menuMount={modalElement} />
+          <SettingsGeneralTab
+            part="appearance"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="app-behavior" class="settings-modal-tab-panel" data-tab="app-behavior">
+          {preferencesLoadError()}
+          <SettingsGeneralTab
+            part="app-behavior"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="notifications" class="settings-modal-tab-panel" data-tab="notifications">
@@ -315,7 +363,12 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="voice" class="settings-modal-tab-panel" data-tab="voice">
-          <SettingsVoiceTab store={voice} selectMount={modalElement} />
+          <SettingsVoiceTab
+            store={voice}
+            selectMount={modalElement}
+            codexLiveAccess={props.codexLiveAccess}
+            onConnectCodex={props.onConnectCodex}
+          />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>
@@ -324,12 +377,21 @@ export function SettingsModal(props: SettingsModalProps) {
             <SettingsDynamicIslandTab
               value={props.value}
               variant={props.appInfo?.variant ?? "production"}
+              platform={props.appInfo?.platform}
               builtInDisplayGeometry={props.builtInDisplayGeometry}
               servers={props.servers ?? []}
               onUpdateSetting={updateSetting}
               onUpdateSettings={updateSettings}
             />
           </Tabs.Content>
+        </Show>
+
+        <Show when={agentDockShown() && props.agentDock}>
+          {(model) => (
+            <Tabs.Content value="agent-dock" class="settings-modal-tab-panel" data-tab="agent-dock">
+              <SettingsAgentDockTab model={model()} selectMount={modalElement} />
+            </Tabs.Content>
+          )}
         </Show>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
@@ -358,6 +420,7 @@ export function SettingsModal(props: SettingsModalProps) {
                 store={license}
                 onManagePayment={() => void billing.openPortal({ flow: "manage" })}
                 onContactUs={licenseContactUs(props.onContactUs)}
+                billingDetails={props.billingApi}
               />
             }
           />

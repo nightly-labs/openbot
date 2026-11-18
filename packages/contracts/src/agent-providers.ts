@@ -37,6 +37,8 @@ export const AGENT_PROVIDERS = [
   "acp",
   "kimi",
   "devin",
+  "copilot",
+  "mistral",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -119,6 +121,22 @@ export interface AgentProviderDescriptor {
    */
   readonly localCodeSignIn: "device" | "paste" | null;
   /**
+   * How an account after the first signs in. `"key"`: each one is an API key of the provider, so a
+   * client asks for the key and shows no browser sign-in for it. Absent: the browser sign-in. It
+   * mirrors `ProviderKeyAccountSupport` of the driver in `src/backend/provider-drivers.ts`; keep the
+   * two in step. A host adds such an account only with `provider-account-keys-v1`.
+   */
+  readonly accountSignIn?: "key";
+  /**
+   * An account after the first can also sign in with a code: the provider's CLI gives a page, and
+   * the person finishes on any device. `device`: a code or a link that the page confirms by itself.
+   * `paste`: a code that the person copies back, which only a computer where
+   * `pasteCodeSignInSupported` can run. It mirrors `accounts.codeSignIn` of the driver in
+   * `src/backend/provider-drivers.ts`; keep the two in step. A joined server's host runs it only
+   * with `provider-account-code-v1`.
+   */
+  readonly accountCodeSignIn?: "device" | "paste";
+  /**
    * Where the provider's sign-in page ends. `callback`: the page sends the browser to an address on
    * the computer that started it, so a browser tab elsewhere must paste that address back. `page`:
    * the user finishes on the page and the provider sees it by itself, so any browser can run it.
@@ -134,7 +152,8 @@ export interface AgentProviderDescriptor {
    * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
    * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
    * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI, in the Cline CLI, in
-   * the Kimi Code CLI and in the commands that Devin CLI 3000.11.234 lists for each skill folder.
+   * the Kimi Code CLI, in the commands that Devin CLI 3000.11.234 lists for each skill folder and in
+   * the `/skills` help of GitHub Copilot CLI 1.0.105 and the skill paths in Mistral Vibe 3.1.0.
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
@@ -142,7 +161,8 @@ export interface AgentProviderDescriptor {
    * itself. `plugin`: OpenBot gives the folder to Claude as a session plugin
    * (`claudeHomeSkillPlugin`). `instructions`: the CLI does not read it, so the developer instructions
    * name each skill and its `SKILL.md`. Sources: the strings and docs of the installed Codex, Grok,
-   * OpenCode, Cursor, Cline, Kimi and Pi CLIs, and the commands of Devin CLI 3000.11.234; the
+   * OpenCode, Cursor, Cline, Kimi and Pi CLIs, the commands of Devin CLI 3000.11.234 and the `/skills`
+   * help of GitHub Copilot CLI 1.0.105 and the agents home of Mistral Vibe 3.1.0; the
    * Antigravity ACP server reads only `$GEMINI_HOME`; Muse and a custom ACP agent are not known to
    * read it.
    */
@@ -161,11 +181,15 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step (Grok through its `x.ai/interject` ACP extension). `deferred`: the protocol has no steer
-   * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
-   * message sent in `steer` mode; the others queue it.
+   * step (Grok through its `x.ai/interject` ACP extension, OpenCode through its `_session/steering`
+   * ACP extension, Antigravity and Devin through a second `session/prompt`). `deferred`: the protocol has no
+   * steer request (ACP), so the message can wait until the turn ends. `reported`: each agent of the
+   * provider reports whether it steers, and its models carry `steersTurns` (a custom ACP agent with
+   * the `_session/steering` extension). Only a `native` provider, or a `reported` one whose model
+   * steers, steers a message sent in `steer` mode; the others queue it. A `native` CLI of a release
+   * before its steer request refuses the message, which then waits in the queue.
    */
-  readonly steer: "native" | "deferred";
+  readonly steer: "native" | "deferred" | "reported";
   /**
    * Whether the CLI runs turns of two sessions of one agent at the same time. `false`: the agent runs
    * one turn at a time, so its tasks and its own chat wait for each other. A custom ACP agent is
@@ -213,6 +237,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "chatgpt",
     pickerOrder: 1,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -236,6 +261,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "claude",
     pickerOrder: 0,
     localCodeSignIn: "paste",
+    accountCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
@@ -254,11 +280,12 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     onboardingDescription: "Included with OpenBot",
     signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
     installGuideLink: null,
-    defaultModel: "grok-4.6",
+    defaultModel: "grok-4.7",
     legacyModelPrefix: "grok-",
     authKind: "grok",
     pickerOrder: 2,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -289,18 +316,18 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
-  // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
+  // so the plan runs through Google's Antigravity CLI. The account and the models are Gemini.
   antigravity: {
     id: "antigravity",
     displayName: "Gemini",
-    cliName: "Antigravity ACP server",
+    cliName: "Antigravity CLI",
     onboardingDescription: "Google AI Pro or Ultra plan",
     signInMessage: "Sign in with Google to use Gemini.",
     installGuideLink: null,
@@ -314,7 +341,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
@@ -332,6 +359,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "cursor",
+    accountSignIn: "key",
     pickerOrder: 5,
     localCodeSignIn: "device",
     signInPageEnd: "callback",
@@ -416,6 +444,61 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
+    // A Devin CLI that sets `cognition.ai/midTurnPrompts` (3000.12.57 does) takes a second prompt into the turn.
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // GitHub's Copilot CLI (`copilot --acp`) with the user's Copilot plan. Sign-in is `copilot login`,
+  // which opens GitHub's page and takes the result on a loopback address, or with `--device-code`, a
+  // code that the user enters on GitHub's page. Copilot CLI 1.0.105 reads the skill folders and
+  // instruction files that its `/skills` and `/help` commands list.
+  copilot: {
+    id: "copilot",
+    displayName: "GitHub Copilot",
+    cliName: "GitHub Copilot CLI",
+    onboardingDescription: "Many models with a Copilot plan",
+    signInMessage: "Sign in with GitHub or set COPILOT_GITHUB_TOKEN to use GitHub Copilot.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "copilot",
+    pickerOrder: 9,
+    localCodeSignIn: "device",
+    signInPageEnd: "callback",
+    skillFolders: [".github/skills", ".agents/skills", ".claude/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // Mistral Vibe's ACP server (`vibe-acp`). The ACP `browser-auth` method opens Mistral's page, and
+  // the server asks Mistral until the user finishes there: the page sends nothing back. A sign-in
+  // saves a Mistral API key. Vibe 3.1.0 reads the project files of a trusted folder only, and of the
+  // folders that a session adds. Each session adds the agent's workspace (`MISTRAL_ACP_FLAVOR`).
+  mistral: {
+    id: "mistral",
+    displayName: "Mistral",
+    cliName: "Mistral Vibe",
+    onboardingDescription: "Mistral models with a Mistral account",
+    signInMessage: "Sign in with Mistral or set MISTRAL_API_KEY to use Mistral.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "mistral",
+    pickerOrder: 10,
+    localCodeSignIn: null,
+    signInPageEnd: "page",
+    skillFolders: [".vibe/skills", ".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: false,
@@ -432,7 +515,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "pi",
-    pickerOrder: 9,
+    pickerOrder: 11,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -455,7 +538,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "muse",
-    pickerOrder: 10,
+    pickerOrder: 12,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -480,7 +563,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "mercury-3",
     legacyModelPrefix: null,
     authKind: "inception",
-    pickerOrder: 11,
+    pickerOrder: 13,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -505,7 +588,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "deepseek-v4-pro",
     legacyModelPrefix: null,
     authKind: "deepseek",
-    pickerOrder: 12,
+    pickerOrder: 14,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -530,7 +613,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "anthropic/claude-sonnet-5.5",
     legacyModelPrefix: null,
     authKind: "openrouter",
-    pickerOrder: 13,
+    pickerOrder: 15,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -558,7 +641,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "hermes",
-    pickerOrder: 14,
+    pickerOrder: 16,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -591,7 +674,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    // An agent that reports `_session/steering` in `initialize` steers; its models carry `steersTurns`.
+    steer: "reported",
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
@@ -609,10 +693,33 @@ export function agentProviderDescriptor(provider: AgentProviderId): AgentProvide
 
 /**
  * Whether the provider can take a queued message into its running turn. A provider that this build
- * does not know can: its host decides, and refuses the message when it cannot.
+ * does not know can: its host decides, and refuses the message when it cannot. A `reported` provider
+ * cannot here; `agentSteersTurns` reads its model.
  */
 export function providerSteersTurns(provider: AgentProviderRef): boolean {
   return !isKnownAgentProvider(provider) || agentProviderDescriptor(provider).steer === "native";
+}
+
+/**
+ * Whether an agent on this provider and model can take a queued message into its running turn. A
+ * `reported` provider steers only when `models` has a model with `steersTurns` from the same custom
+ * agent: the agent process reports it, not one model, so a saved model that the list no longer has, or
+ * that model visibility hides, still counts. An agent with no listed model, or a host without
+ * `model-steering-v1`, does not steer.
+ */
+export function agentSteersTurns(
+  runtime: { provider: AgentProviderRef; model: string },
+  models: readonly { provider: string; id: string; steersTurns?: boolean | undefined }[],
+): boolean {
+  if (!isKnownAgentProvider(runtime.provider) || agentProviderDescriptor(runtime.provider).steer !== "reported")
+    return providerSteersTurns(runtime.provider);
+  const agentId = customAgentIdOfModel(runtime.model);
+  return models.some(
+    (model) =>
+      model.provider === runtime.provider &&
+      model.steersTurns === true &&
+      (agentId === null ? model.id === runtime.model : customAgentIdOfModel(model.id) === agentId),
+  );
 }
 
 /** The provider name to put in front of a user. */
@@ -651,6 +758,8 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "cline",
   "kimi",
   "devin",
+  "copilot",
+  "mistral",
   "pi",
   "muse",
 ] as const satisfies readonly AgentProviderId[];
@@ -663,7 +772,7 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8, and Kimi, Devin and Hermes, which no frozen protocol names.
+ * from protocol 8, and Kimi, Devin, GitHub Copilot, Mistral and Hermes, which no frozen protocol names.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
@@ -672,6 +781,8 @@ export const LOCAL_ONLY_PROVIDERS = [
   "cline",
   "kimi",
   "devin",
+  "copilot",
+  "mistral",
   "pi",
   "muse",
   "inception",
@@ -741,6 +852,27 @@ export function customAgentIdOfModel(model: string): string | null {
 }
 
 /**
+ * The providers that publish no release archive, so OpenBot installs each with the provider's own
+ * pinned installer. The runtime snapshot gives one a status where its CLI is found (`ready`) or
+ * where this computer can run that installer, so a reader that finds no status shows the install
+ * guide instead. Not in `MANAGED_RUNTIME_PROVIDERS`: OpenBot does not pin, verify, update or remove
+ * the installed files, and the user's own CLI is the one that runs.
+ */
+export const INSTALLER_PROVIDERS = ["hermes"] as const satisfies readonly AgentProviderId[];
+export type InstallerProviderId = (typeof INSTALLER_PROVIDERS)[number];
+
+/** A provider whose row can offer Download: a managed runtime, or a provider with its own installer. */
+export type DownloadableProviderId = ManagedProviderId | InstallerProviderId;
+
+export function isInstallerProvider(provider: AgentProviderId): provider is InstallerProviderId {
+  return isOneOf(INSTALLER_PROVIDERS, provider);
+}
+
+export function isDownloadableProvider(provider: AgentProviderId): provider is DownloadableProviderId {
+  return isManagedRuntimeProvider(provider) || isInstallerProvider(provider);
+}
+
+/**
  * The tools OpenBot downloads for the MCP servers rather than for an agent: a JavaScript runtime,
  * so that `npx some-server` starts on a machine that has never had Node.
  *
@@ -785,6 +917,30 @@ export function isFreeOpencodeModelName(name: string): boolean {
  * three cannot disagree about what costs money.
  */
 const FREE_TIER_MODEL_IDS = new Set(["opencode/big-pickle"]);
+
+/** The first of `OPENCODE_RECOMMENDED_FREE_MODELS`, which a development build starts on too. */
+export const OPENCODE_DEFAULT_FREE_MODEL: AgentModelId = "opencode/beam-free";
+
+/**
+ * The free OpenCode models a new agent is offered first, best first. The first one is the model a
+ * new OpenCode agent starts on.
+ *
+ * Chosen on 2026-11-11 (OpenCode 2.2.7, from the EU) with `bun run bench:opencode-free-models
+ * --repeats=1 --task=fix-bug --task=feature --task=data --task=search`: four of its tasks, one run
+ * each. All 11 models that answered passed all four, so the order is total time: 29 s, 35 s and 39 s,
+ * then 52 s and more. Inkling 2 Small Free refuses requests from the EU. The free tier's usage limit
+ * stopped the harder tasks of the bench, so run all of them before the order changes. Run it again
+ * also when OpenCode changes its free tier: a model that left the tier only loses its place, and a
+ * new one goes after these three.
+ *
+ * `src/backend/agent/provider-models.ts` puts them first in the catalog, and the model picker of each
+ * server always shows them in its main list (`src/main/model-visibility.ts`).
+ */
+export const OPENCODE_RECOMMENDED_FREE_MODELS: readonly AgentModelId[] = [
+  OPENCODE_DEFAULT_FREE_MODEL,
+  "opencode/big-pickle",
+  "opencode/glm-5.3-flash-free",
+];
 
 export function isFreeOpencodeModel(id: string, name: string): boolean {
   return FREE_TIER_MODEL_IDS.has(id.trim().toLowerCase()) || isFreeOpencodeModelName(name);

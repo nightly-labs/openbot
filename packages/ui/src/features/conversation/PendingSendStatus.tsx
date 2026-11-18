@@ -1,4 +1,4 @@
-import { IconButton, Pencil, RotateCcw, TriangleAlert, X } from "@openbot/ui";
+import { ErrorReference, IconButton, Pencil, RotateCcw, TriangleAlert, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
@@ -7,6 +7,8 @@ export interface PendingSendStatusProps {
   state: "waiting" | "sending" | "failed";
   /** Why the send failed, when the host or the connection said. */
   error?: string | null;
+  /** The support reference of the failure, when it has one. */
+  errorReference?: string | null;
   /** The composer shows the update notice; keep recovery actions without a second error. */
   updateRequired?: boolean;
   /** The host drops a repeated send of this message, so Retry cannot store it twice. */
@@ -34,6 +36,7 @@ export function PendingSendStatus(props: PendingSendStatusProps): JSX.Element {
           <TriangleAlert aria-hidden="true" />
           {props.retrySafe ? t("chat.send.failed") : t("chat.send.unconfirmed")}
           <Show when={props.error}>{(error) => <span class="pending-send-error">{error()}</span>}</Show>
+          <ErrorReference reference={props.errorReference ?? null} />
         </Show>
       </span>
       <Show when={failed()}>

@@ -1,11 +1,14 @@
+import { BILLING_PLAN_IDS, storageTierOf } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
   hostKeyHandoverStatement,
 } from "@openbot/contracts/host-key-handover";
+import { type HostedServerSize, hostedServerStorageGb } from "@openbot/contracts/hosted-servers";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
+import { isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import {
   DISCORD_ROUTE_AUDIENCE,
@@ -50,6 +53,12 @@ import {
   WEBHOOK_ROUTES_LIMIT,
   type WebhookRoute,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import {
+  isServerAppearanceColor,
+  isServerAppearanceShape,
+  type ServerAppearance,
+  serverAppearanceOrNull,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Option, Result, Schema } from "effect";
 import { importJWK, type JWK, type JWTPayload, SignJWT } from "jose";
@@ -145,6 +154,21 @@ function removedAtAfterChange(change: { revoke: boolean; leave: boolean; activat
 }
 
 export type { RemoteMemberRole };
+
+/**
+ * The plan storage of a hosted server, in GB. A server on a machine of the operator has more, and its
+ * storage tier adds to it. Nothing for a server without a known plan.
+ */
+function hostedStorage(
+  plan: string | null,
+  onOperatorHost: boolean,
+  size: HostedServerSize | null,
+  storageTier: number | null,
+): { storageGb: number } | Record<string, never> {
+  return isOneOf(BILLING_PLAN_IDS, plan)
+    ? { storageGb: hostedServerStorageGb(plan, onOperatorHost, size, storageTierOf(storageTier)) }
+    : {};
+}
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
   status: Schema.Number,
@@ -281,6 +305,14 @@ export interface RemoteSignalPlan {
   entryUrl: string;
   /** The Signal machines that a host can have as its home, by ID. Empty = no host has a home. */
   homes: ReadonlyMap<string, string>;
+  /** The place of each home, by ID. Empty = the hash alone chooses a home, wherever the host is. */
+  locations: ReadonlyMap<string, SignalLocation>;
+}
+
+/** A place in degrees: a home machine's, or the one that Cloudflare gives for a host request. */
+export interface SignalLocation {
+  latitude: number;
+  longitude: number;
 }
 
 /** One configured Signal machine: the `signal` ticket claim and the URL that the ticket answer names. */
@@ -290,6 +322,11 @@ interface RemoteSignalHome {
 }
 
 const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
+/** Homes this much farther than the nearest home are near too, so the hash spreads hosts over one region. */
+const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
+const EARTH_RADIUS_KM = 6_371;
+/** A host ticket waits this long for a nearer home to answer before the host keeps its stored home. */
+const SIGNAL_HOME_MOVE_TIMEOUT_MS = 2_000;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -528,6 +565,7 @@ export class RemoteControlPlane {
       | "REMOTE_TICKET_KEY_ID"
       | "REMOTE_SIGNAL_URL"
       | "REMOTE_SIGNAL_HOMES"
+      | "REMOTE_SIGNAL_HOME_LOCATIONS"
       | "REMOTE_AUTH_WEBHOOK_URL"
       | "REMOTE_AUTH_WEBHOOK_URLS"
       | "REMOTE_AUTH_WEBHOOK_SECRET"
@@ -610,6 +648,8 @@ export class RemoteControlPlane {
         devicePublicKey?: string | null | undefined;
         rotateCredential?: boolean | undefined;
         machineToken?: string | undefined;
+        /** The host publishes itself again with no user action, such as at launch or after a failure. */
+        automatic?: boolean | undefined;
       },
     ) {
       const dependencies = yield* RemoteDependencies;
@@ -621,6 +661,20 @@ export class RemoteControlPlane {
       const existing = yield* this.#host(hostId);
       if (existing && existing.owner_user_id !== user.id) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+      }
+      // An owner removal keeps the host row with no machine token and no memberships (`deleteHost`). The
+      // host can still run, and its automatic publish put the server back in every list (#5273). A
+      // publish that the user starts on that computer registers it again. A host copied from a team
+      // tunnel can also have no token, but it keeps its owner membership.
+      if (input.automatic && existing && !existing.machine_token_hash) {
+        const ownerMembership = yield* remoteCall(() =>
+          dependencies.database
+            .prepare("SELECT 1 FROM remote_memberships WHERE host_id = ? AND user_id = ? AND status = 'active' LIMIT 1")
+            .bind(hostId, user.id)
+            .first(),
+        );
+        if (!ownerMembership)
+          return yield* new RemoteControlPlaneError(409, "host_removed", sourceText("error.remote.hostRemoved"));
       }
       yield* this.#requireHostReservation(hostId, user.id);
       const now = dependencies.now();
@@ -868,9 +922,17 @@ export class RemoteControlPlane {
       const result = yield* remoteCall(() =>
         dependencies.database
           .prepare(
-            `SELECT h.host_id, h.name, h.logo_key, h.device_public_key, h.auth_epoch, m.membership_id, m.role,
-           EXISTS(SELECT 1 FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted
+            `SELECT h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
+           h.auth_epoch, m.membership_id, m.role,
+           (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
+           (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
+           (SELECT CASE WHEN s.provider_template IS NULL THEN NULL ELSE COALESCE(s.pending_size, s.size) END
+             FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size,
+           (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.user_id = ? AND m.status = 'active'
@@ -881,11 +943,16 @@ export class RemoteControlPlane {
             host_id: string;
             name: string;
             logo_key: string | null;
+            appearance_shape: string | null;
+            appearance_color: string | null;
             device_public_key: string | null;
             auth_epoch: number;
             membership_id: string;
             role: RemoteMemberRole;
-            hosted: number;
+            hosted_plan: string | null;
+            operator_host: string | null;
+            hosted_size: HostedServerSize | null;
+            hosted_storage_tier: number | null;
           }>(),
       );
       const keyHandovers = yield* this.#keyHandoversByHost({
@@ -902,6 +969,7 @@ export class RemoteControlPlane {
               hostId: row.host_id,
               name: row.name,
               logoKey: row.logo_key,
+              appearance: storedAppearance(row.appearance_shape, row.appearance_color),
               devicePublicKey: row.device_public_key,
               keyHandovers: keyHandovers.get(row.host_id) ?? [],
               authEpoch: row.auth_epoch,
@@ -911,7 +979,12 @@ export class RemoteControlPlane {
               // join after its users. So no server takes more people than the license has users.
               memberLimit: license ? Math.min(limit, license.users) : limit,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
-              hosted: row.hosted === 1,
+              hosted: row.hosted_plan !== null,
+              // The account service has no call that restarts the machine of an operator, so a client hides
+              // the restart. A client from before this field shows it, and gets the refusal of the restart.
+              ...(row.operator_host === null ? {} : { restartAvailable: false }),
+              // The storage that the plan of a hosted server gives, so a client warns before the plan is full.
+              ...hostedStorage(row.hosted_plan, row.operator_host !== null, row.hosted_size, row.hosted_storage_tier),
             };
           }),
         { concurrency: "unbounded" },
@@ -1082,7 +1155,7 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT m.membership_id, m.role, m.status, m.created_at,
-                u.email, u.name, u.avatar_url
+                u.email, u.name, u.avatar_url, u.chat_color
          FROM remote_memberships m
          JOIN users u ON u.id = m.user_id
          WHERE m.host_id = ?
@@ -1097,6 +1170,7 @@ export class RemoteControlPlane {
             email: string;
             name: string | null;
             avatar_url: string | null;
+            chat_color: string | null;
           }>(),
       );
       return (result.results ?? []).map((member) => ({
@@ -1107,6 +1181,7 @@ export class RemoteControlPlane {
         email: member.email,
         name: member.name,
         avatarUrl: member.avatar_url,
+        chatColor: isAvatarColor(member.chat_color) ? member.chat_color : null,
       }));
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1155,6 +1230,40 @@ export class RemoteControlPlane {
           .run(),
       );
       return host.logo_key;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * Stores the look of a server with no logo (`host-appearance-v1`), which the host copies here.
+   * `null` gives the server its automatic look again. Returns the stored value.
+   */
+  readonly setHostAppearance = Effect.fn("RemoteControlPlane.setHostAppearance")(
+    function* (
+      this: RemoteControlPlane,
+      userId: string,
+      hostId: string,
+      value: unknown,
+    ): Effect.fn.Return<ServerAppearance | null, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.#requireRole(hostId, userId, ["owner"]);
+      const host = yield* this.#host(hostId);
+      if (!host) return yield* new RemoteControlPlaneError(404, "host_not_found", "The remote host does not exist.");
+      const appearance = yield* remoteValidate(() => {
+        if (value === null) return null;
+        const parsed = serverAppearanceOrNull(value);
+        if (!parsed) throw invalid("server appearance");
+        return parsed;
+      });
+      yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            "UPDATE remote_hosts SET appearance_shape = ?, appearance_color = ?, updated_at = ? WHERE host_id = ?",
+          )
+          .bind(appearance?.shape ?? null, appearance?.color ?? null, dependencies.now(), hostId)
+          .run(),
+      );
+      return appearance;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1551,17 +1660,26 @@ export class RemoteControlPlane {
         activating,
       });
       const now = dependencies.now();
-      // The writes after the membership apply only when it took its seat. A refused UPDATE leaves the
-      // membership as it was, so the member keeps their sessions and invitations.
-      const applied = activating
+      const status = input.revoke ? "revoked" : activating ? "active" : membership.status;
+      // The UPDATE applies only to the status and role read above, and to a free seat when it activates.
+      // Another admin's change since that read refuses it, so a stale role change cannot bring back a
+      // removed member. The writes after it apply only when it changed the row; a refused UPDATE leaves
+      // the member their sessions and invitations. A revoke or a leave keeps the role and refuses only
+      // the owner, so a role change at the same time cannot stop a removal.
+      const guardsRole = input.revoke !== true;
+      const applied: SqlCondition = guardsRole
         ? {
-            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = 'active')",
-            binds: [input.membershipId],
+            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND role = ? AND updated_at = ?)",
+            binds: [input.membershipId, status, role, now],
           }
-        : undefined;
+        : {
+            sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = ? AND updated_at = ?)",
+            binds: [input.membershipId, status, now],
+          };
       // An admin who leaves, is removed or is demoted can no longer invite, so their open invitations
-      // close. Then they leave the invitation limits and the list.
-      const closingInvites = membership.role === "admin" && (input.revoke === true || role !== "admin");
+      // close. Then they leave the invitation limits and the list. Only an owner or an admin makes
+      // invitations, so a removal closes them for any role, also for a role given at the same time.
+      const closingInvites = input.revoke === true || (membership.role === "admin" && role !== "admin");
       // Only a removal or a leave bumps the host's auth epoch. A new epoch makes Signal drop the host
       // and every connected member. A role change or reactivation ends this member's sessions below.
       const revokingAccess = input.revoke === true;
@@ -1569,15 +1687,17 @@ export class RemoteControlPlane {
         dependencies.database.batch([
           dependencies.database
             .prepare(
-              `UPDATE remote_memberships SET role = ?, status = ?, updated_at = ?, removed_at = ${removedAt}
-            WHERE membership_id = ?${activating ? ` AND ${memberSeat.sql}` : ""}`,
+              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}
+            WHERE membership_id = ? AND status = ?${guardsRole ? " AND role = ?" : " AND role != 'owner'"}${activating ? ` AND ${memberSeat.sql}` : ""}`,
             )
             .bind(
-              role,
-              input.revoke ? "revoked" : activating ? "active" : membership.status,
+              ...(guardsRole ? [role] : []),
+              status,
               now,
               ...(removedAt.includes("?") ? [now] : []),
               input.membershipId,
+              membership.status,
+              ...(guardsRole ? [membership.role] : []),
               ...(activating ? memberSeat.binds : []),
             ),
           ...(closingInvites
@@ -1586,16 +1706,18 @@ export class RemoteControlPlane {
                   .prepare(
                     `UPDATE remote_invites SET revoked_at = ?
                   WHERE host_id = ? AND created_by_user_id = ? AND revoked_at IS NULL
-                    AND (used_at IS NULL OR max_uses IS NULL)${applied ? ` AND ${applied.sql}` : ""}`,
+                    AND (used_at IS NULL OR max_uses IS NULL) AND ${applied.sql}`,
                   )
-                  .bind(now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
+                  .bind(now, input.hostId, membership.user_id, ...applied.binds),
               ]
             : []),
           ...(revokingAccess
             ? [
                 dependencies.database
-                  .prepare("UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ?")
-                  .bind(now, input.hostId),
+                  .prepare(
+                    `UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ? AND ${applied.sql}`,
+                  )
+                  .bind(now, input.hostId, ...applied.binds),
               ]
             : []),
           // The events come from the same batch as the UPDATE below, so a session that opened during
@@ -1607,27 +1729,41 @@ export class RemoteControlPlane {
                    json_object('type', 'remote-session-ended', 'hostId', host_id, 'sessionId', session_id),
                    ?, 0, ?
               FROM remote_sessions
-             WHERE host_id = ? AND user_id = ? AND ended_at IS NULL${applied ? ` AND ${applied.sql}` : ""}`,
+             WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND ${applied.sql}`,
             )
-            .bind(now, now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
+            .bind(now, now, input.hostId, membership.user_id, ...applied.binds),
           dependencies.database
             .prepare(
               `UPDATE remote_sessions SET ended_at = ?
-            WHERE host_id = ? AND user_id = ? AND ended_at IS NULL${applied ? ` AND ${applied.sql}` : ""}`,
+            WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND ${applied.sql}`,
             )
-            .bind(now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
-          ...(revokingAccess ? [this.#authEpochEventStatement(input.hostId, now)] : []),
+            .bind(now, input.hostId, membership.user_id, ...applied.binds),
+          ...(revokingAccess ? [this.#authEpochEventStatement(input.hostId, now, undefined, applied)] : []),
           // The member whose membership this is, and not the owner who changed it: a revoked server
           // has to leave that member's list on every device they are signed in on.
           this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now, applied),
         ]),
       );
       yield* this.#flushAuthEvents();
+      if ((changed[0]?.meta.changes ?? 0) === 1) return;
+      const current = yield* remoteCall(() =>
+        dependencies.database
+          .prepare("SELECT role, status FROM remote_memberships WHERE membership_id = ?")
+          .bind(input.membershipId)
+          .first<Pick<RemoteMembershipRow, "role" | "status">>(),
+      );
       // A concurrent join, reactivation or revoke took the seat after the check above.
-      if (activating && (changed[0]?.meta.changes ?? 0) !== 1) {
+      if (activating && current?.status === membership.status && current.role === membership.role) {
         yield* this.#requireMemberSeat(memberSeat);
         return yield* memberLimitReached(memberSeat.limit);
       }
+      // Another change already left the membership as this one asks.
+      if (current?.status === status && (!guardsRole || current.role === role)) return;
+      return yield* new RemoteControlPlaneError(
+        409,
+        "membership_changed",
+        "The membership changed while this change was made. Load the members again.",
+      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2107,13 +2243,18 @@ export class RemoteControlPlane {
    * home, because the members of the host still connect to it. A released host build sends no
    * `signalHome` (`null`) and connects only to the entry Signal, so its request removes the stored
    * home: else the members of a host that went back to a released build wait on the old home.
+   * `location` is where Cloudflare puts the host request, or null when it does not know.
    */
   readonly issueHostTicket = Effect.fn("RemoteControlPlane.issueHostTicket")(
     function* (
       this: RemoteControlPlane,
       hostId: string,
       machineToken: string,
-      placement: { signalHome: boolean | null; failedSignalUrl: string | null } = {
+      placement: {
+        signalHome: boolean | null;
+        failedSignalUrl: string | null;
+        location?: SignalLocation | null;
+      } = {
         signalHome: null,
         failedSignalUrl: null,
       },
@@ -2129,7 +2270,9 @@ export class RemoteControlPlane {
             .bind(hostId)
             .run(),
         );
-      const home = placement.signalHome ? yield* this.#placeHost(host, signal, placement.failedSignalUrl) : null;
+      const home = placement.signalHome
+        ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, placement.location ?? null)
+        : null;
       const issued = yield* dependencies.signer.issue({
         sessionId: `host-${hostId}`,
         hostId,
@@ -2211,7 +2354,10 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The host that a Slack workspace, Discord guild or Telegram chat is linked to, or null. */
+  /**
+   * The host that a Slack workspace, Discord guild, Telegram chat or webhook route is linked to, or
+   * null. A revoked webhook route has no host: its routine was disabled, deleted or moved.
+   */
   readonly routeHost = Effect.fn("RemoteControlPlane.routeHost")(
     function* (
       this: RemoteControlPlane,
@@ -2227,9 +2373,18 @@ export class RemoteControlPlane {
             ? dependencies.database
                 .prepare("SELECT host_id FROM discord_guild_routes WHERE guild_id = ?")
                 .bind(route.guildId)
-            : dependencies.database
-                .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
-                .bind(route.botId, route.chatId);
+            : route.platform === "telegram"
+              ? dependencies.database
+                  .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
+                  .bind(route.botId, route.chatId)
+              : dependencies.database
+                  // As in validateWebhookRoute: a host ID that a new owner registered again is not the route's host.
+                  .prepare(
+                    `SELECT route.host_id FROM webhook_routes route
+                     JOIN remote_hosts host ON host.host_id = route.host_id AND host.owner_user_id = route.account_id
+                     WHERE route.route_id = ? AND route.revoked_at IS NULL`,
+                  )
+                  .bind(route.routeId);
       const row = yield* remoteCall(() => statement.first<{ host_id: string }>());
       return row?.host_id ?? null;
     },
@@ -3131,21 +3286,32 @@ export class RemoteControlPlane {
   });
 
   /**
-   * The home of a host that asks for one. The stored home stays while its URL is not the one that
-   * failed for the host. Else the rendezvous choice replaces it, so a removed or failed machine moves
-   * only its own hosts. When two requests race, both use the home that the first one stored.
+   * The home of a host that asks for one. The stored home stays while it is one of the homes near the
+   * host and its URL is not the one that failed for the host. Else the rendezvous choice over those
+   * homes replaces it, so a removed or failed machine moves only its own hosts, and a new machine near
+   * a host takes it from a far one. A stored home that did not fail is left only for a home that answers
+   * `/health/ready`: a host that moved away from a failed near home does not go back while it is down.
+   * When two requests race, both use the home that the first one stored.
    */
   readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
     this: RemoteControlPlane,
     host: RemoteHostRow,
     signal: RemoteSignalPlan,
     failedSignalUrl: string | null,
+    location: SignalLocation | null,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const candidates = nearSignalHomes(signal, failedSignalUrl, location);
     const current = configuredSignalHome(signal, host.signal_home);
-    if (current && current.url !== failedSignalUrl) return current;
-    const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, signal, failedSignalUrl));
+    if (current && candidates.includes(current.id)) return current;
+    const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
+    if (
+      current &&
+      current.url !== failedSignalUrl &&
+      !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
+    )
+      return current;
     const stored = yield* remoteCall(() =>
       dependencies.database
         .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
@@ -3255,14 +3421,27 @@ export class RemoteControlPlane {
     return authEventStatement(this.#database, event, now, condition);
   }
 
-  #authEpochEventStatement(hostId: string, now: number, ownerUserId?: string): D1PreparedStatement {
+  #authEpochEventStatement(
+    hostId: string,
+    now: number,
+    ownerUserId?: string,
+    condition?: SqlCondition,
+  ): D1PreparedStatement {
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
          SELECT ?, json_object('type', 'remote-auth-changed', 'hostId', host_id, 'authEpoch', auth_epoch), ?, 0, ?
-         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)`,
+         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
-      .bind(crypto.randomUUID(), now, now, hostId, ownerUserId ?? null, ownerUserId ?? null);
+      .bind(
+        crypto.randomUUID(),
+        now,
+        now,
+        hostId,
+        ownerUserId ?? null,
+        ownerUserId ?? null,
+        ...(condition?.binds ?? []),
+      );
   }
 
   /**
@@ -3322,10 +3501,11 @@ function remoteSignalNotConfigured(): RemoteControlPlaneError {
 
 /**
  * The Signal URLs of the tickets, or null when `REMOTE_SIGNAL_URL` is not a ws or wss URL or
- * `REMOTE_SIGNAL_HOMES` is invalid. A ticket request then fails with 503 and does not send a host to a wrong machine.
+ * `REMOTE_SIGNAL_HOMES` or `REMOTE_SIGNAL_HOME_LOCATIONS` is invalid. A ticket request then fails with
+ * 503 and does not send a host to a wrong machine.
  */
 export function remoteSignalPlan(
-  bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES">,
+  bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "REMOTE_SIGNAL_HOME_LOCATIONS">,
 ): RemoteSignalPlan | null {
   const entryUrl = bindings.REMOTE_SIGNAL_URL?.trim();
   if (!entryUrl) return null;
@@ -3345,7 +3525,40 @@ export function remoteSignalPlan(
     if (protocol !== "wss:" && !(permitsWs && protocol === "ws:")) return null;
     homes.set(id, url);
   }
-  return { entryUrl, homes };
+  // An empty home list is the rollback, so it must work without a change to the locations.
+  if (homes.size === 0) return { entryUrl, homes, locations: new Map() };
+  const locations = signalHomeLocations(bindings.REMOTE_SIGNAL_HOME_LOCATIONS ?? "", homes);
+  return locations ? { entryUrl, homes, locations } : null;
+}
+
+/**
+ * `REMOTE_SIGNAL_HOME_LOCATIONS` as `id=latitude:longitude,...`: empty, or one place for each home and
+ * no other ID. Null when the value is invalid.
+ */
+function signalHomeLocations(
+  value: string,
+  homes: ReadonlyMap<string, string>,
+): ReadonlyMap<string, SignalLocation> | null {
+  const locations = new Map<string, SignalLocation>();
+  for (const entry of value.split(",")) {
+    if (!entry.trim()) continue;
+    const separator = entry.indexOf("=");
+    if (separator < 0) return null;
+    const id = entry.slice(0, separator).trim();
+    const [latitude, longitude, ...rest] = entry.slice(separator + 1).split(":");
+    const location = signalLocation(latitude, longitude);
+    if (!homes.has(id) || locations.has(id) || rest.length > 0 || !location) return null;
+    locations.set(id, location);
+  }
+  return locations.size === 0 || locations.size === homes.size ? locations : null;
+}
+
+/** A place from two decimal degree texts, or null when either is not a number in its range. */
+export function signalLocation(latitude: unknown, longitude: unknown): SignalLocation | null {
+  if (typeof latitude !== "string" || typeof longitude !== "string") return null;
+  if (!latitude.trim() || !longitude.trim()) return null;
+  const location = { latitude: Number(latitude), longitude: Number(longitude) };
+  return Math.abs(location.latitude) <= 90 && Math.abs(location.longitude) <= 180 ? location : null;
 }
 
 function urlProtocol(value: string): string | null {
@@ -3363,19 +3576,75 @@ function configuredSignalHome(signal: RemoteSignalPlan, id: string | null): Remo
 }
 
 /**
+ * The IDs of the homes that a host can get: the homes whose URL is not `failedSignalUrl`, or each home
+ * when that excludes each one. With a host location and home locations, only those of them at most
+ * `NEAR_SIGNAL_HOME_MARGIN_KM` farther than the nearest one.
+ */
+function nearSignalHomes(
+  signal: RemoteSignalPlan,
+  failedSignalUrl: string | null,
+  location: SignalLocation | null,
+): string[] {
+  const homes = [...signal.homes];
+  const available = homes.filter(([, url]) => url !== failedSignalUrl);
+  const ids = (available.length > 0 ? available : homes).map(([id]) => id);
+  if (!location || signal.locations.size === 0) return ids;
+  const distances = new Map(
+    ids.map((id) => {
+      const home = signal.locations.get(id);
+      return [id, home ? distanceKm(location, home) : Number.POSITIVE_INFINITY];
+    }),
+  );
+  const nearest = Math.min(...distances.values());
+  return ids.filter((id) => (distances.get(id) ?? Number.POSITIVE_INFINITY) <= nearest + NEAR_SIGNAL_HOME_MARGIN_KM);
+}
+
+/** The `/health/ready` URL of the machine of a Signal WebSocket URL. */
+function signalHealthUrl(signalUrl: string): string {
+  const parsed = new URL(signalUrl);
+  return `${parsed.protocol === "ws:" ? "http:" : "https:"}//${parsed.host}/health/ready`;
+}
+
+/** Whether the machine of a Signal URL answers `/health/ready`. A failed request is a false answer, not an error. */
+export function signalAnswers(
+  fetcher: (input: string, init: RequestInit) => Promise<Response>,
+  signalUrl: string,
+  timeoutMs: number,
+): Effect.Effect<boolean> {
+  return Effect.tryPromise({
+    try: (signal) =>
+      fetcher(signalHealthUrl(signalUrl), {
+        method: "GET",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+      }),
+    catch: () => null,
+  }).pipe(
+    Effect.map((response) => response.ok),
+    Effect.orElseSucceed(() => false),
+  );
+}
+
+/** The great-circle distance between two places, in kilometres (haversine). */
+function distanceKm(from: SignalLocation, to: SignalLocation): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitude = radians(to.latitude - from.latitude);
+  const longitude = radians(to.longitude - from.longitude);
+  const a =
+    Math.sin(latitude / 2) ** 2 +
+    Math.cos(radians(from.latitude)) * Math.cos(radians(to.latitude)) * Math.sin(longitude / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
  * The rendezvous choice of a home for the host: the highest first 8 bytes (big-endian) of
- * sha256(`${id}\n${hostId}`), over the machines whose URL is not `failedSignalUrl`, or over all
- * machines when that excludes each one. Null only when no home is configured.
+ * sha256(`${id}\n${hostId}`) over `candidates`. Null only when there is no candidate.
  */
 const rendezvousSignalHome = Effect.fn("RemoteControlPlane.rendezvousSignalHome")(function* (
   hostId: string,
-  signal: RemoteSignalPlan,
-  failedSignalUrl: string | null,
+  candidates: readonly string[],
 ) {
-  const homes = [...signal.homes];
-  const available = homes.filter(([, url]) => url !== failedSignalUrl);
   let chosen: { id: string; score: bigint } | null = null;
-  for (const [id] of available.length > 0 ? available : homes) {
+  for (const id of candidates) {
     const digest = yield* remoteCall(() =>
       crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${id}\n${hostId}`)),
     );
@@ -3567,6 +3836,12 @@ function requiredText(value: string, maximum: number, name: string): string {
   const text = value.trim();
   if (!text || text.length > maximum) throw invalid(name);
   return text;
+}
+
+/** The stored look of a server. An unknown shape is the automatic look; an unknown colour is the automatic colour. */
+function storedAppearance(shape: string | null, color: string | null): ServerAppearance | null {
+  if (!isServerAppearanceShape(shape)) return null;
+  return { shape, color: isServerAppearanceColor(color) ? color : null };
 }
 
 function invalid(name: string): RemoteControlPlaneError {

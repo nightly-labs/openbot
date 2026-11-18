@@ -73,8 +73,11 @@ const flow = fields({
   result: nullable(fields({ error: nullable(string(2_000)) }, { toolCount: count })),
 });
 
+/** The codec of `mcp/start`, which `sign-in-relay-deep-link-v1` uses for its own start route too. */
+export const SIGN_IN_RELAY_MCP_START_CODEC = adminRoute(fields({ config }), started);
+
 export const SIGN_IN_RELAY_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
-  [SIGN_IN_RELAY_ROUTES.mcpStart, adminRoute(fields({ config }), started)],
+  [SIGN_IN_RELAY_ROUTES.mcpStart, SIGN_IN_RELAY_MCP_START_CODEC],
   [SIGN_IN_RELAY_ROUTES.providerStart, adminRoute(fields({ provider: oneOf(...SIGN_IN_RELAY_PROVIDERS) }), started)],
   [SIGN_IN_RELAY_ROUTES.linkStart, adminRoute(fields({ agentId: identifier, url: string(8_192) }), started)],
   [SIGN_IN_RELAY_ROUTES.status, adminRoute(byFlow, flow)],

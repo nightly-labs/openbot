@@ -1,4 +1,4 @@
-import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import { avatarHeadColor, avatarStyleForSeed } from "@openbot/brand/bloub-avatar";
 import { type AvatarMood, avatarMoodIsBusy, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
@@ -13,6 +13,8 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -28,13 +30,13 @@ import {
   plushPictureName,
   savedPlushPicture,
 } from "@/features/agents/model/plush/plush-picture";
-import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
+import { useAgentActivity, useAgentListActivity } from "@/features/workspace/components/use-agent-activity";
 import {
   DISCONNECTED_APPEARANCE,
   useConnectionAppearance,
 } from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { agentActivityMood } from "@/features/workspace/model/agent-activity";
+import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { useScreenFocusedWhile } from "@/shared/lib/use-screen-focused-while";
@@ -50,6 +52,8 @@ interface BloubAvatarProps extends AgentPhotoProps {
   animateIdle?: boolean;
   /** Turns the orbit rings around an agent photo while the agent works. A plush shows its felt dots. */
   rings?: boolean;
+  /** The face also shows the work and the waits of the agent's side threads, as the home list does. */
+  withThreads?: boolean;
 }
 
 /**
@@ -59,7 +63,19 @@ interface BloubAvatarProps extends AgentPhotoProps {
  */
 type PlushTransition = "pop" | "cut";
 
-export function BloubAvatar({
+export function BloubAvatar({ withThreads = false, ...props }: BloubAvatarProps) {
+  return withThreads ? <ListBloubAvatar {...props} /> : <ChatBloubAvatar {...props} />;
+}
+
+function ChatBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
+  return <LiveBloubAvatar {...props} activity={useAgentActivity(props.agentId)} />;
+}
+
+function ListBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
+  return <LiveBloubAvatar {...props} activity={useAgentListActivity(props.agentId)} />;
+}
+
+function LiveBloubAvatar({
   agentId,
   serverId: hostId,
   hue,
@@ -68,14 +84,14 @@ export function BloubAvatar({
   size = 54,
   animateIdle = true,
   rings = false,
-}: BloubAvatarProps) {
+  activity,
+}: Omit<BloubAvatarProps, "withThreads"> & { activity: MobileAgentActivity | undefined }) {
   const serverId = useMobileWorkspaceSelector(
     (workspace) => hostId ?? workspace.agents.find((agent) => agent.id === agentId)?.serverId,
   );
   const disconnected = useMobileWorkspaceSelector(
     (workspace) => !workspace.servers.some((server) => server.id === serverId && showsOnline(server)),
   );
-  const activity = useAgentActivity(agentId);
   return (
     <BloubAvatarPreview
       agentId={agentId}
@@ -125,7 +141,8 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview(
 /**
  * The felt plush of an agent. A still plush is a picture drawn once and shown by the image view, so a
  * long list costs no drawing surface per row. A plush that moves draws its frames with Skia on the UI
- * thread; it keeps its canvas once it has moved, so a face that settles does not flash.
+ * thread; it keeps its canvas once it has moved, so a face that settles does not flash. A seed of the
+ * flat style shows the flat face of the desktop instead.
  */
 const PlushAvatar = memo(function PlushAvatar({
   seed,
@@ -179,7 +196,12 @@ const PlushAvatar = memo(function PlushAvatar({
           popStyle,
         ]}
       >
-        {live ? (
+        {avatarStyleForSeed(shown.seed) === "flat" ? (
+          // A flat face holds its picture, as the desktop does. A busy agent breathes.
+          <FlatBreath amount={animate ? avatarMoodPresentation(mood).breathe : 0} size={drawn}>
+            {picture}
+          </FlatBreath>
+        ) : live ? (
           <PlushCanvas
             seed={shown.seed}
             hue={shown.hue}
@@ -198,6 +220,28 @@ const PlushAvatar = memo(function PlushAvatar({
     </Animated.View>
   );
 });
+
+/** One breath of the desktop: the scale goes from `1 - amount` to `1 + amount` and back in 2.6 s. */
+const BREATH_MS = 1300;
+
+function FlatBreath({ amount, size, children }: { amount: number; size: number; children: ReactNode }) {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (amount <= 0) {
+      scale.set(withTiming(1, { duration: 300 }));
+      return;
+    }
+    const easing = Easing.inOut(Easing.sin);
+    scale.set(
+      withSequence(
+        withTiming(1 - amount, { duration: BREATH_MS / 2, easing }),
+        withRepeat(withTiming(1 + amount, { duration: BREATH_MS, easing }), -1, true),
+      ),
+    );
+  }, [amount, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  return <Animated.View style={[{ width: size, height: size }, style]}>{children}</Animated.View>;
+}
 
 /** The old plush shrinks away, the new one springs out. `cut`, or reduced motion, swaps at once. */
 function usePlushPop(seed: string, hue: AvatarHue | null, color: AvatarColor | null, pop: boolean) {

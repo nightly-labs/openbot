@@ -1,0 +1,134 @@
+/* The machine use of the server in the Usage header, and the details that a click opens. */
+
+.usage-machine-icon {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex-shrink: 0;
+}
+
+.usage-machine-trigger {
+  flex-shrink: 0;
+  gap: var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+}
+
+.usage-machine-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.usage-machine-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-machine-ring {
+  width: var(--openbot-icon-md);
+  --ui-radial-progress-color: var(--openbot-text-secondary);
+}
+
+.usage-machine-ring .ui-radial-progress-track,
+.usage-machine-ring .ui-radial-progress-indicator {
+  stroke-width: 6;
+}
+
+/* The default track is almost invisible on the dark header, so a part-full ring looks like a spinner. */
+.usage-machine-ring .ui-radial-progress-track {
+  stroke: var(--openbot-text-dim);
+  stroke-opacity: 0.35;
+}
+
+/* Above an alert level, as Storage colours the metric. */
+.usage-machine-item[data-tone="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.usage-machine-item[data-tone="danger"] {
+  color: var(--openbot-danger-text);
+}
+
+/* The open motion of the filter selects beside it: it moves down 8px and grows from 95%. */
+.ui-popover-menu-surface.usage-machine-popover {
+  animation: ui-select-content-in var(--openbot-duration-dialog) var(--openbot-ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-popover-menu-surface.usage-machine-popover {
+    animation-name: ui-select-content-fade-in;
+  }
+}
+
+.usage-machine-popover .usage-machine-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+}
+
+.usage-machine-popover .usage-machine-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.usage-machine-popover .usage-machine-detail-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.usage-machine-popover .usage-machine-icon {
+  color: var(--openbot-text-secondary);
+}
+
+.usage-machine-popover .usage-machine-detail-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-machine-popover [data-tone="warning"] .usage-machine-detail-value {
+  color: var(--openbot-warning-text);
+}
+
+.usage-machine-popover [data-tone="danger"] .usage-machine-detail-value {
+  color: var(--openbot-danger-text);
+}
+
+.usage-machine-popover .usage-machine-bar .ui-progress-track {
+  height: 6px;
+}
+
+.usage-machine-popover [data-tone="warning"] .ui-progress-fill {
+  background: var(--openbot-warning);
+}
+
+.usage-machine-popover [data-tone="danger"] .ui-progress-fill {
+  background: var(--openbot-danger);
+}
+
+/* The disk row is the action of the popover: a full-width row that opens Storage. */
+.usage-machine-popover .context-meter-action.usage-machine-storage {
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--openbot-space-1-5);
+  padding-block: var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-weight: inherit;
+  text-align: start;
+}
+
+.usage-machine-popover .usage-machine-storage .usage-machine-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+.usage-machine-popover .usage-machine-detail-size {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}

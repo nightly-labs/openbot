@@ -47,8 +47,8 @@ export const ROUTINE_DRAFT_KIND_VALUES: readonly RoutineDraftKind[] = [
 ];
 
 /**
- * The kinds every host saves. Only this computer's host saves `once`: the released Team API
- * cannot carry it, so a remote host never shows it.
+ * The kinds every host saves. The released Team API cannot carry `once`, so only this computer's
+ * host and a joined host with `routines-once-v1` save it.
  */
 export const ROUTINE_SAVED_DRAFT_KIND_VALUES = ROUTINE_DRAFT_KIND_VALUES.filter((kind) => kind !== "once");
 

@@ -142,6 +142,14 @@
   gap: var(--openbot-space-1);
 }
 
+/* The copy and check glyphs draw as the download and close glyphs beside them. */
+.image-lightbox-copy svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+}
+
 .image-lightbox-zoom {
   display: flex;
   align-items: center;
@@ -183,9 +191,10 @@
   transform: translateX(calc(var(--image-lightbox-slide) * 100%));
 }
 
+/* An image smaller than the stage shows one image pixel on each screen pixel (`ImageLightbox.tsx`). */
 .image-lightbox-image {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: min(100%, var(--image-lightbox-screen-width, 100%));
+  max-height: min(100%, var(--image-lightbox-screen-height, 100%));
   object-fit: contain;
   border-radius: var(--openbot-radius-md);
   user-select: none;

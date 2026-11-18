@@ -7,10 +7,10 @@
  * is the one part that needs a closure of its own, and `createSidebarDragEngine` is it.
  */
 
-import { createContext, createEffect, onCleanup, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, onCleanup, useContext } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createSidebarDragEngine } from "./createSidebarDragEngine";
-import type { SidebarProps } from "./sidebar-types";
+import { type SidebarProps, sidebarChatOrderSortsSections } from "./sidebar-types";
 import { createSidebarAnnouncementStore } from "./stores/announcement-store";
 import { createSidebarDataStore } from "./stores/data-store";
 import { createSidebarDragStateStore } from "./stores/drag-state-store";
@@ -19,14 +19,23 @@ import { createSidebarPendingStore } from "./stores/pending-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
-  const scrollFades = createScrollFades();
+  /** A chat drags only in the manual orders. "Recent activity" and "Unread first" sort each section. */
+  const chatsDraggable = () => layoutMutable() && !sidebarChatOrderSortsSections(props.chatOrder);
+  const scrollFades = createScrollFades({ stuck: ".sidebar-folder > header" });
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
   // The drag state is built from the data store, so the data store reads it through this reference,
   // which is set once the drag state exists.
   let dragActive = () => false;
+  /**
+   * True while a mouse or pen is over the list, or over a menu that is open on it. The read open chat
+   * keeps its place in an unread order only then. A touch is false: a finger leaves nothing under it
+   * after a tap.
+   */
+  const [pointerInList, setPointerInList] = createSignal(false);
   const {
     assignedSectionId,
+    chatIsUnread,
     chatKind,
     chatName,
     chatPinnedItems,
@@ -40,6 +49,7 @@ export function createSidebarScope(props: SidebarProps) {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionIsInside,
@@ -47,12 +57,13 @@ export function createSidebarScope(props: SidebarProps) {
     sectionParent,
     sectionPosition,
     sectionUnreadCount,
+    unreadChats,
     userHiddenAgentList,
     userHiddenSince,
     visiblePinnedKeys,
     visibleSectionIds,
     waitingChats,
-  } = createSidebarDataStore({ props, dragActive: () => dragActive() });
+  } = createSidebarDataStore({ props, dragActive: () => dragActive(), pointerInList });
   const {
     cancelSectionEditor,
     closeDelete,
@@ -139,13 +150,45 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
   });
 
+  // `pointerover` also fires when a menu closes and the pointer moves on, which a `pointerleave` on
+  // the list does not report. An overlay (a menu, a tooltip, a popover) keeps the current state: one
+  // opened from the list holds the row, and one opened elsewhere does not start a hold.
+  const trackListPointer = (event: PointerEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (event.pointerType === "touch" || target === null) {
+      setPointerInList(false);
+      return;
+    }
+    if (agentList?.contains(target) === true) setPointerInList(true);
+    else if (target.closest("[data-popper-positioner], .agent-context-menu") === null) setPointerInList(false);
+  };
+  // The pointer left the window.
+  const releaseListPointer = (event: PointerEvent) => {
+    if (event.relatedTarget === null) setPointerInList(false);
+  };
+  // Another app or a keyboard shortcut took the focus while the pointer did not move.
+  const releaseOnBlur = () => setPointerInList(false);
+  document.addEventListener("pointerover", trackListPointer);
+  document.addEventListener("pointerout", releaseListPointer);
+  window.addEventListener("blur", releaseOnBlur);
+
   onCleanup(() => {
+    document.removeEventListener("pointerover", trackListPointer);
+    document.removeEventListener("pointerout", releaseListPointer);
+    window.removeEventListener("blur", releaseOnBlur);
     stopSidebarDragging();
     scrollFades.stop();
   });
 
   createEffect(
-    () => [resolvedPinnedItems(), waitingChats(), filteredChats(), orderedPeople(), userHiddenAgentList()],
+    () => [
+      resolvedPinnedItems(),
+      waitingChats(),
+      unreadChats(),
+      filteredChats(),
+      orderedPeople(),
+      userHiddenAgentList(),
+    ],
     () => {
       scrollFades.remeasure();
     },
@@ -172,7 +215,9 @@ export function createSidebarScope(props: SidebarProps) {
     deleteTarget,
     channelDeleteTarget,
     deleting,
+    chatIsUnread,
     chatPinnedItems,
+    chatsDraggable,
     directThreadByMember,
     dragOffset: dragState.dragOffset,
     dragOverPinnedKey: dragState.dragOverPinnedKey,
@@ -205,6 +250,7 @@ export function createSidebarScope(props: SidebarProps) {
     scrollFades,
     sectionDeleteTarget,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionDragClasses: dragState.sectionDragClasses,
     sectionIsCollapsed,
@@ -223,6 +269,7 @@ export function createSidebarScope(props: SidebarProps) {
     startRenameSection,
     startSectionDragging,
     stopSidebarDragging,
+    unreadChats,
     updateSectionEditorName,
     updateSidebarNativeDrag,
     userHiddenAgentList,

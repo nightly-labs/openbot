@@ -1,0 +1,33 @@
+{
+  "slug": "intercom",
+  "name": "Intercom",
+  "tagline": "Customer support conversations",
+  "description": "Intercom lets agents search and read conversations, tickets, and contacts in the signed-in workspace. Each user signs in to their own Intercom account through the browser; this address is for US-hosted workspaces.",
+  "category": "productivity",
+  "creatorName": "Intercom",
+  "iconUrl": "https://www.intercom.com/intercom-marketing-site/favicons/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-open-conversations", "text": "Summarize the open conversations from the last 24 hours." },
+    { "id": "prompt-customer", "text": "Show the recent conversations and tickets for this customer email." },
+    { "id": "prompt-themes", "text": "What are the most common topics in this week's support conversations?" }
+  ],
+  "apps": [
+    {
+      "id": "app-intercom-mcp",
+      "name": "Intercom",
+      "description": "Conversation, ticket, and contact search, over Intercom's MCP server with browser sign-in.",
+      "iconUrl": "https://www.intercom.com/intercom-marketing-site/favicons/favicon.ico",
+      "server": {
+        "name": "intercom",
+        "transport": "http",
+        "url": "https://mcp.intercom.com/mcp",
+        "auth": [{ "id": "intercom-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.intercom.com",
+  "privacyPolicyUrl": "https://www.intercom.com/legal/privacy",
+  "termsUrl": "https://www.intercom.com/legal/terms-and-policies"
+}

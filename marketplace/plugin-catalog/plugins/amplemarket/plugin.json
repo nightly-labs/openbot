@@ -1,0 +1,36 @@
+{
+  "slug": "amplemarket",
+  "name": "Amplemarket",
+  "tagline": "Sales prospecting and enrichment",
+  "description": "Amplemarket lets agents find and research leads, enrich companies and contacts, review outreach activity, and add leads to lists in the signed-in account. Each user signs in to their own Amplemarket account through the browser.",
+  "category": "research",
+  "creatorName": "Amplemarket",
+  "iconUrl": "https://cdn.prod.website-files.com/6350808bc45bd0c902af10e6/6703a3a5c41d8b7f3d96c0ce_am-webclip-256.png",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-find-leads",
+      "text": "Find heads of finance at logistics companies in Germany with 200 to 1,000 employees."
+    },
+    { "id": "prompt-account", "text": "Research this company: tech stack, recent hires, and funding." },
+    { "id": "prompt-touchpoints", "text": "What were our past touchpoints with this email address?" }
+  ],
+  "apps": [
+    {
+      "id": "app-amplemarket-mcp",
+      "name": "Amplemarket",
+      "description": "Lead search, enrichment, and outreach data, over Amplemarket's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6350808bc45bd0c902af10e6/6703a3a5c41d8b7f3d96c0ce_am-webclip-256.png",
+      "server": {
+        "name": "amplemarket",
+        "transport": "http",
+        "url": "https://mcp.amplemarket.com/mcp",
+        "auth": [{ "id": "amplemarket-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.amplemarket.com",
+  "privacyPolicyUrl": "https://www.amplemarket.com/legal/privacy",
+  "termsUrl": "https://www.amplemarket.com/legal/terms"
+}

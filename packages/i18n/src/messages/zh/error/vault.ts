@@ -10,6 +10,7 @@ export const messages = {
   "error.vault.valueTooLong": "某个值过长。",
   "error.vault.websiteInvalid": "请填写 HTTPS 网站地址。",
   "error.vault.passwordRequired": "请填写密码。",
+  "error.vault.twoStepKeyInvalid": "这不是两步验证密钥。请填写该网站的设置密钥或 otpauth:// 链接。",
   "error.vault.cardNumberInvalid": "请填写有效的卡号。",
   "error.vault.securityCodeInvalid": "请填写 3 位或 4 位的安全码。",
   "error.vault.expiryInvalid": "请填写有效的到期月份和年份。",

@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
   "composer.queueEdit.cancel": "Bearbeitung abbrechen",
+  "composer.feedbackFix.body":
+    "Bericht #{number} wird korrigiert. Sende die Anfrage, oder brich ab, damit der Bericht bleibt, wie er ist.",
+  "composer.feedbackFix.cancel": "Abbrechen",
   "composer.providerWait.offlineTitle": "Keine Internetverbindung",
   "composer.providerWait.offline": "{provider} kann erst antworten, wenn dieser Computer wieder online ist.",
   "composer.providerWait.silent": "{provider} hat seit {duration} nichts gesendet.",
@@ -15,10 +18,21 @@ export const messages = {
   "composer.signIn.label": "Bei {provider} anmelden",
   "composer.signIn.action": "Anmelden",
   "composer.updateKey.action": "Schlüssel ändern",
+  "composer.verifyAccount.action": "Konto bestätigen",
   "composer.update.body": "Aktualisiere {provider}, um fortzufahren.",
   "composer.update.manual": "Aktualisiere {provider} auf dem Computer, auf dem es läuft, um fortzufahren.",
   "composer.update.pending": "Wird aktualisiert…",
   "composer.update.action": "Aktualisieren",
+  "composer.imageInput.body":
+    "{model} erhält nur Text und sieht die angehängten Bilder nicht. Wenn dieses Modell Bilder lesen kann, schalte Bilder dafür ein.",
+  "composer.imageInput.label": "Bilder für {model} einschalten",
+  "composer.imageInput.pending": "Wird eingeschaltet…",
+  "composer.imageInput.action": "Bilder einschalten",
+  "composer.usageLimit.credits":
+    "Du hast das Planlimit von {provider} erreicht. Deine Agenten nutzen jetzt dein Guthaben.",
+  "composer.usageLimit.creditsResets":
+    "Du hast das Planlimit von {provider} erreicht. Deine Agenten nutzen dein Guthaben, bis es {reset} zurückgesetzt wird.",
+  "composer.usageLimit.creditsTitle": "Guthaben wird genutzt",
   "composer.usageLimit.resets": "Du hast das Limit von {provider} erreicht. Es wird {reset} zurückgesetzt.",
   "composer.usageLimit.selectModel":
     "Du hast das Limit von {provider} erreicht. Wähle ein anderes Modell, um fortzufahren.",
@@ -76,9 +90,9 @@ export const messages = {
   "composer.placeholder.messageAgent": "Nachricht an den Agenten",
   "composer.placeholder.answer": "Gib deine Antwort ein",
   "composer.add.label": "Zur Anweisung hinzufügen",
-  "composer.add.image": "Bild anhängen",
+  "composer.add.files": "Dateien anhängen",
+  "composer.add.teach": "Aufgabe beibringen",
   "composer.add.skill": "Fähigkeit verwenden",
-  "composer.add.context": "Kontext hinzufügen",
   "composer.upload.cancel": "Upload abbrechen",
   "composer.upload.uploading": "{name} wird hochgeladen",
   "composer.upload.progress": "{sent} von {total}",
@@ -110,6 +124,13 @@ export const messages = {
   "composer.error.cancelEdit": "Die Bearbeitung der Warteschlange konnte nicht abgebrochen werden. Versuche es erneut.",
   "composer.error.updateQueued":
     "Die Nachricht in der Warteschlange konnte nicht aktualisiert werden. Versuche es erneut.",
+  "composer.queueEdit.received": "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet.",
+  "composer.queueEdit.receivedKept":
+    "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.deletedKept":
+    "Diese Nachricht wurde gelöscht. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.endedKept":
+    "Diese Bearbeitung wurde beendet, bevor sie gespeichert wurde. Deine Änderungen stehen noch im Nachrichtenfeld.",
   "composer.voice.prepareFailed": "Das Sprachmodell konnte nicht vorbereitet werden. Versuche es erneut.",
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",
@@ -121,6 +142,10 @@ export const messages = {
   "composer.error.changeModel": "Das Modell konnte nicht geändert werden. Versuche es erneut.",
   "composer.error.changeEffort": "Der Denkaufwand konnte nicht geändert werden. Versuche es erneut.",
   "composer.error.changeFastMode": "Der Schnellmodus konnte nicht geändert werden. Versuche es erneut.",
+  "composer.fastMode.confirmTitle": "Schnellmodus einschalten?",
+  "composer.fastMode.confirmDescription":
+    "Claude antwortet schneller, aber jeder Token kostet mehr. Mit einem Claude-Abo nutzt der Schnellmodus immer Nutzungsguthaben, auch wenn dein Plan noch Nutzung übrig hat.",
+  "composer.fastMode.confirm": "Einschalten",
   "composer.context.label": "Kontext zu {percent} voll",
   "composer.context.labelEstimated": "Kontext zu etwa {percent} voll",
   "composer.context.labelCompacting": "Kontext wird komprimiert",
@@ -146,4 +171,15 @@ export const messages = {
   "composer.newChat.action": "Neuer Chat",
   "composer.context.compact": "Jetzt komprimieren",
   "composer.context.compactFailed": "Der Kontext konnte nicht komprimiert werden. Versuche es erneut.",
+  "composer.picker.option.tab": "Browser-Tab {name}",
+  "composer.picker.option.thread": "Thread {name}",
+  "composer.picker.section.agents": "Agenten",
+  "composer.picker.section.files": "Dateien",
+  "composer.picker.section.tabs": "Browser-Tabs",
+  "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In Nachrichten",
+  "composer.token.tab": "Browser-Tab {name}",
+  "composer.token.thread": "Thread {name}",
+  "composer.token.unavailableTab": "Geschlossener Browser-Tab {name}",
+  "composer.token.unavailableThread": "Nicht verfügbarer Thread {name}",
 } as const satisfies PartialTranslation<typeof source>;

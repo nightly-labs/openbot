@@ -15,6 +15,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
+import { RemoteControlPolicySection } from "./RemoteControlPolicySection";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -32,6 +33,7 @@ export function ServerDesktopPanel(props: {
   server: ServerSummary;
   platform: "darwin" | "win32" | "linux";
   hostStatus: HostStatus | null | undefined;
+  menuMount?: HTMLElement | undefined;
 }) {
   const { t, sourceText } = useText();
 
@@ -62,7 +64,7 @@ export function ServerDesktopPanel(props: {
       return server.remoteDesktopAvailable
         ? {
             title: t("server.desktop.serviceAvailable"),
-            message: t("server.desktop.serviceAvailableDescription"),
+            message: t("server.desktop.serviceAvailablePolicyDescription"),
             available: true,
           }
         : {
@@ -107,7 +109,7 @@ export function ServerDesktopPanel(props: {
             <ItemContent>
               <ItemTitle>{REMOTE_HOST_GATEWAY_NAME}</ItemTitle>
               <ItemDescription class="server-settings-desktop-description">
-                {t("server.desktop.gatewayDescription")}
+                {t("server.desktop.gatewayPolicyDescription")}
               </ItemDescription>
             </ItemContent>
             <ItemActions class="server-settings-desktop-meta">
@@ -129,6 +131,12 @@ export function ServerDesktopPanel(props: {
           </Item>
         </Show>
       </ItemGroup>
+      <Show when={props.server.kind === "local"}>
+        <RemoteControlPolicySection
+          activeSessions={props.hostStatus?.remoteDesktopActiveSessions ?? 0}
+          menuMount={props.menuMount}
+        />
+      </Show>
     </SettingsSection>
   );
 }

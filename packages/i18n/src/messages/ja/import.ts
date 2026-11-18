@@ -33,6 +33,11 @@ export const messages = {
   "import.guide.reading": "読み込み中…",
   "import.guide.choose": "エクスポートファイルを選択",
   "import.guide.chooseNote": "変更の前に、含まれるエージェントを確認できます。",
+  "import.guide.hermesLedeServer":
+    "Hermes の各プロファイルが 1 つのエージェントになります。サーバー上のプロファイルを読み込むか、Hermes のエクスポート用スキルで 1 つの .zip ファイルにまとめます。",
+  "import.guide.hermesLedeExport":
+    "Hermes の各プロファイルが 1 つのエージェントになります。Hermes のエクスポート用スキルが、それらを 1 つの .zip ファイルにまとめます。",
+  "import.guide.setupServer": "サーバーから読み込む",
   "import.review.title": "{source} のエクスポート",
   "import.review.exported": "{date} にエクスポート",
   "import.review.fileSize": "ファイル {size}",
@@ -66,4 +71,12 @@ export const messages = {
   "import.result.channel": "チャンネル",
   "import.result.notImportedTitle": "インポートされなかった項目",
   "import.result.warnings": "移行されなかった項目があります",
+  "import.source.ledeServer":
+    "OpenBot はこれらをサーバーにコピーします。何かが変わる前に、すべての項目を確認できます。",
+  "import.source.hermesNoteServer":
+    "サーバー上の Hermes フォルダーを読み込むか、Hermes から .zip ファイルをエクスポートします。",
+  "import.source.hermesNoteExport": "Hermes から .zip ファイルをエクスポートします。",
+  "import.hermes.notFoundServer": "このサーバーに Hermes のプロファイルがありません",
+  "import.hermes.notFoundServerNote":
+    "OpenBot はサーバーの Hermes フォルダーを読み込みます。このコンピューターの Hermes を取り込むには、Hermes から .zip ファイルを書き出してください。",
 } as const satisfies PartialTranslation<typeof source>;

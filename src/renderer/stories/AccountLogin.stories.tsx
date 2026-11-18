@@ -93,6 +93,10 @@ export const Interactive: Story = {
   },
 };
 
+export const KeyringChanged: Story = {
+  args: { state: { status: "signed_out", reason: "keyring_changed" } },
+};
+
 export const SendingCode: Story = {
   args: { state: { status: "signing_in" } },
 };

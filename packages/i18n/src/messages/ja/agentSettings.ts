@@ -78,7 +78,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{name} が書き始める前に {model} が使用量の上限に達した場合、{name} はどのモデルを使うかを確認します。",
   "agentSettings.backupModels.introAutomatic":
-    "{name} が書き始める前に {model} が使用量の上限に達した場合、またはプロバイダーのエラーで失敗した場合、{name} は順番の中で最初に使えるモデルに切り替えます。",
+    "{model} が使用量の上限に達した場合、{name} は順番の中で最初に使えるモデルに切り替えます。{name} が書き始める前に {model} がプロバイダーのエラーで失敗した場合も切り替えます。",
   "agentSettings.backupModels.ask": "切り替える前に確認",
   "agentSettings.backupModels.order": "順番",
   "agentSettings.backupModels.listLabel": "バックアップモデル（順番）",
@@ -142,16 +142,10 @@ export const messages = {
 
   "agentSettings.runtime.model": "エージェントのモデル",
   "agentSettings.runtime.modelUnavailable": "エージェント CLI が接続されると、モデルを選択できます。",
-  "agentSettings.runtime.reasoning": "推論",
-  "agentSettings.runtime.reasoningLabel": "エージェントの推論レベル",
-  "agentSettings.runtime.selectReasoning": "推論を選択",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider} が設定",
   "agentSettings.runtime.access": "アクセス",
   "agentSettings.runtime.accessLabel": "エージェントのアクセス",
   "agentSettings.runtime.busyMessage": "作業中",
   "agentSettings.runtime.busyMessageLabel": "エージェントの作業中に送るメッセージ",
-  "agentSettings.runtime.taskLimit": "並列スレッド",
-  "agentSettings.runtime.taskLimitLabel": "同時に実行するスレッド",
   "agentSettings.runtime.workingDirectory": "作業ディレクトリ",
   "agentSettings.runtime.notAvailable": "まだ利用できません",
   "agentSettings.runtime.fullAccessNote":
@@ -171,9 +165,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "方向を修正",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
-  "agentSettings.taskLimit.default": "デフォルト ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
   "agentSettings.notificationLevel.title": "自分への通知",
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
@@ -188,6 +179,15 @@ export const messages = {
     "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.deleteHistory.title": "履歴を削除",
+  "agentSettings.deleteHistory.description":
+    "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
+  "agentSettings.deleteHistory.button": "削除",
+  "agentSettings.deleteHistory.confirmTitle": "{name} とのチャット履歴を削除しますか？",
+  "agentSettings.deleteHistory.confirmDescription":
+    "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+  "agentSettings.deleteHistory.confirm": "履歴を削除",
+  "agentSettings.deleteHistory.failed": "履歴を削除できませんでした。",
 
   "agentSettings.fullAccess.title": "このエージェントにフルアクセスを許可しますか？",
   "agentSettings.fullAccess.askTitle": "このエージェントにワークスペースの外での作業を許可しますか？",
@@ -224,8 +224,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "agentSettings.quickAcknowledgement.title": "長いタスクの前に計画を表示",
-  "agentSettings.quickAcknowledgement.description":
-    "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "agentSettings.quickAcknowledgement.description": "長いタスクの前に、エージェントが計画を表示します。",
   "agentSettings.browserProfile.label": "ブラウザープロファイル",
   "agentSettings.browserProfile.shared": "共有",
   "agentSettings.browserProfile.agent": "このエージェントのみ",

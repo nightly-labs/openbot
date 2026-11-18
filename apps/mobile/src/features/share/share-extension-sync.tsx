@@ -73,6 +73,7 @@ export function ShareExtensionSync({
       "mobile.share.noAgents": t("mobile.share.noAgents"),
       "mobile.share.extension.send": t("mobile.share.extension.send"),
       "mobile.share.extension.footer": t("mobile.share.extension.footer"),
+      "mobile.share.extension.message": t("mobile.share.extension.message"),
       // The extension puts the agent's name in place of `{name}`.
       "mobile.share.extension.sending": t("mobile.share.extension.sending", { name: "{name}" }),
       "mobile.share.extension.sent": t("mobile.share.extension.sent", { name: "{name}" }),

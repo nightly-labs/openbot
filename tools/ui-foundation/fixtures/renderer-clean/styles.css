@@ -5,3 +5,8 @@
   border-radius: 0;
   transition: none;
 }
+
+/* An icon class that lucide-solid adds from the import path in components/ui/icons.ts. */
+.panel .lucide-clean-glyph > * {
+  fill: none;
+}

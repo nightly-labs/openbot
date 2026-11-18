@@ -1,5 +1,6 @@
 import { dummyLogger, type Logger } from "ts-log";
 
+export { maskIdentifiers } from "./identifiers";
 export type { Logger };
 export { dummyLogger };
 
@@ -51,7 +52,7 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
 // exact shape of an AWS key ID counts.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|whsec_)[A-Za-z0-9._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|rk_test_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
 // A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
 // A PEM private key, with its body. A key that the text cuts off before its END line is removed to
@@ -118,6 +119,13 @@ const RULE_WORD =
 // The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
 // label before a value stays readable.
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
+// The host of an http or https address, after its optional user part. A host is public: it is not
+// masked, and a token does not grow into it or into the `@` before it. Before, a saved password such
+// as the name of the user's company made every link to the company's site `https:[redacted]` in a
+// chat post. The user part, the path and the query stay masked, because a credential can be there.
+// Other schemes, such as an app's own `myapp://`, can carry a credential after `//`, so they keep
+// the rule.
+const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
@@ -166,8 +174,23 @@ export function isSecretName(name: string): boolean {
 }
 
 export function redactText(value: string): string {
+  return redact(value, true);
+}
+
+/**
+ * `redactText` without the email rule, for text that goes back to the agent that the user gave it
+ * to: its memories and its own chat history. An address there is user data that the agent needs to
+ * do its task, not a secret, and the provider already received it with the original message. Logs,
+ * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
+ */
+export function redactSecrets(value: string): string {
+  return redact(value, false, true);
+}
+
+function redact(value: string, emails: boolean, keepUnscanned = false): string {
   const marked = markRegisteredSecrets(value);
-  const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
+  const redacted =
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -178,14 +201,17 @@ function markRegisteredSecrets(value: string): string {
   if (!pattern) return value;
   pattern.lastIndex = 0;
   const ranges: Array<{ start: number; end: number }> = [];
+  let hosts: Uint8Array | null | undefined;
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
+    if (hosts === undefined) hosts = value.includes("://") ? urlHosts(value) : null;
+    if (hosts?.subarray(start, end).every((flag) => flag === HOST)) continue;
     const previous = ranges.at(-1);
     const floor = previous?.end ?? 0;
-    while (start > floor && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
-    while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    while (end < value.length && !hosts?.[end] && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
@@ -200,22 +226,35 @@ function markRegisteredSecrets(value: string): string {
   return result + value.slice(copied);
 }
 
-function applyTextRules(value: string): string {
-  return (
-    value
-      .replace(PEM_PRIVATE_KEY, "[redacted]")
-      .replace(COOKIE_HEADER, "$1[redacted]")
-      .replace(AUTH_HEADER_SECRET, "$1[redacted]")
-      .replace(BEARER_SECRET, "[redacted]")
-      .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
-      .replace(JSON_BARE_KEY, redactAssignedValue)
-      // After the assignment rule: its value runs over `&`, and a query value redacted first would
-      // leave a `]` behind it.
-      .replace(QUERY_SECRET, "$1[redacted]")
-      .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
-      .replace(JSON_WEB_TOKEN, "[redacted]")
-      .replace(EMAIL, "[redacted-email]")
-  );
+const HOST = 1;
+const HOST_SEPARATOR = 2;
+
+/** One flag for each character of `value`: `HOST`, the `@` before a host, or 0 elsewhere. */
+function urlHosts(value: string): Uint8Array {
+  const flags = new Uint8Array(value.length);
+  for (const match of value.matchAll(URL_HOST)) {
+    const prefix = match[1] ?? "";
+    const start = match.index + prefix.length;
+    flags.fill(HOST, start, start + (match[2]?.length ?? 0));
+    if (prefix.endsWith("@")) flags[start - 1] = HOST_SEPARATOR;
+  }
+  return flags;
+}
+
+function applyTextRules(value: string, emails: boolean): string {
+  const redacted = value
+    .replace(PEM_PRIVATE_KEY, "[redacted]")
+    .replace(COOKIE_HEADER, "$1[redacted]")
+    .replace(AUTH_HEADER_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]")
+    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+    .replace(JSON_BARE_KEY, redactAssignedValue)
+    // After the assignment rule: its value runs over `&`, and a query value redacted first would
+    // leave a `]` behind it.
+    .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
+    .replace(JSON_WEB_TOKEN, "[redacted]");
+  return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
 }
 
 /**
@@ -236,10 +275,10 @@ const UNSCANNED = "[redacted-unscanned]";
  *
  * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
  * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
- * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
- * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
+ * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
+ * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
  */
-function redactEmbeddedJson(value: string): string {
+function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -247,6 +286,11 @@ function redactEmbeddedJson(value: string): string {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
+      // `redactSecrets` text goes back to the agent that wrote or received it, and its provider
+      // already has it. Code or a list of links has far more than 16 bracket runs, and a cut reply
+      // made the agent send broken code again (#10122). The tail stays: registered secrets were
+      // already masked in it, and the text rules still run on it.
+      if (keepUnscanned) return result + value.slice(index);
       // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
       // shown either: text before the bound is kept, and everything from the unread payload on is
       // dropped. A truncated line is a smaller loss than a credential that survived the limit.
@@ -260,7 +304,7 @@ function redactEmbeddedJson(value: string): string {
       // credential with no closing brace to parse, so the run is dropped rather than passed on.
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
-    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
+    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
         // A run a serializer wrote that does not parse: a trailing comma, a value cut short. Going on
@@ -270,8 +314,12 @@ function redactEmbeddedJson(value: string): string {
         index = end;
         continue;
       }
-      result += value.slice(index, start + 1);
-      index = start + 1;
+      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
+      // so `{{name}}` costs one scan against the bound and not two.
+      let next = start + 1;
+      while (value[next] === "{" || value[next] === "[") next += 1;
+      result += value.slice(index, next);
+      index = next;
       continue;
     }
     result += value.slice(index, start) + parsed;
@@ -280,12 +328,58 @@ function redactEmbeddedJson(value: string): string {
   return result + value.slice(index);
 }
 
-function parseRedacted(candidate: string): string | null {
+/**
+ * The redacted form of a JSON payload, or the payload as written when no rule changed it.
+ *
+ * Writing an unchanged payload again is not neutral: `JSON.parse` rounds an integer past 2^53, so a
+ * 19-digit ID in a skill example reached the agent with other digits, and the spacing went too
+ * (#7760). The original is kept only when the parse lost no key: with a key written twice, the parse
+ * keeps the last value, and the first could hold a secret that no rule then read.
+ */
+function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
-    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>())) ?? null;
+    const parsed = JSON.parse(candidate);
+    const converted = convertValue(parsed, new Set<object>(), emails);
+    if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
+    return JSON.stringify(converted) ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The keys of a parsed payload when its redacted form is the same value, or -1 when a rule changed it.
+ * The redacted form ends in "[too deep]" at the conversion depth bound, so the walk stops there too.
+ */
+function unchangedKeyCount(parsed: unknown, converted: unknown): number {
+  if (parsed === null || typeof parsed !== "object") return parsed === converted ? 0 : -1;
+  if (converted === null || typeof converted !== "object" || Array.isArray(parsed) !== Array.isArray(converted))
+    return -1;
+  const entries = Object.entries(parsed);
+  const convertedEntries = Object.entries(converted);
+  if (entries.length !== convertedEntries.length) return -1;
+  let count = Array.isArray(parsed) ? 0 : entries.length;
+  for (const [index, [key, value]] of entries.entries()) {
+    const [convertedKey, convertedValue] = convertedEntries[index] ?? [];
+    const inner = key === convertedKey ? unchangedKeyCount(value, convertedValue) : -1;
+    if (inner < 0) return -1;
+    count += inner;
+  }
+  return count;
+}
+
+/** The keys a JSON text writes: each string that a `:` follows. */
+function writtenKeyCount(text: string) {
+  let count = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== '"') continue;
+    index += 1;
+    while (index < text.length && text[index] !== '"') index += text[index] === "\\" ? 2 : 1;
+    let next = index + 1;
+    while (text[next] === " " || text[next] === "\t" || text[next] === "\n" || text[next] === "\r") next += 1;
+    if (text[next] === ":") count += 1;
+  }
+  return count;
 }
 
 /**
@@ -294,12 +388,16 @@ function parseRedacted(candidate: string): string | null {
  * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
  * dropping when it does not close, because prose loses nothing by staying and a record can hold a
  * credential under a header name no rule can predict.
+ *
+ * Only an object key names what is under it, and a serializer opens an object with a quoted key, so
+ * the first character after the opening brackets must be a quote. A template placeholder such as
+ * `{{name}}` or a link such as `[[Page]]` has none, and an agent's text keeps it as written (#6437).
  */
 function startsLikeJson(value: string, start: number): boolean {
   for (let index = start + 1; index < value.length; index += 1) {
     const char = value[index];
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
-    return char === '"' || char === "{" || char === "[";
+    if (char === " " || char === "\t" || char === "\n" || char === "\r" || char === "{" || char === "[") continue;
+    return char === '"';
   }
   return false;
 }
@@ -346,20 +444,16 @@ function redactAssignedValue(_match: string, label: string, value: string): stri
 // an echoed response body, a spawn argument list, a serialized request. Once
 // it parses, the key rules apply to it exactly as they would to a structured
 // param, so `{"apiKey":"…"}` cannot pass as prose.
-function redactSerializedJson(value: string): string | null {
+function redactSerializedJson(value: string, emails: boolean): string | null {
   const trimmed = value.trim();
   // No size cap: a long payload is exactly where a secret hides, and the
   // truncation that follows keeps only the first characters - which would be
   // the unredacted ones.
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
-  try {
-    return JSON.stringify(convertValue(JSON.parse(trimmed), new Set<object>())) ?? null;
-  } catch {
-    // Neither a parse failure nor a conversion failure may become the failure
-    // the caller was trying to report: fall back to the regex rules, which
-    // scan the text without recursing.
-    return null;
-  }
+  // Neither a parse failure nor a conversion failure may become the failure
+  // the caller was trying to report: `null` falls back to the regex rules,
+  // which scan the text without recursing.
+  return parseRedacted(trimmed, emails);
 }
 
 // The `typeof` checks below narrow caller-provided unions rather than
@@ -378,12 +472,20 @@ export function toLogValue(value: unknown): LogValue {
   return convertSafely(value);
 }
 
+/**
+ * `toLogValue` without the email rule, as `redactSecrets` is for text: for a record that the
+ * agent's own chat shows to the user who gave it the text, such as an answer or a history item.
+ */
+export function toSecretSafeValue(value: unknown): LogValue {
+  return convertSafely(value, false);
+}
+
 // The last line of defence for both public entry points: whatever a caller
 // hands over, converting it must never become the exception that hides the one
 // being logged.
-function convertSafely<T>(value: T): LogValue {
+function convertSafely<T>(value: T, emails = true): LogValue {
   try {
-    return convertValue(value, new Set<object>());
+    return convertValue(value, new Set<object>(), emails);
   } catch {
     return UNSERIALIZABLE;
   }
@@ -395,8 +497,8 @@ function convertSafely<T>(value: T): LogValue {
 // shape worth reading in a log line.
 const MAX_CONVERSION_DEPTH = 32;
 
-function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
-  if (typeof value === "string") return redactText(value);
+function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0): LogValue {
+  if (typeof value === "string") return redact(value, emails);
   if (value === null) return null;
   if (value === undefined) return undefined;
   if (typeof value === "number" || typeof value === "boolean") return value;
@@ -406,17 +508,17 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
     // or a class named after the header it failed on - so it is no safer than
     // the message.
     const converted: { [key: string]: LogValue } = {
-      name: redactText(value.name),
-      message: redactText(value.message),
+      name: redact(value.name, emails),
+      message: redact(value.message, emails),
     };
-    if (typeof value.stack === "string") converted.stack = redactText(value.stack);
+    if (typeof value.stack === "string") converted.stack = redact(value.stack, emails);
     return converted;
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    return value.map((entry: LogValue) => convertValue(entry, seen, depth + 1));
+    return value.map((entry: LogValue) => convertValue(entry, seen, emails, depth + 1));
   }
   if (typeof value === "object") {
     if (seen.has(value)) return "[circular]";
@@ -436,8 +538,8 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
         // A key is as caller-controlled as a value: a payload keyed by an
         // email address, or by the header that failed, leaks through a rule
         // that only looks at values.
-        redactText(key),
-        convertEntry(key, entry, seen, depth),
+        redact(key, emails),
+        convertEntry(key, entry, seen, emails, depth),
       ]),
     );
   }
@@ -446,15 +548,15 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
   // and `String()` itself can throw for a null-prototype object or a
   // throwing `toString`.
   try {
-    return redactText(String(value));
+    return redact(String(value), emails);
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-function convertEntry(key: string, entry: unknown, seen: Set<object>, depth: number): LogValue {
+function convertEntry(key: string, entry: unknown, seen: Set<object>, emails: boolean, depth: number): LogValue {
   if (SECRET_KEY.test(key)) return "[redacted]";
-  const converted = convertValue(entry, seen, depth + 1);
+  const converted = convertValue(entry, seen, emails, depth + 1);
   if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
   return redactHeaderStrings(converted);
 }

@@ -1,0 +1,33 @@
+{
+  "slug": "servicem8",
+  "name": "ServiceM8",
+  "tagline": "Field service jobs",
+  "description": "ServiceM8 lets agents look up and update jobs, clients, quotes, and schedules in the ServiceM8 account of the signed-in user.",
+  "category": "productivity",
+  "creatorName": "ServiceM8",
+  "iconUrl": "https://cdn.prod.website-files.com/57d7ef8b3d16a9a554f037bf/57d7ef8c3d16a9a554f03886_webclip.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-tomorrow", "text": "Which jobs are scheduled for tomorrow?" },
+    { "id": "prompt-open-quotes", "text": "List the quotes sent this month that are not accepted yet." },
+    { "id": "prompt-job-note", "text": "Draft a job note for the plumbing repair at 12 King Street." }
+  ],
+  "apps": [
+    {
+      "id": "app-servicem8-mcp",
+      "name": "ServiceM8",
+      "description": "Jobs, clients, quotes, and scheduling, over ServiceM8's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/57d7ef8b3d16a9a554f037bf/57d7ef8c3d16a9a554f03886_webclip.png",
+      "server": {
+        "name": "servicem8",
+        "transport": "http",
+        "url": "https://api.servicem8.com/mcp",
+        "auth": [{ "id": "servicem8-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.servicem8.com",
+  "privacyPolicyUrl": "https://www.servicem8.com/privacy-policy",
+  "termsUrl": "https://www.servicem8.com/terms-of-service"
+}

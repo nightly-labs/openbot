@@ -134,3 +134,32 @@ export const MemoryCountOnly: Story = {
     </div>
   ),
 };
+
+/** A finished turn with two failed tool steps (#4041). Each failed line opens the error that the host sent. */
+export const FailedSteps: Story = {
+  render: () => (
+    <div style={{ width: "640px" }}>
+      <AgentStepsDisclosure
+        steps={[
+          { id: "p1", kind: "progress", text: "Working through the next tool-assisted step…" },
+          {
+            id: "p2",
+            kind: "progress",
+            text: "A tool step failed; reviewing the result and deciding what to try next…",
+            error:
+              "Error: ENOENT: no such file or directory, open '/Users/me/project/config/settings.json'\n    at Object.openSync (node:fs:573:3)",
+          },
+          { id: "p3", kind: "progress", text: "Working through the next tool-assisted step…" },
+          {
+            id: "p4",
+            kind: "progress",
+            text: "A tool step failed; reviewing the result and deciding what to try next…",
+            error: "npm ERR! code E404\nnpm ERR! 404 Not Found - GET https://registry.npmjs.org/@acme%2fwidgets",
+          },
+        ]}
+        defaultOpen
+        facts={{ durationMs: 42_000, failed: 2 }}
+      />
+    </div>
+  ),
+};

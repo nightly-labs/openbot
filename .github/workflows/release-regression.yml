@@ -1,0 +1,126 @@
+name: Release regression report
+
+# Once a day, compares the newest desktop release with the release before it, from production
+# analytics (scripts/release-regression-report.ts), and sends the table to a private Discord channel.
+# This repository is public, so the log of this workflow must show no data: the script runs with
+# --quiet, the report is not uploaded, and errors go only to Discord. The secrets are in the
+# `analytics` environment, which only `main` can use.
+#
+# Access: the SSH key opens one local forward as the user `openpanel-ci` on the analytics server.
+# That user has no shell and can forward only to 127.0.0.1:18123, a socket proxy to the OpenPanel
+# ClickHouse. There, the ClickHouse user can only read the OpenBot events, with time, memory and
+# query limits.
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-regression
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Compare the newest release
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: analytics
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      # The state is an HMAC of the last sent statuses, keyed by the webhook URL, so the cache shows no
+      # data. A scheduled run sends only when a status changed, and on Monday; a manual run always sends.
+      # Restore it first, so that a failure in any later step can clear it.
+      - name: Restore the last sent statuses
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/release-regression-state
+          key: release-regression-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: release-regression-state-
+
+      - name: Open the tunnel to the analytics server
+        id: tunnel
+        env:
+          SSH_KEY: ${{ secrets.RELEASE_REGRESSION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_REGRESSION_SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.RELEASE_REGRESSION_SSH_HOST }}
+        run: |
+          dir="$RUNNER_TEMP/release-regression-ssh"
+          install -d -m 0700 "$dir"
+          printf '%s\n' "$SSH_KEY" > "$dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          chmod 0600 "$dir/key" "$dir/known_hosts"
+          # -q keeps the host name out of the log.
+          ssh -q -F /dev/null -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
+            -M -S "$dir/control" \
+            -f -N -L 127.0.0.1:18123:127.0.0.1:18123 "openpanel-ci@$SSH_HOST" \
+            || { echo "The tunnel did not open."; exit 1; }
+
+      - name: Send the report
+        id: report
+        # Shorter than the job limit, so the failure step below still has time to run.
+        timeout-minutes: 7
+        env:
+          OPENPANEL_CLICKHOUSE_URL: http://127.0.0.1:18123/
+          OPENPANEL_CLICKHOUSE_USER: ${{ secrets.OPENPANEL_CLICKHOUSE_USER }}
+          OPENPANEL_CLICKHOUSE_PASSWORD: ${{ secrets.OPENPANEL_CLICKHOUSE_PASSWORD }}
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+          STATE_FILE: ${{ runner.temp }}/release-regression-state/sent
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          always=""
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then always="--always"; fi
+          set +e
+          bun scripts/release-regression-report.ts --quiet --discord --state "$STATE_FILE" $always
+          code=$?
+          # Exit code 1: the script cleared the state and sent its own notice.
+          if [ "$code" -eq 1 ]; then : > "$RUNNER_TEMP/release-regression-notified"; fi
+          exit "$code"
+
+      # Any failure that the script did not handle (the tunnel, a timeout, a cancel) leaves the old state.
+      # Clear it and send a notice here, so the next good run sends the full report.
+      - name: Clear the state after a failure
+        if: failure() || cancelled()
+        env:
+          RELEASE_REGRESSION_WEBHOOK_URL: ${{ secrets.RELEASE_REGRESSION_WEBHOOK_URL }}
+          STATE_FILE: ${{ runner.temp }}/release-regression-state/sent
+        run: |
+          if [ -f "$RUNNER_TEMP/release-regression-notified" ]; then exit 0; fi
+          mkdir -p "$(dirname "$STATE_FILE")"
+          printf '\n' > "$STATE_FILE"
+          # curl output can contain the webhook URL, so it goes nowhere.
+          curl -sS --fail --max-time 30 -o /dev/null -H 'Content-Type: application/json' \
+            -d '{"allowed_mentions":{"parse":[]},"embeds":[{"title":"🔴 Release regression check failed","description":"The check did not finish: the tunnel did not open, or the run timed out or was cancelled.","color":15548997}]}' \
+            "$RELEASE_REGRESSION_WEBHOOK_URL?wait=true" 2>/dev/null \
+            || echo "The failure could not be sent to Discord."
+
+      - name: Save the sent statuses
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/release-regression-state
+          key: release-regression-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Remove the key and the report
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/release-regression-ssh"
+          if [ -S "$dir/control" ]; then
+            ssh -q -F /dev/null -S "$dir/control" -O exit tunnel || true
+          fi
+          rm -rf "$RUNNER_TEMP/release-regression-ssh" .openbot-build/release-regression

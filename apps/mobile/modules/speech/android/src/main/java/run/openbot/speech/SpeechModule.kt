@@ -1,11 +1,16 @@
 package run.openbot.speech
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.PlaybackParams
 import android.net.Uri
+import android.os.Build
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
@@ -32,6 +37,15 @@ private class CapturePermissionException : CodedException("ERR_CAPTURE_PERMISSIO
 
 private class CaptureException : CodedException("ERR_CAPTURE", "The microphone could not start.", null)
 
+/** Outputs that the user connected for a call: a call plays there and not on the loudspeaker. */
+private val CALL_HEADSETS = setOf(
+  AudioDeviceInfo.TYPE_WIRED_HEADSET,
+  AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+  AudioDeviceInfo.TYPE_USB_HEADSET,
+  AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+  AudioDeviceInfo.TYPE_BLE_HEADSET,
+)
+
 /** A path from a `file://` URI, as the app's file system API names its files, or a plain path. */
 private fun pathOf(location: String): String =
   if (location.startsWith("file:")) Uri.parse(location).path ?: location else location
@@ -48,9 +62,13 @@ class SpeechModule : Module() {
   private var tts: OfflineTts? = null
   private var loadedDirectory: String? = null
   @Volatile private var track: AudioTrack? = null
+  /** The speed of every part. 1 is normal speed; the pitch stays the same. */
+  @Volatile private var speed = 1f
   private var playback: Thread? = null
+  /** The audio mode before GPT live voice set the call mode; null while no call runs. */
+  private var callModeBefore: Int? = null
   /** Only the recognition executor reads and writes it. */
-  private var recognizer: ParakeetRecognizer? = null
+  private var recognizer: OfflineSpeechRecognizer? = null
   private val recognition = Executors.newSingleThreadExecutor()
   private val captureExecutor = Executors.newSingleThreadExecutor()
   private val capture = SpeechCapture(
@@ -122,21 +140,12 @@ class SpeechModule : Module() {
 
     /** Loads Parakeet from a downloaded model directory. The same directory keeps the loaded model. */
     AsyncFunction("loadRecognizer") { location: String, threads: Int, promise: Promise ->
-      recognition.execute {
-        val directory = pathOf(location)
-        if (recognizer?.directory == directory) {
-          promise.resolve(null)
-          return@execute
-        }
-        recognizer?.release()
-        recognizer = null
-        try {
-          recognizer = ParakeetRecognizer(directory, threads)
-          promise.resolve(null)
-        } catch (error: Throwable) {
-          promise.reject(SpeechModelException())
-        }
-      }
+      loadRecognizer(location, RecognizerModel.PARAKEET, threads, promise)
+    }
+
+    /** Loads Qwen3-ASR from a downloaded model directory. The same directory keeps the loaded model. */
+    AsyncFunction("loadQwenRecognizer") { location: String, threads: Int, promise: Promise ->
+      loadRecognizer(location, RecognizerModel.QWEN3_ASR, threads, promise)
     }
 
     /** Frees the recognizer, such as before its files are deleted. */
@@ -148,7 +157,7 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Opens the microphone: `transcribe` recognizes speech with Parakeet, `stream` sends the audio. */
+    /** Opens the microphone: `transcribe` recognizes speech with the loaded recognizer, `stream` sends the audio. */
     AsyncFunction("startCapture") { mode: String, promise: Promise ->
       val context = appContext.reactContext
       if (context?.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -174,6 +183,40 @@ class SpeechModule : Module() {
     /** Closes the microphone and drops the speech that was not sent. */
     Function("cancelCapture") {
       captureExecutor.execute { capture.cancel() }
+    }
+
+    /**
+     * GPT live voice: WebRTC plays the reply as a call, which Android puts on the earpiece. The call
+     * mode keeps echo cancellation on, and the reply goes to the loudspeaker, or to a headset that is
+     * connected. `false` gives the audio back to the mode from before the call.
+     */
+    Function("setCallAudio") { active: Boolean ->
+      val audio = appContext.reactContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        ?: return@Function
+      if (active) {
+        if (callModeBefore == null) callModeBefore = audio.mode
+        audio.mode = AudioManager.MODE_IN_COMMUNICATION
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+          val devices = audio.availableCommunicationDevices
+          val output = devices.firstOrNull { it.type in CALL_HEADSETS }
+            ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+          if (output != null) audio.setCommunicationDevice(output)
+        } else {
+          val headset = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in CALL_HEADSETS }
+          @Suppress("DEPRECATION")
+          audio.isSpeakerphoneOn = !headset
+        }
+      } else {
+        val before = callModeBefore ?: return@Function
+        callModeBefore = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+          audio.clearCommunicationDevice()
+        } else {
+          @Suppress("DEPRECATION")
+          audio.isSpeakerphoneOn = false
+        }
+        audio.mode = before
+      }
     }
 
     /** Frees the model, such as before its files are deleted. */
@@ -228,6 +271,16 @@ class SpeechModule : Module() {
       parts.put(SpeechPart(id, samples, sampleRate, generation.get()))
     }
 
+    /** Plays every part at this speed, also the part that plays now. */
+    Function("setSpeed") { value: Double ->
+      speed = value.toFloat()
+      try {
+        track?.let { applySpeed(it) }
+      } catch (error: IllegalStateException) {
+        // The playback thread released the track; the next track takes the speed.
+      }
+    }
+
     /** Stops the part that plays and drops the parts that wait. */
     Function("stop") {
       generation.incrementAndGet()
@@ -254,6 +307,25 @@ class SpeechModule : Module() {
         recognizer = null
       }
       recognition.shutdown()
+    }
+  }
+
+  /** Loads a recognizer on the recognition executor. The same directory and model keep the loaded one. */
+  private fun loadRecognizer(location: String, model: RecognizerModel, threads: Int, promise: Promise) {
+    recognition.execute {
+      val directory = pathOf(location)
+      if (recognizer?.directory == directory && recognizer?.model == model) {
+        promise.resolve(null)
+        return@execute
+      }
+      recognizer?.release()
+      recognizer = null
+      try {
+        recognizer = OfflineSpeechRecognizer(directory, model, threads)
+        promise.resolve(null)
+      } catch (error: Throwable) {
+        promise.reject(SpeechModelException())
+      }
     }
   }
 
@@ -295,8 +367,8 @@ class SpeechModule : Module() {
       offset += count
     }
     // The track plays what was written after `write` returns: wait for its head to reach the end,
-    // and no longer than the part lasts and a little more, in case the track stalls.
-    val deadline = System.nanoTime() + (part.samples.size * 1_000_000_000L / part.sampleRate) + 2_000_000_000L
+    // and no longer than the part lasts at the slowest speed and a little more, in case the track stalls.
+    val deadline = System.nanoTime() + (part.samples.size * 1_000_000_000L / part.sampleRate * 4 / 3) + 2_000_000_000L
     while (!stale() && offset == part.samples.size && head() < end) {
       if (System.nanoTime() > deadline) break
       Thread.sleep(20)
@@ -328,8 +400,13 @@ class SpeechModule : Module() {
       .setBufferSizeInBytes(minimum * 4)
       .setTransferMode(AudioTrack.MODE_STREAM)
       .build()
+    applySpeed(created)
     track = created
     trackRate = sampleRate
     return created
+  }
+
+  private fun applySpeed(audio: AudioTrack) {
+    audio.playbackParams = PlaybackParams().setSpeed(speed).setPitch(1f)
   }
 }

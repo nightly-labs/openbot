@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -19,6 +19,7 @@ import {
 } from "electron";
 import { BrowserUploads } from "../src/backend/agent/browser-uploads";
 import { attachmentCall } from "../src/backend/attachment-effects";
+import { CONSENT_WORLD } from "../src/backend/browser-consent";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -160,6 +161,25 @@ const server = createServer((request, response) => {
     </script>`);
     return;
   }
+  if (url.pathname === "/hints-away") {
+    // A redirect to a different origin, which has not asked for hints.
+    const host = request.headers.host ?? "127.0.0.1";
+    response.writeHead(302, { location: `http://${host.replace("127.0.0.1", "localhost")}/hints` });
+    response.end();
+    return;
+  }
+  if (url.pathname === "/hints") {
+    // The site asks for the hints that Chrome sends only on request.
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.setHeader("accept-ch", REQUESTED_HINTS.map(([header]) => header).join(", "));
+    const requestHeaders = JSON.stringify(request.headers).replaceAll("<", "\\u003c");
+    response.end(`<main></main><script>
+      navigator.userAgentData.getHighEntropyValues(${JSON.stringify(REQUESTED_HINTS.map(([, key]) => key))}).then((values) => {
+        document.querySelector("main").textContent = JSON.stringify({ requestHeaders: ${requestHeaders}, values });
+      });
+    </script>`);
+    return;
+  }
   if (url.pathname === "/abort") {
     response.destroy();
     return;
@@ -198,6 +218,49 @@ const server = createServer((request, response) => {
       <script>document.querySelector('textarea').addEventListener('paste', event => {
         window.__pasteEvent = event.clipboardData.getData('text/plain');
       });</script>`);
+    return;
+  }
+  if (url.pathname === "/cookie-banner") {
+    // No platform selector knows this banner, so only the text rule can refuse it. By default the
+    // banner appears after the document, as a consent platform shows it; "accept-only" shows a
+    // banner with no reject button at once. "shadow" builds the banner from web components: the
+    // text and the buttons are in two shadow roots, so no light DOM ancestor shows cookie text.
+    // "manual" shows no banner.
+    const acceptOnly = url.searchParams.has("accept-only");
+    const manual = url.searchParams.has("manual");
+    const shadow = url.searchParams.has("shadow");
+    const banner = shadow
+      ? `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <banner-text></banner-text><banner-actions></banner-actions>
+      </div>`
+      : `<div id="notice" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee">
+        <p>We use cookies to improve this site. Read more about how we use cookies.</p>
+        <button onclick="decide('accepted')">Accept all</button>
+        ${acceptOnly ? "" : `<button onclick="decide('rejected')">Reject all</button>`}
+      </div>`;
+    const components = `
+        customElements.define("banner-text", class extends HTMLElement {
+          connectedCallback() { this.attachShadow({ mode: "open" }).innerHTML = "<p>We use cookies to improve this site.</p>"; }
+        });
+        customElements.define("banner-actions", class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              "<button onclick=\\"decide('accepted')\\">Accept all</button><button onclick=\\"decide('rejected')\\">Reject all</button>";
+          }
+        });`;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html>
+      <title>Cookie banner</title>
+      <main><output>banner</output></main>
+      ${acceptOnly ? banner : ""}
+      <script>
+        function decide(value) {
+          document.querySelector("output").textContent = value;
+          document.getElementById("notice").remove();
+        }
+        ${shadow ? components : ""}
+        ${acceptOnly || manual ? "" : `setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(banner)}), 300);`}
+      </script>`);
     return;
   }
   if (url.pathname === "/frame") {
@@ -343,6 +406,12 @@ const server = createServer((request, response) => {
     response.end("console.error('external diagnostic marker');");
     return;
   }
+  // The document stops after its doctype, so a navigation that times out leaves no root element.
+  if (url.pathname === "/stalled-document") {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.write("<!doctype html>");
+    return;
+  }
   if (url.pathname === "/slow-document") {
     slowDocumentVersion += 1;
     const version = slowDocumentVersion;
@@ -397,7 +466,7 @@ const server = createServer((request, response) => {
       <span class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by transfer" /></span>
       <span hidden data-hidden-wait>hidden wait sentinel</span>
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
-      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
+      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault();requestAnimationFrame(() => { this.dataset.dropFrame = 'yes'; })" ondrop="event.preventDefault();document.querySelector('output').textContent=this.dataset.dropFrame === 'yes' ? 'drag:' + event.isTrusted : 'drag:no-frame';delete this.dataset.dropFrame">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
       <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
       <button aria-label="No chooser">No chooser</button>
@@ -428,7 +497,7 @@ const server = createServer((request, response) => {
 
   response.setHeader("content-type", "text/html; charset=utf-8");
   response.end(`<!doctype html>
-    <input aria-label="Task" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
+    <input aria-label="Task" onkeydown="window.smokeKeys = (window.smokeKeys ?? '') + event.key" oninput="this.dataset.trusted = String(event.isTrusted); document.querySelector('output').textContent = 'typed:' + this.value + '|input:' + event.isTrusted" />
     <button aria-label="Save" onclick="document.querySelector('output').textContent = document.querySelector('input').value + '|input:' + document.querySelector('input').dataset.trusted + '|click:' + event.isTrusted">Save</button>
     <a href="/child" target="_blank">Child</a>
     <a href="/download" download>Download</a>
@@ -456,6 +525,7 @@ const SCENARIOS = [
   "secret-handoff",
   "popups",
   "redirect-navigation",
+  "cookie-banner",
 ];
 
 void main().catch((error) => {
@@ -485,11 +555,12 @@ async function main(): Promise<void> {
   app.setPath("sessionData", userDataPath);
   // A backstop for a phase that hangs, not a performance budget -- and it has to stay clear of the
   // phases that wait on a product timeout on purpose, such as the bounded blocked-frame wait and the
-  // frozen-renderer environment race below.
+  // frozen-renderer environment race below. The main flow takes about two minutes on CI, because each
+  // agent click moves along a path and holds the button as a person does.
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 120_000);
+  }, 180_000);
 
   try {
     if (persistencePhase) {
@@ -545,6 +616,8 @@ async function main(): Promise<void> {
           await runRedirectNavigationScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
+        } else if (scenario === "cookie-banner") {
+          await runCookieBannerScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -989,8 +1062,8 @@ async function main(): Promise<void> {
       tabId: v2Tab.id,
       target: { kind: "ref", ref: String(staleFrameTarget.ref), revision: staleFrameRevision },
     });
-    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Stale browser reference")) {
-      throw new Error("V2 iframe navigation did not invalidate revision-bound references.");
+    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Element reference is no longer available")) {
+      throw new Error("V2 iframe navigation did not invalidate the references of that frame.");
     }
     const semanticChangeSnapshot = await runCauseEffect(browser.snapshot(v2Tab.id));
     const semanticChangeTarget = semanticChangeSnapshot.elements.find((element) => element.name === "SPA");
@@ -1715,6 +1788,23 @@ async function main(): Promise<void> {
       releaseActionNavigation();
     }
     await runCauseEffect(browser.close(actionNavigationTab.id));
+    // A document with no root element draws no frame. A snapshot of it must not wait for an image.
+    const { tab: stalledTab } = await openTabWithContents(browser, origin, "smoke-thread", "smoke-bot");
+    const stalledNavigation = await callBrowserTool(browser, "navigate", {
+      tabId: stalledTab.id,
+      url: `${origin}/stalled-document`,
+      timeoutMs: 500,
+    });
+    if (stalledNavigation.success) throw new Error("V2 stalled navigation did not time out.");
+    const stalledSnapshotStartedAt = Date.now();
+    const stalledSnapshot = await callBrowserTool(browser, "snapshot", { tabId: stalledTab.id });
+    const stalledSnapshotMs = Date.now() - stalledSnapshotStartedAt;
+    if (!stalledSnapshot.success || stalledSnapshotMs > 2_000) {
+      throw new Error(
+        `V2 snapshot of a document with no root element waited for an image: ${stalledSnapshotMs} ms, ${stalledSnapshot.success ? "success" : toolError(stalledSnapshot)}.`,
+      );
+    }
+    await runCauseEffect(browser.close(stalledTab.id));
     const { tab: waitTab, contents: waitContents } = await openTabWithContents(
       browser,
       origin,
@@ -1760,12 +1850,12 @@ async function main(): Promise<void> {
     }
     const queuedSnapshotStartedAt = Date.now();
     const queuedSnapshot = await callBrowserTool(browser, "snapshot", { tabId: waitTab.id });
-    if (
-      !queuedSnapshot.success ||
-      Date.now() - queuedSnapshotStartedAt > 1_000 ||
-      browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true
-    ) {
-      throw new Error("V2 timed-out navigation did not stop before the tab queue resumed.");
+    const queuedSnapshotMs = Date.now() - queuedSnapshotStartedAt;
+    const queuedTabLoading = browser.listTabs().find((candidate) => candidate.id === waitTab.id)?.loading === true;
+    if (!queuedSnapshot.success || queuedSnapshotMs > 1_000 || queuedTabLoading) {
+      throw new Error(
+        `V2 timed-out navigation did not stop before the tab queue resumed: ${queuedSnapshotMs} ms, loading ${queuedTabLoading}, ${queuedSnapshot.success ? "success" : toolError(queuedSnapshot)}.`,
+      );
     }
     const beforeReloadText = String(toolTextPayload(queuedSnapshot)?.text);
     const reloadStartedAt = Date.now();
@@ -1916,11 +2006,19 @@ async function main(): Promise<void> {
     process.stdout.write("BrowserHost: top-level cache revalidation passed.\n");
 
     await expectFailure(() => runCauseEffect(browser.open("file:///etc/passwd")));
-    const tabCountBeforeAbort = browser.listTabs().length;
-    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
-    if (browser.listTabs().length !== tabCountBeforeAbort) {
+    // The open tool of an agent closes its tab when the page fails, so failed attempts do not fill the tab limit.
+    const tabIdsBeforeAbort = new Set(browser.listTabs().map((tab) => tab.id));
+    const agentAbort = await callBrowserTool(browser, "open", { url: `${origin}/abort` });
+    if (agentAbort.success || browser.listTabs().length !== tabIdsBeforeAbort.size) {
       throw new Error("A failed navigation leaked a browser tab.");
     }
+    // A person's tab stays on the address that failed, so the person sees where it failed (#5630).
+    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`)));
+    const keptTabs = browser.listTabs().filter((tab) => !tabIdsBeforeAbort.has(tab.id));
+    if (keptTabs.length !== 1 || keptTabs[0]?.url !== `${origin}/abort`) {
+      throw new Error("A person's failed navigation did not keep its tab.");
+    }
+    await runCauseEffect(browser.close(keptTabs[0].id));
 
     const { tab: downloadPage, contents: downloadContents } = await openTabWithContents(
       browser,
@@ -1968,6 +2066,7 @@ async function main(): Promise<void> {
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
+    await runCookieBannerScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
@@ -2146,12 +2245,14 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
           "End redirected focus",
           "replaced focus target",
+          "redirected input append",
+          "redirected input mid-text",
         );
       for (const name of names) {
         const frameTransfer = name.endsWith("frame focus transfer");
         const siblingTransfer = name === "sibling frame focus transfer";
         const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
-        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const redirectInput = name.startsWith("redirected input") || name === "replaced target" || frameTransfer;
         const replace = [
           "normal replace submit",
           "redirected focus replace",
@@ -2160,9 +2261,18 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           "formatted input",
         ].includes(name);
         const empty = name.startsWith("empty");
-        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const submit = ![
+          "normal append",
+          "empty replacement",
+          "readonly",
+          "redirected input append",
+          "redirected input mid-text",
+        ].includes(name);
+        // Focus that moves after the last character, as in a one-time code box, is not a failure.
+        const movedAfterText = name === "redirected input append";
+        const midText = name === "redirected input mid-text";
         const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
-        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        const expectedSuccess = !changedBeforeInput && (!redirectInput || movedAfterText);
         await frame.executeJavaScript(
           `(() => {
             document.body.innerHTML = '<div id="typing-root"></div>';
@@ -2186,7 +2296,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
               if (event.key === 'Enter') event.preventDefault();
             });
             ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
-            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name.startsWith("redirected input") ? "intended.addEventListener('input', () => other.focus());" : ""}
             ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
             ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
             ${
@@ -2246,7 +2356,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
           target: target
             ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
             : { kind: "role", role: "textbox", name: "Intended field", exact: true },
-          text: empty ? "" : "X",
+          text: empty ? "" : midText ? "XY" : "X",
           mode: replace ? "replace" : "append",
           submit,
         });
@@ -2282,10 +2392,20 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
                 : replace
                   ? "X"
                   : "alphaX";
-        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        // Typed text arrives as key events, so each typed character has a keydown on the intended field.
+        const expectedKeys =
+          name === "End redirected focus"
+            ? ["End"]
+            : [...(changedBeforeInput || empty ? [] : ["X"]), ...(expectedSuccess && submit ? ["Enter"] : [])];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
         // The error tells the agent whether the text is already in the field.
-        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const expectedError = expectedSuccess
+          ? ""
+          : changedBeforeInput
+            ? "Nothing was typed"
+            : submit
+              ? "Enter was not sent"
+              : "Only the first part of the text is in the field";
         const safe =
           result.success === expectedSuccess &&
           (result.success || toolError(result).includes(expectedError)) &&
@@ -2553,8 +2673,8 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
     // a hidden view has no compositor surface under xvfb, so `capturePage`
     // reports UnknownVizError and a mouse event is hit-tested by the browser
     // process against surface data this view does not have. Typing takes
-    // neither path, because `DOM.focus` and `Input.insertText` are routed
-    // straight to the renderer, so it is the half of native input a background
+    // neither path, because `DOM.focus` and key events go to the focused
+    // widget and are not hit-tested, so it is the half of native input a background
     // tab can prove. Captures and clicks on displayed tabs are proven in the
     // main flow.
     try {
@@ -2564,8 +2684,20 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
       const typed = await runCauseEffect(
         browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" }),
       );
-      if (!typed.text.includes("typed:background|input:true"))
-        throw new Error(`Background input was not native: ${typed.text}`);
+      if (!typed.text.includes("typed:background|input:true")) {
+        const pages = await Promise.all(
+          webContents
+            .getAllWebContents()
+            .filter((contents) => !contents.isDestroyed() && contents.getURL() === `${origin}/`)
+            .map((contents) =>
+              contents.executeJavaScript(
+                "JSON.stringify({ keys: window.smokeKeys ?? '', value: document.querySelector('input')?.value, active: document.activeElement?.ariaLabel ?? document.activeElement?.localName, focus: document.hasFocus(), visibility: document.visibilityState, size: [innerWidth, innerHeight] })",
+                true,
+              ),
+            ),
+        );
+        throw new Error(`Background input was not native: ${typed.text} ${pages.join(" ")}`);
+      }
     } catch (error) {
       failures.push(`input: ${String(error)}`);
     }
@@ -2848,6 +2980,129 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+  await runLiveViewPageCopy(browser, tabId, contents);
+}
+
+/**
+ * The page's own "Copy" button in a live view. The text it writes goes to the watching member when
+ * a member's click started it, also after the page loads again, and a write with no user action does
+ * not. The results go to `.openbot-build/browser-live-view-page-copy.json`.
+ */
+async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const copies: string[] = [];
+  const stopView = await runCauseEffect(
+    browser.startView(tabId, () => {}, undefined, { onPageCopy: (text) => copies.push(text) }),
+  );
+  try {
+    // The script must also run in a document that loads while the view is open.
+    const loaded = new Promise<void>((resolve) => contents.once("did-finish-load", () => resolve()));
+    contents.reload();
+    await loaded;
+    // The view arms the document that loaded. No user action is given to the page here.
+    const armedDeadline = Date.now() + 5_000;
+    let armed = false;
+    while (!armed && Date.now() < armedDeadline) {
+      armed = await contents.executeJavaScript("window[Symbol.for('openbot.pageCopy')]?.waits?.length > 0", false);
+      if (!armed) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    // The earlier steps gave the page user actions, which stay active for a few seconds, also after
+    // a reload. The write below must come with none.
+    const idleDeadline = Date.now() + 12_000;
+    let idle = false;
+    while (!idle && Date.now() < idleDeadline) {
+      idle = !(await contents.executeJavaScript("navigator.userActivation.isActive", false));
+      if (!idle) await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (!idle) throw new Error("The page kept a user action, so a write with none cannot be checked.");
+    // No user action: the page writes on its own, and the member must not get it.
+    await contents
+      .executeJavaScript("navigator.clipboard.writeText('written without a click').catch(() => {})", false)
+      .catch(() => undefined);
+    await contents.executeJavaScript(
+      `(() => {
+      const make = (id, left, copy, top = 150) => {
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = id;
+        button.style.cssText = 'position:fixed;width:200px;height:60px;z-index:2147483647;left:' + left + 'px;top:' + top + 'px';
+        button.addEventListener('click', copy);
+        document.body.append(button);
+      };
+      make('page-copy-api', 10, () => navigator.clipboard.writeText('copied by the page button'));
+      make('page-copy-command', 250, () => {
+        const once = (event) => { event.clipboardData.setData('text/plain', 'copied by the page command'); event.preventDefault(); };
+        document.addEventListener('copy', once, { once: true });
+        document.execCommand('copy');
+      });
+      // As the copy-to-clipboard library does: a selected element that stops its own copy event.
+      const library = (text, setData) => () => {
+        const mark = document.createElement('span');
+        mark.textContent = text;
+        document.body.append(mark);
+        const range = document.createRange();
+        range.selectNodeContents(mark);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        mark.addEventListener('copy', (event) => {
+          event.stopPropagation();
+          if (setData) { event.preventDefault(); event.clipboardData.clearData(); event.clipboardData.setData('text/plain', text); }
+        });
+        document.execCommand('copy');
+        getSelection().removeAllRanges();
+        mark.remove();
+      };
+      make('page-copy-library', 10, library('copied by a library selection', false), 230);
+      make('page-copy-library-data', 250, library('copied by a library format', true), 230);
+    })()`,
+      true,
+    );
+    const click = async (id: string, expected: string) => {
+      const box = `document.getElementById('${id}').getBoundingClientRect()`;
+      const x = await contents.executeJavaScript(`(r => r.left + r.width / 2)(${box})`, true);
+      const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${box})`, true);
+      if (!isNumber(x) || !isNumber(y)) throw new Error("A page copy button did not report a position.");
+      for (const action of ["move", "down", "up"] as const) {
+        await runCauseEffect(
+          browser.dispatchViewInput(tabId, {
+            type: "pointer",
+            action,
+            x,
+            y,
+            button: "left",
+            clickCount: action === "move" ? 0 : 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          }),
+        );
+      }
+      const deadline = Date.now() + 5_000;
+      while (!copies.includes(expected) && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+    await click("page-copy-api", "copied by the page button");
+    await click("page-copy-command", "copied by the page command");
+    await click("page-copy-library", "copied by a library selection");
+    await click("page-copy-library-data", "copied by a library format");
+    const report = { armed, copies };
+    const reportDirectory = join(process.cwd(), ".openbot-build");
+    await mkdir(reportDirectory, { recursive: true });
+    await writeFile(join(reportDirectory, "browser-live-view-page-copy.json"), `${JSON.stringify(report, null, 2)}\n`);
+    if (!armed) throw new Error("The live view did not arm the page that loaded for page copies.");
+    if (copies.includes("written without a click"))
+      throw new Error("A page copy with no user action reached the member.");
+    for (const expected of [
+      "copied by the page button",
+      "copied by the page command",
+      "copied by a library selection",
+      "copied by a library format",
+    ]) {
+      if (!copies.includes(expected))
+        throw new Error(`A page copy did not reach the member: ${JSON.stringify(copies)}`);
+    }
+  } finally {
+    await Effect.runPromise(stopView());
+  }
 }
 
 /**
@@ -3171,6 +3426,8 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
     tabId: tabId,
     source: { kind: "role", role: "button", name: "Drag source", exact: true },
     target: { kind: "role", role: "button", name: "Drop target", exact: true },
+    // The smoke tab draws about one frame each second, and each pointer move waits for a frame.
+    timeoutMs: 30_000,
   });
   if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
   const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
@@ -3185,6 +3442,7 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
       }))()`,
       true,
     );
+    // "drag:no-frame" means that the drop came before the frame that the page's dragover asked for.
     throw new Error(`V2 drag did not produce a trusted drop event: ${JSON.stringify(dragDiagnostics)}`);
   }
 }
@@ -3621,6 +3879,18 @@ async function runStagedUploadScenario(
     if (missing.success) throw new Error("V2 staged upload reported success for a missing file.");
     const staged = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
     if (!staged.success) throw new Error(`V2 staged upload failed: ${toolError(staged)}`);
+    // An unchanged file reuses its kept copy at the same path. The retry must still reach the page.
+    const settled = new Date(Date.now() - 60_000);
+    await utimes(uploadPath, settled, settled);
+    for (const attempt of ["first", "retry"]) {
+      await contents.executeJavaScript("document.querySelector('output').textContent = 'retry pending'", true);
+      const repeated = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
+      if (!repeated.success) throw new Error(`V2 repeated staged upload failed: ${toolError(repeated)}`);
+      const repeatedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
+      if (repeatedOutput !== basename(uploadPath)) {
+        throw new Error(`V2 ${attempt} upload of an unchanged file did not reach the page: ${String(repeatedOutput)}`);
+      }
+    }
     await contents.executeJavaScript("document.querySelector('output').textContent = 'staged chooser pending'", true);
     const stagedChooser = await upload({ kind: "role", role: "button", name: "Attach files", exact: true }, [
       uploadPath,
@@ -4028,6 +4298,69 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
   }
 }
 
+/**
+ * An agent tab refuses a cookie banner that appears late, also one made of web components, and keeps
+ * a banner that has no reject button. A tab that a person opened keeps the banner, and its document
+ * never gets the script. A takeover stops the script, so a banner that appears after it stays.
+ */
+async function runCookieBannerScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const agent = await openTabWithContents(browser, `${origin}/cookie-banner`, "smoke-thread", "smoke-bot");
+  const shadow = await openTabWithContents(browser, `${origin}/cookie-banner?shadow`, "smoke-thread", "smoke-bot");
+  const acceptOnly = await openTabWithContents(
+    browser,
+    `${origin}/cookie-banner?accept-only`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const takeover = await openTabWithContents(browser, `${origin}/cookie-banner?manual`, "smoke-thread", "smoke-bot");
+  const existingIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
+  const personTab = await runCauseEffect(browser.open(`${origin}/cookie-banner`));
+  const person = webContents
+    .getAllWebContents()
+    .find((candidate) => !existingIds.has(candidate.id) && !candidate.isDestroyed());
+  if (!person) throw new Error("Browser contents were not created for the person's tab.");
+  try {
+    const output = (contents: WebContents) =>
+      contents.executeJavaScript("document.querySelector('output')?.textContent ?? ''", true);
+    const consentScript = (contents: WebContents) =>
+      contents.executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: "globalThis.__openbotConsent ?? null" }]);
+    await waitFor(async () => (await output(agent.contents)) === "rejected", "the agent tab to refuse cookies");
+    await waitFor(async () => (await output(shadow.contents)) === "rejected", "the shadow banner to be refused");
+    // The script scans the document when it starts, so the banner that was there is checked.
+    await waitFor(async () => (await consentScript(acceptOnly.contents)) !== null, "the script in the accept-only tab");
+    const acceptOnlyOutput = await output(acceptOnly.contents);
+    await waitFor(async () => (await consentScript(takeover.contents)) === true, "the script in the takeover tab");
+    await runCauseEffect(browser.beginTakeover(takeover.tab.id));
+    // A stopped script has no observer, so a banner that appears later stays.
+    await waitFor(
+      async () => (await consentScript(takeover.contents)) === "stopped",
+      "the takeover to stop the script",
+    );
+    browser.endTakeover(takeover.tab.id);
+    await waitFor(async () => !person.isLoading() && person.getURL().endsWith("/cookie-banner"), "the person's tab");
+    const personScript = await consentScript(person);
+    const personOutput = await output(person);
+    const report = {
+      status:
+        acceptOnlyOutput === "banner" && personScript === null && personOutput === "banner" ? "passed" : "issues_found",
+      agentTab: "rejected",
+      shadowTab: "rejected",
+      acceptOnlyTab: acceptOnlyOutput,
+      takeoverTab: "stopped",
+      personTab: { output: personOutput, consentScript: personScript },
+    };
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-cookie-banner.json", JSON.stringify(report, null, 2));
+    if (report.status !== "passed") throw new Error(`A cookie banner was changed: ${JSON.stringify(report)}`);
+  } finally {
+    await runCauseEffect(browser.close(agent.tab.id));
+    await runCauseEffect(browser.close(shadow.tab.id));
+    await runCauseEffect(browser.close(acceptOnly.tab.id));
+    await runCauseEffect(browser.close(takeover.tab.id));
+    await runCauseEffect(browser.close(personTab.id));
+  }
+}
+
 async function openTabWithContents(
   browser: BrowserHost,
   url: string,
@@ -4093,12 +4426,79 @@ async function runIdentityScenario(browser: BrowserHost, origin: string): Promis
   const secondTab = await runCauseEffect(browser.open(`${origin}/headers?source=second-tab`, "smoke-thread"));
   const second = await checkBrowserIdentity(browser, secondTab.id);
   await runIdentityFrameProbe(browser, origin);
+  const requestedHints = await runRequestedHintsProbe(browser, origin);
   await mkdir(".openbot-build", { recursive: true });
   await writeFile(
     ".openbot-build/browser-identity.json",
-    JSON.stringify({ initial, reloaded, navigated, second, requests: recordedIdentityAgents }, null, 2),
+    JSON.stringify({ initial, reloaded, navigated, second, requestedHints, requests: recordedIdentityAgents }, null, 2),
   );
   process.stdout.write("BrowserHost: matching page, reload, navigation, and second-tab identity passed.\n");
+}
+
+/** Each requested hint header and the `getHighEntropyValues` key that the page reads for it. */
+const REQUESTED_HINTS = [
+  ["sec-ch-ua-full-version-list", "fullVersionList"],
+  ["sec-ch-ua-full-version", "uaFullVersion"],
+  ["sec-ch-ua-platform-version", "platformVersion"],
+  ["sec-ch-ua-arch", "architecture"],
+  ["sec-ch-ua-bitness", "bitness"],
+  ["sec-ch-ua-model", "model"],
+  ["sec-ch-ua-wow64", "wow64"],
+  ["sec-ch-ua-form-factors", "formFactors"],
+] as const;
+
+/** The header value that Chrome sends for a value that the page reads. */
+function hintHeaderValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "?1" : "?0";
+  if (Array.isArray(value))
+    return value
+      .map((item) =>
+        isDynamicRecord(item) ? `"${getString(item, "brand")}";v="${getString(item, "version")}"` : `"${String(item)}"`,
+      )
+      .join(", ");
+  return `"${String(value)}"`;
+}
+
+/** A site gets the hints that it asked for, from its next request, with the values that its page reads. */
+async function runRequestedHintsProbe(browser: BrowserHost, origin: string) {
+  const tab = await runCauseEffect(browser.open(`${origin}/hints`, "smoke-thread"));
+  const read = async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const text = (await runCauseEffect(browser.snapshot(tab.id))).text;
+      if (text.trim()) {
+        const payload = JSON.parse(text);
+        if (isDynamicRecord(payload) && isDynamicRecord(payload.requestHeaders) && isDynamicRecord(payload.values))
+          return { requestHeaders: payload.requestHeaders, values: payload.values };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("The requested-hints page did not report.");
+  };
+  const first = await read();
+  const early = REQUESTED_HINTS.filter(([header]) => first.requestHeaders[header] !== undefined);
+  if (early.length > 0) throw new Error(`Hints were sent before the site asked: ${JSON.stringify(early)}`);
+  await runCauseEffect(browser.reload(tab.id));
+  const second = await read();
+  // Windows gives no platform version: the host cannot compute the value that the page reads.
+  const hints = REQUESTED_HINTS.filter(
+    ([header]) => process.platform !== "win32" || header !== "sec-ch-ua-platform-version",
+  );
+  const expected = Object.fromEntries(hints.map(([header, key]) => [header, hintHeaderValue(second.values[key])]));
+  const sent = Object.fromEntries(hints.map(([header]) => [header, second.requestHeaders[header]]));
+  if (JSON.stringify(sent) !== JSON.stringify(expected))
+    throw new Error(
+      `Requested hints differ from the page: sent ${JSON.stringify(sent)}, page ${JSON.stringify(expected)}`,
+    );
+  // A redirect to a different origin must not carry the hints that the first origin asked for.
+  await runCauseEffect(browser.loadUrl(tab.id, `${origin}/hints-away`));
+  const away = await read();
+  const carried = REQUESTED_HINTS.filter(([header]) => away.requestHeaders[header] !== undefined);
+  if (!String(away.requestHeaders.host).startsWith("localhost") || carried.length > 0)
+    throw new Error(`A redirect carried hints to a different origin: ${JSON.stringify(carried)}`);
+  await runCauseEffect(browser.close(tab.id));
+  process.stdout.write("BrowserHost: requested client hints match the page.\n");
+  return sent;
 }
 
 async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {

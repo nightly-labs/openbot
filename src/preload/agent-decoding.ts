@@ -18,6 +18,7 @@ import {
   type AccountUsage,
   type AgentMemory,
   type AgentMemorySelectionState,
+  type AgentProviderId,
   type AgentRuntimeSnapshot,
   type AgentStatus,
   type ClientAgentModelOption,
@@ -27,17 +28,20 @@ import {
   decodeOptionalHostAnalytics,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAccountUsage,
   isAgentHostSettings,
   isAgentMemory,
   isAgentMemorySelectionState,
+  isAgentModel,
   isAgentProvider,
   isAgentRuntimeSnapshot,
   isAgentStatus,
   isClientAgentModelOption,
   isClientAgentSummary,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   isRoutine,
   isRoutineCalendar,
@@ -137,6 +141,20 @@ export function decodeProviderUsageResetOutcomeFromMain(value: unknown): Provide
   return decodeProviderUsageResetOutcome(value);
 }
 
+/** Main has already read a provider that this build does not know as none. */
+export function decodeHostDefaultProviderFromMain(value: unknown): HostDefaultProvider {
+  const { preferredProvider, preferredModel } = decodeRecord(value, "default provider");
+  if (preferredProvider !== null && !isAgentProvider(preferredProvider)) throw new Error("Invalid default provider.");
+  if (preferredModel !== null && !isAgentModel(preferredModel)) throw new Error("Invalid default model.");
+  return { preferredProvider, preferredModel };
+}
+
+/** The off providers of a joined server's host. Main has already left out the ones this build does not know. */
+export function decodeProviderUseFromMain(value: unknown): AgentProviderId[] {
+  if (!Array.isArray(value) || !value.every(isAgentProvider)) throw new Error("Invalid provider use.");
+  return value;
+}
+
 /** Main has already left out the providers that this build does not know, so each one must be known. */
 export function decodeHostProviderAccountsFromMain(value: unknown): HostProviderAccounts {
   const invalid = () => new Error("Invalid provider accounts response.");
@@ -157,7 +175,13 @@ export function decodeHostProviderAccountsFromMain(value: unknown): HostProvider
       throw invalid();
     return { agentId: row.agentId, accountId: row.accountId };
   });
-  return { providers, agents };
+  if (value.pools === undefined) return { providers, agents };
+  if (!Array.isArray(value.pools)) throw invalid();
+  const pools = value.pools.map((row: unknown) => {
+    if (!isDynamicRecord(row) || !isAgentProvider(row.provider) || !isProviderAccountPool(row.pool)) throw invalid();
+    return { provider: row.provider, pool: { leftOut: row.pool.leftOut, inUse: row.pool.inUse } };
+  });
+  return { providers, pools, agents };
 }
 
 // Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and
@@ -181,6 +205,11 @@ export function decodeAgents(value: unknown): ClientAgentSummary[] {
     throw new Error("Invalid agent list response.");
   }
   return value;
+}
+
+/** The agents that the `Cmd + Q` hint names, or null when the hint is hidden. */
+export function decodeQuitShortcutHint(value: unknown): ClientAgentSummary[] | null {
+  return value === null ? null : decodeAgents(value);
 }
 
 export function decodeMemory(value: unknown): AgentMemory {

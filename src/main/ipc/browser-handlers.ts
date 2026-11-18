@@ -1,6 +1,11 @@
 // The embedded browser and its picture-in-picture window.
 
-import { type BrowserDisplayState, type BrowserTab, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import {
+  type BrowserDisplayState,
+  type BrowserTab,
+  type BrowserTeachStep,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -8,10 +13,20 @@ import {
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
+import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_SIGN_IN_ROUTES,
   decodeBrowserSignInResult,
 } from "@openbot/contracts/team-protocol/browser-sign-in-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -38,12 +53,13 @@ import {
   decodeBrowserTab,
   decodeBrowserTabs,
 } from "../remote-device-decoding";
-import { decodeVoid } from "../remote-host-decoding";
+import { acceptEmpty, decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
   parseBrowserBounds,
   parseBrowserNavigate,
   parseBrowserOpen,
+  parseBrowserTeachStop,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
@@ -69,6 +85,8 @@ export interface BrowserIpcDependencies {
     | "close"
     | "takeUserControl"
     | "releaseUserControl"
+    | "startTeach"
+    | "stopTeach"
     | "listTabs"
     | "getDisplayState"
     | "getControlState"
@@ -129,6 +147,16 @@ export function browserIpcHandlers({
     await runCauseEffect(
       remoteServers.request(serverId, route, decodeBrowserUserControlSnapshot, { method: "POST", body: { tabId } }),
     );
+  };
+  const teachRequest = async <Result>(
+    serverId: string,
+    route: string,
+    decode: (value: unknown) => Result,
+    body: { tabId: string; save?: boolean },
+  ): Promise<Result> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_TEACH_CAPABILITY))
+      throw new Error(sourceText("error.backend.browserTeachUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decode, { method: "POST", body }));
   };
   return {
     browser: {
@@ -254,14 +282,26 @@ export function browserIpcHandlers({
           return null;
         }
         const cookies = await runCauseEffect(localSignIn.collect());
-        if (cookies.length === 0) return { cookies: 0, signedIn: false };
-        const result = await runCauseEffect(
-          remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
-            method: "POST",
-            body: { tabId: target.tabId, cookies },
-          }),
-        );
-        if (result.cookies === 0) return { cookies: 0, signedIn: false };
+        // Some sites keep the sign-in in the page storage, not in a cookie (#8686). An older server takes cookies only.
+        const withStorage = remoteServers.supportsCapability(target.serverId, BROWSER_SIGN_IN_STORAGE_CAPABILITY);
+        const storage = withStorage ? await runCauseEffect(localSignIn.collectStorage()) : null;
+        if (cookies.length === 0 && !storage?.entries.length) return { cookies: 0, signedIn: false };
+        const set = withStorage
+          ? await runCauseEffect(
+              remoteServers.request(
+                target.serverId,
+                BROWSER_SIGN_IN_STORAGE_ROUTES.import,
+                decodeBrowserSignInStorageResult,
+                { method: "POST", body: { tabId: target.tabId, cookies, storage } },
+              ),
+            ).then((result) => result.cookies + result.storage)
+          : await runCauseEffect(
+              remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
+                method: "POST",
+                body: { tabId: target.tabId, cookies },
+              }),
+            ).then((result) => result.cookies);
+        if (set === 0) return { cookies: 0, signedIn: false };
         if (check) {
           const signedIn = async () => {
             const tabs = await runCauseEffect(
@@ -286,10 +326,10 @@ export function browserIpcHandlers({
             );
             done = await signedIn();
           }
-          if (!done) return { cookies: result.cookies, signedIn: false };
+          if (!done) return { cookies: set, signedIn: false };
         }
         await runCauseEffect(localSignIn.discard());
-        return { cookies: result.cookies, signedIn: true };
+        return { cookies: set, signedIn: true };
       }),
       takeControl: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
@@ -301,6 +341,18 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.releaseUserControl(tabId),
           remote: (serverId) => userControlRequest(serverId, BROWSER_USER_CONTROL_ROUTES.release, tabId),
+        }),
+      ),
+      startTeach: payloadHandler(stringPayload("tabId"), (tabId) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.startTeach(tabId, { kind: "local" })),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.start, acceptEmpty, { tabId }),
+        }),
+      ),
+      stopTeach: payloadHandler(parseBrowserTeachStop, (input) =>
+        routeToServer<BrowserTeachStep[]>(remoteServers.activeServerId, {
+          local: () => browser.stopTeach(input.tabId, { kind: "local" }, input.save),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.stop, decodeBrowserTeachSteps, input),
         }),
       ),
       listTabs: handler(() =>

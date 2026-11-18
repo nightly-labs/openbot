@@ -89,10 +89,11 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
   const rootPropsSource = asComponent ? merge(() => others(["as"])) : others([]);
   // biome-ignore lint/nursery/noUnsafeTypeAssertion: Solid 2's omit cannot preserve Kobalte's generic polymorphic props.
   const rootProps = rootPropsSource as PolymorphicProps<T, ButtonRootProps<T>>;
-  const [element, setElement] = createSignal<HTMLElement | undefined>(undefined, { ownedWrite: true });
+  // From the `as` prop, not from the element: the ref runs inside the spread that reads this value.
+  // A component in `as` is dropped above, so the root is then a native button.
   const isNative = () => {
-    const tagName = element()?.tagName;
-    return tagName === "BUTTON" || tagName === "INPUT";
+    const as = props.as;
+    return typeof as !== "string" || as === "button" || as === "input";
   };
 
   /*
@@ -101,7 +102,6 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
    * form submit, and Enter in a field submits through a click on the default button.
    */
   function guardLoading(target: HTMLElement): void {
-    setElement(target);
     const block = (event: Event): void => {
       if (!props.loading) return;
       event.preventDefault();

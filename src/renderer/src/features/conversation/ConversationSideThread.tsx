@@ -7,14 +7,24 @@ import { AgentThreadView } from "@openbot/ui/features/conversation/threads/Agent
 import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createProjection, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { threadAwaitingReplies } from "../../awaiting-replies";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
+import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
+import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
+import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -32,13 +42,20 @@ export function ConversationSideThread(props: { threadId: string }) {
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
+    taggableBrowserTabs,
+    taggableThreads,
+    openTaggedReference,
     threadComposer,
+    threadQueue,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
     branchThread,
     rewriteThreadMessage,
+    messagePins,
+    changeMarkerActions,
   } = useConversationViewScope();
+  const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -49,6 +66,7 @@ export function ConversationSideThread(props: { threadId: string }) {
   });
   const thread = (): SideThread | undefined => view.threads?.side.thread(props.threadId);
   const item = () => view.threads?.side.tabs.find((tab) => tab.id === props.threadId);
+  const awaiting = createMemo(() => threadAwaitingReplies(thread()?.task, view.agents, view.agentWaits));
   /** Reconciled by id, so a stream chunk redraws only the message that changed. */
   const messages = createProjection<AgentMessage[]>(
     () => {
@@ -67,6 +85,8 @@ export function ConversationSideThread(props: { threadId: string }) {
     activeTurnId: () => thread()?.task.activeTurnId,
   });
   const showAgentSteps = useShowAgentSteps();
+  const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const { appFocused } = usePlatform();
   // The person reads the thread in the side panel while the window has focus.
   createEffect(
@@ -90,7 +110,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   /** Sends the draft of this thread. Without its key, a send would take the draft of the chat's thread. */
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
-    return key ? threadComposer.send(side, text, key) : Promise.resolve(false);
+    if (!key) return Promise.resolve(false);
+    // While a queued message is in the message box, Send saves it in its place.
+    return threadQueue.editOf(side.task.id)
+      ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
+      : threadComposer.send(side, text, key);
   }
   /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {
@@ -101,10 +125,24 @@ export function ConversationSideThread(props: { threadId: string }) {
     waitsForAnswer() ? (
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
+  /** Continue on a sign-in card goes to this thread, as the person's next message there. */
+  const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
+  const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
+  /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
+  const visualReplyCard = useThreadVisualReplyCard(draftKey);
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
+  };
+  /** Pin and Unpin on the messages of this thread. A host without `message-pins-v1` has no such item. */
+  const threadPins = (taskId: string) => {
+    if (!messagePins.available()) return undefined;
+    return {
+      isPinned: (messageId: string) => messagePins.isPinned(taskId, messageId),
+      onToggle: (messageId: string, pinned: boolean) => messagePins.set(taskId, messageId, pinned),
+    };
   };
   /** Deletes a message of this thread. A host without `message-delete-v1` has no Delete item. */
   const deleteMessage = () => {
@@ -122,6 +160,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
+  /** Text selected in this thread goes to this thread, as a reply where the server takes one. */
+  const selectionActions = (side: SideThread) => ({
+    onSend: (messageId: string, body: string) => side.onSend(body, [], view.threads?.acceptsReplies ? messageId : null),
+    quoteShortcut: deviceQuoteShortcut(view.platform),
+  });
   /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
     const source = view.threads?.branchSource(side.task);
@@ -153,6 +196,9 @@ export function ConversationSideThread(props: { threadId: string }) {
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
+            browserTabs={taggableBrowserTabs()}
+            threads={taggableThreads()}
+            onOpenTag={openTaggedReference}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
             rowAttachments={rowImages()}
@@ -170,8 +216,11 @@ export function ConversationSideThread(props: { threadId: string }) {
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onSelectAgent={view.onSelectAgent}
+            changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            backdropAction={backdropAction}
             approval={current().thread.approval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
@@ -180,12 +229,23 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
+            messageCard={(message, quote) =>
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
+            }
+            olderMessages={current().thread.olderMessages}
+            newerMessages={current().thread.newerMessages}
+            focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
+            compactMessageActions={compactMessageActions()}
+            bubbleStyle={bubbleStyle()}
             onBranch={branch()}
             onRewrite={
               view.rewriteAvailable === false
@@ -195,11 +255,15 @@ export function ConversationSideThread(props: { threadId: string }) {
             isOwnSender={view.isOwnSender}
             requireSenderForRewrite={Boolean(view.runtime)}
             onDeleteMessage={deleteMessage()}
+            messagePins={threadPins(current().thread.task.id)}
             canDeleteMessage={view.canDeleteMessage}
             branchSource={branchSource(current().thread, current().agent.name)}
             onReply={reply()}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
+            queue={threadQueue.view(current().thread.task, draftKey())}
+            awaiting={awaiting()}
+            selectionActions={selectionActions(current().thread)}
           />
         )}
       </Show>

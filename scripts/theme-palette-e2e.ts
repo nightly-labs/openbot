@@ -108,8 +108,9 @@ async function openSettings(page: Page) {
       .getByRole("button", { name: en["app.rail.settings"], exact: true })
       .click();
   await settingsTitle(page).waitFor();
-  const general = page.getByRole("tab", { name: en["settings.tab.general.title"], exact: true });
-  if (await general.isVisible()) await general.click();
+  // Theme is in the Appearance section.
+  const appearance = page.getByRole("tab", { name: en["settings.appearance.title"], exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   await themeButton(page).waitFor();
 }
 

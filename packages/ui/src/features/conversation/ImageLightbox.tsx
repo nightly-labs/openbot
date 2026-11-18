@@ -1,9 +1,19 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, X } from "@openbot/ui";
+import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, toast, X } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createMemo, createSignal, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { useText } from "../../text";
-import { CloseIcon, DownloadIcon } from "./ConversationIcons";
+import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon } from "./ConversationIcons";
 import { justifiedGalleryLayout } from "./image-gallery-layout";
 import {
   BACKDROP_IN,
@@ -18,6 +28,8 @@ import {
   ZOOM_OUT,
   ZOOM_OUT_DURATION,
 } from "./lightbox-motion";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
+import { createSteadyImageUrl } from "./steady-image-url";
 import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
 
 /** The images that the viewer steps through, the one it opens on, and the thumbnail it grows from. */
@@ -40,6 +52,8 @@ const GALLERY_MAX_RATIO = 3;
 const SWIPE_DISTANCE = 48;
 /** A drag of a zoomed image that moves this far is not a click, so it does not close the viewer. */
 const DRAG_DISTANCE = 4;
+/** How long the copy button shows its check after a copy. */
+const COPIED_DURATION = 1500;
 
 /** The zoom of the shown image: its scale over the fitted size and its offset from the centre. */
 const FIT: Camera = { x: 0, y: 0, scale: 1 };
@@ -47,6 +61,16 @@ const FIT: Camera = { x: 0, y: 0, scale: 1 };
 interface Point {
   x: number;
   y: number;
+}
+
+function galleryRatio(width: number, height: number): number {
+  return Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, width / height));
+}
+
+/** A tile is square until its image loads, unless the image loaded before in this window. */
+function rememberedGalleryRatio(attachmentId: string): number {
+  const size = rememberedMediaSize(attachmentId);
+  return size ? galleryRatio(size.width, size.height) : 1;
 }
 
 /** Several images of one message, laid out in justified rows. */
@@ -57,14 +81,15 @@ export function ImageGallery(props: {
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }) {
   const { t } = useText();
-  const [ratios, setRatios] = createStore<Record<string, number>>({});
+  // By position: a sent message's images get new ids and URLs when the host stores them, and each
+  // tile keeps its size and pixels until the stored copy loads.
+  const [ratios, setRatios] = createStore<Record<number, number>>({});
   const [missing, setMissing] = createStore<Record<string, boolean>>({});
-  const [loaded, setLoaded] = createStore<Record<string, boolean>>({});
   const [width, setWidth] = createSignal(0);
   let gallery: HTMLUListElement | undefined;
   const layout = createMemo(() =>
     justifiedGalleryLayout(
-      props.images.map((image) => ratios[image.id] ?? 1),
+      props.images.map((image, index) => ratios[index] ?? rememberedGalleryRatio(image.id)),
       {
         width: width(),
         rowHeight: GALLERY_ROW_HEIGHT,
@@ -92,12 +117,30 @@ export function ImageGallery(props: {
       aria-label={t("chat.image.gallery", { count: props.images.length })}
       style={{ height: `${layout().height}px` }}
     >
-      <For each={props.images}>
+      <For each={props.images} keyed={false}>
         {(image, index) => {
-          const box = () => layout().boxes[index()];
-          // Keyed by URL: a new URL for the same attachment gets a new try.
-          const key = () => image.previewUrl ?? image.id;
+          const box = () => layout().boxes[index];
+          // Once the tile draws an image, a new URL draws over it when it loads, with no spinner.
+          const [loaded, setLoaded] = createSignal(false);
+          const url = createSteadyImageUrl(() => image().previewUrl);
+          // Keyed by the drawn URL: a new URL for the same attachment gets a new try.
+          const key = () => url() ?? image().id;
           const isMissing = () => missing[key()] === true;
+          let element: HTMLImageElement | undefined;
+          const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
+            setLoaded(true);
+            if (naturalWidth <= 0 || naturalHeight <= 0) return;
+            rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
+            const ratio = galleryRatio(naturalWidth, naturalHeight);
+            setRatios((state) => {
+              state[index] = ratio;
+            });
+          };
+          // An image in the memory cache, such as one the composer showed, is complete at once. Its
+          // `load` comes frames later, and the tile would be square until then.
+          createEffect(url, () => {
+            if (element?.complete && element.naturalWidth > 0) measure(element);
+          });
           return (
             <li
               class="image-gallery-item"
@@ -112,46 +155,36 @@ export function ImageGallery(props: {
                 variant="ghost"
                 type="button"
                 class={["image-gallery-tile", { "image-gallery-tile-missing": isMissing() }]}
-                data-attachment-id={image.id}
+                data-attachment-id={image().id}
                 disabled={isMissing() && !props.onDownload}
                 data-cuelume-tap={isMissing() ? undefined : "open"}
                 aria-label={
                   !isMissing()
-                    ? t("chat.image.preview", { name: image.name })
+                    ? t("chat.image.preview", { name: image().name })
                     : props.onDownload
-                      ? t("chat.image.download", { name: image.name })
+                      ? t("chat.image.download", { name: image().name })
                       : t("chat.image.unavailable")
                 }
                 onClick={(event) => {
-                  if (!isMissing()) props.onOpen(image, event.currentTarget);
-                  else props.onDownload?.(image);
+                  if (!isMissing()) props.onOpen(image(), event.currentTarget);
+                  else props.onDownload?.(image());
                 }}
               >
                 <Show when={!isMissing()} fallback={props.onDownload ? <DownloadIcon /> : <X aria-hidden="true" />}>
-                  <Show when={!loaded[key()]}>
+                  <Show when={!loaded()}>
                     <span class="image-gallery-tile-loading">
                       <Spinner />
                     </span>
                   </Show>
                   <img
-                    src={image.previewUrl ?? ""}
+                    src={url() ?? ""}
                     alt=""
                     decoding="async"
                     draggable={false}
-                    onLoad={(event) => {
-                      setLoaded((state) => {
-                        state[key()] = true;
-                      });
-                      const { naturalHeight, naturalWidth } = event.currentTarget;
-                      if (naturalWidth <= 0 || naturalHeight <= 0) return;
-                      const ratio = Math.min(
-                        GALLERY_MAX_RATIO,
-                        Math.max(GALLERY_MIN_RATIO, naturalWidth / naturalHeight),
-                      );
-                      setRatios((state) => {
-                        state[image.id] = ratio;
-                      });
+                    ref={(node) => {
+                      element = node;
                     }}
+                    onLoad={(event) => measure(event.currentTarget)}
                     onError={() =>
                       setMissing((state) => {
                         state[key()] = true;
@@ -209,6 +242,67 @@ function zoomKeyframes(from: DOMRect, to: DOMRect, fromRadius: number, toRadius:
   ];
 }
 
+/** Screen pixels for each CSS pixel. A display scale above 100% and a page zoom raise it. */
+const screenPixelRatio = () => window.devicePixelRatio || 1;
+
+/**
+ * Limits an image to one image pixel for each screen pixel, as an image app shows it at 100%. At its
+ * natural CSS size, a display scale above 100% spreads each image pixel over more screen pixels and
+ * blurs a screenshot. A vector image scales without loss, so it keeps its natural CSS size.
+ */
+function fitScreenPixels(image: HTMLImageElement, mimeType: string): void {
+  if (mimeType === "image/svg+xml") return;
+  const ratio = screenPixelRatio();
+  image.style.setProperty("--image-lightbox-screen-width", `${image.naturalWidth / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-height", `${image.naturalHeight / ratio}px`);
+}
+
+/** A web client on plain HTTP has no clipboard that takes images. */
+const canCopyImages = () => typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function";
+
+function drawPng(source: CanvasImageSource, width: number, height: number): Promise<Blob> {
+  const canvas = new OffscreenCanvas(width, height);
+  canvas.getContext("2d")?.drawImage(source, 0, 0);
+  return canvas.convertToBlob({ type: "image/png" });
+}
+
+/**
+ * The clipboard takes images as PNG. A PNG file goes as it is, and other files are drawn again. An
+ * attachment comes from another origin, and a canvas cannot read such an image, so the copy reads
+ * the file. When the file does not load or decode, the copy draws the shown image.
+ */
+async function pngImage(image: HTMLImageElement): Promise<Blob> {
+  const file = await fetch(image.currentSrc).then(
+    (response) => (response.ok ? response.blob() : undefined),
+    () => undefined,
+  );
+  if (file?.type === "image/png") return file;
+  const bitmap = file && (await createImageBitmap(file).catch(() => undefined));
+  if (!bitmap) return drawPng(image, image.naturalWidth, image.naturalHeight);
+  try {
+    return await drawPng(bitmap, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Text that the user selected in the viewer, such as the file name. Text behind the viewer does not count. */
+const selectsText = (viewer: Node) => {
+  const selection = window.getSelection();
+  return Boolean(selection?.toString()) && viewer.contains(selection?.anchorNode ?? null);
+};
+
+/** Command or Ctrl with C, also on a layout without Latin letters, such as Russian. */
+const isCopyKey = (event: KeyboardEvent) => {
+  const key = event.key.toLowerCase();
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    (key === "c" || (!/^[a-z]$/.test(key) && event.code === "KeyC"))
+  );
+};
+
 const FADE_KEYFRAMES: Keyframe[] = [
   { opacity: 0, transform: "scale(0.96)" },
   { opacity: 1, transform: "none" },
@@ -224,6 +318,8 @@ export function ImageLightbox(props: {
   canDownload?: ((attachment: AttachmentSummary) => boolean) | undefined;
   /** The window draws the macOS window controls over the top start corner, so the toolbar leaves room. */
   macWindowControls?: boolean | undefined;
+  /** Names the strip of images. Absent, the images are the ones of one message. */
+  stripLabel?: string | undefined;
   onClose: () => void;
 }) {
   const { t } = useText();
@@ -247,7 +343,15 @@ export function ImageLightbox(props: {
     const image = current();
     return image && (props.canDownload?.(image) ?? true) ? image : undefined;
   };
+  const shownImageLoaded = () => {
+    const image = current();
+    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true;
+  };
   const imageElements = new Map<string, HTMLImageElement>();
+  const copyable = canCopyImages();
+  const [copied, setCopied] = createSignal<string>();
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(copiedTimer));
   const tiles = createTileMotion();
   // The thumbnails move only when the viewer grows out of one of them.
   const tilesMove = Boolean(originRect && props.thumbnail);
@@ -300,7 +404,8 @@ export function ImageLightbox(props: {
       return;
     }
     // Layout sizes, not `getBoundingClientRect`: the zoom and the animations transform the image.
-    setZoom((camera.scale * image.offsetWidth) / image.naturalWidth);
+    // The level counts screen pixels, so 100% shows each image pixel on one screen pixel.
+    setZoom((camera.scale * image.offsetWidth * screenPixelRatio()) / image.naturalWidth);
     const glide = animate && motion;
     image.toggleAttribute("data-settling", glide);
     // A glide back to fit keeps the clip and the sharp drawing until the image is fitted.
@@ -327,6 +432,21 @@ export function ImageLightbox(props: {
       x: point.x - ((point.x - from.x) * next) / from.scale,
       y: point.y - ((point.y - from.y) * next) / from.scale,
     };
+  };
+  /** Copies the shown image. The copy button shows the check and tells a screen reader, also for the key. */
+  const copy = () => {
+    const entry = current();
+    const image = entry ? imageElements.get(entry.id) : undefined;
+    if (!entry || !image?.isConnected || !copyable) return;
+    // The item takes the PNG as a promise, so the write keeps the press's permission while it draws.
+    navigator.clipboard.write([new ClipboardItem({ "image/png": pngImage(image) })]).then(
+      () => {
+        setCopied(entry.id);
+        clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => setCopied(undefined), COPIED_DURATION);
+      },
+      () => toast.error(t("chat.image.copyFailed")),
+    );
   };
   const zoomBy = (factor: number) => move(zoomAround(camera, { x: 0, y: 0 }, camera.scale * factor), true);
   /** A window point from the centre of the stage, where the fitted image is centred. */
@@ -402,11 +522,32 @@ export function ImageLightbox(props: {
       if (zoomed()) move(FIT, true);
       else move(zoomAround(camera, stagePoint(event), DOUBLE_CLICK_ZOOM), true);
     };
-    const onResize = new ResizeObserver(() => {
-      // A new fitted size keeps the zoom level, the percent of the natural size.
+    // A new fitted size keeps the zoom level, the percent of the natural size.
+    const keepZoom = () => {
       const image = zoomImage();
-      move(image && zoomed() ? { ...camera, scale: (zoom() * image.naturalWidth) / image.offsetWidth } : camera);
-    });
+      move(
+        image && zoomed()
+          ? { ...camera, scale: (zoom() * image.naturalWidth) / (image.offsetWidth * screenPixelRatio()) }
+          : camera,
+      );
+    };
+    const onResize = new ResizeObserver(keepZoom);
+    // A page zoom, or a window moved to a screen with another scale, changes the screen pixel size.
+    let resolution: MediaQueryList | undefined;
+    const onResolution = () => {
+      for (const entry of images()) {
+        const image = imageElements.get(entry.id);
+        if (image?.isConnected && image.naturalWidth) fitScreenPixels(image, entry.mimeType);
+      }
+      keepZoom();
+      watchResolution();
+    };
+    const watchResolution = () => {
+      resolution?.removeEventListener("change", onResolution);
+      resolution = matchMedia(`(resolution: ${screenPixelRatio()}dppx)`);
+      resolution.addEventListener("change", onResolution);
+    };
+    watchResolution();
     area.addEventListener("wheel", onWheel, { passive: false });
     area.addEventListener("pointerdown", onDown);
     area.addEventListener("pointermove", onMove);
@@ -422,6 +563,7 @@ export function ImageLightbox(props: {
       area.removeEventListener("pointercancel", onUp);
       area.removeEventListener("dblclick", onDoubleClick);
       onResize.disconnect();
+      resolution?.removeEventListener("change", onResolution);
     };
   });
 
@@ -583,11 +725,15 @@ export function ImageLightbox(props: {
             else if (event.target instanceof Element && !event.target.closest("button, a, .image-lightbox-image"))
               close();
           }}
-          onKeyDown={(event: KeyboardEvent) => {
+          // The native menu copies the image under the pointer, so the message's own menu does not open.
+          onContextMenu={(event: MouseEvent) => event.stopPropagation()}
+          onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
             const offset = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
             if (offset !== undefined) step(offset);
             else if (event.key === "Home") go(0, -1);
             else if (event.key === "End") go(images().length - 1, 1);
+            // Copy takes the image, unless the user selected text, such as the file name.
+            else if (isCopyKey(event) && !selectsText(event.currentTarget)) copy();
             // With Command, Ctrl or Alt, the keys are the app's own zoom shortcuts.
             else if (event.metaKey || event.ctrlKey || event.altKey) return;
             else if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);
@@ -632,6 +778,24 @@ export function ImageLightbox(props: {
                   </Button>
                 )}
               </Show>
+              <Show when={copyable}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  class="image-lightbox-action image-lightbox-copy"
+                  title={t("chat.image.copy")}
+                  disabled={!shownImageLoaded()}
+                  onClick={copy}
+                >
+                  <Show when={copied() === current()?.id} fallback={<CopyIcon />}>
+                    <CheckIcon />
+                  </Show>
+                  <span class="sr-only" aria-live="polite">
+                    {copied() === current()?.id ? t("chat.image.copied") : t("chat.image.copy")}
+                  </span>
+                </Button>
+              </Show>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -674,7 +838,10 @@ export function ImageLightbox(props: {
                             alt={entry.name}
                             referrerpolicy="no-referrer"
                             draggable={false}
-                            onLoad={(event) => reveal(entry, event.currentTarget)}
+                            onLoad={(event) => {
+                              fitScreenPixels(event.currentTarget, entry.mimeType);
+                              reveal(entry, event.currentTarget);
+                            }}
                             onError={() => {
                               if (entry.id === current()?.id) opened = true;
                               setFailed((state) => {
@@ -715,7 +882,10 @@ export function ImageLightbox(props: {
             </Show>
           </div>
           <Show when={images().length > 1}>
-            <nav class="image-lightbox-strip image-lightbox-chrome" aria-label={t("chat.image.lightbox.strip")}>
+            <nav
+              class="image-lightbox-strip image-lightbox-chrome"
+              aria-label={props.stripLabel ?? t("chat.image.lightbox.strip")}
+            >
               <For each={images()}>
                 {(entry, position) => (
                   <Button

@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "キュー内のメッセージを編集中です。実行するには編集を保存するかキャンセルしてください。",
   "composer.queueEdit.cancel": "編集をキャンセル",
+  "composer.feedbackFix.body":
+    "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
+  "composer.feedbackFix.cancel": "キャンセル",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",
@@ -14,10 +17,21 @@ export const messages = {
   "composer.signIn.label": "{provider} にサインイン",
   "composer.signIn.action": "サインイン",
   "composer.updateKey.action": "キーを更新",
+  "composer.verifyAccount.action": "アカウントを確認",
   "composer.update.body": "続行するには {provider} を更新してください。",
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.imageInput.body":
+    "{model} はテキストのみを受け取るため、添付した画像を見られません。このモデルが画像を読める場合は、画像をオンにしてください。",
+  "composer.imageInput.label": "{model} の画像をオンにする",
+  "composer.imageInput.pending": "オンにしています…",
+  "composer.imageInput.action": "画像をオン",
+  "composer.usageLimit.credits":
+    "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
+  "composer.usageLimit.creditsResets":
+    "{provider} のプランの上限をすべて使用しました。{reset} にリセットされるまで、エージェントはクレジットを使用します。",
+  "composer.usageLimit.creditsTitle": "クレジットを使用中",
   "composer.usageLimit.resets": "{provider} の上限をすべて使用しました。上限は {reset} にリセットされます。",
   "composer.usageLimit.selectModel":
     "{provider} の上限をすべて使用しました。続行するには別のモデルを選択してください。",
@@ -75,9 +89,9 @@ export const messages = {
   "composer.placeholder.messageAgent": "エージェントにメッセージを送る",
   "composer.placeholder.answer": "回答を入力",
   "composer.add.label": "プロンプトに追加",
-  "composer.add.image": "画像を添付",
+  "composer.add.files": "ファイルを添付",
+  "composer.add.teach": "タスクを教える",
   "composer.add.skill": "スキルを使う",
-  "composer.add.context": "コンテキストを追加",
   "composer.upload.cancel": "アップロードをキャンセル",
   "composer.upload.uploading": "{name} をアップロード中",
   "composer.upload.progress": "{sent} / {total}",
@@ -107,6 +121,12 @@ export const messages = {
   "composer.error.holdQueued": "編集のためにキューのメッセージを保留できませんでした。",
   "composer.error.cancelEdit": "キューの編集をキャンセルできませんでした。もう一度お試しください。",
   "composer.error.updateQueued": "キューのメッセージを更新できませんでした。もう一度お試しください。",
+  "composer.queueEdit.received": "エージェントはこのメッセージをすでに受け取ったため、編集は終了しました。",
+  "composer.queueEdit.receivedKept":
+    "エージェントはこのメッセージをすでに受け取ったため、編集は終了しました。変更内容はメッセージ欄に残っています。",
+  "composer.queueEdit.deletedKept":
+    "このメッセージは削除されたため、編集は終了しました。変更内容はメッセージ欄に残っています。",
+  "composer.queueEdit.endedKept": "この編集は保存される前に終了しました。変更内容はメッセージ欄に残っています。",
   "composer.voice.prepareFailed": "音声モデルを準備できませんでした。もう一度お試しください。",
   "composer.voice.noSpeechRecorded": "音声が録音されませんでした。",
   "composer.voice.noSpeechDetected": "音声が検出されませんでした。",
@@ -116,6 +136,10 @@ export const messages = {
   "composer.error.changeModel": "モデルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeEffort": "推論レベルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeFastMode": "高速モードを変更できませんでした。もう一度お試しください。",
+  "composer.fastMode.confirmTitle": "高速モードをオンにしますか？",
+  "composer.fastMode.confirmDescription":
+    "Claude の応答が速くなりますが、トークンあたりの料金が高くなります。Claude サブスクリプションでは、プランの使用量が残っていても、高速モードは常に使用クレジットを使います。",
+  "composer.fastMode.confirm": "オンにする",
   "composer.context.label": "コンテキスト使用率 {percent}",
   "composer.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "composer.context.labelCompacting": "コンテキストを圧縮しています",
@@ -141,4 +165,15 @@ export const messages = {
   "composer.newChat.action": "新しいチャット",
   "composer.context.compact": "今すぐ圧縮",
   "composer.context.compactFailed": "コンテキストを圧縮できませんでした。もう一度お試しください。",
+  "composer.picker.option.tab": "{name} ブラウザーのタブ",
+  "composer.picker.option.thread": "{name} スレッド",
+  "composer.picker.section.agents": "エージェント",
+  "composer.picker.section.files": "ファイル",
+  "composer.picker.section.tabs": "ブラウザーのタブ",
+  "composer.picker.section.threads": "スレッド",
+  "composer.picker.section.messages": "メッセージ内",
+  "composer.token.tab": "ブラウザーのタブ {name}",
+  "composer.token.thread": "スレッド {name}",
+  "composer.token.unavailableTab": "閉じたブラウザーのタブ {name}",
+  "composer.token.unavailableThread": "利用できないスレッド {name}",
 } as const satisfies PartialTranslation<typeof source>;

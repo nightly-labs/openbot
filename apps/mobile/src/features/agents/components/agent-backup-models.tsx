@@ -12,6 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { Button, Typography } from "heroui-native";
+import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Plus from "lucide-react-native/icons/plus";
@@ -25,6 +26,7 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -86,6 +88,7 @@ export function AgentBackupModelsRow(props: BackupModelsProps) {
   if (!canManage) return null;
   return (
     <SettingsRow
+      leading={<RowIcon icon={ArrowLeftRight} />}
       supportingText={current ? summary(current.backupModels) : undefined}
       onPress={() =>
         router.push({

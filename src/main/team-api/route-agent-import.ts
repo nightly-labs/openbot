@@ -4,19 +4,25 @@ import {
   AGENT_IMPORT_ROUTES,
   AGENT_IMPORT_UPLOAD_BYTES,
 } from "@openbot/contracts/team-protocol/agent-import-v1";
+import {
+  AGENT_IMPORT_V2_CAPABILITY,
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgentImport } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readBinary, readJson, stringField } from "./request-helpers";
+import { pathIdentifier, readBinary, readJson, stringField } from "./request-helpers";
 
 /**
  * Agents imported from a Grok Bot export sent from a joined server. Any member can import, as any
  * member can create an agent; the token is the member's own. The response codec of `agent-import-v1`
- * leaves out the avatars of the preview. Frozen by `agent-import-v1`. `newAgentHidden` says that a
- * new agent would start on a provider that the caller does not see.
+ * leaves out the avatars of the preview. Frozen by `agent-import-v1`, and `agent-import-v2` for an
+ * export sent in parts. `newAgentHidden` says that a new agent would start on a provider that the
+ * caller does not see.
  */
 export async function routeAgentImport(
   context: TeamApiRequestContext,
@@ -25,6 +31,35 @@ export async function routeAgentImport(
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const route = method === "POST" ? url.pathname : null;
+  if (
+    route === AGENT_IMPORT_V2_ROUTES.open ||
+    route === AGENT_IMPORT_V2_ROUTES.chunk ||
+    route === AGENT_IMPORT_V2_ROUTES.stage
+  ) {
+    if (!agentImport || !capabilities.has(AGENT_IMPORT_V2_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.agentImportUnsupported"));
+    if (route === AGENT_IMPORT_V2_ROUTES.chunk) {
+      const offsetText = url.searchParams.get("offset") ?? "";
+      const offset = Number(offsetText);
+      if (!/^\d+$/u.test(offsetText) || !Number.isSafeInteger(offset)) throw new HttpError(400, "offset is invalid.");
+      const uploadId = pathIdentifier(url.searchParams.get("upload") ?? undefined, "upload");
+      const read = () => readBinary(request, AGENT_IMPORT_V2_CHUNK_BYTES);
+      const received = await answer(
+        () => runCauseEffect(agentImport.writeUpload(uploadId, offset, read, member.id)),
+        409,
+      );
+      return json(200, { received });
+    }
+    const body = await readJson(request);
+    if (route === AGENT_IMPORT_V2_ROUTES.open) {
+      const size = body.size;
+      if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0)
+        throw new HttpError(400, "size is invalid.");
+      return json(200, { uploadId: await answer(() => runCauseEffect(agentImport.openUpload(size, member.id)), 400) });
+    }
+    const uploadId = stringField(body, "uploadId");
+    return json(200, await answer(() => runCauseEffect(agentImport.stageParts(uploadId, member.id)), 400));
+  }
   if (
     route !== AGENT_IMPORT_ROUTES.stage &&
     route !== AGENT_IMPORT_ROUTES.apply &&

@@ -1,6 +1,10 @@
 import { rm } from "node:fs/promises";
 import { parseApplyInstanceTransferInput, parseExportInstanceInput } from "@openbot/contracts/ipc";
 import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -15,12 +19,16 @@ import { readBinary, readJson, requireAdmin, stringField } from "./request-helpe
 import { answer } from "./route-agent-import";
 import { sendFile } from "./route-files";
 
-const ROUTES: ReadonlySet<string> = new Set(Object.values(INSTANCE_TRANSFER_ROUTES));
+const ROUTES: ReadonlySet<string> = new Set([
+  ...Object.values(INSTANCE_TRANSFER_ROUTES),
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply,
+]);
 
 /**
  * The server's agents and server settings to or from an OpenBot transfer file. Only an owner or an
  * admin: an export holds every agent's memories and files, and an import adds server settings. The
- * token is the caller's own. Frozen by `instance-transfer-v1`.
+ * token is the caller's own. Frozen by `instance-transfer-v1`; the apply that also replaces the
+ * server preferences by `instance-transfer-full-copy-v1`.
  */
 export async function routeInstanceTransfer(
   context: TeamApiRequestContext,
@@ -30,6 +38,11 @@ export async function routeInstanceTransfer(
   const { method, url, capabilities, member, request, response, json } = context;
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
   if (!instanceTransfer || !capabilities.has(INSTANCE_TRANSFER_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.instanceTransferUnsupported"));
+  if (
+    url.pathname === INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply &&
+    !capabilities.has(INSTANCE_TRANSFER_FULL_COPY_CAPABILITY)
+  )
     throw new HttpError(400, sourceText("error.team.instanceTransferUnsupported"));
   requireAdmin(member);
 
@@ -43,7 +56,7 @@ export async function routeInstanceTransfer(
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Invalid export.");
       }
-      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input)), 400);
+      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input, member.id)), 400);
       try {
         return await sendFile(response, path, null, (size) => ({
           "Content-Type": "application/zip",
@@ -73,13 +86,26 @@ export async function routeInstanceTransfer(
       if (newAgentHidden()) throw new HttpError(400, sourceText("error.team.newAgentProviderLocalOnly"));
       let input: ReturnType<typeof parseApplyInstanceTransferInput>;
       try {
-        input = parseApplyInstanceTransferInput(body);
+        // The v1 apply never replaces the server preferences, whatever its body says.
+        const { includeServerPreferences, ...v1 } = body;
+        input = parseApplyInstanceTransferInput(
+          url.pathname === INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply ? { ...v1, includeServerPreferences } : v1,
+        );
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Invalid transfer.");
       }
       // The service checks the zone and uses the host's own when it is not valid.
       const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
-      const result = await answer(() => runCauseEffect(instanceTransfer.apply(input, member.id, timezone)), 409);
+      const result = await answer(
+        () =>
+          runCauseEffect(
+            instanceTransfer.apply(input, member.id, timezone, {
+              id: member.id,
+              name: member.name ?? "Team member",
+            }),
+          ),
+        409,
+      );
       return json(200, {
         ...result,
         agents: result.agents.map((agent) => ({ agentId: agent.id, name: agent.name })),

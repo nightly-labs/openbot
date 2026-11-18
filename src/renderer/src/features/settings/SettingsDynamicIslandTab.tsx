@@ -1,4 +1,5 @@
 import {
+  type AppInfo,
   type AppVariant,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
@@ -31,6 +32,9 @@ import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-set
 import type { JSX } from "@solidjs/web";
 import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { usePlatform } from "../../platform";
+import { settingsPort } from "./settings-port";
+import { XWaylandRestartRow } from "./XWaylandRestartRow";
 
 const PREVIEW_NOTCH_SIZE: DynamicIslandNotchSize = { width: 192, height: 32 };
 /** The space the preview keeps on each side of an island that it scales down to fit. */
@@ -40,6 +44,8 @@ export interface SettingsDynamicIslandTabProps {
   value: GeneralSettingsValue;
   /** The previews draw the logo in the color of this build, as the real island does. */
   variant: AppVariant;
+  /** Windows has no notch and no Force Touch trackpad, so its text and switches differ. */
+  platform: AppInfo["platform"] | undefined;
   /**
    * The built-in display's notch, or null when it has none: the built-in preview then draws the
    * island that display shows. Undefined before main answers, and the preview draws a notch.
@@ -60,6 +66,14 @@ export interface SettingsDynamicIslandTabProps {
  */
 export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   const i18n = useI18n();
+  const isMac = () => props.platform === "darwin";
+  // The row key is also the settings search anchor in `settings-tabs.ts`, so the label and the anchor use one key.
+  const showKey = () => (isMac() ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen");
+  const platform = usePlatform();
+  /** Linux has no notch: the island floats at the top of the screen. */
+  const linux = () => props.platform === "linux";
+  /** Linux with Wayland windows: the island above other apps needs a start on XWayland. */
+  const screenSupport = () => (linux() && props.value.macBookNotch ? platform.appInfo()?.aboveAppsSupport : undefined);
   const widthPercent = () => props.value.macBookNotchWidthPercent;
   const heightPercent = () => props.value.macBookNotchHeightPercent;
   const widestBuiltInWidth = () =>
@@ -103,11 +117,21 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection title={i18n.t("settings.notch.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
-            data-settings-row="settings.notch.show.title"
+            data-settings-row={showKey()}
             checked={props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-            label={i18n.t("settings.notch.show.title")}
+            label={i18n.t(showKey())}
             description={i18n.t("settings.notch.show.description")}
+          />
+          <XWaylandRestartRow
+            support={screenSupport()}
+            keys={{
+              title: "settings.notch.xwayland.title",
+              description: "settings.notch.xwayland.description",
+              unsupported: "settings.notch.xwayland.unsupported",
+              restart: "settings.notch.xwayland.restart",
+            }}
+            onRestart={() => settingsPort().dynamicIsland.setXWayland({ enabled: true })}
           />
           <SwitchField
             data-settings-row="settings.notch.idle.title"
@@ -125,14 +149,16 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
             label={i18n.t("settings.notch.displays.title")}
             description={i18n.t("settings.notch.displays.description")}
           />
-          <SwitchField
-            data-settings-row="settings.notch.haptics.title"
-            checked={props.value.macBookNotchHaptics}
-            disabled={!props.value.macBookNotch}
-            onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-            label={i18n.t("settings.notch.haptics.title")}
-            description={i18n.t("settings.notch.haptics.description")}
-          />
+          <Show when={isMac()}>
+            <SwitchField
+              data-settings-row="settings.notch.haptics.title"
+              checked={props.value.macBookNotchHaptics}
+              disabled={!props.value.macBookNotch}
+              onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
+              label={i18n.t("settings.notch.haptics.title")}
+              description={i18n.t("settings.notch.haptics.description")}
+            />
+          </Show>
         </ItemGroup>
       </SettingsSection>
 
@@ -164,7 +190,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection
         data-settings-row="settings.notch.size.title"
         title={i18n.t("settings.notch.size.title")}
-        description={i18n.t("settings.notch.size.description")}
+        description={linux() ? undefined : i18n.t("settings.notch.size.description")}
         actions={
           <Button
             type="button"
@@ -179,24 +205,26 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       >
         <ItemGroup class="settings-modal-card settings-dynamic-island-size">
           <div class="settings-dynamic-island-preview">
-            <figure class="settings-dynamic-island-preview-display">
-              <PreviewFit widestWidth={widestBuiltInWidth()}>
-                <OpenBotDynamicIsland
-                  presentation={IDLE_DYNAMIC_ISLAND_PRESENTATION}
-                  state="compact"
-                  displayMode="notch"
-                  notchSize={builtInNotchSize()}
-                  variant={props.variant}
-                  widthPercent={widthPercent()}
-                  heightPercent={heightPercent()}
-                  onStateChange={() => undefined}
-                  onAction={() => undefined}
-                />
-              </PreviewFit>
-              <figcaption class="settings-dynamic-island-preview-caption">
-                {i18n.t("settings.notch.size.previewNotch")}
-              </figcaption>
-            </figure>
+            <Show when={!linux()}>
+              <figure class="settings-dynamic-island-preview-display">
+                <PreviewFit widestWidth={widestBuiltInWidth()}>
+                  <OpenBotDynamicIsland
+                    presentation={IDLE_DYNAMIC_ISLAND_PRESENTATION}
+                    state="compact"
+                    displayMode="notch"
+                    notchSize={builtInNotchSize()}
+                    variant={props.variant}
+                    widthPercent={widthPercent()}
+                    heightPercent={heightPercent()}
+                    onStateChange={() => undefined}
+                    onAction={() => undefined}
+                  />
+                </PreviewFit>
+                <figcaption class="settings-dynamic-island-preview-caption">
+                  {i18n.t("settings.notch.size.previewNotch")}
+                </figcaption>
+              </figure>
+            </Show>
             <figure class="settings-dynamic-island-preview-display">
               <PreviewFit widestWidth={widestExternalWidth}>
                 <OpenBotDynamicIsland
@@ -210,9 +238,11 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
                   onAction={() => undefined}
                 />
               </PreviewFit>
-              <figcaption class="settings-dynamic-island-preview-caption">
-                {i18n.t("settings.notch.size.previewIsland")}
-              </figcaption>
+              <Show when={!linux()}>
+                <figcaption class="settings-dynamic-island-preview-caption">
+                  {i18n.t("settings.notch.size.previewIsland")}
+                </figcaption>
+              </Show>
             </figure>
           </div>
           <SliderField

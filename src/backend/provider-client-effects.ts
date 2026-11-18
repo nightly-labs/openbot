@@ -1,3 +1,4 @@
+import { redactText } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
 import { getString } from "./protocol";
@@ -16,6 +17,19 @@ export const { rewrap: toProviderClientOperationError } = causeHelpers(ProviderC
 export class ProviderSignInError extends Schema.TaggedError<ProviderSignInError>()("ProviderSignInError", {
   message: Schema.String,
 }) {}
+
+/** The most characters of a provider's own reason that a failed sign-in shows. */
+const SIGN_IN_REASON_LIMIT = 200;
+
+/** A provider's reason for a failed sign-in, redacted and short, or `null` when it gave none. */
+export function signInReason(text: string | null | undefined): string | null {
+  const reason = redactText((text ?? "").trim().replace(/\s+/gu, " "));
+  if (!reason) return null;
+  const characters = Array.from(reason);
+  return characters.length > SIGN_IN_REASON_LIMIT
+    ? `${characters.slice(0, SIGN_IN_REASON_LIMIT - 1).join("")}…`
+    : reason;
+}
 
 export function providerFailure(cause: unknown): ProviderClientOperationError {
   return cause instanceof ProviderClientOperationError ? cause : new ProviderClientOperationError({ cause });

@@ -1,4 +1,4 @@
-// Runs the real `antigravity` provider driver against a fake Antigravity ACP server, to check that
+// Runs the real `antigravity` provider driver against a fake Antigravity CLI 1.5.4, to check that
 // each `session/new`, `session/load` and `session/resume` request asks Antigravity to remove its
 // `schedule` and `run_workflow` tools. A load or resume sends the filter again, so a session that an
 // earlier release opened also gets it. The model catalog probe sends no prompt, and it opens outside the
@@ -9,7 +9,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentClient } from "../src/backend/agent-client";
-import { type AgentCliInfo, ANTIGRAVITY_MANIFEST } from "../src/backend/cli";
+import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { readJsonl, startThread, stopClients } from "./provider-fakes/host";
@@ -22,6 +22,10 @@ const DISABLED = ["schedule", "run_workflow"];
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4" + NL);
+  process.exit(0);
+}
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 const models = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
 function handle(message) {
@@ -67,14 +71,15 @@ interface Report {
 const report: Report = { passed: false, cases: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-filter-e2e-"));
 const clients: AgentClient[] = [];
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 
 try {
-  const executable = join(root, "agy", "1.4.5", "bin", "agy_acp_server");
-  await mkdir(join(root, "agy", "1.4.5", "bin"), { recursive: true });
-  await writeFile(join(root, "agy", "1.4.5", ANTIGRAVITY_MANIFEST), JSON.stringify({ version: "1.4.5" }));
+  const executable = join(root, "agy", "1.5.4", "bin", "antigravity");
+  await mkdir(join(root, "agy", "1.5.4", "bin"), { recursive: true });
   await writeFile(executable, FAKE_AGY);
   await chmod(executable, 0o755);
-  const cli: AgentCliInfo = { executable, version: "1.4.5", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
   const workspace = join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 

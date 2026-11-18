@@ -271,6 +271,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Each start of the stand-in Claude CLI for a session: its pid and its session arguments. */

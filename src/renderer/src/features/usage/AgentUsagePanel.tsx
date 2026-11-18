@@ -7,7 +7,6 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  ArrowLeft,
   Button,
   ErrorReference,
   IconButton,
@@ -29,10 +28,13 @@ import {
   usagePeriodLabels,
   usagePeriods,
 } from "@openbot/ui/features/usage/usage-format";
+import { PageHeader } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { createPageHeaderFrame } from "../window/page-header-frame";
 import { type UsagePort, usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
@@ -44,6 +46,8 @@ interface AgentUsagePanelProps {
   onBack: () => void;
   /** The web client reads the host through its own connection. The default is the desktop bridge. */
   port?: UsagePort;
+  /** The machine use of the server, before the filters. The desktop app shows it to owners and admins. */
+  machine?: JSX.Element;
 }
 interface UsageState {
   range: HostAnalyticsInput;
@@ -178,20 +182,18 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     };
   };
   let reportBody: HTMLDivElement | undefined;
-  let heading: HTMLHeadingElement | undefined;
-  onSettled(() => heading?.focus());
+  const headerFrame = createPageHeaderFrame();
   return (
     <section class="agent-usage" aria-label={t("usage.panel.label")}>
-      <header class="agent-usage-header">
-        <div class="agent-usage-identity">
-          <IconButton variant="ghost" label={t("common.back")} onClick={props.onBack}>
-            <ArrowLeft />
-          </IconButton>
-          <h2 ref={heading} tabindex={-1}>
-            {t("usage.panel.title")} <span aria-hidden="true">/</span> <span>{props.hostName}</span>
-          </h2>
-        </div>
+      <PageHeader
+        class="agent-usage-header"
+        title={t("usage.panel.title")}
+        hostName={props.hostName}
+        onBack={props.onBack}
+        frame={headerFrame()}
+      >
         <div class="agent-usage-controls">
+          {props.machine}
           <Select
             options={[
               "all",
@@ -264,7 +266,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             <RefreshCw />
           </IconButton>
         </div>
-      </header>
+      </PageHeader>
       <div ref={reportBody} class="agent-usage-body">
         <Show when={state.phase === "loading"}>
           <div class="agent-usage-loading" role="status">

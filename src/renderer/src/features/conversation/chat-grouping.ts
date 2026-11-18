@@ -10,11 +10,13 @@
  */
 const CHAT_GROUPING_WINDOW_MS = 5 * 60_000;
 
-/** A row of a transcript, as the two fields the grouping rule reads. */
+/** A row of a transcript, as the fields the grouping rule reads. */
 export interface SenderRunRow {
   /** Who wrote the row. The agent chat carries "you" or "agent"; a channel carries an author id. */
   author: string;
   createdAt?: string;
+  /** The agent turn that wrote the row. The updates and the answer of one turn are one run. */
+  turnId?: string;
 }
 
 /** Do two messages fall close enough together to stay one block? An unreadable time says no. */
@@ -27,7 +29,8 @@ function withinGroupingWindow(previousIso: string | undefined, currentIso: strin
 }
 
 /**
- * Does this row continue the run above it, and so draw no time of its own?
+ * Does this row continue the run above it, and so draw no time of its own? Rows of one agent turn
+ * always do; other rows do when they come within the grouping window.
  *
  * `previous` is absent for the first row of the transcript, which always opens a run.
  * `previousDrawsTime` is false for a row that carries no time the reader can see, such as an
@@ -41,5 +44,7 @@ export function continuesSenderRun(
 ): boolean {
   if (previous === undefined || !options.previousDrawsTime || options.startsDay) return false;
   if (previous.author !== current.author) return false;
+  // A long step can keep an agent quiet for many minutes, but its next update is still the same turn.
+  if (previous.turnId !== undefined && previous.turnId === current.turnId) return true;
   return withinGroupingWindow(previous.createdAt, current.createdAt);
 }

@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "正在创建…",
   "mobile.onboarding.task.withoutTask": "不分配任务直接创建",
   "mobile.onboarding.task.failed": "无法创建助手，请重试。",
+  "mobile.onboarding.task.sendFailed": "第一个任务未发送，请在聊天中发送。",
   "mobile.onboarding.idea.builder1": "做一个小巧的待办清单网页应用。",
   "mobile.onboarding.idea.builder2": "举例讲讲 Git 分支是怎么工作的。",
   "mobile.onboarding.idea.builder3": "写个脚本，把我的照片按日期整理好。",

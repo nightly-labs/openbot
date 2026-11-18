@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isSecretName, type LogValue, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { isSecretName, type LogValue, redactText, registerSecretValue, toSecretSafeValue } from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -23,13 +23,17 @@ export function redactMcpSecrets(text: string, config: McpServerConfig): string 
  * A provider process keeps the credentials it was given until it stops, and the user can edit or
  * disable a server while that process still runs. Its stderr then quotes the old value, which the
  * new configuration no longer names. The caller retains what it handed over and passes it here.
+ * `rules` is `redactSecrets` for text that the agent reads back.
  */
-export function redactMcpValues(text: string, values: Iterable<string>): string {
-  return redactText(maskValues(text, values));
+export function redactMcpValues(text: string, values: Iterable<string>, rules = redactText): string {
+  return rules(maskValues(text, values));
 }
 
 /**
  * The same for a record that a provider sends, such as a notification or a history item.
+ *
+ * The record is the agent's own chat, so an email address stays, as `redactSecrets` keeps it: the
+ * user wrote it or needs to read it (#9988).
  *
  * The shared rules run first, so a key such as `refresh_token` is redacted before a known value can
  * change its name. Then each string, key and number is masked on its own. Masking the serialized
@@ -47,13 +51,21 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
     if (value === null || typeof value !== "object") return value;
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [maskValues(key, known), mask(entry)]));
   };
-  return mask(toLogValue(record));
+  return mask(toSecretSafeValue(record));
 }
+
+/**
+ * Setting words that are never a credential. A provider gets them as values, such as the GitHub
+ * connection's `useHttpPath=true`, and masking them changed `QA_READY=true` in an agent's answer to
+ * `QA_READY=•••`, so a workflow condition took the wrong branch (#10680). Shorter words, such as
+ * `yes`, `no`, `on` and `off`, are under the length limit already.
+ */
+const CONFIG_LITERALS = new Set(["true", "false", "null", "none"]);
 
 function maskValues(text: string, values: Iterable<string>): string {
   let result = text;
   for (const value of values) {
-    if (value.length < 4) continue;
+    if (value.length < 4 || CONFIG_LITERALS.has(value.toLowerCase())) continue;
     result = result.split(value).join(MASK);
   }
   return result;
@@ -86,12 +98,46 @@ export function registerMcpSecretValues(config: McpServerConfig): void {
 export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   const values = new Set<string>();
   for (const config of configs) {
-    for (const value of Object.values(mcpEnvironment(config))) values.add(value);
+    for (const [name, value] of Object.entries(mcpEnvironment(config))) {
+      if (!isInheritedProfileValue(name, value)) values.add(value);
+    }
     for (const pair of config.headers) values.add(pair.value);
     for (const value of urlQueryValues(config.url)) values.add(value);
   }
   // A short value is left alone - masking a two-character value would hide ordinary words.
   return [...values].filter((value) => value.length >= 4);
+}
+
+/**
+ * The variables that name this computer's user, its folders, and its search path. The Computer Use
+ * server inherits `HOME`, `USER` and `TMPDIR` (#4863). This computer's own value of one of them is
+ * not a credential, and masking `HOME` changes each path an agent writes, so a Shared file link no
+ * longer opens. A value that the user typed under one of these names stays masked.
+ */
+const USER_PROFILE_VARIABLES = new Set([
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "PATH",
+  "SHELL",
+  "USERNAME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "TEMP",
+  "TMP",
+  "SYSTEMROOT",
+  "WINDIR",
+]);
+
+/**
+ * Whether an MCP environment entry holds this computer's own value of a profile variable. The name
+ * is upper-cased for Windows; `process.env` is case-sensitive on macOS and Linux, so `user` there is
+ * a different variable and stays masked.
+ */
+export function isInheritedProfileValue(name: string, value: string): boolean {
+  return USER_PROFILE_VARIABLES.has(name.toUpperCase()) && process.env[name] === value;
 }
 
 /**

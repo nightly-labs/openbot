@@ -285,6 +285,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot auf {host} kann keine Telegram-Nachrichten empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
   "connector.telegram.helpError": "OpenBot kann diesen Chat nicht erreichen. Verbinde ihn erneut oder trenne den Chat.",
+  "connector.telegram.helpNotLinked":
+    "Dieser Chat ist nicht mit diesem Server verknüpft. Wähle „Neu verbinden“, um ihn zu verknüpfen.",
   "connector.telegram.retryAt": "Telegram hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "connector.telegram.pause": "Pausieren",
   "connector.telegram.resume": "Fortsetzen",
@@ -371,6 +373,8 @@ export const messages = {
     "WhatsApp hat diesen Server aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.helpError":
     "OpenBot kann WhatsApp unter dieser Nummer nicht erreichen. Verbinde sie erneut oder trenne die Nummer.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot kann die gespeicherten Schlüssel dieser Nummer nicht lesen. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.retryAt": "WhatsApp hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "connector.whatsapp.pause": "Pausieren",
   "connector.whatsapp.resume": "Fortsetzen",
@@ -385,7 +389,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Private Nummer",
   "connector.whatsapp.ownNumberDescription":
-    "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Schalte das für eine Nummer nur für OpenBot aus.",
+    "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
+  "connector.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+  "connector.whatsapp.statusReactions": "Status-Reaktionen",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp-Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Dieser Agent empfängt die Nachrichten für OpenBot von all deinen verknüpften Nummern. Kurze beantwortet er selbst, andere Aufgaben gibt er an den passenden Agenten weiter und antwortet in WhatsApp.",
@@ -404,10 +414,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Nummer",
   "connector.whatsapp.kindPersonal": "Meine private Nummer",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot antwortet nur dir in „Nachricht an dich selbst“ und den Personen, die du zulässt.",
+    "OpenBot antwortet nur dir in „Nachricht an dich selbst“ und den Personen, die du zulässt. Andere Personen bekommen keine Antwort.",
   "connector.whatsapp.kindDedicated": "Eine Nummer nur für OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Unbekannte Personen bekommen einen Code, den sie dir geben. Du genehmigst sie hier.",
+    "OpenBot antwortet von dieser Nummer jeder unbekannten Person mit einem Code, den sie dir gibt. Du genehmigst sie hier.",
   "connector.whatsapp.methodLabel": "Verknüpfungsart",
   "connector.whatsapp.methodQr": "QR-Code",
   "connector.whatsapp.methodCode": "Kopplungscode",
@@ -578,4 +588,74 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API-Schlüssel client_secret",
   "connector.bitwarden.masterPassword": "Master-Passwort",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description":
+    "Agents melden sich bei Websites mit den Zugangsdaten aus einem geteilten Proton-Pass-Tresor an.",
+  "connector.protonPass.descriptionHost":
+    "Agents auf {host} melden sich bei Websites mit den Zugangsdaten aus einem geteilten Proton-Pass-Tresor an.",
+  "connector.protonPass.connect": "Verbinden",
+  "connector.protonPass.moreWays": "Weitere Verbindungswege",
+  "connector.protonPass.useKey": "Zugriffsschlüssel verwenden",
+  "connector.protonPass.keyLabel": "Zugriffsschlüssel",
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Einrichten",
+  "connector.protonPass.setupDescription":
+    "Verbinden öffnet die Proton-Anmeldung im Browser. Dann erstellt OpenBot den geteilten Tresor und behält nur einen Schlüssel mit Lesezugriff.",
+  "connector.protonPass.setupDescriptionHost":
+    "Verbinden öffnet die Proton-Anmeldung im Browser. Dann erstellt {host} den geteilten Tresor und behält nur einen Schlüssel mit Lesezugriff.",
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup":
+    "OpenBot erstellt diesen Tresor beim Verbinden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",
+  "connector.protonPass.showSteps": "Schritte zeigen",
+  "connector.protonPass.stepsLabel": "Verbindungsschritte",
+  "connector.protonPass.stepSignIn": "Anmelden",
+  "connector.protonPass.stepVault": "Geteilten Tresor erstellen",
+  "connector.protonPass.stepDone": "Fertig",
+  "connector.protonPass.signInTitle": "Bei Proton anmelden",
+  "connector.protonPass.signInStarting": "OpenBot startet die Anmeldung. Die Proton-Seite öffnet sich im Browser.",
+  "connector.protonPass.signInDescription":
+    "Die Anmeldung ist im Browser geöffnet. Proton fragt nach Ihrem Passwort und Ihrem zweiten Faktor.",
+  "connector.protonPass.signInDescriptionHost":
+    "Die Anmeldung für {host} ist im Browser geöffnet. Proton fragt nach Ihrem Passwort und Ihrem zweiten Faktor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass fragt nach Ihrem zusätzlichen Passwort.",
+  "connector.protonPass.extraPasswordWrong": "Das zusätzliche Passwort ist falsch. Geben Sie es erneut ein.",
+  "connector.protonPass.extraPasswordLabel": "Zusätzliches Passwort",
+  "connector.protonPass.continue": "Weiter",
+  "connector.protonPass.setupStepTitle": "Geteilter Tresor wird erstellt",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot erstellt den Tresor „{vault}“ und einen Schlüssel mit Lesezugriff dafür. Dann meldet es Ihre Proton-Sitzung ab.",
+  "connector.protonPass.doneTitle": "Proton Pass ist verbunden",
+  "connector.protonPass.doneDescription":
+    "Verschieben Sie Zugangsdaten nach „{vault}“, damit Agents sich damit anmelden können.",
+  "connector.protonPass.failedTitle": "Proton Pass ist nicht verbunden",
+  "connector.protonPass.copyLink": "Link kopieren",
+  "connector.protonPass.linkCopied": "Kopiert",
+  "connector.protonPass.openAgain": "Erneut öffnen",
+  "connector.protonPass.done": "Fertig",
+  "connector.protonPass.close": "Schließen",
+  "connector.protonPass.statusConnecting": "Verbinden",
+  "connector.protonPass.statusConnected": "Verbunden",
+  "connector.protonPass.statusExpired": "Schlüssel abgelaufen",
+  "connector.protonPass.expiredTitle": "Der Proton-Pass-Schlüssel ist abgelaufen",
+  "connector.protonPass.expiredDescription":
+    "Agents können sich erst wieder mit Ihren geteilten Zugangsdaten anmelden, wenn Sie sich erneut anmelden.",
+  "connector.protonPass.reconnect": "Neu verbinden",
+  "connector.protonPass.planTitle": "Proton Pass braucht einen bezahlten Plan",
+  "connector.protonPass.planDescription":
+    "Die Proton Pass CLI funktioniert nur mit einem bezahlten Proton-Plan. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
+  "connector.protonPass.vaultTitle": "Geteilter Tresor",
+  "connector.protonPass.vaultDescription":
+    "Agents können sich mit den Zugangsdaten in diesem Tresor anmelden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",
+  "connector.protonPass.loginCount": { one: "{count} Anmeldung", other: "{count} Anmeldungen" },
+  "connector.protonPass.loginsLoading": "Zugangsdaten werden gezählt…",
+  "connector.protonPass.keyExpires": "Nur Lesezugriff. Läuft am {date} ab.",
+  "connector.protonPass.keyExpired": "Nur Lesezugriff. Am {date} abgelaufen.",
+  "connector.protonPass.keyNoExpiry": "Nur Lesezugriff. Läuft nicht ab.",
+  "connector.protonPass.disconnectTitle": "Proton Pass trennen",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot löscht seinen Zugriffsschlüssel auf diesem Computer. Der Tresor und seine Zugangsdaten bleiben in Ihrem Proton-Konto.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot löscht seinen Zugriffsschlüssel auf {host}. Der Tresor und seine Zugangsdaten bleiben in Ihrem Proton-Konto.",
+  "connector.protonPass.disconnect": "Trennen",
+  "connector.protonPass.actionFailed": "OpenBot konnte die Proton-Pass-Verbindung nicht ändern.",
 } as const satisfies PartialTranslation<typeof source>;

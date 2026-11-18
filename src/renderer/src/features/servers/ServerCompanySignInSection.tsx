@@ -20,6 +20,7 @@ import {
   LogIn,
   SettingsSection,
   Text,
+  toast,
   X,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
@@ -84,11 +85,14 @@ function issuerHost(issuer: string): string {
 
 /**
  * Company sign-in in Members: one card with single sign-on and user sync, and a dialog for the
- * provider values. Only the owner of a published server sees it.
+ * provider values. Only the owner of a published server sees it. Where the app cannot manage it
+ * (the browser client), the card shows only the single sign-on row with no status, and Set up tells
+ * the owner to use the desktop app.
  */
 export function createServerCompanySignInSection(
   host: ServerSettingsSectionHost,
   calls: () => CompanySignInCalls | undefined,
+  download: () => (() => void) | undefined,
   visible: () => boolean,
 ) {
   const { t, errorMessage } = useText();
@@ -107,8 +111,9 @@ export function createServerCompanySignInSection(
     domains: "",
     test: { status: "idle" },
   });
-  const available = () =>
-    Boolean(calls()) && props.server.role === "owner" && configured() && published() && actionsAvailable();
+  const eligible = () => props.server.role === "owner" && configured() && published() && actionsAvailable();
+  const available = () => Boolean(calls()) && eligible();
+  const desktopOnly = () => (!calls() && eligible() ? download() : undefined);
   const connection = () => panel.settings?.connection ?? null;
   const enabled = () => connection()?.enabled === true;
   const serverId = () => props.server.id;
@@ -270,9 +275,42 @@ export function createServerCompanySignInSection(
       : t("server.companySignIn.testedStatus", { domains });
   }
 
+  function DesktopOnlyPanel() {
+    return (
+      <Show when={desktopOnly()}>
+        {(openDownload) => (
+          <SettingsSection title={t("server.companySignIn.title")}>
+            <ItemGroup class="settings-modal-card">
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{t("server.companySignIn.sso")}</ItemTitle>
+                  <ItemDescription>{t("server.companySignIn.dialogSubtitle")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() =>
+                      toast.info(t("server.companySignIn.desktopOnly"), {
+                        id: "company-sign-in-desktop-only",
+                        action: { label: t("common.download"), onClick: () => openDownload()() },
+                      })
+                    }
+                  >
+                    {t("server.companySignIn.setUp")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
+        )}
+      </Show>
+    );
+  }
+
   function Panel() {
     return (
-      <Show when={available() && (panel.settings || panel.loadError)}>
+      <Show when={available() && (panel.settings || panel.loadError)} fallback={<DesktopOnlyPanel />}>
         <SettingsSection title={t("server.companySignIn.title")}>
           <ItemGroup class="settings-modal-card">
             <Show

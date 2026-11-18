@@ -1,26 +1,36 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import {
   createRemoteCommandMailbox,
+  type RemoteDownloadProgress,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamDiagnostic,
+  type RemoteTeamEvent,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
+import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
+import { File, FileMode } from "expo-file-system";
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type {
@@ -29,6 +39,10 @@ import type {
   BrowserViewBridgeOpen,
   RemoteBrowserViewSession,
 } from "@/features/browser/model/browser-view-bridge";
+import type {
+  RemoteDesktopRelayCommand,
+  RemoteDesktopRelayEvent,
+} from "@/features/remote-desktop/model/remote-desktop-relay";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { referencedError } from "@/features/workspace/model/referenced-error";
@@ -37,14 +51,18 @@ import {
   createRequestLimiter,
   isBackgroundRead,
 } from "@/features/workspace/model/request-lanes";
+import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
-  connect(hostId: string, hostPublicKey: string): Promise<void>;
+  /** `kept`: the authenticated connection from before stays, and its event stream lost no event. */
+  connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
+  /** The phone moved to another network, such as from Wi-Fi to mobile data. The peer makes a new connection. */
+  networkChanged(): void;
   request<T>(
     method: string,
     path: string,
@@ -53,12 +71,38 @@ export interface RemoteTeamTransportRef {
     upload?: RemoteFileUpload,
     /** Hears the fraction of the uploaded file sent so far, from 0 to 1. */
     onUploadProgress?: (fraction: number) => void,
+    /** Lets one file larger than the attachment limit answer this request. */
+    largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file of `size` that answers this request. */
+    download?: RemoteDownloadWatch,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
     options: Omit<BrowserViewBridgeOpen, "viewId">,
     listener: (event: BrowserViewBridgeEvent) => void,
   ): RemoteBrowserViewSession | null;
+  /**
+   * A request whose answer the caller reads: the status, and a JSON body or a file as
+   * `{ name, mimeType, base64 }`. For the remote desktop viewer's own files, so it writes no support log line.
+   */
+  fetchRaw(
+    method: string,
+    path: string,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<{ status: number; body: unknown }>;
+  /** A socket of the remote desktop viewer. Null until the peer page is ready. */
+  openRemoteDesktopStream(path: string, listener: (event: RemoteDesktopRelayEvent) => void): RemoteDesktopStream | null;
+}
+
+/** What the remote desktop viewer uses of a connected peer. */
+export type RemoteDesktopConnection = Pick<RemoteTeamTransportRef, "fetchRaw" | "openRemoteDesktopStream">;
+
+/** One socket of the remote desktop viewer, through the peer's desktop channel. */
+export interface RemoteDesktopStream {
+  sendText(data: string): void;
+  sendBinary(base64: string): void;
+  close(code: number, reason: string): void;
 }
 
 interface RemoteTeamTransportProps {
@@ -71,13 +115,32 @@ interface RemoteTeamTransportProps {
   onMembershipChanged?: () => Promise<void>;
   /** The phone got a network again. */
   onNetworkRestored?: () => void;
-  onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
+  onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
 }
 
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
-  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+  | {
+      type: "request";
+      method: string;
+      path: string;
+      body: TeamProtocolV2Json;
+      upload?: RemoteFileUpload;
+      largeDownload?: RemoteLargeDownload;
+      downloadSize?: number;
+    };
+
+/**
+ * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
+ * ChatGPT on the host, no event connection, or a timeout. The screen translates it and removes
+ * secrets from it. A 500 of a start is a Codex failure on the host, whose reason stays in the host log.
+ */
+function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
+  if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
+  if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
+  return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
+}
 
 // One object, not a new one for each render.
 const BRIDGE_DOM: DOMProps = {
@@ -139,12 +202,26 @@ export const RemoteTeamTransport = memo(
       return true;
     }, []);
 
+    const desktopListeners = useRef(new Map<string, (event: RemoteDesktopRelayEvent) => void>());
+    const sendDesktopCommand = useCallback((command: RemoteDesktopRelayCommand) => {
+      // The handle has the method only after the page has registered it.
+      const remoteDesktop = bridge.current?.remoteDesktop;
+      if (typeof remoteDesktop !== "function") return false;
+      remoteDesktop(command);
+      return true;
+    }, []);
+
     // Upload progress arrives from the web view by command ID, while the command is still pending.
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
+    // Download progress arrives the same way, for a request that names the size of its file.
+    const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
+    // The page reads only the device files of the uploads that wait for a result, by count of commands.
+    const uploadFiles = useRef(new Map<string, number>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
         onUploadProgress?: (fraction: number) => void,
+        onDownloadProgress?: (received: number, total: number) => void,
       ): Promise<RemoteTeamCommandResult> => {
         const id = Crypto.randomUUID();
         const command: RemoteTeamCommand =
@@ -158,15 +235,31 @@ export const RemoteTeamTransport = memo(
                   path: next.path,
                   body: next.body,
                   upload: next.upload,
-                  // The transfer file is the one answer larger than an attachment.
+                  // As on desktop and web: a read that makes the server usable fails in seconds, so a
+                  // dead path does not keep the connection attempt running for the 10 min request limit.
+                  timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
+                  // The transfer file, and a large file that the user asked for, can be larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
-                    : {}),
+                    : next.largeDownload
+                      ? { largeDownload: next.largeDownload }
+                      : {}),
+                  ...(next.downloadSize === undefined ? {} : { downloadSize: next.downloadSize }),
                 }
               : { id, type: "disconnect" };
-        if (!onUploadProgress) return mailbox.send(command);
-        uploadListeners.current.set(id, onUploadProgress);
-        return mailbox.send(command).finally(() => uploadListeners.current.delete(id));
+        const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
+        if (!onUploadProgress && !onDownloadProgress && !fileRef) return mailbox.send(command);
+        if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
+        if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
+        if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
+        return mailbox.send(command).finally(() => {
+          uploadListeners.current.delete(id);
+          downloadListeners.current.delete(id);
+          if (!fileRef) return;
+          const count = (uploadFiles.current.get(fileRef) ?? 1) - 1;
+          if (count > 0) uploadFiles.current.set(fileRef, count);
+          else uploadFiles.current.delete(fileRef);
+        });
       },
       [mailbox],
     );
@@ -182,6 +275,12 @@ export const RemoteTeamTransport = memo(
               result.error ?? currentText().t("mobile.workspace.error.connectFailed"),
               result.reference,
             );
+          return { kept: result.kept === true };
+        },
+        networkChanged: () => {
+          // The handle has the method only after the page has registered it.
+          const networkChanged = bridge.current?.networkChanged;
+          if (typeof networkChanged === "function") networkChanged(null);
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
@@ -198,15 +297,26 @@ export const RemoteTeamTransport = memo(
           body: TeamProtocolV2Json = {},
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
+          largeDownload?: RemoteLargeDownload,
+          download?: RemoteDownloadWatch,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
+          const send = () =>
+            enqueue(
+              { type: "request", method, path, body, upload, largeDownload, downloadSize: download?.size },
+              onUploadProgress,
+              download?.onProgress,
+            );
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
           const time = `(${Date.now() - started} ms)`;
           if (!result.ok)
-            supportLog.add("warn", "connection", `${request} -> failed: ${result.error ?? "no error"} ${time}`);
+            supportLog.add(
+              "warn",
+              "connection",
+              `${request} -> failed: ${result.error ?? "no error"}${result.reference ? ` [${result.reference}]` : ""} ${time}`,
+            );
           else
             supportLog.add(
               result.status !== undefined && result.status >= 400 ? "warn" : "info",
@@ -218,12 +328,21 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
-          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.approval)
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === TEAM_API_ROUTES.respond.approval ||
+              path === PENDING_APPROVAL_ROUTES.read ||
+              path === PHONE_FEEDBACK_ROUTES.send)
+          )
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
-            throw referencedError(sourceText("error.remote.serverRequestFailed"), referenceFrom("http", result.status));
+            throw referencedError(
+              liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
+              referenceFrom("http", result.status),
+            );
           return decode(result.body);
         },
         openBrowserView: (options, listener) => {
@@ -244,15 +363,50 @@ export const RemoteTeamTransport = memo(
             },
           };
         },
+        fetchRaw: async (method, path, body = {}, upload) => {
+          const result = await enqueue({ type: "request", method, path, body, upload });
+          if (!result.ok)
+            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+          return { status: result.status ?? 200, body: result.body };
+        },
+        openRemoteDesktopStream: (path, listener) => {
+          const streamId = Crypto.randomUUID();
+          desktopListeners.current.set(streamId, listener);
+          if (!sendDesktopCommand({ type: "open", streamId, path })) {
+            desktopListeners.current.delete(streamId);
+            return null;
+          }
+          return {
+            sendText: (data) => {
+              if (desktopListeners.current.has(streamId)) sendDesktopCommand({ type: "text", streamId, data });
+            },
+            sendBinary: (base64) => {
+              if (desktopListeners.current.has(streamId)) sendDesktopCommand({ type: "binary", streamId, base64 });
+            },
+            close: (code, reason) => {
+              if (!desktopListeners.current.delete(streamId)) return;
+              sendDesktopCommand({ type: "close", streamId, code, reason });
+            },
+          };
+        },
       }),
-      [enqueue, sendViewCommand, backgroundLane],
+      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane],
     );
 
     // A page that loads again, such as after Android ends its renderer, has none of the commands.
     // The page takes later states from the handle only, so it gets the current one before its commands.
+    // A second load means that the system ended the page's web process, such as in the background.
+    const pageLoads = useRef(0);
     const handleReady = useCallback(async () => {
+      pageLoads.current += 1;
+      const outstanding = mailbox.outstanding();
+      supportLog.add(
+        "info",
+        "connection",
+        `${latest.current.props.hostId} page ready, load ${pageLoads.current}, ${outstanding.length} commands waiting`,
+      );
       sendActive(latest.current.props.active);
-      deliverCommands(mailbox.outstanding());
+      deliverCommands(outstanding);
     }, [sendActive, deliverCommands, mailbox]);
     const handleCommandResult = useCallback(
       async (result: RemoteTeamCommandResult) => {
@@ -279,7 +433,27 @@ export const RemoteTeamTransport = memo(
         sessionId: runTeamEffect(props.directory.startSession(props.hostId)).catch(() => null),
       };
     }, [props.active, props.hostId, props.directory]);
+    const uploadFile = (ref: string) => {
+      if (!uploadFiles.current.has(ref)) throw new Error("The file is not part of an upload.");
+      if (uploadCancelled(ref)) {
+        // The peer stops the transfer and tells the host, so the host does not wait for the rest.
+        const cancelUpload = bridge.current?.cancelUpload;
+        if (typeof cancelUpload === "function") cancelUpload(null);
+        throw new Error("The upload was cancelled.");
+      }
+      return new File(ref);
+    };
     const [actions] = useState(() => ({
+      digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
+      readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
+        const handle = uploadFile(ref).open(FileMode.ReadOnly);
+        try {
+          handle.offset = offset;
+          return bytesToBase64(await handle.readBytes(length));
+        } finally {
+          handle.close();
+        }
+      },
       endSession: (sessionId: string) => runTeamEffect(latest.current.props.directory.endSession(sessionId)),
       getBootstrap: async (hostId: string, clientPublicKey: string, existingSessionId: string | null) => {
         const { directory } = latest.current.props;
@@ -303,23 +477,29 @@ export const RemoteTeamTransport = memo(
       },
       onUploadProgress: async ({ commandId, sent, total }: RemoteUploadProgress) =>
         uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1),
+      onDownloadProgress: async ({ commandId, received, total }: RemoteDownloadProgress) =>
+        downloadListeners.current.get(commandId)?.(received, total),
       onAccountProfileChanged: () => latest.current.refreshProfile(),
       onBrowserViewEvent: async (event: BrowserViewBridgeEvent) => {
         const listener = viewListeners.current.get(event.viewId);
         if (event.type === "ended") viewListeners.current.delete(event.viewId);
         listener?.(event);
       },
+      onRemoteDesktopEvent: async (event: RemoteDesktopRelayEvent) => {
+        const listener = desktopListeners.current.get(event.streamId);
+        if (event.type === "closed") desktopListeners.current.delete(event.streamId);
+        listener?.(event);
+      },
       onAccountServersChanged: async () => latest.current.props.onMembershipChanged?.(),
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
       onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
         supportLog.add(
-          step === "failed" ? "warn" : "info",
+          step === "failed" || step === "stalled" || step === "signal-error" ? "warn" : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: AgentEvent | TeamRealtimeEvent) =>
-        latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
     }));
 
     return (

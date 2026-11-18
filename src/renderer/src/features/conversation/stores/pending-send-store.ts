@@ -25,6 +25,8 @@ export interface PendingSend {
   /** The host's id for the message, once it answered. The pending row stays until that row is drawn. */
   messageId: string | null;
   error: string | null;
+  /** The support reference of the failure, so a reason that says little can still be traced. */
+  errorReference: string | null;
   /** The host drops a second send with the same `clientMessageId`, so Retry cannot store it twice. */
   retrySafe: boolean;
   /** What the user said, for a voice message: a local draft that Retry sends again and Dismiss discards. */
@@ -34,6 +36,11 @@ export interface PendingSend {
    * so the chat shows it only when it fails.
    */
   queued: boolean;
+  /**
+   * A `queued` send that the host has not answered after a moment. The queue panel cannot show it
+   * yet, so the chat does: a message is never out of view while a slow host answers.
+   */
+  late: boolean;
   /**
    * Sent while the agent was idle, and answered a moment ago. The host queues each message before it
    * starts it, so for a short time the chat keeps this row and the queue panel does not show it.
@@ -51,6 +58,12 @@ const RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 /** How long a send made while the agent was idle may wait to start before the queue panel shows it. */
 const START_GRACE_MS = 3000;
+
+/**
+ * How long a send made while the agent works stays out of the chat. A host that answers in this
+ * time shows it in the queue panel, so it does not show in the chat for a moment and then move.
+ */
+const QUEUED_REVEAL_MS = 400;
 
 /** Whether Retry cannot store the message twice: the host drops a repeat, and its window is still open. */
 export function pendingSendRetrySafe(send: PendingSend, now = Date.now()): boolean {
@@ -88,14 +101,15 @@ export function createPendingSendStore() {
     if (next?.state !== "waiting" || !deliver) return;
     next.state = "sending";
     next.error = null;
+    next.errorReference = null;
     publish(key);
     void deliver({ ...next })
       .catch((error: unknown) => {
         // An error with no message of its own leaves the reason empty; the status label says enough.
-        const { t, errorMessage } = currentText();
+        const { t, errorDetails } = currentText();
         const fallback = t("chat.send.failed");
-        const message = errorMessage(error, fallback);
-        return { error: message === fallback ? null : message };
+        const details = errorDetails(error, fallback);
+        return { error: details.message === fallback ? null : details.message, reference: details.reference };
       })
       .then((result) => {
         // Dismissed while in flight: nothing is left to update.
@@ -114,6 +128,7 @@ export function createPendingSendStore() {
         } else {
           next.state = "failed";
           next.error = result.error;
+          next.errorReference = result.reference ?? null;
         }
         publish(key);
         pump(key);
@@ -132,14 +147,22 @@ export function createPendingSendStore() {
       queued: false,
       ...input,
       starting: false,
+      late: false,
       clientMessageId: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       state: "waiting",
       messageId: null,
       error: null,
+      errorReference: null,
     };
     deliverers.set(send.clientMessageId, deliver);
     queues.set(key, [...(queues.get(key) ?? []), send]);
+    if (send.queued)
+      window.setTimeout(() => {
+        if (find(key, send.clientMessageId) !== send || send.state === "sent") return;
+        send.late = true;
+        publish(key);
+      }, QUEUED_REVEAL_MS);
     publish(key);
     pump(key);
   }
@@ -156,6 +179,7 @@ export function createPendingSendStore() {
     }
     send.state = "waiting";
     send.error = null;
+    send.errorReference = null;
     publish(key);
     pump(key);
   }
@@ -222,5 +246,7 @@ export function pendingSendMessage(send: PendingSend): AgentMessage {
     createdAt: send.createdAt,
     replyToMessageId: send.draft.replyToMessageId,
     attachments: send.draft.attachments,
+    // The user's own message rises into the chat when it is sent, as Grok Bot's does. Each id enters once.
+    animate: true,
   };
 }

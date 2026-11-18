@@ -8,15 +8,18 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_FLOW_STEP_STATUSES,
+  ROUTINE_RUN_SOURCES,
   type RoutineFlowLink,
   type RoutineFlowPosition,
   type RoutineFlowStep,
   type RoutineFlowStepStatus,
+  type RoutineRun,
   type RoutineRunStatus,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { databaseRow, databaseRows, placeholders } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-graph";
 
@@ -24,7 +27,7 @@ import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-gra
 export class RoutineFlowError extends Error {}
 
 /** The parts of a routine run the runtime reads to continue its flow. */
-export interface RoutineFlowRun {
+export interface RoutineFlowRun extends Pick<RoutineRun, "kind" | "source"> {
   id: string;
   routineId: string;
   agentId: string;
@@ -335,17 +338,7 @@ export class RoutineFlowStore {
   }
 
   #transaction<T>(work: () => T): T {
-    const db = this.#database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = work();
-      db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(this.#database.connection, work);
   }
 }
 
@@ -392,6 +385,8 @@ function toRun(row: DynamicRecord): RoutineFlowRun {
     id: String(row.run_id),
     routineId: String(row.routine_id),
     agentId: String(row.agent_id),
+    kind: row.run_kind === "scheduled" ? "scheduled" : "manual",
+    ...(isOneOf(ROUTINE_RUN_SOURCES, row.run_source) ? { source: row.run_source } : {}),
     routineName: String(row.routine_name),
     scheduledFor: String(row.scheduled_for),
     instruction: String(row.instruction),

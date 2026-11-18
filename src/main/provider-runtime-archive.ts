@@ -13,6 +13,14 @@ import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 const execFileAsync = promisify(execFile);
 
 const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
+/**
+ * The tar program for runtime archives. On Windows, a bare `tar` can find the GNU tar of Git for
+ * Windows, MSYS2 or Cygwin before the Windows one, and GNU tar reads `C:\...` as a remote host.
+ */
+export function tarExecutable(): string {
+  if (process.platform !== "win32") return "tar";
+  return join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", "tar.exe");
+}
 /** tar writes `./` before each name when the archive was made from `.`. */
 export function archiveEntryName(name: string): string {
   return name.replace(/^(?:\.\/)+/u, "");
@@ -47,10 +55,14 @@ export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(
   const [{ stdout: namesValue }, { stdout: detailsValue }] = yield* Effect.all(
     [
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
       ),
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tvzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tvzf", path], {
+          encoding: "utf8",
+          maxBuffer: MAX_ARCHIVE_LIST_BYTES,
+          signal,
+        }),
       ),
     ],
     { concurrency: "unbounded" },
@@ -92,7 +104,7 @@ export const extractArchive = Effect.fn("ProviderArchive.extractArchive")(functi
   destination: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* runtimeIO((signal) =>
-    execFileAsync("tar", ["-xzf", archive, "-C", destination, "--no-same-owner"], {
+    execFileAsync(tarExecutable(), ["-xzf", archive, "-C", destination, "--no-same-owner"], {
       encoding: "utf8",
       maxBuffer: MAX_ARCHIVE_LIST_BYTES,
       signal,
@@ -219,10 +231,12 @@ const readZipDirectoryEffect = Effect.fn("ProviderArchive.readZipDirectory")(fun
     offset += 46 + nameBytes + extraBytes + commentBytes;
     // Unix is host 3; its mode is the high half of the external attributes. A link or device is
     // refused here, as `assertSafeArchive` refuses one in a tarball. A name that ends in `/` is a
-    // folder, and holds no data.
+    // folder, and holds no data. A mode with no type bits is a file: the Antigravity CLI 1.5.x
+    // Windows zip stores `antigravity.exe` as 0600 only, and unzip tools read it as a file.
     const folder = entry.name.endsWith("/");
     const type = folder ? ZIP_UNIX_DIRECTORY : ZIP_UNIX_REGULAR_FILE;
-    if (madeBy === 3 && unixMode !== 0 && (unixMode & ZIP_UNIX_TYPE_MASK) !== type) {
+    const unixType = unixMode & ZIP_UNIX_TYPE_MASK;
+    if (madeBy === 3 && unixType !== 0 && unixType !== type) {
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveSpecialFile")) });
     }
     if (folder && entry.bytes !== 0)

@@ -1,12 +1,34 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentEvent,
-  AskSideQuestionInput,
-  AttachmentImportEvent,
-  AttachmentSummary,
-  TeamRealtimeEvent,
+import {
+  type AgentEvent,
+  type AskSideQuestionInput,
+  type AttachmentImportEvent,
+  type AttachmentSummary,
+  decodeSaveSkillSuggestionResult,
+  type SaveSkillSuggestionInput,
+  STORAGE_CAPABILITY,
+  type TeamRealtimeEvent,
+  type TestRoutineInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import {
+  decodeRoutineRunCommandResponse,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  ROUTINE_RUN_COMMAND_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -32,11 +54,21 @@ import {
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
+import type { SkillCatalogCalls } from "../../skills-port";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import type { FilesPort } from "../files/files-port";
+import {
+  webAgentFoldersApi,
+  webAgentInstructionsApi,
+  webAgentMemoriesApi,
+  webAgentMemoryLimit,
+  webRoutineResultsCalls,
+} from "./web-agent-settings";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import { webBrowserProfileCalls } from "./web-browser-profiles";
+import { useWebLiveVoice, webLiveVoicePort } from "./web-live-voice";
 import { webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -52,6 +84,9 @@ function webHostAdmin(
   routineRecoveryEnabled?: () => boolean,
   webhookTestsEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
+  routinesOnceEnabled?: () => boolean,
+  routinePauseReasonsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -59,6 +94,9 @@ function webHostAdmin(
     () => routineRecoveryEnabled?.() === true,
     () => webhookTestsEnabled?.() === true,
     () => webhookSenderSecretEnabled?.() === true,
+    () => routineRunPlaceEnabled?.() === true,
+    () => routinesOnceEnabled?.() === true,
+    () => routinePauseReasonsEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -130,9 +168,24 @@ export function createWebConversationRuntime(
   webhookTestsEnabled?: () => boolean,
   browserProfilesEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
+  browserProxiesEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
+  skillLearningEnabled?: () => boolean,
+  /** Whether the connected host advertises the capability. */
+  hasCapability?: (capability: string) => boolean,
+  /** Whether the connected host advertises the capability and this user is its owner or admin. */
+  canAdminister?: (capability: string) => boolean,
+  /** The storage calls of the connected host, which Server settings > Storage also uses. */
+  storageCalls?: () => FilesPort,
+  /** The marketplace skills catalog of the account service that serves this page. */
+  skillCatalog?: () => SkillCatalogCalls,
 ): ConversationRuntime {
+  const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
+  const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
+  const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
   // at a time. Each chat sends on its own while another chat imports, so a second import fails, as a
@@ -257,15 +310,24 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => {
     void cancelImportFiles();
     attachmentMedia.dispose();
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
+  const browserProfiles = adminRequest
+    ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
+    : undefined;
   const listLevels = remote.listAgentNotificationLevels;
+  const agentMemories = adminRequest
+    ? webAgentMemoriesApi(adminRequest, onHostEvent, (capability) => hasCapability?.(capability) === true)
+    : undefined;
+  const agentFolders = adminRequest ? webAgentFoldersApi(adminRequest) : undefined;
+  const agentInstructions = adminRequest ? webAgentInstructionsApi(adminRequest) : undefined;
+  const routineResults = adminRequest ? webRoutineResultsCalls(adminRequest) : undefined;
+  const agentMemoryLimit = adminRequest ? webAgentMemoryLimit(adminRequest) : undefined;
+  const administers = (capability: string) => canAdminister?.(capability) === true;
   return {
     agent: {
       ...messageLinks,
@@ -356,6 +418,8 @@ export function createWebConversationRuntime(
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
+      startTeach: (tabId) => remote.startBrowserTeach(tabId),
+      stopTeach: (input) => remote.stopBrowserTeach(input),
       setVisible: async () => {},
     },
     voice: {
@@ -371,6 +435,15 @@ export function createWebConversationRuntime(
       onStreamTranscript: () => () => {},
     },
     openUrl: openWebLink,
+    // Any member who can chat with the agent can talk to it, so the request is not limited to an admin.
+    get liveVoice() {
+      if (!adminRequest || !onHostEvent || hasCapability?.(LIVE_VOICE_CAPABILITY) !== true || !webLiveVoice())
+        return undefined;
+      return webLiveVoicePort(adminRequest, onHostEvent);
+    },
+    get skillCatalog() {
+      return skillCatalog?.();
+    },
     // Any member can ask, so the request is not limited to an admin.
     get askSideQuestion() {
       if (!adminRequest || sideQuestionEnabled?.() !== true) return undefined;
@@ -381,6 +454,50 @@ export function createWebConversationRuntime(
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
+    },
+    // Only the owner can press Remove (the timeline checks the role); the host checks it again.
+    get withdrawFeedback() {
+      if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
+      return async (input: { agentId: string; messageId: string }) =>
+        adminRequest()("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
+        });
+    },
+    // A member who can chat with the agent can press Save; the host checks the level.
+    get saveSkillSuggestion() {
+      if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
+      return async (input: SaveSkillSuggestionInput) =>
+        adminRequest()("POST", SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
+        });
+    },
+    agentMemories,
+    get agentFolders() {
+      return administers(AGENT_FOLDERS_CAPABILITY) ? agentFolders : undefined;
+    },
+    get agentInstructions() {
+      return administers(AGENT_INSTRUCTIONS_CAPABILITY) ? agentInstructions : undefined;
+    },
+    get routineResultCalls() {
+      return administers(ROUTINE_RESULTS_CAPABILITY) ? routineResults : undefined;
+    },
+    // The command runs in a shell on the host, so the host gives it to an owner or admin only.
+    get routineRunCommand() {
+      if (!adminRequest || !administers(ROUTINE_RUN_COMMAND_CAPABILITY)) return undefined;
+      return async (input: TestRoutineInput) =>
+        adminRequest()("POST", ROUTINE_RUN_COMMAND_ROUTES.command, decodeRoutineRunCommandResponse, {
+          agentId: input.agentId,
+          routineId: input.routineId,
+        });
+    },
+    get agentMemoryLimit() {
+      return administers(AGENT_MEMORY_LIMIT_CAPABILITY) ? agentMemoryLimit : undefined;
+    },
+    // Every member reads the files; the host lets only an owner or admin delete them.
+    get storageCalls() {
+      return hasCapability?.(STORAGE_CAPABILITY) === true ? storageCalls?.() : undefined;
     },
     // Any member keeps an own level for each agent. The panel asks only a host with the capability.
     agentNotificationLevels: listLevels ? { list: () => listLevels(hostId()) } : undefined,
@@ -398,7 +515,12 @@ export function createWebConversationRuntime(
     // `request()` names the connected host at call time, so a host switch reaches the new host.
     routines: adminRequest
       ? {
-          ...teamAgentRoutinesApi((...args) => adminRequest()(...args)),
+          ...teamAgentRoutinesApi(
+            (...args) => adminRequest()(...args),
+            () => routineRunPlaceEnabled?.() === true,
+            routinesOnceEnabled,
+            routinePauseReasonsEnabled,
+          ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
               if (event.type === "routines-changed") listener(event);
@@ -414,6 +536,9 @@ export function createWebConversationRuntime(
           routineRecoveryEnabled,
           webhookTestsEnabled,
           webhookSenderSecretEnabled,
+          routineRunPlaceEnabled,
+          routinesOnceEnabled,
+          routinePauseReasonsEnabled,
         )
       : undefined,
   };

@@ -144,3 +144,20 @@ export function applyMcpFlow(
     ? { ...base, env: [...kept(base.env), ...written] }
     : { ...base, headers: [...kept(base.headers), ...written] };
 }
+
+/**
+ * The key flow that saved `config`: the row holds the header, or for a stdio server the variable,
+ * that a field of the flow names. A row that a sign-in saved holds none of them.
+ */
+export function savedKeyFlow(
+  flows: readonly McpConnectFlow[] | null | undefined,
+  config: McpServerConfig,
+): McpKeyFlow | null {
+  const stdio = config.transport === "stdio";
+  const pairs = stdio ? config.env : config.headers;
+  const holds = (field: McpAuthField) => {
+    const key = stdio ? field.env : field.header;
+    return Boolean(key) && pairs.some((pair) => pair.key === key);
+  };
+  return (flows ?? []).find((flow): flow is McpKeyFlow => flow.kind === "key" && flow.fields.some(holds)) ?? null;
+}

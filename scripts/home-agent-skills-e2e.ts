@@ -1,14 +1,15 @@
 // Every provider can use the skills in `~/.agents/skills` (nightly-labs/openbot#3204).
 // A temporary HOME holds two skills; `npx skills` also linked one of them into `~/.claude/skills`.
-// - The real Claude Agent SDK starts a stand-in Claude executable that records its arguments: the
-//   session gets an `agents` plugin with the skill that Claude does not read already.
+// - The real Claude Agent SDK starts a stand-in Claude executable that records its arguments. With the
+//   user's Claude Code setup off (the default), the session gets only the sign-in keys of
+//   `~/.claude/settings.json`. With it on, it gets an `agents` plugin with the skill that Claude does not read already.
 // - The installed Claude CLI, when there is one, loads that plugin and lists `agents:<name>`.
 // - Antigravity gets the skills in its developer instructions; Codex, which reads the folder, does not.
 // - The `$` list adds the home skill, and its tag names the skill's SKILL.md for the provider only.
 // `bun run test:home-skills`; exit 0 = all pass. Writes .openbot-build/home-agent-skills-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { type AgentSummary, DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
@@ -19,6 +20,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { listHomeSkills } from "../src/backend/home-skills";
 import { listHomeFolderSkills } from "../src/main/skill-folder-discovery";
 
+const SIGN_IN_TOKEN = "e2e-sign-in-token";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/home-agent-skills-e2e");
 const ROOT_VARIABLE = "OPENBOT_HOME_SKILLS_E2E_ROOT";
 
@@ -36,6 +38,7 @@ if (!process.env[ROOT_VARIABLE]) {
 interface Report {
   passed: boolean;
   checks: {
+    signInSettings?: { apiKeyHelper: string; env: string[] };
     claudePlugin?: { plugin: string; linked: string[] };
     claudeCli?: { version: string; skills: string[] } | "skipped: no claude on PATH";
     instructions?: string;
@@ -46,7 +49,7 @@ interface Report {
 const report: Report = { passed: false, checks: {} };
 const realHome = process.env.OPENBOT_REAL_HOME;
 const root = process.env[ROOT_VARIABLE] ?? "";
-let client: ClaudeAgentClient | null = null;
+const clients: ClaudeAgentClient[] = [];
 
 async function writeSkill(directory: string, name: string, description: string): Promise<void> {
   await mkdir(directory, { recursive: true });
@@ -70,51 +73,104 @@ try {
     "The scan lists the valid skills and leaves out the one whose name is not its folder.",
   );
 
-  // The Claude session gets a plugin with the skill that `~/.claude/skills` does not hold.
-  const recorded = join(root, "claude-arguments.txt");
-  const executable = join(root, "claude");
+  // The user's Claude settings: the sign-in keys, and a plugin that an agent must not load by default.
   await writeFile(
-    executable,
-    `#!/bin/sh\nprintf '%s\\n' "$@" > "${recorded}.tmp"\nmv "${recorded}.tmp" "${recorded}"\nexec cat > /dev/null\n`,
+    join(home, ".claude", "settings.json"),
+    JSON.stringify({
+      env: { ANTHROPIC_BASE_URL: "https://gateway.example", ANTHROPIC_AUTH_TOKEN: SIGN_IN_TOKEN, SPEND_LIMIT: 5 },
+      apiKeyHelper: "/usr/local/bin/key-helper",
+      forceLoginMethod: "unknown-method",
+      enabledPlugins: { "personal@market": true },
+      hooks: { Stop: [] },
+    }),
   );
-  await chmod(executable, 0o755);
+
+  const executable = join(root, "claude");
   const workspace = join(root, "workspace");
   await mkdir(workspace);
   const state = join(root, "state");
-  client = new ClaudeAgentClient(
-    { executable, version: "2.1.310", source: "system" },
-    undefined,
-    undefined,
-    30_000,
-    () => [],
-    undefined,
-    undefined,
-    undefined,
-    state,
-    () => ({}),
+  /** Starts one Claude session through the real SDK and gives the arguments of the stand-in executable. */
+  async function claudeArguments(userSetup: boolean): Promise<string[]> {
+    for (const previous of clients.splice(0)) await runCauseEffect(previous.stop()).catch(() => undefined);
+    const recorded = join(root, `claude-arguments-${userSetup ? "on" : "off"}.txt`);
+    await writeFile(
+      executable,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > "${recorded}.tmp"\nmv "${recorded}.tmp" "${recorded}"\nexec cat > /dev/null\n`,
+    );
+    await chmod(executable, 0o755);
+    const client = new ClaudeAgentClient(
+      { executable, version: "2.1.310", source: "system" },
+      undefined,
+      undefined,
+      30_000,
+      () => [],
+      undefined,
+      undefined,
+      undefined,
+      state,
+      () => ({}),
+      undefined,
+      undefined,
+      () => userSetup,
+    );
+    clients.push(client);
+    client.start();
+    await runCauseEffect(client.request("thread/start", { cwd: workspace, persistSession: false }, (value) => value));
+    const text = await new Promise<string>((done, fail) => {
+      let expired = false;
+      const deadline = setTimeout(() => {
+        expired = true;
+        fail(new Error("The Claude process did not start."));
+      }, 10_000);
+      const poll = () =>
+        readFile(recorded, "utf8").then(
+          (value) => {
+            clearTimeout(deadline);
+            done(value);
+          },
+          () => {
+            if (!expired) setTimeout(poll, 50);
+          },
+        );
+      poll();
+    });
+    return text.split("\n");
+  }
+  // The SDK writes some flags as `--flag value` and others as `--flag=value`.
+  const flagValues = (argv: string[], flag: string) =>
+    argv.flatMap((value, index) => {
+      if (value === flag) return [argv[index + 1] ?? ""];
+      return value.startsWith(`${flag}=`) ? [value.slice(flag.length + 1)] : [];
+    });
+
+  // With the user's setup off (the default), the session keeps only the sign-in settings.
+  const offArgv = await claudeArguments(false);
+  assert.deepEqual(flagValues(offArgv, "--plugin-dir"), [], "No home skills plugin with the user's setup off.");
+  const offSources = flagValues(offArgv, "--setting-sources");
+  assert.equal(offSources.length, 1, "The session names its setting sources.");
+  assert.ok(!offSources.some((value) => value.split(",").includes("user")), "The user settings file is not a source.");
+  // The settings can hold keys: they go in a file that only this user can read, never on the command line.
+  assert.ok(!offArgv.some((value) => value.includes(SIGN_IN_TOKEN)), "No sign-in key is on the command line.");
+  const offSettings = flagValues(offArgv, "--settings");
+  assert.equal(offSettings.length, 1, "The sign-in settings go to the session as a flag settings file.");
+  const settingsFile = offSettings[0] ?? "";
+  assert.equal((await stat(settingsFile)).mode & 0o777, 0o600, "Only this user can read the settings file.");
+  const signInSettings = JSON.parse(await readFile(settingsFile, "utf8"));
+  assert.deepEqual(
+    signInSettings,
+    {
+      apiKeyHelper: "/usr/local/bin/key-helper",
+      env: { ANTHROPIC_BASE_URL: "https://gateway.example", ANTHROPIC_AUTH_TOKEN: SIGN_IN_TOKEN },
+    },
+    "Only the sign-in keys pass: no plugins, no hooks, no invalid login method, no value that is not text.",
   );
-  client.start();
-  await runCauseEffect(client.request("thread/start", { cwd: workspace, persistSession: false }, (value) => value));
-  const argumentsText = await new Promise<string>((done, fail) => {
-    let expired = false;
-    const deadline = setTimeout(() => {
-      expired = true;
-      fail(new Error("The Claude process did not start."));
-    }, 10_000);
-    const poll = () =>
-      readFile(recorded, "utf8").then(
-        (text) => {
-          clearTimeout(deadline);
-          done(text);
-        },
-        () => {
-          if (!expired) setTimeout(poll, 50);
-        },
-      );
-    poll();
-  });
-  const argv = argumentsText.split("\n");
-  const pluginDirectories = argv.flatMap((value, index) => (value === "--plugin-dir" ? [argv[index + 1] ?? ""] : []));
+  report.checks.signInSettings = { apiKeyHelper: signInSettings.apiKeyHelper, env: Object.keys(signInSettings.env) };
+
+  // The Claude session with the user's setup gets a plugin with the skill that `~/.claude/skills` does not hold.
+  const argv = await claudeArguments(true);
+  await assert.rejects(stat(settingsFile), "The settings file is deleted when its query closes.");
+  assert.deepEqual(flagValues(argv, "--settings"), [], "The user's setup loads the settings file itself.");
+  const pluginDirectories = flagValues(argv, "--plugin-dir");
   assert.equal(pluginDirectories.length, 1, "A Full access Claude session gets one plugin: the home skills.");
   const plugin = pluginDirectories[0] ?? "";
   const manifest = JSON.parse(await readFile(join(plugin, ".claude-plugin", "plugin.json"), "utf8"));
@@ -201,7 +257,7 @@ try {
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {
-  if (client) await runCauseEffect(client.stop()).catch(() => undefined);
+  for (const client of clients) await runCauseEffect(client.stop()).catch(() => undefined);
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 }

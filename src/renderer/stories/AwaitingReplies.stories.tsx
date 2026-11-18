@@ -64,10 +64,11 @@ export const AllReplied: Story = {
   },
 };
 
-/** A channel owner that waits for the sub-tasks it gave out. */
+/** A channel owner that waits for the sub-tasks it gave out. A sub-task that still works has Stop. */
 export const ChannelSubtasks: Story = {
   args: {
     title: "Waiting for sub-tasks",
+    onStop: fn(),
     items: [
       {
         id: "task-research",

@@ -20,6 +20,8 @@ The architecture notes are in one file for each topic:
   - [Browser client](architecture/browser.md#browser-client)
   - [Browser tool execution](architecture/browser.md#browser-tool-execution)
   - [Secure browser authentication](architecture/browser.md#secure-browser-authentication)
+- [Side panel](architecture/side-panel.md)
+  - [Side panel panes](architecture/side-panel.md#side-panel-panes)
 - [Computer Use and remote desktop](architecture/computer-use.md)
   - [Computer Use](architecture/computer-use.md#computer-use)
   - [Remote desktop permission checks and live tests](architecture/computer-use.md#remote-desktop-permission-checks-and-live-tests)

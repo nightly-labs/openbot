@@ -21,6 +21,7 @@ export function HiddenChatsScreen() {
     hiddenAgents,
     unhideAgent,
     hidesAgentsOnServer,
+    hiddenAgentsWorkOnServer,
     canUnhideAgent,
     hiddenChannelIds,
     unhideChannel,
@@ -67,7 +68,15 @@ export function HiddenChatsScreen() {
       id: channel.id,
       name: channel.name,
       href: { pathname: "/channel/[channelId]" as const, params: { channelId: channel.id, serverId: activeServer.id } },
-      avatar: <ChannelAvatar channel={channel} agents={members} size={46} disconnected={!showsOnline(activeServer)} />,
+      avatar: (
+        <ChannelAvatar
+          channel={channel}
+          agents={members}
+          size={46}
+          serverId={activeServer.id}
+          disconnected={!showsOnline(activeServer)}
+        />
+      ),
       show: () => {
         if (!unhideChannel(channel.id, activeServer.id)) return;
         void haptics.notification();
@@ -76,6 +85,10 @@ export function HiddenChatsScreen() {
     })),
   ];
   const synced = hidesAgentsOnServer(activeServer.id) || agentItems.some((item) => item.show === null);
+  const syncedKey = hiddenAgentsWorkOnServer(activeServer.id)
+    ? "mobile.agent.hidden.bodySyncedWorking"
+    : "mobile.agent.hidden.bodySynced";
+  const bodyKey = synced ? syncedKey : "mobile.agent.hidden.body";
 
   return (
     <SheetScrollView contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-7">
@@ -84,7 +97,7 @@ export function HiddenChatsScreen() {
           {t("mobile.agent.hidden.title")}
         </Typography.Heading>
         <Typography.Paragraph type="body-xs" align="center" className="text-text-secondary">
-          {t(synced ? "mobile.agent.hidden.bodySynced" : "mobile.agent.hidden.body")}
+          {t(bodyKey)}
         </Typography.Paragraph>
       </View>
 

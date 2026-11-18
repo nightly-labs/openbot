@@ -1,0 +1,33 @@
+{
+  "slug": "gojiberry",
+  "name": "Gojiberry",
+  "tagline": "B2B lead signals",
+  "description": "Gojiberry lets agents read B2B lead signals, enriched lead data, and campaign results in the signed-in Gojiberry account. Each user signs in to their own Gojiberry account through the browser.",
+  "category": "research",
+  "creatorName": "Gojiberry",
+  "iconUrl": "https://app.gojiberry.ai/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-leads", "text": "Which leads showed buying signals this week?" },
+    { "id": "prompt-lead-profile", "text": "Summarize what Gojiberry knows about the leads from Acme." },
+    { "id": "prompt-campaign-results", "text": "How are my active campaigns performing on replies?" }
+  ],
+  "apps": [
+    {
+      "id": "app-gojiberry-mcp",
+      "name": "Gojiberry",
+      "description": "Lead signal, enrichment, and campaign access, over Gojiberry's MCP server with browser sign-in.",
+      "iconUrl": "https://app.gojiberry.ai/favicon.ico",
+      "server": {
+        "name": "gojiberry",
+        "transport": "http",
+        "url": "https://mcp.gojiberry.ai",
+        "auth": [{ "id": "gojiberry-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://gojiberry.ai",
+  "privacyPolicyUrl": "https://gojiberry.ai/privacy-policy",
+  "termsUrl": "https://gojiberry.ai/general-terms"
+}

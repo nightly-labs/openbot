@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { type InstalledSkill, SKILL_CREATION_REQUEST } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
@@ -13,8 +13,9 @@ import { requestComposerFocus, requestComposerText } from "@/features/chat/model
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { haptics } from "@/shared/lib/haptics";
-import { nativeLabelFont } from "@/shared/lib/native-label-font";
+import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
@@ -227,6 +228,7 @@ function ManagedSkill({
   onUninstall: () => void;
 }) {
   const { t } = useText();
+  const nativeLabelFont = useNativeLabelFont();
   const { theme } = useUniwind();
   return (
     <SettingsSection>
@@ -237,7 +239,7 @@ function ManagedSkill({
           colorScheme={theme === "dark" ? "dark" : "light"}
         >
           {/* Older hosts send no `enabled`; such a skill is on. */}
-          <Switch
+          <AppSwitch
             label={skill.name}
             value={skill.enabled !== false}
             disabled={busy}

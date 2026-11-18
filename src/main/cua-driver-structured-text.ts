@@ -11,8 +11,9 @@
 // beside it. So the copy costs those providers no model tokens, and the providers that need it get
 // it.
 //
-// The structured result itself is never changed: the driver's proxy checks it against the tool's
-// output schema, and a result that fails the check reaches the agent as an error.
+// The structured result of a successful call is never changed: the driver's proxy checks it against
+// the tool's output schema, and a result that fails the check reaches the agent as an error. A
+// failed call only gets its reason added, which the proxy's refusal schema accepts.
 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
@@ -45,14 +46,27 @@ const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
  * One daemon answer line with the copy added, or `null` to pass the line on unchanged.
  *
  * The line is the daemon's own answer to a `call`: `{"ok":true,"result":{content, isError,
- * structuredContent}}`. Anything else - a refusal, an answer with no structured result, a line
- * that is not JSON - is `null`.
+ * structuredContent}}`, as `parseAnswerLine` reads it. A refusal or a failed tool result gets its
+ * reason in the structured result; see `refusalWithMessage` and `withErrorReason`. Anything else -
+ * an answer with no structured result - is `null`.
  */
-export function rewriteCallAnswer(line: string): string | null {
-  // A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
-  // cannot hold exactly. No field the driver sends is that large today, but an answer that has one
-  // is passed on unchanged rather than changed in a way nobody asked for. Only parsed numbers
-  // count: digits inside a string, such as a window title, are kept as they are.
+export function rewriteCallAnswer(parsed: DynamicRecord): string | null {
+  if (parsed.ok === false) return refusalWithMessage(parsed);
+  if (parsed.ok !== true) return null;
+  const copied = withStructuredText(parsed.result);
+  const result = withErrorReason(copied ?? parsed.result) ?? copied;
+  return result ? JSON.stringify({ ...parsed, result }) : null;
+}
+
+/**
+ * One daemon answer line as an object, or `null` when it cannot be changed without loss.
+ *
+ * A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
+ * cannot hold exactly. No field the driver sends is that large today, but an answer that has one
+ * is passed on unchanged rather than changed in a way nobody asked for. Only parsed numbers
+ * count: digits inside a string, such as a window title, are kept as they are.
+ */
+export function parseAnswerLine(line: string): DynamicRecord | null {
   let unsafeInteger = false;
   let parsed: unknown;
   try {
@@ -63,9 +77,59 @@ export function rewriteCallAnswer(line: string): string | null {
   } catch {
     return null;
   }
-  if (unsafeInteger || !isDynamicRecord(parsed) || parsed.ok !== true) return null;
-  const result = withStructuredText(parsed.result);
-  return result ? JSON.stringify({ ...parsed, result }) : null;
+  return !unsafeInteger && isDynamicRecord(parsed) ? parsed : null;
+}
+
+/**
+ * A failed tool result with its text also in `structuredContent` as `message`, or `null` when it
+ * already has a `message` or has no text.
+ *
+ * A tool can fail with only text, such as the `foreground_unavailable` reason of a Windows desktop
+ * click (#6295). The proxy then sends `{"code":"tool_invocation_failed"}` as the structured result,
+ * and Codex shows the model that alone, as with a refused call (`refusalWithMessage`). The code is
+ * added only when no `code`, `refusal` or `status` is present, as the proxy does. The text items do
+ * not change, so the copy that `withStructuredText` added does not repeat the reason.
+ */
+function withErrorReason(result: unknown): DynamicRecord | null {
+  if (!isDynamicRecord(result) || result.isError !== true || !Array.isArray(result.content)) return null;
+  const structured = result.structuredContent ?? {};
+  if (!isDynamicRecord(structured) || Object.hasOwn(structured, "message")) return null;
+  const message = textItems(result.content)
+    .filter((text) => text.length > 0 && !text.startsWith(STRUCTURED_TEXT_LABEL))
+    .join("\n");
+  if (message.length === 0) return null;
+  const marked = ["code", "refusal", "status"].some((key) => Object.hasOwn(structured, key));
+  const code = marked ? {} : { code: "tool_invocation_failed" };
+  return { ...result, structuredContent: { ...structured, ...code, message } };
+}
+
+/**
+ * A refused call as the tool result the proxy would make of it, with the reason also in
+ * `structuredContent`, or `null` when the refusal names no reason.
+ *
+ * The daemon refuses a call with `{"ok":false,"error":…,"exit_code":…}`, and the proxy puts the
+ * reason only in the text and sends `{"code":"tool_invocation_failed","exit_code":…}` as the
+ * structured result. Codex shows the model that structured result alone, so the agent read only
+ * the code and could not see why the call failed, such as an ended session it could start again.
+ * This answer gives the proxy the same text, `isError` and code, and adds the reason as `message`.
+ * The proxy keeps an error result that has a `code` as it is, and its output schema accepts other
+ * fields beside the code.
+ */
+function refusalWithMessage(answer: DynamicRecord): string | null {
+  const { error, exit_code: exitCode } = answer;
+  if (typeof error !== "string" || error.length === 0) return null;
+  return JSON.stringify({
+    ok: true,
+    result: {
+      content: [{ type: "text", text: error }],
+      isError: true,
+      structuredContent: {
+        exit_code: typeof exitCode === "number" ? exitCode : 1,
+        code: "tool_invocation_failed",
+        message: error,
+      },
+    },
+  });
 }
 
 /**
@@ -79,13 +143,17 @@ function withStructuredText(result: unknown): DynamicRecord | null {
   if (!isDynamicRecord(result) || !Array.isArray(result.content)) return null;
   const structured = result.structuredContent;
   if (!isDynamicRecord(structured)) return null;
-  const texts = result.content.flatMap((item) =>
-    isDynamicRecord(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : [],
-  );
+  const texts = textItems(result.content);
   if (texts.some((text) => text.startsWith(STRUCTURED_TEXT_LABEL))) return null;
   const copy = compactCopy(structured, texts);
   if (Object.keys(copy).length === 0) return null;
   return { ...result, content: [...result.content, { type: "text", text: structuredText(copy) }] };
+}
+
+function textItems(content: readonly unknown[]): string[] {
+  return content.flatMap((item) =>
+    isDynamicRecord(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : [],
+  );
 }
 
 /**

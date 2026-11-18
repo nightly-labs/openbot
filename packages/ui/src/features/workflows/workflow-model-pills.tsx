@@ -28,7 +28,14 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { type PickerChip, PickerMenu, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
+import {
+  createPickerFades,
+  type PickerChip,
+  PickerMenu,
+  type PickerOption,
+  PickerRow,
+  pickerMatches,
+} from "./WorkflowPicker";
 import { Hint, useBoard } from "./workflow-board";
 import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model";
 import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
@@ -80,6 +87,8 @@ function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip
 export function ModelPill(props: {
   provider: WfProvider;
   value: AgentModelId;
+  /** The text of the pill while the step saves no model (`value` is empty) and the host chooses one. */
+  placeholder?: string;
   disabled?: boolean;
   onChange: (model: AgentModelId, provider: WfProvider) => void;
 }) {
@@ -92,7 +101,11 @@ export function ModelPill(props: {
   const [tab, setTab] = createSignal<AgentProviderRef>(untrack(() => props.provider));
   const [query, setQuery] = createSignal("");
   const current = () => modelOption(models(), props.value);
+  /** The placeholder, while the step saves no model. */
+  const placeholder = () => (props.value === "" ? props.placeholder : undefined);
+  const label = () => placeholder() ?? current()?.name ?? props.value;
   let panel: HTMLDivElement | undefined;
+  const fades = createPickerFades();
   let opening = false;
   const rows = (provider: AgentProviderRef) => {
     const text = query().trim().toLowerCase();
@@ -124,11 +137,13 @@ export function ModelPill(props: {
     >
       <Popover.Trigger
         class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill wfn-model-pill`}
-        aria-label={t("workflow.model.label", { name: current()?.name ?? props.value })}
+        aria-label={t("workflow.model.label", { name: label() })}
         disabled={props.disabled}
       >
-        <ProviderLogo provider={wfProviderLogo(props.provider)} class="wfn-model-logo" />
-        <span>{current()?.name ?? props.value}</span>
+        <Show when={!placeholder()}>
+          <ProviderLogo provider={wfProviderLogo(props.provider)} class="wfn-model-logo" />
+        </Show>
+        <span>{label()}</span>
         <ChevronDown aria-hidden="true" />
       </Popover.Trigger>
       <Popover.Portal>
@@ -202,6 +217,7 @@ export function ModelPill(props: {
                   >
                     <Listbox.Root<PickerOption<AgentModelId>>
                       ref={(element: HTMLUListElement) => {
+                        fades.bind(element);
                         // A letter typed on a row goes back to the field, so typing always searches.
                         element.addEventListener(
                           "keydown",
@@ -213,7 +229,8 @@ export function ModelPill(props: {
                           true,
                         );
                       }}
-                      class="wfn-picker-list wfn-model-list"
+                      class={["wfn-picker-list wfn-model-list", fades.classes()]}
+                      onScroll={fades.measure}
                       aria-label={t("workflow.model.providerModels", { name: name(provider) })}
                       options={[...rows(provider)]}
                       optionValue={(option) => option.value}

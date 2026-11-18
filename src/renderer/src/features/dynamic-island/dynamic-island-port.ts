@@ -18,6 +18,7 @@ export interface DynamicIslandPort {
     | "performHaptic"
     | "publishPresentation"
     | "setInteractive"
+    | "setInputRegion"
   >;
 }
 

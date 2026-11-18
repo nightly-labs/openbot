@@ -1,0 +1,86 @@
+diff --git a/dist/cjs/client/auth.js b/dist/cjs/client/auth.js
+index 4c87a15f58e385da47145658ea1d82f5d4f82285..f10af236cee2198ce2a99d7da3e428b9ac58d0a9 100644
+--- a/dist/cjs/client/auth.js
++++ b/dist/cjs/client/auth.js
+@@ -725,6 +725,8 @@ async function discoverAuthorizationServerMetadata(authorizationServerUrl, { fet
+     };
+     // Get the list of URLs to try
+     const urlsToTry = buildDiscoveryUrls(authorizationServerUrl);
++    // The first document that fits neither schema, thrown when no later address has one.
++    let schemaError;
+     // Try each URL in order
+     for (const { url: endpointUrl, type } of urlsToTry) {
+         const response = await fetchWithCorsRetry(endpointUrl, headers, fetchFn);
+@@ -743,13 +745,24 @@ async function discoverAuthorizationServerMetadata(authorizationServerUrl, { fet
+             }
+             throw new Error(`HTTP ${response.status} trying to load ${type === 'oauth' ? 'OAuth' : 'OpenID provider'} metadata from ${endpointUrl}`);
+         }
+-        // Parse and validate based on type
+-        if (type === 'oauth') {
+-            return auth_js_2.OAuthMetadataSchema.parse(await response.json());
++        // Validate by the document, not by the address: RFC 8414 section 5 lets a plain OAuth
++        // server publish its metadata at openid-configuration (OpenBot #6854, SDK #2733).
++        // The schema of the address is tried first. A document that fits neither schema
++        // goes to the next address.
++        const metadata = await response.json();
++        const [preferred, other] = type === 'oauth' ? [auth_js_2.OAuthMetadataSchema, auth_js_1.OpenIdProviderDiscoveryMetadataSchema] : [auth_js_1.OpenIdProviderDiscoveryMetadataSchema, auth_js_2.OAuthMetadataSchema];
++        const parsed = preferred.safeParse(metadata);
++        if (parsed.success) {
++            return parsed.data;
+         }
+-        else {
+-            return auth_js_1.OpenIdProviderDiscoveryMetadataSchema.parse(await response.json());
++        const fallback = other.safeParse(metadata);
++        if (fallback.success) {
++            return fallback.data;
+         }
++        schemaError ??= parsed.error;
++    }
++    if (schemaError) {
++        throw schemaError;
+     }
+     return undefined;
+ }
+diff --git a/dist/esm/client/auth.js b/dist/esm/client/auth.js
+index 9b184c011ffa092078a7ed951be21a2bd99d5f89..58bcb88c10100748bdf978522bb961160ccd7128 100644
+--- a/dist/esm/client/auth.js
++++ b/dist/esm/client/auth.js
+@@ -700,6 +700,8 @@ export async function discoverAuthorizationServerMetadata(authorizationServerUrl
+     };
+     // Get the list of URLs to try
+     const urlsToTry = buildDiscoveryUrls(authorizationServerUrl);
++    // The first document that fits neither schema, thrown when no later address has one.
++    let schemaError;
+     // Try each URL in order
+     for (const { url: endpointUrl, type } of urlsToTry) {
+         const response = await fetchWithCorsRetry(endpointUrl, headers, fetchFn);
+@@ -718,13 +720,24 @@ export async function discoverAuthorizationServerMetadata(authorizationServerUrl
+             }
+             throw new Error(`HTTP ${response.status} trying to load ${type === 'oauth' ? 'OAuth' : 'OpenID provider'} metadata from ${endpointUrl}`);
+         }
+-        // Parse and validate based on type
+-        if (type === 'oauth') {
+-            return OAuthMetadataSchema.parse(await response.json());
++        // Validate by the document, not by the address: RFC 8414 section 5 lets a plain OAuth
++        // server publish its metadata at openid-configuration (OpenBot #6854, SDK #2733).
++        // The schema of the address is tried first. A document that fits neither schema
++        // goes to the next address.
++        const metadata = await response.json();
++        const [preferred, other] = type === 'oauth' ? [OAuthMetadataSchema, OpenIdProviderDiscoveryMetadataSchema] : [OpenIdProviderDiscoveryMetadataSchema, OAuthMetadataSchema];
++        const parsed = preferred.safeParse(metadata);
++        if (parsed.success) {
++            return parsed.data;
+         }
+-        else {
+-            return OpenIdProviderDiscoveryMetadataSchema.parse(await response.json());
++        const fallback = other.safeParse(metadata);
++        if (fallback.success) {
++            return fallback.data;
+         }
++        schemaError ??= parsed.error;
++    }
++    if (schemaError) {
++        throw schemaError;
+     }
+     return undefined;
+ }

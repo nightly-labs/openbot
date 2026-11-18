@@ -39,15 +39,23 @@ export function createWebChannelsPort(
   routineRecoveryEnabled: () => boolean,
   webhookTestsEnabled: () => boolean,
   webhookSenderSecretEnabled: () => boolean,
+  routinesOnceEnabled: () => boolean,
 ): ChannelsPort {
-  const files = createWebAttachmentFiles(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  onCleanup(() => attachmentMedia.dispose());
+  const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   const channels = remote.channels;
   const admin = remote.admin;
   const eventRoutines = admin
-    ? webEventRoutinesApi(admin.request, routineRecoveryEnabled, webhookTestsEnabled, webhookSenderSecretEnabled)
+    ? webEventRoutinesApi(
+        admin.request,
+        routineRecoveryEnabled,
+        webhookTestsEnabled,
+        webhookSenderSecretEnabled,
+        undefined,
+        routinesOnceEnabled,
+      )
     : undefined;
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
-  onCleanup(() => attachmentMedia.dispose());
   async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {
     if (chosen.length > INPUT_LIMITS.attachments)
       throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
@@ -67,6 +75,8 @@ export function createWebChannelsPort(
       listChannels: channels?.listChannels ?? unavailable,
       readChannel: channels?.readChannel ?? unavailable,
       channelCommand: channels?.channelCommand ?? unavailable,
+      // The channel editor offers it only for a host with `channel-picture-v1`.
+      setChannelImage: channels?.setChannelImage ?? unavailable,
       listChannelMemories: channels?.listChannelMemories ?? unavailable,
       createChannelMemory: channels?.createChannelMemory ?? unavailable,
       updateChannelMemory: channels?.updateChannelMemory ?? unavailable,
@@ -89,6 +99,10 @@ export function createWebChannelsPort(
       respondToBrowserTakeover: (input) => remote.respondToTakeover(input),
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
       deleteChannelMessage: (input) => remote.deleteMessage?.({ kind: "channel", ...input }) ?? unavailable(),
+      // The channel shows these rows only for a host with `chat-history-v1`.
+      clearChannelContext: (channelId) => remote.clearChannelContext?.(channelId) ?? unavailable(),
+      compactChannelContext: (channelId) => remote.compactChannelContext?.(channelId) ?? unavailable(),
+      deleteChannelHistory: (channelId) => remote.deleteHistory?.({ kind: "channel", channelId }) ?? unavailable(),
     },
     get eventRoutines() {
       return eventsEnabled() ? eventRoutines : undefined;

@@ -5,7 +5,7 @@
   "description": "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",
   "category": "design",
   "creatorName": "Figma",
-  "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
+  "iconUrl": "https://static.figma.com/app/icon/2/icon-256.png",
   "version": "1.1.0",
   "prompts": [
     { "id": "prompt-handoff", "text": "Hand off the checkout file: list screens, components, and styles." },
@@ -17,7 +17,7 @@
       "id": "app-figma-mcp",
       "name": "Figma",
       "description": "Design context, metadata, variables and screenshots, over the MCP server in the Figma desktop app. Read-only for now.",
-      "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
+      "iconUrl": "https://static.figma.com/app/icon/2/icon-256.png",
       "server": {
         "name": "figma-desktop",
         "transport": "http",

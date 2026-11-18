@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Token'lar",
   "usage.column.date": "Tarih",
   "usage.column.costUsd": "Maliyet · USD",
+  "usage.column.loads": "Yükleme",
+  "usage.column.agents": "Ajanlar",
   "usage.empty": "Bu aralıkta kaydedilen kullanım yok.",
   "usage.partial":
     "Kısmi veri · {turns} turun bildirilen kullanımı yok; {unpriced} kaydın maliyet tahmini yok; {incomplete} kaydın eksik token verisi var.",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "Model",
   "usage.breakdown.agent": "Ajan",
   "usage.breakdown.day": "Gün",
+  "usage.breakdown.skill": "Beceri",
   "usage.breakdown.byModel": "Modele göre kullanım",
   "usage.breakdown.byAgent": "Ajana göre kullanım",
   "usage.breakdown.byDay": "Günlük kullanım ve maliyet",
+  "usage.breakdown.bySkill": "Beceriye göre kullanım",
+  "usage.breakdown.skillEmpty": "Bu dönemde beceri yüklenmedi.",
   "usage.unknownModel": "Bilinmeyen model",
   "usage.footer": "Veri toplama başladı: {started} · Güncellendi: {updated}",
   "usage.updatedNever": "hiçbir zaman",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Bu ana makine ajan analizlerini desteklemiyor. Bu görünümü kullanmak için ana makineyi güncelleyin.",
   "usage.panel.loadFailed": "Kullanım yüklenemedi. Bağlantıyı ve tarih aralığını kontrol edin.",
+  "usage.machine.label": "Makine kullanımı. CPU: {cpu}, bellek: {memory}",
+  "usage.machine.openStorage": "Depolamayı aç. Disk: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

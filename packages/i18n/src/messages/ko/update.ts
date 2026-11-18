@@ -16,6 +16,10 @@ export const messages = {
   "update.provider.checking": "{name} 업데이트 확인 중",
   "update.provider.available": "{name} 업데이트 가능",
   "update.provider.updating": "{name} 업데이트 중",
+  "update.provider.downloading": "{name} 다운로드 중",
+  "update.provider.downloaded": "{name} 다운로드 완료",
+  "update.provider.downloadFailed": "{name} 다운로드 실패",
+  "update.provider.downloadFailedRetry": "다운로드에 실패했어요. 다시 시도해 주세요.",
   "update.provider.waiting": "{name} 업데이트 대기 중",
   "update.provider.failed": "{name} 업데이트 실패",
   "update.provider.settingUp": "설정 중",
@@ -61,4 +65,10 @@ export const messages = {
   "update.whatsNew.changelog": "전체 변경 내역",
   "update.whatsNew.changelogFailed": "OpenBot에서 변경 내역을 열지 못했어요.",
   "update.whatsNew.done": "확인",
+  "update.required.title": "업데이트 필요",
+  "update.required.description":
+    "OpenBot {version}은(는) 더 이상 지원되지 않습니다. 계속하려면 {minimum} 이상으로 업데이트하세요.",
+  "update.required.download": "OpenBot 다운로드",
+  "update.required.continue": "업데이트 없이 계속",
+  "update.required.failed": "업데이트를 완료하지 못했습니다.",
 } as const satisfies PartialTranslation<typeof source>;

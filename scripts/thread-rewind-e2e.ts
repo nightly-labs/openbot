@@ -67,9 +67,12 @@ try {
     database.readConversation(agent.id, threadId).messages.map((entry) => entry.id),
     ["first-question", "first-answer"],
   );
-  const shownAfterSearch = windowedSnapshotMessages(original.slice(2), rewound.messages, {
-    mode: "around",
-    snapshotMessageCount: rewound.messages.length,
+  const searchWindow = original.slice(2);
+  const movesBack = snapshotMovesBack(searchWindow, rewound.messages);
+  // The controller clears the old search window before it applies a rewind snapshot.
+  const shownAfterSearch = windowedSnapshotMessages(movesBack ? [] : searchWindow, rewound.messages, {
+    mode: movesBack ? "latest" : "around",
+    capped: true,
   });
   assert.deepEqual(
     shownAfterSearch.map((entry) => entry.id),

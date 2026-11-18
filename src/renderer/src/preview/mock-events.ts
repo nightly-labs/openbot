@@ -54,6 +54,8 @@ export function createMockEvents(
             : clone(input.trigger),
         ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
         ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+        // Only an agent routine has a place to run. A save that leaves it out keeps the saved place.
+        ...(input.owner.kind === "agent" ? { runIn: input.runIn ?? existing?.runIn ?? "chat" } : {}),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       };

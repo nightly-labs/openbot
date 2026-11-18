@@ -12,6 +12,11 @@
   width: 100%;
 }
 
+/* While the chat moves up under the working face, a new message comes up from behind the face line. */
+.virtual-chat-list[data-pushing] {
+  overflow-y: clip;
+}
+
 .virtual-chat-row {
   position: absolute;
   inset: 0 0 auto;
@@ -177,7 +182,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 /* The mark is as tall as the arrow, so one padding can hold both away from every edge. */
@@ -417,13 +422,15 @@
   }
 }
 
+/* The time stands in the middle of the space between two messages. The row above it already has
+   12px of padding at its top, so the time gets less margin above than under it. */
 .time-marker {
   display: flex;
   align-items: center;
   justify-content: center;
   max-width: 656px;
   height: 24px;
-  margin: 0 auto;
+  margin: var(--openbot-space-2) auto var(--openbot-space-4);
   padding: 4px 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);

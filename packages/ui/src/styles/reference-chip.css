@@ -33,6 +33,11 @@
   color: var(--openbot-accent-text);
 }
 
+/* A page title can be long: a tab and a thread stop at a width, and the title shows all of it. */
+.reference-chip:is([data-kind="tab"], [data-kind="thread"]) {
+  max-width: min(260px, 100%);
+}
+
 /* A quote is a passage, not a name: it stops at a short width, and its title shows all of it. */
 .reference-chip[data-kind="quote"] {
   max-width: min(240px, 100%);
@@ -40,7 +45,7 @@
 }
 
 .reference-chip[data-kind="agent"]:hover,
-button.reference-chip[data-kind="quote"]:hover {
+button.reference-chip:is([data-kind="quote"], [data-kind="tab"], [data-kind="thread"]):hover {
   background: var(--openbot-border-strong);
   color: var(--openbot-text-primary);
 }

@@ -3,10 +3,10 @@ import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { lowestPlanLimitsFirst, planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { PlanLimitRing } from "./plan-limit-ring";
 
 const RING_SIZE = 30;
@@ -69,7 +69,14 @@ export function PlanLimitsHeaderButton({
             row={row}
             size={RING_SIZE}
             cutout={
-              index > 0 ? { cx: OVERLAP - RING_SIZE / 2, cy: RING_SIZE / 2, r: RING_SIZE / 2 + CUTOUT_GAP } : undefined
+              // The ring before this one is at its start side: the right in a right-to-left layout.
+              index > 0
+                ? {
+                    cx: END_X === 1 ? OVERLAP - RING_SIZE / 2 : RING_SIZE * 1.5 - OVERLAP,
+                    cy: RING_SIZE / 2,
+                    r: RING_SIZE / 2 + CUTOUT_GAP,
+                  }
+                : undefined
             }
           />
         </View>
@@ -98,7 +105,6 @@ export function PlanLimitsHeaderButton({
     >
       {isAndroid ? (
         <View className="overflow-hidden rounded-full" style={androidGlass}>
-          <ChromeGlassSheen />
           {content}
         </View>
       ) : (

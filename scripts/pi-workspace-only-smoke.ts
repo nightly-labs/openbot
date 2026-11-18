@@ -125,6 +125,8 @@ try {
     [["/bin/mkdir", join(agentDirectory, "models.json.lock")], "denied"],
     [["/bin/mkdir", join(agentDirectory, "settings.json.lock")], "allowed"],
     [["/bin/mkdir", join(agentDirectory, "trust.json.lock")], "allowed"],
+    [["/bin/mkdir", join(agentDirectory, "models-store.json.lock")], "allowed"],
+    [["/bin/sh", "-c", `printf x > ${JSON.stringify(join(agentDirectory, "models-store.json"))}`], "denied"],
   ];
   report.probes = checks.map(([[command = "", ...args], expected]) => {
     const target = confineSpawnTarget({ command, args, windowsVerbatimArguments: false }, confinement, state);

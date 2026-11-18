@@ -16,17 +16,21 @@ export function installNotificationHandler(): void {
 let handled: string | null = null;
 
 /**
- * Opens the chat of a notification that the user taps, also when the tap starts the app. The
+ * Opens the conversation of a notification that the user taps, also when the tap starts the app. The
  * Notification Service Extension on iOS, and `OpenBotMessagingService.kt` on Android, put the agent
- * into the notification data when they open the seal.
- * While the app is on screen, a notification of the chat that shows is not shown again.
+ * and the thread into the notification data when they open the seal.
+ * While the app is on screen, a notification of the conversation that shows is not shown again:
+ * `onScreen` says whether the screen shows the chat or the thread of a target.
  */
-export function useNotificationTaps(open: (target: NotificationTarget) => void, openChat: () => string | null): void {
+export function useNotificationTaps(
+  open: (target: NotificationTarget) => void,
+  onScreen: (target: NotificationTarget) => boolean,
+): void {
   const response = Notifications.useLastNotificationResponse();
   const openRef = useRef(open);
   openRef.current = open;
-  const openChatRef = useRef(openChat);
-  openChatRef.current = openChat;
+  const onScreenRef = useRef(onScreen);
+  onScreenRef.current = onScreen;
 
   useEffect(() => {
     Notifications.setNotificationHandler({
@@ -35,8 +39,8 @@ export function useNotificationTaps(open: (target: NotificationTarget) => void, 
         if (notification.request.content.data?.[SOUND_PREVIEW_KEY] === true) {
           return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: true, shouldSetBadge: false };
         }
-        const agentId = notificationTarget(notification)?.agentId ?? null;
-        const shown = agentId !== null && agentId === openChatRef.current();
+        const target = notificationTarget(notification);
+        const shown = target !== null && onScreenRef.current(target);
         return { shouldShowBanner: !shown, shouldShowList: !shown, shouldPlaySound: !shown, shouldSetBadge: false };
       },
     });

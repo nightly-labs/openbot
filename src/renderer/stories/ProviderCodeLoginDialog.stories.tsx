@@ -41,6 +41,8 @@ const meta = {
     open: true,
     providerName: "ChatGPT",
     state: waitingState(),
+    setupStep:
+      "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
     onOpenVerificationUrl: fn(),
     onCancel: fn(),
     onSubmitCode: fn(),
@@ -197,7 +199,25 @@ export const RelayDevice: Story = {
     state: {
       phase: "relay",
       hostName: "Cloud server",
-      page: { authorizeHost: "auth.openai.com", listening: false, pasteable: false },
+      page: {
+        authorizeHost: "auth.openai.com",
+        url: "https://auth.openai.com/codex/device",
+        listening: false,
+        pasteable: false,
+      },
+    },
+    onOpenRelayPage: fn(),
+    onPasteRelayAddress: fn(),
+  },
+};
+
+/** An address that is too long to send has no copy button. */
+export const RelayNoLink: Story = {
+  args: {
+    state: {
+      phase: "relay",
+      hostName: "Cloud server",
+      page: { authorizeHost: "auth.openai.com", url: null, listening: false, pasteable: false },
     },
     onOpenRelayPage: fn(),
     onPasteRelayAddress: fn(),
@@ -211,7 +231,12 @@ export const RelayPaste: Story = {
     state: {
       phase: "relay",
       hostName: "Cloud server",
-      page: { authorizeHost: "claude.com", listening: false, pasteable: true },
+      page: {
+        authorizeHost: "claude.com",
+        url: "https://claude.com/cai/oauth/authorize?state=example",
+        listening: false,
+        pasteable: true,
+      },
     },
     onOpenRelayPage: fn(),
     onPasteRelayAddress: fn(),

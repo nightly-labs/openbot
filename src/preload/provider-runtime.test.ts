@@ -17,6 +17,8 @@ function snapshot(availableVersion?: string | number | null) {
       pi: runtime,
       muse: runtime,
       devin: runtime,
+      copilot: runtime,
+      mistral: runtime,
     },
     // The tool runtimes travel beside the provider CLIs and are decoded the same way. Main and
     // preload are one build, so a snapshot without them is a main process this one cannot trust.
@@ -33,5 +35,20 @@ describe("provider runtime decoding", () => {
   });
   it("rejects an invalid update version", () => {
     expect(() => decodeProviderRuntimeSnapshot(snapshot(42))).toThrow("Invalid provider runtime response.");
+  });
+  it("keeps a Hermes installer status only when main sends one", () => {
+    expect(decodeProviderRuntimeSnapshot(snapshot()).providers.hermes).toBeUndefined();
+    const withHermes = snapshot();
+    const installing = { phase: "downloading", progress: 40, message: null, version: null };
+    expect(
+      decodeProviderRuntimeSnapshot({ ...withHermes, providers: { ...withHermes.providers, hermes: installing } })
+        .providers.hermes,
+    ).toEqual({ ...installing, availableVersion: null });
+  });
+  it("rejects an invalid Hermes installer status", () => {
+    const withHermes = snapshot();
+    expect(() =>
+      decodeProviderRuntimeSnapshot({ ...withHermes, providers: { ...withHermes.providers, hermes: { phase: "x" } } }),
+    ).toThrow("Invalid provider runtime response.");
   });
 });

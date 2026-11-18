@@ -304,6 +304,7 @@ export const messages = defineMessages("connector", {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "connector.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
+  "connector.telegram.helpNotLinked": "This chat is not linked to this server. Select Reconnect to link it.",
   "connector.telegram.retryAt": "Telegram asked OpenBot to wait. It tries again at {time}.",
   "connector.telegram.pause": "Pause",
   "connector.telegram.resume": "Resume",
@@ -390,6 +391,7 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "connector.whatsapp.helpError": "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot cannot read the saved keys of this number. Link the number again.",
   "connector.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "connector.whatsapp.pause": "Pause",
   "connector.whatsapp.resume": "Resume",
@@ -405,7 +407,13 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Personal number",
   "connector.whatsapp.ownNumberDescription":
-    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+    "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
+  "connector.whatsapp.workingMessage": "“Working on it…” message",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+  "connector.whatsapp.statusReactions": "Status reactions",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -422,9 +430,10 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.kindLabel": "Number",
   "connector.whatsapp.kindPersonal": "My personal number",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+    "OpenBot answers only your “Message yourself” chat and the people you allow. Other people get no reply.",
   "connector.whatsapp.kindDedicated": "A number only for OpenBot",
-  "connector.whatsapp.kindDedicatedDescription": "Unknown people get a code to give you. You approve them here.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot replies from this number to each unknown person, with a code to give you. You approve them here.",
   "connector.whatsapp.methodLabel": "How to link",
   "connector.whatsapp.methodQr": "QR code",
   "connector.whatsapp.methodCode": "Pairing code",
@@ -601,4 +610,72 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.clientSecret": "API key client_secret",
   "connector.bitwarden.masterPassword": "Master password",
   "connector.bitwarden.connecting": "Connecting",
+  "connector.protonPass.title": "Proton Pass",
+  "connector.protonPass.description": "Let agents sign in to sites with the logins in a shared Proton Pass vault.",
+  "connector.protonPass.descriptionHost":
+    "Let agents on {host} sign in to sites with the logins in a shared Proton Pass vault.",
+  "connector.protonPass.connect": "Connect",
+  "connector.protonPass.moreWays": "More ways to connect",
+  "connector.protonPass.useKey": "Use an access key",
+  "connector.protonPass.keyLabel": "Access key",
+  // A Proton Pass access key starts with pst_.
+  "connector.protonPass.keyPlaceholder": "pst_…",
+  "connector.protonPass.setupTitle": "Set up",
+  "connector.protonPass.setupDescription":
+    "Connect opens the Proton sign-in in your browser. Then OpenBot makes the shared vault and keeps only a read-only key for it.",
+  "connector.protonPass.setupDescriptionHost":
+    "Connect opens the Proton sign-in in your browser. Then {host} makes the shared vault and keeps only a read-only key for it.",
+  // The exact vault name that OpenBot makes in Proton Pass. Keep it in English.
+  "connector.protonPass.vaultName": "Shared with OpenBot",
+  "connector.protonPass.vaultSetup": "OpenBot makes this vault when you connect. Move logins into it to share them.",
+  "connector.protonPass.showSteps": "Show steps",
+  "connector.protonPass.stepsLabel": "Connect steps",
+  "connector.protonPass.stepSignIn": "Sign in",
+  "connector.protonPass.stepVault": "Make the shared vault",
+  "connector.protonPass.stepDone": "Done",
+  "connector.protonPass.signInTitle": "Sign in to Proton",
+  "connector.protonPass.signInStarting": "OpenBot starts the sign-in. The Proton page opens in your browser.",
+  "connector.protonPass.signInDescription":
+    "The sign-in is open in your browser. Proton asks for your password and your second factor.",
+  "connector.protonPass.signInDescriptionHost":
+    "The sign-in for {host} is open in your browser. Proton asks for your password and your second factor.",
+  "connector.protonPass.extraPasswordDescription": "Proton Pass asks for your extra password.",
+  "connector.protonPass.extraPasswordWrong": "The extra password is not correct. Enter it again.",
+  "connector.protonPass.extraPasswordLabel": "Extra password",
+  "connector.protonPass.continue": "Continue",
+  "connector.protonPass.setupStepTitle": "Making the shared vault",
+  "connector.protonPass.setupStepDescription":
+    "OpenBot makes the vault “{vault}” and a read-only key for it. Then it signs out of your Proton session.",
+  "connector.protonPass.doneTitle": "Proton Pass is connected",
+  "connector.protonPass.doneDescription": "Move logins into “{vault}” to let agents sign in with them.",
+  "connector.protonPass.failedTitle": "Proton Pass did not connect",
+  "connector.protonPass.copyLink": "Copy link",
+  "connector.protonPass.linkCopied": "Copied",
+  "connector.protonPass.openAgain": "Open again",
+  "connector.protonPass.done": "Done",
+  "connector.protonPass.close": "Close",
+  "connector.protonPass.statusConnecting": "Connecting",
+  "connector.protonPass.statusConnected": "Connected",
+  "connector.protonPass.statusExpired": "Key expired",
+  "connector.protonPass.expiredTitle": "The Proton Pass key expired",
+  "connector.protonPass.expiredDescription": "Agents cannot sign in with your shared logins until you sign in again.",
+  "connector.protonPass.reconnect": "Reconnect",
+  "connector.protonPass.planTitle": "Proton Pass needs a paid plan",
+  "connector.protonPass.planDescription":
+    "The Proton Pass CLI works only with a paid Proton plan. Change your plan, then connect again.",
+  "connector.protonPass.vaultTitle": "Shared vault",
+  "connector.protonPass.vaultDescription":
+    "Agents can sign in with the logins in this vault. Move a login into it to share it.",
+  "connector.protonPass.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.protonPass.loginsLoading": "Counting logins…",
+  "connector.protonPass.keyExpires": "Read only. Expires on {date}.",
+  "connector.protonPass.keyExpired": "Read only. Expired on {date}.",
+  "connector.protonPass.keyNoExpiry": "Read only. Does not expire.",
+  "connector.protonPass.disconnectTitle": "Disconnect Proton Pass",
+  "connector.protonPass.disconnectSummary":
+    "OpenBot deletes its access key on this computer. The vault and its logins stay in your Proton account.",
+  "connector.protonPass.disconnectSummaryHost":
+    "OpenBot deletes its access key on {host}. The vault and its logins stay in your Proton account.",
+  "connector.protonPass.disconnect": "Disconnect",
+  "connector.protonPass.actionFailed": "OpenBot could not change the Proton Pass connection.",
 });

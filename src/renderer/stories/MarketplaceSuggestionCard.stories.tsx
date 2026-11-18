@@ -94,6 +94,41 @@ export const Skill: Story = {
 
 export const SkillInstalled: Story = { args: { ...Skill.args, state: "connected" } };
 
+/**
+ * A memory review asks to save what the chat taught as a skill. The question can be up to 600
+ * characters, so it takes the width of the card and Save goes under it.
+ */
+export const SkillQuestion: Story = {
+  args: {
+    kind: "skill",
+    skillAction: "save",
+    fullDescription: true,
+    name: "Git commit subject writing",
+    description:
+      "You corrected my commit subjects three times: imperative mood, at most 50 characters, and the area in brackets first, as in [auth] Fix login timeout. You said this is the method you want every time, in every repository, also for squash merges and release commits. I can keep it as a skill, so I follow these rules in each new chat, and your other agents can install it too. It would also keep my last check: count the characters and remove filler words such as “update” or “changes”. Should I save this as a new skill named Git commit subject writing?",
+    iconUrl: null,
+    onOpenDetails: undefined,
+  },
+  render: (args) => (
+    <main style={{ width: "min(560px, 100vw)", padding: "var(--openbot-space-4)" }}>
+      <CardStage {...args} />
+    </main>
+  ),
+};
+
+/** The agent saved the skill. */
+export const SkillQuestionSaved: Story = { args: { ...SkillQuestion.args, state: "connected" } };
+
+/** The question in a narrow chat: Save takes the full width. */
+export const SkillQuestionNarrow: Story = {
+  args: SkillQuestion.args,
+  render: (args) => (
+    <main style={{ width: "320px", padding: "var(--openbot-space-4)" }}>
+      <CardStage {...args} />
+    </main>
+  ),
+};
+
 /** A member of a joined server can see the suggestion but cannot connect apps. */
 export const Unavailable: Story = {
   args: {

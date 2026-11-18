@@ -1,7 +1,8 @@
 import type { BitwardenConnectorStatus, BitwardenHostConnectInput } from "@openbot/contracts/ipc";
-import { Button, Field, Input, ItemGroup, Lock, SettingsSection, Text } from "@openbot/ui";
+import { Button, Field, Input, ItemGroup, SettingsSection, Text } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
+import { BitwardenTile } from "./brand-marks";
 import { IntegrationPage, type IntegrationPageSlots } from "./IntegrationLayout";
 import {
   SharedVaultSection,
@@ -78,7 +79,7 @@ export function BitwardenConnectorPanel(props: BitwardenConnectorPanelProps) {
   return (
     <IntegrationPage
       class="bitwarden-connector"
-      logo={<Lock />}
+      logo={<BitwardenTile />}
       name={t("connector.bitwarden.title")}
       subtitle={
         props.hostName

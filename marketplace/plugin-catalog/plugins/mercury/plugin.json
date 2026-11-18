@@ -1,0 +1,33 @@
+{
+  "slug": "mercury",
+  "name": "Mercury",
+  "tagline": "Business bank accounts and transactions",
+  "description": "Mercury lets agents read account balances, transactions, cards, and recipients, and draft payment requests that need approval in Mercury. Each user signs in to their own Mercury account through the browser.",
+  "category": "other",
+  "creatorName": "Mercury",
+  "iconUrl": "https://mercury.com/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-balances", "text": "What are the current balances of my Mercury accounts?" },
+    { "id": "prompt-spend", "text": "Summarize last month's card spending by category." },
+    { "id": "prompt-receipts", "text": "Which transactions this month are missing a receipt or a note?" }
+  ],
+  "apps": [
+    {
+      "id": "app-mercury-mcp",
+      "name": "Mercury",
+      "description": "Balances, transactions, cards, and payment requests, over Mercury's MCP server with browser sign-in.",
+      "iconUrl": "https://mercury.com/apple-icon.png",
+      "server": {
+        "name": "mercury",
+        "transport": "http",
+        "url": "https://mcp.mercury.com/mcp",
+        "auth": [{ "id": "mercury-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://mercury.com",
+  "privacyPolicyUrl": "https://mercury.com/legal/privacy",
+  "termsUrl": "https://mercury.com/legal/terms"
+}

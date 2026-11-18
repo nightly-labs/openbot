@@ -26,6 +26,11 @@ interface GeneralStoreProps {
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** Whether a Claude key is saved, read the same way. Absent where the host does not read the key. */
   claudeKeyStatus?: () => ProviderApiKeyStatus | undefined;
+  /**
+   * Whether a joined server's host logs Codex in with a pasted OpenAI key, read the same way. Absent
+   * where the host does not read the key (`codex-api-key-v1`). This computer's agent status says it.
+   */
+  codexKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** The joined server whose host runs these providers. Absent when this computer runs them. */
   providerHostName?: string | undefined;
   /** The providers that the user turned off in OpenBot. */
@@ -68,12 +73,16 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
        *
        * A CLI the user installed that failed shows its own version too, so the row names the CLI
        * that failed. A copy that is not downloaded keeps its Download then.
+       *
+       * An incomplete CLI of the user's is read as a row with no owner while the copy is not
+       * downloaded: the copy that main offers in its place keeps its Download, as the copy runs
+       * instead once downloaded (#9139).
        */
       const agentVersionShown = Boolean(
         runtime &&
           agent &&
           (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
-          (agent.cliSource === "system"
+          (agent.cliSource === "system" && !(agent.cliIncomplete && runtime.phase === "not-downloaded")
             ? agent.state === "available" ||
               agent.state === "sign-in-required" ||
               (agent.state === "error" && runtime.phase === "ready")
@@ -81,8 +90,9 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
               runtime.phase === "not-downloaded" &&
               !runtime.availableVersion),
       );
-      // The Gemini status says only whether a saved key serves the turns. A Codex key is a login on
-      // this computer, so only this computer offers one. Released hosts do not report a Muse key.
+      // The Gemini status says only whether a saved key serves the turns. The status of a joined
+      // server's host does not carry the Codex key, so that host answers for it on the key route.
+      // Released hosts do not report a Muse key.
       const keyStatus =
         provider === "opencode"
           ? props.openCodeKeyStatus?.()
@@ -90,11 +100,13 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
             ? props.claudeKeyStatus?.()
             : provider === "antigravity" && agent?.apiKeyInUse
               ? ("saved" as const)
-              : (provider === "codex" || provider === "muse") && !props.providerHostName
-                ? agent?.apiKeyInUse
-                  ? ("saved" as const)
-                  : ("missing" as const)
-                : undefined;
+              : provider === "codex" && props.providerHostName
+                ? props.codexKeyStatus?.()
+                : (provider === "codex" || provider === "muse") && !props.providerHostName
+                  ? agent?.apiKeyInUse
+                    ? ("saved" as const)
+                    : ("missing" as const)
+                  : undefined;
       return {
         id: provider,
         name: agentProviderName(provider),
@@ -118,11 +130,13 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
           ...account,
           usedBy: props.providerAccountUsers?.[provider]?.[account.id],
         })),
+        accountPool: agent?.accountPool,
         runtimeStatus:
           runtime && agentVersionShown ? { ...runtime, phase: "ready", version: agent?.version ?? null } : runtime,
         // The label goes only with the version of the CLI it names: in other states the row shows
         // the copy's version, while the agent status can still name the user's CLI.
         cliSource: agentVersionShown || agent?.cliSource === "managed" ? agent?.cliSource : undefined,
+        otherCliVersion: agentVersionShown || agent?.cliSource === "managed" ? agent?.otherCliVersion : undefined,
       };
     }),
   );

@@ -1,4 +1,12 @@
-import type { AccountUsage, AccountUsageLimit, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
+import {
+  type AccountUsage,
+  type AccountUsageLimit,
+  type AvatarColor,
+  type AvatarImageInput,
+  type CentralAuthState,
+  keepUsageCredits,
+  withReadCredits,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
@@ -194,6 +202,11 @@ const Auth = createSimpleContext({
       applyCentralAuthState(await accountPort().auth.updateName(name));
     }
 
+    /** Saves the chat color on the account. Members of each server of the user see it. */
+    async function setChatColor(color: AvatarColor | null): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.updateChatColor(color));
+    }
+
     const accountUsage = () => accountUsageState.data;
     const accountUsageRefreshRevision = () => accountUsageState.refreshRevision;
     const accountUsageTargetKey = () => accountUsageState.targetKey;
@@ -230,7 +243,11 @@ const Auth = createSimpleContext({
       for (const limit of usage.limits) accountUsageEventIds.add(usageLimitKey(limit));
       setAccountUsageState((state) => {
         const byId = new Map((state.data?.limits ?? []).map((limit) => [usageLimitKey(limit), limit]));
-        for (const limit of usage.limits) byId.set(usageLimitKey(limit), limit);
+        // A joined server's event does not say whether an account works on credits: keep the last reading's.
+        for (const limit of usage.limits) {
+          const key = usageLimitKey(limit);
+          byId.set(key, keepUsageCredits(byId.get(key), limit));
+        }
         state.data = { limits: [...byId.values()] };
       });
     }
@@ -242,12 +259,14 @@ const Auth = createSimpleContext({
       const usage = await accountPort().agent.getUsage();
       if (generation === accountUsageRequestGeneration && accountUsageState.targetKey === targetKey) {
         // The refresh reads every provider, so a row it omits has stopped reporting, such as a revoked
-        // OpenCode Go key. It keeps only the rows an event updated after it started.
+        // OpenCode Go key. It keeps only the rows an event updated after it started. A joined server's
+        // event does not say whether an account works on credits, so such a row takes it from the refresh:
+        // the flag the row has is only the one it kept from an older reading.
         setAccountUsageState((state) => {
           const byId = new Map(usage.limits.map((limit) => [usageLimitKey(limit), limit]));
           for (const limit of state.data?.limits ?? []) {
             const key = usageLimitKey(limit);
-            if (accountUsageEventIds.has(key)) byId.set(key, limit);
+            if (accountUsageEventIds.has(key)) byId.set(key, withReadCredits(byId.get(key), limit));
           }
           state.data = { limits: [...byId.values()] };
         });
@@ -316,6 +335,7 @@ const Auth = createSimpleContext({
       logoutCentralAccount,
       updateAccountName,
       updateAccountAvatar,
+      setChatColor,
       createMobileConnect,
       cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),
       getMobileConnectLink: () => accountPort().auth.getMobileConnectLink(),

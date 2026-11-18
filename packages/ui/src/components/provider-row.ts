@@ -1,4 +1,4 @@
-import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, isInstallerProvider, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
@@ -12,7 +12,7 @@ import { useText } from "../text";
 import { toast } from "../toast";
 import { createCodeSignInFallback } from "./createCodeSignInFallback";
 import type { ProviderAlternativeSignIn, ProviderConnection, ProviderPickerOption } from "./ProviderPicker";
-import type { ProviderAccountActions } from "./provider-accounts";
+import { accountCodeSignInOffered, type ProviderAccountActions } from "./provider-accounts";
 
 /** The callbacks a provider row runs. The onboarding picker and the Providers settings page pass their own. */
 export interface ProviderRowHost {
@@ -176,8 +176,12 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * action checks for one.
    */
   // A provider that is off gets no update offer from main, so a check there could only say "up to date".
+  // An installer provider updates itself: OpenBot runs its installer once and checks no versions.
   const updateOffered = () =>
-    Boolean(host.onUpdateProvider) && !off() && (runtimeStatus()?.phase === "ready" || updatable());
+    Boolean(host.onUpdateProvider) &&
+    !off() &&
+    !isInstallerProvider(option().id) &&
+    (runtimeStatus()?.phase === "ready" || updatable());
   const restartOffered = () =>
     Boolean(host.onRestartProvider) && (option().restartPending || (available() && !connecting()));
   const diagnosticsOffered = () => Boolean(option().lastError && option().diagnostics);
@@ -188,6 +192,14 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
   const addAccount = () => {
     setAccountError(null);
     void Promise.resolve(host.accountActions?.connect(option().id, null)).catch((error: unknown) =>
+      setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
+    );
+  };
+  /** A new account can also sign in with a code, where a browser sign-in is not possible. */
+  const accountCodeOffered = () => accountsOffered() && accountCodeSignInOffered(option().id, host.accountActions);
+  const addAccountWithCode = () => {
+    setAccountError(null);
+    void Promise.resolve(host.accountActions?.connectWithCode?.(option().id, null)).catch((error: unknown) =>
       setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
     );
   };
@@ -219,7 +231,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
-   * Codex's key is a login on this computer, so its row has a key status only here.
+   * Codex's key is a login on the host, so its row has a key status only where the host makes that
+   * login: this computer, or a joined server with `codex-api-key-v1`.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&
@@ -265,6 +278,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     accountsOffered,
     accountError,
     addAccount,
+    accountCodeOffered,
+    addAccountWithCode,
     installOffered,
     signInOffered,
     apiKeyOffered,

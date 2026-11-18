@@ -49,16 +49,37 @@ export class UsageReadGate {
               if (generation === this.#generation) this.succeeded(startedAt);
             }),
           ),
-          Effect.tapError(() =>
-            Effect.sync(() => {
-              if (generation !== this.#generation) return;
-              this.#failures += 1;
-              this.#nextReadAt = Date.now() + Math.min(USAGE_RETRY_MS * 2 ** (this.#failures - 1), USAGE_RETRY_MAX_MS);
-            }),
-          ),
+          Effect.tapError(() => Effect.sync(() => this.#failed(generation))),
         );
       }),
     );
+  }
+
+  /**
+   * Runs `read` unless the wait after a failed read holds, else answers `waiting`. For a read that the
+   * views do not get, such as the usage limit check after a refusal: it must see the newest usage, so the
+   * interval does not hold it, but it shares the provider's quota, so it waits after a failure as the views
+   * do, and its failure makes them wait too (#7043). It does not wait for a read of the views.
+   */
+  unlessWaiting<A, E, R>(options: { read: Effect.Effect<A, E, R>; waiting: () => A }): Effect.Effect<A, E, R> {
+    return Effect.suspend(() => {
+      if (this.#failures > 0 && Date.now() < this.#nextReadAt) return Effect.succeed(options.waiting());
+      const generation = this.#generation;
+      return options.read.pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            if (generation === this.#generation) this.#failures = 0;
+          }),
+        ),
+        Effect.tapError(() => Effect.sync(() => this.#failed(generation))),
+      );
+    });
+  }
+
+  #failed(generation: number): void {
+    if (generation !== this.#generation) return;
+    this.#failures += 1;
+    this.#nextReadAt = Date.now() + Math.min(USAGE_RETRY_MS * 2 ** (this.#failures - 1), USAGE_RETRY_MAX_MS);
   }
 
   /** A read that started at `startedAt` succeeded, also one that did not go through `run`. */

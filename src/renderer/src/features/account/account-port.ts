@@ -24,6 +24,7 @@ export interface AccountPort {
     | "revokeMobileConnectedDevice"
     | "revokeMobileConnectLink"
     | "updateAvatar"
+    | "updateChatColor"
     | "updateName"
     | "verifyEmailCode"
   >;

@@ -3,10 +3,14 @@
 // 2. The next start uses software rendering. `OPENBOT_DISABLE_GPU=0` uses the GPU again.
 // 3. A crash file from another Chromium major version does not count, and a clean quit removes the start file.
 //    A GPU process exit after a GPU context loss, which Chromium restarts, writes no crash file.
-// 4. A start that is killed before it is confirmed makes the next start use software rendering. A quit
-//    that starts confirms the start, also when the teardown is killed before it ends.
+// 4. A start that is killed before it is confirmed leaves no crash dump, so the next start tries the GPU
+//    once more. A kill of that start, or a crash of the main process, makes the next start use software
+//    rendering. A quit that starts confirms the start, also when the teardown is killed before it ends.
 // 5. `OPENBOT_DISABLE_GPU=1` uses software rendering and writes no start file.
-// 6. A server uses software rendering and writes no start file, also with `OPENBOT_DISABLE_GPU=0`.
+// 6. A server composites on the CPU, has WebGL (#6404), and writes no start file, also with
+//    `OPENBOT_DISABLE_GPU=0`. A GPU process crash turns off hardware acceleration at the next start,
+//    and `OPENBOT_DISABLE_GPU=1` turns it off. Under `xvfb-run` on a computer with no GPU, the report
+//    shows SwiftShader as the WebGL renderer of the server step.
 //
 // Run on a Linux desktop with a working GPU: bun scripts/linux-gpu-fallback-e2e.ts
 // It writes .openbot-build/linux-gpu-fallback-e2e/report.json and exits non-zero on a failure.
@@ -17,6 +21,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { countCrashDumps } from "../src/main/run-marker";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -44,6 +49,8 @@ interface ReadyLine {
   mode: { hardwareAcceleration: boolean; reason: string };
   hardwareAccelerationEnabled: boolean;
   gpuCompositing: string;
+  webglRenderer: string | null;
+  crashDumps: string;
 }
 
 interface Step {
@@ -120,15 +127,33 @@ try {
   steps.push({ step: "after a GPU context loss", ready: launch.ready });
   await quit(launch);
 
-  // 4. A start that stops before it is confirmed (as with SIGTRAP in #992) turns off the GPU.
+  // 4. A killed start (#6208) gets one retry. A second stop, or a crash (as with SIGTRAP in #992), turns off the GPU.
   const killed = join(root, "killed-start");
   launch = await start(killed, 600_000);
   await killTree(launch.ready.pid, launch.exited);
   assert.equal(existsSync(join(killed, GPU_START_FILE)), true, "a killed start leaves the start file");
+  launch = await start(killed, 600_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "unfinished-start-retry" });
+  assert.equal(launch.ready.hardwareAccelerationEnabled, true);
+  steps.push({ step: "retry after a killed start", ready: launch.ready });
+  await killTree(launch.ready.pid, launch.exited);
   launch = await start(killed, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "unfinished-start" });
   assert.equal(launch.ready.hardwareAccelerationEnabled, false);
-  steps.push({ step: "after unfinished start", ready: launch.ready });
+  steps.push({ step: "after a killed retry", ready: launch.ready });
+  await quit(launch);
+  const crashed = join(root, "crashed-start");
+  launch = await start(crashed, 600_000);
+  launch.child.stdin?.write("crash\n");
+  await launch.exited;
+  const crashDumps = launch.ready.crashDumps;
+  await until(
+    () => countCrashDumps(crashDumps, 0, Number.POSITIVE_INFINITY) > 0,
+    "the main process crash writes a dump",
+  );
+  launch = await start(crashed, 1_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "unfinished-start" });
+  steps.push({ step: "after a crashed start", ready: launch.ready });
   await quit(launch);
   const hung = join(root, "hung-quit");
   launch = await start(hung, 600_000, {}, ["--hang-on-quit"]);
@@ -148,13 +173,28 @@ try {
   steps.push({ step: "OPENBOT_DISABLE_GPU=1", ready: launch.ready });
   await quit(launch);
 
-  // 6. A server has no GPU: software rendering, and the environment value does not change it.
+  // 6. A server has no GPU: it composites on the CPU, and the environment value does not change it.
+  //    It keeps WebGL on SwiftShader for the sites that its agents open.
   const server = join(root, "server");
   launch = await start(server, 1_000, { OPENBOT_DISABLE_GPU: "0" }, ["--server"]);
-  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "server" });
-  assert.equal(launch.ready.hardwareAccelerationEnabled, false);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "server" });
+  assert.equal(launch.ready.hardwareAccelerationEnabled, true);
+  assert.equal(launch.ready.gpuCompositing.startsWith("enabled"), false, "a server composites on the CPU");
+  assert.notEqual(launch.ready.webglRenderer, null, "a server page gets a WebGL context");
   assert.equal(existsSync(join(server, GPU_START_FILE)), false, "a server writes no start file");
-  steps.push({ step: "server", ready: launch.ready });
+  const serverGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
+  steps.push({ step: "server", ready: launch.ready, gpuProcess: serverGpuProcess });
+  process.kill(serverGpuProcess, "SIGSEGV");
+  await until(() => existsSync(join(server, GPU_CRASH_FILE)), "a server GPU crash writes the crash file");
+  await quit(launch);
+  launch = await start(server, 1_000, {}, ["--server"]);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
+  assert.equal(launch.ready.hardwareAccelerationEnabled, false);
+  steps.push({ step: "server after gpu crash", ready: launch.ready });
+  await quit(launch);
+  launch = await start(join(root, "server-forced-software"), 1_000, { OPENBOT_DISABLE_GPU: "1" }, ["--server"]);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "environment-off" });
+  steps.push({ step: "server with OPENBOT_DISABLE_GPU=1", ready: launch.ready });
   await quit(launch);
   passed = true;
 } catch (cause) {

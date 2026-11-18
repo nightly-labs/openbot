@@ -78,7 +78,11 @@ lines.on("line", (line) => {
       return { mime: block.mimeType ?? block.mediaType, size: bytes.length,
         sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
     }) });
-    if (mode === "acp") reply({ stopReason: "end_turn" });
+    if (mode === "acp") {
+      send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: params.sessionId,
+        update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "OK" } } } });
+      reply({ stopReason: "end_turn" });
+    }
     if (mode === "muse") {
       const turnId = params.commandId;
       if (typeof turnId !== "string" || museItems.some((item) => item.turnId === turnId)) {

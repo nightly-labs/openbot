@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Kuyruktaki bir mesajı düzenliyorsunuz. Çalışmasına izin vermek için düzenlemeyi kaydedin veya iptal edin.",
   "composer.queueEdit.cancel": "Düzenlemeyi iptal et",
+  "composer.feedbackFix.body":
+    "#{number} numaralı rapor düzeltiliyor. İsteği gönderin veya raporu olduğu gibi bırakmak için iptal edin.",
+  "composer.feedbackFix.cancel": "İptal",
   "composer.providerWait.offlineTitle": "İnternet bağlantısı yok",
   "composer.providerWait.offline": "Bu bilgisayar yeniden çevrimiçi olana kadar {provider} yanıt veremez.",
   "composer.providerWait.silent": "{provider} {duration} süredir bir şey göndermedi.",
@@ -15,10 +18,21 @@ export const messages = {
   "composer.signIn.label": "{provider} sağlayıcısında oturum aç",
   "composer.signIn.action": "Oturum aç",
   "composer.updateKey.action": "Anahtarı güncelle",
+  "composer.verifyAccount.action": "Hesabı doğrula",
   "composer.update.body": "Devam etmek için {provider} güncellemesini yapın.",
   "composer.update.manual": "Devam etmek için {provider} uygulamasını çalıştığı bilgisayarda güncelleyin.",
   "composer.update.pending": "Güncelleniyor…",
   "composer.update.action": "Güncelle",
+  "composer.imageInput.body":
+    "{model} yalnızca metin alır, bu yüzden eklediğiniz görselleri görmez. Bu model görselleri okuyabiliyorsa görselleri açın.",
+  "composer.imageInput.label": "{model} için görselleri aç",
+  "composer.imageInput.pending": "Açılıyor…",
+  "composer.imageInput.action": "Görselleri aç",
+  "composer.usageLimit.credits":
+    "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız artık kredilerinizi kullanıyor.",
+  "composer.usageLimit.creditsResets":
+    "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız sınır sıfırlanana kadar ({reset}) kredilerinizi kullanır.",
+  "composer.usageLimit.creditsTitle": "Krediler kullanılıyor",
   "composer.usageLimit.resets": "{provider} sınırınızın tamamını kullandınız. Sıfırlanma zamanı: {reset}.",
   "composer.usageLimit.selectModel":
     "{provider} sınırınızın tamamını kullandınız. Devam etmek için farklı bir model seçin.",
@@ -76,9 +90,9 @@ export const messages = {
   "composer.placeholder.messageAgent": "Ajana mesaj gönder",
   "composer.placeholder.answer": "Yanıtınızı yazın",
   "composer.add.label": "İsteme ekle",
-  "composer.add.image": "Görsel ekle",
+  "composer.add.files": "Dosya ekle",
+  "composer.add.teach": "Görev öğret",
   "composer.add.skill": "Bir beceri kullan",
-  "composer.add.context": "Bağlam ekle",
   "composer.upload.cancel": "Yüklemeyi iptal et",
   "composer.upload.uploading": "{name} yükleniyor",
   "composer.upload.progress": "{sent} / {total}",
@@ -108,6 +122,12 @@ export const messages = {
   "composer.error.holdQueued": "Kuyruktaki mesaj düzenleme için bekletilemedi.",
   "composer.error.cancelEdit": "Kuyruk düzenlemesi iptal edilemedi. Tekrar deneyin.",
   "composer.error.updateQueued": "Kuyruktaki mesaj güncellenemedi. Tekrar deneyin.",
+  "composer.queueEdit.received": "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi.",
+  "composer.queueEdit.receivedKept":
+    "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.deletedKept":
+    "Bu mesaj silindi, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.endedKept": "Bu düzenleme kaydedilmeden önce sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
   "composer.voice.prepareFailed": "Ses modeli hazırlanamadı. Tekrar deneyin.",
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",
@@ -117,6 +137,10 @@ export const messages = {
   "composer.error.changeModel": "Model değiştirilemedi. Tekrar deneyin.",
   "composer.error.changeEffort": "Efor değiştirilemedi. Tekrar deneyin.",
   "composer.error.changeFastMode": "Hızlı mod değiştirilemedi. Tekrar deneyin.",
+  "composer.fastMode.confirmTitle": "Hızlı mod açılsın mı?",
+  "composer.fastMode.confirmDescription":
+    "Claude daha hızlı yanıt verir, ancak her token daha pahalıdır. Claude aboneliğinde hızlı mod, planınızda kullanım kalsa bile her zaman kullanım kredisi harcar.",
+  "composer.fastMode.confirm": "Aç",
   "composer.context.label": "Bağlam {percent} dolu",
   "composer.context.labelEstimated": "Bağlam yaklaşık {percent} dolu",
   "composer.context.labelCompacting": "Bağlam sıkıştırılıyor",
@@ -142,4 +166,15 @@ export const messages = {
   "composer.newChat.action": "Yeni sohbet",
   "composer.context.compact": "Şimdi sıkıştır",
   "composer.context.compactFailed": "Bağlam sıkıştırılamadı. Tekrar deneyin.",
+  "composer.picker.option.tab": "{name} tarayıcı sekmesi",
+  "composer.picker.option.thread": "{name} mesaj dizisi",
+  "composer.picker.section.agents": "Ajanlar",
+  "composer.picker.section.files": "Dosyalar",
+  "composer.picker.section.tabs": "Tarayıcı sekmeleri",
+  "composer.picker.section.threads": "Mesaj dizileri",
+  "composer.picker.section.messages": "Mesajlarda",
+  "composer.token.tab": "Tarayıcı sekmesi {name}",
+  "composer.token.thread": "Mesaj dizisi {name}",
+  "composer.token.unavailableTab": "Kapalı tarayıcı sekmesi {name}",
+  "composer.token.unavailableThread": "Kullanılamayan mesaj dizisi {name}",
 } as const satisfies PartialTranslation<typeof source>;

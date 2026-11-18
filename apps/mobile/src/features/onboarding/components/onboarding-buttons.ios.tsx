@@ -14,6 +14,7 @@ import type {
 import { useGlassEntrance } from "@/features/onboarding/components/onboarding-glass";
 import { swapEntering, swapExiting, useOnboardingMotion } from "@/features/onboarding/components/onboarding-motion";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 // Every control beside the main action has its height, so the row reads as one set.
@@ -157,7 +158,7 @@ export function OnboardingIconButton({
       width={size}
       appearDelay={appearDelay}
     >
-      <Icon size={Math.round(size * 0.42)} color={foreground} strokeWidth={2} />
+      <Icon size={Math.round(size * 0.42)} color={foreground} strokeWidth={2} style={MIRROR_IN_RTL} />
     </GlassControl>
   );
 }

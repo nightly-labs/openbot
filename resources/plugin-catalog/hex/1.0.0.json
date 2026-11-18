@@ -1,0 +1,33 @@
+{
+  "slug": "hex",
+  "name": "Hex",
+  "tagline": "Data projects and analysis",
+  "description": "Hex lets agents search projects, read their results, and ask data questions in the signed-in Hex workspace. It needs a Team or Enterprise plan, and each user signs in through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Hex Technologies",
+  "iconUrl": "https://hex.tech/favicon-96x96.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-project", "text": "Find the Hex project that tracks weekly active users." },
+    { "id": "prompt-question", "text": "How did revenue by region change last quarter?" },
+    { "id": "prompt-explain", "text": "Explain what the churn analysis project calculates and which tables it uses." }
+  ],
+  "apps": [
+    {
+      "id": "app-hex-mcp",
+      "name": "Hex",
+      "description": "Project search, results, and data questions, over Hex's MCP server with browser sign-in.",
+      "iconUrl": "https://hex.tech/favicon-96x96.png",
+      "server": {
+        "name": "hex",
+        "transport": "http",
+        "url": "https://app.hex.tech/mcp",
+        "auth": [{ "id": "hex-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://hex.tech",
+  "privacyPolicyUrl": "https://learn.hex.tech/docs/legal/privacy",
+  "termsUrl": "https://learn.hex.tech/docs/legal/terms-and-conditions",
+  "skills": []
+}

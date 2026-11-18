@@ -1,5 +1,6 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentModelId, AgentProviderId, AgentReasoningEffort, UpdateAgentInput } from "@openbot/contracts/ipc";
+import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import type {
   AgentRuntimeSettings,
   AgentRuntimeSettingsPatch,
@@ -41,7 +42,14 @@ export interface SettingsStoreDeps {
   setSettingsReasoning: (effort: AgentReasoningEffort) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   viewIsMounted: () => boolean;
+  /** Gives `false` when no agent is open, and rejects when the save is refused. */
   saveAgentPatch: (updates: Omit<UpdateAgentInput, "agentId">, targetAgentId?: string) => Promise<boolean>;
+}
+
+/** The result of a runtime save. `refusal` holds the error of a refused save, for the reason. */
+interface RuntimeSettingsSave {
+  saved: boolean;
+  refusal?: { error: unknown } | undefined;
 }
 
 export function createSettingsStore(deps: SettingsStoreDeps) {
@@ -50,9 +58,9 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     updates: AgentRuntimeSettingsPatch,
     errorMessage: string | null,
     targetAgentId = deps.props.agent?.id,
-  ): Promise<boolean> {
+  ): Promise<RuntimeSettingsSave> {
     const agentId = targetAgentId;
-    if (!agentId) return false;
+    if (!agentId) return { saved: false };
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId, serverId };
     // Both maps live on the controller, which outlives one server, so the key
@@ -69,7 +77,8 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       releaseSave = resolve;
     });
     deps.runtimeSettingsSaveTails.set(settingsKey, saveTail);
-    let saved: boolean;
+    let saved = false;
+    let refusal: RuntimeSettingsSave["refusal"];
     let baseValid = true;
     let abandoned = false;
     try {
@@ -80,7 +89,13 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       // belongs to the one it was made on, and that one is gone.
       abandoned = !deps.viewIsMounted();
       const completePatch = isCompleteRuntimeSettingsPatch(updates);
-      saved = !abandoned && (baseValid || completePatch) ? await deps.saveAgentPatch(updates, agentId) : false;
+      if (!abandoned && (baseValid || completePatch)) {
+        try {
+          saved = await deps.saveAgentPatch(updates, agentId);
+        } catch (error) {
+          refusal = { error };
+        }
+      }
       if (completePatch) baseValid = saved;
     } finally {
       releaseSave(baseValid);
@@ -89,11 +104,11 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       }
     }
     const latestAttempt = deps.runtimeSettingsAttempts.get(settingsKey);
-    if (latestAttempt?.generation !== generation) return true;
+    if (latestAttempt?.generation !== generation) return { saved: true };
     latestAttempt.pending = false;
     // Nothing left to report to: the pickers, the composer error and the agent
     // this would roll back to all belonged to the conversation that is gone.
-    if (abandoned) return false;
+    if (abandoned) return { saved: false };
     if (saved) {
       const activeAgent = deps.props.agent;
       if (activeAgent?.id === agentId) {
@@ -102,7 +117,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
         deps.setSettingsModel(runtime.model);
         deps.setSettingsReasoning(runtime.reasoningEffort);
       }
-      return true;
+      return { saved: true };
     }
 
     const activeAgent = deps.props.agent;
@@ -111,13 +126,16 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       model: deps.settingsModel(),
       reasoningEffort: deps.settingsReasoning(),
     };
-    if (activeAgent?.id !== agentId || !runtimeSettingsEqual(currentSettings, settings)) return false;
+    if (activeAgent?.id !== agentId || !runtimeSettingsEqual(currentSettings, settings))
+      return { saved: false, refusal };
     const runtime = activeAgent.pendingRuntime ?? activeAgent;
     if (isKnownAgentProvider(runtime.provider)) deps.setSettingsProvider(runtime.provider);
     deps.setSettingsModel(runtime.model);
     deps.setSettingsReasoning(runtime.reasoningEffort);
-    if (errorMessage) deps.setComposerError(errorMessage, target);
-    return false;
+    if (errorMessage) {
+      deps.setComposerError(refusal ? currentText().errorMessage(refusal.error, errorMessage) : errorMessage, target);
+    }
+    return { saved: false, refusal };
   }
 
   async function updateRuntimeSettings(
@@ -130,7 +148,10 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       deps.setSettingsModel(settings.model);
       deps.setSettingsReasoning(settings.reasoningEffort);
     }
-    return saveRuntimeSettings(settings, updates, null, agentId);
+    const result = await saveRuntimeSettings(settings, updates, null, agentId);
+    // The settings panel shows the reason of a refused save next to the change.
+    if (result.refusal) throw result.refusal.error;
+    return result.saved;
   }
 
   async function selectModel(
@@ -141,9 +162,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     accountId?: string | null,
     preferredEffort?: AgentReasoningEffort,
   ): Promise<boolean> {
-    const option = deps.props.modelOptions.find(
-      (candidate) => candidate.provider === provider && candidate.id === model,
-    );
+    const option = findModelOption(deps.props.modelOptions, deps.props.agentStatus.providers, provider, model);
     if (!option) return false;
     const preferred = preferredEffort ?? deps.settingsReasoning();
     const reasoningEffort = option.supportedReasoningEfforts.includes(preferred)
@@ -153,13 +172,14 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     deps.setSettingsModel(model);
     deps.setSettingsReasoning(reasoningEffort);
     if (!persist) return true;
-    return saveRuntimeSettings(
+    const result = await saveRuntimeSettings(
       { provider, model, reasoningEffort },
       accountId === undefined
         ? { provider, model, reasoningEffort }
         : { provider, model, reasoningEffort, providerAccountId: accountId },
       reportComposerError ? currentText().t("composer.error.changeModel") : null,
     );
+    return result.saved;
   }
 
   async function selectAndConfirmModel(
@@ -172,8 +192,11 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
   }
 
   async function selectAndConfirmReasoning(effort: AgentReasoningEffort): Promise<void> {
-    const option = deps.props.modelOptions.find(
-      (candidate) => candidate.provider === deps.settingsProvider() && candidate.id === deps.settingsModel(),
+    const option = findModelOption(
+      deps.props.modelOptions,
+      deps.props.agentStatus.providers,
+      deps.settingsProvider(),
+      deps.settingsModel(),
     );
     if (!option?.supportedReasoningEfforts.includes(effort)) return;
     const settings = {

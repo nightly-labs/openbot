@@ -4,8 +4,25 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз или используйте channel_history для работы с каналом.",
+  "error.agent.historyArgumentsInvalid":
+    "Неверные аргументы истории: {detail} Исправь аргументы и повтори попытку. openbot.tool_describe возвращает схему.",
   "error.agent.toolRequestInvalid":
     "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Инструмент не запущен. В tool_call параметр arguments должен быть объектом JSON, а не текстом. Отправьте вызов снова, передав arguments как объект.",
+  "error.agent.toolCallDiscoveryTool":
+    "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallUnknownTool":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Возможно, полное имя — {name}. Если это так, отправьте вызов снова с этим именем.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe не нашёл инструмент OpenBot с именем {names}. Он описывает только инструменты OpenBot и браузера из списка openbot.tool_search, а не инструменты MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "Вызовите {names} напрямую. tool_describe не описывает инструменты поиска.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
   "error.agent.accessLocalOnly": "Доступ агента можно изменить только на компьютере, где он работает.",
   "error.agent.duplicateCleanupFailed": "Не удалось дублировать агента, а неполную копию удалить не получилось.",
@@ -44,8 +61,12 @@ export const messages = {
   "error.agent.modelNotListed": "Модель «{model}» недоступна. Доступные модели: {models}.",
   "error.agent.providerNotListed":
     "Сейчас нет доступных моделей {provider}. Вызовите list_models, чтобы увидеть доступные модели.",
+  "error.agent.creatorModelNotListed":
+    "Вашей модели «{model}» сейчас нет в списке моделей, поэтому новый агент не может начать работу на ней. Повторите попытку через несколько секунд или укажите в provider и model модель, которую показывает list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Модель «{model}» не поддерживает уровень усилий «{effort}». Поддерживаются: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "У модели «{model}» нет настройки уровня усилий, поэтому его нельзя изменить.",
   "error.agent.noStartingModelInSettings":
     "У {provider} нет доступных моделей, и у других подключённых провайдеров их тоже нет. Войдите в аккаунт провайдера или измените провайдера по умолчанию в разделе Настройки сервера → Провайдеры.",
   "error.agent.noStartingModel":
@@ -57,6 +78,8 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Дождитесь, пока завершатся текущий ход и очередь, прежде чем начинать новый чат.",
   "error.agent.waitBeforeCompactContext": "Дождитесь завершения активного хода и очереди, прежде чем сжимать контекст.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Дождитесь, пока завершатся текущий ход и очередь, прежде чем удалять историю.",
   "error.agent.compactContextUnavailable": "Этот агент сейчас не может сжать свой контекст.",
   "error.agent.unknown": "Неизвестный агент: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -75,6 +98,17 @@ export const messages = {
   "error.agent.endpointRemoved": "Эндпоинт, который использовал этот агент, удалён. Выберите для него другую модель.",
   "error.agent.turnStalled":
     "{provider} перестал отвечать, поэтому OpenBot завершил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.promptCancelled": "{provider} отменил это сообщение до его начала. Отправьте сообщение ещё раз.",
+  "error.agent.toolLoopStopped":
+    "{provider} много раз повторил неудачный шаг, поэтому OpenBot остановил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.answerCutOff":
+    "Агент остановился, не закончив ответ, поэтому ответ неполный. Отправьте сообщение ещё раз.",
+  "error.agent.compactionConnectionLost":
+    "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету, затем отправьте сообщение, чтобы продолжить.",
+  "error.agent.compactionConnectionLostAddress":
+    "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету. Также проверьте, что {variable} в разделе «Переменные» настроек {provider} — это адрес API вашего сервиса моделей (часто заканчивается на /v1). Затем отправьте сообщение.",
+  "error.agent.compactionLoopStopped":
+    "{provider} снова и снова сжимал контекст, но каждый раз он оставался слишком полным, чтобы продолжить, поэтому OpenBot остановил этот ход. Отключите серверы MCP или управление компьютером, которые этому агенту не нужны, затем отправьте сообщение. Если вы или агент изменили, когда {provider} сжимает контекст, отмените это изменение.",
   "error.agent.selectedGone": "Выбранного агента больше нет.",
   "error.agent.profileEndpointsChanged": "Пользовательские эндпоинты изменились во время создания. Повторите попытку.",
   "error.agent.profileInvalid": "Провайдер вернул некорректный профиль. Попробуйте изменить запрос.",
@@ -105,6 +139,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Изменить этот параметр можно только на компьютере, где работает агент.",
   "error.agent.sideQuestionBusy": "Выполняется слишком много побочных вопросов. Повторите попытку чуть позже.",
   "error.agent.sideQuestionFailed": "Агенту не удалось ответить на побочный вопрос. Повторите попытку.",
+  "error.agent.webSearchSignIn": "Для веб-поиска нужен вход в Codex с аккаунтом ChatGPT.",
+  "error.agent.webSearchBusy": "Выполняется слишком много поисков и побочных вопросов. Повторите попытку чуть позже.",
+  "error.agent.webSearchFailed": "Веб-поиск не завершился. Повторите попытку.",
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",
@@ -124,14 +161,21 @@ export const messages = {
     "На этом сервере мало памяти. Ваше сообщение ждёт в очереди и начнётся, когда память освободится.",
   "error.agent.workspaceOnlyToolMissing":
     "Для режима «Только рабочее пространство» нужен {tool}, но OpenBot его не нашёл. Установите его или выберите «Полный доступ» в настройках агента.",
+  "error.agent.codexSandboxUnavailable":
+    "Режиму «Только рабочее пространство» нужна песочница Codex, но Codex не может запустить её на этом компьютере, поэтому команды агента не выполняются. Выберите «Сначала спрашивать» или «Полный доступ» в настройках агента.",
   "error.agent.claudeSandboxUnavailable":
     "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере: {reason}. Выберите «Полный доступ» или другого провайдера в настройках агента.",
+  "error.agent.claudeNoSandbox":
+    "Claude не может использовать песочницу на этом компьютере, поэтому режим «Только рабочее пространство» с ним не работает. Выберите «Полный доступ» или другого провайдера в настройках агента.",
+  "error.agent.claudeSandboxBlocked":
+    "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере, поэтому команды агента не выполняются. Выберите «Полный доступ» или другого провайдера в настройках агента.",
   "error.agent.screenCaptureOff":
     "Снимки экрана для этого агента выключены. Пользователь может включить управление компьютером в настройках агента.",
   "error.agent.screenCaptureUnavailable": "Снимки экрана недоступны на этом компьютере.",
   "error.agent.screenCaptureShared":
     "Снимки экрана не работают в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
   "error.agent.screenCaptureDeclined": "Пользователь не разрешил этот снимок экрана. Ничего не снято.",
+  "error.agent.mcpToolDeclined": "Пользователь не разрешил этот вызов инструмента MCP. Инструмент не был запущен.",
   "error.agent.screenCaptureWindowMissing":
     "Это окно сейчас не открыто. Вызовите list_capture_sources, чтобы получить текущие ID окон.",
   "error.agent.screenCaptureDisplayMissing":

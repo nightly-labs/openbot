@@ -4,8 +4,26 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Der Verlauf ist für diese Anfrage nicht verfügbar. Lies den aktuellen Verlauf erneut oder verwende channel_history für Arbeit in Kanälen.",
+  "error.agent.historyArgumentsInvalid":
+    "Ungültige Verlaufsargumente: {detail} Korrigiere die Argumente und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.toolRequestInvalid":
     "Ungültige Argumente für die Werkzeugsuche. Verwende das deklarierte Schema und einen originalen qualifizierten Werkzeugnamen.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Das Werkzeug wurde nicht ausgeführt. In tool_call muss arguments ein JSON-Objekt sein, kein Text. Sende den Aufruf erneut mit arguments als Objekt.",
+  "error.agent.toolCallDiscoveryTool":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallUnknownTool":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe hat kein OpenBot-Werkzeug mit dem Namen {names} gefunden. Es beschreibt nur die OpenBot- und Browser-Werkzeuge, die openbot.tool_search auflistet, keine MCP-Werkzeuge.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Rufe {names} direkt auf. tool_describe beschreibt die Suchwerkzeuge nicht.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Der Zeitplan der Routine ist ungültig: {detail} Korrigiere den Zeitplan und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
   "error.agent.accessLocalOnly":
     "Der Agentenzugriff kann nur auf dem Computer geändert werden, auf dem der Agent läuft.",
@@ -52,8 +70,12 @@ export const messages = {
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":
     "Derzeit ist kein Modell von {provider} verfügbar. Rufe list_models auf, um die verfügbaren Modelle zu sehen.",
+  "error.agent.creatorModelNotListed":
+    "Dein Modell „{model}“ ist gerade nicht in der Modellliste, daher kann der neue Agent nicht damit starten. Versuche es in ein paar Sekunden erneut, oder setze provider und model auf ein Modell, das list_models zeigt.",
   "error.agent.reasoningEffortUnsupported":
     "Das Modell „{model}“ unterstützt den Denkaufwand „{effort}“ nicht. Unterstützte Stufen: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Das Modell „{model}“ hat keine Einstellung für den Denkaufwand. Du kannst ihn deshalb nicht ändern.",
   "error.agent.noStartingModelInSettings":
     "{provider} hat kein verfügbares Modell, und kein anderer angemeldeter Anbieter hat eines. Melde dich bei einem Anbieter an oder ändere den Standardanbieter unter Servereinstellungen → Anbieter.",
   "error.agent.noStartingModel":
@@ -66,6 +88,8 @@ export const messages = {
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du einen neuen Chat beginnst.",
   "error.agent.waitBeforeCompactContext":
     "Warte, bis der aktive Durchlauf und die Warteschlange fertig sind, bevor du den Kontext komprimierst.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du den Verlauf löschst.",
   "error.agent.compactContextUnavailable": "Dieser Agent kann seinen Kontext jetzt nicht komprimieren.",
   "error.agent.unknown": "Unbekannter Agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -85,6 +109,18 @@ export const messages = {
     "Der von diesem Agenten verwendete Endpunkt wurde entfernt. Wähle ein anderes Modell für ihn.",
   "error.agent.turnStalled":
     "{provider} reagiert nicht mehr, daher hat OpenBot diesen Durchlauf beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.promptCancelled":
+    "{provider} hat diese Nachricht abgebrochen, bevor sie begann. Sende die Nachricht erneut.",
+  "error.agent.toolLoopStopped":
+    "{provider} hat einen fehlgeschlagenen Schritt viele Male wiederholt, daher hat OpenBot diesen Durchgang beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.answerCutOff":
+    "Der Agent hat angehalten, bevor er seine Antwort beendet hat, daher ist die Antwort nicht vollständig. Sende die Nachricht erneut.",
+  "error.agent.compactionConnectionLost":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und sende dann eine Nachricht, um fortzufahren.",
+  "error.agent.compactionConnectionLostAddress":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und ob {variable} unter Variablen in den {provider}-Einstellungen die API-Adresse deines Modelldienstes ist (oft mit /v1 am Ende). Sende dann eine Nachricht.",
+  "error.agent.compactionLoopStopped":
+    "{provider} hat den Kontext immer wieder komprimiert, und jedes Mal blieb er zu voll, um weiterzumachen. Daher hat OpenBot diesen Durchlauf angehalten. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, und sende dann eine Nachricht. Wenn du oder der Agent geändert habt, wann {provider} komprimiert, mach diese Änderung rückgängig.",
   "error.agent.selectedGone": "Der gewählte Agent existiert nicht mehr.",
   "error.agent.profileEndpointsChanged":
     "Die benutzerdefinierten Endpunkte wurden während der Erstellung geändert. Versuche es erneut.",
@@ -123,6 +159,9 @@ export const messages = {
     "Nur der Computer, auf dem der Agent läuft, kann diese Einstellung ändern.",
   "error.agent.sideQuestionBusy": "Es laufen zu viele Nebenfragen. Versuche es gleich noch einmal.",
   "error.agent.sideQuestionFailed": "Der Agent konnte die Nebenfrage nicht beantworten. Versuche es erneut.",
+  "error.agent.webSearchSignIn": "Die Websuche braucht eine Codex-Anmeldung mit einem ChatGPT-Konto.",
+  "error.agent.webSearchBusy": "Es laufen zu viele Suchen und Nebenfragen. Versuche es gleich noch einmal.",
+  "error.agent.webSearchFailed": "Die Websuche wurde nicht abgeschlossen. Versuche es erneut.",
   "error.agent.busyMessageModeLocalOnly":
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":
@@ -144,8 +183,14 @@ export const messages = {
     "Dieser Server hat wenig freien Arbeitsspeicher. Deine Nachricht wartet in der Warteschlange und startet, wenn Speicher frei ist.",
   "error.agent.workspaceOnlyToolMissing":
     "„Nur Arbeitsbereich“ benötigt {tool}, das OpenBot nicht gefunden hat. Installiere es oder wähle „Voller Zugriff“ in den Agenteneinstellungen.",
+  "error.agent.codexSandboxUnavailable":
+    "„Nur Arbeitsbereich“ braucht die Codex-Sandbox, die Codex auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Erst fragen“ oder „Voller Zugriff“ in den Agenteneinstellungen.",
   "error.agent.claudeSandboxUnavailable":
     "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeNoSandbox":
+    "Claude kann auf diesem Computer keine Sandbox nutzen, daher funktioniert „Nur Arbeitsbereich“ damit nicht. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeSandboxBlocked":
+    "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
     "Die Bildschirmaufnahme ist für diesen Agenten deaktiviert. Der Benutzer kann die Computersteuerung in den Agenteneinstellungen aktivieren.",
   "error.agent.screenCaptureUnavailable": "Die Bildschirmaufnahme ist auf diesem Computer nicht verfügbar.",
@@ -153,6 +198,8 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.mcpToolDeclined":
+    "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":
     "Dieses Fenster ist gerade nicht geöffnet. Rufe list_capture_sources auf, um die aktuellen Fenster-IDs zu erhalten.",
   "error.agent.screenCaptureDisplayMissing":

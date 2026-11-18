@@ -1,17 +1,20 @@
 // Reads the newest release of each provider CLI for each target, as each user's update check does.
-// Then it installs the newest release of each provider that has a free model, and runs the conformance
-// cases on it with no account: model list, turn, cancel and a turn after it, resume in a new process,
-// and a missing session. A CLI release reaches users within an hour of
-// its publication, so a scheduled run finds a broken release before many users install it. Add the
-// version to `provider-runtime-blocklist.json` to stop the offer.
+// Then it installs the newest release of each provider that it can run with no account, and runs the
+// conformance cases on it: model list, turn, cancel and a turn after it, resume in a new process, and a
+// missing session. OpenCode uses a fake model on loopback, given as a custom endpoint: the shared free OpenCode models have a
+// usage limit that the runners of all GitHub users reach, so a turn on them fails for no CLI fault.
+// A CLI release reaches users within an hour of its publication, so a scheduled run finds a broken
+// release before many users install it. Add the version to `provider-runtime-blocklist.json` to stop
+// the offer.
 // The run uses a new home folder, so it never reads the account of the person who runs it.
 // `bun run test:provider-cli-canary [-- opencode]`. Writes .openbot-build/provider-cli-canary/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { MANAGED_RUNTIME_PROVIDERS, type ManagedProviderId } from "@openbot/contracts/ipc";
-import { Effect } from "effect";
+import { Effect, Option, Schema } from "effect";
 import lockValue from "../native-runtime.lock.json";
 import { isMissingProviderSessionError } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -34,10 +37,13 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-cli-canary"
 const REQUEST_TIMEOUT_MS = 120_000;
 const TARGETS: readonly RuntimeTarget[] = ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64"];
 
-/** Each provider that has a model with no account and no cost, and that model. */
+/** Each provider that the canary runs with no account, and its model. */
 const FREE_MODELS: Readonly<Partial<Record<ManagedProviderId, string>>> = {
-  opencode: "opencode/big-pickle",
+  opencode: "canary/fake",
 };
+/** The prompt that the fake model answers slowly, so that a cancel arrives while the turn is open. */
+const LONG_PROMPT = "Count from 1 to 2000, one number on each line.";
+const FAKE_STREAM_LIMIT_MS = 30_000;
 
 /** Why the canary does not run a provider. */
 const NOT_COVERED: Readonly<Record<string, string>> = {
@@ -51,6 +57,8 @@ const NOT_COVERED: Readonly<Record<string, string>> = {
   pi: "Needs a provider API key.",
   muse: "Needs a Muse account.",
   devin: "Needs a Devin account.",
+  copilot: "Needs a GitHub account with a Copilot plan.",
+  mistral: "Needs a Mistral account or API key.",
 };
 
 interface CanaryResult {
@@ -80,7 +88,7 @@ function requestedProviders(): ManagedProviderId[] {
   const known = Object.keys(FREE_MODELS).filter((name): name is ManagedProviderId => name in FREE_MODELS);
   if (names.length === 0) return known;
   const unknown = names.filter((name) => !known.some((provider) => provider === name));
-  if (unknown.length > 0) throw new Error(`No free model is known for: ${unknown.join(", ")}.`);
+  if (unknown.length > 0) throw new Error(`The canary cannot run: ${unknown.join(", ")}.`);
   return known.filter((provider) => names.includes(provider));
 }
 
@@ -100,6 +108,84 @@ Object.assign(process.env, {
 });
 
 const lock = parseAgentRuntimeLock(lockValue);
+
+/** The part of an OpenAI chat completions request that the fake model reads. */
+const ChatRequest = Schema.fromJsonString(
+  Schema.Struct({
+    messages: Schema.Array(
+      Schema.Struct({
+        role: Schema.String,
+        content: Schema.Union([Schema.String, Schema.Array(Schema.Struct({ text: Schema.optional(Schema.String) }))]),
+      }),
+    ),
+  }),
+);
+
+/** The text of the last user message in a chat completions request. */
+function lastUserText(body: string): string {
+  const request = Schema.decodeUnknownOption(ChatRequest)(body);
+  if (Option.isNone(request)) return "";
+  const content = request.value.messages.findLast((message) => message.role === "user")?.content ?? "";
+  return typeof content === "string" ? content : content.map((part) => part.text ?? "").join("");
+}
+
+/** Answers each chat completion with "ok", and the long prompt with one number every 50 ms until the client stops. */
+function answerFakeModel(request: IncomingMessage, response: ServerResponse, body: string): void {
+  if (!request.url?.endsWith("/chat/completions")) {
+    response.writeHead(404).end();
+    return;
+  }
+  const chunk = (delta: { readonly role?: "assistant"; readonly content?: string }, finish: string | null) =>
+    `data: ${JSON.stringify({ id: "canary", object: "chat.completion.chunk", created: 0, model: "fake", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+  const end = () => {
+    response.write(chunk({}, "stop"));
+    response.end("data: [DONE]\n\n");
+  };
+  response.writeHead(200, { "content-type": "text/event-stream" });
+  response.write(chunk({ role: "assistant", content: "" }, null));
+  if (!lastUserText(body).includes(LONG_PROMPT)) {
+    response.write(chunk({ content: "ok" }, null));
+    end();
+    return;
+  }
+  let count = 0;
+  const timer = setInterval(() => {
+    count += 1;
+    response.write(chunk({ content: `${count}\n` }, null));
+    if (count * 50 >= FAKE_STREAM_LIMIT_MS) {
+      clearInterval(timer);
+      end();
+    }
+  }, 50);
+  response.on("close", () => clearInterval(timer));
+}
+
+const fakeModel = createServer((request, response) => {
+  let body = "";
+  request.on("data", (part) => {
+    body += part;
+  });
+  request.on("end", () => answerFakeModel(request, response, body));
+});
+await new Promise<void>((done) => fakeModel.listen(0, "127.0.0.1", done));
+const fakeAddress = fakeModel.address();
+if (!fakeAddress || typeof fakeAddress !== "object") throw new Error("The fake model server has no port.");
+const fakePort = fakeAddress.port;
+
+/** The fake model, given as a custom endpoint, as OpenBot gives a user's endpoint to OpenCode. */
+const CANARY_CREDENTIALS = {
+  ...NO_PROVIDER_CREDENTIALS,
+  customProviders: () => [
+    {
+      id: "canary",
+      name: "Canary",
+      baseUrl: `http://127.0.0.1:${fakePort}/v1`,
+      apiKey: "canary",
+      models: [{ id: "fake", name: "Fake" }],
+      headers: [],
+    },
+  ],
+};
 
 /** Every provider's newest release must be readable for every target, or no user gets the update. */
 async function readReleases(): Promise<string[]> {
@@ -162,7 +248,7 @@ async function canary(manager: ProviderRuntimeManager, provider: ManagedProvider
     const client = driver.createClient(
       { executable, version, source: "managed" },
       REQUEST_TIMEOUT_MS,
-      NO_PROVIDER_CREDENTIALS,
+      CANARY_CREDENTIALS,
     );
     clients.push(client);
     client.start();
@@ -188,7 +274,7 @@ async function canary(manager: ProviderRuntimeManager, provider: ManagedProvider
       if (notification.method === "turn/started") started();
     });
   });
-  const waiting = runTurn(client, thread, { model, text: "Count from 1 to 2000, one number on each line." });
+  const waiting = runTurn(client, thread, { model, text: LONG_PROMPT });
   // A turn that fails before it starts ends the wait too.
   await Promise.race([started, waiting]);
   await runCauseEffect(client.request("turn/interrupt", { threadId: thread }, (value) => value));
@@ -244,6 +330,8 @@ try {
 } finally {
   await stopClients(clients);
   await runCauseEffect(manager.stop()).catch(() => undefined);
+  fakeModel.closeAllConnections();
+  fakeModel.close();
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

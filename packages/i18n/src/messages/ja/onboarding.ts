@@ -45,6 +45,8 @@ export const messages = {
   "onboarding.provider.clineAccount": "Cline アカウントで無料モデル",
   "onboarding.provider.kimiAccount": "Kimi Code アカウントで Kimi モデル",
   "onboarding.provider.devinAccount": "Devin アカウントで使える多数のモデル",
+  "onboarding.provider.copilotAccount": "Copilot プランで使える多数のモデル",
+  "onboarding.provider.mistralAccount": "Mistral アカウントで使える Mistral のモデル",
   "onboarding.provider.hermesNous": "Nous Portal プランまたはお使いの Hermes の設定",
   "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
   "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",
@@ -103,7 +105,7 @@ export const messages = {
   "onboarding.action.connect": "接続",
   "onboarding.action.open": "OpenBot を開く",
   "onboarding.action.next": "次へ",
-  "onboarding.server.title": "{server} をセットアップ",
+  "onboarding.server.title": "{server} へようこそ",
   "onboarding.server.description":
     "OpenBot には AI のサブスクリプションが含まれていません。エージェントを作成する前に、このサーバーにご自身のプロバイダーを接続してください。",
   "onboarding.server.label": "このサーバーの AI プロバイダーを選択",

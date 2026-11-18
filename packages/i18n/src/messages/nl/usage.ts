@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Tokens",
   "usage.column.date": "Datum",
   "usage.column.costUsd": "Kosten · USD",
+  "usage.column.loads": "Laadbeurten",
+  "usage.column.agents": "Agents",
   "usage.empty": "Geen gebruik vastgelegd in deze periode.",
   "usage.partial":
     "Gedeeltelijke gegevens · {turns} beurten hebben geen gemeld gebruik; {unpriced} records hebben geen kostenschatting; {incomplete} records hebben onvolledige tokengegevens.",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "Model",
   "usage.breakdown.agent": "Agent",
   "usage.breakdown.day": "Dag",
+  "usage.breakdown.skill": "Vaardigheid",
   "usage.breakdown.byModel": "Gebruik per model",
   "usage.breakdown.byAgent": "Gebruik per agent",
   "usage.breakdown.byDay": "Dagelijks gebruik en kosten",
+  "usage.breakdown.bySkill": "Gebruik per vaardigheid",
+  "usage.breakdown.skillEmpty": "Geen vaardigheden geladen in deze periode.",
   "usage.unknownModel": "Onbekend model",
   "usage.footer": "Verzameling gestart {started} · Bijgewerkt {updated}",
   "usage.updatedNever": "nooit",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Deze host ondersteunt geen agentanalyses. Werk de host bij om deze weergave te gebruiken.",
   "usage.panel.loadFailed": "Kan gebruik niet laden. Controleer de verbinding en de periode.",
+  "usage.machine.label": "Machinegebruik. CPU: {cpu}, geheugen: {memory}",
+  "usage.machine.openStorage": "Opslag openen. Schijf: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -12,11 +12,16 @@
 }
 
 /*
- * A page in the chat starts at the edge of the agent's reply below it (an agent chat shows no avatar
- * column) and is as wide as a wide agent bubble.
+ * A page in the chat starts at the edge of the agent's reply below it and is as wide as a wide agent
+ * bubble, which grows with the chat.
  */
 .chat-visual-reply {
-  max-width: 720px;
+  max-width: var(--message-wide-bubble-width);
+}
+
+/* In a chat with agent faces, the page starts after the face column, as the agent's bubbles do. */
+.chat-visual-with-author {
+  padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
 }
 
 /* A page that fills a panel. The page has no margin, so the frame gives it one. */
@@ -109,31 +114,33 @@
   background: var(--openbot-bg-sidebar);
 }
 
-/* The expand button shows when the pointer or the focus is on the page. */
-:where(.ui-button).chat-visual-expand {
+/* The page buttons show when the pointer or the focus is on the page. */
+.chat-visual-actions {
   position: absolute;
   top: var(--openbot-space-2);
   inset-inline-end: var(--openbot-space-2);
+  display: flex;
+  gap: var(--openbot-space-1);
   opacity: 0;
   transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-.chat-visual-expand svg {
+.chat-visual-actions svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
 }
 
-.chat-visual-box:popover-open > .chat-visual-expand {
+.chat-visual-box:popover-open > .chat-visual-actions {
   display: none;
 }
 
-.chat-visual-box:hover > .chat-visual-expand,
-.chat-visual-box:focus-within > .chat-visual-expand {
+.chat-visual-box:hover > .chat-visual-actions,
+.chat-visual-box:focus-within > .chat-visual-actions {
   opacity: 1;
 }
 
 @media (hover: none) {
-  :where(.ui-button).chat-visual-expand {
+  .chat-visual-actions {
     opacity: 1;
   }
 }

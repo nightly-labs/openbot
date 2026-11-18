@@ -218,7 +218,7 @@ export function renderContactMessageEmail(input: ContactMessageEmailInput): Rend
 }
 
 // Sent once to an account, when its first plan starts. Kamil signs it, and a reply goes to the
-// sending mailbox.
+// team's inbox (`EMAIL_REPLY_TO`).
 export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   const serverName = input.serverName.trim();
   const planName = PLAN_NAMES[input.plan];
@@ -227,7 +227,7 @@ export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   const reachOut =
     "I just wanted to personally say hello and let you know that if you run into any issues or have any feedback or suggestions - feel free to reach out to me directly by replying to this email.";
   const feedback =
-    "Every piece of feedback is incredibly valuable to us, especially as we’re still at an early stage and continuously improving the product.";
+    "Every piece of feedback is incredibly valuable to us. We ship updates almost every day, and your feedback shapes what comes next.";
   const footer = "You receive this email because you started an OpenBot subscription.";
   return {
     subject,
@@ -272,7 +272,7 @@ export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   };
 }
 
-/** Each license email goes from the license sender, and a reply goes to that mailbox. */
+/** Each license email goes from the license sender, and a reply goes to the license inbox. */
 export function renderLicenseEmail(input: LicenseEmailInput): RenderedEmail {
   switch (input.kind) {
     case "welcome":

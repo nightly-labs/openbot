@@ -13,7 +13,7 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { MACHINE_RESOURCES_SHOWN } from "../files/machine-resources";
 import { canManageStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
-import { sidebarPort } from "./sidebar-port";
+import { type SidebarCardsPort, sidebarPort } from "./sidebar-port";
 
 /** A closed card stays closed on this computer, per server, until another metric or level alerts. */
 const DISMISSED_KEY_PREFIX = "openbot:machine-card-dismissed:";
@@ -74,7 +74,7 @@ function writeDismissed(serverId: string, value: string | null): void {
  * Only an owner or admin sees it, as only they can read the machine. A remote host without
  * `machine-resources-v1` shows no card; the storage card still warns about its disk.
  */
-export function createMachineCard(server: () => ServerSummary | undefined) {
+export function createMachineCard(server: () => ServerSummary | undefined, port: () => SidebarCardsPort = sidebarPort) {
   const [reading, setReading] = createSignal<{
     serverId: string;
     metrics: MachineMetrics;
@@ -93,8 +93,8 @@ export function createMachineCard(server: () => ServerSummary | undefined) {
   });
 
   function refresh(serverId: string): void {
-    const port = sidebarPort();
-    Promise.all([port.storage.getMachineMetrics(serverId), port.hostAdmin.getMachineAlerts(serverId)]).then(
+    const calls = port();
+    Promise.all([calls.storage.getMachineMetrics(serverId), calls.hostAdmin.getMachineAlerts(serverId)]).then(
       ([metrics, alerts]) => {
         // An answer for a server that is no longer selected is dropped.
         if (untrack(target) !== serverId) return;

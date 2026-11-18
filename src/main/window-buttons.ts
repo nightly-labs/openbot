@@ -3,7 +3,7 @@ import { app, type BrowserWindow } from "electron";
 
 /**
  * The macOS window buttons sit at the inline start of the page: the top left in a left-to-right
- * language and the top right in Arabic, as in other Arabic macOS apps. The renderer keeps its top
+ * language and the top right in Arabic and Hebrew, as in other right-to-left macOS apps. The renderer keeps its top
  * row clear of them with `padding-inline-start`.
  *
  * AppKit puts the buttons on the right only when Chromium's own locale is right to left, and Chromium

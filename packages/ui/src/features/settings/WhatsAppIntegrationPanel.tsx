@@ -40,7 +40,7 @@ import {
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createStore, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
-import { WhatsAppMark } from "./brand-marks";
+import { WhatsAppTile } from "./brand-marks";
 import {
   type ChannelAgent,
   ChannelConnectionRow,
@@ -53,6 +53,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import {
   type IntegrationPageSlots,
@@ -104,6 +105,10 @@ export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
   onSetOwnNumber: (workspaceId: string, ownNumber: boolean) => void;
+  /** Shown only for a number whose account carries `workingMessage`: an older joined server cannot set it. */
+  onSetWorkingMessage: (workspaceId: string, workingMessage: boolean) => void;
+  /** Shown only for a number whose account carries `statusReactions`: an older joined server cannot set it. */
+  onSetStatusReactions: (workspaceId: string, statusReactions: boolean) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
   /** The groups of a linked number, to choose from. Rejects with the reason. */
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
@@ -162,9 +167,14 @@ const WHATSAPP_HOST_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   // WhatsApp removed the linked device: only a new link brings the number back.
   invalid_token: "connector.whatsapp.helpLoggedOut",
-  secret_storage_unavailable: "connector.whatsapp.helpError",
+  // The saved keys of the number cannot be read: a reconnect has nothing to connect with.
+  secret_storage_unavailable: "connector.whatsapp.helpKeysUnreadable",
   error: "connector.whatsapp.helpError",
 };
+
+/** True when only a new link from the phone brings the number back. */
+const needsNewLink = (connection: MessagingConnection) =>
+  connection.state === "invalid_token" || connection.state === "secret_storage_unavailable";
 
 const LINK_ERROR = {
   timeout: "connector.whatsapp.failedTimeout",
@@ -209,7 +219,9 @@ export function whatsappIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.whatsapp.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.whatsapp.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.whatsapp.statusConnected", attention }
+  );
 }
 
 /** Where the link dialog starts: at the number link, or at the orchestrator of the linked numbers. */
@@ -279,7 +291,7 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
   return (
     <ChannelPage
       text={props.hostName ? WHATSAPP_HOST_TEXT : WHATSAPP_TEXT}
-      logo={<WhatsAppMark />}
+      logo={<WhatsAppTile />}
       state={whatsappIntegrationState(props.connections, props.agents, props.loadError)}
       connections={props.connections}
       unknown={messagingStateUnknown(props)}
@@ -314,14 +326,13 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                   <>
                     <ChannelConnectionRow
                       text={WHATSAPP_TEXT}
-                      logo={<WhatsAppMark />}
+                      logo={<WhatsAppTile />}
                       connection={connection}
                       note={note(connection)}
                       busy={props.busy}
-                      // WhatsApp removed the device. Only a new link from the phone brings the number back.
-                      canReconnect={connection.state !== "invalid_token"}
+                      canReconnect={!needsNewLink(connection)}
                       action={
-                        <Show when={connection.state === "invalid_token"}>
+                        <Show when={needsNewLink(connection)}>
                           <Button
                             type="button"
                             size="sm"
@@ -340,14 +351,36 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                     />
                     <Show when={account(connection.workspaceId)}>
                       {(settings) => (
-                        <SwitchField
-                          class="settings-modal-row"
-                          checked={settings().ownNumber}
-                          disabled={props.busy}
-                          onChange={(checked) => props.onSetOwnNumber(connection.workspaceId, checked)}
-                          label={t("connector.whatsapp.ownNumber")}
-                          description={t("connector.whatsapp.ownNumberDescription")}
-                        />
+                        <>
+                          <SwitchField
+                            class="settings-modal-row"
+                            checked={settings().ownNumber}
+                            disabled={props.busy}
+                            onChange={(checked) => props.onSetOwnNumber(connection.workspaceId, checked)}
+                            label={t("connector.whatsapp.ownNumber")}
+                            description={t("connector.whatsapp.ownNumberDescription")}
+                          />
+                          <Show when={settings().workingMessage !== undefined}>
+                            <SwitchField
+                              class="settings-modal-row"
+                              checked={settings().workingMessage !== false}
+                              disabled={props.busy}
+                              onChange={(checked) => props.onSetWorkingMessage(connection.workspaceId, checked)}
+                              label={t("connector.whatsapp.workingMessage")}
+                              description={t("connector.whatsapp.workingMessageDescription")}
+                            />
+                          </Show>
+                          <Show when={settings().statusReactions !== undefined}>
+                            <SwitchField
+                              class="settings-modal-row"
+                              checked={settings().statusReactions !== false}
+                              disabled={props.busy}
+                              onChange={(checked) => props.onSetStatusReactions(connection.workspaceId, checked)}
+                              label={t("connector.whatsapp.statusReactions")}
+                              description={t("connector.whatsapp.statusReactionsDescription")}
+                            />
+                          </Show>
+                        </>
                       )}
                     </Show>
                   </>
@@ -425,7 +458,7 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
       />
       <ChannelDisconnectDialog
         text={WHATSAPP_TEXT}
-        logo={<WhatsAppMark />}
+        logo={<WhatsAppTile />}
         connection={disconnecting()}
         title={t("connector.whatsapp.disconnectTitle", { number: disconnectingName() })}
         description={t("connector.whatsapp.disconnectDescription", { number: disconnectingName() })}
@@ -636,7 +669,7 @@ function ContactDialog(props: {
       open={props.workspaceId !== null}
       closeLabel={t("connector.whatsapp.close")}
       onClose={props.onClose}
-      logo={<WhatsAppMark />}
+      logo={<WhatsAppTile />}
       link="connected"
       title={t("connector.whatsapp.contactTitle")}
       description={t("connector.whatsapp.contactDescription")}
@@ -751,7 +784,7 @@ function GroupDialog(props: {
       open={props.workspaceId !== null}
       closeLabel={t("connector.whatsapp.close")}
       onClose={props.onClose}
-      logo={<WhatsAppMark />}
+      logo={<WhatsAppTile />}
       link="connected"
       title={t("connector.whatsapp.groupTitle")}
       description={t("connector.whatsapp.groupDescription")}
@@ -968,7 +1001,7 @@ export function WhatsAppLinkDialog(props: {
       onClose={props.onClose}
       // A click outside must not stop a link that waits for the phone.
       dismissible={phase() !== "waiting"}
-      logo={<WhatsAppMark />}
+      logo={<WhatsAppTile />}
       link={dialogLink()}
       title={copy().title}
       description={copy().description}

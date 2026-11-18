@@ -9,8 +9,14 @@ import {
   type AgentProviderRef,
   type AgentStatus,
   type ClientAgentModelOption,
+  type MessagingPlatform,
+  type ProviderAccountStatus,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
+  type WorkflowMediaAspect,
+  type WorkflowMediaKind,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
@@ -46,6 +52,10 @@ export interface WorkflowPlace {
   placeId: string;
   /** The name of the place, as the user knows it, such as "#general". */
   label: string;
+  /** The app, the connection and the place name alone, so a list can group the places by connection. */
+  platform: MessagingPlatform;
+  connection: string;
+  name: string;
 }
 
 /** A Discord server that a Discord trigger listens to or that a Discord output acts on. */
@@ -72,6 +82,12 @@ export interface WorkflowSlackWorkspace {
   channels: readonly { id: string; name: string }[];
 }
 
+/** An OpenBot channel that an output posts its result to. */
+export interface WorkflowChannel {
+  id: string;
+  name: string;
+}
+
 /** A model that an image step can draw with. */
 export interface WorkflowImageModel {
   id: string;
@@ -80,6 +96,29 @@ export interface WorkflowImageModel {
   provider: ProviderLogoVariant;
   /** The company that makes the model. */
   maker: string;
+  /** The subscription that pays for the file, such as "ChatGPT". */
+  subscription: string;
+  /** True when the provider uses an API key in place of the subscription, so each file costs money. */
+  apiKey?: boolean;
+  /** True when each file spends credits of the provider account, such as Sunra credits. */
+  credits?: boolean;
+  /** What the model can make. */
+  kinds: readonly WorkflowMediaKind[];
+  /** Whether a video can speak in a preset voice. */
+  voices?: boolean;
+  /** The aspect ratios that it makes. Every one when absent. */
+  aspects?: readonly WorkflowMediaAspect[];
+  /** The lengths of a video in seconds. The default lengths when absent. */
+  durations?: readonly number[];
+  /** The resolutions that it makes, the default first. */
+  resolutions?: readonly string[];
+  /** Whether an image can have a transparent background. */
+  transparent?: boolean;
+  /**
+   * The accounts of the provider, when it has more than one and the host makes a file on the account
+   * of the step (`workflows-media-account-v1`). The picker then has one entry for each account.
+   */
+  accounts?: readonly ProviderAccountStatus[];
 }
 
 /**
@@ -98,9 +137,32 @@ export interface WorkflowCatalogs {
   telegram?: readonly WorkflowTelegramChat[] | undefined;
   /** The Slack workspaces of the host. Only the host that runs the workflow has them. */
   slack?: readonly WorkflowSlackWorkspace[] | undefined;
+  /** The open OpenBot channels of the host. Only this computer gives them. */
+  channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  /**
+   * What one file of a Sunra or Higgsfield model costs with the choices of a step, as the service
+   * quotes it (`workflows-media-catalog-v1`). Without it, a step shows no price.
+   */
+  mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  /**
+   * Whether an image step can have a custom size in pixels, which the host crops and scales the picture
+   * of the model to, or the aspect ratios 4:5 and 5:4 (`workflows-media-size-v1`). An older host reads
+   * them as the first aspect ratio of the model.
+   */
+  mediaSize?: boolean | undefined;
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
+  /**
+   * The address of an image or a video that a media step made, from the attachment id of its result.
+   * A host without it shows the results that `files` names.
+   */
+  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | undefined) | undefined;
+  /**
+   * Sends a picture from the computer to the host and answers it as a Library file. The host shows
+   * why it refused one. Without it, a file from the computer stays in the page.
+   */
+  upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
   /** The name of the user, which a new sticky note saves as its author. */
   self?: string | undefined;
 }

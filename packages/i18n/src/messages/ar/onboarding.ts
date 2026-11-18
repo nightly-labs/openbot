@@ -42,6 +42,8 @@ export const messages = {
   "onboarding.provider.clineAccount": "نماذج مجانية مع حساب Cline",
   "onboarding.provider.kimiAccount": "نماذج Kimi مع حساب Kimi Code",
   "onboarding.provider.devinAccount": "نماذج كثيرة مع حساب Devin",
+  "onboarding.provider.copilotAccount": "نماذج كثيرة مع خطة Copilot",
+  "onboarding.provider.mistralAccount": "نماذج Mistral مع حساب Mistral",
   "onboarding.provider.hermesNous": "خطة Nous Portal أو إعداد Hermes الخاص بك",
   "onboarding.provider.inceptionKey": "نماذج Mercury مع مفتاح API من Inception",
   "onboarding.provider.deepseekKey": "نماذج DeepSeek مع مفتاح API من DeepSeek",
@@ -98,7 +100,7 @@ export const messages = {
   "onboarding.action.connect": "ربط",
   "onboarding.action.open": "فتح OpenBot",
   "onboarding.action.next": "التالي",
-  "onboarding.server.title": "إعداد {server}",
+  "onboarding.server.title": "مرحبًا بك في {server}",
   "onboarding.server.description":
     "لا يتضمن OpenBot اشتراكًا في الذكاء الاصطناعي. اربط مزوّدك الخاص بهذا الخادم قبل إنشاء وكيل.",
   "onboarding.server.label": "اختر مزوّد الذكاء الاصطناعي لهذا الخادم",

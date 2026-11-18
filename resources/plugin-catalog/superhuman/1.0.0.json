@@ -1,0 +1,33 @@
+{
+  "slug": "superhuman",
+  "name": "Superhuman Mail",
+  "tagline": "Email and calendar",
+  "description": "Superhuman Mail lets agents search the inbox, read threads, draft replies, and look up calendar events in the signed-in Superhuman account. Drafts appear in Superhuman Mail for the user to review.",
+  "category": "productivity",
+  "creatorName": "Superhuman",
+  "iconUrl": "https://superhumanstatic.com/super-funnel/main/public/images/v4/favicons/superhuman-apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-inbox-summary", "text": "Summarize the unread emails from this morning that need a reply." },
+    { "id": "prompt-find-thread", "text": "Find the latest thread with the design agency about the launch date." },
+    { "id": "prompt-draft-reply", "text": "Draft a reply to Anna that proposes a meeting on Thursday afternoon." }
+  ],
+  "apps": [
+    {
+      "id": "app-superhuman-mcp",
+      "name": "Superhuman Mail",
+      "description": "Inbox search, thread reading, reply drafts, and calendar lookup, over Superhuman's MCP server with browser sign-in.",
+      "iconUrl": "https://superhumanstatic.com/super-funnel/main/public/images/v4/favicons/superhuman-apple-touch-icon.png",
+      "server": {
+        "name": "superhuman",
+        "transport": "http",
+        "url": "https://mcp.mail.superhuman.com/mcp",
+        "auth": [{ "id": "superhuman-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://superhuman.com",
+  "privacyPolicyUrl": "https://superhuman.com/legal/privacy-policy",
+  "termsUrl": "https://superhuman.com/legal/terms",
+  "skills": []
+}

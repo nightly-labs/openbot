@@ -115,7 +115,13 @@ export function usePlanLimits(serverId: string) {
     if (account && reading) saveReading(account, serverId, reading);
   }, [account, serverId, reading]);
   const rows = useMemo(() => planLimitRows(limits.data?.usage), [limits.data]);
-  return { rows, accounts: limits.data?.accounts ?? null, online, loading: online && limits.isPending };
+  return {
+    rows,
+    usage: limits.data?.usage ?? null,
+    accounts: limits.data?.accounts ?? null,
+    online,
+    loading: online && limits.isPending,
+  };
 }
 
 /** The provider, and the account when the provider has more than one. */
@@ -150,7 +156,7 @@ export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 /** When a window resets, or null when the host does not say. */
-export function planLimitResetDate(window: PlanLimitWindow): Date | null {
+export function planLimitResetDate(window: Pick<PlanLimitWindow, "resetsAt">): Date | null {
   if (window.resetsAt === null) return null;
   const date = new Date(window.resetsAt * 1_000);
   return Number.isNaN(date.getTime()) ? null : date;

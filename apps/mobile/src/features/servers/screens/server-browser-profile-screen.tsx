@@ -14,8 +14,14 @@ import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { type BrowserProfileStack, openBrowserProfileAgentsPage } from "@/features/servers/model/browser-profile-pages";
+import { TrailingValue } from "@/features/servers/components/trailing-value";
+import {
+  type BrowserProfileStack,
+  openBrowserProfileAgentsPage,
+  openBrowserProfileProxyPage,
+} from "@/features/servers/model/browser-profile-pages";
 import { useAgentBrowserProfile, useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
+import { useBrowserProxyChoices, useServerBrowserProxies } from "@/features/servers/model/use-server-browser-proxies";
 import { useBrowserProfileUsage } from "@/features/servers/screens/server-browser-profiles-screen";
 import {
   SettingsContent,
@@ -49,6 +55,8 @@ export function ServerBrowserProfileScreen() {
   const profiles = useServerBrowserProfiles(serverId);
   const assignment = useAgentBrowserProfile(serverId, assignTo || undefined);
   const usage = useBrowserProfileUsage();
+  const proxies = useServerBrowserProxies(serverId);
+  const proxyChoices = useBrowserProxyChoices(proxies.list);
   const accent = String(useCSSVariable("--openbot-accent"));
   // The selector returns the stored list, so the page does not render again for a new copy.
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
@@ -275,6 +283,26 @@ export function ServerBrowserProfileScreen() {
       </SettingsSection>
       {profile ? (
         <>
+          {proxies.available ? (
+            <SettingsSection footer={t("mobile.server.browserProxies.profileHint")}>
+              <SettingsRow
+                disabled={pending}
+                trailing={
+                  proxies.list ? (
+                    <TrailingValue
+                      value={
+                        proxyChoices.find((choice) => choice.profileIds.includes(profile.id))?.name ??
+                        t("mobile.server.browserProxies.automatic")
+                      }
+                    />
+                  ) : undefined
+                }
+                onPress={() => openBrowserProfileProxyPage(stack, serverId, profile.id)}
+              >
+                <Typography.Paragraph>{t("mobile.server.browserProxies.menu")}</Typography.Paragraph>
+              </SettingsRow>
+            </SettingsSection>
+          ) : null}
           <SettingsSection
             title={t("mobile.server.browserProfiles.agentsTitle")}
             footer={usage(profile.agentIds.length, profile.tabCount)}

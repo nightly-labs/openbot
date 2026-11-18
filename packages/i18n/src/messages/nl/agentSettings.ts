@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
   "agentSettings.backupModels.introAutomatic":
-    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft voordat {name} begint te schrijven.",
   "agentSettings.backupModels.ask": "Vragen voor overschakelen",
   "agentSettings.backupModels.order": "Volgorde",
   "agentSettings.backupModels.listLabel": "Reservemodellen, op volgorde",
@@ -145,16 +145,10 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Kan de avatar van de agent niet verwerken.",
   "agentSettings.runtime.model": "Agentmodel",
   "agentSettings.runtime.modelUnavailable": "Modellen zijn beschikbaar nadat een agent-CLI verbinding maakt.",
-  "agentSettings.runtime.reasoning": "Redeneren",
-  "agentSettings.runtime.reasoningLabel": "Redeneerniveau van de agent",
-  "agentSettings.runtime.selectReasoning": "Kies redeneerniveau",
-  "agentSettings.runtime.reasoningSetByProvider": "Ingesteld door {provider}",
   "agentSettings.runtime.access": "Toegang",
   "agentSettings.runtime.accessLabel": "Toegang van agent",
   "agentSettings.runtime.busyMessage": "Tijdens werk",
   "agentSettings.runtime.busyMessageLabel": "Berichten terwijl de agent werkt",
-  "agentSettings.runtime.taskLimit": "Parallelle threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads die tegelijk draaien",
   "agentSettings.runtime.workingDirectory": "Werkmap",
   "agentSettings.runtime.notAvailable": "Nog niet beschikbaar",
   "agentSettings.runtime.fullAccessNote":
@@ -173,9 +167,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Bijsturen",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
-  "agentSettings.taskLimit.default": "Standaard ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "agentSettings.notificationLevel.title": "Meld mij",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":
@@ -188,6 +179,15 @@ export const messages = {
     "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.deleteHistory.title": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.description":
+    "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",
+  "agentSettings.deleteHistory.button": "Wissen",
+  "agentSettings.deleteHistory.confirmTitle": "Chatgeschiedenis met {name} wissen?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Alle berichten en bestanden van deze chat worden uit OpenBot gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
+  "agentSettings.deleteHistory.confirm": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "agentSettings.fullAccess.title": "Deze agent volledige toegang geven?",
   "agentSettings.fullAccess.askTitle": "Deze agent buiten zijn werkruimte laten werken?",
   "agentSettings.fullAccess.description":
@@ -222,8 +222,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
-  "agentSettings.quickAcknowledgement.description":
-    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",

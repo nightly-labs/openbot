@@ -49,6 +49,14 @@ export class AgentRoster {
     ).map((row) => JSON.parse(requiredStringColumn(row, "agent_json")));
   }
 
+  /** One agent by its id. A conversation write reads its agent here rather than parse the whole roster. */
+  getAgent(agentId: string): AgentSummary | undefined {
+    const row = databaseRow(
+      this.#core.connection.prepare("SELECT agent_json FROM projection_agents WHERE agent_id = ?").get(agentId),
+    );
+    return row ? JSON.parse(requiredStringColumn(row, "agent_json")) : undefined;
+  }
+
   /**
    * Every thread row no agent claims as its own `thread_id`.
    *
@@ -163,7 +171,12 @@ export class AgentRoster {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        for (const table of ["agent_usage_records", "agent_usage_checkpoints", "agent_usage_activity"])
+        for (const table of [
+          "agent_usage_records",
+          "agent_usage_checkpoints",
+          "agent_usage_activity",
+          "agent_usage_skill_loads",
+        ])
           db.prepare(`DELETE FROM ${table} WHERE agent_id = ?`).run(agentId);
         db.prepare(
           "DELETE FROM orchestration_command_receipts WHERE command_id IN (SELECT command_id FROM orchestration_events WHERE aggregate_type = 'agent-usage' AND aggregate_id = ?)",

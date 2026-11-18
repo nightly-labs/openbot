@@ -1,4 +1,5 @@
 import type { FirstTouch } from "@openbot/contracts/first-touch";
+import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
@@ -100,6 +101,15 @@ export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null
   return isNumber(body.ageMs) && Number.isSafeInteger(body.ageMs) && body.ageMs >= 0
     ? { enabled: body.enabled, ageMs: body.ageMs }
     : null;
+}
+
+/**
+ * The chat color in a `PUT /v1/me/chat-color` body: a lower-case `#rrggbb`, or null for no color.
+ * Returns undefined when the body has no valid value.
+ */
+export function readChatColor(body: DynamicRecord): AvatarColor | null | undefined {
+  if (body.chatColor === null) return null;
+  return isAvatarColor(body.chatColor) ? body.chatColor : undefined;
 }
 
 export class AuthService {
@@ -442,6 +452,27 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
+  /** Saves the tint of the user's own chat bubbles. Each server of the user shows it to its members. */
+  readonly updateChatColor = Effect.fn("AuthService.updateChatColor")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+      chatColor: AvatarColor | null,
+    ): Effect.fn.Return<AuthUser, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const user = yield* this.authenticate(sessionToken);
+      if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
+      const updated = yield* dependencies.repository.updateUserChatColor(user.id, chatColor, now);
+      if (user.chatColor !== updated.chatColor) {
+        yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      }
+      return updated;
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly updateAvatar = Effect.fn("AuthService.updateAvatar")(
     function* (
       this: AuthService,
@@ -524,6 +555,28 @@ export class AuthService {
       yield* dependencies.repository.createServerClaim({
         claimHash: yield* sha256(claim),
         email,
+        createdAt: now,
+        expiresAt,
+      });
+      return { claim, expiresAt };
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** For the signed-in user: a claim that signs a new server in to the same account. */
+  readonly createServerClaimForUser = Effect.fn("AuthService.createServerClaimForUser")(
+    function* (
+      this: AuthService,
+      userId: string,
+    ): Effect.fn.Return<{ claim: string; expiresAt: number }, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`server-claim:user:${userId}`, 20, now);
+      const claim = randomToken();
+      const expiresAt = now + SERVER_CLAIM_TTL_MS;
+      yield* dependencies.repository.createServerClaimForUser({
+        claimHash: yield* sha256(claim),
+        userId,
         createdAt: now,
         expiresAt,
       });
@@ -988,7 +1041,7 @@ function newMobileSession(): { id: string; token: string; expiresAt: number } {
   return { id: crypto.randomUUID(), token: randomToken(), expiresAt: PERSISTENT_SESSION_EXPIRES_AT };
 }
 
-function normalizeMobileDevice(input: MobileAuthDeviceIdentity): MobileAuthDeviceIdentity {
+export function normalizeMobileDevice(input: MobileAuthDeviceIdentity): MobileAuthDeviceIdentity {
   if (!isUuidV4(input.id)) {
     throw new AuthServiceError(400, "invalid_mobile_device", "The mobile device ID is invalid.");
   }

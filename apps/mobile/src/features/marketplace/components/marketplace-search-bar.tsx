@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import {
@@ -188,7 +189,14 @@ export function MarketplaceSearchBar({
               submitBehavior="blurAndSubmit"
               {...selectionColorProps(String(foreground))}
               className="h-10 min-w-0 flex-1 font-sans text-foreground"
-              style={{ fontSize: 16, lineHeight: 20, paddingBottom: 0, paddingTop: 0, textAlignVertical: "center" }}
+              style={{
+                fontSize: 16,
+                lineHeight: 20,
+                paddingBottom: 0,
+                paddingTop: 0,
+                textAlignVertical: "center",
+                ...fieldDirectionStyle(query),
+              }}
             />
             {query ? (
               <Pressable

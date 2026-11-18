@@ -20,8 +20,8 @@ export function trackWorkspaceActions(
       run("agent_action", { action: "update", ...agentProperties(input.agentId) }, () =>
         workspace.updateAgent(input, serverId),
       ),
-    deleteAgent: (id) =>
-      run("agent_action", { action: "delete", ...agentProperties(id) }, () => workspace.deleteAgent(id)),
+    deleteAgent: (id, serverId) =>
+      run("agent_action", { action: "delete", ...agentProperties(id) }, () => workspace.deleteAgent(id, serverId)),
     duplicateAgent: (id) =>
       run("agent_action", { action: "duplicate", ...agentProperties(id) }, () => workspace.duplicateAgent(id)),
     sendMessage: (id, text, attachments = [], reply = null, server, clientMessageId) =>
@@ -48,7 +48,7 @@ export function trackWorkspaceActions(
         {
           action: "upload",
           attachment_count: 1,
-          size_bucket: attachmentSizeBucket(Math.floor((input.base64.length * 3) / 4)),
+          size_bucket: attachmentSizeBucket(input.file?.size ?? Math.floor((input.base64.length * 3) / 4)),
         },
         () => workspace.uploadAttachment(id, input, server, onProgress),
       ),

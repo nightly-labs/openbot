@@ -8,6 +8,7 @@ export const messages = defineMessages("error.auth", {
     "A firewall or proxy on this network blocked OpenBot from reaching {host}. Ask your network administrator to allow {host}, then try again.",
   "error.auth.signInFirst": "Sign in to OpenBot first.",
   "error.auth.signInRequired": "Sign in is required.",
+  "error.auth.chatColorUnavailable": "The account service does not support chat colors yet. Try again later.",
   "error.auth.accountChangedDuringRegister": "The signed-in account changed while this server was being registered.",
   "error.auth.hostCredentialUnavailable": "The remote host credential is unavailable. Register the host again.",
   "error.auth.codeNotVerified": "The sign-in code could not be verified.",
@@ -17,6 +18,7 @@ export const messages = defineMessages("error.auth", {
   "error.auth.serviceTimeout": "The account service did not answer in time. Try again.",
   "error.auth.serviceStatus": "The account service returned an error ({status}). Try again later.",
   "error.auth.invalidHostedServer": "The account service returned an invalid hosted server.",
+  "error.auth.invalidServerClaim": "The account service returned an invalid server claim.",
   "error.auth.codeNotSent": "OpenBot could not send the sign-in code.",
   "error.auth.deliveryTimeout":
     "OpenBot could not confirm delivery in time. The code may still arrive; check delivery before sending again.",

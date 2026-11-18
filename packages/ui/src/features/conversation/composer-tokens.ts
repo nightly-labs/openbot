@@ -1,11 +1,12 @@
-import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, referenceName } from "@openbot/contracts/chat-tag-references";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
-import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "../../data";
+import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
 import { currentText } from "../../text";
 import { appendAttachmentReferenceVisual } from "./AttachmentReference";
+import { tabTitle } from "./composer-picker";
 
 export const MENTION_PATTERN = /@\[([^\]]+)]\(([^)]+)\)/g;
 
@@ -159,7 +160,7 @@ function updateSkillToken(token: HTMLSpanElement, skill: ComposerSkill): void {
   token.replaceChildren(iconWrap, name);
 }
 
-/* The lucide-solid 1.33.0 `Puzzle`, `Blocks` and `TextQuote` shapes, drawn without the icon components. A token
+/* The lucide-solid 1.33.0 `Puzzle`, `Blocks`, `TextQuote`, `AppWindow` and `Split` shapes, drawn without the icon components. A token
    is built in effects and event handlers, where a production build has no Solid owner, and lucide's
    `Icon` reads a context there: it throws `NoOwnerError` and halts the renderer. */
 type GlyphShape = ["path" | "rect", Record<string, string>];
@@ -183,6 +184,20 @@ const TEXT_QUOTE_GLYPH: GlyphShape[] = [
   ["path", { d: "M21 12H8" }],
   ["path", { d: "M21 19H8" }],
   ["path", { d: "M3 12v7" }],
+];
+
+const APP_WINDOW_GLYPH: GlyphShape[] = [
+  ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2" }],
+  ["path", { d: "M10 4v4" }],
+  ["path", { d: "M2 8h20" }],
+  ["path", { d: "M6 4v4" }],
+];
+
+const SPLIT_GLYPH: GlyphShape[] = [
+  ["path", { d: "M16 3h5v5" }],
+  ["path", { d: "M8 3H3v5" }],
+  ["path", { d: "M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" }],
+  ["path", { d: "m15 9 6-6" }],
 ];
 
 const GLYPH_ATTRIBUTES = {
@@ -254,7 +269,85 @@ export function createQuoteToken(messageId: string, text: string): HTMLSpanEleme
   return token;
 }
 
-function createUnavailableTagToken(kind: Exclude<ChatTagKind, "quote">, id: string, name: string): HTMLSpanElement {
+/** A browser tab of the agent. The tag keeps the title that the tab had when the user tagged it. */
+export function createTabToken(tab: ComposerBrowserTab): HTMLSpanElement {
+  const token = document.createElement("span");
+  updateReferenceToken(token, "tab", tab.id, referenceName(tabTitle(tab)), true);
+  return token;
+}
+
+/** A side thread of the agent, by its task id. */
+export function createThreadToken(thread: ComposerThread): HTMLSpanElement {
+  const token = document.createElement("span");
+  updateReferenceToken(token, "thread", thread.id, referenceName(thread.title), true);
+  return token;
+}
+
+/*
+ * A tab or a thread that is gone keeps its tag in the draft, drawn with the outline of a removed
+ * skill. The provider then reads that it is closed or deleted.
+ */
+function updateReferenceToken(
+  token: HTMLSpanElement,
+  kind: "tab" | "thread",
+  id: string,
+  name: string,
+  available: boolean,
+): void {
+  token.className = available
+    ? `composer-mention-token ${referenceChipClasses.root}`
+    : "composer-mention-token composer-tag-unavailable";
+  token.dataset.kind = kind;
+  token.title = name;
+  token.contentEditable = "false";
+  if (kind === "tab") {
+    token.dataset.tabId = id;
+    token.dataset.tabName = name;
+  } else {
+    token.dataset.threadId = id;
+    token.dataset.threadName = name;
+  }
+  const { t } = currentText();
+  const label =
+    kind === "tab"
+      ? t(available ? "composer.token.tab" : "composer.token.unavailableTab", { name })
+      : t(available ? "composer.token.thread" : "composer.token.unavailableThread", { name });
+  token.setAttribute("aria-label", label);
+  if (!available) {
+    token.textContent = name;
+    return;
+  }
+  const iconWrap = document.createElement("span");
+  iconWrap.className = referenceChipClasses.icon;
+  iconWrap.setAttribute("aria-hidden", "true");
+  iconWrap.append(
+    kind === "tab" ? createChipGlyph("app-window", APP_WINDOW_GLYPH) : createChipGlyph("split", SPLIT_GLYPH),
+  );
+  const nameElement = document.createElement("span");
+  nameElement.className = referenceChipClasses.name;
+  nameElement.textContent = name;
+  token.replaceChildren(iconWrap, nameElement);
+}
+
+/** Draws each tab and thread tag of the draft as available or gone, after the lists change. */
+export function syncReferenceTokens(
+  editor: HTMLDivElement,
+  tabs: readonly ComposerBrowserTab[],
+  threads: readonly ComposerThread[],
+): void {
+  const tabIds = new Set(tabs.map((tab) => tab.id));
+  const threadIds = new Set(threads.map((thread) => thread.id));
+  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-tab-id], [data-thread-id]")) {
+    const kind = token.dataset.tabId ? "tab" : "thread";
+    const id = token.dataset.tabId ?? token.dataset.threadId ?? "";
+    const name = token.dataset.tabName ?? token.dataset.threadName ?? "";
+    const available = kind === "tab" ? tabIds.has(id) : threadIds.has(id);
+    if (available === token.classList.contains(referenceChipClasses.root)) continue;
+    updateReferenceToken(token, kind, id, name, available);
+  }
+}
+
+function createUnavailableTagToken(kind: "agent" | "skill" | "mcp", id: string, name: string): HTMLSpanElement {
   const token = document.createElement("span");
   if (kind === "skill") {
     updateUnavailableSkillToken(token, id, name);
@@ -319,15 +412,23 @@ export function syncSkillTokens(editor: HTMLDivElement, skills: ComposerSkill[])
   }
 }
 
+/** What the editor draws its tags from. */
+export interface EditorTagSources {
+  agents: ComposerAgent[];
+  skills: ComposerSkill[];
+  mcpServers: ComposerMcpServer[];
+  attachments: DraftAttachment[];
+  browserTabs: ComposerBrowserTab[];
+  threads: ComposerThread[];
+}
+
 export function renderEditorValue(
   editor: HTMLDivElement,
   value: string,
-  agents: ComposerAgent[],
-  skills: ComposerSkill[],
-  mcpServers: ComposerMcpServer[],
-  attachments: DraftAttachment[],
+  sources: EditorTagSources,
   attachmentTokenActions: AttachmentTokenActions,
 ) {
+  const { agents, skills, mcpServers, attachments } = sources;
   editor.replaceChildren();
   let cursor = 0;
   for (const match of value.matchAll(MENTION_PATTERN)) {
@@ -356,6 +457,18 @@ export function renderEditorValue(
     }
     if (semanticReference?.kind === "quote") {
       editor.append(createQuoteToken(semanticReference.id, semanticReference.name));
+      cursor = index + match[0].length;
+      continue;
+    }
+    if (semanticReference?.kind === "tab" || semanticReference?.kind === "thread") {
+      const token = document.createElement("span");
+      const { kind, id } = semanticReference;
+      const available =
+        kind === "tab"
+          ? sources.browserTabs.some((tab) => tab.id === id)
+          : sources.threads.some((thread) => thread.id === id);
+      updateReferenceToken(token, kind, id, semanticReference.name, available);
+      editor.append(token);
       cursor = index + match[0].length;
       continue;
     }

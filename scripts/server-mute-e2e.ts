@@ -173,6 +173,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],
@@ -183,6 +186,8 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
   close: unused,
@@ -287,6 +292,7 @@ try {
   const bindHandler = () => {
     teamIpcHandlers({
       host,
+      localServers: null,
       remoteDesktop: new RemoteDesktopManager(manager),
       remoteServers: manager,
       takePendingInvite: () => null,

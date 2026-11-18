@@ -1,3 +1,4 @@
+import type { AgentSummary, QuitGuard } from "@openbot/contracts/ipc";
 import type { BrowserWindow, Input } from "electron";
 
 /** How long `Cmd + Q` must be held before OpenBot quits. */
@@ -18,8 +19,12 @@ export interface QuitShortcutOptions {
   /** Starts the quit. */
   quit: () => void;
   isQuitting: () => boolean;
-  /** Shows or removes the hint in the window. */
-  showHint: (window: BrowserWindow, visible: boolean) => void;
+  /** The agents that work now, here and on the servers on this computer. A quit stops them. */
+  workingAgents: () => AgentSummary[];
+  /** The user's choice, read at each first press. */
+  guard: () => QuitGuard;
+  /** Shows the hint in the window, with the agents that work. Null removes it. */
+  showHint: (window: BrowserWindow, agents: AgentSummary[] | null) => void;
 }
 
 export interface QuitShortcut {
@@ -31,6 +36,8 @@ export interface QuitShortcut {
 
 interface Hold {
   window: BrowserWindow;
+  /** The agents that worked at the first press. The hint names them for the whole hold. */
+  agents: AgentSummary[];
   startedAt: number;
   lastKeyAt: number;
   repeatGapMs: number;
@@ -38,18 +45,27 @@ interface Hold {
 
 /**
  * `Cmd + Q` is next to `Cmd + W` and `Cmd + A`, and one press stopped OpenBot with its agents and
- * routines (#4149). In a focused OpenBot page, OpenBot quits only when the user holds the keys or
- * presses them twice, and a hint in the window tells how.
+ * routines (#4149). In a focused OpenBot page, while an agent works, OpenBot quits only when the user
+ * holds the keys or presses them twice, and a hint in the window names the agents and tells how. With
+ * no agent at work, a quit stops nothing, so one press quits. The user can guard every quit, or turn
+ * the guard off so that one press always quits (#5500).
  *
  * macOS sends no key up for Q while Command is held, so the repeats of the held key show the hold.
  * The keys stay held when the hold is complete. If OpenBot quit then, macOS would give the next
  * repeats to the app that comes to the front, and that app would quit too. OpenBot therefore hides
  * the window and waits for the release: a key up, the loss of focus, or a quiet time with no repeat.
  */
-export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutOptions): QuitShortcut {
+export function createQuitShortcut({
+  quit,
+  isQuitting,
+  workingAgents,
+  guard,
+  showHint,
+}: QuitShortcutOptions): QuitShortcut {
   let lastPress: { window: BrowserWindow; at: number } | null = null;
   let hold: Hold | null = null;
   let hintWindow: BrowserWindow | null = null;
+  let hintAgents: AgentSummary[] = [];
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
   let releaseTimer: ReturnType<typeof setTimeout> | null = null;
   let waitingForRelease = false;
@@ -59,14 +75,16 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
     hintTimer = null;
     const window = hintWindow;
     hintWindow = null;
-    if (window && !window.isDestroyed()) showHint(window, false);
+    if (window && !window.isDestroyed()) showHint(window, null);
   }
 
-  function keepHint(window: BrowserWindow): void {
-    if (hintWindow !== window) {
-      hideHint();
+  function keepHint(window: BrowserWindow, agents: AgentSummary[]): void {
+    // The repeats of one hold send the same list. A new hold in the same window can name other agents.
+    if (hintWindow !== window) hideHint();
+    if (hintWindow !== window || hintAgents !== agents) {
       hintWindow = window;
-      showHint(window, true);
+      hintAgents = agents;
+      showHint(window, agents);
     }
     if (hintTimer) clearTimeout(hintTimer);
     hintTimer = setTimeout(hideHint, HINT_MS);
@@ -120,16 +138,19 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
         if (hold?.window !== window) return true;
         hold.repeatGapMs = now - hold.lastKeyAt;
         hold.lastKeyAt = now;
-        keepHint(window);
+        keepHint(window, hold.agents);
         if (now - hold.startedAt >= HOLD_MS) complete(hold);
         return true;
       }
       // Two presses count only in one window, which showed the hint after the first.
       const doublePress = lastPress?.window === window && now - lastPress.at <= DOUBLE_PRESS_MS;
       lastPress = { window, at: now };
-      hold = { window, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
-      if (doublePress) complete(hold);
-      else keepHint(window);
+      const choice = doublePress ? "never" : guard();
+      const agents = choice === "never" ? [] : workingAgents();
+      const guarded = isQuitGuarded(choice, agents);
+      hold = { window, agents, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
+      if (guarded) keepHint(window, agents);
+      else complete(hold);
       return true;
     },
     handleBlur(window) {
@@ -138,6 +159,11 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
       else hold = null;
     },
   };
+}
+
+/** True when `Cmd + Q` asks for a hold or a second press before it quits. */
+export function isQuitGuarded(choice: QuitGuard, agents: readonly AgentSummary[]): boolean {
+  return choice === "always" || (choice === "working" && agents.length > 0);
 }
 
 /**

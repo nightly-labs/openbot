@@ -41,7 +41,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} Min.",
   "account.usage.window.cursorModels": "Cursor-Modelle",
   "account.usage.window.otherModels": "Andere Modelle",
+  "account.usage.window.total": "Gesamt",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} übrig",
   "account.update.failedRetry": "Update fehlgeschlagen. Versuche es erneut.",
   "account.update.managedByHost": "Vom Host verwaltet",
   "account.update.restart": "Neu starten",
@@ -67,6 +69,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot kann den Kontodienst gerade nicht erreichen.",
   "account.login.signInDescription":
     "Melde dich mit deiner E-Mail an oder erstelle ein Konto. Wir senden dir einen Einmalcode.",
+  "account.login.keyringChangedDescription":
+    "Der Schlüsselbund des Systems hat deine letzte Anmeldung verloren. OpenBot speichert Anmeldungen jetzt in einer eigenen Datei auf diesem Computer. Melde dich noch einmal an.",
   "account.login.codeAccepted": "Dein Code wurde akzeptiert.",
   "account.login.codeSent": "Wir haben einen Code an {email} gesendet.",
   "account.login.connectingSecurely": "Sichere Verbindung wird hergestellt…",

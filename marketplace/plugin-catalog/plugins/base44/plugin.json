@@ -1,0 +1,33 @@
+{
+  "slug": "base44",
+  "name": "Base44",
+  "tagline": "AI app builder",
+  "description": "Base44 lets agents create and manage Base44 projects, edit an app's code in its sandbox, and call the Base44 platform API. Each user signs in to their own Base44 account through the browser.",
+  "category": "coding",
+  "creatorName": "Base44",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/3b/b0/3f/3bb03faa-e63d-0fb0-9918-c92a4c4e3c41/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-list-apps", "text": "List my Base44 apps and when each one changed last." },
+    { "id": "prompt-new-app", "text": "Create a Base44 app for booking meeting rooms." },
+    { "id": "prompt-fix", "text": "Fix the form validation on the signup page of my app." }
+  ],
+  "apps": [
+    {
+      "id": "app-base44-mcp",
+      "name": "Base44",
+      "description": "Project, app code, and platform tools, over Base44's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/3b/b0/3f/3bb03faa-e63d-0fb0-9918-c92a4c4e3c41/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "base44",
+        "transport": "http",
+        "url": "https://app.base44.com/mcp",
+        "auth": [{ "id": "base44-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://base44.com",
+  "privacyPolicyUrl": "https://base44.com/about-us/legal/privacy-policy",
+  "termsUrl": "https://base44.com/about-us/legal/terms-of-service"
+}
