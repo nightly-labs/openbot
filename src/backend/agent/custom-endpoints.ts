@@ -29,12 +29,36 @@ export interface CustomEndpointsHooks {
   queueAgentUpdate(input: UpdateAgentInput): Effect.Effect<AgentSummary, EndpointChangeFailed>;
   /** The harness that runs a saved endpoint, or null for an id no endpoint has. */
   endpointHarness(endpointId: string): CustomProviderHarness | null;
+  /** Each saved endpoint by id: the harness that runs it and the models the user saved on it. */
+  savedEndpoints(): ReadonlyMap<string, SavedEndpoint>;
   /** Tells the renderer to read the catalogue again. */
   modelsChanged(): void;
   stopProfileClients(): Effect.Effect<void>;
   emitError(code: string, error: unknown, agentId?: string): void;
   providerAvailable(provider: AgentProvider): boolean;
   preference(): ProviderPreference;
+}
+
+interface SavedEndpoint {
+  readonly harness: CustomProviderHarness;
+  /** The saved models, as the harness lists them: `<endpoint id>/<model id>`, encoded where Pi encodes it. */
+  readonly models: readonly string[];
+}
+
+/** One model choice as text, so that a set can hold it. */
+function choiceKey(provider: string, model: string): string {
+  return `${provider}\u0000${model}`;
+}
+
+/**
+ * Whether the user saved the listed model `id` on the endpoint. A reasoning variant that a CLI lists
+ * as `<model>/<effort>` belongs to its saved model. A saved id can hold a `/` itself, such as
+ * `deepseek/deepseek-v4.1-flash`, so the whole id is compared first.
+ */
+function savesModel(saved: readonly string[], id: string): boolean {
+  if (saved.includes(id)) return true;
+  const separator = id.lastIndexOf("/");
+  return separator > 0 && isReasoningEffort(id.slice(separator + 1)) && saved.includes(id.slice(0, separator));
 }
 
 export interface CustomEndpointsOptions {
@@ -107,19 +131,65 @@ export class CustomEndpoints {
 
   /**
    * The catalogue every caller may choose from: what the connected providers report, less the models
-   * of an endpoint whose removal is written.
+   * of an endpoint whose removal is written, and less the models that a provider added to a saved
+   * endpoint by itself (see `#addedEndpointModels`).
    *
-   * The two lists differ only while OpenCode keeps running with an old configuration, which is what
+   * The removal case differs only while OpenCode keeps running with an old configuration, which is what
    * a removal during a turn leaves behind. The CLI still lists the endpoint, so the raw catalogue
    * would let the renderer show it, `updateAgent` accept it, and a new agent start on it, all after
    * the file that defines it is gone. `alsoExcluded` names an endpoint whose removal is in progress
    * and therefore not recorded yet.
    */
   available(): AgentModelOption[] {
-    if (CUSTOM_PROVIDER_HARNESSES.every((harness) => this.#released[harness].size === 0))
-      return this.#providers.listModels();
+    const listed = this.#providers.listModels();
+    const added = this.#addedEndpointModels(listed);
+    if (added.size === 0 && CUSTOM_PROVIDER_HARNESSES.every((harness) => this.#released[harness].size === 0))
+      return listed;
     // A custom agent id can be the same text as an endpoint id. Its models are not the endpoint's.
-    return this.#providers.listModels().filter((option) => this.serves(option.id, option.provider));
+    return listed.filter((option) => !added.has(option) && this.serves(option.id, option.provider));
+  }
+
+  /**
+   * The models that a provider lists for a saved endpoint, but that the user did not save on it.
+   * OpenCode adds them by itself: the public catalogue's models when the endpoint id is a catalogue
+   * provider, such as `lmstudio` or `google`, and each installed model of a local server under the ids
+   * `ollama` and `lmstudio`, which it asks again every 30 s. Checked with OpenCode 2.2.7 and 2.3.0
+   * (#7962). The model picker then showed models that the user's server does not have, and a turn on
+   * one failed. A model that an agent uses, as its model, a queued model, a backup or a usage-limit
+   * return, stays, so no agent moves off its model. The default model of new agents stays too.
+   */
+  #addedEndpointModels(listed: readonly AgentModelOption[]): ReadonlySet<AgentModelOption> {
+    const added = new Set<AgentModelOption>();
+    const endpoints = this.#hooks.savedEndpoints();
+    if (endpoints.size === 0) return added;
+    let inUse: ReadonlySet<string> | undefined;
+    for (const option of listed) {
+      if (!isCustomProviderHarness(option.provider)) continue;
+      const separator = option.id.indexOf("/");
+      if (separator <= 0) continue;
+      const endpoint = endpoints.get(option.id.slice(0, separator));
+      if (endpoint?.harness !== option.provider || savesModel(endpoint.models, option.id)) continue;
+      inUse ??= this.#modelsInUse();
+      if (!inUse.has(choiceKey(option.provider, option.id))) added.add(option);
+    }
+    return added;
+  }
+
+  /**
+   * Each model that an agent names: its model, the model a queued change moves it to, its backup
+   * models and the model it returns to, as `modelsInUse` of the model picker. Also the default model
+   * of new agents, so that a new agent does not start on another model.
+   */
+  #modelsInUse(): ReadonlySet<string> {
+    const keys = new Set<string>();
+    const preference = this.#hooks.preference();
+    if (preference.model !== null) keys.add(choiceKey(preference.provider, preference.model));
+    for (const agent of this.#store.list()) {
+      keys.add(choiceKey(providerForAgent(agent), agent.model));
+      for (const choice of [agent.usageLimitReturn, agent.pendingRuntime, ...(agent.backupModels?.order ?? [])])
+        if (choice) keys.add(choiceKey(choice.provider, choice.model));
+    }
+    return keys;
   }
 
   /**

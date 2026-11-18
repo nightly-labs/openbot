@@ -91,6 +91,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Я подтверждаю, что принимаю {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "политику конфиденциальности",
   "sitePage.pricing.consent.terms": "условия и право на отказ от договора",
+  "sitePage.pricing.consent.earlyStart":
+    "Я прошу начать оказание услуги хостинга до окончания 14-дневного срока для отказа от договора. Я понимаю, что если я откажусь от договора до полного оказания услуги, мне придется оплатить услуги, оказанные до момента отказа, и что после полного оказания услуги я потеряю право на отказ от договора.",
   "sitePage.marketplace.agents.title": "Агенты — каталог OpenBot",
   "sitePage.marketplace.agents.description":
     "Агенты, которых другие люди создали в OpenBot. Добавьте агента в OpenBot вместе с его навыками и регулярными задачами.",

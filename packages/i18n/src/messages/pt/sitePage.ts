@@ -93,6 +93,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Declaro que aceito {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "a política de privacidade",
   "sitePage.pricing.consent.terms": "os termos e o direito de arrependimento",
+  "sitePage.pricing.consent.earlyStart":
+    "Solicito que o serviço de hospedagem comece antes do fim do prazo de arrependimento de 14 dias. Reconheço que, se eu desistir do contrato antes de o serviço ser totalmente prestado, terei de pagar pelos serviços prestados até o momento da desistência e que, depois que o serviço for totalmente prestado, perderei o direito de desistir do contrato.",
   "sitePage.teams.title": "OpenBot para Equipes",
   "sitePage.teams.description":
     "Execute o OpenBot em infraestrutura gerenciada ou deixe a gente criar uma implantação sob medida para sua equipe, seus fluxos de trabalho e os sistemas que você já usa.",

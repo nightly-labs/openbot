@@ -12,6 +12,11 @@ import {
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -35,7 +40,7 @@ import {
   requireReleasedScheduleOn,
   saveOnceEventRoutine,
 } from "@openbot/team-client/routines-once";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostEventsApi } from "../host-events-api";
@@ -61,6 +66,7 @@ interface EventsRemoteServers {
     capability:
       | typeof EVENTS_CAPABILITY
       | typeof ROUTINE_RECOVERY_CAPABILITY
+      | typeof ROUTINE_PAUSE_REASONS_CAPABILITY
       | typeof ROUTINE_RUN_PLACE_CAPABILITY
       | typeof ROUTINES_ONCE_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
@@ -97,12 +103,20 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       input,
     );
     const agentId = runPlaceAgent(serverId, input.owner);
-    if (agentId === null) return routines;
-    const [list, places] = await Promise.all([
+    // A host with `routine-pause-reasons-v1` says which paused routine a run of its own paused (#10048).
+    const pausedAgentId =
+      input.owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY)
+        ? input.owner.id
+        : null;
+    if (agentId === null && pausedAgentId === null) return routines;
+    const [list, places, reasons] = await Promise.all([
       routines,
-      remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+      agentId === null ? [] : remote(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+      pausedAgentId === null
+        ? []
+        : remote(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, { agentId: pausedAgentId }),
     ]);
-    return withRoutineRunPlaces(list, places);
+    return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
   }
   /** A host with `routine-run-place-v1` keeps where an agent routine runs, which the event routes drop. */
   function runPlaceAgent(serverId: string, owner: EventRoutineOwner): string | null {

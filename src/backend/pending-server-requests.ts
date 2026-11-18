@@ -23,12 +23,15 @@ export class PendingServerRequests {
   /**
    * `signal` aborts when the provider stops waiting for this request. The request then rejects and
    * leaves the table, and the same signal on the sent request tells OpenBot to stop asking the user.
+   * `detachAfterMs` and `answerBeforeMs` go on the sent request as they are: see `AppServerRequest`.
    */
   readonly call = Effect.fn("PendingServerRequests.call")(function* (
     this: PendingServerRequests,
     method: string,
     params: unknown,
     signal?: AbortSignal,
+    detachAfterMs?: number,
+    answerBeforeMs?: number,
   ) {
     const id = randomUUID();
     return yield* Effect.callback<unknown, ProviderClientOperationError>((resume) => {
@@ -47,7 +50,14 @@ export class PendingServerRequests {
         reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
       try {
-        this.#send({ id, method, params, signal: requestSignal });
+        this.#send({
+          id,
+          method,
+          params,
+          signal: requestSignal,
+          ...(detachAfterMs === undefined ? {} : { detachAfterMs }),
+          ...(answerBeforeMs === undefined ? {} : { answerBeforeMs }),
+        });
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }

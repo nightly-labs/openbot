@@ -1,5 +1,6 @@
 import { dummyLogger, type Logger } from "ts-log";
 
+export { maskIdentifiers } from "./identifiers";
 export type { Logger };
 export { dummyLogger };
 
@@ -51,7 +52,7 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
 // exact shape of an AWS key ID counts.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|rk_test_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
 // A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
 // A PEM private key, with its body. A key that the text cuts off before its END line is removed to
@@ -118,6 +119,13 @@ const RULE_WORD =
 // The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
 // label before a value stays readable.
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
+// The host of an http or https address, after its optional user part. A host is public: it is not
+// masked, and a token does not grow into it or into the `@` before it. Before, a saved password such
+// as the name of the user's company made every link to the company's site `https:[redacted]` in a
+// chat post. The user part, the path and the query stay masked, because a credential can be there.
+// Other schemes, such as an app's own `myapp://`, can carry a credential after `//`, so they keep
+// the rule.
+const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
@@ -176,12 +184,13 @@ export function redactText(value: string): string {
  * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
  */
 export function redactSecrets(value: string): string {
-  return redact(value, false);
+  return redact(value, false, true);
 }
 
-function redact(value: string, emails: boolean): string {
+function redact(value: string, emails: boolean, keepUnscanned = false): string {
   const marked = markRegisteredSecrets(value);
-  const redacted = redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails), emails);
+  const redacted =
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -192,14 +201,17 @@ function markRegisteredSecrets(value: string): string {
   if (!pattern) return value;
   pattern.lastIndex = 0;
   const ranges: Array<{ start: number; end: number }> = [];
+  let hosts: Uint8Array | null | undefined;
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
+    if (hosts === undefined) hosts = value.includes("://") ? urlHosts(value) : null;
+    if (hosts?.subarray(start, end).every((flag) => flag === HOST)) continue;
     const previous = ranges.at(-1);
     const floor = previous?.end ?? 0;
-    while (start > floor && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
-    while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    while (end < value.length && !hosts?.[end] && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
@@ -212,6 +224,21 @@ function markRegisteredSecrets(value: string): string {
     copied = end;
   }
   return result + value.slice(copied);
+}
+
+const HOST = 1;
+const HOST_SEPARATOR = 2;
+
+/** One flag for each character of `value`: `HOST`, the `@` before a host, or 0 elsewhere. */
+function urlHosts(value: string): Uint8Array {
+  const flags = new Uint8Array(value.length);
+  for (const match of value.matchAll(URL_HOST)) {
+    const prefix = match[1] ?? "";
+    const start = match.index + prefix.length;
+    flags.fill(HOST, start, start + (match[2]?.length ?? 0));
+    if (prefix.endsWith("@")) flags[start - 1] = HOST_SEPARATOR;
+  }
+  return flags;
 }
 
 function applyTextRules(value: string, emails: boolean): string {
@@ -251,7 +278,7 @@ const UNSCANNED = "[redacted-unscanned]";
  * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
  * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
  */
-function redactEmbeddedJson(value: string, emails: boolean): string {
+function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -259,6 +286,11 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
+      // `redactSecrets` text goes back to the agent that wrote or received it, and its provider
+      // already has it. Code or a list of links has far more than 16 bracket runs, and a cut reply
+      // made the agent send broken code again (#10122). The tail stays: registered secrets were
+      // already masked in it, and the text rules still run on it.
+      if (keepUnscanned) return result + value.slice(index);
       // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
       // shown either: text before the bound is kept, and everything from the unread payload on is
       // dropped. A truncated line is a smaller loss than a credential that survived the limit.
@@ -440,12 +472,20 @@ export function toLogValue(value: unknown): LogValue {
   return convertSafely(value);
 }
 
+/**
+ * `toLogValue` without the email rule, as `redactSecrets` is for text: for a record that the
+ * agent's own chat shows to the user who gave it the text, such as an answer or a history item.
+ */
+export function toSecretSafeValue(value: unknown): LogValue {
+  return convertSafely(value, false);
+}
+
 // The last line of defence for both public entry points: whatever a caller
 // hands over, converting it must never become the exception that hides the one
 // being logged.
-function convertSafely<T>(value: T): LogValue {
+function convertSafely<T>(value: T, emails = true): LogValue {
   try {
-    return convertValue(value, new Set<object>(), true);
+    return convertValue(value, new Set<object>(), emails);
   } catch {
     return UNSERIALIZABLE;
   }

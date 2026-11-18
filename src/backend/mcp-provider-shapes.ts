@@ -109,6 +109,7 @@ type McpDropReason =
   | "command_not_found"
   | "working_directory_unsupported"
   | "name_conflict"
+  | "provider_limit"
   | "unusable"
   | "failed_to_start";
 
@@ -178,7 +179,7 @@ export type UsableMcpServer =
       proxied?: undefined;
       error: string;
       /** Machine-readable beside the sentence, so a reporter never has to match on the wording. */
-      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict">;
+      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict" | "provider_limit">;
     };
 
 /** The failed arm, for the readers that have already narrowed to it. */
@@ -545,7 +546,8 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * arguments and an environment, so a server that names a directory is left out rather than started
  * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
  * create a second, empty database beside the agent's workspace. The form says so before the save,
- * the row says so afterwards, and the hand-off reports it as a drop.
+ * the row says so afterwards, and the hand-off reports it as a drop. A client that starts stdio
+ * servers itself (`relayStdioMcpServers`) takes the directory as `cwd`, which stays in OpenBot.
  *
  * **Names travel as `providerMcpServerName`.** Antigravity refuses `session/new` with `invalid
  * params` when one name has a space, so a server the user named "My Server" failed every Gemini
@@ -555,26 +557,52 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * **A name the agent's own files already use travels as `openbot_<name>`.** See `acpMcpServerName`.
  */
 export type AcpMcpServer =
-  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }>; cwd?: string }
   | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
 
 /**
  * The name one server travels under to an ACP agent. Antigravity starts the entry of its own files
  * in place of a session server with the same name, with the user's `enabledTools` list, so the
  * agent could not call the other tools of OpenBot's server (#7785). A name in `own`, the agent's
- * own files, travels as `openbot_<name>`, as for Codex (`codexMcpServerKey`). Computer Use keeps its
- * name, and so does a server whose renamed form is the user's too or is reserved.
+ * own files, travels as `openbot_<name>`, as each Codex key does (`codexMcpServerKey`). Computer Use keeps its
+ * name, and so does a server whose renamed form is the user's too or is reserved. `form` is the
+ * agent's own name rule (`AcpFlavor.mcpServerName`), applied after `providerMcpServerName`.
  */
-export function acpMcpServerName(config: McpServerConfig, own: readonly string[] = []): string {
-  const name = providerMcpServerName(config.name);
+export function acpMcpServerName(
+  config: McpServerConfig,
+  own: readonly string[] = [],
+  form: (name: string) => string = (name) => name,
+): string {
+  const name = form(providerMcpServerName(config.name));
   if (config.id === COMPUTER_USE_MCP_SERVER_ID || !own.includes(name)) return name;
-  const renamed = `openbot_${name}`;
+  const renamed = form(`openbot_${name}`);
   return own.includes(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
+}
+
+/**
+ * A `providerMcpServerName` result in the form that Grok CLI 1.0.77 accepts. Grok names a tool
+ * `<server>__<tool>` and skips each tool of a server whose name has `__`, ends with `_`, or does not
+ * start with a letter or `_`. A server that the user named "Google pessoal — leitura" became
+ * `Google_pessoal___leitura`, and the agent got none of its tools (#9545). A name that Grok accepts
+ * stays the same, so no server that works is renamed.
+ */
+export function grokMcpServerName(name: string): string {
+  const joined = name.replace(/_{2,}/gu, "_").replace(/_+$/u, "");
+  if (joined === "") return "server";
+  return /^[A-Za-z_]/u.test(joined) ? joined : `_${joined}`;
 }
 
 export function acpMcpServers(
   servers: readonly UsableMcpServer[],
   own: readonly string[] = [],
+  form?: (name: string) => string,
+  /** OpenBot starts the stdio servers itself (`relayStdioMcpServers`), so it can use their directory. */
+  relaysStdio = false,
+  /**
+   * The number of the user's servers that the agent takes (`AcpFlavor.mcpServerLimit`). The servers
+   * after it are reported as dropped, so the session still opens.
+   */
+  limit = Number.POSITIVE_INFINITY,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -585,7 +613,15 @@ export function acpMcpServers(
       continue;
     }
     const { config } = server;
-    const name = acpMcpServerName(config, own);
+    if (entries.length >= limit) {
+      dropped.push({
+        name: config.name,
+        reason: "provider_limit",
+        detail: sourceText("error.backend.mcpProviderLimit"),
+      });
+      continue;
+    }
+    const name = acpMcpServerName(config, own, form);
     if (
       entries.some((entry) => entry.name === name) ||
       (name !== config.name && (configured.has(name) || isReservedMcpServerName(name)))
@@ -594,7 +630,7 @@ export function acpMcpServers(
       continue;
     }
     if (config.transport === "stdio") {
-      if (config.workingDirectory) {
+      if (config.workingDirectory && !relaysStdio) {
         dropped.push({
           name: config.name,
           reason: "working_directory_unsupported",
@@ -607,6 +643,7 @@ export function acpMcpServers(
         command: server.command,
         args: server.args,
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
+        ...(config.workingDirectory ? { cwd: server.workingDirectory } : {}),
       });
     } else {
       entries.push({
@@ -637,7 +674,7 @@ export function acpMcpServers(
  * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
  * reported as a drop.
  *
- * **A key Codex's own files already use travels as `openbot_<key>`.** See `codexMcpServerKey`.
+ * **Each key travels as `openbot_<key>`.** See `codexMcpServerKey`.
  */
 export type CodexMcpServer =
   | {
@@ -712,20 +749,22 @@ export function providerMcpServerName(name: string): string {
  * key in its own files, field by field, and a thread entry cannot remove a field. A stdio `command`
  * and an http `url` under one key stop Codex from loading its configuration at all, and the chat
  * cannot start (#2851). With the same transport, the user's `enabled_tools` and other fields stay on
- * OpenBot's server: an `enabled_tools` list from another server hid all of its tools (#5786). So a
- * key that Codex's own files use travels as `openbot_<key>`, and the user's own entry stays as
- * written, turned off. OpenBot's placeholders are not the user's entries and keep the key. When
- * `openbot_<key>` is reserved or the user's too, a server with the same transport keeps the key, as
- * before: merged, it can still start, and renamed, it would be left out.
+ * OpenBot's server: an `enabled_tools` list from another server hid all of its tools (#5786).
+ *
+ * So each server travels as `openbot_<key>`, also when Codex's own files do not use the key. The
+ * disabled placeholder that keeps its approvals (`readCodexMcpConfig`) is in the shared user file,
+ * and another Codex app that sends a server with the plain key at runtime, such as T3 Code's
+ * `t3-code`, got it turned off (#11041). When `openbot_<key>` is reserved or the user's, the server
+ * keeps the key, unless the user's file has the key with the other transport: then it is left out.
  *
  * Computer Use keeps its key: its tool consent and its instructions are found by that name.
  */
 export function codexMcpServerKey(config: McpServerConfig, own: CodexOwnTransports = {}): string {
   const name = providerMcpServerName(config.name);
-  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !Object.hasOwn(own, name)) return name;
+  if (config.id === COMPUTER_USE_MCP_SERVER_ID) return name;
   const renamed = `openbot_${name}`;
   const renamedTaken = Object.hasOwn(own, renamed) || isReservedMcpServerName(renamed);
-  return renamedTaken && own[name] === config.transport ? name : renamed;
+  return renamedTaken && (!Object.hasOwn(own, name) || own[name] === config.transport) ? name : renamed;
 }
 
 /** Whether a key from `codexMcpServerKey` is taken by another server, or a renamed key by OpenBot's own tools. */

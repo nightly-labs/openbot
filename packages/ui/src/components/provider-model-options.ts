@@ -14,6 +14,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isAgentProvider,
   isFreeOpencodeModel,
+  isFreeOpencodeModelName,
   isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -166,10 +167,14 @@ export function pickerModels(
         if (inner >= 0 && (!provider || name.slice(0, inner) === provider)) name = name.slice(inner + 1);
       }
       // A Pi endpoint model is `<endpoint id>/<model>` with Pi's plain name: the endpoint is the group.
+      let piEndpointModel = false;
       if (model.provider === "pi") {
         const separator = model.id.indexOf("/");
         const endpoint = separator > 0 ? piEndpointNames.get(model.id.slice(0, separator)) : undefined;
-        if (endpoint) service = endpoint;
+        if (endpoint) {
+          service = endpoint;
+          piEndpointModel = true;
+        }
       }
       // OpenRouter serves hundreds of models, so its tab has one group per lab.
       if (model.provider === "openrouter") {
@@ -191,10 +196,12 @@ export function pickerModels(
         provider: model.provider,
         name,
         service,
-        // Free-tier label only; shared with catalog order so badge and default agree.
+        // Free-tier label only; shared with catalog order so badge and default agree. A saved endpoint
+        // has no price (Pi gets cost 0 for each of its models), so on Pi, as on OpenCode, its name says it.
         free:
           (model.provider === "opencode" && isFreeOpencodeModel(model.id, name)) ||
-          (model.provider === "openrouter" && model.id.endsWith(":free")),
+          (model.provider === "openrouter" && model.id.endsWith(":free")) ||
+          (piEndpointModel && isFreeOpencodeModelName(name)),
         variants: variants.has(model.id)
           ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
           : [],

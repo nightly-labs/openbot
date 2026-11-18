@@ -6,6 +6,19 @@
   max-width: 100%;
 }
 
+/*
+ * In a chat with agent faces, the open question starts after the face column, as the agents' bubbles
+ * do. It keeps the gap of a chat row above it, and the same gap below it, so it clears the stopped
+ * tasks panel that covers the transcript's lower padding.
+ */
+.question-prompt-with-author {
+  padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
+}
+
+.question-prompt-with-author:has(> *) {
+  padding-block: var(--openbot-chat-entry-gap);
+}
+
 .question-prompt-bubble[data-entrance] {
   animation: question-prompt-in var(--page-slide-dur) var(--page-slide-ease) both;
 }

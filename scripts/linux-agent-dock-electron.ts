@@ -78,6 +78,10 @@ const PRESENTATION: AgentDockPresentation = {
     ],
     working: false,
     wait: null,
+    approval: null,
+    prompt: null,
+    takeover: null,
+    usageLimit: null,
   })),
   results: [],
 };

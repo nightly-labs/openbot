@@ -222,6 +222,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "{name} を開く",
   "routine.calendar.completed": "完了",
+  "routine.calendar.new": "新しいルーティン",
+  "routine.calendar.newOn": "{day} に新しいルーティン",
+  "routine.calendar.agent": "エージェント",
+  "routine.calendar.agentChoice": "エージェント: {name}",
 
   "routine.settings.loadFailed": "ルーティンを読み込めませんでした。",
   "routine.settings.loadRunsFailed": "実行履歴を読み込めませんでした。",
@@ -238,6 +242,7 @@ export const messages = {
   "routine.settings.loading": "ルーティンを読み込んでいます…",
   "routine.settings.empty": "まだルーティンはありません。",
   "routine.settings.paused": "一時停止中",
+  "routine.settings.pausedByRun": "{time} の実行で一時停止",
   "routine.settings.completed": "完了 · {schedule}",
   "routine.settings.active": "有効",
   "routine.settings.pauseFailed": "このルーティンを一時停止できませんでした。",

@@ -15,6 +15,7 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
@@ -92,7 +93,10 @@ const text = (node: WorkflowNode | undefined, name: string): string => {
 };
 
 export interface GitHubTriggerSettings {
+  /** The first repository of the list. Labels and the access notes read this one. */
   repository: string;
+  /** All the repositories whose events start a run, as desktop stores them. */
+  repositories: string[];
   event: WorkflowGitHubEvent;
   labels: string[];
   /** The filters that the event can have: the base branch is a filter of pull requests only. */
@@ -111,8 +115,10 @@ export function githubTrigger(node: WorkflowNode | undefined): GitHubTriggerSett
   const filters = workflowListField(node?.fields.filters).filter((filter): filter is WorkflowGitHubFilter =>
     isOneOf(filterOptions, filter),
   );
+  const repositories = workflowGitHubTriggerRepositories(node?.fields ?? {});
   return {
-    repository: text(node, "repository"),
+    repository: repositories[0] ?? text(node, "repository"),
+    repositories,
     event,
     labels: workflowListField(node?.fields.labels),
     filterOptions,

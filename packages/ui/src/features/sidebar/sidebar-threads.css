@@ -1,0 +1,274 @@
+/* The side threads of an agent in the sidebar: the chevron on the row, the list under it, and the card. */
+
+/* The rows and the chevron are ghost buttons. A ghost hover rule has three classes of weight, so the
+   hover rules here add `:not(:disabled)` and the button class to have more. */
+
+/* --- The chevron in the corner of the row --- */
+
+/* The chevron takes the place of the time, on hover, on focus, and while the threads are open. */
+.sidebar-threads-toggle {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 6px;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  opacity: 0;
+  transition:
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out),
+    background-color var(--openbot-duration-hover) ease;
+}
+
+.sidebar-threads-toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-threads-toggle.ui-button:hover:not(:disabled) {
+  background: var(--openbot-hover);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-agent-item:hover > .sidebar-threads-toggle,
+.sidebar-threads-toggle:focus-visible,
+.sidebar-threads-toggle[data-open] {
+  opacity: 1;
+}
+
+.sidebar-threads-toggle[data-open] .sidebar-threads-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.sidebar-agent-item:has(> .sidebar-threads-toggle):is(
+    :hover,
+    :has(> .sidebar-threads-toggle:focus-visible),
+    :has(> .sidebar-threads-toggle[data-open])
+  )
+  :is(.agent-row-time, .agent-row-wait-chip) {
+  visibility: hidden;
+}
+
+/* With a side thread open in the open list, the thread is the open chat, not the agent's own chat. A closed
+   list keeps its rows, so the agent row stays marked then. */
+.sidebar-agent-item:has(.sidebar-threads[data-open] [aria-current]) .agent-row-active {
+  --agent-avatar-outline: var(--openbot-bg-sidebar, transparent);
+
+  background: transparent;
+}
+
+.sidebar-agent-item:has(.sidebar-threads[data-open] [aria-current]) .agent-row-active:hover {
+  background: var(--openbot-hover);
+}
+
+/* --- Threads under the agent --- */
+
+/* The threads open to their own height, and their rows come in one after the other. */
+.sidebar-threads {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+.sidebar-threads[data-open] {
+  grid-template-rows: 1fr;
+}
+
+.sidebar-threads-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-threads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  list-style: none;
+  padding: 0 0 6px;
+}
+
+.sidebar-thread-item {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.sidebar-threads[data-open] .sidebar-thread-item {
+  opacity: 1;
+  transform: none;
+}
+
+.sidebar-thread-row {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 0 var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  justify-content: flex-start;
+  text-align: start;
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.sidebar-thread-row.ui-button:hover:not(:disabled) {
+  background: var(--openbot-hover);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-thread-row.ui-button[aria-current]:not(:disabled) {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-thread-icon {
+  display: inline-flex;
+  width: 16px;
+  flex: none;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-thread-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-thread-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-thread-time {
+  flex: none;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sidebar-thread-more {
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-thread-more[aria-expanded="true"] .sidebar-thread-more-icon {
+  transform: rotate(180deg);
+}
+
+/* --- The card beside the sidebar --- */
+
+/* The card is a menu panel of the app, a little wider for the thread titles. */
+.sidebar-threads-card.ui-action-menu {
+  width: 304px;
+  max-width: 304px;
+}
+
+/* The whole first row starts a new thread. A line parts it from the threads. */
+.sidebar-threads-card-new {
+  position: relative;
+  margin-bottom: calc(var(--ui-menu-padding) * 2 + 1px);
+}
+
+.sidebar-threads-card-new::after {
+  position: absolute;
+  inset-inline: calc(var(--ui-menu-padding) * -1);
+  bottom: calc(var(--ui-menu-padding) * -1 - 1px);
+  border-bottom: 1px solid var(--ui-menu-edge);
+  content: "";
+}
+
+.sidebar-threads-card-list {
+  margin: 0;
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar-threads-card-row {
+  display: flex;
+  width: 100%;
+  height: var(--openbot-control-md);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--ui-menu-item-radius);
+  outline: 0;
+  background: transparent;
+  padding: 0 var(--ui-menu-inset);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-regular);
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.sidebar-threads-card-row.ui-button:is(:hover, :focus-visible, [aria-current]):not(:disabled) {
+  background: var(--ui-menu-item-hover);
+}
+
+.sidebar-threads-card-icon {
+  display: inline-flex;
+  width: 16px;
+  flex: none;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-threads-card-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sidebar-threads-card-new .sidebar-threads-card-icon {
+  color: var(--openbot-text-secondary);
+}
+
+.sidebar-threads-card-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-threads-card-time {
+  flex: none;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The threads open, come in and turn their arrows only for a user who allows motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-threads {
+    transition: grid-template-rows var(--openbot-duration-slow) var(--openbot-ease-out);
+  }
+
+  .sidebar-thread-item {
+    transition:
+      opacity var(--openbot-duration-slow) var(--openbot-ease-out),
+      transform var(--openbot-duration-slow) var(--openbot-ease-out);
+  }
+
+  .sidebar-threads[data-open] .sidebar-thread-item {
+    transition-delay: calc(var(--sidebar-thread-index, 0) * 20ms);
+  }
+
+  .sidebar-threads-toggle-icon,
+  .sidebar-thread-more-icon {
+    transition: transform var(--openbot-duration-slow) var(--openbot-ease-out);
+  }
+}
