@@ -153,6 +153,8 @@ export interface RuntimeSnapshotSources {
   turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
+  /** Whether a held agent waits for its limit: no ready backup model or pool account takes its work. */
+  waitsForLimit: (agentId: string) => boolean;
 }
 
 /** The runtime view of every agent: active turns, queued work, latest messages and attention. */
@@ -166,6 +168,7 @@ export function buildRuntimeSnapshot({
   turn,
   attention,
   usageLimits,
+  waitsForLimit,
 }: RuntimeSnapshotSources): AgentRuntimeSnapshot {
   const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
     id: agent.id,
@@ -224,7 +227,8 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
-    usageLimits: usageLimits.limitedAgents(),
+    // An agent that moves to a ready backup with its next work does not show that it waits (#12360).
+    usageLimits: usageLimits.limitedAgents().filter((limit) => waitsForLimit(limit.agentId)),
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),
     subagentTurns: turn.subagentTurns(agentIds),
