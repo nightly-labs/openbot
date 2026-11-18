@@ -77,6 +77,7 @@ function schema(db: DatabaseSync) {
   return db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all();
 }
 
+// Migration 65 and 66 add tables, so the fixtures stop at version 64 unless they test the latest.
 function markers(db: DatabaseSync) {
   return db.prepare("SELECT version FROM schema_migrations WHERE version = 64").all();
 }

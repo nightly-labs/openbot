@@ -1751,8 +1751,7 @@ export class MailboxStore {
             storedDelivery.resumeAfterUsageLimit?.previousTurnIds[0] ??
             storedDelivery.turnId ??
             undefined,
-          author:
-            message.sender.kind === "agent" || message.sender.kind === "remote-agent" ? "agent" : "user",
+          author: message.sender.kind === "agent" || message.sender.kind === "remote-agent" ? "agent" : "user",
           source:
             message.sender.kind === "agent" || message.sender.kind === "remote-agent"
               ? "agent"
