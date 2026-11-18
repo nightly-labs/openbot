@@ -44,6 +44,10 @@ export const messages = {
     "Bir HTTPS sunucu adresi, API anahtarının client_id ve client_secret değerlerini ve ana parolayı girin.",
   "error.connector.bitwardenHostFailed":
     "Bu sunucuda Bitwarden açılamadı. Sunucu adresini, API anahtarını ve ana parolayı kontrol edin ve bir klasörün adının Shared with OpenBot olduğundan emin olun. Sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Bu sunucuda Bitwarden'da oturum açılamadı. Sunucu adresini ve API anahtarını kontrol edin, sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bu sunucuda Bitwarden kilidi açılamadı. Ana parolayı kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",

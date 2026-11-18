@@ -52,6 +52,10 @@ export const messages = defineMessages("error.connector", {
     "Enter an HTTPS server address, the API key client_id and client_secret, and the master password.",
   "error.connector.bitwardenHostFailed":
     "Could not open Bitwarden on this server. Check the server address, the API key and the master password, and make sure that one folder is named Shared with OpenBot. Then connect again.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Could not sign in to Bitwarden on this server. Check the server address and the API key, then connect again.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Could not unlock Bitwarden on this server. Check the master password, then connect again.",
   "error.connector.bitwardenCliInstallFailed":
     "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
   "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",

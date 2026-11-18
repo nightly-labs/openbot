@@ -43,6 +43,10 @@ export const messages = {
     "Saisissez une adresse de serveur HTTPS, le client_id et le client_secret de la clé d’API et le mot de passe principal.",
   "error.connector.bitwardenHostFailed":
     "Impossible d’ouvrir Bitwarden sur ce serveur. Vérifiez l’adresse du serveur, la clé d’API et le mot de passe principal, et assurez-vous qu’un dossier se nomme « Shared with OpenBot ». Puis connectez-vous à nouveau.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Impossible de se connecter à Bitwarden sur ce serveur. Vérifiez l’adresse du serveur et la clé d’API, puis connectez-vous à nouveau.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Impossible de déverrouiller Bitwarden sur ce serveur. Vérifiez le mot de passe principal, puis connectez-vous à nouveau.",
   "error.connector.bitwardenCliInstallFailed":
     "Impossible d’installer la CLI Bitwarden sur ce serveur. Vérifiez sa connexion réseau, puis connectez-vous à nouveau.",
   "error.connector.bitwardenFileUnreadable": "Le fichier de connexion Bitwarden est illisible.",
