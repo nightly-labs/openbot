@@ -51,11 +51,11 @@
 
 /*
  * A recording whose message box a page covers: a bar at the bottom of the window, over the page.
- * Below dialogs, so a dialog that opens on the page still covers it.
+ * Below menus and dialogs, so a menu or a dialog that opens on the page still covers it.
  */
 .covered-voice-recording {
   position: fixed;
-  z-index: var(--openbot-layer-popover);
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
   bottom: var(--openbot-space-4);
   inset-inline: 0;
   display: flex;
@@ -89,6 +89,14 @@
 
 .covered-voice-recording-waveform {
   color: var(--openbot-accent);
+}
+
+.covered-voice-recording[data-tone="warning"] :is(.covered-voice-recording-icon, .covered-voice-recording-waveform) {
+  color: var(--openbot-warning-text);
+}
+
+.covered-voice-recording[data-tone="warning"] .voice-recording-remaining {
+  color: var(--openbot-warning-text);
 }
 
 .covered-voice-recording-time {

@@ -21,3 +21,6 @@ export const Recording: Story = {};
 
 /** The user does not speak: the dots stay round. */
 export const Silent: Story = { args: { levels: new Array(24).fill(0), elapsedSeconds: 72 } };
+
+/** Ten seconds before the limit: the bar counts down the time left and turns orange. */
+export const NearTheLimit: Story = { args: { elapsedSeconds: 112 } };
