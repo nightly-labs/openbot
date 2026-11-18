@@ -410,9 +410,9 @@ window backdrop in the Ambient look: a quiet layer, not a wallpaper.
   scroll, such as when rows mount. Each row of the card is opaque. With no backdrop, Home keeps its
   plain list. On Android the bar has no blur or solid surface over the backdrop at rest: it comes in with
   the scroll while the big title fades out under the bar (`androidSurfaceWithTitle` of
-  `LargeTitleBar`), so the small title always reads over it. The blur strength and the surface color
-  follow the scroll (`progress` of `AndroidHeaderBlur`): a fade of a parent snapped on a device,
-  most likely because the blur view does not follow the opacity of its parent.
+  `LargeTitleBar`), so the small title always reads over it. The mask of the blur follows the
+  scroll (`progress` of `AndroidHeaderBlur`), and the blur keeps its full strength: a lower strength
+  is grainy, a strength of 0 turns the blur off and flashes, and a fade of a parent snapped.
 - An agent page (`set_backdrop`) shows in a web view with no touches. A build without the web view
   module does not offer it. The phone keeps the newest page of the open chat's agent, and deletes it
   at sign-out and when its server goes.

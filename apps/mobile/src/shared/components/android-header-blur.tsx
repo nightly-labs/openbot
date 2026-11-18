@@ -5,12 +5,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { ReactNode, RefObject } from "react";
 import { StyleSheet, View, type ViewInstance } from "react-native";
-import Animated, {
-  type SharedValue,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
+import Animated, { type SharedValue, useAnimatedProps, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
@@ -41,7 +36,7 @@ function maskStops(full: number) {
   return [{ offset: 0, opacity: 1 }, ...fade];
 }
 
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 /** The Material 3 small top app bar. */
 const BAR_HEIGHT = 64;
@@ -89,17 +84,19 @@ export function AndroidHeaderBlur({
   surface?: "canvas" | "sheet";
   shape: keyof typeof BLUR_SHAPES;
   /**
-   * From 0 (no bar surface) to 1 (the full blur and surface color). The blur strength and the surface
-   * color follow it, so the bar comes in step by step. A fade of a parent snapped on a device, most
-   * likely because the blur view does not follow the opacity of its parent. Unset, the bar is full.
+   * From 0 (no bar surface) to 1 (the full blur and surface color). The mask follows it, so the bar
+   * comes in step by step while the blur keeps its full strength: a lower blur strength is grainy,
+   * and a strength of 0 turns the blur off, which flashes. A fade of a parent snapped on a device,
+   * most likely because the blur view does not follow the opacity of its parent. Unset, the bar is
+   * full.
    */
   progress?: SharedValue<number>;
 }) {
   const { theme } = useUniwind();
   const fullBar = useSharedValue(1);
   const shown = progress ?? fullBar;
-  const blurProps = useAnimatedProps(() => ({ intensity: BLUR_INTENSITY * shown.get() }));
-  const surfaceStyle = useAnimatedStyle(() => ({ opacity: SURFACE_OPACITY * shown.get() }));
+  // The mask view draws its mask again when the mask content changes.
+  const maskProps = useAnimatedProps(() => ({ opacity: shown.get() }));
   const { belowBar, full } = BLUR_SHAPES[shape];
   return (
     <MaskedView
@@ -119,20 +116,20 @@ export function AndroidHeaderBlur({
               ))}
             </LinearGradient>
           </Defs>
-          <Rect fill="url(#android-header-mask)" height="100%" width="100%" />
+          <AnimatedRect fill="url(#android-header-mask)" height="100%" width="100%" animatedProps={maskProps} />
         </Svg>
       }
     >
-      <AnimatedBlurView
+      <BlurView
         blurTarget={target}
         blurMethod="dimezisBlurViewSdk31Plus"
-        animatedProps={blurProps}
+        intensity={BLUR_INTENSITY}
         tint={theme === "dark" ? "dark" : "light"}
         style={StyleSheet.absoluteFill}
       />
-      <Animated.View
+      <View
         className={surface === "sheet" ? "bg-sheet" : "bg-background"}
-        style={[StyleSheet.absoluteFill, surfaceStyle]}
+        style={[StyleSheet.absoluteFill, { opacity: SURFACE_OPACITY }]}
       />
     </MaskedView>
   );
