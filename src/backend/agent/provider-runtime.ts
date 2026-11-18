@@ -5007,14 +5007,14 @@ export class ProviderRuntime implements ProviderPort {
       (provider) =>
         Effect.gen({ self: this }, function* () {
           const before = listOf(provider);
-          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) {
-            // The quiet read keeps no error of its own, so the timeout of a pass that it held shows now.
-            if (this.#heldListTimeouts.has(provider)) {
-              this.#recordProviderError(provider, this.#heldListTimeouts.get(provider));
-              changed = true;
-            }
-            return;
-          }
+          // The quiet read keeps no error of its own, so when it fails, the timeout of a pass that it held
+          // shows. An empty list, or a client that another one replaced, is no failure.
+          const showHeldTimeout = () => {
+            if (!this.#heldListTimeouts.has(provider)) return;
+            this.#recordProviderError(provider, this.#heldListTimeouts.get(provider));
+            changed = true;
+          };
+          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true, onQuietFailure: showHeldTimeout }))) return;
           if (listOf(provider) !== before) changed = true;
           const lastError = this.#lastErrors.get(provider);
           if (lastError && lastError.serial <= errorSerialAtStart) {
