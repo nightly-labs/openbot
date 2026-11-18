@@ -14,7 +14,6 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { chatContentIsVisible } from "../model/chat-layout";
 
 /** The space under each row of the list. */
@@ -33,10 +32,10 @@ const FOCUS_PLACE_TOLERANCE = 1;
 function afterLayout(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
-/** On Android the chat takes the latest message this many frames after the last row has its size. */
-const ANDROID_PLACE_FRAMES = 2;
-/** The longest wait on Android before the chat takes the latest message, also without a measured row. */
-const ANDROID_PLACE_TIMEOUT_MS = 250;
+/** The chat takes the latest message this many frames after the last row has its size. */
+const OPEN_PLACE_FRAMES = 2;
+/** The longest wait before the chat takes the latest message, also without a measured row. */
+const OPEN_PLACE_TIMEOUT_MS = 350;
 /** How long the list keeps the latest message in view after the chat has its rows and its latest page. */
 const OPENING_FOLLOW_MS = 600;
 
@@ -187,6 +186,15 @@ export function useChatMotion(
   }, [revealed]);
   /** The list finished the first position of its rows. */
   const onListReady = useCallback((withRows: boolean) => setPlacedWithRows(withRows), []);
+  // Legend List can call `onReady` once while the list is empty. When rows come in later it may
+  // not call it again, and `placedWithRows === false` leaves the history hidden until the reader scrolls.
+  useEffect(() => {
+    if (!hasRows) {
+      if (placedWithRows !== null) setPlacedWithRows(null);
+      return;
+    }
+    if (placedWithRows === false) setPlacedWithRows(null);
+  }, [hasRows, placedWithRows]);
 
   // The list shows once it has its place at the latest message. A message from search shows it itself.
   useLayoutEffect(() => {
@@ -199,12 +207,10 @@ export function useChatMotion(
     if (held) void (listRef.current?.scrollToEnd({ animated: false }) ?? Promise.resolve()).then(reveal, reveal);
     else reveal();
   }, [listPlaced, ready, holdOpening, reveal]);
-  // Android moves the list to the latest message with a native scroll, and Legend List can wait for
-  // seconds for that scroll to report before it calls `onReady`. Once the last row has its size,
-  // the chat takes the end itself: this ends the wait, and the list calls `onReady`. iOS places the
-  // list without a native scroll, so it keeps the wait.
+  // The list can wait for a native end scroll before it calls `onReady`, and long chats measure slowly.
+  // Once the last row has its size, or after a short deadline, the chat takes the end itself.
   useEffect(() => {
-    if (!isAndroid || shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
+    if (shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
     const started = Date.now();
     let measuredFrames = 0;
     let frame = requestAnimationFrame(function place() {
@@ -213,7 +219,7 @@ export function useChatMotion(
       const last = state ? state.data.length - 1 : -1;
       // The size of a row is unset until the list has measured it.
       if (state && last >= 0 && state.sizeAtIndex(last) > 0) measuredFrames += 1;
-      if (list && (measuredFrames > ANDROID_PLACE_FRAMES || Date.now() - started >= ANDROID_PLACE_TIMEOUT_MS)) {
+      if (list && (measuredFrames > OPEN_PLACE_FRAMES || Date.now() - started >= OPEN_PLACE_TIMEOUT_MS)) {
         // The list calls `onReady` when this ends its wait. The end of the scroll places the list
         // also if it had no wait left to end.
         void list.scrollToEnd({ animated: false }).then(() => setPlacedWithRows(true));
