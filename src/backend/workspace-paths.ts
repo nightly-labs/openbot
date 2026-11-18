@@ -1,6 +1,6 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
@@ -27,7 +27,16 @@ export interface ResolvedWorkspaceFile extends ResolvedSharedFile {
 /** A line or column reference that agents write after a path: `:12`, `:12:3`, `#L12`, `#L12-L20`, `#L12C3`. */
 const LOCATION_SUFFIX = /(?::\d+(?::\d+)?|#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?)$/u;
 
-export function sharedPathFromInput(sharedRoot: string, inputPath: string): string {
+/**
+ * Codex writes `C:/Users/…` as `/C:/Users/…`, as a file URL spells it (#12104). No Windows path starts
+ * with a separator before a drive letter, so a Windows host reads it without that separator.
+ */
+function withoutSlashBeforeDrive(path: string): string {
+  return process.platform === "win32" && /^[/\\][A-Za-z]:[/\\]/u.test(path) ? path.slice(1) : path;
+}
+
+export function sharedPathFromInput(sharedRoot: string, written: string): string {
+  const inputPath = withoutSlashBeforeDrive(written);
   const normalized = inputPath.replaceAll("\\", "/");
   for (const prefix of ["~/OpenBot/Shared/", "OpenBot/Shared/", "Shared/"]) {
     if (normalized.startsWith(prefix)) return join(sharedRoot, normalized.slice(prefix.length));
@@ -44,7 +53,7 @@ export function sharedPathFromInput(sharedRoot: string, inputPath: string): stri
  * resolves somewhere else.
  */
 export function workspacePathFromInput(workspaceRoot: string, agentId: string, inputPath: string): string {
-  const decoded = decodePath(inputPath.trim());
+  const decoded = withoutSlashBeforeDrive(decodePath(inputPath.trim()));
   const normalized = decoded.replaceAll("\\", "/");
   const legacyId = legacyAgentId(agentId);
   for (const prefix of [
@@ -110,12 +119,17 @@ function decodePath(value: string): string {
 export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(function* (
   sharedRootPath: string,
   inputPath: string,
-  options: { allowDirectory?: boolean } = {},
+  options: { allowDirectory?: boolean; followLinks?: boolean } = {},
 ): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
   const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
-  const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
+  // `resolve` removes `..` before `realpath`, so `..` after a link cannot go up from the link target.
+  const candidatePath = resolve(sharedPathFromInput(sharedRootPath, inputPath));
   const resolvedPath = yield* attachmentCall(() => realpath(candidatePath));
-  if (!isWithin(sharedRoot, resolvedPath)) {
+  // A folder in Shared can be a link (a junction on Windows) to another disk. For the local user, the path as
+  // written decides. A remote member does not get `followLinks`: a link must not take a member out of Shared.
+  const writtenInside =
+    options.followLinks === true && [sharedRootPath, sharedRoot].some((root) => isWithin(resolve(root), candidatePath));
+  if (!writtenInside && !isWithin(sharedRoot, resolvedPath)) {
     return yield* attachmentFailure(new Error(sourceText("error.backend.sharedFileOutside")));
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
@@ -157,11 +171,20 @@ interface WorkspacePathAccess {
   allowedRoots?: readonly string[];
 }
 
+/** A link that misses looks in at most this many work folders. */
+const WORK_FOLDER_LIMIT = 50;
+
+/** What the agent's tools touched in its threads: the files that it read or wrote, and the folders where it worked. */
+interface ToolHistory {
+  fileHistory?: readonly string[];
+  workFolders?: readonly string[];
+}
+
 /** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
 const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: WorkspacePathAccess & { allowRoot?: boolean; exactPath?: boolean; fileHistory?: readonly string[] },
+  options: WorkspacePathAccess & { allowRoot?: boolean; exactPath?: boolean } & ToolHistory,
 ) {
   const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
@@ -238,29 +261,18 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   workspaceRoot: string,
   candidatePath: string,
   readAllowedRoots: Effect.Effect<string[]>,
-  options: WorkspacePathAccess & { fileHistory?: readonly string[] },
+  options: WorkspacePathAccess & ToolHistory,
 ): Effect.fn.Return<string | null, AttachmentOperationError> {
   const allowedRoots = yield* readAllowedRoots;
   const mayAccess = accessCheck(workspaceRoot, allowedRoots, options);
   // A path that leaves the workspace, such as `../notes.md`, names no file of an added folder.
-  if (isWithin(agent.workspacePath, candidatePath)) {
-    const relativePath = relative(agent.workspacePath, candidatePath);
-    const relativePaths = [...new Set([relativePath, relativePath.replace(LOCATION_SUFFIX, "")])];
-    const matches = yield* Effect.forEach(
-      allowedRoots,
-      (root) =>
-        Effect.gen(function* () {
-          for (const path of relativePaths) {
-            const found = yield* Effect.result(attachmentCall(() => realpath(join(root, path))));
-            if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
-          }
-          return null;
-        }),
-      { concurrency: "unbounded" },
-    );
-    const files = new Set(matches.filter((path): path is string => path !== null));
-    if (files.size === 1) return [...files][0] ?? null;
-  }
+  const relativePath = isWithin(agent.workspacePath, candidatePath)
+    ? relative(agent.workspacePath, candidatePath)
+    : null;
+  const relativePaths =
+    relativePath === null ? [] : [...new Set([relativePath, relativePath.replace(LOCATION_SUFFIX, "")])];
+  const inAddedFolder = yield* onlyMatch(allowedRoots, relativePaths, mayAccess);
+  if (inAddedFolder !== null) return inAddedFolder;
   const name = basename(candidatePath);
   const withoutLocation = name.replace(LOCATION_SUFFIX, "");
   const history = [...(options.fileHistory ?? [])].reverse();
@@ -276,7 +288,34 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
     if (Result.isFailure(found) && !isMissing(found.failure) && options.allowOutside)
       return yield* Effect.fail(found.failure);
   }
-  return null;
+  // Last, the same path in the folders where the agent listed files or ran commands, such as
+  // `build-app.md` after `ls /tmp/kskills`. Only when exactly one folder has it, as for added folders.
+  // Only the newest folders, which include those of the current thread: each folder costs a lookup.
+  const workFolders = [...new Set([...(options.workFolders ?? [])].reverse())].slice(0, WORK_FOLDER_LIMIT);
+  return yield* onlyMatch(workFolders, relativePaths, mayAccess);
+});
+
+/** The one real file that a relative path names in the folders, or null when none or several have it. */
+const onlyMatch = Effect.fn("Workspace.onlyMatch")(function* (
+  folders: readonly string[],
+  relativePaths: readonly string[],
+  mayAccess: (path: string) => boolean,
+) {
+  if (relativePaths.length === 0) return null;
+  const matches = yield* Effect.forEach(
+    folders,
+    (folder) =>
+      Effect.gen(function* () {
+        for (const path of relativePaths) {
+          const found = yield* Effect.result(attachmentCall(() => realpath(join(folder, path))));
+          if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
+        }
+        return null;
+      }),
+    { concurrency: "unbounded" },
+  );
+  const files = new Set(matches.filter((path): path is string => path !== null));
+  return files.size === 1 ? ([...files][0] ?? null) : null;
 });
 
 /**
@@ -296,7 +335,7 @@ function isMissing(error: AttachmentOperationError): boolean {
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: WorkspacePathAccess & { exactPath?: boolean; fileHistory?: readonly string[] } = {},
+  options: WorkspacePathAccess & { exactPath?: boolean } & ToolHistory = {},
 ): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
   const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
   if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));

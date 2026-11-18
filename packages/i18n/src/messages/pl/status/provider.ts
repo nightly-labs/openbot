@@ -11,6 +11,11 @@ export const messages = {
     "{provider} nie może połączyć się ze swoim serwerem. Ponowienie {attempt} z {maxAttempts}.",
   "status.provider.retryServerError":
     "Serwer {provider} jest zajęty lub zwrócił błąd. Ponowienie {attempt} z {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} nie może połączyć się z dostawcą modelu. Ponawia próbę: próba {attempt}.",
+  "status.provider.modelRetryServerError":
+    "Dostawca modelu jest zajęty lub zwrócił błąd. {provider} ponawia próbę: próba {attempt}.",
+  "status.provider.modelRetryRecovered": "Dostawca modelu znowu odpowiada.",
   "status.provider.retryRecovered": "{provider} znów otrzymuje odpowiedzi ze swojego serwera.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude odpowiedział ze standardową szybkością. Z subskrypcją Claude tryb szybki korzysta ze środków na użycie. Włącz je na koncie Claude.",
@@ -24,4 +29,6 @@ export const messages = {
     "Claude odpowiedział ze standardową szybkością. Tryb szybki jest wyłączony w ustawieniach Claude Code lub przez Twoją organizację.",
   "status.provider.claudeFastModeUnavailable":
     "Claude odpowiedział ze standardową szybkością. Claude Code nie mógł użyć trybu szybkiego w tej turze.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code jest ustawiony tak, aby używać klucza API Anthropic. Anthropic nalicza każde żądanie z kredytu API klucza, a nie z Twojego planu Claude. Aby używać planu, usuń klucz z ustawień Claude Code lub ze zmiennych środowiskowych, a następnie uruchom ponownie OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

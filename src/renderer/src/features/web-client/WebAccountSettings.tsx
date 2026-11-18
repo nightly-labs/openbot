@@ -18,8 +18,10 @@ import {
   toast,
   UserRound,
 } from "@openbot/ui";
+import { documentColorScheme } from "@openbot/ui/document-color-scheme";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import { ACTION_SOUND_CHOICES, TASK_SOUND_CHOICES } from "@openbot/ui/features/settings/app-settings";
+import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
 import { ChatBubbleStyleSelect } from "@openbot/ui/features/settings/ChatBubbleStyleSelect";
 import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
@@ -40,8 +42,11 @@ import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-s
 import { webReportsEnabled } from "../../error-reports";
 import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
+import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
+import { MotionSwitches } from "../settings/MotionSwitches";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
+import { setWebChatBackground, useWebChatBackground } from "./web-chat-background";
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
@@ -103,6 +108,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
   const bubbleStyle = useChatBubbleStyle();
+  const chatBackground = useWebChatBackground();
   const webLiveVoice = useWebLiveVoice();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
@@ -295,6 +301,30 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   />
                 </ItemActions>
               </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.chatBackground.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.chatBackground.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBackgroundSetting
+                    scheme={documentColorScheme()}
+                    light={chatBackground().chatBackgroundLight}
+                    dark={chatBackground().chatBackgroundDark}
+                    onChange={setWebChatBackground}
+                  />
+                </ItemActions>
+              </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.chatBackdrop.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.chatBackdrop.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBackdropSetting {...(modalElement ? { mount: modalElement } : {})} />
+                </ItemActions>
+              </Item>
+              <MotionSwitches />
             </ItemGroup>
           </SettingsSection>
           {/* The choice is kept in this browser and holds for each server that serves live voice. */}

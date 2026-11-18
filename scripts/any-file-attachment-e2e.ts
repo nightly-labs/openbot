@@ -33,6 +33,18 @@ function digest(bytes: Uint8Array): string {
 const profile = new TextEncoder().encode("client\ndev tun\nproto udp\nremote vpn.example.com 1195\n");
 const binary = new Uint8Array([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x01, 0xff, 0xfe, 0x00]);
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** The start of an `ftyp` box: its size, the type, the major brand, the minor version, then compatible brands. */
+function ftyp(...brands: string[]): Uint8Array {
+  const [major = "", ...compatible] = brands;
+  const box = Buffer.alloc(16 + compatible.length * 4);
+  box.writeUInt32BE(box.length, 0);
+  box.write("ftyp", 4, "latin1");
+  box.write(major, 8, "latin1");
+  for (const [index, brand] of compatible.entries()) box.write(brand, 16 + index * 4, "latin1");
+  return new Uint8Array(Buffer.concat([box, Buffer.alloc(16)]));
+}
+const heif = ftyp("mif1", "mif1", "heic");
+const avif = ftyp("avif", "mif1", "miaf");
 
 async function run() {
   const root = await mkdtemp(join(tmpdir(), "openbot-any-file-attachment-"));
@@ -92,8 +104,20 @@ async function run() {
         kind: "file",
         stored: "application/octet-stream",
       },
-      { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "application/octet-stream" },
+      // #9880: OGG audio takes its type from the name, so the chat plays it.
+      { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "audio/ogg" },
       { name: "screenshot.png", mimeType: "image/png", bytes: png, kind: "image", stored: "image/png" },
+      // #9752: a HEIF photo with a JPEG name is a file, because no provider decodes HEIF. AVIF uses the
+      // same container and stays an image.
+      { name: "IMG_0002.jpeg", mimeType: "image/jpeg", bytes: heif, kind: "file", stored: "application/octet-stream" },
+      { name: "photo.avif", mimeType: "image/avif", bytes: avif, kind: "image", stored: "image/avif" },
+      {
+        name: "late-brand.avif",
+        mimeType: "image/avif",
+        bytes: ftyp("mif1", "miaf", "MA1B", "MA1A", "mif1", "avif"),
+        kind: "image",
+        stored: "image/avif",
+      },
     ];
     const uploaded = await Effect.runPromise(
       files.prepareDrafts(
@@ -164,7 +188,7 @@ async function run() {
     assert.equal(teamCapabilitiesForProtocol(8).includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY), false);
     assert.equal(teamCapabilitiesForProtocol(9).includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY), true);
     assert.ok(teamCapabilitiesForProtocol(8).length <= 128);
-    assert.ok(TEAM_CURRENT_CAPABILITIES.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
+    assert.ok(teamCapabilitiesForProtocol(9).length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT);
 
     return {
       status: "pass",

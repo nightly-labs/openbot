@@ -10,9 +10,7 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
-import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { SERVER_SAFE_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
@@ -27,6 +25,7 @@ import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
+import { readWebHostCompatibility } from "./web-host-compatibility";
 import {
   type acquireWebHostLock,
   decodeWebHostTabMessage,
@@ -158,7 +157,7 @@ export function createWebHostConnections(options: {
    * The opened host's peer options apart from `waitForHost`, so a status connection can become it. A
    * status connection also waits for the host, as the opened host does.
    */
-  peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols">;
+  peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols" | "clientProtocol">;
   acquireHostLock: typeof acquireWebHostLock;
   /** Throws when the host identity differs from the pinned one. */
   pinHostKey(host: RemoteTeamHost): void;
@@ -289,21 +288,26 @@ export function createWebHostConnections(options: {
         entry.connecting = connecting;
         const connected = await connecting;
         if (!connected.ok) throw failed(connected.error, connected.reference);
-        const response = await peer.execute({
-          id: crypto.randomUUID(),
-          type: "request",
-          method: "GET",
-          path: TEAM_API_ROUTES.compatibility,
-          body: {},
+        const { support, negotiated } = await readWebHostCompatibility(async () => {
+          const response = await peer.execute({
+            id: crypto.randomUUID(),
+            type: "request",
+            method: "GET",
+            path: TEAM_API_ROUTES.compatibility,
+            body: {},
+          });
+          if (!response.ok || (response.status ?? 500) >= 400)
+            throw failed(
+              response.error,
+              response.status === undefined
+                ? response.reference
+                : (referenceFrom("http", response.status) ?? undefined),
+            );
+          return response.body;
         });
-        if (!response.ok || (response.status ?? 500) >= 400)
-          throw failed(
-            response.error,
-            response.status === undefined ? response.reference : (referenceFrom("http", response.status) ?? undefined),
-          );
-        const support = decodeTeamProtocolSupportV9(response.body);
-        // The same rule as opening the host, so the rail and the open agree.
-        if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
+        // The same rule as opening the host, so the rail and the open agree. A host in safe mode
+        // answers only with its reason, which the open host shows.
+        if (negotiated.update || support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY)) {
           entry.incompatible = true;
           recovery.suspend();
         } else {

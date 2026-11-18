@@ -16,15 +16,19 @@ import {
   claudeCompactWindowSizes,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  isProviderEnvironmentProvider,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountPool,
   type ProviderAccountState,
+  type ProviderEnvironment,
+  type ProviderEnvironmentVariableInput,
   type ProviderModelVisibility,
   type ProviderRuntimeDownload,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
+  providerEnvironmentProblem,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -41,6 +45,7 @@ import {
   Ellipsis,
   Gauge,
   Globe2,
+  IconButton,
   Input,
   Item,
   ItemActions,
@@ -75,10 +80,11 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
 import {
+  accountCodeSignInOffered,
   hasKeyAccounts,
   isApiKeyAccount,
   isProviderKeyAccount,
@@ -132,6 +138,19 @@ export interface ProviderClaudeCompactWindow {
   /** A load or a save that failed. */
   error: string | null;
   onChange: (tokens: number | null) => void;
+}
+
+/**
+ * The environment variables of one provider of the host. `value` is null until the host answers. A
+ * sensitive variable has an empty `value` and `stored: true`; the host never sends its value back.
+ */
+export interface ProviderEnvironmentControl {
+  value: ProviderEnvironment | null;
+  pending: boolean;
+  /** A load or a save that failed. */
+  error: string | null;
+  /** Replaces the whole list. `value: null` keeps a stored sensitive value. */
+  onSave: (variables: ProviderEnvironmentVariableInput[]) => void;
 }
 
 /** Whether Claude loads the user's own Claude Code setup. `value` is null until main answers. */
@@ -206,6 +225,12 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
   /** On the Claude page. Only for a host with `claude-compact-window-v1` that this account administers. */
   claudeCompactWindow?: ProviderClaudeCompactWindow | undefined;
+  /**
+   * The Environment section of one provider page. Called once when the page opens, so the control
+   * lives as long as the page. Only for a host with `provider-environment-v1` that this account
+   * administers, and only for a provider that takes variables.
+   */
+  environment?: ((provider: AgentProviderId) => ProviderEnvironmentControl | undefined) | undefined;
   /**
    * The model list of one provider page. Called once when the page opens, so the control lives as
    * long as the page. Only for a host with `model-visibility-v1` that this account administers.
@@ -591,6 +616,8 @@ function ProviderPage(props: PageProps) {
   };
   const modelVisibility = createMemo(() => props.modelVisibility);
   const models = createMemo(() => modelVisibility()?.(provider()));
+  const environmentControl = createMemo(() => props.environment);
+  const environment = createMemo(() => environmentControl()?.(provider()));
   return (
     <>
       <DetailHeader
@@ -625,6 +652,16 @@ function ProviderPage(props: PageProps) {
           {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
+        <Show when={isProviderEnvironmentProvider(props.option.id) && environment()}>
+          {(control) => (
+            <EnvironmentSection
+              control={control()}
+              provider={props.option.id}
+              name={props.option.name}
+              disabled={props.disabled}
+            />
+          )}
+        </Show>
       </Show>
       <Show when={!runtimeMissing()}>
         <UseSection {...props} row={row} />
@@ -864,6 +901,23 @@ function AccountsSection(props: SectionProps) {
             <UserRoundPlus aria-hidden="true" />
             {t("provider.account.add")}
           </Button>
+          {/* The other way in for a new account, in a ⋯ menu as on the provider's own sign-in. */}
+          <Show when={!keyOffered() && props.row.accountCodeOffered()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+              <MenuTrigger
+                label={t("provider.account.moreActions", { name: t("provider.account.add") })}
+                disabled={props.disabled || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()}
+              />
+              <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
+                <DropdownMenu.Content>
+                  <DropdownMenu.Item onSelect={props.row.addAccountWithCode}>
+                    <Smartphone aria-hidden="true" />
+                    {t("provider.account.addWithCode")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
         </Show>
       }
     >
@@ -1124,6 +1178,10 @@ function AccountRow(
         <Show when={keyReplacesOwn()}>
           <ItemDescription>{t("provider.settings.geminiKeyReplacesAccount")}</ItemDescription>
         </Show>
+        {/* A connected account has a message only when its CLI bills an API key in place of the plan. */}
+        <Show when={state() === "connected" && props.account.message}>
+          {(message) => <ItemDescription role="status">{sourceText(message())}</ItemDescription>}
+        </Show>
         <Show when={state() !== "connected"}>
           <ItemDescription class={{ "provider-settings-warning": needsSignIn() }}>
             {props.account.message ? sourceText(props.account.message) : t(ACCOUNT_STATE_TEXT[state()])}
@@ -1223,6 +1281,16 @@ function AccountRow(
               </Show>
               <Show when={own()}>
                 <AlternativeItem row={props.row} />
+              </Show>
+              <Show when={signInAgain() && accountCodeSignInOffered(props.option.id, props.accountActions)}>
+                <DropdownMenu.Item
+                  onSelect={() =>
+                    props.run(name(), () => props.accountActions?.connectWithCode?.(props.option.id, props.account.id))
+                  }
+                >
+                  <Smartphone aria-hidden="true" />
+                  {t("provider.action.signInWithCode")}
+                </DropdownMenu.Item>
               </Show>
               <Show when={apiKey()}>
                 <DropdownMenu.Item onSelect={() => void props.onSignInProvider?.(props.option.id)}>
@@ -1980,6 +2048,277 @@ function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disable
             </ItemActions>
           </Show>
         </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
+/* ---------------------------------------------- Environment */
+
+interface EnvironmentRow {
+  /** A key for the list, so a typed character does not make the row again. */
+  id: number;
+  name: string;
+  value: string;
+  sensitive: boolean;
+  /** The host has the value of this sensitive name; an empty field keeps it. */
+  stored: boolean;
+}
+
+/**
+ * The variables that each process of the provider starts with. The list is a draft until Save. A
+ * removed row fades and folds, so the rows under it slide up; from the keyboard, the focus then goes to
+ * the next row's Remove, the previous one, or Add variable. A sensitive value is typed only to change
+ * it. Saving restarts the provider when its turns end.
+ */
+function EnvironmentSection(props: {
+  control: ProviderEnvironmentControl;
+  provider: AgentProviderId;
+  name: string;
+  disabled: boolean | undefined;
+}) {
+  const { t } = useText();
+  let nextId = 0;
+  const rowsOf = (environment: ProviderEnvironment | null): EnvironmentRow[] =>
+    (environment?.variables ?? []).map((variable) => ({ ...variable, id: nextId++ }));
+  const [draft, setDraft] = createSignal<EnvironmentRow[]>([]);
+  /** What the draft was last set to from the host: a change of the user is a difference from it. */
+  const [baseline, setBaseline] = createSignal<string>("[]");
+  const [leaving, setLeaving] = createSignal<ReadonlySet<number>>(new Set());
+  const [saved, setSaved] = createSignal(false);
+  const removeButtons = new Map<number, HTMLButtonElement>();
+  let addButton: HTMLButtonElement | undefined;
+  const snapshot = (rows: readonly Omit<EnvironmentRow, "id">[]) =>
+    JSON.stringify(rows.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
+  const kept = () => draft().filter((row) => !leaving().has(row.id));
+  const dirty = () => snapshot(kept()) !== baseline();
+  /** Sets the draft to what the host keeps now. */
+  const reset = (environment: ProviderEnvironment | null) => {
+    const rows = rowsOf(environment);
+    setLeaving(new Set<number>());
+    setDraft(rows);
+    setBaseline(snapshot(rows));
+  };
+  // An answer of the host starts the draft again from what the host keeps, but not while the user has
+  // a change: each status event reads the variables again, also while the user types. The answer to a
+  // save of this page does start it again.
+  createEffect(
+    () => props.control.value,
+    (environment) => {
+      const keep = untrack(() => dirty() && !(saved() && !props.control.error));
+      if (keep) return;
+      reset(environment);
+    },
+  );
+  const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);
+  const keptNames = () => kept().map((row) => row.name.trim());
+  const problem = (row: EnvironmentRow): string | null => {
+    if (!isProviderEnvironmentProvider(props.provider)) return null;
+    const name = row.name.trim();
+    if (name === "" && row.value === "") return null;
+    const found = providerEnvironmentProblem(props.provider, name, keptNames());
+    if (found === "name") return t("error.provider.environmentNameInvalid", { name: name || "…" });
+    if (found === "reserved") return t("error.provider.environmentNameReserved", { name });
+    if (found === "duplicate") return t("error.provider.environmentNameDuplicate", { name });
+    return null;
+  };
+  const invalid = () => kept().some((row) => problem(row) !== null);
+  const update = (id: number, change: Partial<EnvironmentRow>) => {
+    setSaved(false);
+    setDraft((rows) => rows.map((row) => (row.id === id ? { ...row, ...change } : row)));
+  };
+  const drop = (id: number) => {
+    setLeaving((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setDraft((rows) => rows.filter((row) => row.id !== id));
+    removeButtons.delete(id);
+  };
+  const remove = (id: number) => {
+    if (leaving().has(id)) return;
+    setSaved(false);
+    const rows = draft();
+    const index = rows.findIndex((row) => row.id === id);
+    const staying = rows.filter((row) => row.id !== id && !leaving().has(row.id));
+    const next = staying.find((row) => rows.indexOf(row) > index) ?? staying.at(-1) ?? null;
+    // Only a keyboard user gets the focus moved: after a click it would open the next button's tooltip.
+    if (removeButtons.get(id)?.matches(":focus-visible"))
+      (next ? removeButtons.get(next.id) : addButton)?.focus({ preventScroll: true });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      drop(id);
+      return;
+    }
+    setLeaving((current) => new Set(current).add(id));
+    // The fold reports its end; the timer covers a window in the background, which runs no transition.
+    setTimeout(() => {
+      if (leaving().has(id)) drop(id);
+    }, 260);
+  };
+  const save = () => {
+    const variables: ProviderEnvironmentVariableInput[] = kept()
+      .filter((row) => row.name.trim() !== "" || row.value !== "")
+      .map((row) => ({
+        name: row.name.trim(),
+        // An empty field of a stored sensitive value keeps it.
+        value: row.sensitive && row.stored && row.value === "" ? null : row.value,
+        sensitive: row.sensitive,
+      }));
+    setSaved(true);
+    props.control.onSave(variables);
+  };
+  const label = (row: EnvironmentRow, index: number) =>
+    row.name.trim() || t("provider.settings.environmentUnnamed", { index: index + 1 });
+  return (
+    <SettingsSection title={t("provider.settings.environment")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle>{t("provider.settings.environmentVariables")}</ItemTitle>
+            <Show
+              when={props.control.error}
+              fallback={
+                <ItemDescription>
+                  {t("provider.settings.environmentDescription", { name: props.name })}{" "}
+                  {props.provider === "codex" ? `${t("provider.settings.environmentCodexHint")} ` : ""}
+                  {t("provider.settings.environmentShellNote")}
+                </ItemDescription>
+              }
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy()}
+              ref={(element: HTMLButtonElement) => {
+                addButton = element;
+              }}
+              onClick={() => {
+                setSaved(false);
+                setDraft((rows) => [...rows, { id: nextId++, name: "", value: "", sensitive: false, stored: false }]);
+              }}
+            >
+              <Plus />
+              {t("provider.settings.environmentAdd")}
+            </Button>
+          </ItemActions>
+        </Item>
+        <For each={draft()} keyed={(row) => row.id}>
+          {(row, index) => (
+            // The wrapper folds its row away: its grid row goes from 1fr to 0fr while the row fades.
+            <div
+              class="provider-environment-fold"
+              data-leaving={leaving().has(row().id) ? "" : undefined}
+              inert={leaving().has(row().id)}
+              onTransitionEnd={(event) => {
+                if (event.target === event.currentTarget && event.propertyName === "grid-template-rows") drop(row().id);
+              }}
+            >
+              <Item class="settings-modal-row provider-environment-row">
+                <div class="provider-environment-fields">
+                  <Input
+                    size="sm"
+                    class="provider-environment-mono"
+                    spellcheck={false}
+                    autocomplete="off"
+                    placeholder={t("provider.settings.environmentNamePlaceholder")}
+                    aria-label={t("provider.settings.environmentNameLabel", { index: index() + 1 })}
+                    disabled={busy()}
+                    value={row().name}
+                    // A new name needs its own value: the stored one belongs to the old name.
+                    onValueChange={(value) => update(row().id, { name: value, stored: false })}
+                  />
+                  <Input
+                    size="sm"
+                    class="provider-environment-mono"
+                    type={row().sensitive ? "password" : "text"}
+                    spellcheck={false}
+                    autocomplete="off"
+                    placeholder={
+                      row().stored
+                        ? t("provider.settings.environmentSaved")
+                        : t("provider.settings.environmentValuePlaceholder")
+                    }
+                    aria-label={t("provider.settings.environmentValueLabel", { name: label(row(), index()) })}
+                    disabled={busy()}
+                    value={row().value}
+                    onValueChange={(value) => update(row().id, { value })}
+                  />
+                  <Show when={problem(row())}>
+                    {(message) => <ItemDescription class="provider-settings-error">{message()}</ItemDescription>}
+                  </Show>
+                </div>
+                <ItemActions>
+                  <div class="provider-environment-sensitive">
+                    <Switch
+                      size="sm"
+                      checked={row().sensitive}
+                      disabled={busy()}
+                      aria-label={t("provider.settings.environmentSensitiveLabel", { name: label(row(), index()) })}
+                      onChange={(on: boolean) => update(row().id, { sensitive: on, stored: on && row().stored })}
+                    />
+                    <span aria-hidden="true">{t("provider.settings.environmentSensitive")}</span>
+                  </div>
+                  <IconButton
+                    variant="ghost"
+                    size="icon-sm"
+                    label={t("provider.settings.environmentRemoveLabel", { name: label(row(), index()) })}
+                    disabled={busy()}
+                    ref={(element: HTMLButtonElement) => {
+                      removeButtons.set(row().id, element);
+                    }}
+                    onClick={() => remove(row().id)}
+                  >
+                    <Trash2 />
+                  </IconButton>
+                </ItemActions>
+              </Item>
+            </div>
+          )}
+        </For>
+        <Show when={dirty() || (saved() && !props.control.pending && !props.control.error)}>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemDescription>
+                {dirty()
+                  ? t("provider.settings.environmentPending", { name: props.name })
+                  : t("provider.settings.environmentDone", { name: props.name })}
+              </ItemDescription>
+            </ItemContent>
+            <Show when={dirty()}>
+              <ItemActions>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={props.control.pending}
+                  // The host's answers that came during the change show now.
+                  onClick={() => reset(props.control.value)}
+                >
+                  {t("provider.settings.environmentDiscard")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={props.control.pending}
+                  disabled={busy() || invalid()}
+                  onClick={save}
+                >
+                  {t("provider.settings.environmentSave")}
+                </Button>
+              </ItemActions>
+            </Show>
+          </Item>
+        </Show>
       </ItemGroup>
     </SettingsSection>
   );

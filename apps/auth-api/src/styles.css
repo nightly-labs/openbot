@@ -6,6 +6,7 @@
 @import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
 @import "@openbot/ui/styles/sr-only.css";
+@import "@openbot/ui/styles/scroll-edges.css";
 
 /* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
    so the hero does not move when the font changes. Inter is wider than the system font, and on a
@@ -1927,12 +1928,12 @@ a {
   outline-offset: 3px;
 }
 
-.landing-download-action-apk {
+.landing-download-action-alternate {
   position: relative;
   z-index: 1;
 }
 
-.landing-download-action-apk:focus-visible {
+.landing-download-action-alternate:focus-visible {
   border-radius: 4px;
   outline: 2px solid var(--openbot-download-card-focus);
   outline-offset: 4px;
@@ -4090,12 +4091,12 @@ a {
     transform: translate(2px, -2px);
   }
 
-  /* The pointer is on the APK link, so the card does not show the Google Play link as the target. */
-  .landing-download-card[data-state="available"]:has(.landing-download-action-apk:hover) .landing-download-arrow {
+  /* The pointer is on the second link, so the card does not show its first link as the target. */
+  .landing-download-card[data-state="available"]:has(.landing-download-action-alternate:hover) .landing-download-arrow {
     transform: none;
   }
 
-  .landing-download-action-apk:hover {
+  .landing-download-action-alternate:hover {
     text-decoration: underline;
     text-underline-offset: 4px;
   }
@@ -6513,13 +6514,18 @@ a {
 }
 
 /* Blurs the faces behind the text, and fades out from the centre, so it has no edge.
-   The pointer goes through it to the faces. */
+   The pointer goes through it to the faces. The box ends where the fade does: the faces
+   in it keep still, because the blur draws the whole box again when one of them moves. */
 .post-cta-veil {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: min(100%, 1080px);
+  height: 510px;
+  translate: -50% -50%;
   background: color-mix(in srgb, var(--openbot-bg-canvas) 62%, var(--openbot-transparent));
   backdrop-filter: blur(16px);
-  mask-image: radial-gradient(720px 340px at 50% 50%, var(--openbot-mask-solid) 50%, var(--openbot-transparent) 100%);
+  mask-image: radial-gradient(closest-side, var(--openbot-mask-solid) 66%, var(--openbot-transparent) 100%);
   pointer-events: none;
 }
 
@@ -6561,6 +6567,10 @@ a {
   }
 
   .post-cta-veil {
+    inset: 0;
+    width: auto;
+    height: auto;
+    translate: none;
     mask-image: radial-gradient(340px 400px at 50% 50%, var(--openbot-mask-solid) 55%, var(--openbot-transparent) 100%);
   }
 }

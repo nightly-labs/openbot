@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Есть идея? Давайте воплотим.",
   "prompt.approval.report.dontSend": "Не сейчас",
   "prompt.approval.report.send": "Отправить команде OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Откройте этот чат в приложении OpenBot на телефоне и отправьте отчёт оттуда. Телефон добавляет свою версию, систему и журнал поддержки. Если телефон не может подключиться, откройте Настройки > Поддержка в приложении на телефоне и сообщите о проблеме на GitHub.",
   "prompt.approval.title.command": "Выполнить команду",
   "prompt.approval.title.fileChange": "Изменить файлы",
   "prompt.approval.title.permissions": "Предоставить разрешения",
@@ -43,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Выполните шаг на {host}",
   "prompt.browser.cancelled": "Отменено",
   "prompt.browser.reload":
-    "Завершите вход, затем перезагрузите страницу в браузере, прежде чем нажимать «Готово». Пока страница не перезагружена, её проверка заблокирована.",
+    "OpenBot не смог до конца ввести пароль или код. Проверьте страницу и введите недостающее. Завершите вход, затем перезагрузите страницу в браузере, прежде чем нажимать «Готово». Пока страница не перезагружена, её проверка заблокирована.",
   "prompt.browser.continuing": "{name} продолжает работу.",
   "prompt.browser.cancelledBody": "Шаг в браузере отменён.",
   "prompt.browser.pendingBody":
     "Откройте страницу, чтобы завершить вход, проверку или подтвердить согласие. Затем позвольте {name} продолжить.",
   "prompt.browser.openPage": "Открыть {title}",
+  "prompt.browser.openFailed": "Не удалось открыть страницу в главном окне. Попробуйте ещё раз.",
   "prompt.browser.done": "Готово",
   "prompt.browser.pageFallback": "Страница браузера",
   "prompt.browser.hostFallback": "странице браузера",
@@ -56,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Вход в {host} отменён",
   "prompt.browser.signInBlocked.body":
     "Войдите на этом компьютере. OpenBot отправит на {server} только вход в {host}, и {name} продолжит работу.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там. Затем {name} продолжит работу.",
   "prompt.browser.signInBlocked.cancelledBody": "Вход отменён.",
   "prompt.browser.signInBlocked.waiting": "Ожидание входа",
   "prompt.browser.signInBlocked.waitingButton": "Ожидание входа…",

@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nachdem du diese Version installiert hast, kannst du nicht mehr zu einer älteren OpenBot-Version auf diesem Computer oder Server zurück. Diese Version macht die Datenbank kleiner, und eine ältere Version kann sie nicht öffnen.",
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren benutzerdefinierte Bildgrößen, die Modelle und Preise von Sunra und Higgsfield sowie das schnellere Laden vieler Agenten nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sieh dir die Nebenthreads jedes Agenten in der Seitenleiste an. Wähle den Pfeil am Ende einer Agentenzeile, oder lass den Zeiger auf der Zeile, um alle ihre Threads zu sehen.",
+          "Filtere die Seitenleiste mit dem Filter-Button am Ende des Suchfelds. Zeige nur Agenten oder Kanäle, nur ungelesene Chats oder Agenten, die arbeiten, oder nur die Chats in den Ordnern, die du auswählst.",
+          "Gib einem Bild-Schritt im Workflow-Canvas eine eigene Größe in Pixeln, oder wähle das Seitenverhältnis 4:5 oder 5:4.",
+          "Der Workflow-Canvas zeigt alle Bild- und Videomodelle von Sunra und Higgsfield, und die Schaltfläche Ausführen zeigt den Preis in Credits.",
+          "Schalte Hintergrundunschärfe und Bewegte Agentengesichter unter Einstellungen > Darstellung > Bewegung aus, damit OpenBot auf einem langsamen Computer schneller läuft."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Mehrere Personen können einen Workflow gleichzeitig bearbeiten. Der Canvas übernimmt die Änderungen der anderen Personen, sobald sie speichern.",
+          "OpenBot braucht viel weniger CPU, wenn viele Agenten arbeiten, und du kannst ohne Verzögerung tippen.",
+          "Agenten schließen einen Checkout ab, wenn die Bank einen 3-D-Secure-Code verlangt. Steht der Code in einer E-Mail oder SMS, die der Agent lesen kann, gibt der Agent ihn ein.",
+          "Servereinstellungen > Übertragung > Auf einen anderen Server kopieren kopiert jetzt auch die Workflows und Routine-Abläufe der Agenten."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Die OpenBot-Datenbank braucht viel weniger Platz. Nach dem Update entfernt OpenBot alte Kopien von Chatnachrichten in kleinen Schritten.",
+          "Unter Windows zeigt ein Update seinen Fortschritt wieder an.",
+          "Ein verbundener Server mit vielen Agenten und ein großer Kanal öffnen sich schneller.",
+          "Gemini-Chats mit vielen Bildern oder einem langen Verlauf funktionieren wieder, und Gemini fragt nicht mehr nach einer Anmeldung, wenn ein neuer Chat beginnt.",
+          "Die Desktop-App verbindet sich wieder mit einem Server mit OpenBot v0.34.1 oder älter."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren das CRM, Konto mit Code hinzufügen, ein Hintergrund, den ein Agent festlegt, Bibliotheksordner, die Agenten organisieren, und Nachrichten in einen laufenden Devin-Durchlauf nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zeige einen animierten Hintergrund hinter dem gesamten Fenster. Wähle eine Szene, zum Beispiel Koi-Teich oder Glühwürmchen, unter Einstellungen > Fensterhintergrund, oder bitte einen Agenten, eine für dich zu erstellen.",
+          "Verwalte Leads, Kunden und Zahlungen auf der neuen CRM-Seite. Sie ist experimentell: Ein Inhaber oder Admin schaltet sie unter Servereinstellungen > Experimentell ein. Sie kann aus Stripe importieren, und Agenten schlagen Änderungen vor, die ein Inhaber oder Admin genehmigt.",
+          "Antworte einem Agenten im Chat im Agenten-Dock. Erlaube oder verweigere einen Befehl, beantworte eine Frage oder schließe einen Browser-Schritt ab, ohne das Hauptfenster zu öffnen.",
+          "Ordne die Bibliothek mit Ordnerkacheln, Favoriten, Zuletzt und Rückgängig. Ziehe Dateien auf Neuer Ordner, um einen Ordner zu erstellen, oder bitte einen Agenten, seine Ordner zu ordnen.",
+          "Füge ein Konto für ChatGPT (Codex), Grok oder Claude mit einem Code hinzu. Öffne das Menü neben Konto hinzufügen und wähle Konto mit Code hinzufügen.",
+          "Eine Nachricht, die du sendest, während ein Devin- oder OpenCode-Agent arbeitet, geht in den laufenden Durchlauf. Dafür brauchst du Devin CLI 3000.12.57 oder OpenCode 2.3.0 oder neuer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Einstellungen haben ein neues Layout. Die Bereiche stehen in beschrifteten Gruppen, und die Servereinstellungen haben neue Abschnitte Gedächtnis und Standardwerte für Agenten. Unter macOS nutzt OpenBot die Systemschrift.",
+          "Füge eigene MCP-Server hinzu und bearbeite sie in Marketplace > Apps. Die Servereinstellungen haben keinen MCP-Bereich mehr.",
+          "In einem Chat mit einem Agenten übernehmen deine Blasen jetzt die Farbe des Agenten-Avatars. Ändere das unter Einstellungen > Darstellung > Deine Blasen.",
+          "Ein Sprachgespräch öffnet nicht mehr die Seitenleiste. Eine kleine Leiste oben im Chat zeigt die Sprachsteuerung."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Chat, der seine gespeicherte Sitzung verliert oder zu groß wird, bleibt nicht mehr defekt. Der Agent startet eine neue Sitzung mit dem Chatverlauf und beantwortet deine Nachricht.",
+          "Mehr Agenten wechseln zu ihrem Ersatzmodell, wenn ein Nutzungslimit oder ein Anbieterfehler einen Durchlauf stoppt, darunter Grok-, Hermes- und Claude-Agenten.",
+          "Agenten können einen gespeicherten Login an mehr Stellen verwenden, zum Beispiel in einem Anmeldeformular in einem Frame.",
+          "Eine Routine bleibt nach einem fehlgeschlagenen Lauf eingeschaltet, und ein Lauf, der fällig ist, während der Anbieter nicht starten kann, läuft später.",
+          "OpenBot braucht weniger CPU und Akku: Videos im Chat und in ausgeblendeten Browser-Tabs pausieren, wenn du sie nicht siehst."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

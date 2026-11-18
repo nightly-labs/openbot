@@ -1,4 +1,5 @@
 import { ProviderLogo } from "@openbot/brand";
+import { usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
 import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
@@ -121,7 +122,7 @@ export function AccountUsageDetails(props: {
   );
 }
 
-/** The limit windows of one account: a bar, the amount left and the time to the reset of each. */
+/** The limit windows of one account: a bar with a pace mark, the amount left and the time to the reset of each. */
 export function AccountUsageWindowList(props: { windows: readonly AccountUsageWindowRow[]; now: number }) {
   const text = useText();
   const { t } = text;
@@ -135,6 +136,10 @@ export function AccountUsageWindowList(props: { windows: readonly AccountUsageWi
             </span>
             <span class="account-usage-window-bar" aria-hidden="true">
               <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
+              {/* The amount left at an even pace. A fill that ends before the mark runs out before the reset. */}
+              <Show when={usagePaceRemainingPercent(usageWindow.durationMins, usageWindow.resetsAt, props.now)}>
+                {(pace) => <span class="account-usage-window-pace" style={{ "inset-inline-start": `${pace()}%` }} />}
+              </Show>
             </span>
             <strong class="account-usage-window-remaining">
               {t("account.usage.window.remaining", {

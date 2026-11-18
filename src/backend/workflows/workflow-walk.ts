@@ -15,7 +15,9 @@
  * can see that a branch is missing. A node that was skipped because a node before it failed or was
  * stopped gives that reason too; a node after the branch that a condition did not choose gives none.
  * The other steps get only the answers: an output posts its input, and a condition or an approval
- * hands its input on to the nodes after it, outputs too.
+ * hands its input on to the nodes after it, outputs too. The files of image and asset steps are not
+ * text inputs: an image step and an agent step get them as files, and a failed image step before a
+ * join gives no reason.
  *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
@@ -207,7 +209,8 @@ export function soloInputs(
 
 /**
  * The edges that give text. The answer of an image or an asset step is the id of an attachment: an
- * image step reads it as a file (`mediaInputs`), and no other step gets the id as text.
+ * image step reads it as a file (`mediaInputs`), an agent step gets the file with its message
+ * (`agentFileInputs`), and no step gets the id as text.
  */
 function textEdges(
   kinds: ReadonlyMap<string, WorkflowNode["kind"]>,
@@ -235,17 +238,36 @@ export function mediaInputs(
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): MediaInput[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  return graph.edges.flatMap((edge) => {
-    const node = edge.to === nodeId && edge.type === "image" ? nodes.get(edge.from) : undefined;
-    // An asset gives its file also to a step that runs alone, before the asset ran in a run.
-    if (node?.kind === "asset") {
-      const attachmentId = fieldText(node, "fileId");
-      return attachmentId ? [{ from: edge.from, attachmentId }] : [];
-    }
-    if (node?.kind !== "image") return [];
-    const source = latest.get(edge.from);
-    return source?.status === "done" && source.output ? [{ from: edge.from, attachmentId: source.output }] : [];
-  });
+  return graph.edges.flatMap((edge) =>
+    edge.to === nodeId && edge.type === "image" ? edgeFile(nodes.get(edge.from), latest) : [],
+  );
+}
+
+/**
+ * The files that come into an agent step, as attachment ids in edge order, each one time: the newest
+ * file of each image node and the file of each asset node with an edge into it. The agent gets them
+ * with its message.
+ */
+export function agentFileInputs(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): string[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const files = graph.edges.flatMap((edge) => (edge.to === nodeId ? edgeFile(nodes.get(edge.from), latest) : []));
+  return [...new Set(files.map((file) => file.attachmentId))];
+}
+
+/** The file that `node` gives on an edge: its newest file for an image node, its own file for an asset. */
+function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, StoredWorkflowStep>): MediaInput[] {
+  // An asset gives its file also to a step that runs alone, before the asset ran in a run.
+  if (node?.kind === "asset") {
+    const attachmentId = fieldText(node, "fileId");
+    return attachmentId ? [{ from: node.id, attachmentId }] : [];
+  }
+  if (node?.kind !== "image") return [];
+  const source = latest.get(node.id);
+  return source?.status === "done" && source.output ? [{ from: node.id, attachmentId: source.output }] : [];
 }
 
 /** How an image step uses a picture: the first or the last frame of a video, or a reference. */
@@ -456,12 +478,12 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 const TRANSPARENT_ASK = {
   codex: "Give it a transparent background: a cut-out PNG with clear pixels around the subject.",
   grok: "Put the subject on one flat, solid background colour, with no shadow, floor, gradient or texture, and keep a margin around the subject. Use pure green #00FF00, or pure magenta #FF00FF when the subject is green. Do not use that colour in the subject.",
-} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra">, string>;
+} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield">, string>;
 
 /**
  * The request of an image step: the frame and, for a video, its length and resolution, then the
- * description and the text that comes in. Sunra takes the frame, the length and the resolution as
- * fields of its tool, so its request is the description and the input only.
+ * description and the text that comes in. Sunra and Higgsfield take the frame, the length and the
+ * resolution as fields of their tools, so their request is the description and the input only.
  */
 export function mediaStepPrompt(
   fields: WorkflowFields,
@@ -471,7 +493,7 @@ export function mediaStepPrompt(
   provider: WorkflowMediaProvider,
 ): string {
   const ask =
-    provider === "sunra"
+    provider === "sunra" || provider === "higgsfield"
       ? ""
       : kind === "video"
         ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`
@@ -479,7 +501,10 @@ export function mediaStepPrompt(
             .filter(Boolean)
             .join(" ");
   const description = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
-  return [ask, description, input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
+  // With no description and no text, the host sends the step only when pictures come in. Sunra and
+  // Higgsfield get no other request, so they get one line rather than an empty prompt.
+  const fallback = ask || description || input ? "" : `Make one ${kind} from the input pictures.`;
+  return [ask, description, input ? `--- input ---\n${input}` : "", fallback].filter(Boolean).join("\n\n");
 }
 
 /** The most reference pictures that Grok's `reference_to_video` tool takes (Grok CLI 1.0.77). */

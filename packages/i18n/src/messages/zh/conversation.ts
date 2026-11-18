@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "文件",
   "conversation.threads.new": "新话题",
   "conversation.threads.all": "全部话题",
+  "conversation.threads.allUnread": "全部话题，有新回复",
   "conversation.threads.open": "打开的话题",
   "conversation.threads.current": "话题：{title}",
   "conversation.threads.actions": "话题操作",

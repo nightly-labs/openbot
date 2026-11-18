@@ -1,8 +1,8 @@
 // Starts the Antigravity provider end to end on the real driver and `ProviderRuntime`, with a fake
 // server that, like the Windows PyInstaller build, unpacks itself into the temporary folder at each
 // start. Checks that each process gets its own temporary folder and that OpenBot removes it, that
-// failed starts stop after the limit, that an automatic refresh does not start the provider again
-// and a user refresh does, that low disk space stops a start before the process spawns, that a
+// failed starts stop the restarts and the automatic refresh after the limit while each request and a
+// user refresh start the provider once more (#8071), that low disk space stops a start before the process spawns, that a
 // launch removes what an earlier run left, and that a server that unpacks for longer than the
 // request timeout connects on the retry and after a key change (#2311), that a key change that
 // ends after the runtime is disposed does not keep its new process or the previous one, and that a
@@ -148,6 +148,7 @@ interface Report {
   stoppedProcess?: { tempRoot: string; envInRoot: boolean; unpackedWhileRunning: boolean; leftAfterStop: string[] };
   startCap?: { attempts: number; spawns: number; state: string | undefined; message: string | null | undefined };
   automaticRefresh?: { spawns: number };
+  sameTime?: { spawns: number; message: string | null | undefined };
   userRefresh?: { spawns: number };
   leftInTempRoot?: string[];
   launchSweep?: { left: string[] };
@@ -335,7 +336,8 @@ try {
   assert.ok(envInRoot, "TMP, TEMP and TMPDIR point into OpenBot's temporary root");
   assert.ok(unpackedWhileRunning, "the fake server unpacked while it ran");
 
-  // 2. Failed starts stop after the limit, whatever asks for the provider.
+  // 2. After the limit, OpenBot does not start the provider by itself, but each request starts it once,
+  // as a message or a scheduled routine does (#8071). Each start here fails.
   process.env.FAKE_AGY_MODE = "crash";
   await rm(log, { force: true });
   const capRoot = join(root, "temp-cap");
@@ -350,18 +352,32 @@ try {
     state: capRow?.state,
     message: capRow?.message,
   };
-  assert.equal(report.startCap.spawns, 3, "three failed starts, then no more");
+  assert.equal(report.startCap.spawns, attempts, "one start for each request, and no restart by itself");
   assert.equal(capRow?.state, "error");
-  assert.equal(capRow?.message, sourceText("error.provider.startStopped", { provider: "Gemini" }));
+  assert.equal(capRow?.message, sourceText("error.provider.startPaused", { provider: "Gemini" }));
 
-  // 3. An automatic refresh, such as the one an auth error asks for, does not start it again.
+  // 3. An automatic refresh, such as the one an auth error asks for, does not start it again: a failed
+  // start can send that auth error.
   await runCauseEffect(providers.refreshProviders({ automatic: true }).pipe(Effect.ignore));
-  report.automaticRefresh = { spawns: (await starts()).length - 3 };
+  report.automaticRefresh = { spawns: (await starts()).length - attempts };
   assert.equal(report.automaticRefresh.spawns, 0);
 
+  // 3a. Requests at the same time, such as routines that run together, share one start.
+  const together = (await starts()).length;
+  await runCauseEffect(
+    Effect.all(
+      Array.from({ length: attempts }, () => providers.ensureProvider("antigravity").pipe(Effect.ignore)),
+      { concurrency: "unbounded" },
+    ),
+  );
+  report.sameTime = { spawns: (await starts()).length - together, message: antigravityRow(providers)?.message };
+  assert.equal(report.sameTime.spawns, 1, "one start for requests at the same time");
+  assert.equal(report.sameTime.message, sourceText("error.provider.startPaused", { provider: "Gemini" }));
+
   // 4. A refresh the user asks for starts it once more.
+  const beforeUserRefresh = (await starts()).length;
   await runCauseEffect(providers.refreshProviders({ automatic: false }).pipe(Effect.ignore));
-  report.userRefresh = { spawns: (await starts()).length - 3 };
+  report.userRefresh = { spawns: (await starts()).length - beforeUserRefresh };
   assert.equal(report.userRefresh.spawns, 1);
   await runCauseEffect(providers.dispose());
   await waitFor(

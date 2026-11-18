@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nadat je deze versie hebt geïnstalleerd, kun je niet meer terug naar een oudere OpenBot-versie op deze computer of server. Deze versie maakt de database kleiner, en een oudere versie kan die niet openen.",
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken eigen afbeeldingsformaten, de Sunra- en Higgsfield-modellen en -prijzen, en het sneller laden van veel agents alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bekijk de zijthreads van elke agent in de zijbalk. Selecteer de pijl aan het eind van een agentrij, of houd de aanwijzer op de rij om al zijn threads te zien.",
+          "Filter de zijbalk met de filterknop aan het einde van het zoekveld. Toon alleen agents of kanalen, alleen ongelezen chats of agents die aan het werk zijn, of alleen de chats in de mappen die je selecteert.",
+          "Geef een afbeeldingsstap op het workflowcanvas een eigen formaat in pixels, of gebruik de beeldverhouding 4:5 of 5:4.",
+          "Het workflowcanvas toont alle afbeeldings- en videomodellen van Sunra en Higgsfield, en de knop Uitvoeren toont de prijs in credits.",
+          "Zet Achtergrondvervaging en Bewegende agentgezichten uit bij Instellingen → Weergave → Beweging om OpenBot sneller te maken op een trage computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Meerdere mensen kunnen tegelijk dezelfde workflow bewerken. Het canvas voegt de wijzigingen van de anderen toe zodra ze opslaan.",
+          "OpenBot gebruikt veel minder CPU terwijl veel agents werken, en je kunt typen zonder vertraging.",
+          "Agents ronden een betaling af wanneer de bank om een 3-D Secure-code vraagt. Staat de code in een e-mail of sms die de agent kan lezen, dan typt de agent hem in.",
+          "Serverinstellingen → Overdracht → Kopiëren naar een andere server kopieert nu ook de workflows en routinestromen van de agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De OpenBot-database neemt veel minder ruimte in. Na de update verwijdert OpenBot in kleine stappen oude kopieën van chatberichten.",
+          "Op Windows toont een update weer de voortgang.",
+          "Een aangesloten server met veel agents en een groot kanaal openen sneller.",
+          "Gemini-chats met veel afbeeldingen of een lange geschiedenis blijven werken, en Gemini vraagt niet meer om opnieuw in te loggen wanneer een nieuwe chat begint.",
+          "De desktopapp maakt weer verbinding met een server op OpenBot v0.34.1 of ouder."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken de CRM, Account toevoegen met code, een achtergrond die een agent instelt, Bibliotheekmappen die agents ordenen en berichten in een lopende Devin-beurt alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Speel een geanimeerde achtergrond af achter het hele venster. Kies een scène, zoals Koivijver of Vuurvliegjes, bij Instellingen → Vensterachtergrond, of vraag een agent er een voor je te maken.",
+          "Houd leads, klanten en betalingen bij op de nieuwe CRM-pagina. Die is experimenteel: een eigenaar of beheerder zet hem aan bij Serverinstellingen → Experimenteel. Hij kan importeren uit Stripe, en agents stellen wijzigingen voor die een eigenaar of beheerder goedkeurt.",
+          "Beantwoord een agent in het chatvenster van het Agentdock. Sta een opdracht toe of weiger die, beantwoord een vraag, of rond een browserstap af zonder het hoofdvenster.",
+          "Organiseer de Bibliotheek met maptegels, Favorieten, Recent en Ongedaan maken. Sleep bestanden naar Nieuwe map om een map te maken, of vraag een agent zijn mappen te ordenen.",
+          "Voeg een ChatGPT (Codex)-, Grok- of Claude-account toe met een code. Open het menu naast Account toevoegen en kies Account toevoegen met code.",
+          "Een bericht dat je stuurt terwijl een Devin- of OpenCode-agent werkt, gaat naar de lopende beurt. Dit vereist Devin CLI 3000.12.57 of OpenCode 2.3.0 of later."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Instellingen hebben een nieuwe indeling. Secties staan in gelabelde groepen, en Serverinstellingen heeft nieuwe secties Geheugen en Standaarden voor agents. Op macOS gebruikt OpenBot het systeemlettertype.",
+          "Voeg eigen MCP-servers toe en bewerk ze in Marktplaats → Apps. Serverinstellingen heeft geen MCP-sectie meer.",
+          "In een chat met een agent nemen je ballonnen nu de kleur van de avatar van de agent over. Wijzig dit bij Instellingen → Weergave → Jouw ballonnen.",
+          "Een spraakgesprek opent het zijpaneel niet meer. Een kleine balk boven aan de chat toont de spraakbediening."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een chat die zijn opgeslagen sessie verliest, of te groot wordt, blijft niet langer kapot. De agent start een nieuwe sessie met de chatgeschiedenis en beantwoordt je bericht.",
+          "Meer agents schakelen naar hun reservemodel wanneer een gebruikslimiet of een providerfout een beurt stopt, ook Grok-, Hermes- en Claude-agents.",
+          "Agents kunnen een opgeslagen login op meer plaatsen gebruiken, zoals een inlogformulier in een frame.",
+          "Een routine blijft aan na een mislukte run, en een run die gepland staat terwijl de provider niet kan starten, loopt later.",
+          "OpenBot gebruikt minder CPU en batterij: video's in de chat en in verborgen browsertabbladen pauzeren wanneer je ze niet kunt zien."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

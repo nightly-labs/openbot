@@ -208,4 +208,10 @@ export const messages = {
     other:
       "Lisansınızda azami sayı olan {count} kullanıcı var. Daha büyük bir lisans için bize ulaşın. Yeni kişiler sunucularınıza katılamaz.",
   },
+  "billing.details.country": "Fatura ülkesi",
+  "billing.details.countryPlaceholder": "Ülke seçin",
+  "billing.details.vatId": "AB KDV numarası (isteğe bağlı)",
+  "billing.details.vatIdInvalid": "Bu, seçilen ülkenin KDV numarası değil.",
+  "billing.details.countryMissing": "Fatura ülkenizi seçin.",
+  "billing.details.saveFailed": "Fatura bilgileri kaydedilemedi",
 } as const satisfies PartialTranslation<typeof source>;

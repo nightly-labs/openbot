@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} の OpenBot を更新してください",
   "server.compatibility.unsafeDataTitle": "ホストが安全でないデータを返しました",
   "server.compatibility.cannotConnectTitle": "{name} に接続できません",
+  "server.compatibility.safeModeTitle": "{name} が起動しません",
   "server.compatibility.updateClientDescription":
     "このアプリはホストより古いプロトコルにのみ対応しています。このアプリを更新してから、もう一度お試しください。",
   "server.compatibility.updateHostDescription":
@@ -112,6 +113,8 @@ export const messages = {
   "server.local.create": "サーバーを作成",
   "server.local.creating": "サーバーを作成中…",
   "server.local.createFailed": "サーバーを作成できませんでした。",
+  "server.local.createFailedRetry":
+    "問題が発生しました。もう一度お試しください。再び失敗する場合は、OpenBot を再起動してください。",
   "server.local.limitReached":
     "このコンピューターに作成できるサーバーは最大 {limit} 台です。新しく作成するには、1 台を削除してください。",
   "server.local.deleteConfirmTitle": "{name} を削除しますか？",
@@ -250,8 +253,6 @@ export const messages = {
   "server.settings.membersDescription": "このサーバーを公開し、ユーザーを招待して、アクセスを管理します。",
   "server.settings.desktopTitle": "デスクトップ",
   "server.settings.desktopDescription": "このサーバーのデスクトップを設定、または接続します。",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription": "MCP サーバーを接続し、このサーバーのエージェントが使用できるものを選択します。",
   "server.settings.storageTitle": "ストレージ",
   "server.settings.storageDescription":
     "OpenBot がこのサーバーのディスクに保存しているものを確認し、空き容量を増やします。",
@@ -295,13 +296,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "コピーに失敗しました",
   "server.settings.copyFailed": "OpenBot はこの値をコピーできませんでした。",
   "server.settings.unavailableTitle": "サーバーの設定を利用できません",
-  "server.settings.unsavedMcpChanges": "未保存の MCP の変更",
   "server.settings.reset": "リセット",
   "server.settings.unsavedChanges": "未保存の変更",
   "server.settings.changesNotSaved": "変更は保存されていません",
   "server.settings.group.agents": "エージェント",
   "server.settings.group.people": "ユーザー",
   "server.settings.group.server": "サーバー",
+  "server.settings.experimentalTitle": "試験運用",
+  "server.settings.experimentalDescription": "まだ完成していない機能をオンにします。",
+  "server.settings.experimentalFeatures": "機能",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "オーナーと管理者に CRM ページを表示し、エージェントが CRM を読めるようにして、Stripe と同期します。オフにしてもデータは残ります。",
   "server.settings.agentDefaultsTitle": "エージェントのデフォルト",
   "server.settings.threadsCard": "スレッドとタイムゾーン",
   "server.settings.memoryTitle": "メモリー",
@@ -340,7 +346,7 @@ export const messages = {
     "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "server.settings.turnLimit": "同時に実行するスレッド",

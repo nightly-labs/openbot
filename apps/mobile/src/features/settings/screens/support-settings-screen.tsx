@@ -1,3 +1,4 @@
+import { mobileBugReportFormUrl } from "@openbot/contracts/feedback";
 import { File, Paths } from "expo-file-system";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -11,7 +12,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { supportLog } from "@/features/support/model/support-log";
-import { clearSupportLog, supportLogFileText } from "@/features/support/model/support-log-capture";
+import { clearSupportLog, phoneFeedback, supportLogFileText } from "@/features/support/model/support-log-capture";
 import { useText } from "@/shared/lib/text";
 
 /** The OpenBot Discord community, the same address as the desktop app. Its tickets get the fastest answer. */
@@ -19,7 +20,6 @@ const DISCORD_URL = "https://discord.openbot.run";
 /** The OpenBot account, the same contact as the website. */
 const SUPPORT_X_HANDLE = "@OpenBot_";
 const SUPPORT_X_URL = "https://x.com/OpenBot_";
-const ISSUES_URL = "https://github.com/nightly-labs/openbot/issues/new";
 
 export function SupportSettingsScreen() {
   const { t } = useText();
@@ -69,7 +69,9 @@ export function SupportSettingsScreen() {
         <SettingsRow onPress={() => open(DISCORD_URL)} supportingText={t("mobile.settings.support.discordHint")}>
           <Typography.Paragraph>{t("mobile.settings.support.discord")}</Typography.Paragraph>
         </SettingsRow>
-        <SettingsRow onPress={() => open(ISSUES_URL)}>
+        {/* The form for the phone app, with this phone's system, app version and device filled in. A
+            link cannot hold the log: the footer tells the user to attach the saved file. */}
+        <SettingsRow onPress={() => open(mobileBugReportFormUrl({}, phoneFeedback()))}>
           <Typography.Paragraph>{t("mobile.settings.support.issues")}</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow onPress={() => open(SUPPORT_X_URL)} supportingText={SUPPORT_X_HANDLE}>

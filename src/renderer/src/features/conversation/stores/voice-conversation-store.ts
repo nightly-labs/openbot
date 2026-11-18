@@ -1,5 +1,6 @@
 import {
   type ConversationMessage,
+  DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
   VOICE_AUDIO_LIMITS,
   VOICE_MODELS,
@@ -45,8 +46,6 @@ const WORD = /[\p{L}\p{N}]/u;
 /** A recording with no speech starts again after this long, at a pause, so it does not keep the silence. */
 const SILENT_RECORDING_MS = 4_000;
 const RESTART_QUIET_MS = 600;
-/** The pause after speech that ends the turn. */
-const TURN_END_SILENCE_MS = 1_200;
 /** How often the words so far are transcribed again while the user speaks. */
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_200;
 /** The same loudness scale as the dictation waveform, in dB. */
@@ -157,6 +156,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let streamed = false;
   /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
   let cloud = false;
+  /** The pause after speech that ends the turn: the user's choice in Settings, read at the start. */
+  let turnEndSilenceMs: number = DEFAULT_SPEECH_SETTINGS.turnPauseMs;
   // The logic reads these copies: a store read shows a write only after the next flush.
   let step: VoiceConversationStep = "starting";
   let muted = false;
@@ -238,7 +239,15 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const startingAt = performance.now();
     try {
       const speech = speechPort().voice;
-      const server = await speech.getServer();
+      const [server, turnPauseMs] = await Promise.all([
+        speech.getServer(),
+        // Without the saved pause, the conversation still starts, with the default pause.
+        speech.getSpeechSettings().then(
+          (settings) => settings.turnPauseMs,
+          () => DEFAULT_SPEECH_SETTINGS.turnPauseMs,
+        ),
+      ]);
+      turnEndSilenceMs = turnPauseMs;
       // The user's own server reads the replies, so the speech model is not necessary.
       if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
         const downloadAt = performance.now();
@@ -556,7 +565,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         } else {
           loudFor = 0;
           quietFor += LEVEL_INTERVAL_MS;
-          if (current.spoke && quietFor >= TURN_END_SILENCE_MS) endTurn(current);
+          if (current.spoke && quietFor >= turnEndSilenceMs) endTurn(current);
         }
         if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);
