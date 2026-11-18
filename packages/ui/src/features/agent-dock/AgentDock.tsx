@@ -1110,21 +1110,26 @@ export function AgentDock(props: AgentDockProps) {
 
   const shownSeat = () => (state.shown ? seatFor(state.shown) : undefined);
 
-  /* A sent message leaves `pending` once its host copy is in its chat, also in a chat that is closed.
-     The chat has only the newest messages, so a copy that newer messages pushed out showed the
-     message again at the bottom (#11783). */
+  /* A message that the host stored leaves `pending` once its host copy is in the open chat. The chat
+     has only the newest messages, so a copy that newer messages pushed out showed the message again
+     at the bottom (#11783). A closed chat shows no pending message, and the dock window gets no
+     messages for it, so its stored messages leave at once. */
   createEffect(
     () =>
       Object.entries(state.pending).flatMap(([id, messages]) => {
+        const stored = messages.filter((message) => message.messageId !== null);
+        if (stored.length === 0) return [];
+        if (id !== state.open) return stored.map((message) => message.key);
         const loaded = props.chat(refOfKey(id)).messages;
-        return messages.filter((message) => pendingMessageDelivered(message, loaded)).map((message) => message.key);
+        return stored.filter((message) => pendingMessageDelivered(message, loaded)).map((message) => message.key);
       }),
     (keys) => {
       if (keys.length === 0) return;
-      const delivered = new Set(keys);
+      const settled = new Set(keys);
       setState((draft) => {
         for (const [id, messages] of Object.entries(draft.pending))
-          draft.pending[id] = messages.filter((message) => !delivered.has(message.key));
+          if (messages.some((message) => settled.has(message.key)))
+            draft.pending[id] = messages.filter((message) => !settled.has(message.key));
       });
     },
   );
