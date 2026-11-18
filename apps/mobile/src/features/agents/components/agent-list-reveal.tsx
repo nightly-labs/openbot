@@ -24,6 +24,9 @@ const EASE_OUT = Easing.bezierFn(0.23, 1, 0.32, 1);
 
 export interface AgentListRevealState {
   elapsed: SharedValue<number>;
+  /** The scope that `elapsed` counts for. */
+  elapsedScope: SharedValue<string>;
+  scope: string;
   finished: boolean;
   reducedMotion: boolean;
   onLayout: () => void;
@@ -31,6 +34,9 @@ export interface AgentListRevealState {
 
 export function useAgentListReveal(ready: boolean, scope: string): AgentListRevealState {
   const elapsed = useSharedValue(0);
+  // The rows of a new scope render before the layout effect resets `elapsed`, while it still holds
+  // the end of the last reveal. A row shows nothing until `elapsed` counts for its own scope.
+  const elapsedScope = useSharedValue("");
   const reducedMotion = useReducedMotion();
   const [finishedScope, setFinishedScope] = useState<string | null>(null);
   const finished = finishedScope === scope;
@@ -39,6 +45,7 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
 
   useLayoutEffect(() => {
     elapsed.set(0);
+    elapsedScope.set(scope);
     setFinishedScope(null);
     if (!ready) {
       setLaidOutScope(null);
@@ -60,9 +67,12 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
       active = false;
       cancelAnimation(elapsed);
     };
-  }, [elapsed, laidOutScope, ready, reducedMotion, scope]);
+  }, [elapsed, elapsedScope, laidOutScope, ready, reducedMotion, scope]);
 
-  return useMemo(() => ({ elapsed, finished, reducedMotion, onLayout }), [elapsed, finished, reducedMotion, onLayout]);
+  return useMemo(
+    () => ({ elapsed, elapsedScope, scope, finished, reducedMotion, onLayout }),
+    [elapsed, elapsedScope, scope, finished, reducedMotion, onLayout],
+  );
 }
 
 export function AgentListRowReveal({
@@ -74,9 +84,10 @@ export function AgentListRowReveal({
 }: PropsWithChildren<{ index: number; reveal: AgentListRevealState; skip?: boolean; style?: StyleProp<ViewStyle> }>) {
   // Keep a mounted row's place in the reveal when a live update inserts a section.
   const initialIndex = useRef(index).current;
-  const { elapsed, finished, reducedMotion } = reveal;
+  const { elapsed, elapsedScope, scope, finished, reducedMotion } = reveal;
   const progress = useDerivedValue(() => {
     if (finished || skip) return 1;
+    if (elapsedScope.get() !== scope) return 0;
     const delay = reducedMotion ? 0 : Math.min(initialIndex * ROW_STAGGER, MAX_DELAY);
     const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION;
     return EASE_OUT(Math.min(1, Math.max(0, (elapsed.get() - delay) / duration)));
