@@ -37,7 +37,7 @@ import type { AgentMessage, ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
-import { chatBubbleColor, useBackdropBubbles } from "../conversation/BackdropBubbles";
+import { chatBubbleColor } from "../conversation/BackdropBubbles";
 import { UsageLimitAskCard } from "../conversation/BackupModels";
 import { ComposerEditor } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
@@ -189,12 +189,20 @@ export function AgentDockChat(props: {
     if (message.senderMember) return message.senderMember.name;
     return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
   };
-  const backdropBubbles = useBackdropBubbles();
-  /** The chat color of an agent's bubble, as the main chat draws it. An error keeps the plain bubble. */
+  /**
+   * The chat color of an agent's bubble, as the main chat draws it: a message from another agent takes
+   * the color of that agent. An error keeps the plain bubble. The dock is not on the backdrop of the open
+   * chat, so no backdrop color replaces the agent's own.
+   */
   const agentTint = (message: AgentMessage) => {
     if (message.author !== "agent" || message.kind === "error") return undefined;
-    const agent = agentSeat()?.agent ?? props.agents.find((candidate) => candidate.id === message.senderAgentId);
-    return chatBubbleColor(backdropBubbles(), { kind: "agent", agent });
+    const seated = agentSeat()?.agent;
+    const senderId = message.exchange?.senderAgentId ?? message.senderAgentId;
+    const agent =
+      senderId === undefined || senderId === seated?.id
+        ? seated
+        : props.agents.find((candidate) => candidate.id === senderId);
+    return chatBubbleColor(null, { kind: "agent", agent });
   };
   /* The requests that the chat answers. A card replaces the wait bar. */
   const approval = () => (props.answers ? (props.chat.approval ?? undefined) : undefined);
@@ -447,30 +455,35 @@ export function AgentDockChat(props: {
               fallback={<p class="agent-dock-empty">{t("agent.dock.empty", { name: name() })}</p>}
             >
               <For each={messages()}>
-                {(message) => (
-                  <Bubble
-                    align={isOwn(message) ? "end" : "start"}
-                    variant={isOwn(message) ? "secondary" : "muted"}
-                    class={["agent-dock-bubble", { "message-bubble-colored": agentTint(message) !== undefined }]}
-                    style={agentTint(message) === undefined ? undefined : `--message-chat-color: ${agentTint(message)}`}
-                    data-error={message.kind === "error" ? "" : undefined}
-                  >
-                    <BubbleContent>
-                      <Show when={author(message)}>{(shown) => <span class="agent-dock-author">{shown()}</span>}</Show>
-                      {/* Markdown with mention chips, as in the main chat. */}
-                      <div class="agent-dock-markdown message-markdown">
-                        <MarkdownMessageText
-                          body={message.body}
-                          agents={props.agents}
-                          attachments={message.attachments}
-                          onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
-                          onOpenAttachment={() => props.onOpenInMain()}
-                          onOpenLink={(url) => props.onOpenLink?.(url)}
-                        />
-                      </div>
-                    </BubbleContent>
-                  </Bubble>
-                )}
+                {(message) => {
+                  const tint = createMemo(() => agentTint(message));
+                  return (
+                    <Bubble
+                      align={isOwn(message) ? "end" : "start"}
+                      variant={isOwn(message) ? "secondary" : "muted"}
+                      class={["agent-dock-bubble", { "message-bubble-colored": tint() !== undefined }]}
+                      style={tint() === undefined ? undefined : `--message-chat-color: ${tint()}`}
+                      data-error={message.kind === "error" ? "" : undefined}
+                    >
+                      <BubbleContent>
+                        <Show when={author(message)}>
+                          {(shown) => <span class="agent-dock-author">{shown()}</span>}
+                        </Show>
+                        {/* Markdown with mention chips, as in the main chat. */}
+                        <div class="agent-dock-markdown message-markdown">
+                          <MarkdownMessageText
+                            body={message.body}
+                            agents={props.agents}
+                            attachments={message.attachments}
+                            onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                            onOpenAttachment={() => props.onOpenInMain()}
+                            onOpenLink={(url) => props.onOpenLink?.(url)}
+                          />
+                        </div>
+                      </BubbleContent>
+                    </Bubble>
+                  );
+                }}
               </For>
               <For each={pending()}>
                 {(message) => (

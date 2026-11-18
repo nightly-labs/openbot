@@ -498,7 +498,8 @@
  */
 :is(
   .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
 ) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
   background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
