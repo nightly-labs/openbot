@@ -166,6 +166,7 @@
     "./team-protocol/agent-memory-limit-v1": "./src/team-protocol/agent-memory-limit-v1.ts",
     "./team-protocol/memory-review-v1": "./src/team-protocol/memory-review-v1.ts",
     "./team-protocol/skill-learning-v1": "./src/team-protocol/skill-learning-v1.ts",
+    "./team-protocol/skill-problems-v1": "./src/team-protocol/skill-problems-v1.ts",
     "./team-protocol/prompt-cache-ttl-v1": "./src/team-protocol/prompt-cache-ttl-v1.ts",
     "./team-protocol/model-steering-v1": "./src/team-protocol/model-steering-v1.ts",
     "./team-protocol/provider-model-source-v1": "./src/team-protocol/provider-model-source-v1.ts",

@@ -184,6 +184,7 @@ import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "./skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
@@ -455,6 +456,7 @@ export {
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  SKILL_PROBLEMS_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -800,6 +802,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
   [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
+  [SKILL_PROBLEMS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
