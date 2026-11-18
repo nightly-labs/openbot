@@ -51,6 +51,9 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelRoutingUnreadable",
   // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
   "error.backend.recipientHidden",
+  // An older host sends these GitHub errors of workflow steps, and a stored step can keep them.
+  "error.workflow.githubNoAccess",
+  "error.workflow.githubNoWrite",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

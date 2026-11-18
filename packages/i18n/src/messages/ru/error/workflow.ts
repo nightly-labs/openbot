@@ -76,6 +76,22 @@ export const messages = {
     "OpenBot GitHub App не видит этот репозиторий или элемент. Откройте GitHub и дайте приложению доступ.",
   "error.workflow.githubNoWrite":
     "OpenBot GitHub App не может изменять этот репозиторий. Откройте GitHub и дайте приложению доступ.",
+  "error.workflow.githubNoAccessRepository":
+    "Приложение OpenBot для GitHub не видит репозиторий {repository}. Откройте GitHub и дайте приложению доступ.",
+  "error.workflow.githubNoWriteRepository":
+    "Приложение OpenBot для GitHub не может изменять репозиторий {repository}. Откройте GitHub и дайте приложению доступ.",
+  "error.workflow.githubNoReadRepository":
+    "Приложение OpenBot для GitHub не может прочитать репозиторий {repository}. Откройте GitHub и дайте приложению доступ.",
+  "error.workflow.githubUserNoAccessRepository":
+    "Ваш аккаунт GitHub не видит репозиторий {repository}. Проверьте, что он существует и что вы можете открыть его на GitHub.",
+  "error.workflow.githubUserNoReadRepository":
+    "Ваш аккаунт GitHub не может прочитать репозиторий {repository}. Проверьте, что вы можете открыть его на GitHub.",
+  "error.workflow.githubNoItem":
+    "На GitHub нет задачи или пул-реквеста #{number} в {repository}, или приложение OpenBot для GitHub его не видит.",
+  "error.workflow.githubUserNoItem":
+    "На GitHub нет задачи или пул-реквеста #{number} в {repository}, или ваш аккаунт GitHub его не видит.",
+  "error.workflow.githubRateLimited":
+    "GitHub получил слишком много запросов от OpenBot. Подождите несколько минут и повторите попытку.",
   "error.workflow.githubLocked": "Это обсуждение заблокировано на GitHub.",
   "error.workflow.githubRefused": "GitHub отклонил изменение: {detail}",
   "error.workflow.githubUnreachable": "OpenBot не удалось связаться с GitHub. Запустите шаг снова.",

@@ -65,6 +65,21 @@ export const messages = {
   "error.workflow.githubNotConnected": "יש לחבר את GitHub במחשב שמפעיל את תהליך העבודה הזה.",
   "error.workflow.githubNoAccess": "ל-OpenBot GitHub App אין גישה למאגר או לפריט הזה. יש לפתוח את GitHub ולתת לו גישה.",
   "error.workflow.githubNoWrite": "OpenBot GitHub App לא יכול לשנות את המאגר הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubNoAccessRepository":
+    "אפליקציית OpenBot ב-GitHub לא רואה את המאגר {repository}. פתחו את GitHub ותנו לאפליקציה גישה.",
+  "error.workflow.githubNoWriteRepository":
+    "אפליקציית OpenBot ב-GitHub לא יכולה לשנות את המאגר {repository}. פתחו את GitHub ותנו לאפליקציה גישה.",
+  "error.workflow.githubNoReadRepository":
+    "אפליקציית OpenBot ב-GitHub לא יכולה לקרוא את המאגר {repository}. פתחו את GitHub ותנו לאפליקציה גישה.",
+  "error.workflow.githubUserNoAccessRepository":
+    "חשבון ה-GitHub שלך לא רואה את המאגר {repository}. ודאו שהוא קיים ושאפשר לפתוח אותו ב-GitHub.",
+  "error.workflow.githubUserNoReadRepository":
+    "חשבון ה-GitHub שלך לא יכול לקרוא את המאגר {repository}. ודאו שאפשר לפתוח אותו ב-GitHub.",
+  "error.workflow.githubNoItem":
+    "ב-GitHub אין issue או pull request #{number} ב-{repository}, או שאפליקציית OpenBot ב-GitHub לא רואה אותו.",
+  "error.workflow.githubUserNoItem":
+    "ב-GitHub אין issue או pull request #{number} ב-{repository}, או שחשבון ה-GitHub שלך לא רואה אותו.",
+  "error.workflow.githubRateLimited": "GitHub קיבל יותר מדי בקשות מ-OpenBot. חכו כמה דקות ואז נסו שוב.",
   "error.workflow.githubLocked": "השיחה הזו נעולה ב-GitHub.",
   "error.workflow.githubRefused": "GitHub דחה את השינוי: {detail}",
   "error.workflow.githubUnreachable": "OpenBot לא הצליח להגיע ל-GitHub. יש להריץ את השלב שוב.",

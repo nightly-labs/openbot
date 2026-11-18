@@ -67,6 +67,21 @@ export const messages = {
   "error.workflow.githubNoAccess":
     "لا يستطيع تطبيق OpenBot على GitHub رؤية هذا المستودع أو العنصر. افتح GitHub وامنحه الوصول.",
   "error.workflow.githubNoWrite": "لا يستطيع تطبيق OpenBot على GitHub تغيير هذا المستودع. افتح GitHub وامنحه الوصول.",
+  "error.workflow.githubNoAccessRepository":
+    "لا يستطيع تطبيق OpenBot على GitHub رؤية المستودع {repository}. افتح GitHub وامنح التطبيق الوصول.",
+  "error.workflow.githubNoWriteRepository":
+    "لا يستطيع تطبيق OpenBot على GitHub تغيير المستودع {repository}. افتح GitHub وامنح التطبيق الوصول.",
+  "error.workflow.githubNoReadRepository":
+    "لا يستطيع تطبيق OpenBot على GitHub قراءة المستودع {repository}. افتح GitHub وامنح التطبيق الوصول.",
+  "error.workflow.githubUserNoAccessRepository":
+    "لا يستطيع حسابك على GitHub رؤية المستودع {repository}. تأكد من أنه موجود وأنك تستطيع فتحه على GitHub.",
+  "error.workflow.githubUserNoReadRepository":
+    "لا يستطيع حسابك على GitHub قراءة المستودع {repository}. تأكد من أنك تستطيع فتحه على GitHub.",
+  "error.workflow.githubNoItem":
+    "لا توجد على GitHub مشكلة أو طلب سحب #{number} في {repository}، أو لا يستطيع تطبيق OpenBot على GitHub رؤيته.",
+  "error.workflow.githubUserNoItem":
+    "لا توجد على GitHub مشكلة أو طلب سحب #{number} في {repository}، أو لا يستطيع حسابك على GitHub رؤيته.",
+  "error.workflow.githubRateLimited": "تلقى GitHub طلبات كثيرة جدًا من OpenBot. انتظر بضع دقائق، ثم حاول مرة أخرى.",
   "error.workflow.githubLocked": "هذه المحادثة مقفلة على GitHub.",
   "error.workflow.githubRefused": "رفض GitHub التغيير: {detail}",
   "error.workflow.githubUnreachable": "تعذّر على OpenBot الوصول إلى GitHub. شغّل الخطوة مرة أخرى.",

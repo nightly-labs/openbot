@@ -78,6 +78,22 @@ export const messages = {
     "La GitHub App di OpenBot non vede questo repository o elemento. Apri GitHub e concedile l'accesso.",
   "error.workflow.githubNoWrite":
     "La GitHub App di OpenBot non può modificare questo repository. Apri GitHub e concedile l'accesso.",
+  "error.workflow.githubNoAccessRepository":
+    "L’app GitHub di OpenBot non vede il repository {repository}. Apri GitHub e dai accesso all’app.",
+  "error.workflow.githubNoWriteRepository":
+    "L’app GitHub di OpenBot non può modificare il repository {repository}. Apri GitHub e dai accesso all’app.",
+  "error.workflow.githubNoReadRepository":
+    "L’app GitHub di OpenBot non può leggere il repository {repository}. Apri GitHub e dai accesso all’app.",
+  "error.workflow.githubUserNoAccessRepository":
+    "Il tuo account GitHub non vede il repository {repository}. Verifica che esista e che tu possa aprirlo su GitHub.",
+  "error.workflow.githubUserNoReadRepository":
+    "Il tuo account GitHub non può leggere il repository {repository}. Verifica di poterlo aprire su GitHub.",
+  "error.workflow.githubNoItem":
+    "Su GitHub non c’è una issue o pull request #{number} in {repository}, oppure l’app GitHub di OpenBot non vede l’elemento.",
+  "error.workflow.githubUserNoItem":
+    "Su GitHub non c’è una issue o pull request #{number} in {repository}, oppure il tuo account GitHub non vede l’elemento.",
+  "error.workflow.githubRateLimited":
+    "GitHub ha ricevuto troppe richieste da OpenBot. Attendi qualche minuto, poi riprova.",
   "error.workflow.githubLocked": "Questa conversazione è bloccata su GitHub.",
   "error.workflow.githubRefused": "GitHub ha rifiutato la modifica: {detail}",
   "error.workflow.githubUnreachable": "OpenBot non è riuscito a raggiungere GitHub. Esegui di nuovo il passaggio.",

@@ -80,6 +80,22 @@ export const messages = {
     "De OpenBot GitHub App kan deze repository of dit item niet zien. Open GitHub en geef de app toegang.",
   "error.workflow.githubNoWrite":
     "De OpenBot GitHub App kan deze repository niet wijzigen. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoAccessRepository":
+    "De OpenBot GitHub-app kan de repository {repository} niet zien. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoWriteRepository":
+    "De OpenBot GitHub-app kan de repository {repository} niet wijzigen. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoReadRepository":
+    "De OpenBot GitHub-app kan de repository {repository} niet lezen. Open GitHub en geef de app toegang.",
+  "error.workflow.githubUserNoAccessRepository":
+    "Je GitHub-account kan de repository {repository} niet zien. Controleer of die bestaat en of je hem op GitHub kunt openen.",
+  "error.workflow.githubUserNoReadRepository":
+    "Je GitHub-account kan de repository {repository} niet lezen. Controleer of je hem op GitHub kunt openen.",
+  "error.workflow.githubNoItem":
+    "GitHub heeft geen issue of pull request #{number} in {repository}, of de OpenBot GitHub-app kan het item niet zien.",
+  "error.workflow.githubUserNoItem":
+    "GitHub heeft geen issue of pull request #{number} in {repository}, of je GitHub-account kan het item niet zien.",
+  "error.workflow.githubRateLimited":
+    "GitHub heeft te veel verzoeken van OpenBot gekregen. Wacht een paar minuten en probeer het dan opnieuw.",
   "error.workflow.githubLocked": "Dit gesprek is vergrendeld op GitHub.",
   "error.workflow.githubRefused": "GitHub heeft de wijziging geweigerd: {detail}",
   "error.workflow.githubUnreachable": "OpenBot kon GitHub niet bereiken. Voer de stap opnieuw uit.",

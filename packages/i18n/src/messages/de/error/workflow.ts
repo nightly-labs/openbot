@@ -82,6 +82,22 @@ export const messages = {
     "Die OpenBot-GitHub-App kann dieses Repository oder Element nicht sehen. Öffne GitHub und gib ihr Zugriff.",
   "error.workflow.githubNoWrite":
     "Die OpenBot-GitHub-App kann dieses Repository nicht ändern. Öffne GitHub und gib ihr Zugriff.",
+  "error.workflow.githubNoAccessRepository":
+    "Die OpenBot-GitHub-App kann das Repository {repository} nicht sehen. Öffne GitHub und gib der App Zugriff.",
+  "error.workflow.githubNoWriteRepository":
+    "Die OpenBot-GitHub-App kann das Repository {repository} nicht ändern. Öffne GitHub und gib der App Zugriff.",
+  "error.workflow.githubNoReadRepository":
+    "Die OpenBot-GitHub-App kann das Repository {repository} nicht lesen. Öffne GitHub und gib der App Zugriff.",
+  "error.workflow.githubUserNoAccessRepository":
+    "Dein GitHub-Konto kann das Repository {repository} nicht sehen. Prüfe, ob es existiert und ob du es auf GitHub öffnen kannst.",
+  "error.workflow.githubUserNoReadRepository":
+    "Dein GitHub-Konto kann das Repository {repository} nicht lesen. Prüfe, ob du es auf GitHub öffnen kannst.",
+  "error.workflow.githubNoItem":
+    "GitHub hat kein Issue und keinen Pull Request #{number} in {repository}, oder die OpenBot-GitHub-App kann das Element nicht sehen.",
+  "error.workflow.githubUserNoItem":
+    "GitHub hat kein Issue und keinen Pull Request #{number} in {repository}, oder dein GitHub-Konto kann das Element nicht sehen.",
+  "error.workflow.githubRateLimited":
+    "GitHub hat zu viele Anfragen von OpenBot erhalten. Warte ein paar Minuten und versuche es dann erneut.",
   "error.workflow.githubLocked": "Diese Unterhaltung ist auf GitHub gesperrt.",
   "error.workflow.githubRefused": "GitHub hat die Änderung abgelehnt: {detail}",
   "error.workflow.githubUnreachable": "OpenBot konnte GitHub nicht erreichen. Führe den Schritt erneut aus.",
