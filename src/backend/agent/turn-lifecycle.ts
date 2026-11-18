@@ -131,6 +131,14 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
+
+/** Adds a turn to a set that keeps the newest `ENDED_TURN_LIMIT` turns, oldest first. */
+function keepNewest(turns: Set<string>, turnId: string): void {
+  turns.add(turnId);
+  if (turns.size <= ENDED_TURN_LIMIT) return;
+  const [oldest] = turns;
+  if (oldest !== undefined) turns.delete(oldest);
+}
 /**
  * Failed turns in a row after which OpenBot closes an Antigravity session. Antigravity keeps the
  * history of each session in its CLI, and a session can fail each turn while a new session of the
@@ -515,6 +523,12 @@ export class TurnLifecycle {
    */
   readonly #quietTurns = new Set<string>();
   /**
+   * The newest completed turns that the provider started itself to answer the background work of known
+   * turns, oldest first (`ENDED_TURN_LIMIT`). The first such turn after a person's work shows its answer,
+   * so a later turn for work that it started can end quiet, as a watcher that wakes again (#11090).
+   */
+  readonly #followUpTurns = new Set<string>();
+  /**
    * Running turns whose agent owns a main task of a channel routine's request and called the no-update
    * tool. The channel shows their answers as steps. The entry stays until the completion has marked
    * them as quiet answers, so no capture in between posts them.
@@ -686,6 +700,7 @@ export class TurnLifecycle {
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
     this.#quietTurns.clear();
+    this.#followUpTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
@@ -1928,14 +1943,16 @@ export class TurnLifecycle {
   /**
    * Whether a turn with no delivery answers only the background work of turns that ended quiet, such as a
    * Claude turn after a background command of a teammate update ended. Nobody waited for those turns, so
-   * nobody waits for this one. A turn that also answers work of a person's request is not quiet (#10847).
+   * nobody waits for this one. A turn that also answers work of a person's request is not quiet (#10847):
+   * its answer is the first one after that request. Work that a turn of the provider's own started, after
+   * that first answer, can end quiet too, so a watcher that wakes again does not post each time (#11090).
    */
   #continuesQuietTurns(continues: readonly string[] | undefined, deliveries: readonly DeliveryContext[]): boolean {
     return (
       deliveries.length === 0 &&
       continues !== undefined &&
       continues.length > 0 &&
-      continues.every((turnId) => this.#quietTurns.has(turnId))
+      continues.every((turnId) => this.#quietTurns.has(turnId) || this.#followUpTurns.has(turnId))
     );
   }
 
@@ -2452,13 +2469,9 @@ export class TurnLifecycle {
               running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
-      if (quiet && quietTurn) {
-        this.#quietTurns.add(turnId);
-        if (this.#quietTurns.size > ENDED_TURN_LIMIT) {
-          const [oldest] = this.#quietTurns;
-          if (oldest !== undefined) this.#quietTurns.delete(oldest);
-        }
-      }
+      if (quiet && quietTurn) keepNewest(this.#quietTurns, turnId);
+      if (settles && running?.unprompted && deliveries.length === 0 && running.continues.length > 0)
+        keepNewest(this.#followUpTurns, turnId);
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
       if (!quiet) this.#quietChannelTurns.delete(turnId);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
@@ -3447,7 +3460,12 @@ function answeredRequestTurn(
   snapshot: ConversationSnapshot,
   turnId: string,
 ): boolean {
-  return deliveries.every(({ delivery }) => teammateRequest(delivery)) && textAnswersOnly(snapshot, turnId);
+  // A turn with no delivery answers no request: a result of its background work shows (#11090).
+  return (
+    deliveries.length > 0 &&
+    deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
+    textAnswersOnly(snapshot, turnId)
+  );
 }
 
 /**
