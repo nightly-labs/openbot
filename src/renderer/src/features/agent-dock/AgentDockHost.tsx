@@ -985,6 +985,7 @@ function dockAgent(agent: ComposerAgent): AgentDockAgent {
     avatarHue: agent.avatarHue ?? null,
     avatarColor: agent.avatarColor ?? null,
     avatarUrl: agent.avatarUrl && agent.avatarUrl.length <= INPUT_LIMITS.avatarUrl ? agent.avatarUrl : null,
+    ...(agent.chatColor === undefined ? {} : { chatColor: agent.chatColor }),
   };
 }
 
