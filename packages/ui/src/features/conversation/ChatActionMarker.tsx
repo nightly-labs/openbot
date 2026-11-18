@@ -671,7 +671,13 @@ function SingleChatActionMarker(
             </Button>
           </Show>
         </MarkerContent>
-        <Show when={failureReason()}>{(reason) => <p class="chat-action-marker-reason">{reason()}</p>}</Show>
+        <Show when={failureReason()}>
+          {(reason) => (
+            <p class="chat-action-marker-reason" title={reason()}>
+              {reason()}
+            </p>
+          )}
+        </Show>
         <Show when={historyShown() && routineHistory()}>
           {(transitions) => (
             <RoutineRunHistory
