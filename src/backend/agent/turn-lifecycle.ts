@@ -477,6 +477,12 @@ export class TurnLifecycle {
    * ends during a turn is left out: that turn can read its report.
    */
   readonly #unreadReports = new Map<string, Map<string, string>>();
+  /**
+   * The teammate requests to which the last turn of each thread, by agent and thread, sent its answer as
+   * the result. A turn that the provider then starts itself, as OpenCode does when a background task
+   * ends, sends its answer to them too (#12258). Kept in memory only: a restart also ends that work.
+   */
+  readonly #lastResults = new Map<string, readonly DeliveryContext[]>();
   /** The drain's start of each starting delivery, until its turn starts. */
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   /** The timing of each finished turn, until host analytics takes it. */
@@ -601,6 +607,7 @@ export class TurnLifecycle {
     this.#failedTurns.delete(agentId);
     this.#subagentTurns.delete(agentId);
     this.#lastEventAt.delete(agentId);
+    for (const key of this.#lastResults.keys()) if (key.startsWith(`${agentId}\u0000`)) this.#lastResults.delete(key);
     for (const [childId, parent] of this.#codexChildren)
       if (parent.agentId === agentId) this.#codexChildren.delete(childId);
   }
@@ -685,6 +692,7 @@ export class TurnLifecycle {
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
+    this.#lastResults.clear();
     this.#quietTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
@@ -2503,8 +2511,10 @@ export class TurnLifecycle {
           agentId,
           laneTaskId ?? (this.#laneForThread(agentId, threadId) === MESSAGING_LANE ? MESSAGING_LANE : null),
         );
+      const resultsKey = `${agentId}\u0000${publicThreadId}`;
       if (deliveries.length > 0) {
         const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
+        const resulted: DeliveryContext[] = [];
         for (const delivery of deliveries) {
           this.#refusedRetries.delete(delivery.delivery.id);
           this.#failoverRetries.delete(delivery.delivery.id);
@@ -2539,8 +2549,11 @@ export class TurnLifecycle {
                   redactText(this.#hooks.redactMcp(text)),
                 );
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult);
+            if (yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult))
+              resulted.push(delivery);
         }
+        if (resulted.length > 0) this.#lastResults.set(resultsKey, resulted);
+        else this.#lastResults.delete(resultsKey);
         // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
         // ends a request steered into the turn too, so its sender gets a note and does not wait.
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
@@ -2551,6 +2564,18 @@ export class TurnLifecycle {
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
         }
+      } else if (
+        running?.unprompted &&
+        outcome === "completed" &&
+        !continuation &&
+        !noUpdateCalled &&
+        answerText?.trim()
+      ) {
+        // The provider started this turn itself after the last turn's result went to a teammate, as
+        // OpenCode does when a background task ends. Its answer finishes that request, so it goes to
+        // the same teammate. Before, that teammate kept only the earlier "waiting" result (#12258).
+        for (const request of this.#lastResults.get(resultsKey) ?? [])
+          yield* this.#relayLaterResult(agentId, turnId, request, answerText);
       }
       if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
         yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
@@ -2996,10 +3021,39 @@ export class TurnLifecycle {
     text: string | undefined,
     noResult: string,
   ) {
-    if (delivery.delivery.sender.kind !== "agent") return;
-    if (!this.#sendsResult(agentId, turnId, delivery.delivery, turnDeliveries, text)) return;
-    const messageId = delivery.delivery.messageId;
-    const recipientAgentId = delivery.delivery.sender.agentId;
+    if (!this.#sendsResult(agentId, turnId, delivery.delivery, turnDeliveries, text)) return false;
+    // A turn that ended with no answer still answers, so the agent that asked does not wait for a
+    // result that never comes (#6044).
+    yield* this.#sendResult(agentId, turnId, delivery.delivery, text ?? noResult);
+    return true;
+  });
+
+  /**
+   * Sends the answer of a turn that the provider started itself to the teammate whose request the last
+   * turn answered (#12258). Not when the turn sent that teammate a message itself.
+   */
+  readonly #relayLaterResult = Effect.fn("TurnLifecycle.relayLaterResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    { delivery }: DeliveryContext,
+    text: string,
+  ) {
+    if (delivery.sender.kind !== "agent" || !this.#store.has(delivery.sender.agentId)) return;
+    if (this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, delivery.sender.agentId, new Set())) return;
+    yield* this.#sendResult(agentId, turnId, delivery, text);
+  });
+
+  readonly #sendResult = Effect.fn("TurnLifecycle.sendResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    delivery: QueueDelivery,
+    text: string,
+  ) {
+    if (delivery.sender.kind !== "agent") return;
+    const messageId = delivery.messageId;
+    const recipientAgentId = delivery.sender.agentId;
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;
@@ -3007,13 +3061,10 @@ export class TurnLifecycle {
       .enqueue({
         sender: { kind: "agent", agentId },
         recipientAgentIds: [recipientAgentId],
-        // A turn that ended with no answer still answers, so the agent that asked does not wait for a
-        // result that never comes (#6044).
-        text: text ?? noResult,
+        text,
         replyToMessageId: messageId,
         ...(taskId ? { taskId } : {}),
-        // The requested result, not a new request. The chain-origin guard above already stops a
-        // second relay; this is what tells the recipient it owes no acknowledgement for one.
+        // The requested result, not a new request: this tells the recipient it owes no acknowledgement for it.
         expectsReply: false,
         idempotencyKey: `${AUTO_RESULT_KEY_PREFIX}${turnId}:${messageId}`,
       })
