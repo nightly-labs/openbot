@@ -291,5 +291,5 @@ Controls:
 ## Rollout
 
 Deploy the account service and Signal before the desktop release. Keep the Slack and Discord ingress
-contracts unchanged. The migration must preserve released schemas, update the latest schema, and
-pass schema parity and rollback checks.
+contracts unchanged. The migration must preserve released schemas and pass schema parity and
+rollback checks.

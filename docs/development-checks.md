@@ -89,7 +89,7 @@ an output is missing. File times do not decide: a checkout changes them, and Uni
 file whose content is the same.
 
 In CI, `check:desktop:static` (the UI check, lint, desktop typecheck, build and preload check) takes
-about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, a file in `src/backend/migrations/`, `agent-thread-schema.ts`, the parity test or
+about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, a file in `src/backend/migrations/`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
 `check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
