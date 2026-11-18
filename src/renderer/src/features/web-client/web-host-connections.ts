@@ -10,6 +10,7 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { SERVER_SAFE_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
@@ -304,8 +305,9 @@ export function createWebHostConnections(options: {
             );
           return response.body;
         });
-        // The same rule as opening the host, so the rail and the open agree.
-        if (negotiated.update) {
+        // The same rule as opening the host, so the rail and the open agree. A host in safe mode
+        // answers only with its reason, which the open host shows.
+        if (negotiated.update || support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY)) {
           entry.incompatible = true;
           recovery.suspend();
         } else {

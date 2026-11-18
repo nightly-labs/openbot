@@ -94,8 +94,8 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); no mobile build has it yet (1.4.11 does not), so no deletion before the first store build with it plus 60 days; step 2 (protocol 10) done (#12111, `78ad15d100`); prerequisite steps 2 and 3 in review (#12139); the share sender step needs a store build |
-| 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); no mobile build has it yet (1.4.11 does not), so no deletion before the first store build with it plus 60 days; step 2 (protocol 10) done (#12111, `78ad15d100`); prerequisite steps 2 and 3 done (#12139, `38fd2ed18e`); the share sender step needs a store build |
+| 3 | A server stops a start loop and reports the reason through the Team API | IN REVIEW: the loop stops (#10775, `932be637d6`); safe mode in #12185; `copy_release` stays a copy (see below) |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
@@ -217,8 +217,35 @@ Evidence: `src/main/index.ts` `recoverFromStartLoop` only logs for a server;
 `scripts/hosting/openbot-hosted-update` `copy_release` runs `rm -rf` before the copy.
 
 Change: after repeated failed starts, or a `NewerDatabaseError`, the server stops the loop, keeps a
-minimal Team API up that tells owners and admins the reason, and clients (desktop with a joined
-server, web client, mobile) show it. The release copy becomes atomic.
+minimal Team API up that tells all members the reason, and clients (desktop with a joined
+server, web client, mobile) show it. The release copy is safe after a stop or a failure.
+
+Decisions (developer, 2026-11-18): all members see the reason. The safe mode has no install and no
+rollback action, on servers and on Docker: a newer release, through the existing update path, is the
+fix. No "skip failed version" rule. The safe mode opens no `openbot.db`.
+
+Done in the safe-mode PR (stacked on protocol 10):
+
+- `src/main/server-safe-mode.ts` and `src/main/team-api/server-safe-mode-api.ts`: auth (read-only
+  `TeamStore`), compatibility and `GET /v1/server/safe-mode` only, through loopback HTTP and the
+  WebRTC gateway. Protocols 1-9 get `client_update_required`. The reason is a word, the app version
+  and a time.
+- Optional protocol 10 capability `server-safe-mode-v1`. Desktop, web client and mobile (the
+  mobile workspace now speaks 10 and keeps 9) show a translated reason.
+- `/run/openbot/server-safe-mode` marker. The hourly `check` of `openbot-hosted-update` stops the
+  safe mode, stages, applies and starts. Without the marker directory (Docker), the safe mode ends
+  after 1 h with exit 78.
+- `scripts/server-safe-mode-e2e.ts`.
+
+Not changed: `copy_release` stays a copy (decision, 2026-11-18). A rename of a release directory is
+not safe on boat: a directory moved with `mv` into `/opt` is empty after the next stop and resume.
+The copy is already safe without a rename:
+- `stage_release` writes `staged.ready` only after the copy is complete, so `apply` never uses a
+  partial `staged`.
+- `swap_in` writes `.applying` first and keeps `staged` until `finish_swap`, so a stop or a failure
+  during the copy makes the next `apply` copy again.
+- `swap_in` removes `app` before the copy, so the copy needs about the same free disk space that the
+  removal gives back.
 
 ### 4. Schema-aware desktop recovery
 

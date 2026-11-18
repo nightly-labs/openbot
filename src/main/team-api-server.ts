@@ -240,6 +240,7 @@ import {
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
+import { SERVER_SAFE_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -2808,6 +2809,8 @@ export class TeamApiServer {
         if (capability === STORAGE_CHANNEL_CAPABILITY)
           return this.#options.storage !== undefined && this.#options.channels !== undefined;
         if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
+        // Only the safe mode of a server that stopped its start loop serves it (`server-safe-mode.ts`).
+        if (capability === SERVER_SAFE_MODE_CAPABILITY) return false;
         if (capability === BACKGROUND_PROCESSES_CAPABILITY) return this.#options.backgroundProcesses !== undefined;
         // The routes use the agent operations, which every host has. A channel owner also needs `channel-chats-v1`.
         if (capability === ROUTINES_ONCE_CAPABILITY) return true;

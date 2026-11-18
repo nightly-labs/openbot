@@ -173,6 +173,7 @@ import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
+import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -440,6 +441,7 @@ export {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
+  SERVER_SAFE_MODE_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -788,6 +790,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [AGENT_ACTIVE_QUEUES_CAPABILITY, V9],
   [AGENT_CREATE_OPERATION_CAPABILITY, V9],
   [TEAM_CAPABILITY_BASELINE_CAPABILITY, V10],
+  [SERVER_SAFE_MODE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
@@ -894,9 +897,9 @@ export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   maximum: TEAM_PROTOCOL_V9,
 };
 /**
- * The protocols that the web client speaks through `packages/team-client`. It sends protocol 10 lists to a
- * host of protocol 10. Mobile stays on `TEAM_WEBRTC_CLIENT_PROTOCOL` until a capability after protocol 9
- * needs it there.
+ * The protocols that the web client and the mobile workspace speak through `packages/team-client`. They
+ * send protocol 10 lists to a host of protocol 10. The mobile share extension stays on
+ * `TEAM_WEBRTC_CLIENT_PROTOCOL`.
  */
 export const TEAM_WEB_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   minimum: TEAM_PROTOCOL_V3,
@@ -1007,6 +1010,23 @@ export function decodeTeamProtocolSupportExpanded(value: unknown): TeamProtocolS
     protocol: support.protocol,
     capabilities: expandTeamCapabilitiesV10(support),
   };
+}
+
+/**
+ * Reads the compatibility of a host with the protocol range of a WebRTC client. The first read of a
+ * connection does not know the protocol, so a host of protocol 10 answers it as protocol 9. Then the
+ * peer knows the protocol, and a second read gets the protocol 10 lists with the full set.
+ */
+export async function readTeamHostCompatibility(
+  read: () => Promise<unknown>,
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+) {
+  const first = await read();
+  const support = decodeTeamProtocolSupportExpanded(first);
+  const negotiated = teamWebRtcClientProtocol(support.protocol, client);
+  if (hasTeamProtocolV10Lists(first) || negotiated.update || (negotiated.protocol ?? 0) < TEAM_PROTOCOL_V10)
+    return { support, negotiated };
+  return { support: decodeTeamProtocolSupportExpanded(await read()), negotiated };
 }
 
 function capabilitySince(capability: string): TeamCapabilityPlacement["since"] {

@@ -57,6 +57,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Troppi tentativi di accesso. Riprova più tardi.",
   "error.team.clientUpdateRequired": "Aggiorna questo client OpenBot prima di connetterti a questo host.",
   "error.team.hostUpdateRequired": "Aggiorna OpenBot sull'host prima di connetterti.",
+  "error.team.serverSafeMode": "Questo server è in modalità provvisoria perché OpenBot non si avvia.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} su questo server non può aprire i suoi dati perché una versione più recente di OpenBot li ha salvati. Una versione più recente di OpenBot sul server risolve il problema.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} su questo server si è fermato dopo molti avvii non riusciti. Una versione più recente di OpenBot sul server risolve il problema.",
   "error.team.sidebarLayoutUnavailable": "Il layout della barra laterale non è disponibile.",
   "error.team.providersUnsupported": "Le impostazioni dei provider non sono supportate da questa connessione.",
   "error.team.providerNotManaged": "OpenBot non gestisce la CLI di questo provider.",

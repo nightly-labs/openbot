@@ -184,6 +184,7 @@ import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usa
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { UserFilesBytes } from "../backend/user-files-bytes";
+import { centralAuthApiUrl, createCentralAuthManager, safeStorageCipher } from "./account-service-access";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
 import {
   type AgentDefaultsPreferenceStore,
@@ -223,12 +224,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
-import {
-  CentralAuthManager,
-  isHostNotOnAccount,
-  readCentralAuthApiUrl,
-  readMobileConnectApiUrl,
-} from "./central-auth-manager";
+import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
   type ClaudeCompactWindowControl,
@@ -422,12 +418,7 @@ import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import type { UncleanExitProperties } from "./run-marker";
 import { ScreenCapturer } from "./screen-capture";
-import {
-  createSecretStorage,
-  SECRET_STORAGE_KEY_FILE,
-  type SecretStorage,
-  type SecretStorageCipher,
-} from "./secret-storage-cipher";
+import type { SecretStorageCipher } from "./secret-storage-cipher";
 import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
@@ -450,7 +441,7 @@ import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-de
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
-import { TeamStore } from "./team-store";
+import { LEGACY_TEAM_STORE_FILE, TEAM_STORE_FILE, TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
@@ -534,11 +525,7 @@ const APP_BEHAVIOR_PREFERENCE_FILE = "openbot-app-behavior-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
-const TEAM_FILE = "openbot-team-server-v1.json";
-/** One host per account. The v1 file above stays as the last build without accounts left it. */
-const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
-const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const REMOTE_SESSIONS_FILE = "openbot-remote-sessions-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
@@ -860,48 +847,6 @@ export interface ApplicationServices {
   appliedAccount: CentralAuthState;
   /** Left un-awaited on purpose: the account settles in the background while the app opens. */
   centralAuthInitialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>;
-}
-
-let userDataSecretStorage: SecretStorage | null = null;
-
-/** The secret storage of userData. Made at first use, when userData has its final path. */
-function secretStorage(): SecretStorage {
-  userDataSecretStorage ??= createSecretStorage({
-    keyPath: join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE),
-  });
-  return userDataSecretStorage;
-}
-
-/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux and macOS key file. */
-function safeStorageCipher(
-  unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
-): SecretStorageCipher {
-  return secretStorage().cipher(() => sourceText(unavailableKey));
-}
-
-/**
- * The account service requests go through Chromium's network stack, which uses the computer's proxy
- * settings as the built-in browser does. Node `fetch` ignores them, so the server list and a
- * connection timed out on a network that needs the system proxy (#10314). The requests carry a
- * bearer token: they send no browser cookie and use no HTTP cache, as with Node `fetch`.
- *
- * A Chromium network failure (`net::ERR_CONNECTION_REFUSED`) is thrown as Node `fetch` throws one,
- * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
- * An abort rejects with the signal's reason, as in Node.
- */
-async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
-  try {
-    return await net.fetch(input instanceof URL ? input.href : input, {
-      ...init,
-      credentials: "omit",
-      cache: "no-store",
-    });
-  } catch (error) {
-    if (!(error instanceof Error)) throw error;
-    const code = /^net::(ERR_[A-Z0-9_]+)$/u.exec(error.message)?.[1];
-    if (code === undefined) throw error;
-    throw new TypeError("fetch failed", { cause: Object.assign(error, { code }) });
-  }
 }
 
 /** How the driver's own state reads as the capability the Team API projects. */
@@ -1311,17 +1256,7 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
-  const centralAuthApiUrl = readCentralAuthApiUrl(
-    process.env.OPENBOT_AUTH_API_URL,
-    app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
-  );
-  const centralAuth = new CentralAuthManager({
-    apiUrl: centralAuthApiUrl,
-    mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
-    storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
-    fetch: accountServiceFetch,
-    ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
-    keyringChanged: () => secretStorage().madeKeyFile(),
+  const centralAuth = createCentralAuthManager({
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
     confirmSessionAtStart: hostedServer !== null && hostedServer !== undefined,
@@ -1993,7 +1928,7 @@ export async function createApplicationServices({
     app: githubAppConfig(),
     store: new GitHubConnectorStore(join(app.getPath("userData"), GITHUB_CONNECTOR_FILE), secretCipher),
     toolDirectory: join(app.getPath("userData"), "provider-state", "github"),
-    apiUrl: centralAuthApiUrl,
+    apiUrl: centralAuthApiUrl(),
     openExternal: openLink,
   });
   await runCauseEffect(githubConnector.load());
@@ -3065,8 +3000,8 @@ export async function createApplicationServices({
     installLocal: (input) => skills.installLocal(input),
   });
   const teamStore = new TeamStore(
-    join(app.getPath("userData"), TEAM_FILE_V2),
-    join(app.getPath("userData"), TEAM_FILE),
+    join(app.getPath("userData"), TEAM_STORE_FILE),
+    join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
   );
   await runCauseEffect(teamStore.initialize());
   performance.mark("openbot:services.team");
@@ -4126,7 +4061,7 @@ export async function createApplicationServices({
     },
     {
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
-      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
+      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl()),
       appVersion: app.getVersion(),
       connectTrace,
       // The owner's levels on this computer's server, which the host also reads for the owner's phones.
