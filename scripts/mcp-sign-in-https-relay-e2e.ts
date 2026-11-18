@@ -9,10 +9,13 @@
 //    route must answer 302 to `http://127.0.0.1:28417/mcp-auth` with the query unchanged. That request
 //    goes to the listener (on another port when the OpenBot app holds 28417), which must hand the grant
 //    to the sign-in of step 1. A refusal must reach the listener as a refusal.
+// 3. Starts a sign-in with an MCP server on this computer whose metadata names Meta's issuer. It must
+//    not get the OpenBot Meta app: that app's token would go to the server that asked for it.
 // Writes .openbot-build/mcp-sign-in-https-relay-e2e/report.json. Needs network access to Meta.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { translateFor } from "@openbot/i18n";
@@ -68,6 +71,8 @@ interface Report {
   store?: { client: McpOAuthRecord["client"] | null; issuer: string | null };
   grant?: RelayResult & { delivered: Delivery[] };
   refusal?: RelayResult & { refused: Refusal[] };
+  /** The sign-in of a server that names Meta's issuer and is not Meta's: the pages it opened. */
+  impostor?: { pages: { origin: string; clientId: string | null }[]; error: string | null };
   listenerPort?: number;
 }
 
@@ -105,6 +110,7 @@ mkdirSync(OUT, { recursive: true });
 
 // 1. The sign-in page, from Meta's own discovery documents --------------------------------------
 const records = new Map<string, McpOAuthRecord>();
+const pages: string[] = [];
 let openPage: (url: string) => void = () => {};
 const pageOpened = new Promise<string>((done) => {
   openPage = done;
@@ -116,7 +122,10 @@ const oauth = new McpOAuth({
       Effect.sync(() => void records.set(resource, mcpOAuthRecordSchema.parse(JSON.parse(JSON.stringify(record))))),
     clear: (resource) => Effect.sync(() => void records.delete(resource)),
   },
-  openExternal: async (url) => openPage(url),
+  openExternal: async (url) => {
+    pages.push(url);
+    openPage(url);
+  },
   redirectUrl: LOOPBACK_REDIRECT_URL,
   signInTimeoutMs: 60_000,
 });
@@ -222,6 +231,40 @@ try {
 
   // The grant above is not real, so the token exchange is not run.
   oauth.cancelSignIn(META_ADS_MCP_URL);
+
+  // 3. A server that is not Meta's names Meta's issuer ----------------------------------------------
+  const impostorPort = await freePort();
+  const impostorUrl = `http://127.0.0.1:${impostorPort}/ads`;
+  const impostor = createHttpServer((request, response) => {
+    if (request.url?.startsWith("/.well-known/oauth-protected-resource")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ resource: impostorUrl, authorization_servers: ["https://www.facebook.com/ads"] }));
+      return;
+    }
+    response.writeHead(404).end();
+  });
+  await new Promise<void>((done) => impostor.listen(impostorPort, "127.0.0.1", done));
+  const before = pages.length;
+  let impostorError: string | null = null;
+  try {
+    const impostorSignIn = oauth.signIn(impostorUrl);
+    assert.ok(impostorSignIn, "McpOAuth takes a loopback MCP address");
+    await runCauseEffect(impostorSignIn.begin());
+  } catch (error) {
+    impostorError = error instanceof Error ? error.message : String(error);
+  } finally {
+    oauth.cancelSignIn(impostorUrl);
+    await new Promise<void>((done) => impostor.close(() => done()));
+  }
+  const impostorPages = pages.slice(before).map((url) => {
+    const opened = new URL(url);
+    return { origin: opened.origin, clientId: opened.searchParams.get("client_id") };
+  });
+  report.impostor = { pages: impostorPages, error: impostorError };
+  check(
+    impostorPages.every((opened) => opened.clientId !== META_APP_ID),
+    "a server that is not Meta's got the OpenBot Meta app",
+  );
 } catch (error) {
   report.failures.push(error instanceof Error ? error.message : String(error));
   writeFileSync(resolve(OUT, "site-output.log"), siteOutput);

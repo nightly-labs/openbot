@@ -85,6 +85,11 @@ export const MCP_OAUTH_RELAY_URL = "https://openbot.run/oauth/mcp-callback";
 
 /** A public OAuth client that OpenBot registered with one authorization server itself. */
 interface BuiltInMcpClient {
+  /**
+   * The MCP server that this client signs in to. Any server can name this issuer in its
+   * protected-resource metadata, and the token goes to the server that asked for it.
+   */
+  resource: string;
   /** The authorization server URL that discovery finds, which the SDK binds the tokens to. */
   issuer: string;
   clientId: string;
@@ -102,12 +107,31 @@ interface BuiltInMcpClient {
  * and PKCE protects the grant.
  */
 const BUILT_IN_MCP_CLIENTS: readonly BuiltInMcpClient[] = [
-  { issuer: "https://www.facebook.com/ads", clientId: "1479376854168579", redirectUrl: MCP_OAUTH_RELAY_URL },
+  {
+    resource: "https://mcp.facebook.com/ads",
+    issuer: "https://www.facebook.com/ads",
+    clientId: "1479376854168579",
+    redirectUrl: MCP_OAUTH_RELAY_URL,
+  },
 ];
 
-/** The built-in client for this authorization server, or `undefined`. */
-function builtInMcpClient(issuer: string | undefined): BuiltInMcpClient | undefined {
-  return issuer ? BUILT_IN_MCP_CLIENTS.find((client) => issuersMatch(client.issuer, issuer)) : undefined;
+/** The origin and path of an MCP server address, without a final "/", or `null`. */
+function builtInResourceKey(url: string): string | null {
+  const resource = normalizeResource(url);
+  if (!resource) return null;
+  const parsed = new URL(resource);
+  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+}
+
+/** The built-in client for this MCP server and authorization server, or `undefined`. */
+function builtInMcpClient(resource: string, issuer: string | undefined): BuiltInMcpClient | undefined {
+  if (!issuer) return undefined;
+  const key = builtInResourceKey(resource);
+  return key === null
+    ? undefined
+    : BUILT_IN_MCP_CLIENTS.find(
+        (client) => builtInResourceKey(client.resource) === key && issuersMatch(client.issuer, issuer),
+      );
 }
 
 /**
@@ -1066,7 +1090,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const record = this.#record();
     const own = this.#options.redirectUrl;
     if (record.app) return own;
-    const builtIn = builtInMcpClient(this.#activeIssuer);
+    const builtIn = builtInMcpClient(this.#options.resource, this.#activeIssuer);
     if (builtIn) return builtIn.redirectUrl;
     const client = this.#registeredClient ?? record.client;
     if (!client) return own;
@@ -1184,7 +1208,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     // A built-in client is the client of its authorization server, which registers no other. The
     // SDK reads this after discovery, so the issuer is known. A server that refuses it gets it back
     // once more from the SDK's retry, and the sign-in then ends with the server's own refusal.
-    const builtIn = builtInMcpClient(this.#activeIssuer);
+    const builtIn = builtInMcpClient(this.#options.resource, this.#activeIssuer);
     if (builtIn)
       return {
         client_id: builtIn.clientId,
