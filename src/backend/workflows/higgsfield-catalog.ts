@@ -10,9 +10,11 @@
 
 import {
   WORKFLOW_MEDIA_ASPECTS,
+  WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX,
   type WorkflowMediaAspect,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaKind,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
@@ -48,8 +50,6 @@ export interface HiggsfieldCatalogEntry {
 const IMAGE_ROLES = ["start_image", "end_image", "image_references", "image"] as const;
 /** A model that takes no reference count in its catalog entry gets this many. */
 const DEFAULT_REFERENCES = 16;
-/** A video model with more lengths than this shows only some of them; see `shownDurations`. */
-const MAX_DURATION_CHOICES = 5;
 /** A resolution option that is a size: "2k", "1.5k", "720p". */
 const SIZE_OPTION = /^\d+(?:\.\d+)?k$|^\d+p$/iu;
 /**
@@ -105,15 +105,12 @@ export function canvasAspects(value: unknown): WorkflowMediaAspect[] {
 }
 
 /**
- * The lengths to show. A model with many lengths (3 to 30 seconds) shows its shortest and longest
- * length and each multiple of 5 between them.
+ * The lengths that a catalog model sends: each length that the service takes, in ascending order, so
+ * the canvas can ask for any of them. A list longer than the wire limit keeps its short list.
  */
-export function shownDurations(all: readonly number[]): number[] {
+export function catalogDurations(all: readonly number[]): number[] {
   const sorted = [...new Set(all)].sort((left, right) => left - right);
-  if (sorted.length <= MAX_DURATION_CHOICES) return sorted;
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  return sorted.filter((value) => value === first || value === last || value % 5 === 0);
+  return sorted.length <= WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX ? sorted : workflowVideoLengthChoices(sorted);
 }
 
 /** Each whole second from `min` to `max`. */
@@ -199,7 +196,7 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
 
   const durations =
     kind === "video"
-      ? shownDurations(
+      ? catalogDurations(
           videoDurations(
             item,
             parameters.find((entry) => entry.name === "duration"),

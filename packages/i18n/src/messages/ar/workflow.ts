@@ -169,6 +169,7 @@ export const messages = {
   "workflow.video.models": "نماذج الفيديو",
   "workflow.video.making": "جارٍ إنشاء الفيديو، {time}",
   "workflow.video.length": "المدة",
+  "workflow.video.length.custom": "مخصصة",
   "workflow.video.lengthLabel": "المدة: {value}",
   "workflow.video.seconds": "{value} ث",
   "workflow.video.resolution": "الدقة",

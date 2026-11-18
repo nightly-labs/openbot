@@ -18,6 +18,7 @@ import {
   workflowMediaResolutions,
   workflowMediaSpecs,
   workflowVideoDurations,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -33,6 +34,7 @@ import {
   Minimize2,
   Play,
   Popover,
+  SliderField,
   Square,
   Textarea,
   Type,
@@ -210,6 +212,71 @@ function SizeChip(props: { size: WorkflowMediaSize; disabled: boolean; onChange:
             {field("width")}
             {field("height")}
           </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** The option of the Length menu that opens a slider over every length of the model. */
+const CUSTOM_LENGTH = "custom" as const;
+type LengthChoice = `${number}` | typeof CUSTOM_LENGTH;
+
+/** The place in `lengths` of the length nearest to `seconds`. */
+function nearestLength(lengths: readonly number[], seconds: number): number {
+  return lengths.reduce(
+    (best, length, index) =>
+      Math.abs(length - seconds) < Math.abs((lengths[best] ?? seconds) - seconds) ? index : best,
+    0,
+  );
+}
+
+/**
+ * The glass chip of a custom length. It opens a slider that moves through the lengths of the model,
+ * so each stop is a length that the model makes. The chip follows the slider while the user drags it,
+ * and the step keeps the length when the user releases it.
+ */
+function LengthChip(props: {
+  seconds: number;
+  lengths: readonly number[];
+  disabled: boolean;
+  onChange: (seconds: number) => void;
+}) {
+  const { t } = useText();
+  const [dragged, setDragged] = createSignal<number | null>(null);
+  const sorted = () => [...new Set(props.lengths)].sort((left, right) => left - right);
+  const index = () => dragged() ?? nearestLength(sorted(), props.seconds);
+  const at = (place: number) => sorted()[place] ?? props.seconds;
+  const seconds = (place: number) => t("workflow.video.seconds", { value: String(at(place)) });
+  const commit = (place: number) => {
+    setDragged(place);
+    if (at(place) !== props.seconds) props.onChange(at(place));
+  };
+  return (
+    <Popover.Root placement="top" gutter={6} onOpenChange={(open) => !open && setDragged(null)}>
+      <Popover.Trigger
+        class="wfn-chip"
+        aria-label={t("workflow.video.lengthLabel", { value: seconds(index()) })}
+        disabled={props.disabled}
+      >
+        {seconds(index())}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          class="ui-popover-menu-surface wfn-popover wfn-length-popover"
+          aria-label={t("workflow.video.length")}
+          data-wfn-portal=""
+        >
+          <SliderField
+            label={t("workflow.video.length")}
+            value={index()}
+            minValue={0}
+            maxValue={Math.max(sorted().length - 1, 1)}
+            step={1}
+            formatValue={seconds}
+            onChange={setDragged}
+            onChangeEnd={commit}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -400,6 +467,23 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
+  /** Every length of the model, and the short list of the Length menu. Custom takes the others. */
+  const lengths = () => workflowVideoDurations(model());
+  const lengthChoices = () => workflowVideoLengthChoices(lengths());
+  const customLengthAllowed = () => lengthChoices().length < lengths().length;
+  const [customLength, setCustomLength] = createSignal(false);
+  /** A length that the short list does not show is a custom length, also after a reload. */
+  const lengthIsCustom = () => customLengthAllowed() && (customLength() || !lengthChoices().includes(specs().duration));
+  const chooseLength = (choice: LengthChoice) => {
+    if (choice === CUSTOM_LENGTH) {
+      setCustomLength(true);
+      return;
+    }
+    const next = lengths().find((option) => String(option) === choice);
+    if (next === undefined) return;
+    setCustomLength(false);
+    setDuration(next);
+  };
   /** A Sunra or Higgsfield step shows what one file costs with its choices. */
   const price = useMediaPrice(() => {
     const chosen = model();
@@ -531,6 +615,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const specsDisabled = () => locked() || making();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => (specs().size ? t("workflow.image.aspect.custom") : specs().aspect);
+  const lengthText = () => (lengthIsCustom() ? t("workflow.video.length.custom") : durationText(specs().duration));
   return (
     <>
       <NodeShell
@@ -656,25 +741,36 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 )}
               </Show>
               <Show when={kind() === "video"}>
-                <ChipMenu
-                  label={t("workflow.video.lengthLabel", { value: durationText(specs().duration) })}
+                <ChipMenu<LengthChoice>
+                  label={t("workflow.video.lengthLabel", { value: lengthText() })}
                   title={t("workflow.video.length")}
-                  text={durationText(specs().duration)}
-                  value={String(specs().duration)}
+                  text={lengthText()}
+                  value={lengthIsCustom() ? CUSTOM_LENGTH : `${specs().duration}`}
                   groups={[
                     {
-                      options: workflowVideoDurations(model()).map((value) => ({
-                        value: String(value),
-                        label: durationText(value),
-                      })),
+                      options: [
+                        ...lengthChoices().map((value) => ({ value: `${value}` as const, label: durationText(value) })),
+                        ...(customLengthAllowed()
+                          ? [{ value: CUSTOM_LENGTH, label: t("workflow.video.length.custom") }]
+                          : []),
+                      ],
                     },
                   ]}
                   disabled={specsDisabled()}
-                  onSelect={(value) => {
-                    const next = workflowVideoDurations(model()).find((option) => String(option) === value);
-                    if (next !== undefined) setDuration(next);
-                  }}
+                  onSelect={chooseLength}
                 />
+                <Show when={lengthIsCustom()}>
+                  <LengthChip
+                    seconds={specs().duration}
+                    lengths={lengths()}
+                    disabled={specsDisabled()}
+                    onChange={(seconds) => {
+                      // A slider stop on the short list keeps Custom, so the slider stays open.
+                      setCustomLength(true);
+                      setDuration(seconds);
+                    }}
+                  />
+                </Show>
               </Show>
               {/* A custom size sets the resolution that the model makes. */}
               <Show when={!specs().size && specs().resolution}>

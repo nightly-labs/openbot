@@ -8,7 +8,7 @@
 
 import type { WorkflowMediaCatalogModel, WorkflowMediaKind } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { canvasAspects, numbers, shownDurations, strings, text } from "./higgsfield-catalog";
+import { canvasAspects, catalogDurations, numbers, strings, text } from "./higgsfield-catalog";
 
 /** How the host sends the pictures and the background of a step to one Sunra model. */
 export interface SunraPlan {
@@ -71,7 +71,7 @@ export function sunraCatalogEntry(item: DynamicRecord): SunraCatalogEntry | null
   const capabilities = new Set(strings(item.capabilities));
   const editsVideo = [...capabilities].some((capability) => capability.startsWith("video-to-video"));
   if (kind === "video" && editsVideo && !capabilities.has("image-to-video")) return null;
-  const durations = kind === "video" ? shownDurations(numbers(item.supported_durations)) : [];
+  const durations = kind === "video" ? catalogDurations(numbers(item.supported_durations)) : [];
   if (kind === "video" && durations.length === 0) return null;
   const listed = strings(item.supported_resolutions).filter((value) => value.length <= 16);
   const fallback = text(item.default_resolution);
