@@ -5,8 +5,8 @@
 // card must also answer its call first, stay open, and send only the saved item's name as the late
 // answer. Mistral Vibe stops each call after 60 s (#11550), so an `ask_ui` card answers its call first,
 // stays open, and sends its late answer, with an edited preview, to the card's thread; a form with a
-// secret field still waits in its call. A secure fill that fails gives the page to the user and tells the agent only a fixed reason
-// (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
+// secret field still waits in its call. A secure fill that fails gives the page to the user and tells
+// the agent only a fixed reason (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
 // `bun scripts/browser-takeover-deadline-e2e.ts`. Writes .openbot-build/browser-takeover-deadline-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -484,8 +484,11 @@ try {
     assert.equal(blockRegistry.runtimeAttention().pendingPrompts.length, 0);
     assert.equal(lateAnswers.length, 1, "the agent got no late answer");
     assert.deepEqual(lateAnswers[0]?.target, { taskId: "routine-task" }, "the answer went to another thread");
-    assert.match(lateAnswers[0]?.text ?? "", /^> Send this to Ann\?\n/u);
-    assert(lateAnswers[0]?.text.endsWith(`\n\nSend\n\n${edited}`), "the late answer has no action or edited text");
+    assert.equal(
+      lateAnswers[0]?.text,
+      `> Send this to Ann?\n> \n> ${edited}\n\nSend`,
+      "the late answer does not quote the edited text with the action",
+    );
     return { waiting, lateAnswer: lateAnswers[0] };
   });
 

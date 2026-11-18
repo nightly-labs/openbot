@@ -886,12 +886,16 @@ export class AttentionRegistry {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
       // The form of a Vault request holds secrets, so its late answer names the saved item only. An edited
-      // preview follows the answer: the quoted question holds only the agent's draft.
+      // preview replaces the agent's draft in the quote: the user approved that text.
+      const quotedQuestions =
+        preview !== undefined && pending.uiBlock?.spec.type === "confirm"
+          ? uiBlockFallbackQuestions({ ...pending.uiBlock.spec, preview })
+          : pending.questions;
       const lateAnswer = !pending.detached
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : [lateAnswerText(pending.questions, answers), preview ?? ""].filter(Boolean).join("\n\n");
+          : lateAnswerText(quotedQuestions, answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -1998,10 +2002,11 @@ export class AttentionRegistry {
   }
 
   /**
-   * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
-   * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
-   * caller has checked the spec and refused a channel. With `autoAnswer`, the host answers that action
-   * itself after `afterMs` when nobody answered first.
+   * Shows an `ask_ui` block and waits for its answer, or detaches as a question does when the provider
+   * cannot wait (#11550). The block is a question prompt: its fallback questions let a client that does
+   * not know `uiBlock` answer it through `respondToPrompt`. The caller has checked the spec and refused a
+   * channel. With `autoAnswer`, the host answers that action itself after `afterMs` when nobody answered
+   * first.
    */
   surfaceUiBlock(
     client: AgentClient,
