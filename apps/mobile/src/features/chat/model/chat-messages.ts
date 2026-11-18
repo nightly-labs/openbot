@@ -969,10 +969,9 @@ function projectChannelMessage(
   latestRuns: ReadonlySet<string>,
   progress: boolean,
   replaced: boolean,
-  tasks: readonly ChannelTask[],
+  request: ReturnType<typeof channelRoutineRequest>,
 ): ChatMessage | null {
   // A routine's request is its instruction, with the event data of a webhook: it shows as its marker (#11686).
-  const request = channelRoutineRequest(entry, tasks);
   if (request)
     return {
       id: entry.id,
@@ -1106,7 +1105,8 @@ export function projectChannelMessages(
       const latest = latestRuns.has(entry.message.id);
       const progress = showsUpdate(entry);
       const replaced = replacedIds.has(entry.id);
-      const run = channelRoutineRequest(entry, tasks)?.status ?? null;
+      const request = channelRoutineRequest(entry, tasks);
+      const run = request?.status ?? null;
       if (
         cached &&
         cached.self === self &&
@@ -1116,7 +1116,7 @@ export function projectChannelMessages(
         cached.run === run
       )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, tasks);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request);
       // A progress update keeps a steps row of its own, so the activity row knows that the member's
       // latest step is this update and does not show an older thought.
       const rows: readonly ChatMessage[] = !message
