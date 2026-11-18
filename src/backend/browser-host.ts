@@ -1686,6 +1686,15 @@ export class BrowserHost {
   }
 
   /**
+   * Releases each tab whose holder `refused` names, such as a member who may no longer see the tab
+   * after a change of the roles. A recording in the tab ends with it.
+   */
+  releaseUserControlRefused(refused: (tabId: string, holder: BrowserUserControlHolder) => boolean): void {
+    for (const [tabId, holder] of [...this.#userControlTabIds])
+      if (refused(tabId, holder)) this.releaseUserControl(tabId);
+  }
+
+  /**
    * The tab of this agent tool call while a person controls it, or null. A call for the agent's tab
    * set, such as `list_tabs`, waits while the person controls any tab that the agent can use.
    */
