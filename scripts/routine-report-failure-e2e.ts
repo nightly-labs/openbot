@@ -13,7 +13,8 @@
 // answer of a reported failure but not of a provider failure, that a failed run does not pause its
 // own routine in either call order (#9856), and that a routine that its own run paused says which run
 // until the next change of the routine, also after a restart (#10048), and that the routine prompt
-// says that a request to a teammate is not a failure (#10928).
+// says that a request to a teammate is not a failure (#10928), and that a stop that the user asked
+// for is not a failure, except in a Test run (#11578).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -884,6 +885,16 @@ try {
     scriptPrompt?.includes(`routineId "${quietFailed.id}" and active false`) === true &&
       !scriptPrompt.includes("Do not create, update, delete, or test routines") &&
       healthPrompt?.includes(`routineId "${health.id}"`) === false,
+    scriptPrompt,
+  );
+  // A run that the user paused or stopped on purpose ended as failed (#11578). A Test run is the
+  // user's own request to run, so its prompt does not say to skip the task.
+  const userStopLine = "A stop that the user asked for is not a failure.";
+  pass(
+    "A script-run prompt says that a stop the user asked for is not a failure, and a Test-run prompt does not (#11578)",
+    scriptPrompt?.includes(userStopLine) === true &&
+      scriptPrompt.includes("do not call the routine_report_failure tool: call the routine_no_update tool") &&
+      healthPrompt?.includes(userStopLine) === false,
     scriptPrompt,
   );
 
