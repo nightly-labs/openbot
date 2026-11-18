@@ -444,8 +444,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
     // Agents also write a shared file as `Shared/…`, as the host reads it. It opens from the shared
-    // folder when the workspace has nothing at that path (#5657).
-    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(path, place, fallback) : fallback;
+    // folder when the workspace has nothing at that path (#5657). The workspace resolver decodes `%XX`
+    // and the shared-file resolver does not, so the shared path is decoded here once (#12104).
+    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(decodedPath(path), place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -821,14 +822,17 @@ function filePreviewKey(source: SidebarFilePreview["source"]): string {
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
 }
 
-function filePreviewError(error: unknown, path: string): string {
-  let decodedPath = path;
+function decodedPath(path: string): string {
   try {
-    decodedPath = decodeURIComponent(path);
+    return decodeURIComponent(path);
   } catch {
     // A literal percent sign can be part of a file name.
+    return path;
   }
-  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
+}
+
+function filePreviewError(error: unknown, path: string): string {
+  const name = decodedPath(path).replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
   if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
     return t("attachment.error.fileNotFound", { name });
   }
