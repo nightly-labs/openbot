@@ -1,10 +1,10 @@
 {
-  "version": "0.70.0",
+  "version": "0.73.0",
   "highlights": [
-    "Update your joined servers to this version too: you can then restart a self-hosted server from the app and set its agent defaults and thread limits.",
-    "Choose which agents can use each Vault item. An API key saved for one agent now stays in the encrypted Vault.",
-    "Make pictures and short videos in Workflows with GPT Image, Grok Imagine and Sunra models.",
-    "Connect Sunra and TryPost from the Apps marketplace.",
-    "OpenBot opens faster when chats are long, and on Windows and Linux it asks before it quits while agents work."
+    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
+    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
+    "Edit one workflow together with other people at the same time.",
+    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
+    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
   ]
 }

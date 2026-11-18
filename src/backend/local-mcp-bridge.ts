@@ -43,6 +43,17 @@ export interface LocalMcpSession {
   setThreadId(threadId: string): void;
   /** Whether the client sent a request to each of `servers` since the session opened. */
   reached(): boolean;
+  /**
+   * Whether the client gave up a server of this session: it did not get the tools of a token that
+   * this session was the first to send within `limitMs` of `sentAt`, the time of the session request.
+   * Such a server is marked, so a session that joins it later gets a new token.
+   */
+  dropped(sentAt: number, limitMs: number): boolean;
+  /**
+   * Gives each marked server a new token, which all sessions of its directory share. `servers` then
+   * has the new tokens, and is returned.
+   */
+  renew(): LocalMcpSession["servers"];
   close(): void;
 }
 
@@ -67,6 +78,39 @@ const LOCAL_MCP_UNEXTENDED_DETACH_MS = 45_000;
  */
 const OPENCODE_SESSION_META = "ai.opencode/sessionID";
 
+/**
+ * A session request that the client answered this close to its connection limit, with no tools listed,
+ * gave up the server. The client starts its attempt after the request leaves, so it ends a little later.
+ */
+const DROP_JUDGE_MARGIN_MS = 2_000;
+
+/**
+ * How long the bridge keeps an idle connection. Go's HTTP client, which Antigravity uses, keeps one for
+ * up to 90 seconds and does not read `Keep-Alive: timeout=5`. With Node's 5-second default, it can send
+ * a tool call into a connection that the bridge just closed, and the call fails (#11465).
+ */
+const LOCAL_MCP_KEEP_ALIVE_MS = 95_000;
+
+/**
+ * Keeps idle connections for `LOCAL_MCP_KEEP_ALIVE_MS`. `close` ends only the connections idle at that
+ * moment, so a connection ends after its last response once the server stops listening. Otherwise it
+ * would hold the close for the whole keep-alive time.
+ */
+function keepIdleConnections(server: HttpServer): HttpServer {
+  server.keepAliveTimeout = LOCAL_MCP_KEEP_ALIVE_MS;
+  const inFlight = new WeakMap<object, number>();
+  server.on("request", (request: IncomingMessage, response: ServerResponse) => {
+    const socket = request.socket;
+    inFlight.set(socket, (inFlight.get(socket) ?? 0) + 1);
+    response.once("close", () => {
+      const left = (inFlight.get(socket) ?? 1) - 1;
+      inFlight.set(socket, left);
+      if (left === 0 && !server.listening) socket.end();
+    });
+  });
+  return server;
+}
+
 /** One session that a token serves. A token shared by a directory serves each session in it. */
 interface BridgeMember {
   threadId: string;
@@ -88,7 +132,8 @@ interface BridgeRoute {
    * `signal` aborts when the client abandons the call: it sent `notifications/cancelled` (an MCP
    * client does this when its own timeout ends) or closed the response stream. Nothing reads the
    * result after that, so the owner must stop waiting for the user. `detachAfterMs` is set when the
-   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`.
+   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`. `subagent` is true for a
+   * call from a session that the client started itself: see `AppServerRequest.subagent`.
    */
   call: (
     params: {
@@ -101,6 +146,7 @@ interface BridgeRoute {
     },
     signal: AbortSignal,
     detachAfterMs: number | undefined,
+    subagent: boolean,
   ) => Effect.Effect<DynamicToolResult, ProviderClientOperationError>;
   /**
    * The calls still running, by JSON-RPC id. Each POST gets a new MCP server, so the POST that
@@ -109,6 +155,17 @@ interface BridgeRoute {
   running: Map<RequestId, AbortController>;
   /** Whether the client sent a request with this token. */
   reached: boolean;
+  /**
+   * The tokens of this route, the current one last. A renewed route keeps its earlier tokens, so a
+   * call still running on one of them is not refused.
+   */
+  tokens: string[];
+  /** The session that sent the current token first, which judges whether the client loaded it. */
+  sentBy: BridgeMember;
+  /** When the client first listed the tools with the current token, or null. */
+  listedAt: number | null;
+  /** The client gave up the current token: OpenCode 2.3.0 does not connect again to the same settings. */
+  dropped: boolean;
 }
 
 export class LocalMcpBridge {
@@ -145,49 +202,92 @@ export class LocalMcpBridge {
       activeTurnId,
       namespaces: new Map(namespaces.map((namespace) => [namespace.name, namespace])),
     };
-    const tokens: string[] = [];
-    const servers = namespaces.map((namespace) => {
+    const routes = namespaces.map((namespace) => {
       const shareKey = directory === undefined ? null : JSON.stringify([directory, namespace.name]);
       const sharedToken = shareKey === null ? undefined : this.#shared.get(shareKey);
       const shared = sharedToken === undefined ? undefined : this.#routes.get(sharedToken);
-      let token: string;
-      if (sharedToken !== undefined && shared) {
-        token = sharedToken;
+      if (shared) {
         // The server takes the name and description of the session that opened last.
         shared.namespace = namespace;
         shared.members.push(member);
-      } else {
-        token = randomBytes(32).toString("base64url");
-        this.#routes.set(token, { namespace, members: [member], shareKey, call, running: new Map(), reached: false });
-        if (shareKey !== null) this.#shared.set(shareKey, token);
+        // The client gave up this server, and the same settings would not make it connect again.
+        if (shared.dropped) this.#renewToken(shared, member);
+        return shared;
       }
-      tokens.push(token);
-      return {
-        type: "http" as const,
-        name: namespace.name,
-        url: `http://127.0.0.1:${this.#port}/mcp`,
-        headers: [{ name: "Authorization", value: `Bearer ${token}` }],
+      const token = randomBytes(32).toString("base64url");
+      const route: BridgeRoute = {
+        namespace,
+        members: [member],
+        shareKey,
+        call,
+        running: new Map(),
+        reached: false,
+        tokens: [token],
+        sentBy: member,
+        listedAt: null,
+        dropped: false,
       };
+      this.#routes.set(token, route);
+      if (shareKey !== null) this.#shared.set(shareKey, token);
+      return route;
     });
+    const servers = () =>
+      routes.map((route) => ({
+        type: "http" as const,
+        name: route.namespace.name,
+        url: `http://127.0.0.1:${this.#port}/mcp`,
+        headers: [{ name: "Authorization", value: `Bearer ${route.tokens.at(-1)}` }],
+      }));
+    // One array for the session: a renew changes it in place, so a caller that kept its entries still finds them.
+    const current = servers();
     return {
-      servers,
+      servers: current,
       setThreadId: (nextThreadId) => {
         member.threadId = nextThreadId;
       },
-      reached: () => tokens.every((token) => this.#routes.get(token)?.reached === true),
+      reached: () => routes.every((route) => route.reached),
+      dropped: (sentAt, limitMs) => {
+        const now = Date.now();
+        let dropped = false;
+        for (const route of routes) {
+          if (route.sentBy !== member || route.dropped) continue;
+          // OpenCode answers the session request after its connection attempt ends. With no tools
+          // listed, an answer that came just before the limit can still be followed by the list.
+          route.dropped =
+            route.listedAt === null
+              ? now - sentAt >= limitMs - DROP_JUDGE_MARGIN_MS
+              : route.listedAt - sentAt >= limitMs;
+          dropped ||= route.dropped;
+        }
+        return dropped;
+      },
+      renew: () => {
+        for (const route of routes) if (route.dropped) this.#renewToken(route, member);
+        current.splice(0, current.length, ...servers());
+        return current;
+      },
       close: () => {
-        for (const token of tokens) {
-          const route = this.#routes.get(token);
-          if (!route) continue;
+        for (const route of routes) {
           route.members = route.members.filter((candidate) => candidate !== member);
           if (route.members.length > 0) continue;
-          this.#routes.delete(token);
-          if (route.shareKey !== null && this.#shared.get(route.shareKey) === token)
+          for (const token of route.tokens) this.#routes.delete(token);
+          if (route.shareKey !== null && route.tokens.includes(this.#shared.get(route.shareKey) ?? ""))
             this.#shared.delete(route.shareKey);
         }
       },
     };
   });
+
+  /** A new token for `route`: a client that gave up its server connects again to changed settings. */
+  #renewToken(route: BridgeRoute, member: BridgeMember): void {
+    const token = randomBytes(32).toString("base64url");
+    route.tokens.push(token);
+    route.sentBy = member;
+    route.listedAt = null;
+    route.dropped = false;
+    this.#routes.set(token, route);
+    if (route.shareKey !== null) this.#shared.set(route.shareKey, token);
+  }
 
   readonly close = Effect.fn("LocalMcpBridge.close")(function* (this: LocalMcpBridge) {
     if (this.#closing) return yield* Deferred.await(this.#closing);
@@ -238,7 +338,9 @@ export class LocalMcpBridge {
   ): Effect.fn.Return<void, McpOperationError> {
     let retained = false;
     yield* Effect.acquireUseRelease(
-      mcpSync(() => createServer((request, response) => void runCauseEffect(this.#handle(request, response)))),
+      mcpSync(() =>
+        keepIdleConnections(createServer((request, response) => void runCauseEffect(this.#handle(request, response)))),
+      ),
       (server) =>
         Effect.gen({ self: this }, function* () {
           yield* mcpCall(
@@ -270,12 +372,13 @@ export class LocalMcpBridge {
     request: IncomingMessage,
     response: ServerResponse,
   ): Effect.fn.Return<void, McpOperationError> {
-    const route = this.#authorize(request);
-    if (!route) {
+    const authorized = this.#authorize(request);
+    if (!authorized) {
       response.writeHead(401, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: "unauthorized" }));
       return;
     }
+    const { route, token } = authorized;
     route.reached = true;
     if (request.method !== "POST") {
       response.writeHead(405, { allow: "POST" });
@@ -291,13 +394,16 @@ export class LocalMcpBridge {
       },
     );
     // The client lists one set for all sessions of a shared token; a call is checked against its own session.
-    mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: listedTools(route).map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      })),
-    }));
+    mcp.setRequestHandler(ListToolsRequestSchema, async () => {
+      if (token === route.tokens.at(-1)) route.listedAt ??= Date.now();
+      return {
+        tools: listedTools(route).map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+        })),
+      };
+    });
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) =>
       runCauseEffect(
         Effect.gen({ self: this }, function* (): Effect.fn.Return<CallToolResult, McpOperationError> {
@@ -346,6 +452,10 @@ export class LocalMcpBridge {
                 },
                 abandoned.signal,
                 progressToken === undefined ? LOCAL_MCP_UNEXTENDED_DETACH_MS : undefined,
+                // An OpenCode subagent names its own child session, which no member is. Its call goes to
+                // the parent's chat and turn, but the subagent runs in the background and can still wait
+                // after the parent's turn ends (#10657).
+                typeof caller === "string" && caller !== member.threadId,
               )
               .pipe(Effect.mapError(({ cause }) => mcpFailure(cause)));
           }).pipe(
@@ -409,14 +519,14 @@ export class LocalMcpBridge {
     );
   });
 
-  #authorize(request: IncomingMessage): BridgeRoute | null {
+  #authorize(request: IncomingMessage): { route: BridgeRoute; token: string } | null {
     const header = request.headers.authorization;
     if (!header?.startsWith("Bearer ")) return null;
     const candidate = header.slice(7);
     for (const [token, route] of this.#routes) {
       const left = Buffer.from(candidate);
       const right = Buffer.from(token);
-      if (left.length === right.length && timingSafeEqual(left, right)) return route;
+      if (left.length === right.length && timingSafeEqual(left, right)) return { route, token };
     }
     return null;
   }

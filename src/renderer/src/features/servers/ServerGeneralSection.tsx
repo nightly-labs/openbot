@@ -1,7 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarImageInput } from "@openbot/contracts/ipc";
+import type { AvatarImageInput, ServerAppearance } from "@openbot/contracts/ipc";
 import {
   Button,
+  buttonVariants,
   ConfirmDialog,
   Image,
   ImageRemoveButton,
@@ -12,22 +13,19 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Popover,
   SettingsSection,
   Text,
 } from "@openbot/ui";
 import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
+import { ServerAppearancePicker } from "@openbot/ui/features/servers/ServerAppearancePicker";
 import { ServerLogo } from "@openbot/ui/features/servers/ServerLogo";
+import { ServerPlushLogo } from "@openbot/ui/server-plush-logo";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { ServerBrowsingMemorySetting } from "./ServerBrowsingMemorySetting";
-import { ServerMemoryLimitSetting } from "./ServerMemoryLimitSetting";
-import { ServerMemoryReviewSetting } from "./ServerMemoryReviewSetting";
-import { ServerSkillLearningSetting } from "./ServerSkillLearningSetting";
-import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
-import { ServerTurnLimitsSetting } from "./ServerTurnLimitsSetting";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -58,6 +56,12 @@ interface GeneralPanels {
   confirmLeave: boolean;
   confirmRotateKey: boolean;
   identity: ServerIdentityDraft;
+  /**
+   * The plush look that the user chose and the server has not confirmed. `undefined` shows the
+   * server's own look, so the picker and the logo change at the click.
+   */
+  appearance: ServerAppearance | null | undefined;
+  appearancePickerOpen: boolean;
 }
 
 interface ServerGeneralSection {
@@ -83,7 +87,7 @@ interface ServerGeneralSection {
 /** The General section: server identity, agent settings, and leaving a joined server. */
 export function createServerGeneralSection(host: ServerSettingsSectionHost): ServerGeneralSection {
   const { t, errorMessage, format } = useText();
-  const { props, local, published, actionsAvailable, busy, run } = host;
+  const { props, local, configured, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<GeneralPanels>({
     confirmLeave: false,
     confirmRotateKey: false,
@@ -98,18 +102,28 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
       savedLogoUrl: null,
       savedName: "",
     },
+    appearance: undefined,
+    appearancePickerOpen: false,
   });
   let logoInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
 
   /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
-  const canSetTimezone = () => serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable();
-  const canSetTurnLimits = () => serverCanAdminister(props.server, "host-turn-limits-v1") && actionsAvailable();
-  const canSetMemoryLimit = () => serverCanAdminister(props.server, "agent-memory-limit-v1") && actionsAvailable();
-  const canSetMemoryReview = () => serverCanAdminister(props.server, "memory-review-v1") && actionsAvailable();
-  const canSetSkillLearning = () => serverCanAdminister(props.server, "skill-learning-v1") && actionsAvailable();
-  const canSetBrowsingMemory = () => serverCanAdminister(props.server, "browsing-memory-v1") && actionsAvailable();
+  /**
+   * An owner or admin chooses the plush look. A joined server needs `host-appearance-v1`; this
+   * computer's server needs an identity first, which the first save of the name gives.
+   */
+  const canEditAppearance = () =>
+    Boolean(props.onSaveAppearance) &&
+    serverCanAdminister(props.server, "host-appearance-v1") &&
+    actionsAvailable() &&
+    (!local() || configured());
+  const appearance = (): ServerAppearance | null =>
+    panels.appearance === undefined ? (props.server.appearance ?? null) : panels.appearance;
+  /** A choice made while a save runs; it is sent when that save ends, so the last click wins. */
+  let queuedAppearance: ServerAppearance | null | undefined;
+  let savingAppearance = false;
   const trimmedName = () => panels.identity.name.trim();
   const nameError = () => {
     if (!canEditIdentity()) return null;
@@ -227,6 +241,36 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     });
   }
 
+  async function saveAppearance(next: ServerAppearance | null): Promise<void> {
+    setPanels((state) => {
+      state.appearance = next;
+    });
+    if (savingAppearance) {
+      queuedAppearance = next;
+      return;
+    }
+    const save = props.onSaveAppearance;
+    if (!save) return;
+    savingAppearance = true;
+    let value = next;
+    try {
+      for (;;) {
+        const sent = value;
+        const saved = await run("appearance", () => save(sent));
+        if (queuedAppearance === undefined || !saved) break;
+        value = queuedAppearance;
+        queuedAppearance = undefined;
+      }
+    } finally {
+      savingAppearance = false;
+      queuedAppearance = undefined;
+      // The server's own look shows again: the saved one, or the previous one after a failure.
+      setPanels((state) => {
+        state.appearance = undefined;
+      });
+    }
+  }
+
   async function saveIdentityDraft(): Promise<boolean> {
     if (!identityDirty() || nameError()) return true;
     await saveIdentity();
@@ -249,6 +293,8 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     setPanels((state) => {
       state.confirmLeave = false;
       state.confirmRotateKey = false;
+      state.appearance = undefined;
+      state.appearancePickerOpen = false;
       state.identity.editing = false;
       state.identity.nameTouched = false;
       state.identity.nameShaking = false;
@@ -352,9 +398,47 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                 </ItemDescription>
               </ItemContent>
               <ItemActions class="settings-identity-image-control">
+                {/* The plush shows only while the server has no logo, so its picker does too. */}
+                <Show when={canEditAppearance() && !panels.identity.logoUrl}>
+                  <Popover.Root
+                    open={panels.appearancePickerOpen}
+                    placement="bottom-end"
+                    gutter={8}
+                    onOpenChange={(open) =>
+                      setPanels((state) => {
+                        state.appearancePickerOpen = open;
+                      })
+                    }
+                  >
+                    <Popover.Trigger
+                      class={buttonVariants({
+                        variant: "outline",
+                        size: "icon-lg",
+                        class: "settings-identity-image-trigger server-appearance-trigger",
+                      })}
+                      aria-label={t("server.settings.appearance")}
+                      // Another action holds `run`, which would refuse the save with no message.
+                      disabled={Boolean(busy()) && busy() !== "appearance"}
+                    >
+                      <ServerPlushLogo class="server-settings-plush" seed={props.server.id} appearance={appearance()} />
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content class="avatar-editor">
+                        <Popover.Title class="sr-only">{t("server.settings.appearance")}</Popover.Title>
+                        <ServerAppearancePicker
+                          serverId={props.server.id}
+                          appearance={appearance()}
+                          onChange={(next) => void saveAppearance(next)}
+                        />
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                </Show>
                 <Show
                   when={canEditIdentity()}
-                  fallback={<ServerLogo serverId={props.server.id} url={panels.identity.logoUrl} />}
+                  fallback={
+                    <ServerLogo serverId={props.server.id} url={panels.identity.logoUrl} appearance={appearance()} />
+                  }
                 >
                   <div class="settings-identity-image-picker ui-removable-image">
                     <Button
@@ -371,7 +455,9 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                         when={panels.identity.logoUrl}
                         fallback={<Image class="server-settings-logo-placeholder" aria-hidden="true" />}
                       >
-                        {(logoUrl) => <ServerLogo serverId={props.server.id} url={logoUrl()} />}
+                        {(logoUrl) => (
+                          <ServerLogo serverId={props.server.id} url={logoUrl()} appearance={appearance()} />
+                        )}
                       </Show>
                     </Button>
                     <Show when={panels.identity.logoUrl}>
@@ -394,86 +480,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
             </Item>
           </ItemGroup>
         </SettingsSection>
-        <Show
-          when={
-            (canSetTimezone() && props.hostTimezone) ||
-            (canSetTurnLimits() && props.hostTurnLimits) ||
-            (canSetMemoryLimit() && props.hostMemoryLimit) ||
-            (canSetMemoryReview() && props.memoryReview) ||
-            (canSetSkillLearning() && props.skillLearning) ||
-            (canSetBrowsingMemory() && props.browsingMemory)
-          }
-        >
-          <SettingsSection title={t("server.settings.agents")}>
-            <ItemGroup class="settings-modal-card">
-              <Show when={canSetTimezone() && props.hostTimezone}>
-                {(options) => (
-                  <ServerTimezoneSetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    menuMount={host.menuMount()}
-                    run={run}
-                  />
-                )}
-              </Show>
-              <Show when={canSetTurnLimits() && props.hostTurnLimits}>
-                {(options) => (
-                  <ServerTurnLimitsSetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    menuMount={host.menuMount()}
-                    run={run}
-                  />
-                )}
-              </Show>
-              <Show when={canSetMemoryLimit() && props.hostMemoryLimit}>
-                {(options) => (
-                  <ServerMemoryLimitSetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    menuMount={host.menuMount()}
-                    run={run}
-                  />
-                )}
-              </Show>
-              <Show when={canSetMemoryReview() && props.memoryReview}>
-                {(options) => (
-                  <ServerMemoryReviewSetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    menuMount={host.menuMount()}
-                    run={run}
-                  />
-                )}
-              </Show>
-              <Show when={canSetSkillLearning() && props.skillLearning}>
-                {(options) => (
-                  <ServerSkillLearningSetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    menuMount={host.menuMount()}
-                    run={run}
-                  />
-                )}
-              </Show>
-              <Show when={canSetBrowsingMemory() && props.browsingMemory}>
-                {(options) => (
-                  <ServerBrowsingMemorySetting
-                    {...options()}
-                    serverId={props.server.id}
-                    disabled={Boolean(busy())}
-                    run={run}
-                  />
-                )}
-              </Show>
-            </ItemGroup>
-          </SettingsSection>
-        </Show>
         <Show when={canRotateKey() || keyChangedAt() !== undefined}>
           <SettingsSection title={t("server.settings.hostKeyTitle")}>
             <ItemGroup class="settings-modal-card">

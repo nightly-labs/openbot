@@ -9,13 +9,18 @@ import {
   type RoutineCalendarRoutine,
   type RoutineCalendarStatus,
 } from "@openbot/ui/features/conversation/RoutineCalendar";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { useNavigation } from "../../navigation";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
+import type { RoutinesPort } from "../conversation/routines-port";
+import { useServers } from "../servers/servers-context";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import { useWindowPage } from "../window/window-page-context";
 import { desktopScheduleSource, type ScheduleSource } from "./schedule-port";
+import { scheduleRoutineCreate, scheduleRoutinePorts } from "./schedule-routine-create";
 
 const DAY = 86_400_000;
 
@@ -38,6 +43,11 @@ interface ScheduleViewProps extends SchedulePanelProps {
   onOpenRoutine: (routine: ScheduleRoutine) => void;
   /** Opens the routine settings of the agent on a new routine. */
   onCreateRoutine: (agentId: string) => void;
+  /**
+   * The routines of each agent, when this person can add one on this server. With it, a day of the
+   * calendar opens a card that creates a routine there.
+   */
+  routinePorts?: ((agentId: string) => RoutinesPort) | undefined;
 }
 
 /**
@@ -72,6 +82,13 @@ export function SchedulePanel(props: SchedulePanelProps) {
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const windowPage = useWindowPage();
+  const { servers } = useServers();
+  const routinePorts = createMemo(() =>
+    scheduleRoutinePorts(
+      servers().find((server) => server.id === props.serverId),
+      undefined,
+    ),
+  );
 
   function openRoutine(routine: ScheduleRoutine): void {
     if (routine.owner.kind === "channel") {
@@ -104,12 +121,14 @@ export function SchedulePanel(props: SchedulePanelProps) {
       onOpenAgent={selectAgent}
       onOpenRoutine={openRoutine}
       onCreateRoutine={createRoutine}
+      routinePorts={routinePorts()}
     />
   );
 }
 
 /** The calendar of the routines of a server. The desktop and the web client give its source and actions. */
 export function ScheduleView(props: ScheduleViewProps) {
+  const { t } = useText();
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [now, setNow] = createSignal(new Date());
   const [state, setState] = createStore<{ phase: "loading" | "ready" | "error"; calendar: HostCalendar | null }>({
@@ -200,6 +219,17 @@ export function ScheduleView(props: ScheduleViewProps) {
     return () => window.clearInterval(clock);
   });
 
+  const create = createMemo(() => {
+    const ports = props.routinePorts;
+    return ports
+      ? scheduleRoutineCreate(
+          ports,
+          () => void load(true),
+          () => actionToast.warning(t("routine.settings.runInSaveFailed")),
+        )
+      : undefined;
+  });
+
   const headerFrame = createPageHeaderFrame();
   return (
     <div class="schedule-pane">
@@ -219,6 +249,7 @@ export function ScheduleView(props: ScheduleViewProps) {
         onOpenAgent={props.onOpenAgent}
         onRetry={() => void load()}
         onCreateRoutine={props.onCreateRoutine}
+        create={create()}
         onBack={props.onBack}
         frame={headerFrame()}
       />

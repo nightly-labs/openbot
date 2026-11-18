@@ -28,6 +28,8 @@ export interface FontSelectProps {
   "aria-labelledby": string;
   /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
+  /** macOS: the default interface font is the system font, not Inter. */
+  systemFontDefault?: boolean | undefined;
 }
 
 /**
@@ -44,9 +46,11 @@ export function FontSelect(props: FontSelectProps): JSX.Element {
     const fonts = extra === null ? props.fonts : [extra, ...props.fonts];
     return [DEFAULT_OPTION, ...fonts.map((font) => ({ font }))];
   });
+  const interfaceDefaultLabel = () =>
+    props.systemFontDefault ? t("settings.interfaceFont.defaultSystem") : t("settings.interfaceFont.default");
   const selected = () => options().find((option) => option.font === props.value) ?? DEFAULT_OPTION;
   const label = (option: FontOption) =>
-    option.font ?? (props.kind === "interface" ? t("settings.interfaceFont.default") : t("settings.codeFont.default"));
+    option.font ?? (props.kind === "code" ? t("settings.codeFont.default") : interfaceDefaultLabel());
   const fontFamily = (option: FontOption) =>
     option.font === null ? DEFAULT_FONTS[props.kind] : `"${option.font}", ${DEFAULT_FONTS[props.kind]}`;
   return (

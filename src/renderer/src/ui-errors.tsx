@@ -1,9 +1,18 @@
 import type { AgentMessage } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createSignal } from "solid-js";
 import { formatMessageTime } from "./app-message-projection";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { createSimpleContext } from "./simple-context";
+
+/**
+ * A request that a joined server's connection dropped while it waited for the answer. The app
+ * connects again by itself, so a background request with this failure is not the user's to fix.
+ */
+export function isConnectionDrop(error: unknown): boolean {
+  return errorReference(error) === "http/503/remote_disconnected";
+}
 
 /**
  * The inline error feed of an agent's message list.
@@ -44,7 +53,20 @@ const UiErrors = createSimpleContext({
       }));
     }
 
-    return { uiErrors, setUiErrors, appendUiError };
+    /** Removes the errors with `status` from the conversation `errorKey`, or from each conversation without it. */
+    function clearUiErrors(status: string, errorKey?: string): void {
+      setUiErrors((current) => {
+        let next = current;
+        for (const [key, errors] of Object.entries(current)) {
+          if ((errorKey !== undefined && key !== errorKey) || !errors.some((entry) => entry.status === status))
+            continue;
+          next = { ...next, [key]: errors.filter((entry) => entry.status !== status) };
+        }
+        return next;
+      });
+    }
+
+    return { uiErrors, setUiErrors, appendUiError, clearUiErrors };
   },
 });
 

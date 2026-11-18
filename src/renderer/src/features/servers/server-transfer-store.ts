@@ -10,17 +10,21 @@ import type {
   InstanceExportPhase,
   InstanceImportPhase,
   InstanceTransferScreen,
+  TransferUploadState,
 } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
 /**
  * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
  * host. In the browser client they go to the connected host, and a download has no folder to show.
  */
-export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport" | "copy"> &
-  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
+export type ServerTransferCalls = Omit<
+  OpenBotDesktopApi["instanceTransfer"],
+  "showExport" | "copy" | "onUploadProgress"
+> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport" | "onUploadProgress">>;
 
 interface ServerTransferState {
   screen: InstanceTransferScreen;
@@ -30,6 +34,8 @@ interface ServerTransferState {
   exportWarnings: string[];
   exportError: string | null;
   importPhase: InstanceImportPhase;
+  /** The bytes of the chosen file that a joined server has, while `reading`. */
+  importProgress: TransferUploadState | null;
   preview: InstanceTransferPreview | null;
   result: InstanceTransferResult | null;
   importError: string | null;
@@ -43,6 +49,7 @@ const INITIAL: ServerTransferState = {
   exportWarnings: [],
   exportError: null,
   importPhase: "idle",
+  importProgress: null,
   preview: null,
   result: null,
   importError: null,
@@ -51,6 +58,16 @@ const INITIAL: ServerTransferState = {
 /** The Transfer section's view of one export and one import of one server. */
 export function createServerTransferStore(serverId: string, calls: ServerTransferCalls) {
   const [state, setState] = createStore<ServerTransferState>({ ...INITIAL });
+
+  // Only while this screen sends a file. The host keeps one upload for each member, so no other
+  // upload of this member to the same server runs at the same time.
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
+    if (target !== serverId || state.importPhase !== "reading") return;
+    setState((draft) => {
+      draft.importProgress = { sent, total };
+    });
+  });
+  if (stopProgress) onCleanup(stopProgress);
 
   // The agents are read again each time the export screen opens.
   createEffect(
@@ -131,6 +148,7 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
   function choose(): void {
     setState((draft) => {
       draft.importPhase = "reading";
+      draft.importProgress = null;
       draft.importError = null;
     });
     void calls
@@ -140,11 +158,13 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
           // A closed dialog keeps the file that was open before.
           if (preview) draft.preview = preview;
           draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
         }),
       )
       .catch((error: unknown) =>
         setState((draft) => {
           draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
           draft.importError = message(error, "settings.transfer.import.openFailed");
         }),
       );

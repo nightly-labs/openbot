@@ -8,7 +8,7 @@ import {
   type DownloadPlatform,
   detectDownloadPlatform,
 } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import type { LandingPageText } from "../../lib/landing-page-text";
 import { detectMobilePlatform, MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "../../lib/mobile-apps";
 import { LandingIcon } from "./LandingIcon";
@@ -17,7 +17,21 @@ import { useLandingText } from "./LandingText";
 /** The Android app as an APK: a second Android download, with no store. */
 const ANDROID_APK = "android-apk";
 
-type HeroPlatform = DownloadPlatform | MobilePlatform | typeof ANDROID_APK;
+/** The Intel Mac installer: a second macOS download. The main macOS entry is the Apple silicon one. */
+const MAC_INTEL = "macos-intel";
+
+type HeroPlatform = DownloadPlatform | MobilePlatform | typeof ANDROID_APK | typeof MAC_INTEL;
+
+/**
+ * The desktop apps of the menu. macOS is two entries, because a browser cannot reliably tell an
+ * Intel Mac from an Apple silicon Mac, and the Apple silicon installer does not open on an Intel Mac.
+ * "Apple silicon" and "Intel" are names, so they have no translation.
+ */
+const HERO_DESKTOP_APPS: readonly HeroPlatform[] = DOWNLOAD_PLATFORM_ORDER.flatMap<HeroPlatform>((platform) =>
+  platform === "macos" ? [platform, MAC_INTEL] : [platform],
+);
+const MAC_SILICON_LABEL = "macOS · Apple silicon";
+const MAC_INTEL_LABEL = "macOS · Intel";
 
 /**
  * The phone apps of the menu. While a version has an APK, Android is two entries, and each one
@@ -29,9 +43,14 @@ const HERO_PHONE_APPS: readonly HeroPlatform[] = ANDROID_APK_AVAILABLE
 const ANDROID_PLAY_LABEL = "Android · Google Play";
 const ANDROID_APK_LABEL = "Android · APK";
 
-/** The system of an entry, for its logo and for analytics: the APK is the Android app too. */
+/**
+ * The system of an entry, for its logo and for analytics: the APK is the Android app too, and the
+ * Intel installer is the macOS app too.
+ */
 function heroSystem(platform: HeroPlatform): DownloadPlatform | MobilePlatform {
-  return platform === ANDROID_APK ? "android" : platform;
+  if (platform === ANDROID_APK) return "android";
+  if (platform === MAC_INTEL) return "macos";
+  return platform;
 }
 
 interface HeroOffer {
@@ -45,7 +64,15 @@ interface HeroOffer {
 }
 
 function heroOffer(platform: HeroPlatform, text: LandingPageText): HeroOffer {
-  const { apk, available, desktop, phone } = text.download;
+  const { apk, available, desktop, intelMac, phone } = text.download;
+  if (platform === MAC_INTEL)
+    return {
+      label: MAC_INTEL_LABEL,
+      action: intelMac,
+      href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
+      status: available,
+      external: false,
+    };
   if (platform === ANDROID_APK)
     return {
       label: ANDROID_APK_LABEL,
@@ -61,7 +88,8 @@ function heroOffer(platform: HeroPlatform, text: LandingPageText): HeroOffer {
   const { href, ...details } = DOWNLOAD_PLATFORMS[platform];
   // A platform that is not out yet keeps its English status: no catalog key names it.
   if (!details.available || !href) return { ...details, external: false };
-  return { ...details, action: desktop[platform], status: available, href, external: false };
+  const label = platform === "macos" ? MAC_SILICON_LABEL : details.label;
+  return { ...details, label, action: desktop[platform], status: available, href, external: false };
 }
 
 interface HeroMenuItemProps {
@@ -239,7 +267,7 @@ export function HeroDownloadSelector() {
           aria-label={text().hero.platforms}
           onKeyDown={handleKeyDown}
         >
-          <For each={DOWNLOAD_PLATFORM_ORDER}>
+          <For each={HERO_DESKTOP_APPS}>
             {(menuPlatform) => (
               <HeroMenuItem
                 platform={menuPlatform}

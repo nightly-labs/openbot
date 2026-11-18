@@ -6,6 +6,7 @@ import type { IpcMainInvokeEvent } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type DynamicIslandWindowController, requireDynamicIslandSender } from "../dynamic-island-window";
 import {
+  parseBrowserTakeoverPage,
   parseDynamicIslandAction,
   parseDynamicIslandInputRegion,
   parseDynamicIslandInteractive,
@@ -30,6 +31,8 @@ export interface DynamicIslandIpcDependencies {
     | "setInteractive"
     | "setInputRegion"
   >;
+  /** The `webContents` ids of the chat windows. Only they ask the main window to show a takeover page. */
+  chatRendererIds: () => ReadonlySet<number>;
   /** On Wayland, starts OpenBot again on XWayland at each start, or stops that. */
   setXWayland: (enabled: boolean) => Effect.Effect<void, { readonly cause: unknown }>;
   /** Already on XWayland in a Wayland session: keeps that for the next start. Does not restart. */
@@ -38,6 +41,7 @@ export interface DynamicIslandIpcDependencies {
 
 export function dynamicIslandIpcHandlers({
   dynamicIsland,
+  chatRendererIds,
   setXWayland,
   keepXWayland,
 }: DynamicIslandIpcDependencies): Pick<IpcGroupHandlers, "dynamicIsland"> {
@@ -45,6 +49,8 @@ export function dynamicIslandIpcHandlers({
     requireDynamicIslandSender(event.sender.id, dynamicIsland.mainRendererIds, "main renderer");
   const fromOverlayRenderer = (event: IpcMainInvokeEvent) =>
     requireDynamicIslandSender(event.sender.id, dynamicIsland.overlayRendererIds, "Dynamic Island renderer");
+  const fromChatWindow = (event: IpcMainInvokeEvent) =>
+    requireDynamicIslandSender(event.sender.id, chatRendererIds(), "chat windows");
 
   return {
     dynamicIsland: {
@@ -86,6 +92,10 @@ export function dynamicIslandIpcHandlers({
       }),
       performAction: authorizedHandler(fromOverlayRenderer, parseDynamicIslandAction, (_event, action) =>
         runCauseEffect(dynamicIsland.performAction(action)),
+      ),
+      // A chat window has no browser. The island's path brings up the main window, which opens the page.
+      openBrowserTakeover: authorizedHandler(fromChatWindow, parseBrowserTakeoverPage, (_event, page) =>
+        runCauseEffect(dynamicIsland.performAction({ type: "open-browser-takeover", ...page })),
       ),
       performHaptic: eventHandler((event) => {
         fromOverlayRenderer(event);

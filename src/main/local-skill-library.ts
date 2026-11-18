@@ -4,9 +4,11 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
+import type { LocalSkillListing, UnreadableLocalSkill } from "../backend/agent/skill-tools";
 import { causeHelpers } from "../backend/effect-boundary";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import {
@@ -18,6 +20,8 @@ import {
   skillZippable,
 } from "./skill-package";
 
+const logger = createOpenBotLogger("local-skill-library");
+
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
 export class LocalSkillLibrary {
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -27,7 +31,15 @@ export class LocalSkillLibrary {
   ) {}
 
   list(): Effect.Effect<MarketplaceSkillDetail[], LocalSkillFailure> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail[], LocalSkillFailure> {
+    return this.listWithUnreadable().pipe(Effect.map(({ skills }) => skills));
+  }
+
+  /**
+   * Every skill that reads, and the skills whose latest revision does not read. One bad skill does not
+   * hide the others or stop a new skill from saving (#7883).
+   */
+  listWithUnreadable(): Effect.Effect<LocalSkillListing, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<LocalSkillListing, LocalSkillFailure> {
       yield* localIO(() => mkdir(this.root, { recursive: true, mode: 0o700 }));
       const entries = yield* localIO(() => readdir(this.root, { withFileTypes: true }));
       const published = [];
@@ -36,11 +48,29 @@ export class LocalSkillLibrary {
         const revisions = yield* localIO(() => readdir(join(this.root, entry.name)));
         if (revisions.some((name) => /^[1-9]\d*$/u.test(name))) published.push(entry.name);
       }
-      const results = yield* Effect.forEach(published, (id) => this.get(id), { concurrency: "unbounded" });
+      const results = yield* Effect.forEach(published, (id) => Effect.result(this.get(id)), {
+        concurrency: "unbounded",
+      });
+      const skills: MarketplaceSkillDetail[] = [];
+      const unreadable: UnreadableLocalSkill[] = [];
+      for (const [index, result] of results.entries()) {
+        if (Result.isSuccess(result)) {
+          skills.push(result.success);
+          continue;
+        }
+        const skillId = published[index] ?? "";
+        // The cause can quote the skill text, so the log has only the ID.
+        logger.warn(`OpenBot skipped local skill ${skillId}: its latest revision could not be read.`);
+        const cause = result.failure.cause;
+        unreadable.push({ skillId, error: cause instanceof Error ? cause.message : String(cause) });
+      }
       // An older version took a skill with the name of an OpenBot skill. It can never install, so it stays hidden.
-      return results
-        .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      return {
+        skills: skills
+          .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        unreadable,
+      };
     });
   }
 

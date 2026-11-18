@@ -120,7 +120,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       );
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
-      props.onCountChange(assignedSkillCount(next));
+      props.onCountChange(next.length);
       const targetId = props.selectionRequest?.skillId;
       if (showLoading && targetId) {
         const target = next.find((skill) => skill.skillId === targetId);

@@ -72,6 +72,61 @@ export function writeThreadTabs(tabs: ThreadTabsByServer, storage: ThreadTabsSto
   }
 }
 
+/**
+ * Server id → agent id → the creation time of the newest side thread that this device has seen. A newer
+ * thread, also one that started on another device while this one was off, gets a tab here.
+ */
+type SeenThreadsByServer = Record<string, Record<string, string>>;
+
+const THREADS_SEEN_STORAGE_KEY = "openbot:thread-tabs-seen:v1";
+const seenThreadsSchema = z.record(id, z.record(id, id.nullable().catch(null)).catch({}));
+
+function readSeenThreads(storage: ThreadTabsStorage): SeenThreadsByServer {
+  try {
+    const parsed = seenThreadsSchema.safeParse(JSON.parse(storage.getItem(THREADS_SEEN_STORAGE_KEY) ?? "{}"));
+    if (!parsed.success) return {};
+    return Object.fromEntries(
+      Object.entries(parsed.data).map(([serverId, agents]) => [
+        serverId,
+        Object.fromEntries(Object.entries(agents).flatMap(([agentId, time]) => (time ? [[agentId, time]] : []))),
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+/** The creation time of the newest side thread of the agent that this device has seen, if any. */
+export function readThreadsSeenThrough(
+  serverId: string,
+  agentId: string,
+  storage: ThreadTabsStorage = window.localStorage,
+): string | undefined {
+  return readSeenThreads(storage)[serverId]?.[agentId];
+}
+
+/** Sets the time that `readThreadsSeenThrough` reads. `null` forgets it, for a deleted agent. */
+export function writeThreadsSeenThrough(
+  serverId: string,
+  agentId: string,
+  time: string | null,
+  storage: ThreadTabsStorage = window.localStorage,
+): void {
+  const stored = readSeenThreads(storage);
+  const agents = { ...stored[serverId] };
+  if (time === null) {
+    if (!(agentId in agents)) return;
+    delete agents[agentId];
+  } else agents[agentId] = time;
+  const next = { ...stored, [serverId]: agents };
+  if (Object.keys(agents).length === 0) delete next[serverId];
+  try {
+    storage.setItem(THREADS_SEEN_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Without browser storage, a thread from another device gets a tab only while this window stays open.
+  }
+}
+
 /** A side thread that is archived and waits for the end of its Undo time before the delete. */
 export interface PendingThreadDelete {
   serverId: string;

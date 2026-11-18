@@ -1,4 +1,4 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Tabs, X } from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, AlertTitle, ArrowLeft, Button, Tabs } from "@openbot/ui";
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
@@ -172,18 +172,18 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     },
   );
 
+  /** The way out of the view names where it goes: an X alone reads as "close the browser" (#9979). */
   const hideBrowserButton = () => (
     <Button
       variant="secondary"
-      size="icon-sm"
+      size="sm"
       ref={(element) => (hideButton = element)}
       class="no-drag browser-hide"
-      aria-label={t("browser.hide")}
-      title={t("browser.hide")}
       data-cuelume-tap="close"
       onClick={props.onBack}
     >
-      <X aria-hidden="true" />
+      <ArrowLeft aria-hidden="true" />
+      {t("browser.backToChat")}
     </Button>
   );
 

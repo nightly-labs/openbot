@@ -88,6 +88,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.channelNotOpen",
       "error.remote.signalOffline",
       "error.remote.mobileUpdateRequired",
+      "error.team.hostUpdateRequired",
       "error.remote.hostBusy",
       "error.remote.signalPermissionDenied",
       "error.remote.signalProtocolError",
@@ -107,6 +108,8 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.accountSessionInactive",
       "error.remote.hostOtherAccount",
       "error.remote.remoteNotConfigured",
+      "error.remote.hostKeyMissing",
+      "error.remote.connectionNotStarted",
     ] as const satisfies readonly (keyof SourceMessages)[]
   ).map((key) => sourceText(key)),
 );

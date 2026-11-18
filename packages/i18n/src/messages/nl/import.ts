@@ -153,7 +153,7 @@ export const messages = {
   "import.hermes.reason.duplicateSkill": "Een andere vaardigheid in dit profiel heeft dezelfde naam.",
   "import.hermes.reason.builtIn": "Deze horen bij Hermes. OpenBot heeft eigen vaardigheden.",
   "import.hermes.reason.mcpOff":
-    "Wordt uitgeschakeld toegevoegd. Controleer het en zet het daarna aan in de MCP-instellingen.",
+    "Wordt uitgeschakeld toegevoegd. Controleer het en zet het daarna aan in Marktplaats, Apps.",
   "import.hermes.reason.mcpNameTaken": "Hier staat al een server met deze naam.",
   "import.hermes.reason.routineSchedule": "OpenBot kan het schema niet uitvoeren, of het tijdstip is voorbij.",
   "import.hermes.reason.routineScript": "Het voert een script uit, niet de agent.",

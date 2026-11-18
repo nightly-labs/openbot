@@ -12,7 +12,7 @@ import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow
 import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { saveSettingsPanelWidth } from "../src/components/settings-panel-width";
+import { saveSidePanelWidth } from "../src/components/side-panel-width";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
 import { STORY_AGENT, STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
@@ -88,7 +88,7 @@ function ChannelPanelStory(props: { title: string; body: () => ReturnType<typeof
   return (
     <main class="conversation-panel agent-memories-story-stage" style="--settings-panel-width: 296px">
       <SettingsPanel
-        onResizeEnd={saveSettingsPanelWidth}
+        onResizeEnd={saveSidePanelWidth}
         id="channel-side-panel"
         label="Channel panel"
         width={296}

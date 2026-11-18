@@ -256,7 +256,12 @@ const Agents = createSimpleContext({
         if (!agentProfilesEqual(existing, next)) updateStored(existing, next);
         return [existing];
       });
-      setAgentList(profiles);
+      // The same agents in the same order keep the list, so the readers of the roster do not run again.
+      setAgentList((current) =>
+        current.length === profiles.length && current.every((agent, index) => agent === profiles[index])
+          ? current
+          : profiles,
+      );
       setAgentListSettled(true);
       setActiveAgentId((current) => {
         // Validate the saved choice before it can trigger conversation requests.

@@ -18,6 +18,7 @@ export const messages = {
   "error.host.publishFailed": "לא ניתן לפרסם את OpenBot הזה.",
   "error.host.mobileConnectPublishFailed": "לא ניתן לפרסם את OpenBot הזה עבור Mobile Connect.",
   "error.host.mobileConnectHostChanged": "המארח של Mobile Connect השתנה. יש לנסות שוב.",
+  "error.host.mobileConnectHostMismatch": "בחשבון שלך יש מפתח אחר לשרת הזה. יש לנסות שוב.",
   "error.host.noServer": "במחשב הזה אין שרת לשינוי.",
   "error.host.identityLocalOnly": "אפשר לשנות את שם השרת ואת הלוגו שלו רק במחשב שמריץ אותו.",
   "error.host.timezoneInvalid": "אזור הזמן הזה אינו מוכר.",
