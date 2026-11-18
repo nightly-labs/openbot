@@ -216,7 +216,10 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * while the chat showed them as stopped (#11419).
    */
   readonly #stoppedParents = new Set<string>();
-  /** The running turns of the threads that are not subagents, by thread and turn, for the stall limits. */
+  /**
+   * The running turns, by thread and turn, for the stall limits. The check skips a turn of a subagent
+   * thread: it ends with the turn that started it.
+   */
   readonly #turnClocks = new Map<string, TurnClock>();
   /**
    * The requests of Codex that OpenBot answers, such as an OpenBot tool, an approval or a question to the
