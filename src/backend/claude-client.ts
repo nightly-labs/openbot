@@ -274,9 +274,22 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...(firstPartyApi && isClaudeAutoToolSearch(environmentValue("ENABLE_TOOL_SEARCH"))
       ? { env: { ENABLE_TOOL_SEARCH: "true" } }
       : {}),
+    ...(sources.includes("project") && !sources.includes("user") ? { claudeMdExcludes: claudeHomeMemoryFiles() } : {}),
   };
   return settings;
 });
+
+/**
+ * The user's CLAUDE.md and rules in `~/.claude`. The CLI looks for project files in each parent of
+ * the workspace, and `~/OpenBot/Agents` is in the home folder, so without the user setup it loaded
+ * these files as project files, with no `claudeMdExcludes` of the user (#11946). The CLI adds this
+ * list to the `claudeMdExcludes` of the project settings. The walk finds the home folder also when
+ * an account has its own `CLAUDE_CONFIG_DIR`.
+ */
+function claudeHomeMemoryFiles(): string[] {
+  const userFolder = join(homedir(), ".claude");
+  return [join(userFolder, "CLAUDE.md"), join(userFolder, "rules", "**")];
+}
 
 /** The variables that send Claude requests to an API other than the Anthropic API. */
 const CLAUDE_OTHER_API_VARIABLES = [
@@ -694,6 +707,7 @@ const lastAuthStatuses = new Map<string, DynamicRecord>();
  * The settings files that a query loads. A profile generation loads none. Workspace only loads the
  * user settings alone: see `claude-workspace-sandbox.ts`. Without the user setup the user settings
  * go, and with them the user's CLAUDE.md, skills, agents, hooks and plugins; the project files stay.
+ * The flag settings exclude the CLAUDE.md and rules of `~/.claude`: see `claudeHomeMemoryFiles`.
  */
 function claudeSettingSources(
   config: Pick<ThreadConfig, "profileGeneration" | "workspaceOnly">,
