@@ -132,7 +132,7 @@ interface AgentRoutinesSettingsProps {
   onBack?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
   /** A new value shows the list of routines, as Back does, such as for a setting card of the routines. */
-  listRequest?: number | null | undefined;
+  listViewRequest?: number | null | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
@@ -319,12 +319,13 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   );
 
   // A request that was set before this page opened is not new: the page already shows the list.
-  let lastListRequest = untrack(() => props.listRequest);
+  let lastListViewRequest = untrack(() => props.listViewRequest);
   createEffect(
-    () => props.listRequest,
-    (request) => {
-      if (request == null || request === lastListRequest) return;
-      lastListRequest = request;
+    () => ({ request: props.listViewRequest, saving: saving() }),
+    ({ request, saving: isSaving }) => {
+      // Back is disabled during a save, so the request waits for the save to end.
+      if (request == null || request === lastListViewRequest || isSaving) return;
+      lastListViewRequest = request;
       // Back asks before it discards an edit of the routine.
       untrack(() => {
         if (draft()) requestExit("list");
