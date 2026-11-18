@@ -21,10 +21,17 @@ import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
+import { setCommitCoAuthorToolSchema } from "./agent/commit-co-author-tool";
+import { CRM_TOOL_DEFINITIONS } from "./agent/crm-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
+import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { readImageToolShape } from "./agent/image-reader";
-import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
+import {
+  libraryFolderArgument,
+  listLibraryFoldersToolSchema,
+  organizeLibraryToolSchema,
+} from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
@@ -104,6 +111,20 @@ export const htmlRenderToolSchema = z.object({
     .describe(
       `The highest frame height in CSS pixels, ${CHAT_VISUAL_MIN_HEIGHT}-${CHAT_VISUAL_MAX_HEIGHT}. Omit it to fit the whole page.`,
     ),
+});
+
+const backdropBubbleColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, "Use a #rrggbb color.");
+
+export const setBackdropToolSchema = z.object({
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A full self-contained HTML document."),
+  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short scene name."),
+  bubbles: z
+    .object({
+      yours: backdropBubbleColor.optional().describe("The user's bubbles."),
+      agents: backdropBubbleColor.optional().describe("Your bubbles."),
+    })
+    .optional()
+    .describe("Bubble colors that match the scene."),
 });
 
 const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
@@ -272,6 +293,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   ...WORKFLOW_TOOL_DEFINITIONS,
+  ...CRM_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -319,8 +341,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, and the count of your files in no folder. Pass folder to list one folder and the folders in it. To put a file in a folder, pass folder to attach_files_to_response.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, and your files in no folder. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
+  },
+  {
+    name: "organize_library",
+    description:
+      'Organize your Library folders and their files, by the folder paths and file ids from list_library_folders, such as "Reports/2026". create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder and its subfolders into to, or at the top level with no to. delete removes folder and its subfolders; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; with no to, it takes files out of their folders. No action changes a file on disk. Delete or rename only a folder that the user asked you to change.',
+    shape: organizeLibraryToolSchema.shape,
   },
   {
     name: "html_preview",
@@ -331,6 +359,11 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "html_render",
     description: `Show a finished HTML page (chart, table, diagram, collage, mockup) in this conversation, above your final text reply; call it before you write that reply. The user already sees the page, so the reply must not announce it or restate it: add only what the page does not say. In a channel, each member who reads the channel sees it. OpenBot fits the frame to the page height. A height lower than the page caps the frame, and the rest scrolls in it. ${VISUAL_PAGE_RULES} ${VISUAL_PAGE_ACTIONS}`,
     shape: htmlRenderToolSchema.shape,
+  },
+  {
+    name: "set_backdrop",
+    description: `Put a full-screen HTML scene behind the user's whole OpenBot window. Use it only when the user asks to set or change the backdrop. Each call replaces your last page, so send the whole new page. It runs in the html_render sandbox with no clicks or keys: build no controls. Fill the frame and follow resize. Keep the center plain because the chat shows over it, and draw no text. Animate with requestAnimationFrame and stop for prefers-reduced-motion. The user can undo it. Do not repeat the page in your reply.`,
+    shape: setBackdropToolSchema.shape,
   },
   {
     name: "list_capture_sources",
@@ -371,13 +404,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_sections",
     description:
-      "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
+      "List sidebar sections (folders), their stable ids, and assigned agents and channels before choosing message recipients or grouping.",
     shape: {},
   },
   {
     name: "create_section",
     description:
-      "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+      "Create a sidebar section (folder) to group agents and channels. List sections first; reuse a matching one.",
     shape: createSectionToolSchema.shape,
   },
   {
@@ -392,7 +425,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "assign_agent_section",
-    description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+    description: "Move an agent or channel (id as agentId) into a sidebar section. Null sectionId ungroups it.",
     shape: assignAgentSectionToolSchema.shape,
   },
   {
@@ -422,7 +455,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_agents",
     description:
-      "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. OpenBot does not track which files an agent changed.",
+      "List local OpenBot agents: name, title, description (300 characters; read_agent has all), status (working, queued or ready), queuedMessages, turnStartedAt, waitingFor (approval, answer, browser) while working, lastActivityAt, openWaits. Changed files are not tracked.",
     shape: {},
   },
   {
@@ -466,6 +499,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Move local agents to one browser profile when the user asks. A profile holds sign-ins and cookies, which its agents share. The owner approves each change on a card. Moved agents lose their open tabs.",
     shape: setBrowserProfileToolSchema.shape,
+  },
+  {
+    name: "set_commit_co_author",
+    description:
+      "Turn the OpenBot co-author trailer in the git commits of all agents off or on, when the user asks. The owner approves a card.",
+    shape: setCommitCoAuthorToolSchema.shape,
+  },
+  {
+    name: "delete_agent",
+    description:
+      "Delete other local agents with their chats and files when the user asks. The owner approves each call on a card; it cannot be undone. A busy agent cannot be deleted. The result gives ok or the error for each agent.",
+    shape: deleteAgentToolSchema.shape,
   },
   {
     name: "start_new_chat",
@@ -608,8 +653,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {
     name: "remember",
-    description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or merge a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. It commits only if the current turn completes.",
+    description: `Stage one durable memory for this agent, up to ${INPUT_LIMITS.agentMemoryText} characters. memoryId corrects or merges a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. Commits only if the turn completes.`,
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
@@ -672,12 +716,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "ask_ui",
     description: [
-      "Show the user a confirm card in this conversation and wait for the answer: an approval of an action or of a draft in its preview, with up to 4 buttons. For a question or a choice, use ask_user.",
+      "Show a confirm card and stop until the user answers, to approve an action or a draft in its preview, with up to 4 buttons. Information goes in your reply; a question or a choice in ask_user.",
       'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button id; values has the option of each select field by its select key;',
       'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',
       "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information, not a permission: provider approvals still apply.",
       "Ids: letters, digits and _ . : -, up to 64 characters, not starting with _. Write every field as plain text. In a channel, each member who reads the channel sees it.",
-      'Example: {"block":{"type":"confirm","title":"Send the letter to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"cancel","label":"Cancel"}]}}.',
+      'Example: {"block":{"type":"confirm","title":"Send this to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"edit_preview","label":"Edit"}]}}.',
     ].join(" "),
     shape: askUiToolSchema.shape,
   },
@@ -717,9 +761,21 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     /* The description does not list the apps: the catalog has more than 200, and each agent turn would
        carry them. An unknown name returns the list. */
     description:
-      "Call this when the user needs an outside service, such as Notion, Slack or Linear, and you have no working tools for it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
+      "Call this when the user needs an outside service, such as Notion or Slack, and your shell or browser cannot do it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
     shape: {
       app: z.string().min(1).max(63).describe("The app id, such as notion or brave-search."),
+    },
+  },
+  {
+    name: "show_setting",
+    description:
+      "When the user asks how to do something in OpenBot or for a feature, find the setting that does it and show a card that opens it: a row of OpenBot Settings or your agent settings, or the steps of a server action. Only the user changes it. Words return matches; then call again with one id.",
+    shape: {
+      setting: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("A setting id from an earlier result, or a few words for the feature, such as dark mode or speech."),
     },
   },
   {
@@ -769,6 +825,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .describe("A similar issue that is the same problem. The report becomes a comment on it.")
         .optional(),
     },
+  },
+  {
+    name: "withdraw_feedback",
+    description:
+      "Remove a report that the user sent from GitHub, when they ask. The user approves first. To correct one, remove it, then send it again.",
+    shape: { issue: z.number().int().min(1).describe("Its issue number.") },
   },
   {
     name: "react_to_user_message",

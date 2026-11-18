@@ -14,6 +14,9 @@ import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import { ChatGlassIconButton } from "./chat-glass-icon-button";
 
+// The buttons: 48 points high, 8 points under the safe area and 8 points over the video.
+const HEADER_HEIGHT = 8 + 48 + 8;
+
 interface VideoViewerProps {
   uri: string;
   name: string;
@@ -133,7 +136,9 @@ function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: V
         // A texture draws inside the modal's window on Android; a surface view can draw under it.
         surfaceType="textureView"
         accessibilityLabel={name}
-        style={{ flex: 1, marginBottom: insets.bottom }}
+        // The space under the video is as high as the buttons above it, so the picture is in the
+        // middle of the screen and not low on it.
+        style={{ flex: 1, marginBottom: Math.max(insets.bottom, insets.top + HEADER_HEIGHT) }}
       />
     </View>
   );

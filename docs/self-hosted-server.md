@@ -155,6 +155,12 @@ about 10 seconds. In Docker, the container must have a restart policy, such as `
 unless-stopped`; without one, the container stays stopped. When the server does not answer, use
 `sudo openbot restart`.
 
+When the start of OpenBot fails again and again, the service stops, and systemd does not start it again
+(see [Start loop](hosted-servers.md#start-loop)). `openbot status` then says so. Read the reason with
+`openbot logs`. Install a newer release with `sudo openbot update`, or try again with
+`sudo openbot restart`. The update timer also starts the service again about each hour, with a
+newer release when one is staged.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 
@@ -247,7 +253,7 @@ An image costs `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens on Claude. 
 
 ### Screenshots and clicks
 
-The computer use driver (cua-driver, `cua-driver-rs-v0.43.2`) has two screenshots on Linux:
+The computer use driver (cua-driver, `cua-driver-rs-v0.52.9`) has two screenshots on Linux:
 
 - **One window** (`get_window_state`). The driver makes the image 1.15 megapixels or less, with a long
   edge of 1568 px or less, and changes the x and y of each click back to screen pixels. A 1260x780
@@ -313,7 +319,8 @@ installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app
 scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
-On Ubuntu 26.04, the install also adds one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
+When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
+and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
 `priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all
 capabilities from the programs that `bwrap` starts, and the Claude sandbox ("Workspace only") needs
 `CAP_SYS_ADMIN` there. With the rule, those programs keep the profile of `bwrap`, for all users of
@@ -335,7 +342,9 @@ title bars, and a right-click on the empty screen opens a menu with a terminal a
 
 Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a
 new release, and it starts at the next boot, or when an owner, an admin or a permitted member
-installs it in Server Settings > Updates. `sudo openbot update` stages, stops the service, applies
+installs it in Server Settings > Updates. When an owner turns on the automatic update switch (it is
+off by default), the server also installs it when it is idle. A hosted server always does this, and
+also waits until no connected client uses it. `sudo openbot update` stages, stops the service, applies
 and starts the service again. When a step fails or a signal stops it, the command completes an
 interrupted copy, starts the service, and exits with an error.
 

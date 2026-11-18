@@ -48,7 +48,7 @@ export interface BrowserHostTab {
   /**
    * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
    * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
-   * the session fills. A main-frame navigation replaces the document and clears this.
+   * the session fills. A main-frame navigation or an idle unload ends the document and clears this.
    */
   scriptedOrigins?: Set<string>;
   /**
@@ -83,6 +83,8 @@ export interface BrowserHostTab {
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
+  /** True while `open` waits for the tab's first page. That wait is not on `queue`, and it is a use of the tab. */
+  opening?: boolean;
   /** How often the page renderer crashed. A `run_script` stops when this changes. */
   crashes?: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */

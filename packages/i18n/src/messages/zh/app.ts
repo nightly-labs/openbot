@@ -57,6 +57,8 @@ export const messages = {
   "app.rail.workflows": "工作流",
   "app.rail.usage": "用量",
   "app.rail.library": "资料库",
+  "app.rail.providers": "服务商",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "市场",
   "app.rail.settings": "设置",
   "app.rail.settingsNotice": "设置。{notice}",
@@ -108,6 +110,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "搜索设置…",
   "app.settingsPage.results": "设置搜索结果",
   "app.settingsPage.noResults": "没有匹配的设置。",
+  "app.settingsPage.marketplaceApps": "连接器和 MCP 服务器",
   "app.settingsPage.resultCount": {
     one: "{count} 项匹配设置。",
     other: "{count} 项匹配设置。",

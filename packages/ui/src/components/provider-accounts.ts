@@ -28,6 +28,18 @@ export interface ProviderAccountActions {
    * when it did not. Absent where the computer that runs the providers cannot take such a key.
    */
   connectKey?: ((provider: AgentProviderId, accountId: string | null, key: string) => Promise<void>) | undefined;
+  /**
+   * Signs an account in with a code that the person types on the provider's page, on any device: a
+   * new account when `accountId` is null. Only a provider with `accountCodeSignIn` has it. Absent
+   * where the computer that runs the providers cannot run it.
+   */
+  connectWithCode?: ((provider: AgentProviderId, accountId: string | null) => Promise<void>) | undefined;
+  /**
+   * The computer that runs the providers can take a code that the person copies back from the
+   * provider's page (`pasteCodeSignInSupported`). A provider whose account code sign-in is `paste`
+   * needs it.
+   */
+  pasteCodeSignIn?: boolean | undefined;
   /** Stops a `connecting` account's sign-in. A new account goes; another one shows as signed out. */
   cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
   /** A null label returns the account to its email. */
@@ -92,6 +104,16 @@ export function isApiKeyAccount(accountId: string, provider?: string): boolean {
 /** Whether each account after the first of the provider is one API key (`accountSignIn: "key"`). */
 export function hasKeyAccounts(provider: string): boolean {
   return isAgentProvider(provider) && agentProviderDescriptor(provider).accountSignIn === "key";
+}
+
+/**
+ * Whether an account of the provider can sign in with a code that the person types on the provider's
+ * page. The computer that runs the providers must also be able to run that sign-in.
+ */
+export function accountCodeSignInOffered(provider: string, actions: ProviderAccountActions | undefined): boolean {
+  if (!actions?.connectWithCode || !isAgentProvider(provider)) return false;
+  const codeSignIn = agentProviderDescriptor(provider).accountCodeSignIn;
+  return codeSignIn === "device" || (codeSignIn === "paste" && actions.pasteCodeSignIn === true);
 }
 
 /** Whether the account is one API key of such a provider. The user adds, changes and removes it. */

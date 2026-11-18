@@ -6,6 +6,8 @@
 // ignore `agentCreateModel`. A protocol older than V3 is served by the V1 adapter.
 
 import { TEAM_API_ROUTES } from "../team-api-routes";
+import { decodeAgentCreateOperation } from "./agent-create-operation-v1";
+import { isAgentCreateRoute } from "./current";
 import {
   decodeTeamProtocolV1CurrentHttpRequest,
   decodeTeamProtocolV1CurrentHttpResponse,
@@ -74,6 +76,8 @@ export interface TeamHttpCodecOptions {
   usageTertiary?: boolean;
   /** Read only by V8 responses: the negotiated agent-pending-runtime-v1 capability. */
   agentPendingRuntime?: boolean;
+  /** Read only by V8 responses, for a protocol 9 peer: the negotiated memory-changes-v1 capability. */
+  memoryChanges?: boolean;
 }
 
 type DecodedRequest =
@@ -141,9 +145,24 @@ const V8_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV8CurrentHttpResponse,
 };
 
-/** Protocol 9 is the protocol 8 wire. Only its compatibility response has up to 256 capabilities. */
+/**
+ * Protocol 9 is the protocol 8 wire, with two changes: its compatibility response has up to 256
+ * capabilities, and its agent create request can carry the `operationId` of agent-create-operation-v1.
+ */
 const V9_CODEC: TeamHttpCodec = {
   ...V8_CODEC,
+  // Read off the raw request: the protocol 8 projection drops unknown keys.
+  encodeRequest: (method, path, value, options) =>
+    isAgentCreateRoute(method, path)
+      ? JSON.stringify({
+          ...JSON.parse(V8_CODEC.encodeRequest(method, path, value, options)),
+          ...decodeAgentCreateOperation(value),
+        })
+      : V8_CODEC.encodeRequest(method, path, value, options),
+  decodeRequest: (method, path, value, options) =>
+    isAgentCreateRoute(method, path)
+      ? { ...V8_CODEC.decodeRequest(method, path, value, options), ...decodeAgentCreateOperation(value) }
+      : V8_CODEC.decodeRequest(method, path, value, options),
   encodeResponse: (method, path, status, value, options) =>
     isCompatibilityRead(method, path, status)
       ? JSON.stringify(decodeTeamProtocolSupportV9(value))

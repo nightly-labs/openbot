@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Edytujesz wiadomość z kolejki. Zapisz lub anuluj edycję, aby mogła zostać wysłana.",
   "composer.queueEdit.cancel": "Anuluj edycję",
+  "composer.feedbackFix.body":
+    "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
+  "composer.feedbackFix.cancel": "Anuluj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Zaktualizuj {provider} na komputerze, na którym działa, aby kontynuować.",
   "composer.update.pending": "Aktualizowanie…",
   "composer.update.action": "Zaktualizuj",
+  "composer.imageInput.body":
+    "{model} dostaje tylko tekst, więc nie widzi załączonych obrazów. Jeśli ten model umie czytać obrazy, włącz dla niego obrazy.",
+  "composer.imageInput.label": "Włącz obrazy dla {model}",
+  "composer.imageInput.pending": "Włączanie…",
+  "composer.imageInput.action": "Włącz obrazy",
   "composer.usageLimit.credits": "Wykorzystano cały limit planu {provider}. Agenci używają teraz Twoich kredytów.",
   "composer.usageLimit.creditsResets":
     "Wykorzystano cały limit planu {provider}. Agenci używają Twoich kredytów do odnowienia: {reset}.",
@@ -112,6 +120,12 @@ export const messages = {
   "composer.error.holdQueued": "Nie udało się wstrzymać wiadomości z kolejki do edycji.",
   "composer.error.cancelEdit": "Nie udało się anulować edycji w kolejce. Spróbuj ponownie.",
   "composer.error.updateQueued": "Nie udało się zaktualizować wiadomości z kolejki. Spróbuj ponownie.",
+  "composer.queueEdit.received": "Agent już otrzymał tę wiadomość, więc edycja została zakończona.",
+  "composer.queueEdit.receivedKept":
+    "Agent już otrzymał tę wiadomość, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.deletedKept":
+    "Ta wiadomość została usunięta, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.endedKept": "Ta edycja zakończyła się przed zapisaniem. Twoje zmiany nadal są w polu wiadomości.",
   "composer.voice.prepareFailed": "Nie udało się przygotować modelu głosowego. Spróbuj ponownie.",
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
@@ -156,6 +170,7 @@ export const messages = {
   "composer.picker.section.files": "Pliki",
   "composer.picker.section.tabs": "Karty przeglądarki",
   "composer.picker.section.threads": "Wątki",
+  "composer.picker.section.messages": "W wiadomościach",
   "composer.token.tab": "Karta przeglądarki {name}",
   "composer.token.thread": "Wątek {name}",
   "composer.token.unavailableTab": "Zamknięta karta przeglądarki {name}",

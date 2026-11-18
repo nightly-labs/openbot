@@ -1,3 +1,4 @@
+import type { BillingDetails } from "@openbot/contracts/billing-details";
 import type { LicenseDesktopApi } from "@openbot/contracts/ipc";
 import { type License, type LicensePlan, type LicenseState, licenseMonthlyAmount } from "@openbot/contracts/license";
 import { BillingPanel } from "@openbot/ui/features/billing/BillingPanel";
@@ -36,9 +37,10 @@ function license(
 }
 
 /** The Billing panel with the license section above the server plans. */
-function LicenseStory(props: { calls: LicenseDesktopApi }) {
+function LicenseStory(props: { calls: LicenseDesktopApi; details?: BillingDetails }) {
+  const api = createMockBilling(SERVERS, props.details);
   const billing = createBillingStore(
-    () => createMockBilling(SERVERS),
+    () => api,
     () => true,
   );
   const store = createLicenseStore(
@@ -50,7 +52,14 @@ function LicenseStory(props: { calls: LicenseDesktopApi }) {
       <BillingPanel
         store={billing}
         available
-        license={<LicenseSection store={store} onManagePayment={() => undefined} onContactUs={() => undefined} />}
+        license={
+          <LicenseSection
+            store={store}
+            billingDetails={props.details ? api : undefined}
+            onManagePayment={() => undefined}
+            onContactUs={() => undefined}
+          />
+        }
       />
     </main>
   );
@@ -72,6 +81,26 @@ type Story = StoryObj<typeof meta>;
 
 /** No license, and 4 people use the owner's servers. "Buy a license" opens the slider dialog at 4 people. */
 export const Buy: Story = story({});
+
+/**
+ * A first purchase: no billing country is saved. "Buy a license" opens the dialog with the billing country, which
+ * the payment page needs. An EU country also shows the optional EU VAT ID.
+ */
+export const BuyBillingCountry: Story = {
+  render: () => <LicenseStory calls={createMockLicense({})} details={{ country: null, vatId: null }} />,
+};
+
+/** A first purchase from France: nothing is saved, so the dialog starts on the country of the IP address. */
+export const BuyBillingCountryGuessed: Story = {
+  render: () => (
+    <LicenseStory calls={createMockLicense({})} details={{ country: null, vatId: null, suggestedCountry: "FR" }} />
+  ),
+};
+
+/** The account bought before from Germany with a VAT ID. The dialog fills in both. */
+export const BuyBillingCountrySaved: Story = {
+  render: () => <LicenseStory calls={createMockLicense({})} details={{ country: "DE", vatId: "DE123456789" }} />,
+};
 
 /** No license, and only the owner. The dialog starts on the Starter license. */
 export const BuyStarter: Story = story({ used: 1, users: previewLicenseUsers().slice(0, 1) });

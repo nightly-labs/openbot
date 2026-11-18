@@ -45,7 +45,7 @@ const profileFields = {
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
     .describe(
-      `Face color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
+      `Color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
     ),
 };
 
@@ -93,6 +93,30 @@ export const listModelsToolSchema = z
 
 const providerAccountId = z.string().refine(isProviderAccountId, "Use an account id from list_models.");
 
+const backupModelToolSchema = z
+  .object({
+    provider: z.enum(AGENT_PROVIDERS),
+    model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("Model id from list_models."),
+    providerAccountId: providerAccountId
+      .describe("Account id from list_models. Omit it for the provider's own sign-in.")
+      .optional(),
+  })
+  .strict();
+
+const backupModelsToolSchema = z
+  .object({
+    automatic: z
+      .boolean()
+      .describe(
+        "true: when a usage limit holds a message, or a provider error fails a turn before it did work, the agent moves at once to the first ready model in order. false: it asks in the chat first.",
+      ),
+    order: z
+      .array(backupModelToolSchema)
+      .max(AGENT_BACKUP_MODEL_LIMIT)
+      .describe("The backup models to try, first to last. They use the agent's reasoning effort where they can."),
+  })
+  .strict();
+
 export const updateProfileToolSchema = z
   .object({
     agentId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
@@ -107,7 +131,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed.",
       )
       .optional(),
     provider: z
@@ -124,32 +148,10 @@ export const updateProfileToolSchema = z
     providerAccountId: providerAccountId
       .nullable()
       .describe(
-        "Account id from list_models, or null for the provider's own sign-in (also used after a provider change). A runtime change while the agent works waits as pendingRuntime for its next turn. With pooled accounts, a named account stays until it hits a limit; null gives it to the pool.",
+        "Account id from list_models ('default' is the provider's own sign-in), or null for it (also after a provider change). A runtime change during work waits as pendingRuntime for the next turn. With pooled accounts, a named account stays until a limit; null gives it to the pool.",
       )
       .optional(),
-    backupModels: z
-      .object({
-        automatic: z
-          .boolean()
-          .describe(
-            "true: when a usage limit holds a message, or a provider error fails a turn before it did work, the agent moves at once to the first ready model in order. false: it asks in the chat first.",
-          ),
-        order: z
-          .array(
-            z
-              .object({
-                provider: z.enum(AGENT_PROVIDERS),
-                model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("Model id from list_models."),
-                providerAccountId: providerAccountId
-                  .describe("Account id from list_models. Omit it for the provider's own sign-in.")
-                  .optional(),
-              })
-              .strict(),
-          )
-          .max(AGENT_BACKUP_MODEL_LIMIT)
-          .describe("The backup models to try, first to last. They use the agent's reasoning effort where they can."),
-      })
-      .strict()
+    backupModels: backupModelsToolSchema
       .nullable()
       .describe(
         "Replaces the agent's backup models. null removes them: the agent asks in the chat, with no saved order.",
@@ -208,6 +210,8 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "update_profile",
   "update_agents",
   "set_browser_profile",
+  "set_commit_co_author",
+  "delete_agent",
 ]);
 
 /**
@@ -232,6 +236,8 @@ export function restrictionInput(
   return { ...(access === "workspace" ? { access } : {}), ...(computerUse === false ? { computerUse } : {}) };
 }
 
+const UNSUPPORTED_PROFILE_FIELDS = "Remove unsupported profile fields.";
+
 /**
  * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
  * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
@@ -240,7 +246,7 @@ export function restrictionInput(
  */
 export function profileToolErrorMessage(
   error: unknown,
-  unsupportedFields: (path: readonly PropertyKey[]) => string = () => "Remove unsupported profile fields.",
+  unsupportedFields: (path: readonly PropertyKey[]) => string = () => UNSUPPORTED_PROFILE_FIELDS,
 ): string {
   if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
   const details = error.issues.map((issue) => {
@@ -252,4 +258,31 @@ export function profileToolErrorMessage(
     return `${field}: ${issue.message}`;
   });
   return `${details.join(" ")} Correct the arguments and retry.`;
+}
+
+const PROFILE_TOOL_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["create_agent", Object.keys(createAgentToolSchema.shape)],
+  ["update_profile", Object.keys(updateProfileToolSchema.shape)],
+  ["update_agents", Object.keys(updateAgentsToolSchema.shape)],
+]);
+const BACKUP_MODELS_FIELDS = Object.keys(backupModelsToolSchema.shape).join(", ");
+const BACKUP_MODEL_FIELDS = Object.keys(backupModelToolSchema.shape).join(", ");
+
+/**
+ * Describe a failed profile tool call, as `profileToolErrorMessage` does. A field that `create_agent`,
+ * `update_profile` or `update_agents` does not take gets the fields that its object takes, never the
+ * name that the call sent, so the agent can correct the call (#10024).
+ */
+export function profileAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    const toolFields = path.length === 0 ? PROFILE_TOOL_FIELDS.get(tool) : undefined;
+    if (toolFields) return `${UNSUPPORTED_PROFILE_FIELDS} ${tool} takes only: ${toolFields.join(", ")}.`;
+    if (tool !== "update_profile" || path[0] !== "backupModels") return UNSUPPORTED_PROFILE_FIELDS;
+    const entryFields = `Each backupModels.order entry takes only: ${BACKUP_MODEL_FIELDS}.`;
+    if (path.length === 1)
+      return `${UNSUPPORTED_PROFILE_FIELDS} backupModels takes only: ${BACKUP_MODELS_FIELDS}. ${entryFields}`;
+    if (path.length === 3 && path[1] === "order" && typeof path[2] === "number")
+      return `${UNSUPPORTED_PROFILE_FIELDS} ${entryFields}`;
+    return UNSUPPORTED_PROFILE_FIELDS;
+  });
 }

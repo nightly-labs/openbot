@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} non è completo",
   "marketplace.app.partialDescription": "Alcune delle sue app o skill non sono installate. Riconnetti le installa.",
   "marketplace.app.notConnected": "Non connessa",
+  "marketplace.app.paused": "In pausa",
   "marketplace.app.custom": "Server MCP",
   "marketplace.app.githubTagline": "Repository, issue e pull request",
   "marketplace.app.onePasswordTagline": "Accedi ai siti con le credenziali che condividi",
@@ -137,6 +138,7 @@ export const messages = {
     "{host} usa una versione precedente di OpenBot che non può collegare app. Aggiorna OpenBot su {host} o chiedi al proprietario di aggiornarlo.",
   "marketplace.app.blocked.member":
     "Solo un proprietario o un admin di {host} può collegare app lì. Chiedi a uno di loro di collegare {name} o di aggiornare OpenBot su {host}, così i membri potranno collegare app.",
+  "marketplace.app.blocked.mac": "{name} funziona solo su un Mac che esegue OpenBot.",
   "marketplace.app.connectAgain": "Connetti di nuovo",
   "marketplace.app.automation.askOnInstall": "Chiedi accesso a macOS all'installazione",
   "marketplace.app.automation.title": "Accesso alle app Apple",
@@ -399,8 +401,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Salva questa decisione come nuova nota nel mio vault.",
   "marketplace.plugin.obsidian.prompt.log":
     "Aggiungi un riepilogo del lavoro di oggi alla mia nota Registro di lavoro.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, apri Settings > Local REST API. Copia la chiave API e attiva "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, apri Settings > Local REST API e copia la chiave API.",
   "marketplace.plugin.resend.tagline": "Email transazionali",
   "marketplace.plugin.resend.description":
     "Resend permette agli agenti di inviare email transazionali e controllarne la consegna con una sola API. Una chiave API presa dalla dashboard di Resend viene passata al server locale come variabile d'ambiente.",
@@ -412,9 +413,9 @@ export const messages = {
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
   "marketplace.plugin.omnisend.tagline": "Marketing via email e SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente accede al proprio account Omnisend nel browser e sceglie il livello di accesso nella schermata di consenso. Con l'accesso in scrittura, gli agenti possono anche inviare campagne ed eliminare dati. Scegli l'accesso in sola lettura quando agli agenti servono solo i report.",
+    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente si collega con una chiave API del proprio account Omnisend. Gli agenti possono fare ciò che la chiave consente, compreso inviare campagne ed eliminare dati.",
   "marketplace.plugin.omnisend.app":
-    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con accesso nel browser.",
+    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con una chiave API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Come sono andate le campagne della scorsa settimana rispetto a quella precedente?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -422,6 +423,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.postiz.tagline": "Pianificazione social",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, apri Store settings > API keys e crea una chiave.",
   "marketplace.plugin.postiz.description":
     "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Accedi al tuo account Postiz dal browser, oppure incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz includono l'accesso alle API. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
   "marketplace.plugin.postiz.app":

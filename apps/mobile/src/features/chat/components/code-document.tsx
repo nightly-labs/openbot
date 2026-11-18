@@ -1,12 +1,12 @@
 import { Typography } from "heroui-native";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { ScrollView, TextInput, type TextStyle, View } from "react-native";
+import { ScrollView, Text, TextInput, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import { type CodeToken, highlightCode } from "../model/code-highlight";
-import { useCodeTokenColors } from "./chat-code-block";
+import { codeRuns, useCodeTokenColors } from "./chat-code-block";
 
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 20;
@@ -68,15 +68,29 @@ export function CodeDocument({
     lineHeight: LINE_HEIGHT,
     color: foreground,
   };
-  const runs = (tokens ?? [{ text, offset: 0 }]).map((token) => (
-    <Typography.Code
-      key={token.offset}
-      className="bg-transparent p-0"
-      style={{ ...codeStyle, color: token.type ? (colors[token.type] ?? foreground) : foreground }}
-    >
-      {token.text}
-    </Typography.Code>
-  ));
+  const androidRuns = isIOS ? null : codeRuns(tokens ?? [{ text, offset: 0 }], colors, foreground);
+  const runs = androidRuns
+    ? // Android: plain native spans in one run for each colour, inside the code style of
+      // `SelectableCode`. A file has thousands of tokens, and a text with a span set for each token
+      // blocked the main thread. `codeRuns` also limits the coloured runs on Android.
+      androidRuns.map((run) =>
+        run.color === undefined ? (
+          run.text
+        ) : (
+          <Text key={run.offset} style={{ color: run.color }}>
+            {run.text}
+          </Text>
+        ),
+      )
+    : (tokens ?? [{ text, offset: 0 }]).map((token) => (
+        <Typography.Code
+          key={token.offset}
+          className="bg-transparent p-0"
+          style={{ ...codeStyle, color: token.type ? (colors[token.type] ?? foreground) : foreground }}
+        >
+          {token.text}
+        </Typography.Code>
+      ));
   const code = <SelectableCode label={title} style={codeStyle} runs={runs} />;
 
   return (

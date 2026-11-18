@@ -3,8 +3,9 @@
 // has no flow and of a routine with a flow. Checks that the sweep still gives each ended run its own
 // agent's step, sends only the handoffs that are not sent yet, and sends nothing on a second sweep.
 // Years of older runs sit outside the 7 days: no query of the sweep may read every row of a table for
-// them. Records the time of a sweep with nothing to do, which runs on each turn and queue change. No
-// app, provider, account or network is started.
+// them. Records the time of a sweep with nothing to do, which runs on each turn and queue change. Also
+// checks that the read of a run's answer finds the turn by its index and does not read the whole chat
+// (#11463). No app, provider, account or network is started.
 //
 // Run: bun scripts/routine-flow-sweep-e2e.ts
 // Writes .openbot-build/routine-flow-sweep-e2e/report.json and exits non-zero on a failure.
@@ -35,6 +36,7 @@ interface Report {
   doneFlowRuns: number;
   oldFlowRuns: number;
   plans?: Record<string, string[]>;
+  answerPlan?: string[];
   checks: string[];
   timing?: { sweeps: number; totalMs: number; perSweepMs: number };
   passed: boolean;
@@ -128,6 +130,66 @@ async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>)
   );
 }
 
+/**
+ * The answer of a routine turn in the agent's chat, where a routine runs by default (#11463). Reads it
+ * as the app does, and checks that the read goes through the turn index: the plan of the chat order
+ * index reads every message of the chat.
+ */
+function checkTurnAnswerRead(database: OpenBotDatabase): string[] {
+  const db = database.connection;
+  const at = (second: number) => new Date(Date.UTC(2026, 10, 1, 0, 0, second)).toISOString();
+  db.prepare(
+    `INSERT INTO projection_threads (thread_id, agent_id, title, active_turn_id, created_at, updated_at,
+       last_event_sequence) VALUES ('chief-chat', 'chief', 'Chat', NULL, ?, ?, 1)`,
+  ).run(at(0), at(0));
+  const turn = db.prepare(
+    `INSERT INTO projection_turns (turn_id, thread_id, provider_session_id, status, started_at, completed_at,
+       last_event_sequence) VALUES (?, 'chief-chat', NULL, 'completed', ?, ?, 1)`,
+  );
+  const message = db.prepare(
+    `INSERT INTO projection_thread_messages (thread_id, message_id, turn_id, author, status, item_type, created_at,
+       ordinal, message_json, last_event_sequence) VALUES ('chief-chat', ?, ?, ?, 'completed', NULL, ?, ?, ?, 1)`,
+  );
+  const add = (id: string, turnId: string, author: string, second: number, ordinal: number) =>
+    message.run(id, turnId, author, at(second), ordinal, JSON.stringify({ id, turnId, author, text: id }));
+  db.exec("BEGIN");
+  turn.run("chat-turn", at(1), at(1));
+  turn.run("routine-turn", at(10), at(12));
+  add("chat-question", "chat-turn", "user", 1, 0);
+  add("chat-answer", "chat-turn", "assistant", 2, 1);
+  // Written out of order: the read gives them in the order of the chat.
+  add("routine-answer", "routine-turn", "assistant", 12, 4);
+  add("routine-instruction", "routine-turn", "user", 10, 2);
+  add("routine-progress", "routine-turn", "assistant", 11, 3);
+  db.exec("COMMIT");
+
+  const prepare = db.prepare.bind(db);
+  const statements: string[] = [];
+  db.prepare = (...args: Parameters<typeof prepare>) => {
+    statements.push(args[0]);
+    return prepare(...args);
+  };
+  let ids: string[];
+  try {
+    ids = database.readTurnAssistantMessages("chief", "routine-turn").map((read) => read.id);
+  } finally {
+    db.prepare = prepare;
+  }
+  assert.deepEqual(ids, ["routine-progress", "routine-answer"], "The read gives the turn's answers in chat order.");
+  assert.deepEqual(database.readTurnAssistantMessages("editor", "routine-turn"), [], "Another agent reads nothing.");
+  const [sql] = statements;
+  assert.ok(sql, "The answer read prepares a statement.");
+  const plan = prepare(`EXPLAIN QUERY PLAN ${sql}`)
+    .all("routine-turn", "chief")
+    .map((row) => String(row.detail));
+  const messages = plan.find((line) => line.includes(" message "));
+  assert.ok(
+    messages?.startsWith("SEARCH message USING INDEX thread_messages_turn (thread_id=? AND turn_id=?)"),
+    `The answer read finds the turn's messages by the turn index, not by reading the chat: ${plan.join("; ")}`,
+  );
+  return plan;
+}
+
 function count(database: OpenBotDatabase, sql: string): number {
   return Number(database.connection.prepare(sql).get()?.count);
 }
@@ -208,6 +270,8 @@ try {
       totalMs: Math.round(totalMs),
       perSweepMs: Number((totalMs / TIMED_SWEEPS).toFixed(2)),
     };
+    report.answerPlan = checkTurnAnswerRead(database);
+    report.checks.push("answer read: the turn's answers in chat order, by the turn index");
     report.passed = true;
   } finally {
     await Effect.runPromise(flows.close());

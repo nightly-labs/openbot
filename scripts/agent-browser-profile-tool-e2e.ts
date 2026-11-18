@@ -17,6 +17,7 @@ import { join, resolve } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import type { ToolApprovalDecision } from "../src/backend/agent/attention-registry";
 import { agentBrowserProfileView, handleSetBrowserProfileTool } from "../src/backend/agent/browser-profile-tool";
 import { profileToolErrorMessage } from "../src/backend/agent/profile-tools";
 import { openBotToolFailure } from "../src/backend/agent/routine-tools";
@@ -113,7 +114,7 @@ try {
   const support = await create("Support");
 
   const cards: string[] = [];
-  let answer = "accept";
+  let answer: ToolApprovalDecision = "accept";
   /** One `set_browser_profile` call from the coordinator, answered as the tool router answers it. */
   const call = async (args: unknown, requestedByPerson = true): Promise<{ success: boolean; value: DynamicRecord }> => {
     const response = await Effect.runPromise(

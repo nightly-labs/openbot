@@ -229,8 +229,10 @@ function jsonLines<T>(path: string): T[] {
   } catch {
     return [];
   }
+  // The fake appends while this reads: a last line with no newline is not complete yet.
   return text
     .split("\n")
+    .slice(0, -1)
     .filter(Boolean)
     .map((line) => JSON.parse(line));
 }

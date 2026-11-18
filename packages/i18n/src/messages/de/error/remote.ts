@@ -153,6 +153,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Der Host hat den Anhang abgelehnt.",
   "error.remote.attachmentTooLarge": "Anhänge dürfen höchstens 10 MB groß sein.",
   "error.remote.attachmentBusy": "Warte, bis der aktuelle Anhang abgeschlossen ist.",
+  "error.remote.attachmentChanged": "Die Datei hat sich geändert oder ist nicht verfügbar. Wähle sie erneut aus.",
   "error.remote.uploadTimeout": "Die Zeit für den Anhangsupload ist abgelaufen.",
   "error.remote.hostSessionActive": "Der Host hat bereits eine aktive entfernte Sitzung.",
   "error.remote.tooManyConnections": "Zu viele aktive entfernte Verbindungen.",

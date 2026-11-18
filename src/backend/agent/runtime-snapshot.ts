@@ -181,7 +181,8 @@ export function buildRuntimeSnapshot({
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
     const live = conversation.loadedSnapshot(agent.id);
-    const liveLatest = [...(live?.messages ?? [])].reverse().find(
+    // Each change of attention builds this for every agent, so the messages are not copied.
+    const liveLatest = live?.messages.findLast(
       (message) =>
         (message.author === "assistant" || message.author === "agent") &&
         // A message that another agent sent to this one is not a reply to the user.

@@ -293,6 +293,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "فتح {name}",
   "routine.calendar.completed": "مكتملة",
+  "routine.calendar.new": "مهمة دورية جديدة",
+  "routine.calendar.newOn": "مهمة دورية جديدة في {day}",
+  "routine.calendar.agent": "الوكيل",
+  "routine.calendar.agentChoice": "الوكيل: {name}",
 
   "routine.settings.loadFailed": "تعذّر تحميل المهام الدورية.",
   "routine.settings.loadRunsFailed": "تعذّر تحميل سجل التشغيل.",
@@ -309,6 +313,7 @@ export const messages = {
   "routine.settings.loading": "جارٍ تحميل المهام الدورية…",
   "routine.settings.empty": "لا توجد مهام دورية بعد.",
   "routine.settings.paused": "متوقفة مؤقتًا",
+  "routine.settings.pausedByRun": "أوقفها تشغيل {time} مؤقتًا",
   "routine.settings.completed": "منجزة · {schedule}",
   "routine.settings.active": "نشطة",
   "routine.settings.pauseFailed": "تعذّر إيقاف هذه المهمة الدورية مؤقتًا.",

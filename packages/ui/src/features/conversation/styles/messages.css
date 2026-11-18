@@ -19,7 +19,8 @@
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
 .message-author-gutter,
-.chat-visual-with-author {
+.chat-visual-with-author,
+.question-prompt-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
@@ -1849,6 +1850,8 @@ button.chat-action-target:active,
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-media-control-surface);
   color: var(--openbot-media-control-text);
+  /* Frosted: the frame behind the button is blurred, so the button reads on a busy picture. */
+  backdrop-filter: blur(12px);
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
@@ -1862,6 +1865,39 @@ button.chat-action-target:active,
   height: 22px;
   margin-inline-start: 2px;
   fill: currentColor;
+}
+
+/* The video plays but has no data yet. The sign takes the place of the play button, after a short
+   time: a seek in a loaded video waits for less than that. */
+.media-generation-wait {
+  display: grid;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  translate: -50% -50%;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  color: var(--openbot-media-control-text);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: media-generation-wait-in var(--openbot-duration-hover) ease 250ms both;
+}
+
+.media-generation-player .ui-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+  border-color: var(--openbot-media-control-track);
+  border-top-color: currentColor;
+}
+
+@keyframes media-generation-wait-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .media-generation-bar {
@@ -1879,7 +1915,8 @@ button.chat-action-target:active,
   transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.media-generation-player:is(:hover, :focus-within, :not([data-playing])) .media-generation-bar {
+/* The controls show only with the pointer or the keyboard on the video. A paused video keeps its play button. */
+.media-generation-player:is(:hover, :focus-within) .media-generation-bar {
   opacity: 1;
 }
 
@@ -2132,4 +2169,53 @@ button.chat-action-target:active,
   > .ui-bubble:last-child
   > .ui-bubble-content {
   border-end-end-radius: var(--openbot-radius-sm);
+}
+
+/* The details of a video show on hover as a title line at the top of its frame: the same scrim,
+   text and timing as the controls at the bottom. */
+.media-stage-details {
+  display: flex;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  align-items: baseline;
+  background: linear-gradient(to bottom, var(--openbot-media-control-scrim), var(--openbot-transparent));
+  padding: 10px 14px 28px;
+  color: var(--openbot-media-control-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+  white-space: nowrap;
+}
+
+.media-stage-details:empty {
+  display: none;
+}
+
+.media-generation-stage:is(:hover, :focus-within) > .media-stage-details {
+  opacity: 1;
+}
+
+.media-stage-details .image-generation-spec {
+  flex: none;
+}
+
+/* The name is at the start and is the part that gets shorter. The values are at the end. */
+.media-stage-details .image-generation-spec:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  margin-inline-end: 12px;
+  color: var(--openbot-media-control-text);
+  font-weight: 560;
+  text-overflow: ellipsis;
+}
+
+.media-stage-details .image-generation-spec:nth-child(2)::before {
+  content: none;
 }

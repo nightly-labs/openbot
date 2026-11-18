@@ -5,7 +5,7 @@ import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createIdleRestartToast } from "./idle-restart-toast";
 import { createScheduledUpdateToast } from "./scheduled-update-toast";
-import { updatesPort } from "./updates-port";
+import { idleRestartTarget, updatesPort } from "./updates-port";
 
 /**
  * The updater, as the renderer sees it: one status main pushes, and one button
@@ -94,9 +94,7 @@ const Updates = createSimpleContext({
 
     /** Restarts OpenBot when no work runs. A downloaded update is installed by the same restart. */
     async function restartWhenIdle(): Promise<void> {
-      const current = status();
-      const target = current.phase === "ready" && current.managedByHost !== true ? "update" : "relaunch";
-      setStatus(await updatesPort().update.restartWhenIdle(target));
+      setStatus(await updatesPort().update.restartWhenIdle(idleRestartTarget(status())));
     }
 
     async function cancelIdleRestart(): Promise<void> {

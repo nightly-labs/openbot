@@ -157,6 +157,7 @@ export const messages = {
   "error.remote.attachmentRejected": "O computador anfitrião rejeitou o anexo.",
   "error.remote.attachmentTooLarge": "Os anexos devem ter no máximo 10 MB.",
   "error.remote.attachmentBusy": "Aguarde o anexo atual terminar.",
+  "error.remote.attachmentChanged": "O arquivo mudou ou não está disponível. Selecione-o novamente.",
   "error.remote.uploadTimeout": "O tempo para enviar o anexo esgotou.",
   "error.remote.hostSessionActive": "O computador anfitrião já tem uma sessão remota ativa.",
   "error.remote.tooManyConnections": "Há conexões remotas ativas demais.",

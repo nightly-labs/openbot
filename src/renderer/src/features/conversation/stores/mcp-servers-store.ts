@@ -25,24 +25,37 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
   let request = 0;
   // An agent that saves a server asks for its sign-in with a card, which draws from this list. Each
   // new card, in the chat or in a thread, is read again, or the card would wait for the settings to close.
-  const signInCards = createMemo(() => {
+  const signInCardList = createMemo(() => {
     const threads = deps.props.threads;
     const threadMessages = [
       threads?.conversation,
       ...(threads?.side.tabs ?? []).map((tab) => threads?.side.thread(tab.id)?.conversation),
     ].flatMap((conversation) => conversation?.messages ?? []);
-    // Sorted and without repeats, so a tab that moves or opens reads nothing again.
-    const ids = new Set([
+    return [
       ...deps.props.messages.flatMap((message) =>
-        message.actionMarker?.kind === "mcp-sign-in" ? [message.actionMarker.mcpServerId] : [],
+        message.actionMarker?.kind === "mcp-sign-in"
+          ? [{ messageId: message.id, mcpServerId: message.actionMarker.mcpServerId }]
+          : [],
       ),
       ...threadMessages.flatMap((message) => {
         const signIn = mcpSignInEvent(message);
-        return signIn ? [signIn.mcpServerId] : [];
+        return signIn ? [{ messageId: message.id, mcpServerId: signIn.mcpServerId }] : [];
       }),
-    ]);
-    return [...ids].sort().join(",");
+    ];
   });
+  // Sorted and without repeats, so a tab that moves or opens reads nothing again.
+  const signInCards = createMemo(() => [...new Set(signInCardList().map((card) => card.mcpServerId))].sort().join(","));
+  // Each new card reads the sign-in states again, a second card for the same server too: an agent
+  // that tests again after the server refused the sign-in makes a new card for the same row (#6661).
+  const signInCardMessages = createMemo(() =>
+    [...new Set(signInCardList().map((card) => card.messageId))].sort().join(","),
+  );
+  createEffect(
+    () => [signInCardMessages(), deps.props.refreshMcpSignIns] as const,
+    ([key, refresh]) => {
+      if (key) refresh?.();
+    },
+  );
   const source = createMemo(() => {
     const server = deps.props.server;
     // A host that predates the capability answers 404, and a host without `mcp-member-access-v1`

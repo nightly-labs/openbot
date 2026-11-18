@@ -78,10 +78,14 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinePauseReasonsUnsupported": "Questa connessione non può mostrare perché una routine è in pausa.",
+  "error.team.activeQueuesUnsupported": "Questa connessione non può mostrare le code di tutti gli agenti.",
   "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.threadRequestsUnsupported":
+    "Questa connessione non può mostrare le richieste di un thread secondario ad altri agenti.",
   "error.team.hostTurnLimitsUnsupported":
     "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
@@ -89,6 +93,8 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
   "error.team.providerDetectionUnsupported":
     "Questa connessione non può trovare i server di modelli e gli agenti del server.",
+  "error.team.providerModelSourceUnsupported":
+    "Questa connessione non può mostrare da dove arrivano i modelli di un provider.",
   "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
@@ -141,6 +147,7 @@ export const messages = {
     "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Questa connessione non supporta la dimensione di compattazione di Claude.",
+  "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -195,6 +202,8 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
   "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
   "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
+  "error.team.phoneFeedbackUnsupported":
+    "Questa connessione non permette di inviare una segnalazione dall'app del telefono.",
   "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
   "error.team.queuedMessageThreadUnsupported":
     "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",

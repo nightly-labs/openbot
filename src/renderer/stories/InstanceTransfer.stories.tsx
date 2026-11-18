@@ -115,6 +115,32 @@ export const ExportFailed: Story = {
 
 export const ImportStart: Story = { name: "Import", render: () => <Stage args={viewArgs({ screen: "import" })} /> };
 
+export const ImportSending: Story = {
+  name: "Import: sending to a joined server",
+  render: () => (
+    <Stage
+      args={viewArgs({
+        screen: "import",
+        importPhase: "reading",
+        importProgress: { sent: 629_145_600, total: 1_468_550_085 },
+      })}
+    />
+  ),
+};
+
+export const ImportServerReading: Story = {
+  name: "Import: the server reads the file",
+  render: () => (
+    <Stage
+      args={viewArgs({
+        screen: "import",
+        importPhase: "reading",
+        importProgress: { sent: 1_468_550_085, total: 1_468_550_085 },
+      })}
+    />
+  ),
+};
+
 export const ImportReview: Story = {
   name: "Import: review",
   render: () => (
@@ -195,6 +221,13 @@ export const CopyLoading: Story = {
 export const CopyCopying: Story = {
   name: "Copy: copying",
   render: () => <CopyAgentsDialog {...copyArgs({ phase: "copying" })} />,
+};
+
+export const CopySending: Story = {
+  name: "Copy: sending to a joined server",
+  render: () => (
+    <CopyAgentsDialog {...copyArgs({ phase: "copying", progress: { sent: 184_549_376, total: 314_691_120 } })} />
+  ),
 };
 
 export const CopyDone: Story = {

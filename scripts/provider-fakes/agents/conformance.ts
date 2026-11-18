@@ -29,7 +29,7 @@ const MODELS = [
 ];
 
 const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpError>>> = {
-  // The protocol's own error, which Grok, Cline and custom agents give.
+  // The protocol's own error, which Grok and custom agents give.
   protocol: (sessionId) => ({ code: -32002, message: "Resource not found", data: { uri: sessionId } }),
   // OpenCode 2.x.
   opencode: (sessionId) => ({
@@ -55,6 +55,13 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
     code: -32602,
     message: `Session not found: ${sessionId}`,
     data: { session_id: sessionId },
+  }),
+  // Cline CLI 3.0.74, when its hub no longer has the session (#11096). The ACP SDK sends its thrown
+  // `SessionNotFoundError` as "Internal error".
+  cline: (sessionId) => ({
+    code: -32603,
+    message: "Internal error",
+    data: { details: `session not found: ${sessionId}` },
   }),
   // Cursor.
   cursor: (sessionId) => ({

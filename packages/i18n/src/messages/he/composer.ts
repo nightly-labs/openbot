@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "הודעה בתור נמצאת בעריכה. יש לשמור את העריכה או לבטל אותה כדי שההודעה תרוץ.",
   "composer.queueEdit.cancel": "ביטול העריכה",
+  "composer.feedbackFix.body": "מתקנים את הדיווח #{number}. שלחו את הבקשה, או בטלו כדי להשאיר את הדיווח כפי שהוא.",
+  "composer.feedbackFix.cancel": "ביטול",
   "composer.providerWait.offlineTitle": "אין חיבור לאינטרנט",
   "composer.providerWait.offline": "{provider} לא יכול להשיב עד שהמחשב הזה יחזור להיות מחובר.",
   "composer.providerWait.silent": "{provider} לא שלח עדכון במשך {duration}.",
@@ -19,6 +21,11 @@ export const messages = {
   "composer.update.manual": "יש לעדכן את {provider} במחשב שמריץ אותו כדי להמשיך.",
   "composer.update.pending": "מעדכן…",
   "composer.update.action": "עדכון",
+  "composer.imageInput.body":
+    "{model} מקבל רק טקסט, ולכן אינו רואה את התמונות שמצרפים. אם המודל הזה יכול לקרוא תמונות, הפעילו עבורו תמונות.",
+  "composer.imageInput.label": "הפעלת תמונות עבור {model}",
+  "composer.imageInput.pending": "מפעיל…",
+  "composer.imageInput.action": "הפעלת תמונות",
   "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
   "composer.usageLimit.creditsResets":
     "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",
@@ -110,6 +117,11 @@ export const messages = {
   "composer.error.holdQueued": "לא ניתן להשהות את ההודעה בתור לעריכה.",
   "composer.error.cancelEdit": "לא ניתן לבטל את עריכת התור. יש לנסות שוב.",
   "composer.error.updateQueued": "לא ניתן לעדכן את ההודעה בתור. יש לנסות שוב.",
+  "composer.queueEdit.received": "הסוכן כבר קיבל את ההודעה הזו, ולכן העריכה הסתיימה.",
+  "composer.queueEdit.receivedKept":
+    "הסוכן כבר קיבל את ההודעה הזו, ולכן העריכה הסתיימה. השינויים שלך עדיין בתיבת ההודעה.",
+  "composer.queueEdit.deletedKept": "ההודעה הזו נמחקה, ולכן העריכה הסתיימה. השינויים שלך עדיין בתיבת ההודעה.",
+  "composer.queueEdit.endedKept": "העריכה הזו הסתיימה לפני שנשמרה. השינויים שלך עדיין בתיבת ההודעה.",
   "composer.voice.prepareFailed": "לא ניתן להכין את מודל הקול. יש לנסות שוב.",
   "composer.voice.noSpeechRecorded": "לא הוקלט דיבור.",
   "composer.voice.noSpeechDetected": "לא זוהה דיבור.",
@@ -154,6 +166,7 @@ export const messages = {
   "composer.picker.section.files": "קבצים",
   "composer.picker.section.tabs": "לשוניות דפדפן",
   "composer.picker.section.threads": "שרשורים",
+  "composer.picker.section.messages": "בהודעות",
   "composer.token.tab": "לשונית דפדפן {name}",
   "composer.token.thread": "שרשור {name}",
   "composer.token.unavailableTab": "לשונית דפדפן סגורה {name}",

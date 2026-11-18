@@ -8,8 +8,10 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
@@ -22,6 +24,7 @@ import {
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -96,8 +99,8 @@ import {
 import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
-  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
@@ -118,6 +121,12 @@ import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
+/**
+ * The total length of the event frames that wait to be sent to one device. One frame can be about
+ * 1 MB, so the count limit alone let a device that does not take its events, such as one on a slow
+ * relay, keep about 2 GB in the main process (#11429).
+ */
+const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 /** A Moonlight session and a few browser views, which is more than a member watches at once. */
 const MAXIMUM_DESKTOP_STREAMS = 6;
 
@@ -178,6 +187,7 @@ export class TeamWebRtcHostPeer {
   readonly #responses = new Map<string, string>();
   readonly #responsesInFlight = new Map<string, Fiber.Fiber<string, RemoteWorkflowError>>();
   readonly #events = new Map<number, string>();
+  #eventCharacters = 0;
   #peerCapabilities = new Set<string>();
   #peerId: string | null = null;
   readonly #hostId: string;
@@ -345,6 +355,7 @@ export class TeamWebRtcHostPeer {
     if (connection.sessionId === this.#localSessionId && this.#localSessionToken) return;
     // incoming already cleared the prior session; retain the active authentication gate.
     this.#events.clear();
+    this.#eventCharacters = 0;
     this.#responses.clear();
     this.#nextEventSequence = 1;
     this.#eventsSentThrough = 0;
@@ -706,17 +717,19 @@ export class TeamWebRtcHostPeer {
                   ? 3
                   : 1;
     const decodeRequest =
-      protocol >= 8
-        ? decodeTeamProtocolV8WebRtcHttpRequest
-        : protocol === 7
-          ? decodeTeamProtocolV7WebRtcHttpRequest
-          : protocol === 6
-            ? decodeTeamProtocolV6WebRtcHttpRequest
-            : protocol === 5
-              ? decodeTeamProtocolV5WebRtcHttpRequest
-              : protocol === 4
-                ? decodeTeamProtocolV4WebRtcHttpRequest
-                : decodeTeamProtocolV3WebRtcHttpRequest;
+      protocol >= 9
+        ? decodeTeamProtocolV9WebRtcHttpRequest
+        : protocol === 8
+          ? decodeTeamProtocolV8WebRtcHttpRequest
+          : protocol === 7
+            ? decodeTeamProtocolV7WebRtcHttpRequest
+            : protocol === 6
+              ? decodeTeamProtocolV6WebRtcHttpRequest
+              : protocol === 5
+                ? decodeTeamProtocolV5WebRtcHttpRequest
+                : protocol === 4
+                  ? decodeTeamProtocolV4WebRtcHttpRequest
+                  : decodeTeamProtocolV3WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined
@@ -817,6 +830,7 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
             videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
             usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
             agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
           };
@@ -908,6 +922,7 @@ export class TeamWebRtcHostPeer {
                 preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
                 // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
+                browserVaultSkip: this.#peerCapabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
                 usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
@@ -916,6 +931,7 @@ export class TeamWebRtcHostPeer {
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
                 videoGeneration: this.#peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+                memoryChanges: this.#peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
               }),
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
@@ -927,8 +943,15 @@ export class TeamWebRtcHostPeer {
       }
       const sequence = this.#nextEventSequence++;
       // If this removes events that the sender did not send, the sender resets the client.
-      if (this.#events.size >= MAXIMUM_BUFFERED_EVENTS) this.#events.clear();
+      if (
+        this.#events.size >= MAXIMUM_BUFFERED_EVENTS ||
+        this.#eventCharacters + frame.length > MAXIMUM_BUFFERED_EVENT_CHARACTERS
+      ) {
+        this.#events.clear();
+        this.#eventCharacters = 0;
+      }
       this.#events.set(sequence, frame);
+      this.#eventCharacters += frame.length;
       const sessionId = this.#localSessionId;
       if (sessionId && this.#eventSender !== sessionId) {
         this.#eventSender = sessionId;
@@ -981,7 +1004,7 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({ cause: new Error("The event frame is not client control data.") });
     // Do not send `event-reset` here. The client can acknowledge an old event after the stream
     // already reset it, and a second reset would move it back before the newer events it has.
-    for (const sequence of this.#events.keys()) if (sequence <= frame.throughSequence) this.#events.delete(sequence);
+    // The sender already removed each event that it read, so the acknowledgement frees nothing.
   });
 
   readonly #sendEvents = Effect.fn("TeamHostPeer.sendEvents")(function* (
@@ -998,6 +1021,9 @@ export class TeamWebRtcHostPeer {
       if (sequence >= this.#nextEventSequence) break;
       this.#eventsSentThrough = sequence;
       const frame = this.#events.get(sequence);
+      // No path sends an event again, so the buffer keeps only the events that are not sent yet.
+      this.#events.delete(sequence);
+      if (frame !== undefined) this.#eventCharacters -= frame.length;
       // The buffer limit removed this event before it was sent.
       if (frame === undefined) {
         this.#eventResetPending = true;
@@ -1201,12 +1227,14 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
     (value.capabilities === undefined ||
       (Array.isArray(value.capabilities) &&
         value.capabilities.length <=
-          (value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-            ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT
-            : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
-                value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
-              ? 128
-              : 64) &&
+          TEAM_PROTOCOL_CAPABILITY_LIMITS[
+            value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+              ? 9
+              : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
+                  value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                ? 7
+                : 1
+          ] &&
         value.capabilities.every(isString))) &&
     (value.bodyTransferId === undefined || isString(value.bodyTransferId)) &&
     (value.contentType === undefined || isString(value.contentType))
