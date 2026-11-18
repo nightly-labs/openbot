@@ -1940,6 +1940,12 @@ button.chat-action-target:active,
   fill: currentColor;
 }
 
+.media-generation-speed {
+  flex: none;
+  min-inline-size: calc(5ch + 2 * var(--openbot-space-2));
+  font-variant-numeric: tabular-nums;
+}
+
 .media-generation-seek {
   flex: 1;
   min-width: 0;
