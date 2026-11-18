@@ -15,7 +15,7 @@ import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { encodeTeamCapabilitiesV10, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   REMOTE_AGENT_BRIDGE_CAPABILITY,
@@ -23,6 +23,7 @@ import {
 } from "@openbot/contracts/team-protocol/remote-agent-bridge-v1";
 import { TEAM_PROTOCOL_V8 } from "@openbot/contracts/team-protocol/v8";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_ABSENT_CAPABILITIES_HEADER, TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -144,6 +145,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -236,7 +238,9 @@ async function stopHost(host: Host): Promise<void> {
   host.database.close();
 }
 
-const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
+// Protocol 10 sends the names after the protocol 9 baseline, and the baseline ones it leaves out.
+const capabilityLists = encodeTeamCapabilitiesV10(capabilities);
 
 async function call(
   host: Host,
@@ -246,9 +250,10 @@ async function call(
 ): Promise<{ status: number; body: unknown }> {
   const headers: Record<string, string> = {
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V9),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V10),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: capabilities.join(","),
+    [TEAM_CAPABILITIES_HEADER]: capabilityLists.capabilities.join(","),
+    [TEAM_ABSENT_CAPABILITIES_HEADER]: capabilityLists.absent.join(","),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -312,8 +317,9 @@ try {
     assert.equal(response.status, 503);
   });
 
-  await step("protocol 9 advertises the link and protocol 8 does not", async () => {
-    assert.ok(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(REMOTE_AGENT_BRIDGE_CAPABILITY));
+  await step("protocol 10 advertises the link and protocol 9 does not", async () => {
+    assert.ok(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).includes(REMOTE_AGENT_BRIDGE_CAPABILITY));
+    assert.equal(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(REMOTE_AGENT_BRIDGE_CAPABILITY), false);
     assert.equal(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V8).includes(REMOTE_AGENT_BRIDGE_CAPABILITY), false);
   });
 

@@ -368,6 +368,8 @@ export interface McpOAuthAuthority {
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
   cancelSignIn: (url: string) => boolean;
+  /** The page that the sign-in waiting for this URL opened, or `null`. */
+  signInLink: (url: string) => string | null;
   /** Whether this computer holds a token for this URL. Never the token itself. */
   signedIn: (url: string) => boolean;
   /** Whether the server refused the stored sign-in, so the user must sign in again. */
@@ -412,6 +414,11 @@ export class McpOAuth implements McpOAuthAuthority {
    * first rather than leaving two browser tabs that race to answer.
    */
   readonly #attempts = new Map<string, () => void>();
+  /**
+   * The provider of the sign-in still running for each server, which knows the page it opened. A
+   * browser can start and show nothing, which OpenBot cannot see, so the user can copy the page.
+   */
+  readonly #pages = new Map<string, McpOAuthClientProvider>();
   /**
    * For each server, the redirect address its last sign-in opened the browser with and got no grant
    * back on. The next sign-in registers the other name of the same listener: a firewall can refuse
@@ -565,6 +572,7 @@ export class McpOAuth implements McpOAuthAuthority {
       Effect.ensuring(
         Effect.sync(() => {
           for (const cancel of [...this.#attempts.values()]) cancel();
+          this.#pages.clear();
           this.#waiting.clear();
           this.#openedElsewhere.clear();
         }),
@@ -616,6 +624,7 @@ export class McpOAuth implements McpOAuthAuthority {
       Deferred.doneUnsafe(exchanged, Effect.succeed(false));
       this.#exchanges.delete(state);
       if (this.#attempts.get(key) === cancel) this.#attempts.delete(key);
+      if (this.#pages.get(key) === provider) this.#pages.delete(key);
     };
     // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
     const cancel = () => {
@@ -626,6 +635,7 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon();
     };
     this.#attempts.set(key, cancel);
+    this.#pages.set(key, provider);
     return {
       provider,
       begin: () =>
@@ -756,6 +766,12 @@ export class McpOAuth implements McpOAuthAuthority {
     const cancel = key ? this.#attempts.get(key) : undefined;
     cancel?.();
     return cancel !== undefined;
+  }
+
+  /** The page that the sign-in waiting for this address opened, or `null` before it opens one. */
+  signInLink(url: string): string | null {
+    const key = mcpOAuthAccountKey(url);
+    return (key && this.#pages.get(key)?.openedUrl) ?? null;
   }
 
   signedIn(url: string): boolean {
@@ -1098,6 +1114,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   readonly #retryRedirectUrl: string | null;
   /** The `redirect_uri` of the authorization page this attempt opened, or `null` before it opens one. */
   #openedRedirectUrl: string | null = null;
+  /** The authorization page this attempt opened, or `null` before it opens one. */
+  #openedUrl: string | null = null;
 
   /** The `localhost` form of this run's address for its `127.0.0.1` form, and the reverse. */
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
@@ -1286,6 +1304,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   get openedRedirectUrl(): string | null {
     return this.#openedRedirectUrl;
+  }
+
+  get openedUrl(): string | null {
+    return this.#openedUrl;
   }
 
   get registrationPending(): boolean {
@@ -1648,6 +1670,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
             ? withAppScope(authorizationUrl, app)
             : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
         );
+        // Kept before the open: a browser that starts and shows nothing still lets the user copy it.
+        this.#openedUrl = url.toString();
         yield* mcpCall(() => this.#options.openExternal(url.toString()));
         this.#openedRedirectUrl = url.searchParams.get("redirect_uri");
       }),

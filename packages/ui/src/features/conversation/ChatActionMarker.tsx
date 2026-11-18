@@ -54,6 +54,11 @@ interface ChatActionMarkerProps {
    * for a routine, when the routine has no thread: its runs then show in the chat.
    */
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
+  /**
+   * Why a failed routine run failed, by run id: the reason that the agent reported, or the error of
+   * the run. Absent, or undefined for a run, when this client cannot read the run history.
+   */
+  routineRunFailure?: ((runId: string) => string | undefined) | undefined;
   onOpenHostedSite?: ((url: string) => void) | undefined;
   /** Opens a web link outside the app, such as the issue of sent feedback. */
   onOpenLink?: ((url: string) => void) | undefined;
@@ -154,6 +159,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                       onSelectAgent={props.onSelectAgent}
                       onOpenRoutine={props.onOpenRoutine}
                       openRoutineThread={props.openRoutineThread}
+                      routineRunFailure={props.routineRunFailure}
                       onOpenHostedSite={props.onOpenHostedSite}
                       onOpenLink={props.onOpenLink}
                       onToggleRoutineRun={props.onToggleRoutineRun}
@@ -525,6 +531,13 @@ function SingleChatActionMarker(
     const marker = textMessage();
     return marker?.expanded === true ? marker : undefined;
   };
+  // Without the reason, a failed run next to the answer it gave does not say what went wrong (#11143).
+  const failureReason = () => {
+    const marker = props.marker;
+    if (marker.kind !== "routine-run" || marker.status !== "failed") return undefined;
+    const reason = props.routineRunFailure?.(marker.runId);
+    return reason ? sourceText(reason) : undefined;
+  };
   return (
     <Marker
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
@@ -681,6 +694,13 @@ function SingleChatActionMarker(
             </Button>
           </Show>
         </MarkerContent>
+        <Show when={failureReason()}>
+          {(reason) => (
+            <p class="chat-action-marker-reason" title={reason()}>
+              {reason()}
+            </p>
+          )}
+        </Show>
         <Show when={historyShown() && routineHistory()}>
           {(transitions) => (
             <RoutineRunHistory

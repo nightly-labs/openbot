@@ -19,6 +19,7 @@ import { Effect, Semaphore } from "effect";
 import {
   app,
   BrowserWindow,
+  clipboard,
   crashReporter,
   dialog,
   type NativeImage,
@@ -1208,6 +1209,7 @@ function registerIpcHandlers({
       ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
       relay: signInRelayClient,
+      writeClipboard: (text) => clipboard.writeText(text),
     }),
     ...attachmentIpcHandlers({
       service,

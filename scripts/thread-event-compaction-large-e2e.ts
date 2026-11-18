@@ -14,7 +14,8 @@
 // script kills it with SIGKILL after 30 batches, starts it again to the end, and starts it a third time,
 // which must rewrite nothing. It samples the free disk and the WAL during each run. At the end it
 // rebuilds each thread again and compares the hashes, and checks that each event row keeps its sequence,
-// id, command, type, time and every payload key other than `changedMessages`.
+// id, command, type, time and every payload key other than `changedMessages`. Last, one VACUUM gives the
+// freed pages back to the disk (item 26); the script records its cost and checks the rows and replays again.
 //
 // Writes `.openbot-build/thread-event-compaction-large/report.json` and exits non-zero on a failure. The
 // report holds sizes, times and counts only, no message text.
@@ -121,6 +122,20 @@ if (child === "compact") {
   if (!root) throw new Error("The child needs --root.");
   const result = await runCompactionChild(root, Number(flag("pause-ms") ?? "5"));
   process.stdout.write(`result ${JSON.stringify(result)}\n`);
+  process.exit(0);
+}
+// The compaction leaves the freed pages in the file. One VACUUM gives them back to the disk (plan 011,
+// item 26). SQLite writes its copy to `SQLITE_TMPDIR`, on the same volume.
+if (child === "vacuum") {
+  const path = flag("database");
+  if (!path) throw new Error("The child needs --database.");
+  const db = new DatabaseSync(path);
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  const started = performance.now();
+  db.exec("VACUUM");
+  const seconds = (performance.now() - started) / 1000;
+  db.close();
+  process.stdout.write(`result ${JSON.stringify({ seconds, maxRssBytes: process.resourceUsage().maxRSS * 1024 })}\n`);
   process.exit(0);
 }
 
@@ -412,8 +427,20 @@ function parseChildResult(value: unknown): ChildResult {
   };
 }
 
-/** Runs the child to the end, or kills it with SIGKILL after `killAfter` batches. */
-function runChild(killAfter: number | null): Promise<Measured> {
+interface Sampled {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  peakExtraDiskBytes: number;
+  peakWalBytes: number;
+  walBytesAfter: number;
+  wallSeconds: number;
+}
+
+/**
+ * Runs a child mode of this script and samples the free disk and the WAL until it ends. `onLine` gets
+ * each line of its output and a function that kills it with SIGKILL.
+ */
+function runSampled(args: readonly string[], onLine: (line: string, kill: () => void) => void): Promise<Sampled> {
   return new Promise((resolvePromise, reject) => {
     const freeBefore = freeBytes(OUT);
     const started = performance.now();
@@ -424,38 +451,19 @@ function runChild(killAfter: number | null): Promise<Measured> {
       peakWalBytes = Math.max(peakWalBytes, fileBytes(`${databasePath}-wal`));
     };
     const timer = setInterval(sample, 25);
-    const compaction = spawn(
-      process.execPath,
-      [import.meta.filename, "--child=compact", `--root=${root}`, "--pause-ms=5"],
-      {
-        env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
-        stdio: ["ignore", "pipe", "inherit"],
-      },
-    );
-    let batchesSeen = 0;
-    let result: ChildResult | null = null;
-    let killed = false;
-    createInterface({ input: compaction.stdout }).on("line", (line) => {
-      if (line.startsWith("batch ")) {
-        batchesSeen += 1;
-        if (killAfter !== null && batchesSeen >= killAfter && !killed) {
-          killed = true;
-          compaction.kill("SIGKILL");
-        }
-      } else if (line.startsWith("result ")) result = parseChildResult(JSON.parse(line.slice(7)));
+    const child = spawn(process.execPath, [import.meta.filename, ...args], {
+      env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
+      stdio: ["ignore", "pipe", "inherit"],
     });
-    compaction.on("error", reject);
-    compaction.on("close", (code, signal) => {
+    const kill = () => child.kill("SIGKILL");
+    createInterface({ input: child.stdout }).on("line", (line) => onLine(line, kill));
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
       clearInterval(timer);
       sample();
-      if (!killed && code !== 0) {
-        reject(new Error(`The compaction child exited with ${code ?? signal}.`));
-        return;
-      }
       resolvePromise({
-        result,
-        killed,
-        batchesSeen,
+        code,
+        signal,
         peakExtraDiskBytes,
         peakWalBytes,
         walBytesAfter: fileBytes(`${databasePath}-wal`),
@@ -463,6 +471,32 @@ function runChild(killAfter: number | null): Promise<Measured> {
       });
     });
   });
+}
+
+/** Runs the compaction child to the end, or kills it with SIGKILL after `killAfter` batches. */
+async function runChild(killAfter: number | null): Promise<Measured> {
+  let batchesSeen = 0;
+  let result: ChildResult | null = null;
+  let killed = false;
+  const run = await runSampled(["--child=compact", `--root=${root}`, "--pause-ms=5"], (line, kill) => {
+    if (line.startsWith("batch ")) {
+      batchesSeen += 1;
+      if (killAfter !== null && batchesSeen >= killAfter && !killed) {
+        killed = true;
+        kill();
+      }
+    } else if (line.startsWith("result ")) result = parseChildResult(JSON.parse(line.slice(7)));
+  });
+  if (!killed && run.code !== 0) throw new Error(`The compaction child exited with ${run.code ?? run.signal}.`);
+  return {
+    result,
+    killed,
+    batchesSeen,
+    peakExtraDiskBytes: run.peakExtraDiskBytes,
+    peakWalBytes: run.peakWalBytes,
+    walBytesAfter: run.walBytesAfter,
+    wallSeconds: run.wallSeconds,
+  };
 }
 
 const generated = await generate();
@@ -506,6 +540,34 @@ after.close();
 const replaysAfter = await replayHashes();
 const replayDifferences = [...replaysBefore].filter(([threadId, hash]) => replaysAfter.get(threadId) !== hash).length;
 
+/** Runs one VACUUM in a child and samples the free disk and the WAL until it ends. */
+async function runVacuum() {
+  const results: string[] = [];
+  const run = await runSampled(["--child=vacuum", `--database=${databasePath}`], (line) => {
+    if (line.startsWith("result ")) results.push(line.slice(7));
+  });
+  const value = results[0] === undefined ? null : JSON.parse(results[0]);
+  if (run.code !== 0 || !isDynamicRecord(value))
+    throw new Error(`The VACUUM child exited with ${run.code ?? run.signal}.`);
+  return {
+    seconds: Number(value.seconds),
+    maxRssBytes: Number(value.maxRssBytes),
+    peakExtraDiskBytes: run.peakExtraDiskBytes,
+    peakWalBytes: run.peakWalBytes,
+  };
+}
+
+const vacuum = await runVacuum();
+const vacuumed = new DatabaseSync(databasePath);
+const sizeAfterVacuum = tableSize(vacuumed);
+const rowsHashAfterVacuum = eventRowsHash(vacuumed);
+const integrityAfterVacuum = String(rows(vacuumed, "PRAGMA integrity_check")[0]?.integrity_check);
+vacuumed.close();
+const replaysAfterVacuum = await replayHashes();
+const replayDifferencesAfterVacuum = [...replaysBefore].filter(
+  ([threadId, hash]) => replaysAfterVacuum.get(threadId) !== hash,
+).length;
+
 const report = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
@@ -524,6 +586,7 @@ const report = {
   threadsDone,
   integrityAfter,
   replayDifferences,
+  vacuumAfterCompaction: { ...vacuum, after: sizeAfterVacuum, integrity: integrityAfterVacuum },
   acceptance: {
     databaseAtLeast1_4Gb: generated.fileBytes >= 1.4 * 1e9,
     killedInsideTheLongThread: killedRun.killed && progressAfterKill.longThreadDone === 0,
@@ -537,6 +600,13 @@ const report = {
     // The freed pages go to the free list; the progress rows and a few index pages can add some.
     fileGrowsAtMost1Mib: sizeAfter.fileBytes - fileBytesBeforeCompaction <= 1024 ** 2,
     integrityAfter: integrityAfter === "ok",
+    vacuumGivesBackTheFreePages:
+      sizeAfterVacuum.freelistBytes === 0 && sizeAfterVacuum.fileBytes <= sizeAfter.fileBytes - sizeAfter.freelistBytes,
+    vacuumKeepsEveryRowAndReplay:
+      integrityAfterVacuum === "ok" &&
+      rowsHashAfterVacuum === rowsHashBefore &&
+      replayDifferencesAfterVacuum === 0 &&
+      replaysAfterVacuum.size === replaysBefore.size,
   },
 };
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });

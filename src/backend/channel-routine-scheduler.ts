@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type {
-  ChannelRoutine,
-  ChannelRoutineRun,
-  ChannelRoutineRunStatus,
-  ChannelTask,
-  CreateChannelRoutineInput,
-  DeleteChannelRoutineInput,
-  ListChannelRoutineRunsInput,
-  TestChannelRoutineInput,
-  UpdateChannelRoutineInput,
+import {
+  type ChannelRoutine,
+  type ChannelRoutineRun,
+  type ChannelRoutineRunStatus,
+  type CreateChannelRoutineInput,
+  channelRunStatusForTasks,
+  type DeleteChannelRoutineInput,
+  type ListChannelRoutineRunsInput,
+  type TestChannelRoutineInput,
+  type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
@@ -40,70 +40,6 @@ export interface ChannelRoutineHooks {
 export interface ChannelRoutineSchedulerOptions {
   channels: ChannelService;
   hooks: ChannelRoutineHooks;
-}
-
-/**
- * The task that holds this one, if there is one: the first dependency of the branch below it that
- * failed or that a human has to unblock. A dependency of a dependency counts, because the branch
- * moves again only from its own root.
- */
-function stoppedBlocker(tasks: ChannelTask[], task: ChannelTask, seen = new Set<string>()): ChannelTask | null {
-  for (const id of task.dependencies) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const dependency = tasks.find((item) => item.id === id);
-    if (!dependency) continue;
-    if (dependency.state === "failed" || dependency.state === "paused") return dependency;
-    const deeper = stoppedBlocker(tasks, dependency, seen);
-    if (deeper) return deeper;
-  }
-  return null;
-}
-
-/**
- * Reads the run's status out of the tasks its request produced. Pure, because that is what makes a
- * restart free: the status is a function of durable rows, so a fresh scheduler over the same
- * database reaches the same answer with no in-memory state.
- *
- * `hasAssignment` separates "nobody has picked this up yet" from "a member is on it": an assignment
- * is a durable row, so the difference survives a restart too.
- */
-function channelRunStatusForTasks(
-  tasks: ChannelTask[],
-  hasAssignment: boolean,
-): { status: ChannelRoutineRunStatus; error: string | null } {
-  // A later human message can absorb the routine's open task and take its request id with it, and a
-  // deleted channel takes every task. Neither is a failure of the routine.
-  if (!tasks.length) return { status: "cancelled", error: null };
-  if (tasks.some((task) => task.state === "running")) return { status: "running", error: null };
-  const open = tasks.filter((task) => task.state === "queued" || task.state === "waiting");
-  if (open.length) {
-    // A task starts only when every task it delegated is completed, so an open task behind one
-    // that stopped is not work in progress: nothing but a human moves it again. Reporting it as
-    // queued would hide the reason in the run history while the run cannot advance.
-    const blocked = open.map((task) => stoppedBlocker(tasks, task));
-    const free = blocked.some((blocker) => !blocker);
-    if (free) return { status: hasAssignment ? "running" : "queued", error: null };
-    const blocker = blocked.find((task) => task?.state === "failed") ?? blocked[0];
-    if (blocker)
-      return blocker.state === "failed"
-        ? { status: "failed", error: blocker.error }
-        : { status: "needs-attention", error: blocker.error };
-  }
-  const failed = tasks.find((task) => task.state === "failed");
-  if (failed) return { status: "failed", error: failed.error };
-  // In a channel, `paused` always means a human has to act: a routing question, an unavailable
-  // owner, the assignment limit, an unconfirmed turn, or an explicit Stop.
-  const paused = tasks.find((task) => task.state === "paused");
-  if (paused) return { status: "needs-attention", error: paused.error };
-  // A person cancelled the run from its stopped task: it did not succeed.
-  if (tasks.some((task) => task.parentTaskId === null && task.state === "cancelled"))
-    return { status: "cancelled", error: null };
-  // A completed task has an error only when its owner reported that the run failed (#6667).
-  const reported = tasks.find((task) => task.state === "completed" && task.error);
-  if (reported) return { status: "failed", error: reported.error };
-  // Every task is completed or cancelled. This includes the lead judging that no work was needed.
-  return { status: "succeeded", error: null };
 }
 
 /**

@@ -727,15 +727,6 @@ export function agentNamesById(agents: AgentSummary[]): ReadonlyMap<string, stri
   return new Map(agents.map((agent) => [agent.id, agent.name]));
 }
 
-export function lastUserPrompt(snapshot: ConversationSnapshot): string | null {
-  return (
-    [...snapshot.messages]
-      .reverse()
-      .find((message) => (message.author === "user" || message.source === "user") && message.text.trim())
-      ?.text.trim() ?? null
-  );
-}
-
 export function renderHandoffMessage(
   message: ConversationSnapshot["messages"][number],
   agentNames: ReadonlyMap<string, string>,

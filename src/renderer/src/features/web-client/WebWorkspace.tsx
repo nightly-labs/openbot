@@ -207,6 +207,7 @@ import {
   untrack,
 } from "solid-js";
 import { queuedDeliveriesInOrder } from "../../queue-reconciliation";
+import { backgroundWorkKey } from "../conversation/background-work-key";
 // Copying a selection with a formula in it gives its LaTeX source, as on desktop.
 import "katex/contrib/copy-tex";
 // Copying a selection gives clean HTML, as on desktop.
@@ -4165,6 +4166,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       ? workspace.state.progress[workspace.state.selectedId]?.activity
                       : undefined
                   }
+                  backgroundWorkSince={(taskId) => {
+                    const agentId = workspace.state.selectedId;
+                    return agentId ? workspace.state.backgroundWork[backgroundWorkKey(agentId, taskId)] : undefined;
+                  }}
                   turnStepLines={workspace.stepLines()}
                   skillsMarketplaceOpen={marketplaceOpen()}
                   mcpSettingsOpen={marketplaceOpen()}

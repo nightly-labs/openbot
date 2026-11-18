@@ -23,6 +23,9 @@ export const messages = {
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
   "error.remote.windowsSessionDisconnected":
     "جلسة Windows على المضيف غير متصلة، لذلك لا توجد شاشة لمشاركتها. سجّل الدخول إلى Windows على شاشة المضيف، ثم أعد المحاولة.",
+  "error.remote.streamTooSlowLowerQuality":
+    "الاتصال بالمضيف بطيء جدًا لعرض الصورة. أعد المحاولة: سيستخدم الاتصال التالي جودة أقل.",
+  "error.remote.streamTooSlow": "الاتصال بالمضيف بطيء جدًا لعرض الصورة. استخدم شبكة أسرع، ثم أعد المحاولة.",
   "error.remote.teamSessionExpired": "انتهت صلاحية جلسة الفريق.",
   "error.remote.finishTestBeforeSwitch": "أنهِ اختبار سطح المكتب البعيد قبل تبديل الشاشات.",
   "error.remote.displayNotFound": "الشاشة البعيدة غير موجودة.",

@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -74,7 +75,12 @@ interface KeptViewerFiles {
 export class RemoteViewerProxy {
   readonly #options: RemoteViewerProxyOptions;
   readonly #operations = new Set<Deferred.Deferred<void>>();
-  readonly #token = crypto.randomUUID().replaceAll("-", "");
+  /**
+   * One path secret for each server. All viewers share the origin of this listener, and a host serves
+   * its own viewer page, so a host's script can read its own secret. With one secret for all, it could
+   * send requests to another joined server with this user's session.
+   */
+  readonly #tokens = new Map<string, string>();
   readonly #webSockets = new webSockets.WebSocketServer({ noServer: true });
   readonly #streams = new Map<string, ViewerStream>();
   // By server. A host gets a new runtime only when it restarts, and the client then makes a new
@@ -181,7 +187,10 @@ export class RemoteViewerProxy {
     response: ServerResponse,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const route = this.#route(request.url ?? "/");
-    if (!route) return sendText(response, 404, "Not found");
+    // The viewer only loads remote-screen routes. Other Team API routes stay closed to the page script.
+    if (!route?.upstreamPath.startsWith(`${TEAM_API_ROUTES.remoteScreen.prefix}/`)) {
+      return sendText(response, 404, "Not found");
+    }
     const viewerFile =
       request.method === "GET" || request.method === "HEAD" ? viewerFilePath(route.upstreamPath) : null;
     const keptFile = viewerFile === null ? undefined : this.#viewerFiles.get(route.serverId)?.files.get(viewerFile);
@@ -392,18 +401,26 @@ export class RemoteViewerProxy {
   #route(value: string): { serverId: string; upstreamPath: string } | null {
     try {
       const url = new URL(value, "http://127.0.0.1");
-      const match = new RegExp(`^/${this.#token}/([^/]+)(/.*)$`, "u").exec(url.pathname);
+      const match = /^\/([0-9a-f]{32})\/([^/]+)(\/.*)$/u.exec(url.pathname);
       if (!match) return null;
-      const serverId = decodeURIComponent(match[1] ?? "");
+      const serverId = decodeURIComponent(match[2] ?? "");
       if (!/^[A-Za-z0-9:_-]{1,128}$/u.test(serverId)) return null;
-      return { serverId, upstreamPath: `${match[2]}${url.search}` };
+      const expected = this.#tokens.get(serverId);
+      const given = Buffer.from(match[1] ?? "");
+      if (expected === undefined || !timingSafeEqual(given, Buffer.from(expected))) return null;
+      return { serverId, upstreamPath: `${match[3]}${url.search}` };
     } catch {
       return null;
     }
   }
 
   #basePath(serverId: string): string {
-    return `/${this.#token}/${encodeURIComponent(serverId)}`;
+    let token = this.#tokens.get(serverId);
+    if (token === undefined) {
+      token = randomBytes(16).toString("hex");
+      this.#tokens.set(serverId, token);
+    }
+    return `/${token}/${encodeURIComponent(serverId)}`;
   }
 }
 

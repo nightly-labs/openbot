@@ -7,6 +7,8 @@
 //   waiting for each retry, and rate limit retries keep a turn open (#9941);
 // - a stall on a custom endpoint's model names the endpoint, not OpenCode (#3234);
 // - a custom endpoint with a longer limit of its own is not ended at the agent's limit (#3823);
+// - an agent whose flavor has a longer limit of its own, as Grok, is not ended at the plain limit,
+//   and a prompt that stays silent still ends at the flavor's limit (#12295);
 // - an open tool call longer than the limit is not a stall;
 // - a stop of a prompt that ignores `session/cancel` ends the turn as interrupted;
 // - OpenCode answer text streams before the prompt answers;
@@ -56,6 +58,7 @@ interface Report {
   rateLimitRetry?: { status: string | null; reply: string; elapsedMs: number };
   endpointStall?: { status: string | null; error: string | null };
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
+  slowFlavor?: { quietStatus: string | null; hangStatus: string | null; hangElapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
@@ -79,7 +82,8 @@ async function open(
   env: Readonly<Record<string, string>> = {},
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
   firstUpdateMs?: number,
-  turnStallMs = STALL_MS,
+  /** Null leaves the option out, so the flavor's limit applies. */
+  turnStallMs: number | null = STALL_MS,
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -94,7 +98,7 @@ async function open(
     argv: ["acp"],
     env: {},
     signInMessage: "Sign in to the fake agent.",
-    turnStallMs,
+    ...(turnStallMs !== null ? { turnStallMs } : {}),
     ...(customEndpoint ? { customEndpoint } : {}),
     ...(firstUpdateMs ? { firstUpdateMs } : {}),
   });
@@ -237,6 +241,39 @@ try {
   assert.equal(slowTurn.value.status, "completed", "A slow endpoint turn is not ended at the agent's limit.");
   assert.equal(slowTurn.value.reply, "working, done", "The slow endpoint's answer is complete.");
   assert.ok(slowTurn.elapsedMs >= STALL_MS * 2, "The endpoint was silent for longer than the agent's limit.");
+
+  // An agent that waits longer for a silent model, as Grok waits 10 minutes, has a longer limit in its
+  // flavor. A turn silent for longer than the plain limit goes on, and a prompt that stays silent
+  // still ends, at the flavor's limit.
+  const slowFlavor = await open(
+    "cline",
+    { ...DEFAULT_ACP_FLAVOR, turnStallMs: STALL_MS * 3 },
+    join(root, "slow-flavor.jsonl"),
+    { FAKE_QUIET_MS: String(STALL_MS * 2) },
+    undefined,
+    undefined,
+    null,
+  );
+  const slowFlavorThread = await startThread(slowFlavor, { cwd: workspace });
+  const slowQuiet = await runTurn(slowFlavor, slowFlavorThread, { text: "quiet", timeoutMs: STALL_MS * 10 });
+  const slowHang = await timed(() => runTurn(slowFlavor, slowFlavorThread, { text: "hang", timeoutMs: STALL_MS * 10 }));
+  report.slowFlavor = {
+    quietStatus: slowQuiet.status,
+    hangStatus: slowHang.value.status,
+    hangElapsedMs: slowHang.elapsedMs,
+  };
+  assert.equal(
+    slowQuiet.status,
+    "completed",
+    "A turn of a flavor with a longer limit is not ended at the plain limit.",
+  );
+  assert.equal(slowHang.value.status, "failed", "A silent prompt of that flavor still fails.");
+  assert.equal(
+    slowHang.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Cline" }),
+    "A silent prompt of that flavor names the stall.",
+  );
+  assert.ok(slowHang.elapsedMs >= STALL_MS * 3, "The silent prompt was ended at the flavor's limit, not before.");
 
   // An open tool call is work, not a stall, also when it takes longer than the limit.
   const tool = await timed(() => runTurn(client, thread, { text: "tool" }));

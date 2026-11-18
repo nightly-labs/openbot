@@ -3,6 +3,7 @@ import { expandChatTagReferences } from "../chat-tag-references";
 import { type AgentEvent, isAgentEvent } from "../ipc-agent-events";
 import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { withRuntimeSnapshotBackgroundWork } from "./agent-background-work-v1";
 import { withEventAgentPendingRuntimes } from "./agent-pending-runtime-v1";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { restoreBrowserTakeoverReason } from "./browser-sign-in-v1";
@@ -56,7 +57,10 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
             restoreBrowserSecretMetadata(
               toCurrentAgentKeys(
                 withEventAgentPendingRuntimes(
-                  withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                  withUsageEventTertiary(
+                    withRuntimeSnapshotBackgroundWork(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                    value,
+                  ),
                   value,
                 ),
               ),
@@ -71,8 +75,9 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
         // video request only under video-generation-v1, memory changes only under memory-changes-v1,
         // a multi-select flag only under prompt-multi-select-v1, a takeover reason only under
         // browser-sign-in, a vault skip reason only under browser-vault-skip-v1, context states only
-        // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending
-        // runtime only under agent-pending-runtime-v1, so a present one is always kept.
+        // under context-usage-v1, background work only under agent-background-work-v1, a third usage
+        // window only under usage-tertiary-v1, and a pending runtime only under agent-pending-runtime-v1,
+        // so a present one is always kept.
         value,
         value,
         value,
@@ -102,6 +107,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     videoGeneration?: boolean;
     remoteSender?: boolean;
     contextUsage?: boolean;
+    backgroundWork?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
@@ -121,6 +127,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
+  const backgroundWork = options.backgroundWork === true && event.type === "runtime-snapshot";
   const usageTertiary = options.usageTertiary === true && event.type === "usage-changed";
   const pendingRuntime = options.agentPendingRuntime === true && event.type === "agents-changed";
   if (
@@ -131,6 +138,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
       !eventConversationKey(event.type) &&
       !promptMultiSelect &&
       !contextUsage &&
+      !backgroundWork &&
       !usageTertiary &&
       !pendingRuntime)
   )
@@ -150,7 +158,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const withContext = contextUsage
     ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true)
     : withMultiSelect;
-  const withUsage = usageTertiary ? withUsageEventTertiary(withContext, wireValue, true) : withContext;
+  const withWork = backgroundWork ? withRuntimeSnapshotBackgroundWork(withContext, wireValue, true) : withContext;
+  const withUsage = usageTertiary ? withUsageEventTertiary(withWork, wireValue, true) : withWork;
   const output = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;

@@ -545,6 +545,11 @@ export class McpGateway {
     this.#oauth?.cancelSignIn(url);
   }
 
+  /** The page that the sign-in waiting for this address opened, or `null`. */
+  signInLink(url: string): string | null {
+    return this.#oauth?.signInLink(url) ?? null;
+  }
+
   /**
    * Forgets the sign-in of one http row, and every agent's session is refreshed so the old bearer
    * stops being handed out. Rows with the same address share that account, so they are signed out

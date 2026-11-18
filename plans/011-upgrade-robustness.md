@@ -95,7 +95,7 @@ Not confirmed: desktop users other than the developer (no central source).
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
 | 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); no mobile build has it yet (1.4.11 does not), so no deletion before the first store build with it plus 60 days; step 2 (protocol 10) done (#12111, `78ad15d100`); prerequisite steps 2 and 3 done (#12139, `38fd2ed18e`); the share sender step needs a store build |
-| 3 | A server stops a start loop and reports the reason through the Team API | IN REVIEW: the loop stops (#10775, `932be637d6`); safe mode in #12185; `copy_release` stays a copy (see below) |
+| 3 | A server stops a start loop and reports the reason through the Team API | DONE: the loop stops (#10775, `932be637d6`); safe mode (#12185, `af09bea47a`); `copy_release` stays a copy (see below) |
 | 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
@@ -224,7 +224,7 @@ Decisions (developer, 2026-11-18): all members see the reason. The safe mode has
 rollback action, on servers and on Docker: a newer release, through the existing update path, is the
 fix. No "skip failed version" rule. The safe mode opens no `openbot.db`.
 
-Done in the safe-mode PR (stacked on protocol 10):
+Done in #12185 (`af09bea47a`, stacked on protocol 10):
 
 - `src/main/server-safe-mode.ts` and `src/main/team-api/server-safe-mode-api.ts`: auth (read-only
   `TeamStore`), compatibility and `GET /v1/server/safe-mode` only, through loopback HTTP and the
@@ -246,6 +246,8 @@ The copy is already safe without a rename:
   during the copy makes the next `apply` copy again.
 - `swap_in` removes `app` before the copy, so the copy needs about the same free disk space that the
   removal gives back.
+- A container has no `copy_release`: Docker pulls the release as an image, and `staged.ready` is
+  written only after the pull, through a `.new` file and `mv -f` (`docker/instances/openbot-instance`).
 
 ### 4. Schema-aware desktop recovery
 
@@ -308,7 +310,7 @@ send new user data (`PRIVACY.md` if outbound data changes).
 |---|---|---|
 | 13 | Durable idempotency keys for commands that clients retry | DONE (#11906, `2279f4aa56`: task start; #11930, `8aa900004a`: agent create, protocol 9 capability `agent-create-operation-v1`, and a resent thread message keeps its client id. Message sends were already durable. The share extension has no resend after a failure, so it needs no change.) |
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | RE-SCOPED: developer decision, 2026-11-18 (see below) |
-| 16 | Typed update state machine and one runtime state file | RE-SCOPED: audit of 2026-11-18 (see below); the host takeover fix is done |
+| 16 | Typed update state machine and one runtime state file | DONE (re-scoped): audit of 2026-11-18 (see below); the host takeover fix (#12051, `ab70ccbc2d`); the two open parts are not planned |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |
 | 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | DONE (#11872, `a694b58a7b`; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
 | 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | DONE (#11643, `d264b0a324`) |
@@ -355,21 +357,22 @@ macOS Host Manager. Each claim below was checked in the code.
   `sort -V` copies compare validated `X.Y.Z` versions only, as the tested bash `newer()` does.
 - **Not worth a union type.** `UpdateStatus` is also the server update status that mobile and the
   web client read, and the loose fields have no defect left after the items above.
-- **Open, needs a decision.** The install result of a hosted server is not saved or reported (no
-  code reads `.applying`). Reporting it needs a new optional capability, and the protocol 9 list is
-  full (item 2). The four "run started" files (`start-attempts`, `run-marker`, `startup-history`,
-  `gpu-start`) can become one versioned file, but released versions read them, so this needs its own
-  upgrade plan.
+- **Not planned (2026-11-18).** The install result of a hosted server is not saved or reported (no
+  code reads `.applying`). Protocol 10 (item 2) removes the full-list block, and the safe mode (item 3)
+  now shows members why a release does not start, which is the failure that matters. Add an install
+  history only when someone needs it, as a new optional protocol 10 capability. The four "run started"
+  files (`start-attempts`, `run-marker`, `startup-history`, `gpu-start`) can become one versioned
+  file, but released versions read them, so this needs its own upgrade plan, and it fixes no defect.
 
 ## Phase 4: longer term
 
 | # | Item | State |
 |---|---|---|
-| 18 | Durable event cursor resume for clients | TODO |
-| 19 | Mailbox unit of work | TODO |
+| 18 | Durable event cursor resume for clients | NOT PLANNED (2026-11-18): a feature, not upgrade safety; start it only on evidence that clients lose events at a reconnect (not audited) |
+| 19 | Mailbox unit of work | NOT PLANNED (2026-11-18): start it only on a bug that points to it (not audited) |
 | 20 | Tables that can be rebuilt move to a separate database | DROPPED: audit of 2026-11-18 (see below); item 23 removed most of the size |
-| 21 | Effect Schema for new codecs | TODO |
-| 26 | Give free pages back to the disk after the item 23 compaction | TODO: not measured at 17 GB yet (see item 20) |
+| 21 | Effect Schema for new codecs | NOT PLANNED (2026-11-18): `AGENTS.md` (Effect) already requires it for new code; no separate work |
+| 26 | Give free pages back to the disk after the item 23 compaction | MEASURED at 1.5 GB (see below); the change needs a decision; not measured at 17 GB |
 | 22 | Split `scripts/team-api-routes-e2e.ts` | NOT DONE: audit of 2026-11-18 (see below); new route areas go in their own script |
 
 ### 20. Separate database for tables that can be rebuilt (dropped)
@@ -394,9 +397,35 @@ Audit of 2026-11-18 (`main` at `6a5f3fab5b`):
   work on one file. The move copies about 12 GB on the largest hosted server.
 
 Item 26 takes the real gap that is left: the file does not get smaller on disk. A one-time `VACUUM`
-needs about 2x the file in free disk and holds the write lock for its full time; measure it with
-`bun scripts/migration-large-db-e2e.ts --full` on a large server first. Not confirmed: hosted
+holds the write lock for its full time; item 26 below has the measurement. Not confirmed: hosted
 servers after v0.73.0 were not measured.
+
+### 26. Free pages after the compaction (measured)
+
+`bun scripts/thread-event-compaction-large-e2e.ts` (default 1.5 GB, 2026-11-18, Apple silicon) now
+also runs one `VACUUM` after the compaction and checks the rows and the replays again. Report:
+`.openbot-build/thread-event-compaction-large/report.json`. All acceptance checks pass.
+
+| Measure | Result |
+|---|---|
+| File before the compaction | 1.67 GB |
+| Event payloads | 1.54 GB to 0.05 GB |
+| File after the compaction | 1.67 GB, of which 1.52 GB is free pages |
+| `VACUUM` | 0.8 s, peak extra disk 0.30 GB, peak WAL 0.15 GB, 269 MB RSS |
+| File after the `VACUUM` | 0.15 GB, no free pages; every row and replay is the same |
+
+The cost of a `VACUUM` follows the data that stays, not the size of the file. Not confirmed for
+server A (17 GB): the data that stays after the compaction is not known, because its
+`provider_history_staging` (2.9 GB before item 25) and `projection_*` sizes after v0.73.0 were not
+measured. The `migration-large-db-e2e.ts` mix, where the snapshot events stay full, gave 9.5 s for a
+1.9 GB file with 0 free pages.
+
+Decision needed before a change: a `VACUUM` holds the write lock for its full time and needs free
+disk for a copy of the data that stays. Options: (a) one `VACUUM` after the first complete
+compaction, at start before the backend serves, only when the free pages are more than half of the
+file and the free disk is more than the file; (b) the same, but only through an owner action in
+Server Settings or a `doctor` command; (c) no change: the free pages are used again by new writes,
+so the file does not grow until they are full.
 
 ### 22. Routes E2E split (not done)
 

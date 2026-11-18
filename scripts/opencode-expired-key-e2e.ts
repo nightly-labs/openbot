@@ -8,7 +8,8 @@
 // key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
 // models (#7550); that a model whose provider has no sign-in names that provider and its fix
 // (#2746); that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
-// sign-in (#9095); and that a `-32000` for a provider with a key in OpenCode 2's own database says
+// sign-in (#9095), and a 403 that OpenCode 2 stored for the turn names the plan or the network, not the key
+// (#12281); and that a `-32000` for a provider with a key in OpenCode 2's own database says
 // that the provider refused the request, as a firewall's 403 does, not that a sign-in is missing (#10166).
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
@@ -43,7 +44,7 @@ interface Report {
   noStoredKey?: { configKey: string | null; key: string | null };
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
-  refusedV2?: { saved: string; notSaved: string };
+  refusedV2?: { saved: string; notSaved: string; refused401: string | null; refused403: string | null };
   providerRefused?: { error: string };
 }
 
@@ -171,6 +172,38 @@ try {
   const sixth = open(cli);
   const { error: saved } = await runTurn(sixth, await startThread(sixth, { cwd: workspace }));
   assert.equal(saved, sourceText("error.provider.opencodeKeyRefused"), "A refused saved key names its fix.");
+  // OpenCode 2.2.5 keeps the status of the refusal in the newest message row of the session. A 401 is
+  // the key, so the key text stays. A 403 refuses a valid key, such as a plan that is not active, so a
+  // new key cannot help and the error must not ask for one (#12281).
+  await mkdir(openCodeData, { recursive: true });
+  const sessions = new DatabaseSync(join(openCodeData, "opencode.db"));
+  sessions.exec(
+    "CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT, seq INTEGER, data TEXT)",
+  );
+  const refusal = async (status: number) => {
+    const session = await startThread(sixth, { cwd: workspace });
+    const error = { type: "provider.auth", message: "refused", status, response: { body: "{}" } };
+    const insert = sessions.prepare(
+      "INSERT INTO session_message (id, session_id, type, seq, data) VALUES (?, ?, ?, ?, ?)",
+    );
+    insert.run(`${session}-1`, session, "user", 1, JSON.stringify({ text: "Say hi" }));
+    insert.run(`${session}-2`, session, "idle", 2, JSON.stringify({ outcome: "failed", error }));
+    return (await runTurn(sixth, session)).error;
+  };
+  let refused401: string | null;
+  let refused403: string | null;
+  try {
+    refused401 = await refusal(401);
+    assert.equal(refused401, sourceText("error.provider.opencodeKeyRefused"), "A 401 names the refused key.");
+    refused403 = await refusal(403);
+    assert.equal(
+      refused403,
+      sourceText("error.provider.opencodeGoRequestRefused"),
+      "A 403 with a saved key does not ask for a new key.",
+    );
+  } finally {
+    sessions.close();
+  }
   await runCauseEffect(sixth.stop());
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "expired-v2";
@@ -187,7 +220,7 @@ try {
     sourceText("error.provider.opencodeAuthRequired", { provider: "opencode-go" }),
     "With no saved key, the error stays the missing sign-in.",
   );
-  report.refusedV2 = { saved, notSaved };
+  report.refusedV2 = { saved, notSaved, refused401, refused403 };
   await runCauseEffect(seventh.stop());
 
   // 8. OpenCode 2.3.0 sends each 403 of a provider as `-32000`, also a firewall's block of a VPN
