@@ -6,6 +6,12 @@ export const messages = {
     "Der Verlauf ist für diese Anfrage nicht verfügbar. Lies den aktuellen Verlauf erneut oder verwende channel_history für Arbeit in Kanälen.",
   "error.agent.historyArgumentsInvalid":
     "Ungültige Verlaufsargumente: {detail} Korrigiere die Argumente und versuche es erneut. openbot.tool_describe liefert das Schema.",
+  "error.agent.browserArgumentsInvalid":
+    "Ungültige Browser-Argumente für {tool}: {detail} {hint}Korrigiere die Argumente und versuche es erneut. openbot.tool_describe liefert das Schema.",
+  "error.agent.browserArgumentsInvalidUser":
+    "Der Agent hat ungültige Browser-Argumente verwendet. Er korrigiert den Aufruf und macht weiter.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Für eine neue Seite rufe open nur mit url auf. Für eine bestehende Registerkarte rufe list_tabs auf, dann navigate mit tabId und url. ",
   "error.agent.toolRequestInvalid":
     "Ungültige Argumente für die Werkzeugsuche. Verwende das deklarierte Schema und einen originalen qualifizierten Werkzeugnamen.",
   "error.agent.toolCallArgumentsNotObject":

@@ -6,6 +6,12 @@ export const messages = {
     "이 요청에서는 기록을 사용할 수 없어요. 최근 기록을 다시 읽거나, 채널 작업에는 channel_history를 사용하세요.",
   "error.agent.historyArgumentsInvalid":
     "기록 인수가 올바르지 않습니다: {detail} 인수를 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
+  "error.agent.browserArgumentsInvalid":
+    "브라우저 인수가 올바르지 않습니다({tool}): {detail} {hint}인수를 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
+  "error.agent.browserArgumentsInvalidUser":
+    "에이전트가 잘못된 브라우저 인수를 사용했습니다. 호출을 수정한 뒤 계속합니다.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "새 페이지를 열려면 url만으로 open을 호출하세요. 기존 탭에서 URL을 열려면 list_tabs를 호출한 다음 tabId와 url로 navigate를 호출하세요. ",
   "error.agent.toolRequestInvalid":
     "도구 검색 인수가 올바르지 않아요. 선언된 스키마와 원래의 정규화된 도구 이름을 사용하세요.",
   "error.agent.toolCallArgumentsNotObject":

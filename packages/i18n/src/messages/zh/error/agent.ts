@@ -6,6 +6,11 @@ export const messages = {
     "该请求的历史记录不可用，请重新读取最近的历史，或在频道工作中使用 channel_history。",
   "error.agent.historyArgumentsInvalid":
     "历史记录参数不正确：{detail} 请更正参数后重试。openbot.tool_describe 可提供架构。",
+  "error.agent.browserArgumentsInvalid":
+    "浏览器参数不正确（{tool}）：{detail} {hint}请更正参数后重试。openbot.tool_describe 可提供架构。",
+  "error.agent.browserArgumentsInvalidUser": "智能体使用了无效的浏览器参数。它将更正调用并继续。",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "要打开新页面，请仅用 url 调用 open。要在现有标签页中加载 URL，请先调用 list_tabs，再用 tabId 和 url 调用 navigate。 ",
   "error.agent.toolRequestInvalid": "工具发现参数无效。请使用声明的 schema 和原始的完整工具名。",
   "error.agent.toolCallArgumentsNotObject":
     "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",

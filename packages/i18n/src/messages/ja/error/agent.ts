@@ -6,6 +6,12 @@ export const messages = {
     "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取るか、チャンネルの作業には channel_history を使用してください。",
   "error.agent.historyArgumentsInvalid":
     "履歴の引数が正しくありません: {detail} 引数を修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
+  "error.agent.browserArgumentsInvalid":
+    "ブラウザーの引数が正しくありません ({tool}): {detail} {hint}引数を修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
+  "error.agent.browserArgumentsInvalidUser":
+    "エージェントが無効なブラウザー引数を使いました。呼び出しを修正して続けます。",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "新しいページを開くには url だけを指定して open を呼び出してください。既存のタブで URL を開くには list_tabs を呼び出し、次に tabId と url で navigate を呼び出してください。 ",
   "error.agent.toolRequestInvalid":
     "ツール検出の引数が無効です。宣言されたスキーマと、元の修飾されたツール名を使用してください。",
   "error.agent.toolCallArgumentsNotObject":

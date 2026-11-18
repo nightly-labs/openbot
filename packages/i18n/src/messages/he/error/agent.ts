@@ -6,6 +6,11 @@ export const messages = {
     "ההיסטוריה אינה זמינה לבקשה הזו. יש לקרוא שוב את ההיסטוריה האחרונה, או להשתמש ב-channel_history לעבודה בערוץ.",
   "error.agent.historyArgumentsInvalid":
     "ארגומנטים שגויים להיסטוריה: {detail} תקן את הארגומנטים ונסה שוב. openbot.tool_describe מחזיר את הסכמה.",
+  "error.agent.browserArgumentsInvalid":
+    "ארגומנטים שגויים לדפדפן עבור {tool}: {detail} {hint}תקן את הארגומנטים ונסה שוב. openbot.tool_describe מחזיר את הסכמה.",
+  "error.agent.browserArgumentsInvalidUser": "הסוכן השתמש בארגומנטים לא תקינים לדפדפן. הוא יתקן את הקריאה וימשיך.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "כדי לפתוח דף חדש, קרא ל-open עם url בלבד. כדי לטעון כתובת בלשונית קיימת, קרא ל-list_tabs ואז ל-navigate עם tabId ו-url. ",
   "error.agent.toolRequestInvalid": "ארגומנטים לא תקינים לגילוי כלים. יש להשתמש בסכימה המוצהרת ובשם כלי מקורי מלא.",
   "error.agent.toolCallArgumentsNotObject":
     "הכלי לא רץ. ב-tool_call, arguments חייב להיות אובייקט JSON ולא טקסט. יש לשלוח את הקריאה שוב עם arguments כאובייקט.",

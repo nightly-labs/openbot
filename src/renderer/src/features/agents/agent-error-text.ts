@@ -10,6 +10,8 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.providerModelAtCapacity",
 ]);
 
+const BROWSER_ARGUMENTS_ERROR_KEYS: ReadonlySet<string> = new Set(["error.agent.browserArgumentsInvalid"]);
+
 /**
  * The retry notices that a chat banner shows now, by banner key. The host sends the English text, so
  * a client of any language and of a joined server reads the key from it. The end of the agent's turn
@@ -60,6 +62,9 @@ const lastErrorToastAt = new Map<string, number>();
 /** One sentence a reader can act on, whichever surface shows it. */
 export function readableAgentError(message: string): string {
   const { t, errorMessage } = currentText();
+  if (matchingSourceKeys(message.trim()).some((key) => BROWSER_ARGUMENTS_ERROR_KEYS.has(key))) {
+    return t("error.agent.browserArgumentsInvalidUser");
+  }
   const readable = errorMessage(message, t("agent.error.continueFailed"));
   if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
   return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;

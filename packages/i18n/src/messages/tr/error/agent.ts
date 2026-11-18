@@ -6,6 +6,12 @@ export const messages = {
     "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun veya kanal çalışması için channel_history kullanın.",
   "error.agent.historyArgumentsInvalid":
     "Geçmiş bağımsız değişkenleri yanlış: {detail} Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
+  "error.agent.browserArgumentsInvalid":
+    "Tarayıcı bağımsız değişkenleri yanlış ({tool}): {detail} {hint}Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
+  "error.agent.browserArgumentsInvalidUser":
+    "Aracı geçersiz tarayıcı bağımsız değişkenleri kullandı. Çağrıyı düzeltip devam edecek.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Yeni bir sayfa açmak için yalnızca url ile open çağır. Mevcut sekmede URL yüklemek için list_tabs çağır, sonra tabId ve url ile navigate çağır. ",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
   "error.agent.toolCallArgumentsNotObject":

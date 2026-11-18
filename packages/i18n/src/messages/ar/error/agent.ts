@@ -6,6 +6,11 @@ export const messages = {
     "السجل غير متاح لهذا الطلب. اقرأ السجل الحديث مرة أخرى، أو استخدم channel_history لعمل القنوات.",
   "error.agent.historyArgumentsInvalid":
     "وسائط السجل غير صحيحة: {detail} صحّح الوسائط وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
+  "error.agent.browserArgumentsInvalid":
+    "وسائط المتصفح غير صحيحة لـ {tool}: {detail} {hint}صحّح الوسائط وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
+  "error.agent.browserArgumentsInvalidUser": "استخدم الوكيل وسائط متصفح غير صالحة. سيصحح الاستدعاء ويكمل.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "لفتح صفحة جديدة، استدعِ open مع url فقط. لتحميل عنوان URL في علامة تبويب موجودة، استدعِ list_tabs ثم navigate مع tabId وurl. ",
   "error.agent.toolRequestInvalid": "وسائط اكتشاف الأدوات غير صالحة. استخدم المخطط المُعلَن واسم الأداة المؤهَّل الأصلي.",
   "error.agent.toolCallArgumentsNotObject":
     "لم تعمل الأداة. في tool_call يجب أن تكون arguments كائن JSON وليست نصًا. أرسل الاستدعاء مرة أخرى مع arguments ككائن.",

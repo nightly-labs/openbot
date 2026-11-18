@@ -6,6 +6,12 @@ export const messages = {
     "La cronologia non è disponibile per questa richiesta. Rileggi la cronologia recente o usa channel_history per il lavoro nei canali.",
   "error.agent.historyArgumentsInvalid":
     "Argomenti della cronologia non corretti: {detail} Correggi gli argomenti e riprova. openbot.tool_describe fornisce lo schema.",
+  "error.agent.browserArgumentsInvalid":
+    "Argomenti del browser non corretti per {tool}: {detail} {hint}Correggi gli argomenti e riprova. openbot.tool_describe fornisce lo schema.",
+  "error.agent.browserArgumentsInvalidUser":
+    "L'agente ha usato argomenti non validi per il browser. Correggerà la chiamata e continuerà.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Per aprire una nuova pagina, chiama open con solo url. Per caricare un URL in una scheda esistente, chiama list_tabs, poi navigate con tabId e url. ",
   "error.agent.toolRequestInvalid":
     "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
   "error.agent.toolCallArgumentsNotObject":

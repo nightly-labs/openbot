@@ -168,6 +168,7 @@ import {
   browserInputAction,
   browserToolTimeout,
 } from "./browser-tool-actions";
+import { browserToolFailureText } from "./browser-tool-errors";
 import { repairBrowserToolInput } from "./browser-tool-input";
 import {
   BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS,
@@ -3010,13 +3011,14 @@ export class BrowserHost {
           Effect.sync((): { result: DynamicToolResult } | { heldTabId: string } => {
             const error = operationFailure.cause;
             if (error instanceof BrowserUserControlHeld) return { heldTabId: error.tabId };
+            const failureText = browserToolFailureText(error);
             return {
               result: {
                 success: false,
                 // The single place every browser tool failure reaches a provider. A page exception carries
                 // the page's own message -- `throw new Error("password=hunter2")` -- so this gets the same
                 // redaction the diagnostics ring applies, and the diagnostic copy stays the redacted one.
-                contentItems: [{ type: "inputText", text: redactText(String(error)) }],
+                contentItems: [{ type: "inputText", text: failureText }],
               },
             };
           }),
