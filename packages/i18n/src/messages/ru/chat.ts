@@ -473,6 +473,7 @@ export const messages = {
   "chat.menu.copy": "Копировать сообщение",
   "chat.menu.react": "Реакция",
   "chat.menu.branch": "Ответвить отсюда",
+  "chat.rewrite.send": "Отправить",
   "chat.menu.markUnread": "Не прочитано",
   "chat.menu.pin": "Закрепить",
   "chat.menu.unpin": "Открепить",

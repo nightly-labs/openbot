@@ -36,6 +36,7 @@ import { AGENT_THREAD_QUEUE_CODECS } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CODECS } from "./agent-thread-replies-v1";
 import { AGENT_THREAD_REQUESTS_CODECS } from "./agent-thread-requests-v1";
+import { AGENT_THREAD_REWRITE_CODECS } from "./agent-thread-rewrite-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
@@ -315,6 +316,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREAD_FILES_CODECS,
   ...AGENT_THREAD_REPLIES_CODECS,
   ...AGENT_THREAD_BRANCHES_CODECS,
+  ...AGENT_THREAD_REWRITE_CODECS,
   ...AGENT_THREAD_PAGES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,

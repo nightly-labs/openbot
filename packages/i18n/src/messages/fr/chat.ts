@@ -378,6 +378,7 @@ export const messages = {
   "chat.menu.copy": "Copier le message",
   "chat.menu.react": "Réagir",
   "chat.menu.branch": "Dériver d’ici",
+  "chat.rewrite.send": "Envoyer",
   "chat.menu.markUnread": "Marquer comme non lu",
   "chat.menu.pin": "Épingler",
   "chat.menu.unpin": "Désépingler",

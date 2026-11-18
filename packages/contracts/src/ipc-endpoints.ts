@@ -308,6 +308,7 @@ import type {
   PasteMessageLinkInput,
   ReadConversationPageInput,
   RespondToPromptInput,
+  RewriteMessageInput,
   SearchConversationFilesInput,
   SearchConversationMessagesInput,
   SendMessageInput,
@@ -1871,6 +1872,7 @@ export const IPC_ENDPOINTS = {
       "agent:mark-conversation-unread",
     ),
     sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
+    rewriteMessage: scopedRequest<RewriteMessageInput, QueuedMessageReceipt>()("agent:rewrite-message"),
     setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),
     // A joined server takes it through `message-delete-v1`.
     deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(

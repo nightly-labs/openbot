@@ -337,6 +337,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "Открыть файл {name}",
   "mobile.chat.markdown.openFileFailed": "Не удалось открыть файл",
   "mobile.chat.message.reply": "Ответить",
+  "mobile.chat.message.sendEdit": "Отправить",
   "mobile.chat.message.branch": "Ответвить отсюда",
   "mobile.chat.message.branchFailed": "Не удалось создать ответвление чата.",
   "mobile.chat.message.markUnread": "Не прочитано",

@@ -96,6 +96,7 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
+  RewriteMessageInput,
   Routine,
   RoutineRun,
   RunQueuedMessageAsTaskInput,
@@ -229,6 +230,7 @@ import { MemoryReviewCursors } from "./agent/memory-review-cursors";
 import type { ReviewSkill } from "./agent/memory-review-prompt";
 import { MessageDeletion } from "./agent/message-deletion";
 import { MessagePins } from "./agent/message-pins";
+import { MessageRewrites } from "./agent/message-rewrites";
 import {
   creationModel,
   developmentDefaultsApply,
@@ -661,6 +663,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
+  readonly #rewrites: MessageRewrites;
   readonly #endpoints: CustomEndpoints;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Effect.Effect<void, AgentLifecycleFailed>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -2212,6 +2215,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         searchWeb: (agentId, query) => this.#searchWeb(agentId, query),
         providerVersion: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.version ?? null,
       },
+    });
+    this.#rewrites = new MessageRewrites({
+      store,
+      mailbox,
+      conversation: this.#conversation,
+      tasks: this.#tasks,
+      threads: this.#threads,
+      mailboxSync: this.#mailboxSync,
+      drain: this.#drain,
+      agentsChanged: () => this.#emit({ type: "agents-changed", agents: this.listAgents() }),
     });
   }
 
@@ -5283,6 +5296,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "initialize mailbox", cause: failure.cause }),
         ),
       );
+    // The mailbox may have committed a rewritten delivery just before the process stopped.
+    // Finish its cut before providers or queue recovery can start that delivery.
+    yield* lifecycleStep("recover queued message rewrites", () => this.#rewrites.recover());
     yield* lifecycleStep("restore channel links", () => {
       // Before any drain. A conversation whose thread is also the agent's own chat (#2120) runs its turns
       // there, and a provider that runs one turn at a time keeps one queue: both keep the own chat's lane.
@@ -6397,7 +6413,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
-    return structuredClone(this.#tasks.read(agentId, taskId));
+    const snapshot = structuredClone(this.#tasks.read(agentId, taskId));
+    this.#mailboxSync.restoreMessageSenders(snapshot, taskId);
+    return snapshot;
   }
 
   /**
@@ -6900,6 +6918,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       Effect.ensuring(Effect.sync(() => this.#pendingUserSends.delete(idempotencyKey))),
     );
   }).bind(this);
+
+  /** Edits one finished user request and starts a new turn in the same thread. */
+  readonly rewriteMessage = (
+    input: RewriteMessageInput,
+    sender?: ConversationMessageSender,
+    source: "host" | "member" = "member",
+  ) =>
+    this.#rewrites
+      .rewrite(input, sender, source)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "rewrite message", cause: failure.cause })),
+      );
 
   readonly #sendUserMessage = Effect.fn("AgentService.sendUserMessage")(function* (
     this: AgentService,

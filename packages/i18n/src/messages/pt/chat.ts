@@ -376,6 +376,7 @@ export const messages = {
   "chat.menu.copy": "Copiar mensagem",
   "chat.menu.react": "Reagir",
   "chat.menu.branch": "Ramificar daqui",
+  "chat.rewrite.send": "Enviar",
   "chat.menu.markUnread": "Marcar como não lido",
   "chat.menu.pin": "Fixar",
   "chat.menu.unpin": "Desafixar",

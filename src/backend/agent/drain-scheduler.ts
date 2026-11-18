@@ -1130,7 +1130,7 @@ export class DrainScheduler {
         );
       };
 
-      for (const { delivery: item, senderTaskId } of batch) {
+      for (const { delivery: item, senderMember, voiceRecording, senderTaskId } of batch) {
         if (snapshot.messages.some((message) => message.id === item.id)) continue;
         snapshot.messages.push({
           id: item.id,
@@ -1139,6 +1139,8 @@ export class DrainScheduler {
           ...(item.sender.kind === "agent" ? { senderAgentId: item.sender.agentId } : {}),
           replyToMessageId: item.replyToMessageId,
           attachments: item.attachments,
+          ...(senderMember ? { senderMember } : {}),
+          ...(voiceRecording ? { voiceRecording } : {}),
           delivery: { id: item.id, status: "starting", position: null },
           text: item.text,
           createdAt: item.createdAt,

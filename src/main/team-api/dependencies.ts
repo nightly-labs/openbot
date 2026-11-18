@@ -407,6 +407,7 @@ export type TeamApiAgentTasks = Pick<
   | "listTaskReads"
   | "markTaskRead"
   | "branchTask"
+  | "rewriteMessage"
   | "runQueuedMessageAsTask"
 >;
 

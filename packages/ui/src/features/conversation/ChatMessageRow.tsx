@@ -81,6 +81,8 @@ export interface ChatMessageRowProps {
   actions?: JSX.Element;
   /** Draws the right-click menu, a `MessageMenu`. Without it, right-click keeps the native menu. */
   menu?: (() => JSX.Element) | undefined;
+  /** Replaces only the message text while its attachments and extra content stay in place. */
+  textEditor?: (() => JSX.Element) | undefined;
   /** Extra content inside the bubble, under the body: a question prompt, a note about the message. */
   children?: JSX.Element;
   /**
@@ -179,6 +181,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       "message-entry-user": person(),
       "message-entry-agent": !person(),
       "message-entry-with-author": props.showAuthor === true && !person(),
+      "message-entry-editing": Boolean(props.textEditor),
       "message-entry-actions-beside": beside(),
     },
     props.class,
@@ -241,6 +244,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       open={props.open}
       animate={props.animate === true && props.textAtOnce !== true}
       message={props.message}
+      textEditor={props.textEditor}
       referencedMessage={props.referencedMessage}
       referencedAuthorName={props.referencedAuthorName}
       onOpenReference={props.onOpenReference}
@@ -324,7 +328,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // The actions, the time and the steps stand under the bubble. A named author shows the time beside
   // the name. A row beside the bubble goes under it only when the line has no room. The reader's own
   // row can stand beside the bubble too, before it; another person's row stays under it.
-  const beside = () => props.actionsBeside === true && !member();
+  const beside = () => props.actionsBeside === true && !member() && !props.textEditor;
   const actionRow = (): JSX.Element => (
     <div class="message-action-row">
       {props.actions}
@@ -394,7 +398,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           </Show>
           <Show when={props.actionRow !== false && beside()}>{actionRow()}</Show>
         </div>
-        <Show when={props.actionRow !== false && !beside()}>{actionRow()}</Show>
+        <Show when={!props.textEditor && props.actionRow !== false && !beside()}>{actionRow()}</Show>
       </MessageContent>
     </>
   );

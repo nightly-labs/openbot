@@ -279,6 +279,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "ファイル {name} を開く",
   "mobile.chat.markdown.openFileFailed": "ファイルを開けませんでした",
   "mobile.chat.message.reply": "返信",
+  "mobile.chat.message.sendEdit": "送信",
   "mobile.chat.message.branch": "ここから分岐",
   "mobile.chat.message.branchFailed": "チャットを分岐できませんでした。",
   "mobile.chat.message.markUnread": "未読にする",

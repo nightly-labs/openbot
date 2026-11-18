@@ -99,6 +99,7 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
@@ -346,6 +347,7 @@ import {
   readAgentMemorySelection,
   readAgentTask,
   renameAgentThread,
+  rewriteAgentThreadMessage,
   runQueuedMessageAsAgentTask,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
@@ -434,6 +436,7 @@ type HostRequestActions = Pick<
   | "startAgentTask"
   | "runQueuedMessageAsTask"
   | "sendAgentTaskMessage"
+  | "rewriteMessage"
   | "controlAgentTask"
   | "renameAgentThread"
   | "deleteAgentThread"
@@ -678,6 +681,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   return {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    canRewriteThreads: (serverId) => has(serverId, AGENT_THREAD_REWRITE_CAPABILITY),
     // The host grants `agent-tasks-v1` with it, and the phone opens the new thread through those routes.
     canRunQueuedMessageAsTask: (serverId) =>
       has(serverId, AGENT_QUEUE_TASK_CAPABILITY) && has(serverId, AGENT_TASKS_CAPABILITY),
@@ -777,6 +781,8 @@ export function createHostRequestActions({
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
+  const rewriteApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_THREAD_REWRITE_CAPABILITY, "mobile.chat.message.editUnsupported");
   /** "Run in new thread" on a queued message is an optional route beside the tasks. */
   const queueTaskApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_QUEUE_TASK_CAPABILITY, "mobile.server.threads.unsupported");
@@ -1323,6 +1329,7 @@ export function createHostRequestActions({
       runTeamRequest(runQueuedMessageAsAgentTask(queueTaskApi(serverId), input)),
     sendAgentTaskMessage: async (input, serverId) =>
       runTeamRequest(sendAgentTaskMessage(threadMessageApi(serverId, input.attachmentDraftIds), input)),
+    rewriteMessage: async (input, serverId) => runTeamRequest(rewriteAgentThreadMessage(rewriteApi(serverId), input)),
     controlAgentTask: async (action, input, serverId) =>
       runTeamRequest(agentTaskControl(tasksApi(serverId), action, input)),
     renameAgentThread: async (input, serverId) => runTeamRequest(renameAgentThread(threadsApi(serverId), input)),

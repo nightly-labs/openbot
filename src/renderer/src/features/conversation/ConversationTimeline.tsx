@@ -33,6 +33,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageRewriteForm } from "@openbot/ui/features/conversation/MessageRewriteForm";
 import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
 import { ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
@@ -235,6 +236,35 @@ export function ConversationTimeline() {
     messagePins,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
+  const [rewritingMessage, setRewritingMessage] = createSignal<AgentMessage | null>(null);
+  const rewriteAction = (message: AgentMessage) => {
+    if (
+      channel ||
+      !props.agent ||
+      props.rewriteAvailable === false ||
+      (props.runtime && !message.senderMember) ||
+      message.author !== "you" ||
+      message.streaming ||
+      message.status !== undefined ||
+      otherSender(message) ||
+      props.activeTurnId ||
+      props.queue?.deliveries.some(
+        (delivery) => delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running",
+      )
+    )
+      return;
+    return () => setRewritingMessage(message);
+  };
+  const submitRewrite = async (text: string, requestId: string) => {
+    const message = rewritingMessage();
+    const agent = props.agent;
+    if (!message || !agent) return;
+    await conversationRuntime(props).agent.rewriteMessage(
+      { agentId: agent.id, taskId: null, messageId: message.id, text, requestId },
+      props.server?.id ?? "local",
+    );
+    setRewritingMessage(null);
+  };
   const controller = useConversationController();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
@@ -1540,6 +1570,7 @@ export function ConversationTimeline() {
                   onMarkUnread: markUnreadAction(message() ?? initialMessage),
                   sendToChannel: sendToChannelAction(message() ?? initialMessage),
                   onBranch: branchAction(message() ?? initialMessage),
+                  onEdit: rewriteAction(message() ?? initialMessage),
                   branchDisabled: Boolean(props.activeTurnId),
                   pin: pinAction(message() ?? initialMessage),
                   onUseAsBackdrop: backdropAction(message() ?? initialMessage),
@@ -1597,6 +1628,17 @@ export function ConversationTimeline() {
                         fallback={
                           <ChatMessageRow
                             message={message() ?? initialMessage}
+                            textEditor={
+                              rewritingMessage()?.id === message()?.id
+                                ? () => (
+                                    <MessageRewriteForm
+                                      text={rewritingMessage()?.body ?? ""}
+                                      onCancel={() => setRewritingMessage(null)}
+                                      onSubmit={submitRewrite}
+                                    />
+                                  )
+                                : undefined
+                            }
                             author={author()}
                             showFull={
                               chatSearchOpen() && chatSearchOpensMessage(message()?.body ?? "", chatSearchQuery())
@@ -1714,6 +1756,7 @@ export function ConversationTimeline() {
                                     copied={rowCopied()}
                                     readAloud={rowReadAloud()}
                                     onBranch={rowBranch()}
+                                    onEdit={compactActions() ? undefined : rewriteAction(message() ?? initialMessage)}
                                     branchDisabled={Boolean(props.activeTurnId)}
                                   />
                                 </Show>

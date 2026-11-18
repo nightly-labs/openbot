@@ -56,6 +56,17 @@ export function missingReplyOriginals(page: Pick<ConversationPage, "messages" | 
   return missing;
 }
 
+/** A rewind publishes a snapshot whose newest message precedes the message being edited. */
+export function snapshotMovesBack(
+  loaded: readonly { createdAt?: string }[],
+  snapshot: readonly { createdAt: string }[],
+): boolean {
+  const lastLoaded = loaded.findLast((message) => message.createdAt !== undefined)?.createdAt;
+  if (!lastLoaded) return false;
+  const lastSnapshot = snapshot.at(-1)?.createdAt;
+  return lastSnapshot === undefined || lastSnapshot < lastLoaded;
+}
+
 /**
  * The part of a refreshed snapshot a conversation may show without losing its
  * window.

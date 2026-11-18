@@ -173,6 +173,7 @@
     "./features/conversation/MarkdownMessageText": "./src/features/conversation/MarkdownMessageText.tsx",
     "./features/conversation/MessageNavigation": "./src/features/conversation/MessageNavigation.tsx",
     "./features/conversation/MessageRendering": "./src/features/conversation/MessageRendering.tsx",
+    "./features/conversation/MessageRewriteForm": "./src/features/conversation/MessageRewriteForm.tsx",
     "./features/conversation/BackdropBubbles": "./src/features/conversation/BackdropBubbles.tsx",
     "./features/conversation/chat-backdrop": "./src/features/conversation/chat-backdrop.ts",
     "./features/conversation/ChatBackdrop": "./src/features/conversation/ChatBackdrop.tsx",

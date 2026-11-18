@@ -32,6 +32,11 @@ export interface TasksSource {
     input: AgentTaskInput & { text: string; clientMessageId: string; attachmentDraftIds?: string[] },
     serverId: string,
   ): Promise<unknown>;
+  /** Absent on hosts that do not support editing a finished task message. */
+  rewrite?(
+    input: AgentTaskInput & { messageId: string; text: string; requestId: string },
+    serverId: string,
+  ): Promise<unknown>;
   stop(input: AgentTaskInput, serverId: string): Promise<void>;
   close(input: AgentTaskInput, serverId: string): Promise<void>;
   reopen(input: AgentTaskInput, serverId: string): Promise<void>;
@@ -51,6 +56,10 @@ export function desktopTasksSource(): TasksSource {
     send: (input, serverId) => {
       noteAgentRequest(serverId, input.agentId);
       return window.openbot.agent.sendMessage(input, serverId);
+    },
+    rewrite: (input, serverId) => {
+      noteAgentRequest(serverId, input.agentId);
+      return window.openbot.agent.rewriteMessage(input, serverId);
     },
     stop: (input, serverId) => window.openbot.agent.stopTask(input, serverId),
     close: (input, serverId) => window.openbot.agent.closeTask(input, serverId),

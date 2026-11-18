@@ -73,6 +73,7 @@ export function ConversationThread() {
     copyMessage,
     copiedMessageId,
     branchThread,
+    rewriteThreadMessage,
     changeMarkerActions,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
@@ -347,6 +348,18 @@ export function ConversationThread() {
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
             onBranch={branch(current().threads)}
+            onRewrite={
+              props.rewriteAvailable === false
+                ? undefined
+                : (messageId, text, requestId) => {
+                    const taskId = current().threads.open?.id;
+                    return taskId
+                      ? rewriteThreadMessage(taskId, messageId, text, requestId)
+                      : Promise.reject(new Error(t("chat.rewrite.failed")));
+                  }
+            }
+            isOwnSender={props.isOwnSender}
+            requireSenderForRewrite={Boolean(props.runtime)}
             onDeleteMessage={deleteMessage(current().threads)}
             messagePins={threadPins(current().threads.open?.id)}
             canDeleteMessage={props.canDeleteMessage}

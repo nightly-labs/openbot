@@ -279,6 +279,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "Abrir el archivo {name}",
   "mobile.chat.markdown.openFileFailed": "No se pudo abrir el archivo",
   "mobile.chat.message.reply": "Responder",
+  "mobile.chat.message.sendEdit": "Enviar",
   "mobile.chat.message.branch": "Ramificar desde aquí",
   "mobile.chat.message.branchFailed": "No se pudo ramificar el chat.",
   "mobile.chat.message.markUnread": "Marcar como no leído",

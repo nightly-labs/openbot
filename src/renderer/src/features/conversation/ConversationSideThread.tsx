@@ -51,6 +51,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     copyMessage,
     copiedMessageId,
     branchThread,
+    rewriteThreadMessage,
     messagePins,
     changeMarkerActions,
   } = useConversationViewScope();
@@ -246,6 +247,13 @@ export function ConversationSideThread(props: { threadId: string }) {
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
             onBranch={branch()}
+            onRewrite={
+              view.rewriteAvailable === false
+                ? undefined
+                : (messageId, text, requestId) => rewriteThreadMessage(props.threadId, messageId, text, requestId)
+            }
+            isOwnSender={view.isOwnSender}
+            requireSenderForRewrite={Boolean(view.runtime)}
             onDeleteMessage={deleteMessage()}
             messagePins={threadPins(current().thread.task.id)}
             canDeleteMessage={view.canDeleteMessage}

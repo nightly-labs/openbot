@@ -277,6 +277,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "{name} dosyasını aç",
   "mobile.chat.markdown.openFileFailed": "Dosya açılamadı",
   "mobile.chat.message.reply": "Yanıtla",
+  "mobile.chat.message.sendEdit": "Gönder",
   "mobile.chat.message.branch": "Buradan dallandır",
   "mobile.chat.message.branchFailed": "Sohbet dallandırılamadı.",
   "mobile.chat.message.markUnread": "Okunmadı olarak işaretle",

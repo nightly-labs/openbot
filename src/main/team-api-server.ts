@@ -61,6 +61,7 @@ import { AGENT_THREAD_QUEUE_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
@@ -347,6 +348,7 @@ import { routeAgentSessionSettings } from "./team-api/route-agent-session-settin
 import { agentTasksWireSnapshot, routeAgentTasks } from "./team-api/route-agent-tasks";
 import { routeAgentThreadQueue } from "./team-api/route-agent-thread-queue";
 import { routeAgentThreadRequests } from "./team-api/route-agent-thread-requests";
+import { routeAgentThreadRewrite } from "./team-api/route-agent-thread-rewrite";
 import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
@@ -1332,6 +1334,11 @@ export class TeamApiServer {
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReplies(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if (
+        (await routeAgentThreadRewrite(context, { tasks: this.#options.agentTasks, hiddenAgentIds: hidden })) ===
+        "handled"
+      )
+        return;
       if ((await routeAgentThreadPages(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeGithubSkills(context, this.#options.admin)) === "handled") return;
@@ -2715,6 +2722,7 @@ export class TeamApiServer {
           if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_REPLIES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_BRANCHES_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_REWRITE_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_PAGES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;

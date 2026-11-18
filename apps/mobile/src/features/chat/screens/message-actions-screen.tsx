@@ -12,6 +12,7 @@ import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import GitFork from "lucide-react-native/icons/git-fork";
 import Hash from "lucide-react-native/icons/hash";
 import MailDot from "lucide-react-native/icons/mail-dot";
+import Pencil from "lucide-react-native/icons/pencil";
 import Pin from "lucide-react-native/icons/pin";
 import PinOff from "lucide-react-native/icons/pin-off";
 import Reply from "lucide-react-native/icons/reply";
@@ -170,7 +171,12 @@ export function MessageActionsScreen() {
         />
       ) : null}
 
-      {request.onReply || request.onBranch || request.onMarkUnread || request.onTogglePin || sendToChannel ? (
+      {request.onReply ||
+      request.onEdit ||
+      request.onBranch ||
+      request.onMarkUnread ||
+      request.onTogglePin ||
+      sendToChannel ? (
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
@@ -179,6 +185,18 @@ export function MessageActionsScreen() {
               onPress={() => run(() => request.onReply?.())}
             >
               <Typography>{t("mobile.chat.message.reply")}</Typography>
+            </SettingsRow>
+          ) : null}
+          {request.onEdit ? (
+            <SettingsRow
+              leading={<Pencil size={ICON_SIZE} color={icon} />}
+              disclosure={false}
+              onPress={() => {
+                afterClose.current = request.onEdit;
+                router.back();
+              }}
+            >
+              <Typography>{t("mobile.chat.message.edit")}</Typography>
             </SettingsRow>
           ) : null}
           {request.onBranch ? (

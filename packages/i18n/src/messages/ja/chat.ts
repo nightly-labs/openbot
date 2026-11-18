@@ -362,6 +362,7 @@ export const messages = {
   "chat.menu.copy": "メッセージをコピー",
   "chat.menu.react": "リアクション",
   "chat.menu.branch": "ここから分岐",
+  "chat.rewrite.send": "送信",
   "chat.menu.markUnread": "未読にする",
   "chat.menu.pin": "ピン留め",
   "chat.menu.unpin": "ピン留めを解除",

@@ -173,6 +173,7 @@ function AgentTaskChat({
   const { t, errorMessage } = useText();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
+  const accountUserId = useMobileSession().session?.user.id ?? null;
   const queryClient = useQueryClient();
   const isDraft = taskId === DRAFT_THREAD_ID;
   const threadMenu = useChatThreadMenu(target, taskId);
@@ -198,6 +199,8 @@ function AgentTaskChat({
     loadAgentTasks,
     loadAgentTaskConversation,
     sendAgentTaskMessage,
+    rewriteMessage,
+    canRewriteThreads,
     respondToTaskPrompt,
     respondToApproval,
     readsWholeApprovals,
@@ -225,7 +228,6 @@ function AgentTaskChat({
   const task = list.data?.tasks.find((item) => item.id === taskId);
   // The reader's membership marks their own messages, which they can delete, and names the other members.
   const memberId = server?.membershipId ?? null;
-  const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(serverId, serverAgents, agentId);
   const activeTurnId = task?.activeTurnId ?? null;
   const messages = useMemo(
@@ -722,6 +724,19 @@ function AgentTaskChat({
           messages={messages}
           turnSummaries={turnSummaries}
           onOpenTurn={isDraft ? undefined : openTurn}
+          onRewrite={
+            !isDraft && canSend && canRewriteThreads(serverId) && task?.state === "idle"
+              ? async (message, text, requestId) => {
+                  await rewriteMessage({ agentId, taskId, messageId: message.id, text, requestId }, serverId);
+                  await Promise.all([
+                    queryClient.invalidateQueries({
+                      queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId),
+                    }),
+                    queryClient.invalidateQueries({ queryKey: queryKeys.agentTasks(queryScope, serverId, agentId) }),
+                  ]);
+                }
+              : undefined
+          }
           messageAliases={NO_ALIASES}
           referenceMessages={NO_MESSAGES}
           hasOlder={false}

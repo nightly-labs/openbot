@@ -5,8 +5,9 @@ import { expandAttachmentReferences } from "@openbot/contracts/attachment-refere
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
+import * as Crypto from "expo-crypto";
 import { useIsFocused } from "expo-router";
-import { Button, Typography } from "heroui-native";
+import { Button, TextArea, Typography } from "heroui-native";
 import CircleX from "lucide-react-native/icons/circle-x";
 import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
@@ -98,7 +99,7 @@ import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
-import { useText } from "@/shared/lib/text";
+import { currentText, useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
 import { chatDayLabels } from "../model/chat-day-markers";
@@ -126,6 +127,7 @@ import {
   MESSAGE_TIME_WIDTH,
 } from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
+import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
 import { KeptOpenContext } from "./use-kept-open";
@@ -338,6 +340,8 @@ interface ChatMessageListProps {
   topInset: number;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
+  /** Only provided for an idle agent thread on a host that supports rewrites. */
+  onRewrite?: (message: ChatBubbleMessage, text: string, requestId: string) => Promise<void>;
   /** Copies the conversation through a message of `branchPoints` into a new thread. */
   onBranch?: (message: ChatBubbleMessage) => void;
   /** Deletes a message for everyone. Absent where the host cannot delete messages. */
@@ -430,6 +434,7 @@ interface MessageRowShared {
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
   canReply: boolean;
+  canRewrite: boolean;
   canReact: boolean;
   /** The host deletes messages. A message that the reader did not send also needs `deletesAny`. */
   canDelete: boolean;
@@ -457,6 +462,8 @@ interface MessageRowShared {
   openFile: (file: MessageFileTarget, written: MessageFileTarget | null) => Promise<void>;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
+    bringEditIntoView: (message: ChatBubbleMessage) => void;
+    rewrite: (message: ChatBubbleMessage, text: string, requestId: string) => Promise<void>;
     branch: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
@@ -666,8 +673,14 @@ const MessageRow = memo(function MessageRow({
   selecting?: boolean;
   shared: MessageRowShared;
 }) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+  const [editHeight, setEditHeight] = useState(0);
+  const [editSending, setEditSending] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const editRequestId = useRef(Crypto.randomUUID());
   const waiting = awaitingFirstWord(message, shared, arriving, revealed);
   // A message that the host does not have yet, or that still streams, has no host ID to act on:
   // it has no actions.
@@ -693,6 +706,21 @@ const MessageRow = memo(function MessageRow({
             reactions: bubble.reactions,
             onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
             onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
+            onEdit:
+              shared.canRewrite &&
+              bubble.author === "user" &&
+              !bubble.sender &&
+              bubble.hasSenderMember &&
+              bubble.status === "completed"
+                ? () => {
+                    setEditDraft(bubble.body);
+                    setEditHeight(0);
+                    editRequestId.current = Crypto.randomUUID();
+                    setEditError(null);
+                    setEditing(true);
+                    actions.bringEditIntoView(bubble);
+                  }
+                : undefined,
             onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
             onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
             onDelete:
@@ -820,10 +848,10 @@ const MessageRow = memo(function MessageRow({
           key={key}
           agent={message.author === "agent"}
           collapsed={waiting}
-          animateSize={shared.textReveal}
+          animateSize={shared.textReveal && !editing}
           className={
             message.author === "user"
-              ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
+              ? `max-w-full self-end px-4 py-3 ${editing ? "w-full" : ""} ${userBubbleStyle || memberColor ? "" : "bg-control/60"}`
               : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
           }
           style={[
@@ -844,7 +872,7 @@ const MessageRow = memo(function MessageRow({
           {children}
         </ChatBubble>
       ) : null,
-    [message, waiting, shared.textReveal, shared.listWidth, userBubbleStyle, memberColor],
+    [message, waiting, shared.textReveal, shared.listWidth, userBubbleStyle, memberColor, editing],
   );
   // A table out of the user's bubble is as wide as the widest bubble and on its side.
   const sentTable = useCallback(
@@ -900,7 +928,9 @@ const MessageRow = memo(function MessageRow({
           arriving && !isFirstUser ? (message.author === "user" ? USER_MESSAGE_ENTRANCE : undefined) : undefined
         }
         className={
-          message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
+          message.author === "user"
+            ? `max-w-full items-end self-end gap-2 ${editing ? "w-full" : ""}`
+            : "max-w-full items-start self-start gap-2"
         }
         style={[{ borderCurve: "circular" }, isFirstUser ? firstMessageStyle : undefined]}
       >
@@ -975,8 +1005,63 @@ const MessageRow = memo(function MessageRow({
             </Button.Label>
           </Button>
         ) : null}
-        {message.body.trim() ? (
-          tableOutside && !selecting ? (
+        {editing || message.body.trim() ? (
+          editing ? (
+            bubbleFor(
+              <View className="w-full gap-3">
+                <TextArea
+                  accessibilityLabel={t("mobile.chat.message.edit")}
+                  multiline
+                  autoFocus
+                  value={editDraft}
+                  onChangeText={setEditDraft}
+                  isDisabled={editSending}
+                  background={null}
+                  scrollEnabled={false}
+                  onContentSizeChange={({ nativeEvent }) => setEditHeight(nativeEvent.contentSize.height)}
+                  className="w-full min-h-0 rounded-none border-0 bg-transparent p-0 shadow-none"
+                  style={[
+                    CHAT_TEXT_STYLES.body,
+                    { color: textColor, height: Math.max(CHAT_TEXT_STYLES.body.lineHeight * 3, editHeight) },
+                  ]}
+                />
+                {editError ? (
+                  <Typography.Paragraph type="body-xs" className="text-danger">
+                    {editError}
+                  </Typography.Paragraph>
+                ) : null}
+                <View className="flex-row justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      setEditing(false);
+                      setEditError(null);
+                    }}
+                    isDisabled={editSending}
+                  >
+                    <Button.Label>{t("mobile.chat.message.cancelEdit")}</Button.Label>
+                  </Button>
+                  <Button
+                    size="sm"
+                    isDisabled={editSending || !editDraft.trim()}
+                    onPress={() => {
+                      setEditSending(true);
+                      actions
+                        .rewrite(message, editDraft.trim(), editRequestId.current)
+                        .then(() => setEditing(false))
+                        .catch((error: unknown) => {
+                          setEditError(errorMessage(error, t("mobile.chat.message.editFailed")));
+                        })
+                        .finally(() => setEditSending(false));
+                    }}
+                  >
+                    <Button.Label>{t("mobile.chat.message.sendEdit")}</Button.Label>
+                  </Button>
+                </View>
+              </View>,
+            )
+          ) : tableOutside && !selecting ? (
             <ChatFileActionsContext value={openMessageFile}>
               <ChatMarkdown
                 {...markdownProps}
@@ -1042,9 +1127,11 @@ const MessageRow = memo(function MessageRow({
       className={
         message.author === "agent"
           ? "max-w-full self-start gap-1"
-          : message.attachments?.length
-            ? "max-w-full self-end gap-1"
-            : "max-w-[92%] self-end gap-1"
+          : editing
+            ? "w-full max-w-[92%] self-end gap-1"
+            : message.attachments?.length
+              ? "max-w-full self-end gap-1"
+              : "max-w-[92%] self-end gap-1"
       }
     >
       {message.replyToMessageId ? (
@@ -1061,7 +1148,9 @@ const MessageRow = memo(function MessageRow({
           </Typography.Paragraph>
         </View>
       ) : null}
-      {message.author === "agent" ? (
+      {editing ? (
+        rendered
+      ) : message.author === "agent" ? (
         <ChatMessageGesture
           selecting={selecting}
           // A progress update is a step of its turn: it takes no reply, as on desktop.
@@ -1483,6 +1572,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   topInset,
   onRetryHistory,
   onReply,
+  onRewrite,
   onBranch,
   onDeleteMessage,
   deletesAnyMessage = false,
@@ -1726,8 +1816,16 @@ export const ChatMessageList = memo(function ChatMessageList({
   const hasRows = rows.length > 0;
   const onReady = useCallback(() => onListReady(hasRows), [onListReady, hasRows]);
   const selectionArea = useRef<ViewInstance | null>(null);
+  const bringEditIntoView = (message: ChatBubbleMessage) => {
+    const index = chatRowIndex(rows, message.id);
+    if (index < 0) return;
+    // The editor grows and takes focus on the next frame. Place its row below the floating header.
+    requestAnimationFrame(() => void motion.openAt(index));
+  };
   const actionHandlers = useRef({
     onReply,
+    onRewrite,
+    bringEditIntoView,
     onBranch,
     onReact,
     onDeleteMessage,
@@ -1741,6 +1839,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   });
   actionHandlers.current = {
     onReply,
+    onRewrite,
+    bringEditIntoView,
     onBranch,
     onReact,
     onDeleteMessage,
@@ -1755,6 +1855,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
+      bringEditIntoView: (message) => actionHandlers.current.bringEditIntoView(message),
+      rewrite: (message, text, requestId) =>
+        actionHandlers.current.onRewrite?.(message, text, requestId) ??
+        Promise.reject(new Error(currentText().t("mobile.chat.message.editFailed"))),
       branch: (message) => actionHandlers.current.onBranch?.(message),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
@@ -1801,6 +1905,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   // The parent passes new handler functions on each render. The rows call them through
   // `actionHandlers`, so only their presence keeps `shared`, and every row, from rendering again.
   const canReply = Boolean(onReply);
+  const canRewrite = Boolean(onRewrite) && !sending && !awaitingTurn && !activity && !activeTurnId;
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
   const canMarkUnread = Boolean(onMarkUnread);
@@ -1835,6 +1940,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       markRevealed,
       replyHaptics,
       canReply,
+      canRewrite,
       canReact,
       canDelete,
       deletesAny: deletesAnyMessage,
@@ -1873,6 +1979,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       markRevealed,
       replyHaptics,
       canReply,
+      canRewrite,
       canReact,
       canDelete,
       deletesAnyMessage,

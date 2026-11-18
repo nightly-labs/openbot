@@ -63,6 +63,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageRewriteForm } from "@openbot/ui/features/conversation/MessageRewriteForm";
 import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
@@ -287,6 +288,12 @@ export interface AgentThreadViewProps {
    * offers it. Missing where the host cannot branch.
    */
   onBranch?: ((messageId: string) => void) | undefined;
+  /** Sends edited text in this thread. Missing when the host cannot rewrite messages. */
+  onRewrite?: ((messageId: string, text: string, requestId: string) => Promise<void>) | undefined;
+  /** A remote member cannot claim an older message without a stamped sender. */
+  requireSenderForRewrite?: boolean | undefined;
+  /** Hides Edit on another member's user message. */
+  isOwnSender?: ((senderId: string) => boolean) | undefined;
   /**
    * Deletes a message of the thread, after the reader confirms. Missing where the host cannot delete
    * messages. `canDeleteMessage` says which messages offer it.
@@ -343,6 +350,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
+  const [rewritingMessage, setRewritingMessage] = createSignal<AgentMessage | null>(null);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   const [selectionScope, setSelectionScope] = createSignal<HTMLElement>();
@@ -498,6 +506,25 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
+  const rewriteAction = (message: AgentMessage) => {
+    if (
+      !props.onRewrite ||
+      props.task?.state !== "idle" ||
+      message.author !== "you" ||
+      message.streaming ||
+      message.status !== undefined ||
+      (props.requireSenderForRewrite && !message.senderMember) ||
+      (message.senderMember && !props.isOwnSender?.(message.senderMember.id))
+    )
+      return;
+    return () => setRewritingMessage(message);
+  };
+  const submitRewrite = async (text: string, requestId: string) => {
+    const message = rewritingMessage();
+    if (!message || !props.onRewrite) return;
+    await props.onRewrite(message.id, text, requestId);
+    setRewritingMessage(null);
+  };
   /** The message that the delete dialog asks about. */
   const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
   const deleteAction = (message: AgentMessage) => {
@@ -621,6 +648,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onReply: replyAction(message),
       onCopy: () => onCopy(message),
       onBranch: branchAction(message),
+      onEdit: rewriteAction(message),
       branchDisabled: branchBusy(),
       pin: pinAction(message),
       onUseAsBackdrop: props.backdropAction?.(message),
@@ -651,6 +679,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onReply={replyAction(message)}
             onCopy={() => onCopy(message)}
             onBranch={branchAction(message)}
+            onEdit={rewriteAction(message)}
             branchDisabled={branchBusy()}
           />
         }
@@ -872,6 +901,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       fallback={
                         <ChatMessageRow
                           message={message()}
+                          textEditor={
+                            rewritingMessage()?.id === message().id
+                              ? () => (
+                                  <MessageRewriteForm
+                                    text={rewritingMessage()?.body ?? ""}
+                                    onCancel={() => setRewritingMessage(null)}
+                                    onSubmit={submitRewrite}
+                                  />
+                                )
+                              : undefined
+                          }
                           author={author(message())}
                           showFull={props.showFullMessage?.(message())}
                           agents={props.agents}

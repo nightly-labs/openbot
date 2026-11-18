@@ -275,6 +275,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "파일 {name} 열기",
   "mobile.chat.markdown.openFileFailed": "파일을 열 수 없습니다",
   "mobile.chat.message.reply": "답장",
+  "mobile.chat.message.sendEdit": "보내기",
   "mobile.chat.message.branch": "여기서 분기",
   "mobile.chat.message.branchFailed": "채팅을 분기할 수 없어요.",
   "mobile.chat.message.markUnread": "읽지 않음으로 표시",

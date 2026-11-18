@@ -340,6 +340,7 @@ export const messages = {
   "mobile.chat.markdown.openFile": "Otwórz plik {name}",
   "mobile.chat.markdown.openFileFailed": "Nie udało się otworzyć pliku",
   "mobile.chat.message.reply": "Odpowiedz",
+  "mobile.chat.message.sendEdit": "Wyślij",
   "mobile.chat.message.branch": "Odgałęź stąd",
   "mobile.chat.message.branchFailed": "Nie udało się utworzyć odgałęzienia czatu.",
   "mobile.chat.message.markUnread": "Oznacz jako nieprzeczytane",

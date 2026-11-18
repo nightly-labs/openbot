@@ -16,6 +16,7 @@ import {
   Hash,
   Info,
   LoaderCircle,
+  Pencil,
   Pin,
   PinOff,
   Trash2,
@@ -316,6 +317,8 @@ function fileImage(file: MessageImageFile, url: string): AttachmentSummary {
 }
 
 export function MessageBody(props: {
+  /** Replaces the text while the original attachments stay visible. */
+  textEditor?: (() => JSX.Element) | undefined;
   animate?: boolean | undefined;
   message: AgentMessage;
   referencedMessage?: AgentMessage | undefined;
@@ -796,92 +799,104 @@ export function MessageBody(props: {
       </Show>
       <div class="message-content-resize" ref={(element) => (messageContentResize = element)}>
         <div class="message-content-blocks" ref={(element) => (messageContent = element)}>
-          <StreamingRevealContext value={streamingBody.trail}>
-            <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
-              {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
-              <For each={contentBlocks()} keyed={false}>
-                {(block, index) => (
-                  <Switch>
-                    <Match when={comparisonTableContent(block())}>
-                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
-                    </Match>
-                    <Match when={dataTableContent(block())}>
-                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
-                    </Match>
-                    <Match when={codeContent(block())}>
-                      {(code) => (
-                        // The id lets the selection actions open for text selected in the code.
-                        <div
-                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                        >
-                          <Show
-                            when={chatPreviewKind(code().language)}
-                            fallback={
-                              <CodeBlock
-                                block={code()}
-                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                              />
-                            }
-                          >
-                            {(preview) => (
-                              <CodePreview
-                                block={code()}
-                                kind={preview()}
-                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+          <Show
+            when={props.textEditor}
+            fallback={
+              <StreamingRevealContext value={streamingBody.trail}>
+                <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
+                  {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
+                  <For each={contentBlocks()} keyed={false}>
+                    {(block, index) => (
+                      <Switch>
+                        <Match when={comparisonTableContent(block())}>
+                          {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                        </Match>
+                        <Match when={dataTableContent(block())}>
+                          {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                        </Match>
+                        <Match when={codeContent(block())}>
+                          {(code) => (
+                            // The id lets the selection actions open for text selected in the code.
+                            <div
+                              data-selection-message-id={
+                                props.message.streaming !== true ? props.message.id : undefined
+                              }
+                            >
+                              <Show
+                                when={chatPreviewKind(code().language)}
+                                fallback={
+                                  <CodeBlock
+                                    block={code()}
+                                    streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                  />
+                                }
+                              >
+                                {(preview) => (
+                                  <CodePreview
+                                    block={code()}
+                                    kind={preview()}
+                                    streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                    onOpenLink={props.onOpenLink}
+                                  />
+                                )}
+                              </Show>
+                            </div>
+                          )}
+                        </Match>
+                        <Match when={textContent(block())}>
+                          {(text) => (
+                            <div
+                              class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                              data-selection-message-id={
+                                props.message.streaming !== true ? props.message.id : undefined
+                              }
+                            >
+                              <MarkdownMessageText
+                                body={text().text}
+                                agents={props.agents}
+                                skills={props.skills}
+                                attachments={props.message.attachments}
+                                citations={props.message.citations}
+                                onSelectAgent={props.onSelectAgent}
                                 onOpenLink={props.onOpenLink}
+                                onOpenAttachment={openAttachment}
+                                onOpenImage={openMarkdownImage}
+                                onOpenSharedFile={props.onOpenSharedFile}
+                                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                                onOpenQuote={props.onOpenQuote}
+                                onOpenTag={props.onOpenTag}
+                                showCitationFooter={index === lastTextBlockIndex()}
+                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                streamingTailAfter={textTailAfter()[index]}
                               />
-                            )}
-                          </Show>
-                        </div>
-                      )}
-                    </Match>
-                    <Match when={textContent(block())}>
-                      {(text) => (
-                        <div
-                          class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
-                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                        >
-                          <MarkdownMessageText
-                            body={text().text}
-                            agents={props.agents}
-                            skills={props.skills}
-                            attachments={props.message.attachments}
-                            citations={props.message.citations}
-                            onSelectAgent={props.onSelectAgent}
-                            onOpenLink={props.onOpenLink}
-                            onOpenAttachment={openAttachment}
-                            onOpenImage={openMarkdownImage}
-                            onOpenSharedFile={props.onOpenSharedFile}
-                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                            onOpenQuote={props.onOpenQuote}
-                            onOpenTag={props.onOpenTag}
-                            showCitationFooter={index === lastTextBlockIndex()}
-                            streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                            streamingTailAfter={textTailAfter()[index]}
-                          />
-                        </div>
-                      )}
-                    </Match>
-                  </Switch>
-                )}
-              </For>
-              <Show when={longMessage() && props.showFull !== true}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  class="message-show-full"
-                  aria-expanded={expanded() ? "true" : "false"}
-                  onClick={toggleExpanded}
-                >
-                  {expanded() ? t("chat.message.showLess") : t("chat.message.showFull")}
-                </Button>
-              </Show>
-              <Show when={selectionInstruction()}>
-                {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
-              </Show>
-            </Show>
-          </StreamingRevealContext>
+                            </div>
+                          )}
+                        </Match>
+                      </Switch>
+                    )}
+                  </For>
+                  <Show when={longMessage() && props.showFull !== true}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      class="message-show-full"
+                      aria-expanded={expanded() ? "true" : "false"}
+                      onClick={toggleExpanded}
+                    >
+                      {expanded() ? t("chat.message.showLess") : t("chat.message.showFull")}
+                    </Button>
+                  </Show>
+                  <Show when={selectionInstruction()}>
+                    {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
+                  </Show>
+                </Show>
+              </StreamingRevealContext>
+            }
+          >
+            {/* Keep the draft and requestId when the message refreshes during this edit. */}
+            {(editor) => untrack(() => editor()())}
+          </Show>
         </div>
       </div>
       <Show when={generatedImageShown() && props.message.imageGeneration}>
@@ -953,6 +968,7 @@ export function MessageBody(props: {
    * names the images that show above it says nothing more.
    */
   const imagesOnly = () =>
+    !props.textEditor &&
     !standaloneImageAttachments()
       .reduce((body, image) => removeAttachmentReferences(body, image.id), props.message.body)
       .trim() &&
@@ -1028,6 +1044,8 @@ export function MessageActions(props: {
    * finished turn has it.
    */
   onBranch?: (() => void) | undefined;
+  /** Rewrites a completed question in this thread. */
+  onEdit?: (() => void) | undefined;
   /** A turn runs in the thread, so Branch shows but does nothing. */
   branchDisabled?: boolean | undefined;
   /** The items of the More menu, a `MessageMenuItems`. Without it, the row has no More button. */
@@ -1163,6 +1181,19 @@ export function MessageActions(props: {
           </Button>
         )}
       </Show>
+      <Show when={props.onEdit}>
+        {(onEdit) => (
+          <Button
+            variant="ghost"
+            type="button"
+            class="message-action-button"
+            aria-label={t("chat.actions.edit")}
+            onClick={onEdit()}
+          >
+            <Pencil aria-hidden="true" />
+          </Button>
+        )}
+      </Show>
       <Show when={props.menu}>
         {(menu) => (
           <div class="message-action-popover-anchor">
@@ -1193,6 +1224,8 @@ export interface MessageMenuItemsProps {
   onMarkUnread?: (() => void) | undefined;
   /** Copies the thread through this message into a new thread. Without it, the menu has no such item. */
   onBranch?: (() => void) | undefined;
+  /** Rewrites a completed question in this thread. */
+  onEdit?: (() => void) | undefined;
   /** A turn runs in the thread, so "Branch from here" shows but does nothing. */
   branchDisabled?: boolean | undefined;
   /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
@@ -1303,7 +1336,7 @@ export function MessageMenuItems(props: MessageMenuItemsProps) {
           </ContextMenu.Item>
         )}
       </Show>
-      <Show when={props.onBranch || props.onMarkUnread || props.pin}>
+      <Show when={props.onBranch || props.onEdit || props.onMarkUnread || props.pin}>
         <ContextMenu.Separator />
       </Show>
       <Show when={props.pin}>
@@ -1311,6 +1344,14 @@ export function MessageMenuItems(props: MessageMenuItemsProps) {
           <ContextMenu.Item onSelect={() => pin().onToggle()}>
             {pin().pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
             <span>{pin().pinned ? t("chat.menu.unpin") : t("chat.menu.pin")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onEdit}>
+        {(onEdit) => (
+          <ContextMenu.Item onSelectAfterClose={onEdit()}>
+            <Pencil aria-hidden="true" />
+            <span>{t("chat.menu.edit")}</span>
           </ContextMenu.Item>
         )}
       </Show>
