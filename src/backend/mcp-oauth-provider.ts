@@ -1286,6 +1286,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return this.#register();
     }
     if (!this.#options.state || this.#exchangingCode) return client;
+    const discovery = this.#discoveryState;
+    // A server with a registration endpoint gets the document only when it refuses the registration
+    // (`watchRegistration`), so it decides again on each sign-in. Releases 0.71 to 0.73 saved the
+    // document after YNAB's `invalid_redirect_uri`, and YNAB refuses it on its page (#12367).
+    if (client.client_id === MCP_CLIENT_METADATA_URL && discovery?.authorizationServerMetadata?.registration_endpoint)
+      return this.#register();
     // The last browser trip on the address of this registration got no grant back: register the
     // next address (see the constructor). A client metadata document lists only one address.
     const retry = this.#retryRedirectUrl;
@@ -1293,7 +1299,6 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return this.#register();
     // A registration made before its scope named `offline_access` refuses the request that adds it.
     // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.
-    const discovery = this.#discoveryState;
     const scopeAllowed =
       !client.scope ||
       !discovery?.resourceMetadata?.scopes_supported?.length ||

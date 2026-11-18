@@ -243,9 +243,30 @@ function probe(oauth: McpOAuth, url: string): Promise<{ toolCount: number; error
   return runCauseEffect(testMcpServer(httpConfig(url), 10_000, undefined, authority, "here"));
 }
 
-async function runCase(name: string, registration: boolean, refused: Refusal = false, document = true): Promise<Case> {
+/**
+ * `storedDocument` starts with the document client that releases 0.71 to 0.73 saved for a server that
+ * refused each redirect address, before they opened its page (#12367).
+ */
+async function runCase(
+  name: string,
+  registration: boolean,
+  refused: Refusal = false,
+  document = true,
+  storedDocument = false,
+): Promise<Case> {
   const server = await fakeServer(registration, refused, document);
   const records = new Map<string, McpOAuthRecord>();
+  const issuer = new URL(server.url).origin;
+  if (storedDocument)
+    records.set(server.url, {
+      client: {
+        client_id: CLIENT_METADATA_URL,
+        redirect_uris: [REDIRECT_URL],
+        token_endpoint_auth_method: "none",
+        issuer,
+      },
+      discovery: { authorizationServerUrl: issuer },
+    });
   const oauth = oauthOn(records, server);
   let restarted: McpOAuth | null = null;
   try {
@@ -444,6 +465,18 @@ async function main(): Promise<void> {
       check(redirect, !redirect.signedIn, "a token is stored after a refused registration");
       report.cases.push(redirect);
     }
+
+    // A document client that an earlier release saved for YNAB must not open the page again.
+    const stored = await runCase("redirect-refused-stored-document", true, "redirect", true, true);
+    check(
+      stored,
+      stored.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${stored.attempts[0]?.error}`,
+    );
+    check(stored, stored.pageClientIds.length === 0, `the pages named ${stored.pageClientIds.join()}`);
+    check(stored, stored.registrations > 0, "the sign-in did not register again");
+    check(stored, !stored.signedIn, "a token is stored after a refused registration");
+    report.cases.push(stored);
 
     // Google: no registration endpoint and no document support (#8398). Only a sign-in app can be
     // the client, so the sentence names it.
