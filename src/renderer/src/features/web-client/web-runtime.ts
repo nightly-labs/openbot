@@ -776,7 +776,8 @@ export function createWebWorkspaceRuntime(
   let uploadGeneration = 0;
   let capabilities: string[] = [];
   let connectedHost: RemoteTeamHost | null = null;
-  const duplicateOperationIds = new Map<string, string>();
+  // A duplicate whose answer got lost sends its id again and gets the first copy.
+  const duplicateIds = retryOperationIds(() => crypto.randomUUID());
   // A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`).
   const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const completedDraftIdsByHost = new Map<string, Set<string>>();
@@ -1856,13 +1857,17 @@ export function createWebWorkspaceRuntime(
     },
     async duplicateAgent(agentId) {
       if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
-      const operationKey = `${lockedHostId ?? ""}\0${agentId}`;
-      const operationId = duplicateOperationIds.get(operationKey) ?? crypto.randomUUID();
-      duplicateOperationIds.set(operationKey, operationId);
-      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), { operationId });
-      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
+      const duplicate = duplicateIds([lockedHostId, agentId]);
+      const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), {
+        operationId: duplicate.id,
+      }).catch((error: unknown) => {
+        duplicate.failed();
+        throw error;
+      });
+      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout)) {
+        duplicate.failed();
         throw new Error(currentText().t("error.remote.invalidData"));
-      duplicateOperationIds.delete(operationKey);
+      }
       // The released route answers the layout without the parents of the folders. The copy exists, so a
       // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
       const answered = value.layout;
@@ -2014,7 +2019,6 @@ export function createWebWorkspaceRuntime(
       disposed = true;
       generation += 1;
       connectedHost = null;
-      duplicateOperationIds.clear();
       revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);

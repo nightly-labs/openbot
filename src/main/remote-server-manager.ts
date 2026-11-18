@@ -119,6 +119,7 @@ import {
   hostedStartStep,
   WAKE_RECONNECT_STATES,
 } from "@openbot/team-client/hosted-server-wake";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { Deferred, Effect, Exit, Layer, Result, Scope, Semaphore } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import { ComputerActivityReport } from "./computer-activity-report";
@@ -336,7 +337,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #allowLocalDevelopmentInvites: boolean;
   readonly #inviteLinks: InviteLinkOptions;
   readonly #appVersion: string | null;
-  #duplicateOperationIds = new Map<string, string>();
+  // A duplicate whose answer got lost sends its id again and gets the first copy.
+  #duplicateIds = retryOperationIds(randomUUID);
   /** When Signal first missed each host that restarts into an update. */
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
@@ -1845,25 +1847,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       agentId: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<DuplicateAgentResult, RemoteWorkflowError, RemoteRequest> {
-      const key = `${serverId}\0${agentId}`;
-      const operationId = this.#duplicateOperationIds.get(key) ?? randomUUID();
-      this.#duplicateOperationIds.set(key, operationId);
-      return yield* Effect.gen({ self: this }, function* () {
-        const result = yield* this.request(
-          serverId,
-          TEAM_API_ROUTES.agent.duplicate(agentId),
-          decodeDuplicateAgentResultFromHost,
-          { method: "POST", body: { operationId }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
-        );
-        this.#duplicateOperationIds.delete(key);
-        return result;
-      }).pipe(
+      const duplicate = this.#duplicateIds([serverId, agentId]);
+      return yield* this.request(
+        serverId,
+        TEAM_API_ROUTES.agent.duplicate(agentId),
+        decodeDuplicateAgentResultFromHost,
+        { method: "POST", body: { operationId: duplicate.id }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
+      ).pipe(
         Effect.catch(({ cause: error }) =>
-          Effect.gen({ self: this }, function* () {
-            if (error instanceof RemoteRequestError && error.status >= 400 && error.status < 500) {
-              this.#duplicateOperationIds.delete(key);
-            }
-            return yield* new RemoteWorkflowError({ cause: error });
+          Effect.suspend(() => {
+            // The host refused the request, so it made no copy: a retry is a new duplicate.
+            if (!(error instanceof RemoteRequestError && error.status >= 400 && error.status < 500)) duplicate.failed();
+            return Effect.fail(new RemoteWorkflowError({ cause: error }));
           }),
         ),
       );

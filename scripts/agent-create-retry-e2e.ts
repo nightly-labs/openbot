@@ -3,6 +3,7 @@
 // A real `TeamApiServer` runs on loopback with the real team, agent and mailbox stores on a temporary
 // profile, and each turn goes to a fake Codex app-server, so no real provider CLI starts.
 // 1. The host advertises agent-create-operation-v1, and the protocol 9 client and host codecs keep the field.
+//    The client retry ids (`retryOperationIds`) keep an id only for the next retry, for 10 minutes.
 // 2. Two creates at the same time and a third after them, with one operationId, give one agent and one turn.
 // 3. The same operationId from a different member makes that member's own agent.
 // 4. After the agent is deleted, the same operationId makes a new agent.
@@ -34,6 +35,7 @@ import {
   decodeTeamProtocolV9WebRtcHttpRequest,
   encodeTeamProtocolV9WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -473,6 +475,30 @@ try {
       "A malformed operationId did not fail closed.",
     );
     return { kept: 4, protocol8: "dropped" };
+  });
+
+  await step("a client keeps an operation id only for the next retry, for 10 minutes", async () => {
+    const ids = retryOperationIds(() => crypto.randomUUID());
+    const write = ["server", "agent"];
+    const first = ids(write);
+    first.failed();
+    assert.equal(ids(write).id, first.id, "A retry after a failure got a new id.");
+    assert.notEqual(ids(write).id, first.id, "A write after a successful retry kept the old id.");
+    const failed = ids(write);
+    failed.failed();
+    ids(["server", "other agent"]);
+    assert.notEqual(ids(write).id, failed.id, "A retry after another write kept the old id.");
+    const late = ids(write);
+    late.failed();
+    // Move the clock past the window instead of waiting for it.
+    const now = Date.now;
+    Date.now = () => now() + 10 * 60_000;
+    try {
+      assert.notEqual(ids(write).id, late.id, "A retry after 10 minutes kept the old id.");
+    } finally {
+      Date.now = now;
+    }
+    return { retry: "same id", afterSuccess: "new id", afterOtherWrite: "new id", after10Minutes: "new id" };
   });
 
   const operationId = crypto.randomUUID();
