@@ -234,9 +234,9 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | 13 | Durable idempotency keys for commands that clients retry | TODO |
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | TODO |
 | 16 | Typed update state machine and one runtime state file | TODO |
-| 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | IN REVIEW (#11633) |
-| 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | TODO |
-| 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | TODO |
+| 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | DONE (#11633, `fa0550d33f`) |
+| 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | IN REVIEW (#11872; 1.72 GB test database: payloads 1,651 MB to 53 MB, longest write transaction 39 ms, kill and resume keep each replay; migration 65 blocks older releases) |
+| 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | DONE (#11643, `d264b0a324`) |
 
 ## Phase 4: longer term
 

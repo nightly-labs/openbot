@@ -52,6 +52,7 @@ import {
 } from "./database/provider-history-store";
 import { type ProviderSession, ProviderSessions } from "./database/provider-sessions";
 import { withTransaction } from "./database/sqlite-transaction";
+import { ThreadEventCompaction, type ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 import { ThreadReplay } from "./database/thread-replay";
 import { type StoredThreadSummary, ThreadSummaries } from "./database/thread-summaries";
 
@@ -74,6 +75,7 @@ export type {
   ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
 export type { ProviderSession } from "./database/provider-sessions";
+export type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 export type { StoredThreadSummary } from "./database/thread-summaries";
 
 /** One streamed message to write, for a caller that knows only that message changed. */
@@ -107,6 +109,7 @@ export class OpenBotDatabase {
   readonly #agentHistory: AgentHistoryQueries;
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
+  readonly #threadEvents: ThreadEventCompaction;
 
   constructor(
     readonly userDataPath: string,
@@ -124,6 +127,7 @@ export class OpenBotDatabase {
     this.#sessions = new ProviderSessions({ core: this.#core });
     this.#providerHistory = new ProviderHistoryStore({ core: this.#core });
     this.#summaries = new ThreadSummaries({ core: this.#core });
+    this.#threadEvents = new ThreadEventCompaction({ core: this.#core });
   }
 
   get path(): string {
@@ -630,6 +634,11 @@ export class OpenBotDatabase {
   /** Compacts one batch of imported Codex and Claude items after `afterRowId`. */
   compactImportedProviderHistory(afterRowId: number): ProviderHistoryCompactionBatch {
     return this.#providerHistory.compactImportedItems(afterRowId);
+  }
+
+  /** Removes the message copies that a replay does not need from one batch of old thread events. */
+  compactThreadEvents(): ThreadEventCompactionBatch {
+    return this.#threadEvents.compactNext();
   }
 
   dropCompactedProviderHistoryItems(sessionId: string, turnId: string): void {

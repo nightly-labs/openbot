@@ -1054,7 +1054,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               );
             yield* this.channels.recover();
             this.#channelRoutines.reconcileAll();
-            yield* this.#boot.backfillProviderHistory().pipe(Effect.forkIn(this.#scope));
+            // One after the other, so the two background passes do not compete with the start. A failed
+            // backfill (a typed error or a defect) must not stop the compaction at each start.
+            yield* this.#boot.backfillProviderHistory().pipe(
+              Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.void)),
+              Effect.andThen(this.#boot.compactThreadEvents()),
+              Effect.forkIn(this.#scope),
+            );
           }).pipe(
             // Limits are not kept over a restart, so an agent on a backup model goes back first.
             // The drains also run when a step above fails, so no settled lane stays idle.

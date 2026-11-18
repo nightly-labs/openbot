@@ -34,6 +34,11 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
+function migrateToCompactionMarker(db: DatabaseSync): void {
+  if (LATEST_SCHEMA_VERSION > 64) migrateUpTo(db, 64);
+  else migrateOpenBotDatabase(db);
+}
+
 /** A memory, and from schema 29 on an imported Codex turn with its staged item in full. */
 function seed(db: DatabaseSync, version: number): void {
   db.prepare(`INSERT INTO projection_agent_memories
@@ -73,11 +78,12 @@ function schema(db: DatabaseSync) {
 }
 
 function markers(db: DatabaseSync) {
-  return db.prepare("SELECT version FROM schema_migrations WHERE version >= 64").all();
+  return db.prepare("SELECT version FROM schema_migrations WHERE version = 64").all();
 }
 
-function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 64 });
+/** Later migrations add tables, so the fixtures stop at version 64 unless they test the latest. */
+function expectHealthy(db: DatabaseSync, version = 64): void {
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -93,7 +99,7 @@ describe("provider history compaction marker migration", () => {
       if (version < 63) migrateUpTo(db, 63);
       const before = contents(db);
       const schemaBefore = schema(db);
-      migrateOpenBotDatabase(db);
+      migrateToCompactionMarker(db);
       expect(contents(db)).toEqual(before);
       expect(schema(db)).toEqual(schemaBefore);
       if (version >= 29)
@@ -113,7 +119,7 @@ describe("provider history compaction marker migration", () => {
     expect(markers(db)).toEqual([]);
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
-    migrateOpenBotDatabase(db);
+    migrateToCompactionMarker(db);
     expect(contents(db)).toEqual(before);
     expectHealthy(db);
   });
@@ -122,9 +128,10 @@ describe("provider history compaction marker migration", () => {
     const db = databaseAt(63);
     seed(db, 63);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(65,'now')");
+    db.prepare("INSERT INTO schema_migrations VALUES(?, 'now')").run(LATEST_SCHEMA_VERSION + 1);
     expect(() => migrateOpenBotDatabase(db)).toThrow(NewerDatabaseError);
-    db.exec("DELETE FROM schema_migrations WHERE version=65; DELETE FROM schema_migrations WHERE version=20");
+    db.prepare("DELETE FROM schema_migrations WHERE version = ?").run(LATEST_SCHEMA_VERSION + 1);
+    db.exec("DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(markers(db)).toEqual([]);
@@ -165,6 +172,7 @@ describe("provider history compaction marker migration", () => {
     const db = new DatabaseSync(":memory:");
     databases.push(db);
     migrateOpenBotDatabase(db);
-    expectHealthy(db);
+    expect(markers(db)).toEqual([{ version: 64 }]);
+    expectHealthy(db, LATEST_SCHEMA_VERSION);
   });
 });

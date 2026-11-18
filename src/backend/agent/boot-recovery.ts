@@ -18,6 +18,7 @@ import {
   importProviderHistory,
   retiredSessionNeedsHistoryRead,
 } from "../provider-history-import";
+import { compactThreadEvents } from "../thread-event-compaction-run";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
@@ -32,6 +33,7 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 type UnresolvedDelivery = DeliveryContext["delivery"];
 
 const logger = createOpenBotLogger("provider-history");
+const eventLogger = createOpenBotLogger("thread-event-compaction");
 
 export interface BootRecoveryHooks {
   /** The channel and messaging threads. A channel thread names its channel: its turns run in their own lane. */
@@ -88,6 +90,9 @@ export interface BootRecoveryOptions {
  *   OpenBot was down into the persisted conversation. Then it compacts, in small
  *   transactions, the imported Codex and Claude items that a release before
  *   compaction kept in full.
+ * - `compactThreadEvents` then removes, also in small transactions, the message
+ *   copies that a replay does not need from the thread events of a release
+ *   before #8166 and #8794.
  *
  * Reads the store/mailbox/provider and writes the database plus in-memory
  * snapshots; delivery to the renderer goes through `mailboxSync` and
@@ -116,6 +121,8 @@ export class BootRecovery {
   readonly #unreadableHistory = new Set<string>();
   /** The imported items of earlier releases are compacted once per process. */
   #historyCompacted = false;
+  /** The old thread events are compacted once per process too. */
+  #threadEventsCompacted = false;
 
   constructor(options: BootRecoveryOptions) {
     this.#store = options.store;
@@ -542,6 +549,30 @@ export class BootRecovery {
         Effect.sync(() => {
           this.#historyCompacted = false;
           logger.warn("Could not compact imported provider history.", toLogValue(failure.cause));
+        }),
+      ),
+    );
+  });
+
+  readonly compactThreadEvents = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
+    if (this.#threadEventsCompacted) return;
+    this.#threadEventsCompacted = true;
+    yield* compactThreadEvents(this.#store.database).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          // Counts, sizes and error names only: an event payload holds message text.
+          if (result.rewritten > 0 || Object.keys(result.failedThreads).length > 0)
+            eventLogger.info("Compacted old thread events.", toLogValue(result));
+        }),
+      ),
+      // The next start tries again; a failure here loses no data.
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#threadEventsCompacted = false;
+          const cause = failure.cause;
+          eventLogger.warn("Could not compact old thread events.", {
+            name: cause instanceof Error ? cause.name : typeof cause,
+          });
         }),
       ),
     );
