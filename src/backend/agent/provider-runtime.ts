@@ -112,6 +112,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSessionClosingDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
@@ -4505,6 +4506,15 @@ export class ProviderRuntime implements ProviderPort {
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
         stderrLogger.warn("A provider wrote an error while OpenBot stopped it.", {
+          provider: client.provider,
+          message,
+        });
+        return;
+      }
+      // A server that the provider did not start because its session was closing did not fail, also
+      // when it is a built-in server such as Computer Use (#12320).
+      if (isMcpSessionClosingDiagnostic(redacted)) {
+        stderrLogger.warn("A provider did not start an MCP server of a closing session.", {
           provider: client.provider,
           message,
         });
