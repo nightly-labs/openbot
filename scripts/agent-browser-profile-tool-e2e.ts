@@ -2,7 +2,9 @@
 // the real profile service, agent service, agent store and profile store on a temporary database.
 // A coordinator moves two agents to a new named profile in one call, reuses the profile by a name in
 // another case, moves agents to the shared profile and to profiles of their own, and gets a refusal for
-// a turn that no person started and for a card that the owner declines. Each call goes through
+// a turn that no person started and for a card that the owner declines. The refusal sends an owner or
+// admin to the agent's settings, and tells a member, who does not see that setting, to ask an owner or
+// admin (#12109). Each call goes through
 // `handleSetBrowserProfileTool`, as the tool router sends it, with a card stub that records the text and
 // gives the owner's answer. A failed call becomes the correctable tool failure of the router.
 // The browser is a stub with no tabs, and the agent service is not initialized, so no provider starts.
@@ -116,7 +118,11 @@ try {
   const cards: string[] = [];
   let answer: ToolApprovalDecision = "accept";
   /** One `set_browser_profile` call from the coordinator, answered as the tool router answers it. */
-  const call = async (args: unknown, requestedByPerson = true): Promise<{ success: boolean; value: DynamicRecord }> => {
+  const call = async (
+    args: unknown,
+    requestedByPerson = true,
+    requestersCanAdminister = true,
+  ): Promise<{ success: boolean; value: DynamicRecord }> => {
     const response = await Effect.runPromise(
       handleSetBrowserProfileTool(
         {
@@ -131,6 +137,7 @@ try {
           listAgents: () => service.listAgents(),
           profiles,
           requestedByPerson,
+          requestersCanAdminister,
           approve: (reason) =>
             Effect.sync(() => {
               cards.push(reason);
@@ -158,8 +165,22 @@ try {
     assert.equal(cards.length, 0);
     assert.equal(profiles.list().profiles.length, 0, "No profile is made.");
     assert.deepEqual(view(sales.id), { kind: "shared" });
+    assert.match(String(value.error), /Advanced, Browser profile/u, "An owner or admin finds the setting there.");
     return value;
   });
+
+  await step(
+    "A member's refusal tells them to ask an owner or admin, not to open a setting they do not see",
+    async () => {
+      const { success, value } = await call({ agentIds: [sales.id], profile: "named", name: "Client A" }, false, false);
+      assert.equal(success, false);
+      assert.equal(cards.length, 0);
+      assert.equal(profiles.list().profiles.length, 0, "No profile is made.");
+      assert.match(String(value.error), /ask an owner or admin/u);
+      assert.doesNotMatch(String(value.error), /Advanced/u);
+      return value;
+    },
+  );
 
   await step("A declined card changes nothing", async () => {
     answer = "decline";

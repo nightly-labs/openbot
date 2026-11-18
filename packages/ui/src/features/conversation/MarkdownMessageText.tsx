@@ -1341,9 +1341,10 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
 /** The shared and workspace paths that a link target can open as a chip. */
 function linkFileTargets(href: string): { shared: string | null; workspace: string | null } {
   const fileUrl = fileUrlPath(href);
-  // The shared-file resolver does not decode, and the workspace resolver does.
+  // A link target is percent-encoded, such as `a%20b.md`. The shared-file resolver does not decode, so
+  // the shared target is decoded here once; the workspace resolver decodes by itself (#12104).
   return {
-    shared: sharedFileTarget(fileUrl === null ? href : decodedFileUrlPath(fileUrl)),
+    shared: sharedFileTarget(decodedFileUrlPath(fileUrl ?? href)),
     workspace: workspaceFileTarget(fileUrl ?? href),
   };
 }
