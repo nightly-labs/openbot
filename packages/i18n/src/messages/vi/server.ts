@@ -335,7 +335,7 @@ export const messages = {
   "server.settings.threadsCard": "Luồng và múi giờ",
   "server.settings.memoryTitle": "Bộ nhớ",
   "server.settings.memoryDescription": "Chọn những gì agent trên máy chủ này ghi nhớ và học hỏi.",
-  "server.settings.memoriesCard": "Ký ức",
+  "server.settings.memoriesCard": "Mục bộ nhớ",
   "server.settings.learningCard": "Học hỏi",
   "server.settings.sections": "Các mục cài đặt máy chủ",
   "server.settings.identity": "Danh tính",
@@ -424,8 +424,8 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Số luồng mỗi agent có thể chạy cùng lúc khi agent không có giới hạn riêng.",
   "server.settings.agentTaskLimitDefault": "Mặc định ({count})",
-  "server.settings.memoryLimit": "Số ký ức mỗi agent",
-  "server.settings.memoryLimitDescription": "Số ký ức mỗi agent trên máy chủ này có thể lưu giữ.",
+  "server.settings.memoryLimit": "Số mục bộ nhớ mỗi agent",
+  "server.settings.memoryLimitDescription": "Số mục bộ nhớ mỗi agent trên máy chủ này có thể lưu giữ.",
   "server.settings.memoryLimitLoadFailed": "Không thể tải giới hạn bộ nhớ của máy chủ này.",
   "server.settings.memoryReview": "Rà soát bộ nhớ",
   "server.settings.memoryReviewDescription":

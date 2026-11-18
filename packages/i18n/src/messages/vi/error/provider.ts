@@ -444,7 +444,7 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Máy tính này không có kho lưu trữ an toàn, nên không thể lưu giá trị biến môi trường. Hãy xóa chúng và thử lại.",
   "error.provider.customAgentNotSaved": "Agent tùy chỉnh này chưa được lưu. Hãy làm mới danh sách và thử lại.",
-  "error.provider.customAgentWorkspaceOnly": "{reason}. Chế độ Chỉ không gian làm việc chặn thao tác này. Hãy thử Toàn quyền truy cập.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. Chế độ Chỉ không gian làm việc chặn thao tác này. Hãy thử Toàn quyền.",
   "error.provider.customAgentTooMany": "Bạn có thể lưu tối đa {count} agent tùy chỉnh.",
   "error.provider.customAgentEnvValueMissing": "Hãy nhập giá trị cho {name}.",
   "error.provider.off": "{provider} đang tắt trong OpenBot. Hãy bật trong cài đặt nhà cung cấp trước.",
@@ -514,7 +514,7 @@ export const messages = {
   "error.provider.museInvalidToolResult": "Kết quả công cụ OpenBot không hợp lệ.",
   "error.provider.museMcpRequired": "Muse phải hỗ trợ máy chủ MCP theo phiên.",
   "error.provider.museSessionMismatch": "Muse trả về một phiên khác.",
-  "error.provider.museCompactRejected": "Muse không chấp nhận việc nén ngữ cảnh.",
+  "error.provider.museCompactRejected": "Muse không chấp nhận việc thu gọn ngữ cảnh.",
   "error.provider.museTurnMismatch": "Muse trả về một lượt khác.",
   "error.provider.museHistoryMismatch": "Lịch sử Muse bị lẫn giữa các phiên.",
   "error.provider.museRecoveryFailed": "Muse không thể khôi phục các sự kiện bị thiếu.",

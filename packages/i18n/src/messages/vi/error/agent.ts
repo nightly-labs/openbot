@@ -37,7 +37,7 @@ export const messages = {
   "error.agent.searchQueryRequired": "Cần có truy vấn tìm kiếm.",
   "error.agent.messageTooLong": "Tin nhắn quá dài.",
   "error.agent.messageOrAttachmentRequired": "Cần có tin nhắn hoặc tệp đính kèm.",
-  "error.agent.promptAnswersTooLong": "Câu trả lời cho lời nhắc quá dài.",
+  "error.agent.promptAnswersTooLong": "Câu trả lời cho prompt quá dài.",
   "error.agent.gone": "Agent này không còn tồn tại.",
   "error.agent.instructionsTooLarge": "Tệp hướng dẫn quá lớn để mở tại đây. Hãy rút gọn tệp trong trình soạn thảo văn bản.",
   "error.agent.instructionsOutside":
@@ -79,9 +79,9 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange":
     "Các tác vụ của agent này đang chạy. Hãy đợi chúng hoàn tất, hoặc dừng chúng, trước khi đổi nhà cung cấp.",
   "error.agent.waitBeforeClearContext": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi bắt đầu cuộc trò chuyện mới.",
-  "error.agent.waitBeforeCompactContext": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi nén ngữ cảnh.",
+  "error.agent.waitBeforeCompactContext": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi thu gọn ngữ cảnh.",
   "error.agent.waitBeforeDeleteHistory": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi xóa lịch sử.",
-  "error.agent.compactContextUnavailable": "Agent này hiện không thể nén ngữ cảnh.",
+  "error.agent.compactContextUnavailable": "Agent này hiện không thể thu gọn ngữ cảnh.",
   "error.agent.unknown": "Agent không xác định: {id}",
   "error.agent.onlyUserWidensSettings":
     "Chỉ người dùng mới có thể cấp Toàn quyền cho agent hoặc bật Điều khiển máy tính. Hãy nhờ người dùng thay đổi trong cài đặt của agent.",
@@ -103,21 +103,21 @@ export const messages = {
   "error.agent.answerCutOff":
     "Agent đã dừng trước khi trả lời xong, nên câu trả lời chưa đầy đủ. Hãy gửi lại tin nhắn.",
   "error.agent.compactionConnectionLost":
-    "Kết nối bị ngắt trong lúc agent nén ngữ cảnh, nên tác vụ đã dừng. Hãy kiểm tra kết nối internet, rồi gửi tin nhắn để tiếp tục.",
+    "Kết nối bị ngắt trong lúc agent thu gọn ngữ cảnh, nên tác vụ đã dừng. Hãy kiểm tra kết nối internet, rồi gửi tin nhắn để tiếp tục.",
   "error.agent.compactionConnectionLostAddress":
-    "Kết nối bị ngắt trong lúc agent nén ngữ cảnh, nên tác vụ đã dừng. Hãy kiểm tra kết nối internet. Đồng thời đảm bảo {variable} trong mục Biến của cài đặt {provider} là địa chỉ API của dịch vụ mô hình, thường kết thúc bằng /v1. Sau đó gửi tin nhắn.",
+    "Kết nối bị ngắt trong lúc agent thu gọn ngữ cảnh, nên tác vụ đã dừng. Hãy kiểm tra kết nối internet. Đồng thời đảm bảo {variable} trong mục Biến của cài đặt {provider} là địa chỉ API của dịch vụ mô hình, thường kết thúc bằng /v1. Sau đó gửi tin nhắn.",
   "error.agent.compactionLoopStopped":
-    "{provider} đã nén ngữ cảnh nhiều lần liên tiếp, và lần nào ngữ cảnh cũng vẫn quá đầy để tiếp tục, nên OpenBot đã dừng lượt này. Hãy tắt các máy chủ MCP hoặc điều khiển máy tính mà agent này không cần, rồi gửi tin nhắn. Nếu bạn hoặc agent đã thay đổi thời điểm {provider} nén ngữ cảnh, hãy hoàn tác thay đổi đó.",
+    "{provider} đã thu gọn ngữ cảnh nhiều lần liên tiếp, và lần nào ngữ cảnh cũng vẫn quá đầy để tiếp tục, nên OpenBot đã dừng lượt này. Hãy tắt các máy chủ MCP hoặc điều khiển máy tính mà agent này không cần, rồi gửi tin nhắn. Nếu bạn hoặc agent đã thay đổi thời điểm {provider} thu gọn ngữ cảnh, hãy hoàn tác thay đổi đó.",
   "error.agent.selectedGone": "Agent đã chọn không còn tồn tại.",
   "error.agent.profileEndpointsChanged": "Các endpoint tùy chỉnh đã thay đổi trong lúc tạo. Hãy thử lại.",
-  "error.agent.profileInvalid": "Nhà cung cấp trả về hồ sơ không hợp lệ. Hãy thử sửa lời nhắc của bạn.",
+  "error.agent.profileInvalid": "Nhà cung cấp trả về hồ sơ không hợp lệ. Hãy thử sửa prompt của bạn.",
   "error.agent.profileSectionUnavailable":
     "Phần được tạo không khả dụng. Hãy thử lại hoặc tự chọn một phần.",
   "error.agent.profileTimedOut": "Tạo hồ sơ đã hết thời gian chờ. Hãy thử lại.",
   "error.agent.profileDisconnected": "Nhà cung cấp đã ngắt kết nối trong lúc tạo hồ sơ.",
-  "error.agent.profileToolUse": "Nhà cung cấp đã cố dùng một công cụ. Hãy thử sửa lời nhắc của bạn.",
+  "error.agent.profileToolUse": "Nhà cung cấp đã cố dùng một công cụ. Hãy thử sửa prompt của bạn.",
   "error.agent.profileFailed": "Nhà cung cấp không thể tạo hồ sơ. Hãy thử lại.",
-  "error.agent.profileTooLarge": "Hồ sơ được tạo quá lớn. Hãy thử lời nhắc ngắn hơn.",
+  "error.agent.profileTooLarge": "Hồ sơ được tạo quá lớn. Hãy thử prompt ngắn hơn.",
   "error.agent.profileNotStarted": "Nhà cung cấp không thể bắt đầu tạo hồ sơ.",
   "error.agent.deletionBusy": "Agent đang được xóa.",
   "error.agent.stopBeforeDelete": "Hãy dừng agent và hủy các tin nhắn trong hàng đợi trước khi xóa.",

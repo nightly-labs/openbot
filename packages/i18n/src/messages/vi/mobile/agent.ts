@@ -321,7 +321,7 @@ export const messages = {
   "mobile.agent.access.label": "Quyền truy cập của agent",
   "mobile.agent.access.workspace": "Chỉ không gian làm việc",
   "mobile.agent.access.ask": "Hỏi trước",
-  "mobile.agent.access.full": "Toàn quyền truy cập",
+  "mobile.agent.access.full": "Toàn quyền",
   "mobile.agent.access.autoApproveLocked": "Chế độ Turbo đang bật trên host này, nên mọi agent đều tự động phê duyệt.",
   "mobile.agent.access.workspaceNote":
     "Agent làm việc trong không gian làm việc của nó và thư mục dùng chung trên host.",

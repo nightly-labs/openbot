@@ -117,7 +117,7 @@ export const messages = {
     other: "{count} cài đặt khớp.",
   },
   "app.standingApproval.description":
-    "{name} sẽ chuyển sang Toàn quyền truy cập. Agent sẽ chạy lệnh và công cụ, sửa tệp, xuất bản trang web và tự mở rộng quyền truy cập hệ thống tệp và mạng trên máy tính chạy nó mà không hỏi lại. Bạn có thể thay đổi điều này trong cài đặt Quyền của agent.",
+    "{name} sẽ chuyển sang Toàn quyền. Agent sẽ chạy lệnh và công cụ, sửa tệp, xuất bản trang web và tự mở rộng quyền truy cập hệ thống tệp và mạng trên máy tính chạy nó mà không hỏi lại. Bạn có thể thay đổi điều này trong cài đặt Quyền của agent.",
   "app.standingApproval.descriptionUnnamed":
-    "Agent này sẽ chuyển sang Toàn quyền truy cập. Agent sẽ chạy lệnh và công cụ, sửa tệp, xuất bản trang web và tự mở rộng quyền truy cập hệ thống tệp và mạng trên máy tính chạy nó mà không hỏi lại. Bạn có thể thay đổi điều này trong cài đặt Quyền của agent.",
+    "Agent này sẽ chuyển sang Toàn quyền. Agent sẽ chạy lệnh và công cụ, sửa tệp, xuất bản trang web và tự mở rộng quyền truy cập hệ thống tệp và mạng trên máy tính chạy nó mà không hỏi lại. Bạn có thể thay đổi điều này trong cài đặt Quyền của agent.",
 } as const satisfies PartialTranslation<typeof source>;

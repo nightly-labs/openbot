@@ -61,15 +61,15 @@ export const messages = {
   "error.backend.sunshineNotReadyReason": "Sunshine chưa sẵn sàng. {reason}",
   "error.backend.channelLeadModelUnavailable": "Mô hình của trưởng nhóm kênh không khả dụng.",
   "error.backend.contextCompactionIneffective":
-    "Nén không làm cuộc trò chuyện này nhỏ hơn: sau hai lần nén, nó vẫn dùng {percent}% cửa sổ ngữ cảnh của mô hình, nên OpenBot ngừng nén. Công cụ và hướng dẫn chiếm phần lớn cửa sổ. Hãy tắt các máy chủ MCP hoặc điều khiển máy tính mà agent này không cần, hoặc chọn mô hình có cửa sổ lớn hơn. Sau đó bắt đầu cuộc trò chuyện mới.",
+    "Thu gọn không làm cuộc trò chuyện này nhỏ hơn: sau hai lần thu gọn, nó vẫn dùng {percent}% cửa sổ ngữ cảnh của mô hình, nên OpenBot ngừng thu gọn. Công cụ và hướng dẫn chiếm phần lớn cửa sổ. Hãy tắt các máy chủ MCP hoặc điều khiển máy tính mà agent này không cần, hoặc chọn mô hình có cửa sổ lớn hơn. Sau đó bắt đầu cuộc trò chuyện mới.",
   "error.backend.contextCompactionStopped":
-    "Hai lần nén cuộc trò chuyện này liên tiếp thất bại, nên OpenBot ngừng tự động nén. Mỗi lần thử sẽ gửi toàn bộ cuộc trò chuyện tới mô hình và dùng hạn mức gói của bạn. Hãy chọn Nén ngay để thử lại, hoặc bắt đầu cuộc trò chuyện mới.",
+    "Hai lần thu gọn cuộc trò chuyện này liên tiếp thất bại, nên OpenBot ngừng tự động thu gọn. Mỗi lần thử sẽ gửi toàn bộ cuộc trò chuyện tới mô hình và dùng hạn mức gói của bạn. Hãy chọn Thu gọn ngay để thử lại, hoặc bắt đầu cuộc trò chuyện mới.",
   "error.backend.providerModelAtCapacity":
     "Mô hình đang quá tải. Nhà cung cấp sẽ thử lại sau vài phút. Để tiếp tục ngay, hãy dừng lượt và chọn mô hình khác.",
   "error.backend.providerRetrying":
     "Nhà cung cấp đã thất bại {attempts} lần với yêu cầu này và đang thử lại. Nếu agent không tiếp tục, hãy dừng lượt.",
   "error.backend.providerRetryingLargeContext":
-    "Nhà cung cấp đã thất bại {attempts} lần với yêu cầu này và đang thử lại. Cuộc trò chuyện này dùng {percent}% cửa sổ ngữ cảnh của mô hình. Nếu agent không tiếp tục, hãy dừng lượt: OpenBot sẽ nén cuộc trò chuyện trước tin nhắn tiếp theo.",
+    "Nhà cung cấp đã thất bại {attempts} lần với yêu cầu này và đang thử lại. Cuộc trò chuyện này dùng {percent}% cửa sổ ngữ cảnh của mô hình. Nếu agent không tiếp tục, hãy dừng lượt: OpenBot sẽ thu gọn cuộc trò chuyện trước tin nhắn tiếp theo.",
   "error.backend.sharedDataUnavailable": "Dữ liệu dùng chung không khả dụng.",
   "error.backend.shuttingDown": "OpenBot đang tắt.",
   "error.backend.channelUnconfirmedStart":
@@ -80,14 +80,14 @@ export const messages = {
     "Hãy rút gọn hướng dẫn xuống 2.000 ký tự. Hướng dẫn dài hơn sẽ không được lưu.",
   "error.backend.channelWaitBeforeNewConversation":
     "Hãy đợi công việc trong kênh này dừng, rồi bắt đầu cuộc trò chuyện mới.",
-  "error.backend.channelWaitBeforeCompact": "Hãy đợi công việc trong kênh này dừng, rồi nén kênh.",
+  "error.backend.channelWaitBeforeCompact": "Hãy đợi công việc trong kênh này dừng, rồi thu gọn kênh.",
   "error.backend.channelWaitBeforeDeleteHistory": "Hãy đợi công việc trong kênh này dừng, rồi xóa lịch sử.",
   "error.backend.channelCompactUnavailable":
-    "Hiện không thành viên nào của kênh này có thể nén ngữ cảnh. Một thành viên phải trả lời trong kênh trước, và nhà cung cấp của thành viên đó phải hỗ trợ nén.",
+    "Hiện không thành viên nào của kênh này có thể thu gọn ngữ cảnh. Một thành viên phải trả lời trong kênh trước, và nhà cung cấp của thành viên đó phải hỗ trợ thu gọn.",
   "error.backend.channelCompactNoSession":
-    "Các thành viên của kênh này chưa có cuộc trò chuyện nào để nén. Hãy nén sau khi một thành viên trả lời trong kênh.",
+    "Các thành viên của kênh này chưa có cuộc trò chuyện nào để thu gọn. Hãy thu gọn sau khi một thành viên trả lời trong kênh.",
   "error.backend.channelCompactNotSupported":
-    "Không thành viên nào của kênh này có thể nén theo yêu cầu. Các thành viên hỗ trợ sẽ tự động nén ngữ cảnh khi gần đầy.",
+    "Không thành viên nào của kênh này có thể thu gọn theo yêu cầu. Các thành viên hỗ trợ sẽ tự động thu gọn ngữ cảnh khi gần đầy.",
   "error.backend.channelArchived": "Hãy khôi phục kênh này trước khi gửi tin nhắn hoặc thay đổi tác vụ.",
   "error.backend.channelArchiveRunning": "Hãy dừng công việc đang chạy trong kênh này, rồi xóa kênh.",
   "error.backend.channelReferenceUnavailable": "Tin nhắn kênh được tham chiếu không khả dụng.",
@@ -113,7 +113,7 @@ export const messages = {
   "error.backend.channelAssignmentChanged": "Lượt giao việc trong kênh này đã thay đổi.",
   "error.backend.channelMemberRequired": "Hãy chọn một thành viên khả dụng của kênh này.",
   "error.backend.memoryEssentialBudget":
-    "Các mục bộ nhớ thiết yếu vượt quá giới hạn lời nhắc. Hãy đặt một mục thành tìm kiếm khi cần, rồi thử lại.",
+    "Các mục bộ nhớ thiết yếu vượt quá giới hạn prompt. Hãy đặt một mục thành tìm kiếm khi cần, rồi thử lại.",
   "error.backend.memorySelectionConflict": "Bộ nhớ đã thay đổi. Hãy tải lại và thử lại.",
   "error.backend.memorySelectionUserControlled": "Người dùng kiểm soát lựa chọn bộ nhớ này. Hãy giữ lựa chọn của người dùng.",
   "error.backend.memorySearchQuery": "Hãy nhập một hoặc nhiều từ tìm kiếm, tối đa 256 ký tự.",
@@ -357,7 +357,7 @@ export const messages = {
   "error.backend.steerRoutineRun":
     "Một tác vụ định kỳ đang chạy. Tin nhắn của bạn vẫn nằm trong hàng đợi và sẽ bắt đầu sau tác vụ định kỳ.",
   "error.backend.steerQueuedOnly": "Chỉ có thể định hướng bằng tin nhắn trong hàng đợi.",
-  "error.backend.promptInactive": "Lời nhắc này không còn hoạt động.",
+  "error.backend.promptInactive": "Prompt này không còn hoạt động.",
   "error.backend.promptAnswerMismatch": "Một câu trả lời không khớp với câu hỏi đang hoạt động.",
   "error.backend.uiBlockAnswerInvalid": "Câu trả lời này không phù hợp với khối của agent.",
   "error.backend.uiBlockActionNotAllowed": "Chỉ chủ sở hữu máy chủ hoặc quản trị viên mới có thể chọn hành động này.",

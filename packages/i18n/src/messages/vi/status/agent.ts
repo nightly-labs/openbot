@@ -155,7 +155,7 @@ export const messages = {
   "status.agent.vaultField.email": "Địa chỉ email",
   "status.agent.nextStepContinues": "Agent đã dừng trước bước tiếp theo. Agent sẽ tiếp tục ({current}/{limit}).",
   "status.agent.planContinues": "Kế hoạch vẫn còn bước chưa xong. Agent sẽ tiếp tục ({current}/{limit}).",
-  "status.agent.compactionContinues": "Kết nối bị ngắt khi agent đang nén ngữ cảnh. Agent sẽ tiếp tục.",
+  "status.agent.compactionContinues": "Kết nối bị ngắt khi agent đang thu gọn ngữ cảnh. Agent sẽ tiếp tục.",
   "status.agent.providerExitContinues": "Agent đã dừng trước khi trả lời xong. Agent sẽ tiếp tục.",
   "status.agent.branchTitle": "Cuộc trò chuyện rẽ nhánh",
   "status.agent.importedChatTitle": "Cuộc trò chuyện đã nhập",

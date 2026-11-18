@@ -63,14 +63,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Thư mục kỹ năng cần có SKILL.md ở thư mục gốc.",
   "error.skill.pathSymlink": "Đường dẫn kỹ năng không được chứa liên kết tượng trưng.",
   "error.skill.folderNotRead": "{provider} không đọc {folder}. Hãy sao chép thư mục này vào {target}.",
-  "error.skill.githubLinkInvalid": "Hãy dán liên kết tới một kho lưu trữ hoặc thư mục GitHub.",
+  "error.skill.githubLinkInvalid": "Hãy dán liên kết tới một kho mã hoặc thư mục GitHub.",
   "error.skill.githubNotFound":
-    "OpenBot không thể mở {repository}. Kho lưu trữ này là riêng tư hoặc không tồn tại.",
+    "OpenBot không thể mở {repository}. Kho mã này là riêng tư hoặc không tồn tại.",
   "error.skill.githubNoSkills": "Không có SKILL.md trong {folder}.",
   "error.skill.githubUnavailable": "OpenBot hiện không thể đọc GitHub. Hãy thử lại sau.",
   "error.skill.githubRateLimited":
     "GitHub giới hạn số lần OpenBot có thể đọc khi không có tài khoản. Hãy thử lại sau một giờ.",
-  "error.skill.githubTooLarge": "OpenBot không thể đọc hết các tệp của {repository}. Kho lưu trữ quá lớn.",
+  "error.skill.githubTooLarge": "OpenBot không thể đọc hết các tệp của {repository}. Kho mã quá lớn.",
   "error.skill.githubHostTooOld": "Hãy cập nhật máy chủ này để thêm kỹ năng từ GitHub.",
   "error.skill.publishGithub": "{name} đến từ GitHub. Bạn chỉ có thể xuất bản các kỹ năng do bạn tạo.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,7 +19,7 @@ export const messages = {
   "error.workflow.conditionUnclear": "Mô hình không trả lời có hoặc không.",
   "error.workflow.modelFailed": "Mô hình không thể trả lời. Hãy chạy lại bước này.",
   "error.workflow.modelTimedOut":
-    "Mô hình không trả lời kịp thời. Hãy chọn mức nỗ lực thấp hơn hoặc mô hình nhanh hơn cho bước này, rồi chạy lại.",
+    "Mô hình không trả lời kịp thời. Hãy chọn mức suy luận thấp hơn hoặc mô hình nhanh hơn cho bước này, rồi chạy lại.",
   "error.workflow.modelToolUse":
     "Mô hình đã cố dùng một công cụ, nhưng bước này chỉ có thể trả lời bằng văn bản. Hãy chạy lại bước này, hoặc chọn mô hình khác cho nó.",
   "error.workflow.modelUnavailable": "Mô hình của bước này không khả dụng. Hãy chọn mô hình khác cho bước này.",
@@ -60,7 +60,7 @@ export const messages = {
     "Quy trình này quá lớn để gửi sang máy tính khác. Hãy mở trên máy tính chạy máy chủ.",
   "error.workflow.webhookMissing": "Bước này không phải trình kích hoạt webhook. Hãy lưu quy trình, rồi thử lại.",
   "error.workflow.githubActionMissing": "Chọn việc đầu ra này làm trên GitHub.",
-  "error.workflow.githubRepositoryMissing": "Chọn kho lưu trữ cho đầu ra này.",
+  "error.workflow.githubRepositoryMissing": "Chọn kho mã cho đầu ra này.",
   "error.workflow.githubItemMissing":
     "Đầu ra này không có issue hoặc pull request. Hãy bắt đầu lần chạy từ một sự kiện GitHub, hoặc đưa số vào đầu vào của nó.",
   "error.workflow.githubPullRequestOnly": "Thao tác này chỉ dùng được với pull request.",
@@ -68,12 +68,12 @@ export const messages = {
   "error.workflow.githubEventText":
     "Đầu ra này không thể gửi sự kiện thô của trình kích hoạt. Hãy đặt một agent giữa trình kích hoạt và đầu ra này.",
   "error.workflow.githubChoiceMissing": "Chọn nhãn hoặc người cho đầu ra này.",
-  "error.workflow.githubChoseNothing": "Mô hình không chọn nhãn hoặc người nào của kho lưu trữ này.",
+  "error.workflow.githubChoseNothing": "Mô hình không chọn nhãn hoặc người nào của kho mã này.",
   "error.workflow.githubNotConnected": "Kết nối GitHub trên máy tính chạy quy trình này.",
   "error.workflow.githubNoAccess":
-    "OpenBot GitHub App không thấy kho lưu trữ hoặc mục này. Hãy mở GitHub và cấp quyền truy cập cho ứng dụng.",
+    "OpenBot GitHub App không thấy kho mã hoặc mục này. Hãy mở GitHub và cấp quyền truy cập cho ứng dụng.",
   "error.workflow.githubNoWrite":
-    "OpenBot GitHub App không thể thay đổi kho lưu trữ này. Hãy mở GitHub và cấp quyền truy cập cho ứng dụng.",
+    "OpenBot GitHub App không thể thay đổi kho mã này. Hãy mở GitHub và cấp quyền truy cập cho ứng dụng.",
   "error.workflow.githubLocked": "Cuộc trò chuyện này đã bị khóa trên GitHub.",
   "error.workflow.githubRefused": "GitHub đã từ chối thay đổi: {detail}",
   "error.workflow.githubUnreachable": "OpenBot không thể kết nối tới GitHub. Hãy chạy lại bước này.",
@@ -96,7 +96,7 @@ export const messages = {
   "error.workflow.higgsfieldNeedsPlan":
     "Mô hình Higgsfield này cần gói Higgsfield. Hãy đăng ký gói tại higgsfield.ai/pricing, hoặc chọn mô hình khác.",
   "error.workflow.higgsfieldBlocked":
-    "Higgsfield không tạo tệp vì bộ kiểm duyệt nội dung đã chặn. Hãy thay đổi lời nhắc hoặc hình ảnh đầu vào, rồi chạy lại bước này.",
+    "Higgsfield không tạo tệp vì bộ kiểm duyệt nội dung đã chặn. Hãy thay đổi prompt hoặc hình ảnh đầu vào, rồi chạy lại bước này.",
   "error.workflow.higgsfieldFailed": "Higgsfield không thể tạo tệp: {reason}",
   "error.workflow.higgsfieldTimeout":
     "Higgsfield không tạo xong tệp kịp thời. Hãy xem lịch sử của bạn trên higgsfield.ai trước khi chạy lại bước này.",

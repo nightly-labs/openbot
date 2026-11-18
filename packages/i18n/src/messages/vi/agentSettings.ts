@@ -159,7 +159,7 @@ export const messages = {
 
   "agentSettings.access.workspace": "Chỉ không gian làm việc",
   "agentSettings.access.ask": "Hỏi trước",
-  "agentSettings.access.full": "Toàn quyền truy cập",
+  "agentSettings.access.full": "Toàn quyền",
   "agentSettings.busyMessage.appDefaultQueue": "Mặc định của ứng dụng (Hàng đợi)",
   "agentSettings.busyMessage.appDefaultSteer": "Mặc định của ứng dụng (Định hướng)",
   "agentSettings.busyMessage.hostDefaultQueue": "Mặc định của host (Hàng đợi)",

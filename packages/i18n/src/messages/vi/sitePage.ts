@@ -361,7 +361,7 @@ export const messages = {
     "Agent có thể chuyển sang mô hình dự phòng của nhà cung cấp khác khi gói của nó đạt giới hạn, hoặc khi nhà cung cấp quá tải hay ngừng hoạt động. Agent giữ nguyên cuộc trò chuyện và không gian làm việc, và một ghi chú trong cuộc trò chuyện cho biết việc chuyển đổi.",
   "sitePage.landing.faq.start.question": "Tôi bắt đầu như thế nào?",
   "sitePage.landing.faq.start.answer":
-    "Tải OpenBot và kết nối một nhà cung cấp. Sau đó mô tả agent bạn muốn trong một lời nhắc, kiểm tra chỉ dẫn của nó và lưu lại. Bạn có thể giao việc ngay: tin nhắn sẽ chờ trong hàng đợi cho đến khi agent rảnh.",
+    "Tải OpenBot và kết nối một nhà cung cấp. Sau đó mô tả agent bạn muốn trong một prompt, kiểm tra chỉ dẫn của nó và lưu lại. Bạn có thể giao việc ngay: tin nhắn sẽ chờ trong hàng đợi cho đến khi agent rảnh.",
   "sitePage.landing.faq.data.question": "Dữ liệu của tôi đi đâu?",
   "sitePage.landing.faq.data.answer":
     "Không gian làm việc, cuộc trò chuyện, tệp đính kèm và dữ liệu trình duyệt nằm trên máy tính chạy OpenBot. Nhà cung cấp AI bạn chọn nhận các lời nhắc mà agent gửi tới, và các trang mà agent mở sẽ dùng mạng.",

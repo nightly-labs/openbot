@@ -130,7 +130,7 @@ export const messages = {
   "composer.error.saveEditTryAgain": "Không lưu được chỉnh sửa này trên máy tính này. Hãy thử lại.",
   "composer.error.saveUnconfirmed": "Chưa xác nhận được việc lưu. Hãy bấm Lưu lại để kiểm tra kết quả.",
   "composer.error.changeModel": "Không đổi được mô hình. Hãy thử lại.",
-  "composer.error.changeEffort": "Không đổi được mức nỗ lực. Hãy thử lại.",
+  "composer.error.changeEffort": "Không đổi được mức suy luận. Hãy thử lại.",
   "composer.error.changeFastMode": "Không đổi được chế độ nhanh. Hãy thử lại.",
   "composer.fastMode.confirmTitle": "Bật chế độ nhanh?",
   "composer.fastMode.confirmDescription":
