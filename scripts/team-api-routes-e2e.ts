@@ -1857,8 +1857,13 @@ const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0]
 const releasedSession = (sessionId: string | undefined) =>
   releasedHolders.some((holder) => holder.kind === "session" && holder.sessionId === sessionId);
 
+// The tabs of the host. Only the check of the tabs of a closed agent sets them; before and after it,
+// a read of the tab list fails, as it did before.
+let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> | undefined;
+const unusedListTabs = unused("listTabs");
+
 const browser: TeamApiBrowser = {
-  listTabs: unused("listTabs"),
+  listTabs: () => browserTabs ?? unusedListTabs(),
   getControlState: unused("getControlState"),
   open: unused("open"),
   activate: unused("activate"),
@@ -6489,6 +6494,48 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The tabs of an agent that the roles close to a member ----
+  {
+    const tab = (id: string, ownerAgentId: string) => ({
+      id,
+      title: id,
+      url: "https://shop.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId,
+    });
+    browserTabs = [tab("tab-ada", "agent-ada"), tab("tab-oc", "agent-oc")];
+    const ids = (reply: Reply) => list(reply.body).map((entry) => field(entry, "id"));
+    const opensBefore = callsOf("open").length;
+    const teachesBefore = callsOf("startTeach").length;
+    accessLevels = { revision: 93, everyone: { "agent-ada": "none" }, roles: [] };
+    const memberTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    const adminTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: adaToken });
+    const teach = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-ada" },
+      capabilities: [BROWSER_TEACH_CAPABILITY],
+    });
+    const open = await call("POST", TEAM_API_ROUTES.browser.open, {
+      token: bobToken,
+      json: { url: "https://shop.example/", ownerThreadId: null, ownerAgentId: "agent-ada" },
+    });
+    accessLevels = { revision: 94, everyone: {}, roles: [] };
+    const reopened = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    browserTabs = undefined;
+    check(
+      "a member does not see or use a tab of an agent at none, and cannot open one for it; an admin sees it; the member sees it again when the access opens",
+      isDeepStrictEqual(ids(memberTabs), ["tab-oc"]) &&
+        isDeepStrictEqual(ids(adminTabs), ["tab-ada", "tab-oc"]) &&
+        errorIs(teach, 404, sourceText("error.backend.browserTabNotFound")) &&
+        errorIs(open, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("open").length === opensBefore &&
+        callsOf("startTeach").length === teachesBefore &&
+        isDeepStrictEqual(ids(reopened), ["tab-ada", "tab-oc"]),
+      [summary(memberTabs), summary(adminTabs), summary(teach), summary(open), summary(reopened)],
     );
   }
 

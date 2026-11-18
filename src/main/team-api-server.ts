@@ -1529,6 +1529,7 @@ export class TeamApiServer {
     return routeBrowser(context, {
       browser: this.#options.browser,
       ...(browserView === undefined ? {} : { browserView }),
+      blockedAgentIds: () => this.#blockedAgentIds(context.member),
     });
   }
 
@@ -2087,9 +2088,10 @@ export class TeamApiServer {
   }
 
   /**
-   * A member does not see an administrator's private MCP sign-in tab, the same as on the browser
-   * routes. A usage reading keeps the provider's own sign-in only, as `GET /v1/agents/usage` does: a
-   * released client reads one limit per provider.
+   * A member does not see an administrator's private MCP sign-in tab, or a tab of an agent that the
+   * roles close to that member, the same as on the browser routes. A usage reading keeps the
+   * provider's own sign-in only, as `GET /v1/agents/usage` does: a released client reads one limit per
+   * provider.
    */
   #eventFor(connection: EventClientState, event: AgentEvent): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
@@ -2098,24 +2100,52 @@ export class TeamApiServer {
         usage: { ...event.usage, limits: event.usage.limits.filter((limit) => limit.accountId === undefined) },
       };
     if (event.type === "browser-user-control-changed") {
-      const { browser, store } = this.#options;
-      if (!event.tabIds.some((tabId) => browser.isPrivate(tabId))) return event;
-      if (canAdministerServer(store.authenticate(connection.token)?.role)) return event;
-      return { ...event, tabIds: event.tabIds.filter((tabId) => !browser.isPrivate(tabId)) };
+      const hidden = this.#hiddenTab(connection, event.tabIds);
+      if (!hidden) return event;
+      return { ...event, tabIds: event.tabIds.filter((tabId) => !hidden(tabId)) };
     }
     if (event.type === "browser-page-state-changed") {
-      const { browser, store } = this.#options;
-      if (!event.tabs.some((tab) => browser.isPrivate(tab.tabId))) return event;
-      if (canAdministerServer(store.authenticate(connection.token)?.role)) return event;
-      return { ...event, tabs: event.tabs.filter((tab) => !browser.isPrivate(tab.tabId)) };
+      const hidden = this.#hiddenTab(
+        connection,
+        event.tabs.map((tab) => tab.tabId),
+      );
+      if (!hidden) return event;
+      return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
     }
     if (event.type !== "browser-changed") return event;
-    const { browser, store } = this.#options;
-    if (!event.tabs.some((tab) => browser.isPrivate(tab.id))) return event;
-    const role = store.authenticate(connection.token)?.role;
-    if (canAdministerServer(role)) return event;
-    const tabs = event.tabs.filter((tab) => !browser.isPrivate(tab.id));
+    const hidden = this.#hiddenTab(
+      connection,
+      event.tabs.map((tab) => tab.id),
+      new Map(event.tabs.map((tab) => [tab.id, tab.ownerAgentId])),
+    );
+    if (!hidden) return event;
+    const tabs = event.tabs.filter((tab) => !hidden(tab.id));
     return { ...event, tabs, activeTabId: tabs.some((tab) => tab.id === event.activeTabId) ? event.activeTabId : null };
+  }
+
+  /**
+   * The test of `routeBrowser` for the tabs of an event: a private tab, or a tab of an agent at `none`
+   * for this member. Undefined when the event has no tab that this connection must not see.
+   */
+  #hiddenTab(
+    connection: EventClientState,
+    tabIds: readonly string[],
+    owners?: ReadonlyMap<string, string | null>,
+  ): ((tabId: string) => boolean) | undefined {
+    const { browser } = this.#options;
+    if (tabIds.length === 0) return undefined;
+    const member = this.#connectionMember(connection);
+    if (canAdministerServer(member.role)) return undefined;
+    const blocked = this.#blockedAgentIds(member);
+    if (blocked.size === 0 && !tabIds.some((tabId) => browser.isPrivate(tabId))) return undefined;
+    // The owners are read only when an agent is closed to this member.
+    const tabOwners =
+      blocked.size === 0 ? undefined : (owners ?? new Map(browser.listTabs().map((tab) => [tab.id, tab.ownerAgentId])));
+    const hidden = (tabId: string) => {
+      const owner = tabOwners?.get(tabId);
+      return browser.isPrivate(tabId) || (typeof owner === "string" && blocked.has(owner));
+    };
+    return tabIds.some(hidden) ? hidden : undefined;
   }
 
   #connectEvents(

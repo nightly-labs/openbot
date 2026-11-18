@@ -227,6 +227,34 @@ describe("redactText", () => {
     expect(redactText("set-cookie: session=9f2b3c4d5e6f")).not.toContain("9f2b3c4d5e6f");
   });
 
+  // The fixed scheme list kept the token after `Bot`, `ApiKey` or `Negotiate`.
+  it("redacts the token after any authorization scheme", () => {
+    expect(redactText(`Authorization: Bot ${run64(24)}.${run64(6)}.${run64(27)} sent`)).toBe(
+      "Authorization: [redacted] sent",
+    );
+    expect(redactText("authorization: ApiKey abcdef1234567890")).toBe("authorization: [redacted]");
+    expect(redactText("Proxy-Authorization: Negotiate YIIabcdef1234567890")).toBe("Proxy-Authorization: [redacted]");
+  });
+
+  it("redacts Google OAuth tokens, Telegram bot tokens and webhook addresses", () => {
+    expect(redactText(`token ya29.${run64(40)} expired`)).toBe("token [redacted] expired");
+    expect(redactText(`client GOCSPX-${run64(28)} refused`)).toBe("client [redacted] refused");
+    const telegram = `123456789:AA${run64(33)}`;
+    expect(redactText(`GET https://api.telegram.org/bot${telegram}/getMe failed`)).toBe(
+      "GET https://api.telegram.org/[redacted]/getMe failed",
+    );
+    expect(redactText(`token ${telegram} refused`)).toBe("token [redacted] refused");
+    const slack = redactText(`post https://hooks.slack.com/services/T01ABCDEF/B01ABCDEF/${run64(24)} failed`);
+    expect(slack).toBe("post https://hooks.slack.com/services/[redacted] failed");
+    expect(redactText(slack)).toBe(slack);
+    expect(redactText(`post https://discord.com/api/webhooks/123456789012345678/${run64(68)} failed`)).toBe(
+      "post https://discord.com/api/webhooks/[redacted] failed",
+    );
+    expect(redactText("see https://api.slack.com/messaging/webhooks and 12:30:45")).toBe(
+      "see https://api.slack.com/messaging/webhooks and 12:30:45",
+    );
+  });
+
   it("leaves scheme words used as ordinary prose alone", () => {
     expect(redactText("Token validation failed")).toBe("Token validation failed");
     expect(redactText("Basic authentication unavailable")).toBe("Basic authentication unavailable");
@@ -435,6 +463,24 @@ describe("redactValue", () => {
     expect(redactValue({ headers: [{ name: "X-Api-Token", value: "abcdef123456" }] })).toEqual({
       headers: [{ name: "[redacted]", value: "[redacted]" }],
     });
+  });
+
+  // ACP and MCP send environment variables as a list of name and value pairs.
+  it("redacts the value of a pair whose name labels a secret", () => {
+    expect(
+      redactValue({
+        env: [
+          { name: "OPENAI_API_KEY", value: "opaque-value-123" },
+          { name: "LOG_LEVEL", value: "debug" },
+        ],
+      }),
+    ).toEqual({
+      env: [
+        { name: "OPENAI_API_KEY", value: "[redacted]" },
+        { name: "LOG_LEVEL", value: "debug" },
+      ],
+    });
+    expect(redactText('env [{"name":"GITHUB_TOKEN","value":"opaque-value-123"}]')).not.toContain("opaque-value-123");
   });
 
   it("leaves a headers count and the word in prose alone", () => {

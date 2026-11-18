@@ -41,16 +41,33 @@ import { nullableString, parseBrowserBounds, pathIdentifier, readJson, stringFie
 export interface BrowserRouteDependencies {
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView | undefined;
+  /** The agents at `none` for this member. Their tabs are not this member's to see or use. Read only on a browser route. */
+  blockedAgentIds: () => ReadonlySet<string>;
 }
 
 export async function routeBrowser(
   context: TeamApiRequestContext,
-  { browser, browserView }: BrowserRouteDependencies,
+  { browser, browserView, blockedAgentIds: readBlockedAgentIds }: BrowserRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, member, sessionId, capabilities, json, empty } = context;
   // A private tab holds an administrator's MCP sign-in (`mcp-sign-in-v1`). A member could watch the
   // password, or finish the sign-in with their own account, so to a member that tab does not exist.
-  const hidden = (tabId: string) => !canAdministerServer(member.role) && browser.isPrivate(tabId);
+  // A tab of an agent that the roles close to this member holds that agent's sign-ins, so it does not
+  // exist to this member either.
+  let blocked: ReadonlySet<string> | undefined;
+  const blockedAgentIds = () => {
+    blocked ??= readBlockedAgentIds();
+    return blocked;
+  };
+  let owners: ReadonlyMap<string, string | null> | undefined;
+  const hidden = (tabId: string) => {
+    if (canAdministerServer(member.role)) return false;
+    if (browser.isPrivate(tabId)) return true;
+    if (blockedAgentIds().size === 0) return false;
+    owners ??= new Map(browser.listTabs().map((tab) => [tab.id, tab.ownerAgentId]));
+    const owner = owners.get(tabId);
+    return typeof owner === "string" && blockedAgentIds().has(owner);
+  };
   const tabId = (body: DynamicRecord) => {
     const id = stringField(body, "tabId");
     if (hidden(id)) throw new HttpError(404, sourceText("error.backend.browserTabNotFound"));
@@ -78,13 +95,17 @@ export async function routeBrowser(
     const body = await readJson(request);
     const focus = body.focus ?? false;
     if (!isBoolean(focus)) throw new HttpError(400, "focus must be a boolean.");
+    const ownerAgentId = nullableString(body, "ownerAgentId");
+    // A tab opens in its agent's browser session, with that agent's sign-ins.
+    if (ownerAgentId !== null && blockedAgentIds().has(ownerAgentId))
+      throw new HttpError(404, sourceText("error.team.agentNotFound"));
     return json(
       201,
       await runCauseEffect(
         browser.open(
           stringField(body, "url", false, INPUT_LIMITS.browserUrl),
           nullableString(body, "ownerThreadId"),
-          nullableString(body, "ownerAgentId"),
+          ownerAgentId,
           focus,
         ),
       ),
