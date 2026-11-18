@@ -16,6 +16,7 @@ import KeyRound from "lucide-react-native/icons/key-round";
 import LogOut from "lucide-react-native/icons/log-out";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Smartphone from "lucide-react-native/icons/smartphone";
 import Trash2 from "lucide-react-native/icons/trash";
 import UserMinus from "lucide-react-native/icons/user-minus";
 import UserPlus from "lucide-react-native/icons/user-plus";
@@ -198,6 +199,12 @@ function AccountPage({
   // A saved key has no plan limit, so it is not a pool member.
   const inPool = pool !== undefined && !apiKeyAccount && !keyAccount && !pool.leftOut.includes(account.id);
   const removable = account.id !== DEFAULT_PROVIDER_ACCOUNT_ID && !apiKeyAccount;
+  // As on desktop: the code sign-in is for an account after the first that is signed out or failed.
+  const codeSignIn =
+    account.id !== DEFAULT_PROVIDER_ACCOUNT_ID &&
+    !apiKeyAccount &&
+    (account.state === "signed-out" || account.state === "error") &&
+    accounts.code?.offered(provider) === true;
   const value = (text: string) => (
     <Typography.Paragraph numberOfLines={1} className="shrink text-grouped-secondary">
       {text}
@@ -259,21 +266,35 @@ function AccountPage({
             </SettingsRow>
           </SettingsSection>
         ) : null
-      ) : accounts.canSignIn(provider) ? (
+      ) : accounts.canSignIn(provider) || codeSignIn ? (
         <SettingsSection footer={t("mobile.server.providers.relayHint")}>
-          <SettingsRow
-            disclosure={false}
-            disabled={pending !== null}
-            leading={<RowIcon icon={RefreshCw} tone="accent" />}
-            onPress={() =>
-              // The sign-in page runs the relayed sign-in and comes back here when it ends.
-              openSignIn({ serverId, provider, method: "relay", account: account.id })
-            }
-          >
-            <Typography.Paragraph className="text-accent">
-              {t("mobile.server.providers.accountSignInAgain")}
-            </Typography.Paragraph>
-          </SettingsRow>
+          {accounts.canSignIn(provider) ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={pending !== null}
+              leading={<RowIcon icon={RefreshCw} tone="accent" />}
+              onPress={() =>
+                // The sign-in page runs the relayed sign-in and comes back here when it ends.
+                openSignIn({ serverId, provider, method: "relay", account: account.id })
+              }
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.accountSignInAgain")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {codeSignIn ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={pending !== null}
+              leading={<RowIcon icon={Smartphone} tone="accent" />}
+              onPress={() => openSignIn({ serverId, provider, method: "account-code", account: account.id })}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.accountSignInWithCode")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
         </SettingsSection>
       ) : null}
       {usageResets && resetsLeft > 0 ? (

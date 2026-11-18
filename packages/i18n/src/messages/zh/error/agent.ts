@@ -13,6 +13,8 @@ export const messages = {
     "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
   "error.agent.toolCallEnvelopeKeys":
     "工具未运行。tool_call 只接受 name 和 arguments。请将工具的参数作为对象放入 arguments，再次发送调用。",
+  "error.agent.toolCallMissingName":
+    "工具未运行。tool_call 没有 name。请在 name 中填写 tool_search 给出的完整名称，例如 openbot.history_read，然后再次发送调用。",
   "error.agent.toolCallUnknownTool":
     "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
   "error.agent.toolCallUnknownToolSuggest":
@@ -55,6 +57,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "所选模型不属于该服务商。",
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
+  "error.agent.creatorModelNotListed":
+    "你的模型“{model}”当前不在模型列表中，因此新智能体无法使用它启动。请几秒后重试，或将 provider 和 model 设为 list_models 显示的模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
   "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
@@ -80,6 +84,7 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.promptCancelled": "{provider} 在开始处理前取消了这条消息。请重新发送消息。",
   "error.agent.toolLoopStopped":
     "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.answerCutOff": "智能体在完成回答之前停止了，因此回答不完整。请重新发送消息。",
@@ -102,6 +107,8 @@ export const messages = {
   "error.agent.deletionBusy": "助手正在删除中。",
   "error.agent.stopBeforeDelete": "请先停止该助手并取消它的排队消息，再删除它。",
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
+  "error.agent.deleteFolderInUse":
+    "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",

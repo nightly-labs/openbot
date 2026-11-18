@@ -241,33 +241,33 @@
   },
   "cuaDriver": {
     "repository": "https://github.com/trycua/cua",
-    "tag": "cua-driver-rs-v0.49.5",
-    "version": "0.49.5",
+    "tag": "cua-driver-rs-v0.52.9",
+    "version": "0.52.9",
     "license": "MIT",
     "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "cua-driver-rs-0.49.5-darwin-universal-binary.tar.gz",
-        "assetSha256": "5c55f62f04f2f204df8a2ab11f7d821520f275e2bf90512a0fbbfedd0ea68920",
-        "downloadBytes": 43140847,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "bf84282bce1f5e032d915b62f5aafd8a2e8b2eb937f559adc6c11afebb45375e"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "darwin-x64": {
-        "asset": "cua-driver-rs-0.49.5-darwin-universal-binary.tar.gz",
-        "assetSha256": "5c55f62f04f2f204df8a2ab11f7d821520f275e2bf90512a0fbbfedd0ea68920",
-        "downloadBytes": 43140847,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "bf84282bce1f5e032d915b62f5aafd8a2e8b2eb937f559adc6c11afebb45375e"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "linux-x64": {
-        "asset": "cua-driver-rs-0.49.5-linux-x86_64-binary.tar.gz",
-        "assetSha256": "e01fe9dd44e6a7d2d8ac128737fb0204c6deb57929da6cc2871c049eda96f7dc",
-        "downloadBytes": 29981906,
+        "asset": "cua-driver-rs-0.52.9-linux-x86_64-binary.tar.gz",
+        "assetSha256": "f20c3d3b468778d03ec25bef32a40be2b83b3ef8961cf7816295acdbcf5ff273",
+        "downloadBytes": 30098066,
         "files": {
-          "cua-driver": "c0917f41728f740d22ab4d1f29a973e7648e56118ed303ec6f5355dba5deeb71",
+          "cua-driver": "d0f329e0304ccb54059b8bfce940694b945475730380b463da67a22fbcd34600",
           "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
           "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
           "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
@@ -275,11 +275,11 @@
         }
       },
       "linux-arm64": {
-        "asset": "cua-driver-rs-0.49.5-linux-arm64-binary.tar.gz",
-        "assetSha256": "6c1ad93c32485270cf826c6439b119b3ad548117e8a9fe8f0073bd11251b9330",
-        "downloadBytes": 27901617,
+        "asset": "cua-driver-rs-0.52.9-linux-arm64-binary.tar.gz",
+        "assetSha256": "b3c1be792b132b9af8a0b3f54e9d2e3edab74860d27c1ed539f4907d111daf0a",
+        "downloadBytes": 28009360,
         "files": {
-          "cua-driver": "6ea410f82d9e37e0cfb48d979e0f1ce85631fa8f12f24486fe5e9d5c58314b93",
+          "cua-driver": "09779104ad8e5fd26bc6d6ba8e85cca1be426f46938e938e4e74fc2ed8475d35",
           "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
           "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
           "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
@@ -287,11 +287,11 @@
         }
       },
       "win32-x64": {
-        "asset": "cua-driver-rs-0.49.5-windows-x86_64-binary.zip",
-        "assetSha256": "b19c4a8613df17184005ddf14a930f51c3d403b06364656acd899498059f711f",
-        "downloadBytes": 32317981,
+        "asset": "cua-driver-rs-0.52.9-windows-x86_64-binary.zip",
+        "assetSha256": "b05c6ab050100d2b532dfa948c94742d0b95bfaf13e46e6ce44c1ee4224290e3",
+        "downloadBytes": 32377889,
         "files": {
-          "cua-driver.exe": "3fda9f1ad1663e60600a96f0fbd523f2bdf19e05913cf3e45597e01b3bfa476d"
+          "cua-driver.exe": "e21d21d25205d7c188fea6776185abb1cbd437410df6243c512d1523b0c8cbfa"
         }
       }
     }

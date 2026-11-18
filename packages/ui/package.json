@@ -415,9 +415,11 @@
     "./features/team/TeamPersonAvatar": "./src/features/team/TeamPersonAvatar.tsx",
     "./features/updates/HelpMenu": "./src/features/updates/HelpMenu.tsx",
     "./features/updates/restart-reasons": "./src/features/updates/restart-reasons.ts",
+    "./features/updates/UpdateRequiredScreen": "./src/features/updates/UpdateRequiredScreen.tsx",
     "./features/updates/update-status": "./src/features/updates/update-status.ts",
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",
+    "./features/updates/update-required.css": "./src/features/updates/update-required.css",
     "./features/updates/whats-new.css": "./src/features/updates/whats-new.css",
     "./features/window/PageHeader": "./src/features/window/PageHeader.tsx",
     "./features/window/page-header.css": "./src/features/window/page-header.css",
@@ -562,7 +564,7 @@
     "@openbot/telemetry": "workspace:*"
   },
   "peerDependencies": {
-    "solid-js": "2.0.0-rc.18",
+    "solid-js": "2.0.0",
     "@solidjs/web": "catalog:"
   }
 }

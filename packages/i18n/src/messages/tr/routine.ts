@@ -251,6 +251,7 @@ export const messages = {
   "routine.settings.loading": "Rutinler yükleniyor…",
   "routine.settings.empty": "Henüz rutin yok.",
   "routine.settings.paused": "Duraklatıldı",
+  "routine.settings.pausedByRun": "{time} çalıştırması tarafından duraklatıldı",
   "routine.settings.completed": "Tamamlandı · {schedule}",
   "routine.settings.active": "Etkin",
   "routine.settings.pauseFailed": "Bu rutin duraklatılamadı.",

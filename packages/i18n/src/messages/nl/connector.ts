@@ -374,10 +374,10 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Persoonlijk nummer",
   "connector.whatsapp.ownNumberDescription":
-    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "connector.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
   "connector.whatsapp.statusReactions": "Statusreacties",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -399,10 +399,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Nummer",
   "connector.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat. Andere mensen krijgen geen antwoord.",
   "connector.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+    "OpenBot antwoordt vanaf dit nummer elke onbekende persoon met een code om aan jou te geven. Je keurt ze hier goed.",
   "connector.whatsapp.methodLabel": "Koppelmethode",
   "connector.whatsapp.methodQr": "QR-code",
   "connector.whatsapp.methodCode": "Koppelcode",

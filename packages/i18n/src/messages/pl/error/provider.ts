@@ -172,6 +172,10 @@ export const messages = {
     "{provider} nie odpowiedział na czas. Komputer może być zajęty. OpenBot spróbuje ponownie.",
   "error.provider.cliTimedOutRefresh":
     "{provider} nie odpowiedział na czas. Komputer może być zajęty. Odśwież dostawców, aby spróbować ponownie.",
+  "error.provider.serviceUnreachable":
+    "{provider} nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem. OpenBot spróbuje ponownie.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem, a potem odśwież dostawców.",
   "error.provider.acpStartTimedOut":
     "{provider} nie zakończył uruchamiania w ciągu {seconds} s. Komputer może być zajęty.",
   "error.provider.acpModelsTimedOut":
@@ -237,6 +241,8 @@ export const messages = {
     "Darmowe modele OpenCode osiągnęły limit użycia. Wszystkie darmowe modele mają wspólny limit. Aby kontynuować, wklej klucz OpenCode Go w ustawieniach OpenCode albo wybierz model innego dostawcy.",
   "error.provider.opencodeProviderFailed":
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Ten model nie jest dla Ciebie dostępny. Wybierz inny model dla tego agenta.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -355,6 +361,8 @@ export const messages = {
     "Codex nie mógł kontynuować tego czatu, ponieważ w jego zapisanej historii brakuje elementu. OpenBot rozpoczął nową sesję Codex z historią czatu. Spróbuj ponownie.",
   "error.provider.codexRequestRefused":
     "{provider} odrzucił żądanie tego czatu i nie podał przyczyny. Może się to zdarzyć w długim czacie z wieloma obrazami. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.codexAudioRefused":
+    "Model nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooSmall":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
@@ -489,6 +497,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi zwrócił inną sesję. Zapisana sesja nie została zastąpiona.",
   "error.provider.piExtensionFailed":
     "Pi zatrzymał się, ponieważ nie mógł wczytać rozszerzenia. Usuń lub zaktualizuj to rozszerzenie, a następnie spróbuj ponownie. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi nieoczekiwanie zatrzymał się przed zakończeniem tej tury. Wyślij wiadomość, aby kontynuować.",
   "error.provider.piModelInvalid": "Wybierz model Pi, który zawiera nazwę dostawcy.",
   "error.provider.piToolInvalid": "Narzędzie zwróciło nieprawidłowy wynik.",
   "error.provider.piSignIn": "Użyj /login w Pi na komputerze hosta. Zamknij Pi po zakończeniu logowania.",

@@ -170,6 +170,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliTimedOut": "{provider} did not answer in time. The computer may be busy. OpenBot will try again.",
   "error.provider.cliTimedOutRefresh":
     "{provider} did not answer in time. The computer may be busy. Refresh the providers to try again.",
+  "error.provider.serviceUnreachable":
+    "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} cannot connect to its service. Check your internet connection, then refresh the providers.",
   "error.provider.acpStartTimedOut": "{provider} did not finish starting within {seconds} s. The computer may be busy.",
   "error.provider.acpModelsTimedOut":
     "{provider} did not list its models within {seconds} s. The computer may be busy.",
@@ -234,6 +238,8 @@ export const messages = defineMessages("error.provider", {
     "The free OpenCode models reached their usage limit. All free models share this limit. To continue, paste an OpenCode Go key in the OpenCode settings, or choose a model from another provider.",
   "error.provider.opencodeProviderFailed":
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "This model is not available to you. Select a different model for this agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -350,6 +356,8 @@ export const messages = defineMessages("error.provider", {
     "Codex could not continue this chat, because an item in its saved history is missing. OpenBot started a new Codex session with the chat history. Try again.",
   "error.provider.codexRequestRefused":
     "{provider} refused the request for this chat and did not give the cause. This can occur in a long chat with many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.codexAudioRefused":
+    "The model did not accept audio in this chat. OpenBot started a new Codex session with the chat history. Try again.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
@@ -479,6 +487,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.piSessionIdentity": "Pi returned a different session. The saved session was not replaced.",
   "error.provider.piExtensionFailed":
     "Pi stopped because it could not load an extension. Remove or update this extension, then try again. {detail}",
+  "error.provider.piThreadStopped": "Pi stopped unexpectedly before it finished this turn. Send a message to continue.",
   "error.provider.piModelInvalid": "Select a Pi model that includes its provider.",
   "error.provider.piToolInvalid": "The tool returned an invalid result.",
   "error.provider.piSignIn": "Use /login in Pi on the host computer. Close Pi when sign-in is complete.",

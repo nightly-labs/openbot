@@ -13,6 +13,8 @@ export const messages = {
     "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
   "error.agent.toolCallEnvelopeKeys":
     "لم تعمل الأداة. لا يقبل tool_call إلا name وarguments. ضع وسائط الأداة في arguments ككائن، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallMissingName":
+    "لم تعمل الأداة. لا يحتوي tool_call على name. ضع في name الاسم المؤهل الذي يعطيه tool_search، مثل openbot.history_read، ثم أرسل الاستدعاء مرة أخرى.",
   "error.agent.toolCallUnknownTool":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -55,6 +57,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "النموذج المحدد لا ينتمي إلى هذا المزوّد.",
   "error.agent.modelNotListed": "النموذج «{model}» غير متاح. النماذج المتاحة: {models}.",
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
+  "error.agent.creatorModelNotListed":
+    "نموذجك «{model}» غير موجود في قائمة النماذج الآن، لذلك لا يمكن أن يبدأ الوكيل الجديد عليه. حاول مرة أخرى بعد بضع ثوانٍ، أو عيّن provider وmodel إلى نموذج يعرضه list_models.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -85,6 +89,7 @@ export const messages = {
   "error.agent.endpointRemoved": "أُزيلت نقطة النهاية التي استخدمها هذا الوكيل. اختر نموذجًا آخر له.",
   "error.agent.turnStalled":
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.promptCancelled": "ألغى {provider} هذه الرسالة قبل أن تبدأ. أرسل الرسالة مرة أخرى.",
   "error.agent.toolLoopStopped":
     "كرر {provider} خطوة فاشلة مرات كثيرة، لذلك أوقف OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
   "error.agent.answerCutOff": "توقف الوكيل قبل أن ينهي إجابته، لذلك الإجابة غير كاملة. أرسل الرسالة مرة أخرى.",
@@ -107,6 +112,8 @@ export const messages = {
   "error.agent.deletionBusy": "حذف الوكيل قيد التنفيذ بالفعل.",
   "error.agent.stopBeforeDelete": "أوقف الوكيل وألغِ رسائله في قائمة الانتظار قبل حذفه.",
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
+  "error.agent.deleteFolderInUse":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
   "error.agent.waitBeforeDuplicate": "انتظر انتهاء الوكيل وإفراغ قائمة انتظاره قبل تكراره.",
   "error.agent.saveOtherAgent": "عملية الحفظ هذه تخص وكيلًا آخر.",

@@ -326,6 +326,9 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
+    this.#threads.setOwnerPostSource(
+      (link) => this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true,
+    );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
@@ -360,6 +363,7 @@ export class MessagingService {
     // The kept deliveries that wait for a connection go now: nothing will start it.
     for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
+    this.#threads.setOwnerPostSource(null);
     this.#threads.setHistorySource(null);
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
@@ -1579,6 +1583,9 @@ export class MessagingService {
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
     if (!agentId) {
+      // On WhatsApp, only the owner can add the orchestrator, and only in their own chat do they write
+      // as the number. A contact or a group that the owner allowed gets no setup text from their number.
+      if (live.record.platform === "whatsapp" && message.authorId !== live.identity.botUserId) return;
       const noAgent =
         live.record.platform === "discord"
           ? "status.messaging.discordNoAgent"
@@ -1804,7 +1811,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
+      Effect.map((list) => (whatsApp ? { ...list, note: WHATSAPP_ALLOWED_PLACES } : list)),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1824,7 +1831,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const platform = live.record.platform;
     return yield* Effect.gen(function* () {
-      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      const place = (yield* live.adapter.places()).places.find((candidate) => candidate.id === placeId);
       if (!place)
         return {
           error:
@@ -2090,6 +2097,8 @@ export class MessagingService {
       this.#threads.awaitsTeammate(activity.link.linkId),
       this.#quietEnd(activity.link.connectionId, target),
       this.#withoutStatusPost(activity.link.connectionId),
+      // The files go out below only when this connection runs now.
+      live !== undefined,
     );
     // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
     if (final.answer && live?.record.platform === "slack") {
@@ -2652,13 +2661,14 @@ function token(): string {
  * The last post of a request and the reaction on the person's message, from how its turn ended. In a
  * quiet chat, a failed or stopped request posts no text: an empty text takes back the status post.
  * With `answerOnly`, a stopped request, or one that ends without an answer, posts no text either; a
- * failed one still does.
+ * failed one still does. A request that ends with files and no text has its answer in the files.
  */
 function finalPost(
   activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
   awaitsTeammate: boolean,
   quiet: boolean,
   answerOnly: boolean,
+  sendsFiles: boolean,
 ): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
@@ -2669,7 +2679,7 @@ function finalPost(
       reaction: reacts ? "stopped" : null,
     };
   // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
-  // the catalog text of a start that failed, such as a provider that is not downloaded, or the general one.
+  // the catalog text of a start or a turn that failed, such as an expired sign-in, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
@@ -2685,6 +2695,9 @@ function finalPost(
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
+  // The files are the answer, such as an edited image: an empty text takes back the status post where
+  // the platform can delete it.
+  if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };
   return { answer: false, text: sourceText("status.messaging.noAnswer"), reaction };
 }
 

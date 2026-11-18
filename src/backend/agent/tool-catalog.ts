@@ -64,7 +64,7 @@ const DIRECT_BROWSER_DYNAMIC_TOOLS = BROWSER_DYNAMIC_TOOLS.map((namespace) => ({
  * long as the inline search (`bun run bench:codex-web-search`). The Pi-based providers have no web search,
  * and a custom ACP agent can have none, so they get the tool. Some CLIs need a condition that the OpenBot
  * sign-in meets: an Anthropic or Grok account, `kimi login`, a Mistral key, the Cline account. OpenCode
- * asks once for consent and then searches without a key.
+ * searches without a key; OpenBot gives the consent that it asks for (`opencode-agent-defaults.ts`).
  */
 const OWN_WEB_SEARCH_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "codex",
@@ -530,6 +530,9 @@ function refusedCallError(params: DynamicToolCallParams, provider: AgentProvider
   if (!parsed.success) {
     const { issues } = parsed.error;
     if (issues.some(({ code }) => code === "unrecognized_keys")) return sourceText("error.agent.toolCallEnvelopeKeys");
+    // The `callSchema` refinement: the call has neither `name` nor `tool`. The general error did not
+    // say which field to add, and a Pi agent sent the same call without a name for minutes (#11725).
+    if (issues.some(({ code }) => code === "custom")) return sourceText("error.agent.toolCallMissingName");
     return issues.some(({ path }) => path[0] === "arguments")
       ? sourceText("error.agent.toolCallArgumentsNotObject")
       : null;

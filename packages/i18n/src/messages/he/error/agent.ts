@@ -13,6 +13,8 @@ export const messages = {
     "הכלי לא רץ. tool_call לא יכול להריץ את openbot.tool_search או את openbot.tool_describe. יש לקרוא להם ישירות עם אותם ארגומנטים.",
   "error.agent.toolCallEnvelopeKeys":
     "הכלי לא רץ. tool_call מקבל רק name ו-arguments. יש לשים את הארגומנטים של הכלי ב-arguments, כאובייקט, ולשלוח את הקריאה שוב.",
+  "error.agent.toolCallMissingName":
+    "הכלי לא רץ. ל-tool_call אין name. יש לשים ב-name את השם המלא ש-tool_search מחזיר, למשל openbot.history_read, ולשלוח את הקריאה שוב.",
   "error.agent.toolCallUnknownTool":
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -57,6 +59,8 @@ export const messages = {
   "error.agent.modelNotListed": 'המודל "{model}" אינו זמין. המודלים הזמינים: {models}.',
   "error.agent.providerNotListed":
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
+  "error.agent.creatorModelNotListed":
+    'המודל שלך "{model}" לא נמצא עכשיו ברשימת המודלים, ולכן הסוכן החדש לא יכול להתחיל איתו. אפשר לנסות שוב בעוד כמה שניות, או להגדיר ב-provider וב-model מודל ש-list_models מציג.',
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
@@ -86,6 +90,7 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.promptCancelled": "{provider} ביטל את ההודעה הזו לפני שהתחילה. יש לשלוח את ההודעה שוב.",
   "error.agent.toolLoopStopped":
     "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
   "error.agent.answerCutOff": "הסוכן נעצר לפני שסיים את התשובה שלו, ולכן התשובה אינה מלאה. שלחו את ההודעה שוב.",
@@ -108,6 +113,8 @@ export const messages = {
   "error.agent.deletionBusy": "מחיקת הסוכן כבר מתבצעת.",
   "error.agent.stopBeforeDelete": "יש לעצור את הסוכן ולבטל את ההודעות שלו בתור לפני המחיקה.",
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
+  "error.agent.deleteFolderInUse":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",
   "error.agent.waitBeforeDuplicate": "יש להמתין שהסוכן יסיים ולרוקן את התור שלו לפני השכפול.",
   "error.agent.saveOtherAgent": "השמירה הזו שייכת לסוכן אחר.",

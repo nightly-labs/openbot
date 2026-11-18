@@ -14,6 +14,8 @@ export const messages = {
     "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
   "error.agent.toolCallEnvelopeKeys":
     "Araç çalışmadı. tool_call yalnızca name ve arguments alır. Aracın bağımsız değişkenlerini arguments içine nesne olarak koyun ve çağrıyı yeniden gönderin.",
+  "error.agent.toolCallMissingName":
+    "Araç çalışmadı. tool_call içinde name yok. name alanına tool_search'ün verdiği tam nitelikli adı yazın, örneğin openbot.history_read, ve çağrıyı yeniden gönderin.",
   "error.agent.toolCallUnknownTool":
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -64,6 +66,8 @@ export const messages = {
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
+  "error.agent.creatorModelNotListed":
+    '"{model}" modeliniz şu anda model listesinde yok, bu yüzden yeni ajan bu modelle başlayamaz. Birkaç saniye sonra yeniden deneyin veya provider ve model alanlarına list_models\'in gösterdiği bir model yazın.',
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable":
@@ -95,6 +99,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.promptCancelled": "{provider} bu mesajı başlamadan önce iptal etti. Mesajı yeniden gönderin.",
   "error.agent.toolLoopStopped":
     "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",
@@ -118,6 +123,8 @@ export const messages = {
   "error.agent.deletionBusy": "Ajan silme işlemi zaten devam ediyor.",
   "error.agent.stopBeforeDelete": "Ajanı silmeden önce durdurun ve kuyruğa alınmış mesajlarını iptal edin.",
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
+  "error.agent.deleteFolderInUse":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
   "error.agent.waitBeforeDuplicate": "Ajanı kopyalamadan önce bitmesini ve kuyruğunu temizlemesini bekleyin.",
   "error.agent.saveOtherAgent": "Bu kayıt başka bir ajana ait.",

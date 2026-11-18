@@ -154,6 +154,8 @@ export const messages = {
   "error.provider.cliNotReady": "{provider} CLI 尚未就绪或未登录。",
   "error.provider.cliTimedOut": "{provider} 未及时响应，电脑可能正忙。OpenBot 将重试。",
   "error.provider.cliTimedOutRefresh": "{provider} 未及时响应，电脑可能正忙。请刷新服务商以重试。",
+  "error.provider.serviceUnreachable": "{provider} 无法连接到其服务。请检查网络连接。OpenBot 将重试。",
+  "error.provider.serviceUnreachableRefresh": "{provider} 无法连接到其服务。请检查网络连接，然后刷新服务商。",
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",
   "error.provider.acpModelsTimedOut": "{provider} 未在 {seconds} 秒内列出模型，电脑可能正忙。",
   "error.provider.startStopped": "{provider} 连续多次启动失败，OpenBot 已停止尝试。请刷新服务商以重试。",
@@ -214,6 +216,7 @@ export const messages = {
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
+  "error.provider.opencodeModelUnavailable": "你无法使用此模型。请为该助手改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
@@ -321,6 +324,7 @@ export const messages = {
     "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
   "error.provider.codexRequestRefused":
     "{provider} 拒绝了此聊天的请求，但没有给出原因。在包含大量图片的长聊天中可能出现这种情况。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.codexAudioRefused": "模型未接受此聊天中的音频。OpenBot 已使用聊天记录开始新的 Codex 会话。请重试。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
@@ -433,6 +437,7 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi 取消了会话恢复，请重试。",
   "error.provider.piSessionIdentity": "Pi 返回了另一个会话，已保存的会话未被替换。",
   "error.provider.piExtensionFailed": "Pi 无法加载某个扩展，因此已停止。请移除或更新该扩展，然后重试。{detail}",
+  "error.provider.piThreadStopped": "Pi 在完成本轮之前意外停止。发送一条消息以继续。",
   "error.provider.piModelInvalid": "请选择包含其服务商的 Pi 模型。",
   "error.provider.piToolInvalid": "工具返回了无效结果。",
   "error.provider.piSignIn": "请在主机电脑的 Pi 中使用 /login。登录完成后关闭 Pi。",

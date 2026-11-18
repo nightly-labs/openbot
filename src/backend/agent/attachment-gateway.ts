@@ -189,7 +189,8 @@ export class AttachmentGateway {
   /**
    * Discards each staged file whose bytes match a file that a message of this turn already shows, and
    * returns the files to keep and the shown files that they copy. An agent often copies a generated
-   * image and attaches it again, and the chat then showed the same image two times (#7178).
+   * image and attaches it again, and the chat then showed the same image two times (#7178). An agent
+   * also attaches again the files of a teammate's message, which the chat shows already (#11589).
    */
   readonly #withoutTurnCopies = Effect.fn("AttachmentGateway.withoutTurnCopies")(function* (
     this: AttachmentGateway,
@@ -203,7 +204,7 @@ export class AttachmentGateway {
     for (const message of snapshot.messages) {
       if (message.turnId !== turnId) continue;
       for (const attachment of message.attachments ?? []) {
-        const digest = this.#mailbox.generatedAttachmentSha256(attachment.id);
+        const digest = this.#mailbox.attachmentSha256(attachment.id);
         if (digest && !shownByDigest.has(digest)) shownByDigest.set(digest, attachment);
       }
     }
@@ -211,7 +212,7 @@ export class AttachmentGateway {
     const shown: AttachmentSummary[] = [];
     const copies: string[] = [];
     for (const attachment of staged) {
-      const digest = this.#mailbox.generatedAttachmentSha256(attachment.id);
+      const digest = this.#mailbox.attachmentSha256(attachment.id);
       const original = digest ? shownByDigest.get(digest) : undefined;
       if (original) {
         shown.push(original);

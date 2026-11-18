@@ -9,6 +9,8 @@
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
+// which run paused each paused routine (`routine-pause-reasons-v1`) over the same records,
+// the open work of the queues of all agents in one read (`agent-active-queues-v1`),
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // the whole copy of a pending approval (`pending-approval-v1`),
@@ -97,6 +99,11 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
+  AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
@@ -141,6 +148,7 @@ import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_PAGES_ROUTES,
@@ -153,6 +161,10 @@ import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -359,6 +371,10 @@ import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import {
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
@@ -388,6 +404,7 @@ import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -417,6 +434,7 @@ import {
 } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
+import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -762,6 +780,36 @@ const agents = [
 const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4-5");
 mkdirSync(transferAgent.workspacePath, { recursive: true });
 writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
+
+/** `agent-active-queues-v1`: the text of each open delivery, and how many each agent has. */
+let activeQueueText = "open work";
+let activeQueueDeliveries = 1;
+
+/** The open work of a queue, with an attachment whose preview URL is an address on the host. */
+function activeQueue(agentId: string): QueueSnapshot {
+  const [delivery] = queueSnapshot(agentId).deliveries;
+  if (!delivery) throw new Error("The queue fixture has no delivery.");
+  return {
+    agentId,
+    ...(agentId === "agent-oc" ? { welcome: true as const } : {}),
+    deliveries: Array.from({ length: agentId === "agent-ada" ? activeQueueDeliveries : 1 }, (_, index) => ({
+      ...delivery,
+      id: `delivery-${agentId}-${index}`,
+      text: activeQueueText,
+      attachments: [
+        {
+          id: "attachment-1",
+          name: "notes.txt",
+          size: 4,
+          kind: "file" as const,
+          mimeType: "text/plain",
+          previewKind: "text" as const,
+          previewUrl: "http://127.0.0.1:1/preview/attachment-1",
+        },
+      ],
+    })),
+  };
+}
 
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
@@ -1151,6 +1199,10 @@ const fakeAgents: TeamApiAgents = {
   listQueue: (agentId) => {
     record("listQueue", agentId);
     return queueSnapshot(agentId);
+  },
+  listActiveQueues: (agentIds) => {
+    record("listActiveQueues", agentIds);
+    return agentIds.map(activeQueue);
   },
   acknowledgeFailedTurn: (agentId, turnId) => record("acknowledgeFailedTurn", agentId, turnId),
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
@@ -1550,7 +1602,8 @@ const fakeAgents: TeamApiAgents = {
       };
     return undefined;
   },
-  respondToPrompt: unused("respondToPrompt"),
+  // Records the answers as the route decodes them, such as an edited confirm preview (`_preview`).
+  respondToPrompt: (input, responder) => Effect.sync(() => record("respondToPrompt", input, responder)),
   // As the agent service answers: a closed request, an answer that only the owner can give, and a
   // report about the phone app (request 7), which takes "accept" only with the phone's data.
   respondToApproval: (input, responder) => {
@@ -1572,6 +1625,7 @@ const fakeAgents: TeamApiAgents = {
 // (`agent-thread-pages-v1`) reach the side threads in this run. The thread holds one message before
 // `message-7`, and no other message.
 // The thread list has one thread with a waiting message (`agent-thread-queue-v1`) and one without.
+// The thread without one waits for the answer to a request to another agent (`agent-thread-requests-v1`).
 // With `longThreadQueue`, the waiting thread holds 20 messages of 100,000 characters: more than one
 // WebRTC frame.
 let longThreadQueue = false;
@@ -1633,7 +1687,11 @@ const fakeAgentTasks: TeamApiAgentTasks = {
           position: index + 1,
         }))
       : [waiting];
-    return { agentId, tasks: [task("task-queued", queue), task("task-idle", [])], limit: 10 };
+    const asking: AgentTask = {
+      ...task("task-idle", []),
+      awaitedReplies: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+    };
+    return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
   readTaskPage: (input) => {
@@ -3490,6 +3548,12 @@ try {
         (process.platform !== "darwin") &&
         !list(field(hiddenWorkV8.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY),
       { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises ui-block-preview-edit to a protocol 9 peer only",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY) &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
+      { v9: summary(hiddenWorkV9) },
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(
@@ -10828,6 +10892,186 @@ try {
     );
   }
 
+  // ---- Why a routine is paused (routine-pause-reasons-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_PAUSE_REASONS_CAPABILITY];
+    const saves = () => [...callsOf("updateRoutine"), ...callsOf("saveRoutineRecord")];
+    const savesBefore = saves().length;
+    const unchanged = routineRecords;
+    // Each routine was paused by a scheduled run of its own: a schedule routine, a webhook routine and
+    // a `once` routine. The store gives `pausedByRun` only on a paused routine.
+    routineRecords = routineRecords.map((routine) => ({
+      ...routine,
+      active: false,
+      pausedByRun: { scheduledFor: `2026-11-15T0${routine.id === "routine-hook" ? 9 : 8}:00:00.000Z` },
+    }));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-pause-reasons-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the list route without the capability gets 400 routinePauseReasonsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.routinePauseReasonsUnsupported")),
+      summary(unsupported),
+    );
+    const member = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const admin = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the run that paused each schedule routine that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
+      member.status === 200 &&
+        isDeepStrictEqual(member.body, {
+          routines: [{ routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" }],
+        }) &&
+        isDeepStrictEqual(admin.body, {
+          routines: [
+            { routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" },
+            { routineId: "routine-hook", scheduledFor: "2026-11-15T09:00:00.000Z" },
+          ],
+        }),
+      [summary(member), summary(admin)],
+    );
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    const missing = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    routineRecords = unchanged;
+    const resumed = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member who can only view the agent reads the reasons, an unknown or hidden agent gets 404, a routine with no reason is not listed, and the route saves nothing",
+      isDeepStrictEqual(viewer.body, member.body) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        isDeepStrictEqual(resumed.body, { routines: [] }) &&
+        saves().length === savesBefore,
+      [summary(viewer), summary(missing), summary(hiddenAgent), summary(resumed)],
+    );
+  }
+
+  // ---- The open work of all queues (agent-active-queues-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_ACTIVE_QUEUES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-active-queues-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {} });
+    const unknownKey = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "the list route without the capability gets 400 activeQueuesUnsupported, and a body with another key gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.activeQueuesUnsupported")) && unknownKey.status === 400,
+      [summary(unsupported), summary(unknownKey)],
+    );
+    const all = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    const visibleIds = list(field(all.body, "queues")).map((queue) => field(queue, "agentId"));
+    const firstAttachment = field(list(field(list(field(all.body, "queues"))[0], "deliveries"))[0], "attachments");
+    check(
+      "a member reads the open work of every agent that the member can see in one read, with no preview URL, and the welcome flag",
+      all.status === 200 &&
+        visibleIds.length > 0 &&
+        visibleIds.includes("agent-ada") &&
+        isDeepStrictEqual(field(all.body, "omitted"), []) &&
+        list(firstAttachment).every((attachment) => field(attachment, "previewUrl") === null) &&
+        list(field(all.body, "queues")).some(
+          (queue) => field(queue, "agentId") === "agent-oc" && field(queue, "welcome") === true,
+        ),
+      summary(all),
+    );
+    const named = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-none"] },
+      capabilities,
+    });
+    const oldClient = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-pi"] },
+      capabilities,
+      protocol: 6,
+    });
+    accessLevels = { revision: 37, everyone: { "agent-ada": "none" }, roles: [] };
+    const noAccess = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    accessLevels = { revision: 38, everyone: {}, roles: [] };
+    const ids = (reply: Reply) => list(field(reply.body, "queues")).map((queue) => field(queue, "agentId"));
+    check(
+      "named agents limit the read; an unknown agent, an agent hidden from the client and an agent without access are left out with no error",
+      isDeepStrictEqual(ids(named), ["agent-ada"]) &&
+        isDeepStrictEqual(ids(oldClient), ["agent-ada"]) &&
+        noAccess.status === 200 &&
+        !ids(noAccess).includes("agent-ada") &&
+        ids(noAccess).length === visibleIds.length - 1,
+      [summary(named), summary(oldClient), summary(noAccess)],
+    );
+    // Agent Ada has more open work than one frame carries: the answer names Ada in `omitted`, and the
+    // client reads Ada on the released route.
+    activeQueueText = "x".repeat(90_000);
+    activeQueueDeliveries = 20;
+    const large = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueText = "open work";
+    activeQueueDeliveries = 1;
+    check(
+      "an agent whose open work does not fit in one WebRTC frame is named in omitted, and the other agents stay in the answer",
+      large.status === 200 &&
+        isDeepStrictEqual(field(large.body, "omitted"), ["agent-ada"]) &&
+        !ids(large).includes("agent-ada") &&
+        ids(large).length === visibleIds.length - 1 &&
+        Buffer.byteLength(large.text) <= WEBRTC_FRAME_BODY_BUDGET,
+      { status: large.status, bytes: large.text.length, omitted: field(large.body, "omitted"), queues: ids(large) },
+    );
+    // Agent Ada has more open deliveries than one answer carries: Ada is omitted, not cut.
+    activeQueueDeliveries = AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT + 1;
+    const long = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueDeliveries = 1;
+    check(
+      "an agent with more open deliveries than one answer carries is named in omitted, not cut",
+      long.status === 200 &&
+        isDeepStrictEqual(field(long.body, "omitted"), ["agent-ada"]) &&
+        !ids(long).includes("agent-ada") &&
+        ids(long).length === visibleIds.length - 1,
+      { status: long.status, omitted: field(long.body, "omitted"), queues: ids(long) },
+    );
+  }
+
   // ---- Routine result destinations (routine-results-v1) ----
   {
     const resultCapabilities = [ROUTINE_RESULTS_CAPABILITY];
@@ -12086,6 +12330,19 @@ try {
       errorIs(plain, 403, sourceText("error.backend.feedbackNeedsPhone")) && declined.status === 204,
       [summary(plain), summary(declined)],
     );
+    // The host reads an edited confirm preview beside the answers (`ui-block-preview-edit-v1`).
+    const editedAnswers = { action: ["Send"], [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Tuesday."] };
+    const edited = await call("POST", TEAM_API_ROUTES.respond.prompt, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, answers: editedAnswers },
+    });
+    check(
+      "the prompt route gives the agent service an edited confirm preview with the answers",
+      edited.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToPrompt").at(-1)?.[0], { requestId: 7, answers: editedAnswers }),
+      { status: edited.status, call: callsOf("respondToPrompt").at(-1) },
+    );
   }
 
   /**
@@ -12466,6 +12723,64 @@ try {
           [{ ...order, deliveryIds: ["delivery-stale"] }],
         ]),
       [summary(reordered), summary(stale)],
+    );
+  }
+
+  // ---- The requests of a side thread to other agents (agent-thread-requests-v1) ----
+  {
+    const capabilities = [AGENT_THREAD_REQUESTS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const listBody = { agentId: "agent-ada" };
+    const unsupported = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, json: listBody });
+    const extraField = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: { ...listBody, taskId: "task-idle" },
+    });
+    const hiddenAgent = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi" },
+    });
+    accessLevels = { revision: 26, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewerList = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: listBody,
+    });
+    accessLevels = { revision: 27, everyone: {}, roles: [] };
+    check(
+      "the thread requests route without the capability, with an unknown field, of a hidden agent, or for a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.threadRequestsUnsupported")) &&
+        extraField.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewerList, 403, sourceText("error.team.agentViewOnly")),
+      [summary(unsupported), summary(extraField), summary(hiddenAgent), summary(viewerList)],
+    );
+    const listed = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, ...v9, json: listBody });
+    const tasks = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    check(
+      "a member reads the open requests of each side thread, and the frozen task list does not carry them",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, {
+          agentId: "agent-ada",
+          threads: [
+            {
+              taskId: "task-idle",
+              requests: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+            },
+          ],
+        }) &&
+        tasks.status === 200 &&
+        field(tasks.body, "tasks", 1, "id") === "task-idle" &&
+        field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
+      [summary(listed), summary(tasks)],
     );
   }
 

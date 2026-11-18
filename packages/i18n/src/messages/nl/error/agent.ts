@@ -14,6 +14,8 @@ export const messages = {
     "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
   "error.agent.toolCallEnvelopeKeys":
     "De tool is niet uitgevoerd. tool_call accepteert alleen name en arguments. Zet de argumenten van de tool in arguments, als object, en stuur de aanroep opnieuw.",
+  "error.agent.toolCallMissingName":
+    "De tool is niet uitgevoerd. De tool_call heeft geen name. Zet in name de gekwalificeerde naam die tool_search geeft, zoals openbot.history_read, en stuur de aanroep opnieuw.",
   "error.agent.toolCallUnknownTool":
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -67,6 +69,8 @@ export const messages = {
   "error.agent.modelNotListed": "Model “{model}” is niet beschikbaar. Beschikbare modellen: {models}.",
   "error.agent.providerNotListed":
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
+  "error.agent.creatorModelNotListed":
+    "Je model ‘{model}’ staat nu niet in de modellijst, dus de nieuwe agent kan er niet mee starten. Probeer het over een paar seconden opnieuw, of zet provider en model op een model dat list_models toont.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -104,6 +108,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.promptCancelled":
+    "{provider} heeft dit bericht geannuleerd voordat het begon. Stuur het bericht opnieuw.",
   "error.agent.toolLoopStopped":
     "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
   "error.agent.answerCutOff":
@@ -130,6 +136,8 @@ export const messages = {
   "error.agent.stopBeforeDelete": "Stop de agent en annuleer de berichten in de wachtrij voordat je hem verwijdert.",
   "error.agent.deleteIncomplete":
     "De gegevens van de agent konden niet volledig worden verwijderd. Probeer de agent opnieuw te verwijderen.",
+  "error.agent.deleteFolderInUse":
+    "Werk van een andere agent gebruikt de map van deze agent nog. Verwijder deze agent opnieuw als dat werk klaar is, of nadat je OpenBot opnieuw start.",
   "error.agent.duplicationBusy": "Deze agent wordt al gedupliceerd.",
   "error.agent.waitBeforeDuplicate": "Wacht tot de agent klaar is en de wachtrij leeg is voordat je hem dupliceert.",
   "error.agent.saveOtherAgent": "Deze opslag hoort bij een andere agent.",

@@ -649,7 +649,7 @@ user removes it there.
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
-Team API adapters are permanent (see [Team API compatibility](team-api.md)). Worked example:
+Team API adapters stay while a release in the support window speaks them (see [Team API compatibility](team-api.md)). Worked example:
 `sign-in-relay-v1`, which follows `mcp-sign-in-app-v1`.
 
 1. **Frozen codec.** Add `packages/contracts/src/team-protocol/<name>-v1.ts`. Build each route with

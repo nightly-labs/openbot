@@ -174,6 +174,10 @@ export const messages = {
     "{provider} reageerde niet op tijd. De computer is misschien bezet. OpenBot probeert het opnieuw.",
   "error.provider.cliTimedOutRefresh":
     "{provider} reageerde niet op tijd. De computer is misschien bezet. Vernieuw de aanbieders om het opnieuw te proberen.",
+  "error.provider.serviceUnreachable":
+    "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding. OpenBot probeert het opnieuw.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding en vernieuw daarna de aanbieders.",
   "error.provider.acpStartTimedOut":
     "{provider} was niet binnen {seconds} s klaar met starten. De computer is misschien bezet.",
   "error.provider.acpModelsTimedOut":
@@ -243,6 +247,8 @@ export const messages = {
     "De gratis OpenCode-modellen hebben hun gebruikslimiet bereikt. Alle gratis modellen delen deze limiet. Plak een OpenCode Go-sleutel in de OpenCode-instellingen om door te gaan, of kies een model van een andere aanbieder.",
   "error.provider.opencodeProviderFailed":
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Dit model is niet beschikbaar voor je. Kies een ander model voor deze agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -362,6 +368,8 @@ export const messages = {
     "Codex kon deze chat niet voortzetten, omdat een item in de opgeslagen geschiedenis ontbreekt. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexRequestRefused":
     "{provider} heeft het verzoek voor deze chat geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat met veel afbeeldingen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexAudioRefused":
+    "Het model accepteerde geen audio in deze chat. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
@@ -498,6 +506,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi gaf een andere sessie terug. De opgeslagen sessie is niet vervangen.",
   "error.provider.piExtensionFailed":
     "Pi is gestopt omdat een extensie niet kon worden geladen. Verwijder of werk deze extensie bij en probeer het opnieuw. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi is onverwacht gestopt voordat deze beurt klaar was. Stuur een bericht om verder te gaan.",
   "error.provider.piModelInvalid": "Kies een Pi-model dat de aanbieder bevat.",
   "error.provider.piToolInvalid": "De tool gaf een ongeldig resultaat terug.",
   "error.provider.piSignIn": "Gebruik /login in Pi op de hostcomputer. Sluit Pi als het inloggen klaar is.",

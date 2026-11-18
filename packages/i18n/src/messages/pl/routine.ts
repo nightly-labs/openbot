@@ -290,6 +290,7 @@ export const messages = {
   "routine.settings.loading": "Wczytywanie rutyn…",
   "routine.settings.empty": "Brak rutyn.",
   "routine.settings.paused": "Wstrzymana",
+  "routine.settings.pausedByRun": "Wstrzymana przez uruchomienie z {time}",
   "routine.settings.completed": "Zakończona · {schedule}",
   "routine.settings.active": "Aktywna",
   "routine.settings.pauseFailed": "Nie udało się wstrzymać tej rutyny.",

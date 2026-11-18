@@ -35,6 +35,7 @@ import {
   LEGACY_RESPONSE_STYLE,
   MCP_SERVERS_CAPABILITY,
   type RoutineCalendarOwner,
+  type RoutineFields,
   type SetAgentHiddenInput,
   STORAGE_CAPABILITY,
   type TeamRole,
@@ -85,6 +86,7 @@ import {
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
+import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
@@ -110,6 +112,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
@@ -167,6 +170,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -200,6 +204,11 @@ import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
+import {
+  listOnceAgentRoutines,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+} from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
   bitwardenConnectorRequest,
@@ -344,6 +353,7 @@ import {
   readAgentMemorySelection,
   readAgentTask,
   renameAgentThread,
+  runQueuedMessageAsAgentTask,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   setMessagePinned,
@@ -429,6 +439,7 @@ type HostRequestActions = Pick<
   | "loadAgentTasks"
   | "loadAgentTaskConversation"
   | "startAgentTask"
+  | "runQueuedMessageAsTask"
   | "sendAgentTaskMessage"
   | "controlAgentTask"
   | "renameAgentThread"
@@ -478,6 +489,7 @@ type HostRequestActions = Pick<
   | "startLiveVoice"
   | "stopLiveVoice"
   | "compactContext"
+  | "deleteAgentHistory"
   | "loadAgentSessionSettings"
   | "loadAgentFolders"
   | "addAgentFolder"
@@ -673,6 +685,9 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   return {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    // The host grants `agent-tasks-v1` with it, and the phone opens the new thread through those routes.
+    canRunQueuedMessageAsTask: (serverId) =>
+      has(serverId, AGENT_QUEUE_TASK_CAPABILITY) && has(serverId, AGENT_TASKS_CAPABILITY),
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
@@ -692,6 +707,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
     canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
+    canDeleteChatHistory: (serverId) => has(serverId, CHAT_HISTORY_CAPABILITY),
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
@@ -768,6 +784,9 @@ export function createHostRequestActions({
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
+  /** "Run in new thread" on a queued message is an optional route beside the tasks. */
+  const queueTaskApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_QUEUE_TASK_CAPABILITY, "mobile.server.threads.unsupported");
   /** Rename and delete of a thread are an optional route set beside the tasks. */
   const threadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREADS_CAPABILITY, "mobile.chat.threads.unsupported");
@@ -1270,6 +1289,7 @@ export function createHostRequestActions({
           routineCalendarSource(
             teamApi(serverId),
             capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
+            capabilities.get(serverId)?.includes(ROUTINES_ONCE_CAPABILITY) ?? false,
             owners,
           ),
         ),
@@ -1307,6 +1327,8 @@ export function createHostRequestActions({
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
     startAgentTask: async (input, serverId) =>
       runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),
+    runQueuedMessageAsTask: async (input, serverId) =>
+      runTeamRequest(runQueuedMessageAsAgentTask(queueTaskApi(serverId), input)),
     sendAgentTaskMessage: async (input, serverId) =>
       runTeamRequest(sendAgentTaskMessage(threadMessageApi(serverId, input.attachmentDraftIds), input)),
     controlAgentTask: async (action, input, serverId) =>
@@ -1585,6 +1607,10 @@ export function createHostRequestActions({
         await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
       else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, ignoreResponse, { agentId, taskId }, serverId);
     },
+    deleteAgentHistory: async (agentId, serverId) => {
+      requireCapability(capabilities, serverId, CHAT_HISTORY_CAPABILITY, "error.team.historyDeleteUnsupported");
+      await request("POST", CHAT_HISTORY_ROUTES.agentDelete, ignoreResponse, { agentId }, serverId);
+    },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),
     deleteSharedTable: async (name, serverId) => runTeamRequest(deleteSharedTable(sharedTablesAdmin(serverId), name)),
@@ -1733,6 +1759,7 @@ export function createHostRequestActions({
 function routineCalendarSource(
   request: TeamApiRequest,
   channels: boolean,
+  once: boolean,
   knownOwners?: readonly RoutineCalendarOwner[],
 ): RoutineCalendarSource<TeamRequestError> {
   /** One request to this server as an Effect. */
@@ -1761,14 +1788,29 @@ function routineCalendarSource(
                 .map((channel): RoutineCalendarOwner => ({ kind: "channel", channelId: channel.id })),
             ];
           }),
-    routines: (owner) =>
-      owner.kind === "agent"
-        ? send("GET", TEAM_API_ROUTES.agent.routines(owner.agentId), (value) => {
-            if (!Array.isArray(value) || !value.every(isRoutine))
-              throw new Error("The host returned invalid routines.");
-            return value;
-          })
-        : send("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: owner.channelId }),
+    routines: (owner) => {
+      const released: Effect.Effect<RoutineFields[], TeamRequestError> =
+        owner.kind === "agent"
+          ? send("GET", TEAM_API_ROUTES.agent.routines(owner.agentId), (value) => {
+              if (!Array.isArray(value) || !value.every(isRoutine))
+                throw new Error("The host returned invalid routines.");
+              return value;
+            })
+          : send("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: owner.channelId });
+      // The released routes do not list a `once` routine; `routines-once-v1` lists them, as on desktop and web.
+      if (!once) return released;
+      const oncePost: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
+      const onceRoutines = Effect.tryPromise({
+        try: (): Promise<RoutineFields[]> =>
+          owner.kind === "agent"
+            ? listOnceAgentRoutines(oncePost, owner.agentId)
+            : listOnceChannelRoutines(oncePost, owner.channelId),
+        catch: (cause) => new TeamRequestError({ cause }),
+      });
+      return Effect.all([released, onceRoutines], { concurrency: "unbounded" }).pipe(
+        Effect.map(([list, extra]) => [...list, ...extra]),
+      );
+    },
     runs: (owner, routineId, limit) =>
       owner.kind === "agent"
         ? send("GET", `${TEAM_API_ROUTES.agent.routineRuns(owner.agentId, routineId)}?limit=${limit}`, (value) => {

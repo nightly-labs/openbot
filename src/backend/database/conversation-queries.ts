@@ -72,6 +72,17 @@ const ARCHIVED_SIDE_THREAD_EXCLUSION = `${CHANNEL_THREAD_EXCLUSION}
  */
 export class ConversationQueries {
   readonly #core: DatabaseCore;
+  /**
+   * The newest reply of each thread, at the thread revision it was read at. Each runtime snapshot
+   * reads it for every agent whose chat is not in memory, up to 4 times a second while an agent
+   * works, and the read goes back over every message after that reply (#11103). Each message write
+   * moves the thread's `last_event_sequence`, an AUTOINCREMENT value, so the same revision has the
+   * same reply. A rollback can give its value again, so a read in an open transaction skips the cache.
+   */
+  readonly #latestReplies = new Map<
+    string,
+    { agentId: string; revision: number; message: ConversationMessage | null }
+  >();
 
   constructor(options: ConversationQueriesOptions) {
     this.#core = options.core;
@@ -109,6 +120,10 @@ export class ConversationQueries {
    * so it does not load and parse the whole history of the thread for it. The turn row names the
    * thread that ran the turn: the agent's chat or a side thread, such as a routine thread. A branch
    * keeps the turn ids of the rows it copied, but the turn row stays with the source thread.
+   *
+   * The read goes through the turn index. Without the hint, SQLite takes the page order index to skip
+   * the sort, and reads every message of the thread for the few rows of one turn: about a second on
+   * the main process for a chat of a million messages, at the end of each routine run (#11463).
    */
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     const rows = databaseRows(
@@ -116,7 +131,7 @@ export class ConversationQueries {
         .prepare(
           `SELECT message.message_json FROM projection_turns AS turn
            JOIN projection_threads AS thread ON thread.thread_id = turn.thread_id
-           JOIN projection_thread_messages AS message
+           JOIN projection_thread_messages AS message INDEXED BY thread_messages_turn
              ON message.thread_id = turn.thread_id AND message.turn_id = turn.turn_id
            WHERE turn.turn_id = ? AND thread.agent_id = ? AND message.author = 'assistant'
            ORDER BY message.created_at, message.ordinal, message.message_id`,
@@ -195,13 +210,31 @@ export class ConversationQueries {
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     if (!threadId) return { activeTurnId: null, latestMessage: null };
+    // Each runtime snapshot reads this for each agent whose chat is not loaded.
+    const thread = databaseRow(
+      this.#core
+        .statement(
+          "SELECT active_turn_id, last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?",
+        )
+        .get(threadId, agentId),
+    );
+    if (!thread) {
+      this.#latestReplies.delete(threadId);
+      return { activeTurnId: null, latestMessage: null };
+    }
+    const activeTurnId = optionalStringColumn(thread, "active_turn_id");
+    const revision = requiredNumberColumn(thread, "last_event_sequence");
+    const cached = !this.#core.connection.isTransaction;
+    const known = cached ? this.#latestReplies.get(threadId) : undefined;
+    if (known?.agentId === agentId && known.revision === revision) {
+      return { activeTurnId, latestMessage: known.message };
+    }
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT thread.active_turn_id,
-                  (SELECT message.message_json
+          `SELECT message.message_json AS latest_message_json
                    FROM projection_thread_messages message
-                   WHERE message.thread_id = thread.thread_id
+                   WHERE message.thread_id = ?
                      AND json_extract(message.message_json, '$.author') IN ('assistant', 'agent')
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'commentary'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'question_prompt'
@@ -212,18 +245,14 @@ export class ConversationQueries {
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
                      AND json_extract(message.message_json, '$.senderAgentId') IS NULL
                    ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
-                   LIMIT 1) AS latest_message_json
-           FROM projection_threads thread
-           WHERE thread.thread_id = ? AND thread.agent_id = ?`,
+                   LIMIT 1`,
         )
-        .get(threadId, agentId),
+        .get(threadId),
     );
-    if (!row) return { activeTurnId: null, latestMessage: null };
-    const latestMessage = optionalStringColumn(row, "latest_message_json");
-    return {
-      activeTurnId: optionalStringColumn(row, "active_turn_id"),
-      latestMessage: latestMessage ? decodeConversationMessageJson(latestMessage) : null,
-    };
+    const latestJson = row ? optionalStringColumn(row, "latest_message_json") : null;
+    const latestMessage = latestJson ? decodeConversationMessageJson(latestJson) : null;
+    if (cached) this.#latestReplies.set(threadId, { agentId, revision, message: latestMessage });
+    return { activeTurnId, latestMessage };
   }
 
   /** Reads only named messages for a row-level conversation update. */

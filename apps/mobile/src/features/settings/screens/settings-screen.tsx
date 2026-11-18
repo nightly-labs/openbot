@@ -12,6 +12,7 @@ import MessagesSquare from "lucide-react-native/icons/messages-square";
 import Mic from "lucide-react-native/icons/mic";
 import Palette from "lucide-react-native/icons/palette";
 import Shield from "lucide-react-native/icons/shield";
+import SquareMenu from "lucide-react-native/icons/square-menu";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import WandSparkles from "lucide-react-native/icons/wand-sparkles";
 import { useEffect } from "react";
@@ -102,6 +103,9 @@ export function SettingsScreen() {
         {/* On iOS the screen also has the Live Activities, which exist only there. */}
         <SettingsRow leading={<RowIcon icon={Bell} />} onPress={() => router.push("/settings/notifications")}>
           <Typography.Paragraph>{t("mobile.settings.notifications.title")}</Typography.Paragraph>
+        </SettingsRow>
+        <SettingsRow leading={<RowIcon icon={SquareMenu} />} onPress={() => router.push("/settings/quick-actions")}>
+          <Typography.Paragraph>{t("mobile.settings.quickActions.title")}</Typography.Paragraph>
         </SettingsRow>
         {/* The shortcuts need the Shortcuts app of iOS 26. */}
         {shortcutsSupported ? (

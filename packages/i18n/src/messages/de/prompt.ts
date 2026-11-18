@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Schließe den Schritt auf {host} ab",
   "prompt.browser.cancelled": "Abgebrochen",
   "prompt.browser.reload":
-    "Schließe die Anmeldung ab und lade die Browserseite neu, bevor du „Fertig“ wählst. Die Seitenprüfung bleibt gesperrt, bis die Seite neu geladen wurde.",
+    "OpenBot konnte das Passwort oder den Code nicht vollständig eingeben. Prüfe die Seite und gib ein, was fehlt. Schließe die Anmeldung ab und lade die Browserseite neu, bevor du „Fertig“ wählst. Die Seitenprüfung bleibt gesperrt, bis die Seite neu geladen wurde.",
   "prompt.browser.continuing": "{name} fährt fort.",
   "prompt.browser.cancelledBody": "Der Browserschritt wurde abgebrochen.",
   "prompt.browser.pendingBody":
     "Öffne die Seite, um die Anmeldung, Verifizierung oder Zustimmung abzuschließen. Lass {name} danach fortfahren.",
   "prompt.browser.openPage": "{title} öffnen",
+  "prompt.browser.openFailed": "Die Seite konnte nicht im Hauptfenster geöffnet werden. Versuche es erneut.",
   "prompt.browser.done": "Fertig",
   "prompt.browser.pageFallback": "Browserseite",
   "prompt.browser.hostFallback": "dem Browser",

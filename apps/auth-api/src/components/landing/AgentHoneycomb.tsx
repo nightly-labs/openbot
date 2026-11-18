@@ -63,13 +63,53 @@ export function honeycombRows(rows: number, columns: number, artEvery: number, p
  * equal: the agent bodies are drawn by hand and are not all the same size.
  *
  * The faces load when the comb comes near the viewport, also with reduced motion, so a page that the
- * reader leaves early does not load the avatar engine. Each face then drifts, blinks and winks; only
- * the one under the pointer turns its eyes to it. Decorative: the caller hides it from assistive
- * technology.
+ * reader leaves early does not load the avatar engine. One in three of the faces outside `stillUnder`
+ * drifts, blinks and winks, and stops while the page scrolls. The face under the pointer moves and
+ * turns its eyes to it. The others keep still: a backdrop blur over the comb draws its box again on
+ * each frame that a face moves, and with all faces moving the page scrolled at a third of its frame
+ * rate. Decorative: the caller hides it from assistive technology.
  */
-export function AgentHoneycomb(props: { rows: HoneycombCell[][] }) {
+export function AgentHoneycomb(props: { rows: HoneycombCell[][]; stillUnder: () => HTMLElement | undefined }) {
   let comb: HTMLDivElement | undefined;
   const [near, setNear] = createSignal(false);
+  const cells = new Map<number, HTMLElement>();
+  const [awake, setAwake] = createSignal<ReadonlySet<number>>(new Set());
+  // The comb and the box are both centred on the block, so their overlap changes only when one of
+  // them changes size: on a narrow window, and at the breakpoint where the cells get smaller.
+  onSettled(() => {
+    const box = props.stillUnder();
+    if (!comb || !box || !globalThis.ResizeObserver) return;
+    const observer = new ResizeObserver(() => {
+      const still = box.getBoundingClientRect();
+      const next = new Set<number>();
+      for (const [index, cell] of cells) {
+        const rect = cell.getBoundingClientRect();
+        const outside =
+          rect.right <= still.left || rect.left >= still.right || rect.bottom <= still.top || rect.top >= still.bottom;
+        if (outside && scatteredPhase(index) < 20) next.add(index);
+      }
+      setAwake(next);
+    });
+    observer.observe(box);
+    observer.observe(comb);
+    return () => observer.disconnect();
+  });
+  // Without a compositor that redraws only the changed part, a face that moves anywhere still makes the
+  // blur draw again, so no face moves while the page scrolls.
+  const [scrolling, setScrolling] = createSignal(false);
+  onSettled(() => {
+    let timer: number | undefined;
+    const scroll = () => {
+      setScrolling(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setScrolling(false), 200);
+    };
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", scroll);
+      window.clearTimeout(timer);
+    };
+  });
   onSettled(() => {
     if (!comb || !globalThis.IntersectionObserver) {
       setNear(true);
@@ -95,6 +135,7 @@ export function AgentHoneycomb(props: { rows: HoneycombCell[][] }) {
             <For each={row}>
               {(cell) => (
                 <span
+                  ref={(element) => cells.set(cell.index, element)}
                   class="agent-honeycomb-cell"
                   data-kind={cell.tile.kind}
                   onPointerEnter={() => setHovered(cell.index)}
@@ -118,7 +159,7 @@ export function AgentHoneycomb(props: { rows: HoneycombCell[][] }) {
                         seed={cell.tile.seed}
                         hue={null}
                         shape="squircle"
-                        motion="always"
+                        motion={awake().has(cell.index) && !scrolling() ? "always" : "hover"}
                         animationOffset={scatteredPhase(cell.index)}
                         followPointer={hovered() === cell.index}
                         class="agent-honeycomb-avatar"

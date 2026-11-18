@@ -90,6 +90,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
+  "error.backend.channelArchiveRunning": "Bu kanaldaki devam eden işi durdurun, ardından kanalı silin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
@@ -122,6 +123,8 @@ export const messages = {
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
   "error.backend.routineRunGone": "Bu rutin çalıştırması artık mevcut değil.",
+  "error.backend.routineRunFailedNoReason":
+    "Çalıştırma bir hatayla durdu, ancak bir neden gelmedi. Ajanın ne yaptığını görmek için çalıştırmayı açın.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
@@ -269,6 +272,7 @@ export const messages = {
     "Oturum açma sunucusu OpenBot'un okuyamadığı bir yanıt gönderdi. Hizmet size bir API anahtarı veya belirteç veriyorsa bunu bu sunucunun ayarlarına ekleyin, ardından bağlantıyı yeniden test edin.",
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",

@@ -81,6 +81,7 @@ export const messages = {
   "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
   "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
+  "error.backend.channelArchiveRunning": "请先停止该频道中正在运行的工作，再删除它。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
   "error.backend.channelTaskComplete": "该任务已完成。",
@@ -110,6 +111,7 @@ export const messages = {
   "error.backend.memoryGone": "该记忆已不存在。",
   "error.backend.routineGone": "该自动化任务已不存在。",
   "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
+  "error.backend.routineRunFailedNoReason": "运行因错误而停止，但没有收到原因。打开这次运行，查看智能体做了什么。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
@@ -245,6 +247,7 @@ export const messages = {
   "error.backend.mcpSignInAnswerUnreadable":
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
+  "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpToolSchemaRefused":

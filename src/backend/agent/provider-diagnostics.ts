@@ -402,17 +402,37 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
 /**
+ * A count of images in one clause, such as "at most 8 images", or Azure's "Exceeded maximum number of
+ * images (50) allowed in the request" (#11628).
+ */
+const IMAGE_COUNT_LIMIT =
+  /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])|\bmaximum number of images\b/iu;
+
+/** A limit over time, such as "at most 50 images per day", which a new session does not change. */
+const IMAGE_QUOTA_PERIOD =
+  /\b(?:per|a|each|every) (?:second|minute|hour|day|week|month)\b|\b(?:hourly|daily|weekly|monthly|quota)\b/iu;
+
+/**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
  * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
  * 30", other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
- * (#9038). A daily quota of images is not a count in one request, so it does not match.
+ * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
+ * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
+ * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not
+ * a count in one request, so a clause that names a period does not match. A period in a different
+ * clause, such as "try again in a minute", does not stop the match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
-  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
-    message,
+  return (
+    /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
+      message,
+    ) ||
+    // Split first: a pattern that also reads the clause around the count takes quadratic time on a long
+    // error text with no full stop.
+    message.split(/[.;\n]/u).some((clause) => IMAGE_COUNT_LIMIT.test(clause) && !IMAGE_QUOTA_PERIOD.test(clause))
   );
 }
 
@@ -441,10 +461,11 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
  * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
  * at position 124 with role 'user' contains an invalid part type: file" (#8654). Z.ai's text-only
  * GLM models refuse an image with error 1210: "messages.content.type is invalid, allowed values:
- * ['text']" (#10012).
+ * ['text']" (#10012). A local server refuses a screenshot that a tool returned to a text-only model:
+ * "MiniMax-M2.7-AWQ-4bit is not a multimodal model" (#11679).
  */
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }

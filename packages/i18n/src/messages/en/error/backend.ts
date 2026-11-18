@@ -89,6 +89,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
+  "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
@@ -120,6 +121,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
   "error.backend.routineRunGone": "This routine run no longer exists.",
+  "error.backend.routineRunFailedNoReason":
+    "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
@@ -268,6 +271,7 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",

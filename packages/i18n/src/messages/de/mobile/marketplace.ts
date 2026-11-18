@@ -97,6 +97,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Hilf mir, diese Fähigkeit zu nutzen.",
   "mobile.marketplace.app.add": "App hinzufügen",
+  "mobile.marketplace.app.addCustom": "Eigene hinzufügen",
   "mobile.marketplace.app.connect": "Verbinden",
   "mobile.marketplace.app.connectTitle": "{name} verbinden",
   "mobile.marketplace.app.keyIntro":

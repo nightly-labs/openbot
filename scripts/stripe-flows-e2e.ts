@@ -109,6 +109,7 @@ import {
 } from "@openbot/contracts/license";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
+import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
 import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
@@ -3707,12 +3708,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
     );
 
-    // A customer from before the billing details step that never paid has no address. The Worker reads
-    // BILLING_COUNTRY_REQUIRED from the same shell as this script.
+    // A customer from before the billing details step that never paid has no address. The local Worker
+    // reads BILLING_COUNTRY_REQUIRED from the same shell as this script, else "true" from wrangler.jsonc.
     await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
     const noCountry = await account.checkout(serverId);
     const cleared = await details();
-    if (process.env.BILLING_COUNTRY_REQUIRED?.trim() === "true") {
+    if (readLocalRuntimeVars(process.env).BILLING_COUNTRY_REQUIRED !== "false") {
       record(
         "vat",
         "with no billing country a Checkout page is refused: 409 billing_country_required",

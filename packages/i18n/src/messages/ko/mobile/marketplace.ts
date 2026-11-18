@@ -95,6 +95,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "이 스킬을 사용하도록 도와줘.",
   "mobile.marketplace.app.add": "앱 추가",
+  "mobile.marketplace.app.addCustom": "사용자 지정 추가",
   "mobile.marketplace.app.connect": "연결",
   "mobile.marketplace.app.connectTitle": "{name} 연결",
   "mobile.marketplace.app.keyIntro": "계정의 키를 붙여넣으세요. 서버가 앱을 저장하기 전에 키를 테스트해요.",

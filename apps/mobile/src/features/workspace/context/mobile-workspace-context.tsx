@@ -36,6 +36,7 @@ import {
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
@@ -78,8 +79,8 @@ import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sideba
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
@@ -1285,8 +1286,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         "connection",
         `${serverId} host OpenBot ${compatibility.appVersion}, protocol ${compatibility.protocol.minimum}-${compatibility.protocol.maximum}, capabilities: ${compatibility.capabilities.join(" ")}`,
       );
-      if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
+      // The host range is compared with the protocols that this app speaks, so a host that raised its
+      // minimum still connects, and the side that is too old is named.
+      const negotiated = teamWebRtcClientProtocol(compatibility.protocol);
+      if (negotiated.update === "client_update_required") {
         throw new Error(sourceText("error.remote.mobileUpdateRequired"));
+      }
+      if (negotiated.update === "host_update_required") {
+        throw new Error(sourceText("error.team.hostUpdateRequired"));
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
@@ -2641,6 +2648,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
         macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
+        canEditUiBlockPreview: (serverId) => hasCapability(capabilities, serverId, UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
         canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),

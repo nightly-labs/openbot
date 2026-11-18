@@ -121,6 +121,8 @@ const subscriptionSchema = Schema.Struct({
   currency: Schema.String,
   cancel_at_period_end: Schema.Boolean,
   cancel_at: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** The time of the last cancel request. Stripe keeps it after a resume. */
+  canceled_at: Schema.optional(Schema.NullOr(Schema.Int)),
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
   /** The end of the trial. Stripe keeps it after the trial ends. */

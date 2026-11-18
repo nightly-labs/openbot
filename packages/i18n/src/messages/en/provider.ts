@@ -134,6 +134,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
     "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":

@@ -10,6 +10,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
 import { BillingError, type BillingOperationError, stripeFailure, stripeRequest } from "./billing-errors";
+import { requestCountry } from "./request-country";
 import {
   type StripeClient,
   type StripeCustomerTax,
@@ -79,7 +80,7 @@ export function billingDetailsOf(tax: StripeCustomerTax | null): BillingDetails 
  * Cloudflare sends XX for an unknown country and T1 for Tor; neither is a billing country.
  */
 export function withSuggestedCountry(details: BillingDetails, request: Request): BillingDetails {
-  const located = request.headers.get("cf-ipcountry");
+  const located = requestCountry(request);
   return details.country === null && isBillingCountry(located) ? { ...details, suggestedCountry: located } : details;
 }
 
@@ -231,6 +232,14 @@ const paidCheckoutSchema = Schema.Struct({
     ),
   ),
 });
+
+/**
+ * The Discord form of a VAT text (`VAT check: ...` or `VAT limit: ...`): an emoji and the bold label.
+ * The log keeps the plain text.
+ */
+export function vatAlertText(text: string): string {
+  return text.replace(/^(VAT check|VAT limit): /, "🧾 **$1** · ");
+}
 
 /**
  * The operator text for a paid Checkout page whose billing address is in another country than the one

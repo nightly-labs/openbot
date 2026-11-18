@@ -353,27 +353,96 @@ function hits(term: string, words: readonly string[]): boolean {
   );
 }
 
-/** The settings that fit the query best. A title match counts most. */
-export function searchSettingLinks(query: string, limit = 5): SettingLinkSummary[] {
-  const queryTerms = terms(query);
+/**
+ * How well an entry fits the query terms. A title match counts most. With `sentences`, the about and
+ * place text count too.
+ */
+function score(queryTerms: readonly string[], entry: SettingLinkEntry, sentences: boolean) {
+  const title = terms(entry.title);
+  const words = terms(entry.words);
+  const rest = sentences ? terms(`${entry.about} ${entry.place}`) : [];
+  let total = 0;
+  for (const term of queryTerms) {
+    if (hits(term, title)) total += 3;
+    else if (hits(term, words)) total += 2;
+    // The descriptions are sentences, so a word of two letters, such as "is" or "to", is not a match.
+    else if (term.length > 2 && hits(term, rest)) total += 1;
+  }
+  return total;
+}
+
+/** The entries that fit the query best. */
+function rank<T>(
+  items: readonly T[],
+  entry: (item: T) => SettingLinkEntry,
+  queryTerms: readonly string[],
+  limit: number,
+  sentences: boolean,
+) {
   if (queryTerms.length === 0) return [];
-  const scored = SETTING_LINK_IDS.map((id) => {
-    const entry = SETTING_LINKS[id];
-    const title = terms(entry.title);
-    const words = terms(entry.words);
-    const rest = terms(`${entry.about} ${entry.place}`);
-    let score = 0;
-    for (const term of queryTerms) {
-      if (hits(term, title)) score += 3;
-      else if (hits(term, words)) score += 2;
-      // The descriptions are sentences, so a word of two letters, such as "is" or "to", is not a match.
-      else if (term.length > 2 && hits(term, rest)) score += 1;
-    }
-    return { id, score };
-  });
-  return scored
-    .filter((entry) => entry.score > 0)
+  return items
+    .map((item) => ({ item, score: score(queryTerms, entry(item), sentences) }))
+    .filter((match) => match.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map((entry) => settingLinkSummary(entry.id));
+    .map((match) => match.item);
+}
+
+/** The settings that fit the query best. */
+export function searchSettingLinks(query: string, limit = 5): SettingLinkSummary[] {
+  return rank(SETTING_LINK_IDS, (id) => SETTING_LINKS[id], terms(query), limit, true).map(settingLinkSummary);
+}
+
+const SERVER_LIST = "On a computer: in the server list on the left, right-click the server";
+const SERVER_SETTINGS = "Server settings (right-click the server in the server list on the left, then Server settings)";
+const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
+
+/**
+ * Server actions that `show_setting` finds but shows no card for. A card opens the settings of the
+ * server of the chat, and these actions are often for another server of the list, such as the server
+ * of an old computer, so the agent gives the steps in words.
+ */
+export type ServerPlace = Omit<SettingLinkEntry, "words">;
+
+const SERVER_PLACES: readonly SettingLinkEntry[] = [
+  {
+    title: "Remove server",
+    place: `${SERVER_LIST} > Remove server, or ${SERVER_SETTINGS} > General > Remove server. ${PHONE_SERVERS} > Remove server.`,
+    about:
+      "Only the owner. Removes the server from the account for all members and ends remote access, for example the server of an old computer that is not used now. It works also when that computer is off. Files and chats on that computer stay. It does not show for a hosted server or for the server on this computer.",
+    words: "delete forget rid replace unregister old previous",
+  },
+  {
+    title: "Leave server",
+    place: `${SERVER_LIST} > Leave server, or ${SERVER_SETTINGS} > General > Leave server. ${PHONE_SERVERS} > Leave server.`,
+    about: "A member who is not the owner removes a joined server from their own server list. The server stays.",
+    words: "quit exit joined membership",
+  },
+  {
+    title: "Transfer",
+    place: `On a computer: ${SERVER_SETTINGS} > Transfer.`,
+    about:
+      "Owners and admins move the agents, with their skills, routines, memories and files, to another computer: export a .zip file from the old server, then import it into the new server.",
+    words: "move migrate migration copy new",
+  },
+];
+
+/** Words for a server or its computer. A server action fits only a query with one of them. */
+const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
+
+/**
+ * The server actions that fit the query. Only the title and the words count: the place of each action
+ * repeats the same steps, so its common words would match nearly every query. The words for a server
+ * or a computer only open the search and do not add to the score: another word, such as "remove" or
+ * "move", must match.
+ */
+export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
+  const queryTerms = terms(query);
+  if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];
+  const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
+  return rank(SERVER_PLACES, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
+    title,
+    place,
+    about,
+  }));
 }

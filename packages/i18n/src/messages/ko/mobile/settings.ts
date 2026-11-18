@@ -129,6 +129,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
+  "mobile.settings.appearance.replyDetails": "답장 세부 정보",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "세부 정보를 끄면 채팅에서 해당 행이 숨겨집니다. 에이전트는 계속 생각하고, 하위 에이전트를 실행하고, 기억을 저장합니다.",
+  "mobile.settings.appearance.showThinking": "에이전트 생각 표시",
+  "mobile.settings.appearance.showSubagents": "하위 에이전트 표시",
+  "mobile.settings.appearance.showMemoryChanges": "저장된 기억 표시",
   "mobile.settings.appearance.fullVisuals": "시각 자료 미리보기 전체 표시",
   "mobile.settings.appearance.fullVisualsFooter":
     "에이전트의 시각 자료를 채팅에 전체 높이로 표시합니다. 끄면 긴 시각 자료가 잘리며, 탭하면 전체를 볼 수 있습니다.",
@@ -245,8 +251,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
   "mobile.settings.conversations.swipeThreads": "스레드",
   "mobile.settings.conversations.swipeBrowser": "브라우저",
+  "mobile.settings.conversations.swipeOff": "끔",
   "mobile.settings.conversations.swipeFooter":
-    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지 위에서 스와이프하면 계속 답장합니다.",
+    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지에서 같은 방향으로 스와이프하면 메시지 시간이 표시됩니다.",
   "mobile.settings.conversations.pullInfo": "위로 당겨 정보 보기",
   "mobile.settings.conversations.pullInfoFooter":
     "채팅, 채널 또는 스레드에서 최신 메시지 너머로 위로 당긴 뒤 놓으면 정보가 열립니다.",
@@ -502,6 +509,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "프로세스를 중지할 수 없어요.",
   "mobile.settings.agents.processes.stopTitle": "이 프로그램을 중지할까요?",
   "mobile.settings.agents.processes.stopLabel": "프로세스 {pid} 중지",
+  "mobile.settings.quickActions.title": "앱 아이콘 메뉴",
+  "mobile.settings.quickActions.footer":
+    "OpenBot 아이콘을 길게 누르면 이 동작이 표시됩니다. 최대 {count}개까지 켤 수 있습니다.",
+  "mobile.settings.quickActions.latestChat": "최근 채팅",
+  "mobile.settings.quickActions.secondChat": "두 번째 최근 채팅",
   "mobile.settings.shortcuts.title": "단축어",
   "mobile.settings.shortcuts.agent": "에이전트",
   "mobile.settings.shortcuts.none": "없음",

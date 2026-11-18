@@ -964,6 +964,7 @@ export class LicenseService {
             {
               event,
               periodEnd: subscriptionEnd(subscription),
+              cancelRequest: subscription.canceled_at ?? null,
               ...(change.endReason ? { endReason: change.endReason } : {}),
               product: "license",
               tier: plan.tier,

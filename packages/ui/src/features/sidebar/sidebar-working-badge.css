@@ -48,6 +48,11 @@
   }
 }
 
+/* A badge off screen keeps its balls still: each hopping ball is restyled on each frame. */
+.agent-row-agent-status-working.agent-row-agent-status-still .agent-row-thinking-dots i {
+  animation: none;
+}
+
 /* A low hop with a soft squash, so each ball stays inside the pill border. */
 @keyframes agent-row-ball-hop {
   0%,

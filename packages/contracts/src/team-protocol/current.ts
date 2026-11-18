@@ -4,6 +4,7 @@ import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
+import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
@@ -35,6 +36,7 @@ import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_QUEUE_CAPABILITY } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CAPABILITY } from "./agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
@@ -60,6 +62,7 @@ import {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
@@ -162,6 +165,7 @@ import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
@@ -184,12 +188,15 @@ import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
+import { highestCommonTeamProtocol, type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "./v1";
+import { TEAM_PROTOCOL_V3 } from "./v3";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
-import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
@@ -206,6 +213,7 @@ import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
@@ -277,6 +285,7 @@ export const TEAM_QUEUE_WINDOW_CAPABILITY = "queue-window-v1";
 export {
   ACP_REGISTRY_CAPABILITY,
   AGENT_ACCESS_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
@@ -307,6 +316,7 @@ export {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   AGENT_WAITS_CAPABILITY,
@@ -404,6 +414,7 @@ export {
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -429,6 +440,7 @@ export {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
@@ -444,6 +456,7 @@ export {
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
@@ -462,6 +475,7 @@ export {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
@@ -704,6 +718,12 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -768,12 +788,19 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-// Keep the first request readable by every released peer. The v7 marker lets a current
-// host return the expanded list; older hosts ignore the marker and retain all old features.
-// A protocol 6 peer reads at most 64 capabilities, so each new capability is v7 only.
-// The v8 marker stays out: a client sends it only after the host reports protocol 8.
+// Keep the first request readable by every released peer. A client also sends this list to a host
+// of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
+// over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
+// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
+// protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
+// stays out: a client sends it only after the host reports protocol 8.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    // No host of protocol 6 or older knows these three. They came after v0.34.1, the last protocol 6
+    // release, and took the list over 64. A host of protocol 7 or newer gets them in its own list.
+    capability !== TEAM_ZIP_ATTACHMENTS_CAPABILITY &&
+    capability !== AGENT_HOST_SETTINGS_CAPABILITY &&
+    capability !== MCP_SIGN_IN_CAPABILITY &&
     capability !== TEAM_OPEN_PROVIDERS_CAPABILITY &&
     capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
@@ -956,7 +983,13 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
     capability !== MAC_APPS_LIMIT_CAPABILITY &&
     capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+    capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+    capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
+    capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+    capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+    capability !== AGENT_ACTIVE_QUEUES_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1085,6 +1118,12 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1098,6 +1137,23 @@ const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V8_CURRENT_CAPABILIT
     capability !== PROVIDERS_V8_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY,
 );
+/**
+ * The protocols that mobile and the web client speak through `packages/team-client`. They send protocol 9
+ * requests; an older host reads them with its own codec. Protocol 3 is the oldest host that they accepted.
+ */
+export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
+  minimum: TEAM_PROTOCOL_V3,
+  maximum: TEAM_PROTOCOL_V9,
+};
+
+/** The highest protocol that a WebRTC client and a host both speak, or which side must update. */
+export function teamWebRtcClientProtocol(
+  host: TeamProtocolSupportV1["protocol"],
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+) {
+  return { protocol: highestCommonTeamProtocol(client, host), update: teamProtocolUpdateDirection(client, host) };
+}
+
 export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
   if (protocol === null || protocol === undefined || protocol < 7) return TEAM_BOOTSTRAP_CAPABILITIES;
   if (protocol >= 9) return TEAM_CURRENT_CAPABILITIES;
@@ -1296,6 +1352,12 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
       capability !== MAC_APPS_LIMIT_CAPABILITY &&
       capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+      capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+      capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
+      capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+      capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+      capability !== AGENT_ACTIVE_QUEUES_CAPABILITY,
   );
 }

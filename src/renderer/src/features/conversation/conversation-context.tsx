@@ -13,6 +13,7 @@ import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
+import { noteAgentRequest } from "../../agent-requests";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
@@ -21,7 +22,6 @@ import {
   retainThinkingMessages,
   toAgentMessage,
   toAgentMessages,
-  withoutAgent,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
 import { usePlatform } from "../../platform";
@@ -86,6 +86,18 @@ function trimToLatestPage(conversation: ConversationState): void {
   conversation.messages = kept;
   conversation.references = references;
   conversation.page = { hasOlder: true, olderCursor: null };
+}
+
+/** A chat with no cursor of its own for its older messages: it has no page yet, or it was trimmed. */
+function lacksOlderCursor(page: ConversationPageInfo | undefined): boolean {
+  return !page || (page.hasOlder && !page.olderCursor);
+}
+
+/** The originals that a page's replies quote, as the chat shows them. */
+function pageReferences(page: ConversationPage): Record<string, AgentMessage> {
+  return Object.fromEntries(
+    Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
+  );
 }
 
 interface ConversationState {
@@ -339,15 +351,25 @@ const Conversation = createSimpleContext({
     // Main adds text to a message before it sends the buffered delta, so the preview can hold text
     // that the first delta also holds. A message added from the preview starts with an empty raw body.
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
-      const agentIds = new Set(messages.map((message) => message.agentId));
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
       setConversations((current) => {
-        const currentMessages = Object.fromEntries(
-          Object.entries(current).map(([id, conversation]) => [id, conversation.messages]),
-        );
-        const next = appendLatestRuntimeMessages(currentMessages, messages);
-        for (const message of messages) {
+        // Most snapshots repeat messages that are loaded. Only a new message, or an agent that is not
+        // open and holds more than a page, has work.
+        const pending = messages.filter((message) => {
+          const loaded = current[message.agentId]?.messages;
+          if (!loaded?.some((candidate) => candidate.id === message.id)) return true;
+          return message.agentId !== activeAgentId() && loaded.length > LATEST_PAGE_SIZE;
+        });
+        if (pending.length === 0) return;
+        const agentIds = new Set(pending.map((message) => message.agentId));
+        const currentMessages: Record<string, ConversationState["messages"]> = {};
+        for (const agentId of agentIds) {
+          const loaded = current[agentId]?.messages;
+          if (loaded) currentMessages[agentId] = loaded;
+        }
+        const next = appendLatestRuntimeMessages(currentMessages, pending);
+        for (const message of pending) {
           if (currentMessages[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
           if (!next[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
           rawAgentMessageBodies.set(agentMessageKey(message.agentId, message.id), "");
@@ -600,11 +622,14 @@ const Conversation = createSimpleContext({
         applyConversation(pendingSnapshot, isAgentChatReadable(event.agentId));
       }
       const messageKey = agentMessageKey(event.agentId, event.messageId);
+      const animate = conversations[event.agentId]?.loaded === true;
       let appended = false;
       updateConversation(event.agentId, (conversation) => {
         conversation.revision = event.revision;
+        if (conversation.loaded !== true) conversation.loaded = true;
         const messages = conversation.messages;
-        const existing = messages.find((message) => message.id === event.messageId);
+        // A streamed message is near the end, so the search starts there.
+        const existing = messages.findLast((message) => message.id === event.messageId);
         const thinking = existing
           ? undefined
           : messages.find((message) => message.kind === "thinking" && message.itemIds?.includes(event.messageId));
@@ -637,7 +662,7 @@ const Conversation = createSimpleContext({
           time: formatMessageTime(event.createdAt),
           createdAt: event.createdAt,
           streaming: true,
-          animate: conversations[event.agentId]?.loaded === true,
+          animate,
           kind: "text",
         });
         appended = true;
@@ -656,9 +681,6 @@ const Conversation = createSimpleContext({
           });
         }
       }
-      updateConversation(event.agentId, (conversation) => {
-        conversation.loaded = true;
-      });
     }
 
     function applyConversation(snapshot: ConversationSnapshot, markNewMessagesRead = false) {
@@ -745,7 +767,7 @@ const Conversation = createSimpleContext({
       }));
       setTurnProgress((current) => {
         const progress = current[agentId];
-        return progress && progress.turnId !== snapshot.activeTurnId ? withoutAgent(current, agentId) : current;
+        if (progress && progress.turnId !== snapshot.activeTurnId) delete current[agentId];
       });
       const readState = conversations[agentId]?.read;
       const latestIncomingMessage = markNewMessagesRead
@@ -758,13 +780,41 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * A page that streamed text overtook is not applied, but the place of the older messages that it
+     * gives is still right. A chat with no place of its own, such as a chat trimmed while it was not
+     * open, takes it: without it, a scroll up loads nothing (#11240). The chat keeps its own, newer
+     * copy of each message, and gets only the page's messages before its first one.
+     */
+    function keepOlderHistoryPlace(page: ConversationPage): void {
+      const conversation = conversations[page.agentId];
+      if (!conversation || !lacksOlderCursor(conversation.page)) return;
+      const mapped = toAgentMessages(page.messages, page.agentId);
+      const first = conversation.messages[0];
+      const start = first ? mapped.findIndex((message) => message.id === first.id) : -1;
+      // The chat must meet the page, or the place would leave a gap that the reader does not see.
+      if (start === -1 && !conversation.messages.some((message) => message.id === mapped[0]?.id)) return;
+      const older = mapped
+        .slice(0, Math.max(start, 0))
+        .map((message) => createStoredMessage({ ...message, animate: false }));
+      updateConversation(page.agentId, (current) => {
+        current.messages = mergeConversationPage(current.messages, older, "older");
+        current.references = { ...current.references, ...pageReferences(page) };
+        current.missingReferences = { ...current.missingReferences, ...missingReplyOriginals(page) };
+        current.page = page.pageInfo;
+      });
+    }
+
     function applyConversationPage(
       page: ConversationPage,
       merge: "replace" | "older" | "latest",
       windowMode?: "latest" | "around",
     ): boolean {
       flushConversationDeltas();
-      if (page.revision < (conversations[page.agentId]?.revision ?? -1)) return false;
+      if (page.revision < (conversations[page.agentId]?.revision ?? -1)) {
+        if (merge !== "older") keepOlderHistoryPlace(page);
+        return false;
+      }
       for (const message of page.messages) {
         const key = agentMessageKey(page.agentId, message.id);
         if (message.author !== "user" && message.status === "streaming") rawAgentMessageBodies.set(key, message.text);
@@ -790,8 +840,7 @@ const Conversation = createSimpleContext({
         // its place, and loaded messages that the page does not meet give way to the page.
         const mappedIds = new Set(pageMessages.map((message) => message.id));
         // A chat with no page yet, or a trimmed one, has no cursor of its own, so it takes the page's.
-        const own = conversation.page;
-        const trimmed = !own || (own.hasOlder && !own.olderCursor);
+        const trimmed = lacksOlderCursor(conversation.page);
         const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
         const keepsWindow = tail && conversation.windowMode === "around";
         const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
@@ -807,9 +856,7 @@ const Conversation = createSimpleContext({
         const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
-          ...Object.fromEntries(
-            Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
-          ),
+          ...pageReferences(page),
         };
         conversation.missingReferences = {
           ...(merge === "replace" ? {} : conversation.missingReferences),
@@ -1042,6 +1089,7 @@ const Conversation = createSimpleContext({
           ...(clientMessageId ? { clientMessageId } : {}),
           ...(voiceRecordingDraftId ? { voiceRecordingDraftId } : {}),
         };
+        noteAgentRequest(serverId, agentId);
         const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
         setUiErrors((current) => ({ ...current, [errorKey]: [] }));

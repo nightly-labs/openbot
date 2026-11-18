@@ -44,11 +44,12 @@ export const messages = {
   "prompt.browser.title.pending": "请在 {host} 上完成该步骤",
   "prompt.browser.cancelled": "已取消",
   "prompt.browser.reload":
-    "完成登录后，先刷新浏览器页面，再选择“我已完成”。在页面刷新之前，页面检查会一直处于阻断状态。",
+    "OpenBot 未能完成输入密码或验证码。请检查页面并补全缺少的部分。完成登录后，先刷新浏览器页面，再选择“我已完成”。在页面刷新之前，页面检查会一直处于阻断状态。",
   "prompt.browser.continuing": "{name} 正在继续。",
   "prompt.browser.cancelledBody": "浏览器步骤已取消。",
   "prompt.browser.pendingBody": "请打开页面完成登录、验证或授权，然后让 {name} 继续。",
   "prompt.browser.openPage": "打开 {title}",
+  "prompt.browser.openFailed": "无法在主窗口中打开页面，请重试。",
   "prompt.browser.done": "我已完成",
   "prompt.browser.pageFallback": "浏览器页面",
   "prompt.browser.hostFallback": "浏览器",

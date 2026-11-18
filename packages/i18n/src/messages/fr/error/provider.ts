@@ -191,6 +191,10 @@ export const messages = {
     "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. OpenBot va réessayer.",
   "error.provider.cliTimedOutRefresh":
     "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. Actualisez les fournisseurs pour réessayer.",
+  "error.provider.serviceUnreachable":
+    "{provider} ne parvient pas à se connecter à son service. Vérifiez votre connexion internet. OpenBot va réessayer.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} ne parvient pas à se connecter à son service. Vérifiez votre connexion internet, puis actualisez les fournisseurs.",
   "error.provider.acpStartTimedOut":
     "{provider} n’a pas fini de démarrer en {seconds} s. L’ordinateur est peut-être occupé.",
   "error.provider.acpModelsTimedOut":
@@ -257,6 +261,8 @@ export const messages = {
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Ce modèle ne vous est pas disponible. Choisissez un autre modèle pour cet agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -381,6 +387,8 @@ export const messages = {
     "Codex n’a pas pu continuer cette conversation, car un élément manque dans son historique enregistré. OpenBot a ouvert une nouvelle session Codex avec l’historique de la conversation. Réessayez.",
   "error.provider.codexRequestRefused":
     "{provider} a refusé la requête de ce chat sans en donner la cause. Cela peut arriver dans un long chat avec beaucoup d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.codexAudioRefused":
+    "Le modèle n'a pas accepté l'audio de ce chat. OpenBot a démarré une nouvelle session Codex avec l'historique du chat. Réessayez.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooLarge":
@@ -516,6 +524,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi a renvoyé une autre session. La session enregistrée n’a pas été remplacée.",
   "error.provider.piExtensionFailed":
     "Pi s’est arrêté, car il n’a pas pu charger une extension. Supprimez ou mettez à jour cette extension, puis réessayez. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi s’est arrêté de façon inattendue avant de terminer ce tour. Envoyez un message pour continuer.",
   "error.provider.piModelInvalid": "Sélectionnez un modèle Pi qui inclut son fournisseur.",
   "error.provider.piToolInvalid": "L’outil a renvoyé un résultat non valide.",
   "error.provider.piSignIn": "Utilisez /login dans Pi sur l’ordinateur hôte. Fermez Pi une fois la connexion terminée.",

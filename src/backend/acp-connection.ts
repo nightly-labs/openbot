@@ -142,7 +142,7 @@ export class AcpConnection {
       emit: (message) => {
         lastDiagnostic = message;
         if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
+        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child), stderr: true });
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));

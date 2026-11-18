@@ -412,10 +412,10 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "מספר אישי",
   "connector.whatsapp.ownNumberDescription":
-    "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר שמיועד רק ל-OpenBot.",
+    "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "connector.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. יש לכבות כדי לשלוח רק את התשובה.",
   "connector.whatsapp.statusReactions": "תגובות סטטוס",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
@@ -433,9 +433,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "יש לבחור את המספר ואז לקשר את השרת הזה מ-WhatsApp בטלפון.",
   "connector.whatsapp.kindLabel": "מספר",
   "connector.whatsapp.kindPersonal": "המספר האישי שלי",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ ולאנשים שאישרת.",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ ולאנשים שאישרת. אנשים אחרים לא מקבלים תשובה.",
   "connector.whatsapp.kindDedicated": "מספר רק עבור OpenBot",
-  "connector.whatsapp.kindDedicatedDescription": "אנשים לא מוכרים מקבלים קוד שיש למסור לך. את האישור נותנים כאן.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot משיב מהמספר הזה לכל אדם לא מוכר עם קוד שיש למסור לך. את האישור נותנים כאן.",
   "connector.whatsapp.methodLabel": "אופן הקישור",
   "connector.whatsapp.methodQr": "קוד QR",
   "connector.whatsapp.methodCode": "קוד צימוד",

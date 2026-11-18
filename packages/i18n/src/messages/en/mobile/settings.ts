@@ -129,6 +129,12 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
+  "mobile.settings.appearance.replyDetails": "Reply details",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Turn off a detail to hide its row in chats. The agent still reasons, runs subagents and saves memories.",
+  "mobile.settings.appearance.showThinking": "Show agent thinking",
+  "mobile.settings.appearance.showSubagents": "Show subagents",
+  "mobile.settings.appearance.showMemoryChanges": "Show saved memories",
   "mobile.settings.appearance.fullVisuals": "Show full visual previews",
   "mobile.settings.appearance.fullVisualsFooter":
     "A visual from an agent shows at its full height in the chat. When this is off, a tall visual is cut, and you tap it to see all of it.",
@@ -244,8 +250,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Off",
   "mobile.settings.conversations.swipeFooter":
-    "A swipe away from Back in an agent's chat opens this. A swipe on a message still replies to it.",
+    "A swipe away from Back in an agent's chat opens this. The same swipe on a message shows the times of the messages.",
   "mobile.settings.conversations.pullInfo": "Pull up for info",
   "mobile.settings.conversations.pullInfoFooter":
     "Pull up past the latest message in a chat, a channel or a thread, and release, to open its info.",
@@ -511,6 +518,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.agents.processes.stopFailed": "The process could not be stopped.",
   "mobile.settings.agents.processes.stopTitle": "Stop this program?",
   "mobile.settings.agents.processes.stopLabel": "Stop process {pid}",
+  "mobile.settings.quickActions.title": "App icon menu",
+  "mobile.settings.quickActions.footer":
+    "Touch and hold the OpenBot icon to see these actions. You can turn on up to {count}.",
+  "mobile.settings.quickActions.latestChat": "Latest chat",
+  "mobile.settings.quickActions.secondChat": "Second latest chat",
   "mobile.settings.shortcuts.title": "Shortcuts",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "None",

@@ -480,6 +480,22 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
+only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
+`models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
+(`src/backend/workflows/media-catalog.ts`). It drops the models that need a source video and the
+models that are only tools. For each model, the host keeps a plan that stays on the host: which input
+pictures it sends and how it names the choices (`sunra-catalog.ts`, `higgsfield-catalog.ts`). A
+service that does not answer gives its fixed models. `POST /v1/workflows/media/catalog {}` answers
+`{ models }`. `POST /v1/workflows/media/price` takes the model and the choices of a step and answers
+`{ credits }`: the price of one file, from Higgsfield's `get_cost` or Sunra's `estimate_cost`. Both
+only quote: they start no job and spend no credits, and the quote sends no picture. Sunra quotes a
+Personal account only, so a Sunra Team sign-in gets null. The host keeps a quote for ten minutes.
+Each member who can use workflows can call both routes. A step keeps its `model` field; a model id of
+the live list has the same `sunra-` or `higgsfield-` form as a fixed id. A client of a host without
+the capability shows the fixed models and no price. The Run button of an image step shows the price,
+and the page rail shows the number of credits under the logo when the account has no quota.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -585,6 +601,15 @@ the item and the last four digits of a card; it never holds a secret value. The 
 Vault card with it and answers through the released prompt route. A client without it gets the form
 as questions. The desktop transports do not copy it yet.
 
+`ui-block-preview-edit-v1` (`team-protocol/ui-block-preview-edit-v1.ts`, protocol 9 only) adds
+nothing to the wire of a block. A host with it reads one more key, `_preview`
+(`UI_CONFIRM_PREVIEW_ANSWER_ID`), beside the answers of a confirm that has a preview: the text that
+the person edited in the card after they pressed the `edit_preview` button. The host gives the text
+to the agent as `preview` and stores it as the block's preview and in its fallback question and text,
+so the closed card shows what the agent got; the stored resolution leaves the key out. A host without it refuses the key, so the desktop, the
+web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
+`edit_preview` button answers as any other button, and the agent asks what to change.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -680,6 +705,18 @@ joined desktop get the window without other client code. A released phone keeps 
 until it updates. `scripts/queue-window-e2e.ts` checks the frame size with and without the
 capability.
 
+### Open queues of all agents
+
+`agent-active-queues-v1` adds `POST /v1/agent-active-queues/list`. A client reads the open work of
+each visible agent (queued, starting and running deliveries, the failed deliveries of a failed turn,
+and the welcome mark) in one request, not one `GET /v1/agents/:id/queue` for each agent. On a server
+with many agents, those reads filled the data channel after connect and delayed the chat. The
+answer has no finished history; agents that do not fit in one WebRTC frame, or that have more than 200
+open deliveries, are in `omitted`, and the client reads them on the released route. The web client and a joined desktop use the route on
+connect, resync, agent changes and `queue-invalidated`, and read the full queue of an agent when the
+user opens its chat. A host without the capability gets the released per-agent reads.
+`scripts/team-api-routes-e2e.ts` checks the route.
+
 ### Browser control and page state
 
 The frozen `browser-changed` event and `GET /v1/browser/tabs` drop unknown tab keys in released
@@ -727,9 +764,11 @@ on this computer and has no "I'm done" button. A sign-in that sets cookies compl
 that tab.
 The window also sends by itself (`src/main/browser-sign-in-page.ts`): after a page with a sign-in
 address or a visible password field, a new `HttpOnly` cookie of the site, and then a page of the site
-that is not a sign-in step. This is a guess, so after that send the desktop reads the server's tab
-list. When the tab still shows a sign-in step, it opens the window's page in the tab (with
-`browser-navigation`) and reads the list again. The window closes only when the tab left the sign-in
+that is not a sign-in step. For the pages only, the site also includes the other subdomains of the
+same registrable domain (`tldts`, private suffixes kept apart), because some sites sign in on one
+subdomain and then show the page on another (#11219). The cookies and the page storage keep the
+scope above. This is a guess, so after that send the desktop reads the server's tab list. When the
+tab still shows a sign-in step, it opens the window's page in the tab (with `browser-navigation`) and reads the list again. The window closes only when the tab left the sign-in
 steps; otherwise it stays open and waits for the next cookie. Done sends without this check.
 The desktop discards the window's session after a send that set cookies, on Cancel, and at shutdown.
 A failed send keeps it, so Done can try again. The web client has no menu item: a web page cannot
@@ -1437,8 +1476,9 @@ creates them and the Customer Portal settings.
     with the customer, the subscription and the two countries.
   - A customer with no country (a client from before this step) gets a Checkout with Stripe Tax
     (`automatic_tax`, tax ID collection) and no VAT metadata, as before. With the Worker setting
-    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Turn the
-    setting on after the desktop release and the live run of `scripts/stripe-vat-migrate.ts`. Checkout requires the billing address; when its country differs from the saved
+    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Production
+    sets it in `wrangler.jsonc` since desktop 0.72.0; run `scripts/stripe-vat-migrate.ts` once more
+    after the deploy, for plans that older clients bought with Stripe Tax before it. Checkout requires the billing address; when its country differs from the saved
     one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
     with the Checkout session ID and the two countries.
   - Consumers in other EU countries pay Polish VAT only below the EU limit of EUR 10,000 a year.

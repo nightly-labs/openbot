@@ -160,6 +160,10 @@ export const messages = {
   "error.provider.cliTimedOut": "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. سيعيد OpenBot المحاولة.",
   "error.provider.cliTimedOutRefresh":
     "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.serviceUnreachable":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
+  "error.provider.serviceUnreachableRefresh":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت، ثم حدّث المزوّدين.",
   "error.provider.acpStartTimedOut": "لم يكتمل تشغيل {provider} خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.acpModelsTimedOut": "لم يعرض {provider} نماذجه خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.startStopped":
@@ -223,6 +227,7 @@ export const messages = {
     "بلغت نماذج OpenCode المجانية حد الاستخدام. تشترك جميع النماذج المجانية في هذا الحد. للمتابعة، الصق مفتاح OpenCode Go في إعدادات OpenCode، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.opencodeProviderFailed":
     "فشل مزوّد النموذج من جهته. اتصالك ليس السبب. أعد المحاولة لاحقًا أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeModelUnavailable": "هذا النموذج غير متاح لك. اختر نموذجًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -335,6 +340,8 @@ export const messages = {
     "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.codexRequestRefused":
     "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.codexAudioRefused":
+    "لم يقبل النموذج الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
@@ -460,6 +467,7 @@ export const messages = {
   "error.provider.piSessionIdentity": "أرجع Pi جلسة مختلفة. لم تُستبدل الجلسة المحفوظة.",
   "error.provider.piExtensionFailed":
     "توقف Pi لأنه لم يتمكن من تحميل إضافة. أزل هذه الإضافة أو حدّثها، ثم حاول مرة أخرى. {detail}",
+  "error.provider.piThreadStopped": "توقف Pi بشكل غير متوقع قبل أن ينهي هذا الدور. أرسل رسالة للمتابعة.",
   "error.provider.piModelInvalid": "اختر نموذج Pi يتضمن مزوّده.",
   "error.provider.piToolInvalid": "أرجعت الأداة نتيجة غير صالحة.",
   "error.provider.piSignIn": "استخدم /login في Pi على الحاسوب المضيف. أغلق Pi عند اكتمال تسجيل الدخول.",

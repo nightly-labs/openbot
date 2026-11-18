@@ -38,7 +38,8 @@ import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-c
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
-import { PI_REQUEST_TIMEOUT_MS, PiRpc } from "./pi-rpc";
+import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
+import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type AppServerNotification,
@@ -125,6 +126,24 @@ const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
   deepseek: "DEEPSEEK_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
 };
+
+const PI_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+/**
+ * The thinking levels of a model that `get_available_models` lists, by Pi's own rule
+ * (`getSupportedThinkingLevels` in `@earendil-works/pi-ai`, the same from Pi 1.1.0 to 1.5.2). The
+ * list read them with `set_model` for each model, but Pi can replace its model list during that
+ * loop: a model that OpenRouter removed then failed `set_model`, and the provider showed Error (#11097).
+ */
+function piThinkingLevels(model: unknown): string[] {
+  if (!isRecord(model) || model.reasoning !== true) return [];
+  const map = getRecord(model, "thinkingLevelMap");
+  return PI_THINKING_LEVELS.filter((level) => {
+    const mapped = map?.[level];
+    if (mapped === null) return false;
+    return level === "xhigh" || level === "max" ? mapped !== undefined : true;
+  });
+}
 
 const PiSessionUsage = Schema.Struct({
   tokens: Schema.Struct({
@@ -368,6 +387,34 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (Option.isNone(done) && !thread.turn && this.#threads.get(thread.id) === thread) this.#armIdle(thread);
   });
 
+  /**
+   * The Pi process of one open thread exited. The other threads keep their processes and turns. This
+   * turn fails, and the agent that asked for it gets the failure. Out of the map first, as an idle
+   * release, so the next turn opens the session again with the saved settings.
+   */
+  readonly #threadExited = Effect.fn("PiAgentClient.threadExited")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+    error: Error,
+  ) {
+    logger.warn("A Pi process exited. Only its thread ends.", { provider: this.provider, error: error.message });
+    if (this.#threads.get(thread.id) !== thread) return;
+    if (thread.configured) this.#released.set(thread.id, thread.params);
+    this.#threads.delete(thread.id);
+    if (thread.turn)
+      yield* error instanceof PiProcessClosedError
+        ? this.#endAfterExit(thread)
+        : this.#finish(thread, "failed", error.message, "provider_exited");
+    yield* this.#close(thread);
+  });
+
+  /** Ends the turn of a thread whose Pi process closed: as stopped when the user stopped it, else as failed. */
+  #endAfterExit(thread: PiThread) {
+    return thread.turn?.stopped
+      ? this.#finish(thread, "interrupted")
+      : this.#finish(thread, "failed", sourceText("error.provider.piThreadStopped"), "provider_exited");
+  }
+
   /** Marks a thread whose turn ended as idle, and closes the longest idle threads over the limit. */
   readonly #markIdle = Effect.fn("PiAgentClient.markIdle")(function* (this: PiAgentClient, thread: PiThread) {
     if (thread.turn || this.#threads.get(thread.id) !== thread) return;
@@ -538,15 +585,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             if (!provider || !id || (keyProvider && provider !== keyProvider.id)) continue;
             // OpenRouter's `:batch` models work only through its batch API: a chat turn fails with 404.
             if (provider === "openrouter" && id.endsWith(":batch")) continue;
-            const reasoning = isRecord(model) && model.reasoning === true;
-            let levels: string[] = [];
-            if (reasoning) {
-              yield* connection.request({ type: "set_model", provider, modelId: id }, timeoutMs);
-              const advertised = yield* connection.request({ type: "get_available_thinking_levels" }, timeoutMs);
-              levels = getArray(advertised, "levels")
-                .filter(isString)
-                .map((level) => (level === "off" ? "none" : level));
-            }
+            const levels = piThinkingLevels(model).map((level) => (level === "off" ? "none" : level));
             const thinkingLevel = getString(state, "thinkingLevel");
             const preferred = thinkingLevel === "off" ? "none" : thinkingLevel;
             const defaultLevel = preferred && levels.includes(preferred) ? preferred : levels[0];
@@ -726,6 +765,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       });
       rpc.on("exit", (error) => {
         if (thread?.closed) return;
+        // Each thread has a Pi process of its own, so its exit ends only this thread (#11584).
+        if (thread && this.#threads.get(thread.id) === thread) {
+          this.#background(this.#threadExited(thread, error));
+          return;
+        }
         if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message, "provider_exited"));
         this.emit("exit", error);
       });
@@ -740,6 +784,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           ? ["--no-tools", ...(withExtensions ? [] : ["--no-extensions"]), "--no-mcp"]
           : ["--extension", extension.path]),
       );
+      if (!this.options.profileGeneration && process.platform === "win32")
+        args.push(...(yield* piWindowsShellArguments(cwd, this.#environment())));
       const instructions = getString(params, "developerInstructions");
       if (instructions) {
         // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`
@@ -898,9 +944,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     const fail = (failure: ProviderClientOperationError) =>
-      thread.turn === turn
-        ? this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause))
-        : Effect.void;
+      thread.turn !== turn
+        ? Effect.void
+        : failure.cause instanceof PiProcessClosedError
+          ? this.#endAfterExit(thread)
+          : this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause));
     let answered = false;
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
     // Pi acknowledges only after it prepares the run, which can compact the session first. A late

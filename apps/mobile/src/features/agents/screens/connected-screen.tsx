@@ -55,6 +55,7 @@ import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { OnboardingFlow } from "@/features/onboarding/components/onboarding-flow";
 import { useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
+import { useRatingAskGate } from "@/features/rating-ask/model/use-rating-ask-gate";
 import {
   HOME_SEARCH_HEIGHT,
   HomeSearchBar,
@@ -580,6 +581,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // An app update drops the lilac block to a header above the list, where the search field shows.
   const appUpdate = useAppUpdate();
   const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
+  // The rating ask waits for a home with nothing over its list.
+  // A pane stays focused while a chat or a sheet is open beside it, so only the home screen asks.
+  // Open search also keeps the ask away, so it never covers the field and the keyboard.
+  useRatingAskGate(!pane && searchShows && !search.open && !updateHeader.shown);
   const { open: searchOpen, closeSearch } = search;
   useEffect(() => {
     if (!searchShows && searchOpen) closeSearch();

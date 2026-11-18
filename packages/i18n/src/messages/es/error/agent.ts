@@ -14,6 +14,8 @@ export const messages = {
     "La herramienta no se ejecutó. tool_call no puede ejecutar openbot.tool_search ni openbot.tool_describe. Llámalas directamente con los mismos argumentos.",
   "error.agent.toolCallEnvelopeKeys":
     "La herramienta no se ejecutó. tool_call solo acepta name y arguments. Pon los argumentos de la herramienta en arguments, como objeto, y vuelve a enviar la llamada.",
+  "error.agent.toolCallMissingName":
+    "La herramienta no se ejecutó. El tool_call no tiene name. Pon en name el nombre calificado que da tool_search, como openbot.history_read, y envía la llamada otra vez.",
   "error.agent.toolCallUnknownTool":
     "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Usa el nombre calificado exacto que da tool_search, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -64,6 +66,8 @@ export const messages = {
   "error.agent.modelNotListed": "El modelo «{model}» no está disponible. Modelos disponibles: {models}.",
   "error.agent.providerNotListed":
     "No hay ningún modelo de {provider} disponible ahora. Llama a list_models para ver los modelos disponibles.",
+  "error.agent.creatorModelNotListed":
+    "Tu modelo «{model}» no está ahora en la lista de modelos, así que el nuevo agente no puede empezar con él. Inténtalo de nuevo en unos segundos, o indica en provider y model un modelo que muestre list_models.",
   "error.agent.reasoningEffortUnsupported":
     "El modelo «{model}» no admite el nivel de razonamiento «{effort}». Niveles admitidos: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -101,6 +105,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.promptCancelled": "{provider} canceló este mensaje antes de que empezara. Envía el mensaje de nuevo.",
   "error.agent.toolLoopStopped":
     "{provider} repitió muchas veces un paso fallido, así que OpenBot detuvo este turno. Envía el mensaje de nuevo o elige otro modelo.",
   "error.agent.answerCutOff":
@@ -126,6 +131,8 @@ export const messages = {
   "error.agent.deletionBusy": "La eliminación del agente ya está en curso.",
   "error.agent.stopBeforeDelete": "Detén el agente y cancela sus mensajes en cola antes de eliminarlo.",
   "error.agent.deleteIncomplete": "No se pudieron eliminar todos los datos del agente. Intenta eliminarlo de nuevo.",
+  "error.agent.deleteFolderInUse":
+    "El trabajo de otro agente todavía usa la carpeta de este agente. Vuelve a eliminarlo cuando ese trabajo termine o después de reiniciar OpenBot.",
   "error.agent.duplicationBusy": "Este agente ya se está duplicando.",
   "error.agent.waitBeforeDuplicate": "Espera a que el agente termine y vacía su cola antes de duplicarlo.",
   "error.agent.saveOtherAgent": "Este guardado pertenece a otro agente.",

@@ -50,6 +50,15 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   const { t } = useText();
   const active = () => props.tabs.find((thread) => thread.id === props.activeId);
   const switcher = () => (props.mode === "compact" ? active() : undefined);
+  // A thread with unread replies that the header does not show: without a tab, or behind a narrow header.
+  const unreadInMenu = () =>
+    props.threads.some(
+      (thread) =>
+        (thread.unread ?? 0) > 0 &&
+        thread.id !== props.activeId &&
+        (props.mode !== "tabs" || !props.tabs.some((tab) => tab.id === thread.id)),
+    );
+  const allLabel = () => t(unreadInMenu() ? "conversation.threads.allUnread" : "conversation.threads.all");
   return (
     <Show
       when={switcher()}
@@ -60,10 +69,13 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
             size: "icon-sm",
             class: "agent-threads-icon-button agent-threads-menu-button no-drag",
           })}
-          aria-label={t("conversation.threads.all")}
-          title={t("conversation.threads.all")}
+          aria-label={allLabel()}
+          title={allLabel()}
         >
           <ChevronDown aria-hidden="true" />
+          <Show when={unreadInMenu()}>
+            <span class="agent-threads-menu-unread" aria-hidden="true" />
+          </Show>
         </DropdownMenu.Trigger>
       }
     >
@@ -73,6 +85,7 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           data-attention={threadAttention(thread().status)}
           title={thread().title}
           aria-label={t("conversation.threads.current", { title: thread().title })}
+          aria-description={unreadInMenu() ? t("conversation.threads.allUnread") : undefined}
         >
           {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
           <span class="agent-threads-switcher-icon" aria-hidden="true">
@@ -81,6 +94,9 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           <ThreadTitle class="agent-threads-tab-title" title={thread().title} />
           <ThreadStatusText status={thread().status} />
           <ChevronDown class="agent-threads-switcher-chevron" aria-hidden="true" />
+          <Show when={unreadInMenu()}>
+            <span class="agent-threads-menu-unread" aria-hidden="true" />
+          </Show>
         </DropdownMenu.Trigger>
       )}
     </Show>

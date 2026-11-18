@@ -91,6 +91,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Ни один участник этого канала не может сжимать по запросу. Участники, которые это поддерживают, сжимают контекст автоматически, когда он почти заполнен.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",
+  "error.backend.channelArchiveRunning": "Остановите текущую работу в этом канале, затем удалите его.",
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",
   "error.backend.channelTaskComplete": "Эта задача уже выполнена.",
@@ -123,6 +124,8 @@ export const messages = {
   "error.backend.memoryGone": "Этой записи памяти больше нет.",
   "error.backend.routineGone": "Этой регулярной задачи больше нет.",
   "error.backend.routineRunGone": "Этого запуска регулярной задачи больше нет.",
+  "error.backend.routineRunFailedNoReason":
+    "Запуск остановился с ошибкой, но причина не пришла. Откройте запуск, чтобы увидеть, что сделал агент.",
   "error.backend.turnNotStarted": "Провайдер не начал этот ход.",
   "error.backend.routineResultConnectionOff":
     "Это подключение к мессенджеру выключено или удалено. Выберите другое место.",
@@ -274,6 +277,7 @@ export const messages = {
     "Сервер входа прислал ответ, который OpenBot не может прочитать. Если сервис выдаёт API-ключ или токен, добавьте его в настройки этого сервера и снова проверьте подключение.",
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
+  "error.backend.mcpServerExitedWithOutput": "Сервер остановился, не ответив. Он написал: {detail}",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} перестал ждать до запуска сервера, поэтому его агенты не получают инструменты этого сервера.",

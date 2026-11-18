@@ -98,6 +98,11 @@ export interface UpdateStatus {
    * phase `up-to-date`. A check that a person asks for gets this release. Absent when none waits.
    */
   stagedVersion?: string;
+  /**
+   * The supported minimum, while this version is below it: the app shows "Update required". Absent
+   * when the version is supported or no check succeeded.
+   */
+  requiredVersion?: string;
 }
 
 /** `relaunch` starts OpenBot again; `update` installs the downloaded update. */
@@ -620,6 +625,8 @@ export type ExternalDestination =
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.
   | "hosted-server-contact"
+  // The download page, from "Update required" when this install cannot update itself.
+  | "download"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind
   // its own endpoint because the destination is still a fixed address the renderer only names.
   | "mac-screen-recording";

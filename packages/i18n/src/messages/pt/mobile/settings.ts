@@ -132,6 +132,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",
+  "mobile.settings.appearance.replyDetails": "Detalhes das respostas",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Desative um detalhe para ocultar a linha dele nos chats. O agente continua raciocinando, iniciando subagentes e salvando memórias.",
+  "mobile.settings.appearance.showThinking": "Mostrar o raciocínio do agente",
+  "mobile.settings.appearance.showSubagents": "Mostrar subagentes",
+  "mobile.settings.appearance.showMemoryChanges": "Mostrar memórias salvas",
   "mobile.settings.appearance.fullVisuals": "Mostrar prévias visuais completas",
   "mobile.settings.appearance.fullVisualsFooter":
     "Um visual de um agente aparece no chat com a altura inteira. Quando isto está desligado, um visual alto é cortado, e você toca nele para ver tudo.",
@@ -249,8 +255,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
   "mobile.settings.conversations.swipeThreads": "Tópicos",
   "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeOff": "Desativado",
   "mobile.settings.conversations.swipeFooter":
-    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. Deslizar em uma mensagem ainda responde a ela.",
+    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. O mesmo gesto em uma mensagem mostra o horário das mensagens.",
   "mobile.settings.conversations.pullInfo": "Puxar para cima para ver info",
   "mobile.settings.conversations.pullInfoFooter":
     "Em um chat, canal ou tópico, puxe para cima além da última mensagem e solte para abrir as informações.",
@@ -518,6 +525,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Não foi possível parar o processo.",
   "mobile.settings.agents.processes.stopTitle": "Parar este programa?",
   "mobile.settings.agents.processes.stopLabel": "Parar o processo {pid}",
+  "mobile.settings.quickActions.title": "Menu do ícone do app",
+  "mobile.settings.quickActions.footer":
+    "Toque e segure o ícone do OpenBot para ver estas ações. Você pode ativar até {count}.",
+  "mobile.settings.quickActions.latestChat": "Último chat",
+  "mobile.settings.quickActions.secondChat": "Penúltimo chat",
   "mobile.settings.shortcuts.title": "Atalhos",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Nenhum",

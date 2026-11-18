@@ -182,6 +182,10 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。OpenBot が再試行します。",
   "error.provider.cliTimedOutRefresh":
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
+  "error.provider.serviceUnreachable":
+    "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} がサービスに接続できません。インターネット接続を確認してから、プロバイダーを更新してください。",
   "error.provider.acpStartTimedOut":
     "{provider} の起動が {seconds} 秒以内に完了しませんでした。コンピューターの負荷が高い可能性があります。",
   "error.provider.acpModelsTimedOut":
@@ -249,6 +253,8 @@ export const messages = {
     "OpenCode の無料モデルが使用量の上限に達しました。この上限はすべての無料モデルで共有されます。続けるには、OpenCode の設定に OpenCode Go のキーを貼り付けるか、別のプロバイダーのモデルを選択してください。",
   "error.provider.opencodeProviderFailed":
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "このモデルは利用できません。このエージェントに別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -374,6 +380,8 @@ export const messages = {
     "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.codexRequestRefused":
     "{provider} がこのチャットのリクエストを拒否しましたが、原因は示されていません。画像の多い長いチャットで起こることがあります。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexAudioRefused":
+    "モデルはこのチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":
@@ -515,6 +523,8 @@ export const messages = {
   "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
   "error.provider.piExtensionFailed":
     "拡張機能を読み込めなかったため、Pi が停止しました。この拡張機能を削除または更新してから、もう一度お試しください。{detail}",
+  "error.provider.piThreadStopped":
+    "Pi がこのターンを終える前に予期せず停止しました。続けるにはメッセージを送信してください。",
   "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
   "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
   "error.provider.piSignIn":

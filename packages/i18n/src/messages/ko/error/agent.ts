@@ -14,6 +14,8 @@ export const messages = {
     "도구가 실행되지 않았어요. tool_call로는 openbot.tool_search나 openbot.tool_describe를 실행할 수 없어요. 같은 인수로 직접 호출하세요.",
   "error.agent.toolCallEnvelopeKeys":
     "도구가 실행되지 않았어요. tool_call은 name과 arguments만 받아요. 도구의 인수를 arguments에 객체로 넣고 다시 호출하세요.",
+  "error.agent.toolCallMissingName":
+    "도구가 실행되지 않았어요. tool_call에 name이 없어요. tool_search가 알려 주는 전체 이름(예: openbot.history_read)을 name에 넣고 다시 호출하세요.",
   "error.agent.toolCallUnknownTool":
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. tool_search가 알려 주는 정확한 전체 이름(예: openbot_browser.snapshot)을 사용하세요.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -62,6 +64,8 @@ export const messages = {
   "error.agent.modelNotListed": '모델 "{model}"을(를) 사용할 수 없어요. 사용 가능한 모델: {models}.',
   "error.agent.providerNotListed":
     "지금 사용할 수 있는 {provider} 모델이 없어요. list_models를 호출해 사용 가능한 모델을 확인하세요.",
+  "error.agent.creatorModelNotListed":
+    '내 모델 "{model}"이(가) 지금 모델 목록에 없어서 새 에이전트를 이 모델로 시작할 수 없어요. 몇 초 후에 다시 시도하거나, list_models에 표시되는 모델을 provider와 model에 지정하세요.',
   "error.agent.reasoningEffortUnsupported":
     '모델 "{model}"은(는) 추론 강도 "{effort}"을(를) 지원하지 않아요. 지원하는 강도: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": '모델 "{model}"에는 추론 강도 설정이 없어서 강도를 바꿀 수 없어요.',
@@ -92,6 +96,7 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.promptCancelled": "{provider}이(가) 시작 전에 이 메시지를 취소했어요. 메시지를 다시 보내 주세요.",
   "error.agent.toolLoopStopped":
     "{provider}이(가) 실패한 단계를 여러 번 반복해서 OpenBot이 이 턴을 중지했습니다. 메시지를 다시 보내거나 다른 모델을 선택하세요.",
   "error.agent.answerCutOff": "에이전트가 답변을 마치기 전에 멈춰서 답변이 완전하지 않습니다. 메시지를 다시 보내세요.",
@@ -114,6 +119,8 @@ export const messages = {
   "error.agent.deletionBusy": "에이전트를 이미 삭제하는 중이에요.",
   "error.agent.stopBeforeDelete": "삭제하기 전에 에이전트를 중지하고 대기 중인 메시지를 취소해 주세요.",
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
+  "error.agent.deleteFolderInUse":
+    "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",
   "error.agent.waitBeforeDuplicate": "복제하기 전에 에이전트가 끝나고 대기열이 비워질 때까지 기다려 주세요.",
   "error.agent.saveOtherAgent": "이 저장은 다른 에이전트의 것이에요.",
