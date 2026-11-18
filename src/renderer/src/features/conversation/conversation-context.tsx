@@ -314,7 +314,12 @@ const Conversation = createSimpleContext({
               void markAgentMessagesRead(agentId, page.messages.at(-1)?.id ?? null, serverId).catch((error) =>
                 reportAutomaticReadFailure(agentId, error, serverId),
               );
-            } else if (agentChatsToRetryRead.has(trackingKey) && (page.readState?.unreadCount ?? 0) > 0) {
+            } else if (
+              agentChatsToRetryRead.has(trackingKey) &&
+              (page.readState?.unreadCount ?? 0) > 0 &&
+              // A reply that came while the window was hidden stays unread.
+              isAgentChatReadable(agentId)
+            ) {
               const latestIncomingMessage = latestIncomingConversationMessage(page.messages);
               if (latestIncomingMessage) autoMarkAgentMessageRead(agentId, latestIncomingMessage.id);
             }
