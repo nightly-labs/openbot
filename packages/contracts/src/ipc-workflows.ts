@@ -336,6 +336,23 @@ export function workflowVideoDurations(model: WorkflowMediaRange | null | undefi
   return model?.durations ?? WORKFLOW_VIDEO_DURATIONS;
 }
 
+/** The most lengths that a catalog model has: the limit of `workflows-media-catalog-v1`. */
+export const WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX = 64;
+/** A model with more lengths than this lists only some of them; see `workflowVideoLengthChoices`. */
+const WORKFLOW_VIDEO_LENGTH_CHOICES = 5;
+
+/**
+ * The lengths that a short list shows, in ascending order. A model with many lengths (3 to 30
+ * seconds) shows its shortest and longest length and each multiple of 5 between them.
+ */
+export function workflowVideoLengthChoices(durations: readonly number[]): number[] {
+  const sorted = [...new Set(durations)].sort((left, right) => left - right);
+  if (sorted.length <= WORKFLOW_VIDEO_LENGTH_CHOICES) return sorted;
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  return sorted.filter((value) => value === first || value === last || value % 5 === 0);
+}
+
 /** The resolutions of a model for a kind. An image of a model without them has none. */
 export function workflowMediaResolutions(
   model: WorkflowMediaRange | null | undefined,
@@ -1180,7 +1197,7 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
     isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
     isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
     isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
-    isListOf(value.durations, 64, isCreditCount) &&
+    isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
