@@ -10,6 +10,7 @@ import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageL
 import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
 import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
+import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 /* --------------------------------------------------------------- Asset */
 
@@ -66,18 +67,44 @@ function fileExtension(name: string): string {
   return name.split(".").pop()?.toUpperCase() ?? "";
 }
 
-function AssetThumb(props: { file: StoredFileRow }) {
+/**
+ * The address that a thumbnail of the file shows: the small copy of a host picture when the host
+ * sends one, else the file. A file from the computer has its own address. Undefined while the copy
+ * loads, null when there is no picture to show.
+ */
+function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefined {
+  const preview = board.catalogs().mediaPreview;
+  if (!preview || file.previewKind !== "image" || board.uploads().includes(file)) return file.previewUrl;
+  return preview(file.id);
+}
+
+/** The picture or the file icon of a file. On a card, a picture pulses until it shows. */
+function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
+  const board = useBoard();
   return (
     <Show
-      when={props.file.previewUrl}
+      when={thumbUrl(board, props.file)}
       fallback={
-        <span class="wfn-asset-glyph" aria-hidden="true">
-          <File />
-          <span>{fileExtension(props.file.name)}</span>
-        </span>
+        <Show
+          when={props.card && thumbUrl(board, props.file) === undefined}
+          fallback={
+            <span class="wfn-asset-glyph" aria-hidden="true">
+              <File />
+              <span>{fileExtension(props.file.name)}</span>
+            </span>
+          }
+        >
+          <CardPictureLoading />
+        </Show>
       }
     >
-      {(url) => <img class="wfn-media" src={url()} alt="" draggable="false" />}
+      {(url) =>
+        props.card ? (
+          <CardPicture src={url()} alt="" />
+        ) : (
+          <img class="wfn-media" src={url()} alt="" decoding="async" draggable="false" />
+        )
+      }
     </Show>
   );
 }
@@ -321,7 +348,10 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
-  const shape = usePictureShape(() => (isImage() ? (file()?.previewUrl ?? undefined) : undefined));
+  const shape = usePictureShape(() => {
+    const current = file();
+    return current && isImage() ? (thumbUrl(board, current) ?? undefined) : undefined;
+  });
   /** A picture with clear pixels shows on the canvas at its own shape, with no card behind it. */
   const clear = () => (isImage() ? shape()?.clear === true : false);
   const [sending, setSending] = createSignal(false);
@@ -430,7 +460,7 @@ export function AssetNode(props: { id: string; file?: string }) {
                     </span>
                   }
                 >
-                  <AssetThumb file={current()} />
+                  <AssetThumb file={current()} card />
                   <span class="wfn-chip wfn-asset-caption">{current().name}</span>
                 </Show>
               )}

@@ -372,9 +372,11 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
-        // A detached question outlives its turn: the host keeps it until the user answers. A takeover
-        // leaves on its own `browser-takeover-resolved`, which the host sends before this event when the
-        // turn closes it. A subagent's takeover can outlive the turn (#10657).
+        // A detached question outlives its turn: the host keeps it until the user answers. A joined
+        // server's Team API does not mark it, but the host closes each other question of the turn with
+        // `agent-input-resolved` before this event, so a question that is still here is open (#11440).
+        // A takeover leaves on its own `browser-takeover-resolved`, which the host sends before this event
+        // when the turn closes it. A subagent's takeover can outlive the turn (#10657).
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
@@ -382,7 +384,9 @@ export function AgentEventBridge() {
           if (
             pending?.type === "browser-takeover-requested" ||
             (pending?.type === "prompt" &&
-              (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey))
+              (pending.detached ||
+                activeServerId() !== LOCAL_SERVER_ID ||
+                promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey))
           ) {
             return current;
           }

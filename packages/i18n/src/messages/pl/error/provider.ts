@@ -87,6 +87,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Aktualizacja środowiska uruchomieniowego nie została ukończona.",
   "error.provider.downloadHttp": "Pobieranie środowiska uruchomieniowego nie powiodło się (HTTP {status}).",
   "error.provider.downloadNoData": "Pobieranie środowiska uruchomieniowego nie zwróciło danych.",
+  "error.provider.downloadStalled":
+    "Pobieranie zatrzymało się, ponieważ przez minutę nie dotarły żadne dane. Sprawdź połączenie z internetem, a potem spróbuj ponownie.",
   "error.provider.downloadSize": "Pobrane środowisko uruchomieniowe ma nieoczekiwany rozmiar.",
   "error.provider.downloadIntegrity": "Pobrane środowisko uruchomieniowe nie przeszło kontroli integralności.",
   "error.provider.runtimeReplacing":
@@ -231,6 +233,8 @@ export const messages = {
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go odrzucił żądanie. Nowy klucz API tego nie naprawi. Twój plan OpenCode Go może być nieaktywny albo OpenCode Go może blokować Twoją sieć: niektóre usługi blokują VPN, serwery proxy lub niektóre kraje. Sprawdź w OpenCode Console, czy plan jest aktywny, albo wyłącz VPN, a potem spróbuj ponownie. Możesz też wybrać inny model.",
   "error.provider.opencodeServiceFailure":
     "OpenCode nie ukończył tej tury, ponieważ jego lokalna usługa uległa awarii. Spróbuj ponownie. Jeśli błąd się powtarza, połącz ponownie OpenCode w Ustawieniach.",
   "error.provider.opencodeRateLimited":
@@ -276,6 +280,7 @@ export const messages = {
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
+  "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
   "error.provider.chatgptPageFailed": "Nie udało się otworzyć strony połączenia ChatGPT.",
   "error.provider.noneReady": "Żaden dostawca agentów nie jest gotowy.",
   "error.provider.claudeTurnActive": "Zaczekaj na zakończenie aktywnej tury Claude, zanim odświeżysz jego kontekst.",
@@ -368,6 +373,8 @@ export const messages = {
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.claudeApiKeyNoCredit":
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
+  "error.provider.claudeAccountNoCredit":
+    "Saldo środków na koncie Claude jest za niskie. Niektóre zapytania, na przykład w trybie szybkim, korzystają ze środków na użycie, także gdy plan Claude ma jeszcze limit. Doładuj środki na użycie na koncie Claude albo wybierz inny model w menu modeli agenta.",
   "error.provider.claudeServiceBlocked":
     "Usługa Claude zablokowała to zapytanie. Zwykle to krótki problem po stronie Claude, a nie problem z Twoim kontem. Wyślij wiadomość ponownie za kilka minut.",
   "error.provider.foreignReasoning":

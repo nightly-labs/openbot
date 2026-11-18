@@ -148,6 +148,38 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
   }).pipe(Effect.orElseSucceed(() => false));
 });
 
+/** The provider refusal that OpenCode 2 writes in the newest message row of a failed turn. */
+const RefusedTurn = Schema.Struct({
+  error: Schema.Struct({ type: Schema.Literal("provider.auth"), status: Schema.Finite }),
+});
+
+/**
+ * The HTTP status of the provider's refusal that ended the newest turn of an OpenCode session, or
+ * null. OpenCode 2.2.5 sends each 401 and 403 to ACP as the same `-32000` with empty data, but its
+ * database keeps the status in the turn's newest `session_message` row: OpenCode Go answers a bad
+ * key with 401, and a refusal of a valid key, such as a plan that is not active, with 403 (#12281).
+ * Only the newest row is read, so an older turn's error cannot apply. It reads only when a turn
+ * fails, so it reads synchronously.
+ */
+export const readOpenCodeRefusalStatus = Effect.fn("OpenCode.readRefusalStatus")(function* (
+  sessionId: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  const row = yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(databasePath, (database) =>
+        database
+          .prepare("SELECT data FROM session_message WHERE session_id = ? ORDER BY seq DESC LIMIT 1")
+          .get(sessionId),
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => undefined));
+  const refused = Schema.decodeUnknownOption(Schema.fromJsonString(RefusedTurn))(row?.data);
+  return Option.isSome(refused) ? refused.value.error.status : null;
+});
+
 function authFileGoKey(text: string): string | undefined {
   const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
   if (Option.isNone(file)) return undefined;

@@ -53,6 +53,13 @@ interface MobileSessionContextValue {
 
 const MobileSessionContext = createContext<MobileSessionContextValue | null>(null);
 
+/** Deletes the account data that this phone keeps between launches. */
+function deletePhoneCopy() {
+  void deleteWorkspaceCaches();
+  deleteAgentBackdrops();
+  deleteAgentAvatars();
+}
+
 export function MobileSessionProvider({ children }: PropsWithChildren) {
   const [sessionState, setSessionState] = useState<MobileSession | null | undefined>(undefined);
   const sessionRef = useRef<MobileSession | null>(null);
@@ -75,10 +82,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       deleteComposerDrafts();
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
-    if (sessionRef.current && !session) {
-      void deleteWorkspaceCaches();
-      deleteAgentBackdrops();
-    }
+    if (sessionRef.current && !session) deletePhoneCopy();
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);
@@ -102,7 +106,11 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     void untilForeground().then(loadAnalyticsPreference);
     const read = () =>
       readMobileSession().then((stored) => {
-        if (active && scope === sessionScope.current) setCurrentSession(stored);
+        if (!active || scope !== sessionScope.current) return;
+        // The keychain opened and has no valid session: a copy left by a sign-out or an invalid session
+        // that the app did not finish deleting belongs to no account. A closed keychain throws instead.
+        if (!stored) deletePhoneCopy();
+        setCurrentSession(stored);
       });
     // A start in the background can find the keychain closed. The app reads again when the user
     // opens it, so it does not show sign-in for a session that it still has.

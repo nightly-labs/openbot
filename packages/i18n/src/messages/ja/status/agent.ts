@@ -110,6 +110,8 @@ export const messages = {
   "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
+  "status.agent.planStopped":
+    "プランに未完了のステップを残してエージェントが停止しました。続けるにはメッセージを送信してください。",
   "status.agent.compactionContinues":
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",

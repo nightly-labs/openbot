@@ -621,6 +621,14 @@ so the closed card shows what the agent got; the stored resolution leaves the ke
 web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
 `edit_preview` button answers as any other button, and the agent asks what to change.
 
+`routine-quiet-answers-v1` (`team-protocol/routine-quiet-answers-v1.ts`, protocol 10 only) adds no
+route and no field. A host with it sends the `routine_quiet_answer` messages, the text of a routine run
+or a teammate update that ended with nothing to report, in pages, live events and read state to a
+client that sends it, as the local desktop chat has them. The desktop with a joined server and the web
+client show them under their run or update, which starts closed. The mobile app sends it too, but
+shows the run row only. Before it, a user on a server could never read a report that the agent ended
+quiet by mistake (#11174). A host or client without it leaves these messages out, as before.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -1823,7 +1831,9 @@ the time until the workspace can be used, and the host requests that block that 
   the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
   by the full time and each data-channel send and message by half of it. The desktop Signal socket is
   in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
-  `--latency`.
+  `--latency`. `OPENBOT_DEV_DOWNLINK_KBPS=<kbit/s>` also limits the data that an unpackaged desktop
+  client receives on the data channel to that rate. `scripts/workflow-canvas-pictures-perf-e2e.ts`
+  uses both values to measure the pictures of the Workflows canvas on a joined server.
 - A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
   an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
   or a host.

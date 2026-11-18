@@ -89,6 +89,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "La actualización del entorno de ejecución no se completó.",
   "error.provider.downloadHttp": "La descarga del entorno de ejecución falló con HTTP {status}.",
   "error.provider.downloadNoData": "La descarga del entorno de ejecución no devolvió datos.",
+  "error.provider.downloadStalled":
+    "La descarga se detuvo porque no llegaron datos durante un minuto. Comprueba la conexión a internet y vuelve a intentarlo.",
   "error.provider.downloadSize": "La descarga del entorno de ejecución tiene un tamaño inesperado.",
   "error.provider.downloadIntegrity": "La descarga del entorno de ejecución no superó la comprobación de integridad.",
   "error.provider.runtimeReplacing":
@@ -243,6 +245,8 @@ export const messages = {
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go rechazó tu clave de API guardada. Puede que la clave haya caducado. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go rechazó la solicitud. Una clave de API nueva no lo soluciona. Puede que tu plan de OpenCode Go no esté activo, o que OpenCode Go bloquee tu red: algunos servicios bloquean VPN, proxies o algunos países. Comprueba que tu plan esté activo en OpenCode Console o desactiva la VPN, y luego inténtalo de nuevo. También puedes elegir otro modelo.",
   "error.provider.opencodeServiceFailure":
     "OpenCode no pudo completar este turno porque falló su servicio local. Inténtalo de nuevo. Si el error continúa, vuelve a conectar OpenCode en Ajustes.",
   "error.provider.opencodeRateLimited":
@@ -288,6 +292,7 @@ export const messages = {
     "{provider} terminó el turno sin respuesta. Envía el mensaje de nuevo o empieza un nuevo chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} hizo algunos pasos y terminó el turno sin respuesta. Pregunta al agente qué hizo antes de enviar la misma solicitud otra vez.",
+  "error.provider.acpRefusedNoReason": "{provider} se detuvo sin respuesta. Envía el mensaje de nuevo.",
   "error.provider.chatgptPageFailed": "OpenBot no pudo abrir la página de conexión de ChatGPT.",
   "error.provider.noneReady": "Ningún proveedor de agentes está listo.",
   "error.provider.claudeTurnActive": "Espera a que termine el turno activo de Claude antes de actualizar su contexto.",
@@ -381,6 +386,8 @@ export const messages = {
     "Este chat se volvió demasiado largo para Claude. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
   "error.provider.claudeApiKeyNoCredit":
     "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
+  "error.provider.claudeAccountNoCredit":
+    "El saldo de créditos de tu cuenta de Claude es demasiado bajo. Algunas solicitudes, como el modo rápido, usan créditos de uso aunque tu plan de Claude tenga uso disponible. Añade créditos de uso en tu cuenta de Claude, o selecciona otro modelo en el menú de modelos del agente.",
   "error.provider.claudeServiceBlocked":
     "El servicio de Claude bloqueó esta solicitud. Suele ser un problema breve de Claude, no de tu cuenta. Vuelve a enviar el mensaje en unos minutos.",
   "error.provider.foreignReasoning":

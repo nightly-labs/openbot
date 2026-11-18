@@ -175,6 +175,7 @@ interface HostServiceOptions {
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
   mailbox: ForwardedApiOptions["mailbox"];
+  attachmentPreviews?: ForwardedApiOptions["attachmentPreviews"];
   browser: ForwardedApiOptions["browser"];
   chat?: TeamChatStore;
   /**
@@ -551,6 +552,7 @@ export class HostService extends EventEmitter<HostEvents> {
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
+      ...(options.attachmentPreviews === undefined ? {} : { attachmentPreviews: options.attachmentPreviews }),
       browser: options.browser,
       browserView: this.#browserView,
       remoteScreen: this.#remoteScreen,

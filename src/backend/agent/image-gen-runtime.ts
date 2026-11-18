@@ -14,7 +14,6 @@ import { type ImageSize, imageSize, imageSizeOfBytes } from "../image-size";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { lastUserPrompt } from "./delivery-content";
 import {
   decodeGeneratedImage,
   type GeneratedMediaKind,
@@ -171,11 +170,12 @@ export class ImageGenRuntime {
 
     const previous =
       generatedMediaInfo(message)?.kind === kind ? (message.imageGeneration ?? message.videoGeneration) : undefined;
+    // Codex app-server sends `revisedPrompt`; the Responses API item sends `revised_prompt`.
     const prompt =
+      getString(item, "revisedPrompt") ??
       getString(item, "revised_prompt") ??
       getString(item, "prompt") ??
       previous?.prompt ??
-      lastUserPrompt(snapshot) ??
       undefined;
     // A video model makes a wide clip unless the call asks for another frame.
     const aspectRatio =

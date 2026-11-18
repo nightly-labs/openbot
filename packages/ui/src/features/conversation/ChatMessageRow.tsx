@@ -103,7 +103,7 @@ export interface ChatMessageRowProps {
   onOpenLink: (url: string) => void;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  onOpenSharedFile?: (path: string, asWritten?: string) => void;
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;

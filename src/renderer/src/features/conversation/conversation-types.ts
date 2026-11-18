@@ -340,6 +340,8 @@ export interface ConversationProps {
    * limit. The waiting block names it for each agent that this agent asked.
    */
   agentWaits?: Record<string, SidebarAgentWait> | undefined;
+  /** The page of the browser takeover in each agent's own chat, by agent. "Take over" in the waiting block opens it. */
+  agentTakeoverTabIds?: Record<string, string> | undefined;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
   /**

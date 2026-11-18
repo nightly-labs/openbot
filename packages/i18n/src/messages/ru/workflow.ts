@@ -163,6 +163,7 @@ export const messages = {
   "workflow.video.models": "Модели видео",
   "workflow.video.making": "Создание видео, {time}",
   "workflow.video.length": "Длительность",
+  "workflow.video.length.custom": "Своя",
   "workflow.video.lengthLabel": "Длительность: {value}",
   "workflow.video.seconds": "{value} с",
   "workflow.video.resolution": "Разрешение",

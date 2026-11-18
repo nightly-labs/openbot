@@ -7,6 +7,7 @@ import { AgentThreadView } from "@openbot/ui/features/conversation/threads/Agent
 import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
@@ -26,19 +27,21 @@ import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /**
  * A side thread in the side panel, beside the agent's own chat. Its message box takes text only:
  * files, and the question and takeover cards of the thread, stay in the chat. A thread that waits
  * for an answer shows a card that moves it to the chat.
  */
-export function ConversationSideThread(props: { threadId: string }) {
+export function ConversationSideThread(props: { threadId: string; resizer: JSX.Element }) {
   const {
     props: view,
     openExternalMessageUrl,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    openThreadFile,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
@@ -53,6 +56,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     branchThread,
     messagePins,
     changeMarkerActions,
+    openWaitingAgent,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
@@ -82,6 +86,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     messages: () => messages,
     lines: () => undefined,
     activeTurnId: () => thread()?.task.activeTurnId,
+  });
+  const turnTrace = useTurnTrace({
+    turnSteps,
+    agentName: () => view.agent?.name,
+    agents: () => view.agents,
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
@@ -181,9 +190,11 @@ export function ConversationSideThread(props: { threadId: string }) {
   };
   return (
     <aside
+      id="side-thread-panel"
       class="browser-panel side-thread-panel"
       aria-label={t("conversation.threads.view.label", { title: item()?.title ?? "" })}
     >
+      {props.resizer}
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView
@@ -215,7 +226,9 @@ export function ConversationSideThread(props: { threadId: string }) {
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onOpenFile={openThreadFile}
             onSelectAgent={view.onSelectAgent}
+            onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
@@ -239,6 +252,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}

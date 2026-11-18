@@ -18,6 +18,7 @@ import {
   workflowMediaResolutions,
   workflowMediaSpecs,
   workflowVideoDurations,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -33,12 +34,13 @@ import {
   Minimize2,
   Play,
   Popover,
+  SliderField,
   Square,
   Textarea,
   Type,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
@@ -61,6 +63,7 @@ import {
   useTextField,
   type WfnInputPort,
 } from "./workflow-node-parts";
+import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type Aspect = WorkflowMediaAspect;
 /** The frame of a step: an aspect ratio of the model, or a size of its own in pixels. */
@@ -209,6 +212,64 @@ function SizeChip(props: { size: WorkflowMediaSize; disabled: boolean; onChange:
             {field("width")}
             {field("height")}
           </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** The option of the Length menu that opens a slider over every length of the model. */
+const CUSTOM_LENGTH = "custom" as const;
+type LengthChoice = `${number}` | typeof CUSTOM_LENGTH;
+
+/**
+ * The glass chip of a custom length. It opens a slider that moves through the lengths of the model,
+ * so each stop is a length that the model makes. The chip follows the slider while the user drags it,
+ * and the step keeps the length when the user releases it.
+ */
+function LengthChip(props: {
+  seconds: number;
+  lengths: readonly number[];
+  disabled: boolean;
+  onChange: (seconds: number) => void;
+}) {
+  const { t } = useText();
+  const [dragged, setDragged] = createSignal<number | null>(null);
+  const sorted = createMemo(() => [...new Set(props.lengths)].sort((left, right) => left - right));
+  // The specs already keep a length of the model, so `seconds` is one of the stops.
+  const index = () => dragged() ?? Math.max(sorted().indexOf(props.seconds), 0);
+  const at = (place: number) => sorted()[place] ?? props.seconds;
+  const seconds = (place: number) => t("workflow.video.seconds", { value: String(at(place)) });
+  const commit = (place: number) => {
+    if (at(place) !== props.seconds) props.onChange(at(place));
+    setDragged(null);
+  };
+  return (
+    <Popover.Root placement="top" gutter={6}>
+      <Popover.Trigger
+        class="wfn-chip"
+        aria-label={t("workflow.video.lengthLabel", { value: seconds(index()) })}
+        disabled={props.disabled}
+      >
+        {seconds(index())}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          class="ui-popover-menu-surface wfn-popover wfn-length-popover"
+          aria-label={t("workflow.video.length")}
+          data-wfn-portal=""
+        >
+          <SliderField
+            label={t("workflow.video.length")}
+            value={index()}
+            minValue={0}
+            maxValue={Math.max(sorted().length - 1, 1)}
+            step={1}
+            disabled={props.disabled}
+            formatValue={seconds}
+            onChange={setDragged}
+            onChangeEnd={commit}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -399,6 +460,25 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
+  /** Every length of the model, and the short list of the Length menu. Custom takes the others. */
+  const lengths = () => workflowVideoDurations(model());
+  const lengthChoices = () => workflowVideoLengthChoices(lengths());
+  const customLengthAllowed = () => lengthChoices().length < lengths().length;
+  /** The model on which the user chose Custom, so another model starts from its own short list. */
+  const [customLengthModel, setCustomLengthModel] = createSignal<string | null>(null);
+  const customLength = () => customLengthModel() === (model()?.id ?? "");
+  /** A length that the short list does not show is a custom length, also after a reload. */
+  const lengthIsCustom = () => customLengthAllowed() && (customLength() || !lengthChoices().includes(specs().duration));
+  const chooseLength = (choice: LengthChoice) => {
+    if (choice === CUSTOM_LENGTH) {
+      setCustomLengthModel(model()?.id ?? "");
+      return;
+    }
+    const next = lengths().find((option) => String(option) === choice);
+    if (next === undefined) return;
+    setCustomLengthModel(null);
+    setDuration(next);
+  };
   /** A Sunra or Higgsfield step shows what one file costs with its choices. */
   const price = useMediaPrice(() => {
     const chosen = model();
@@ -449,7 +529,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const shown = board.shown(source);
     const file = board.field(source, "fileId");
     const value = shown && !shown.failed ? resultValue(shown) : typeof file === "string" && file ? file : undefined;
-    return value === undefined ? undefined : board.catalogs().media?.(value, "image");
+    return value === undefined ? undefined : (pictureUrl(value) ?? undefined);
   };
   const roleOf = (source: string): InputRole => {
     if (kind() !== "video") return "reference";
@@ -467,24 +547,37 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const seconds = useElapsed(run.running);
   /**
    * The address of a result: the attachment that the step made, else a workspace image by name, as
-   * a host without media results gives it.
+   * a host without media results gives it. Undefined while it loads, null when it cannot show.
    */
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
-    const made = board.catalogs().media?.(value, kind());
-    if (made) return made;
-    return (
-      board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ??
-      undefined
-    );
+    return orFile(board.catalogs().media?.(value, kind()), value);
+  };
+  const orFile = (made: string | null | undefined, value: string) => made ?? fileUrl(value) ?? made;
+  /** A workspace image by name, as a host without media results gives it. */
+  const fileUrl = (value: string) =>
+    board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined;
+  /**
+   * The small copy of a picture, which the card, its strip and its inputs show. A host that sends
+   * it gives no full file here, so the card does not download both. The viewer and a download read
+   * the file.
+   */
+  const pictureUrl = (value: string) => {
+    const preview = board.catalogs().mediaPreview;
+    return orFile(preview ? preview(value) : board.catalogs().media?.(value, "image"), value);
+  };
+  const smallUrlOf = (value: string | undefined) => {
+    if (value === undefined) return undefined;
+    return kind() === "image" ? pictureUrl(value) : urlOf(value);
   };
   const shownValue = () => {
     const shown = board.shown(props.id);
     return shown ? resultValue(shown) : props.image;
   };
   const shownUrl = () => urlOf(shownValue());
-  /** An image with clear pixels shows on the canvas with no card behind it. */
-  const shape = usePictureShape(() => (kind() === "image" ? shownUrl() : undefined));
+  const shownPicture = () => smallUrlOf(shownValue());
+  /** An image with clear pixels shows on the canvas with no card behind it. The copy keeps clear pixels. */
+  const shape = usePictureShape(() => (kind() === "image" ? (shownPicture() ?? undefined) : undefined));
   const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   /** The name that a download of the media takes. */
@@ -517,6 +610,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const specsDisabled = () => locked() || making();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => (specs().size ? t("workflow.image.aspect.custom") : specs().aspect);
+  const lengthText = () => (lengthIsCustom() ? t("workflow.video.length.custom") : durationText(specs().duration));
   return (
     <>
       <NodeShell
@@ -525,7 +619,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         kind="image"
         media
         clear={clear()}
-        thumb={(result) => (kind() === "image" ? urlOf(result.value) : undefined)}
+        thumb={(result) => (kind() === "image" ? (smallUrlOf(result.value) ?? undefined) : undefined)}
         inputs={["text", "image"]}
         inputPorts={kind() === "video" ? videoPorts(t) : undefined}
         output={kind() === "video" ? "file" : "image"}
@@ -571,27 +665,31 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           }
         >
           <Show
-            when={shownUrl()}
+            when={shownPicture()}
             fallback={
-              <span class="wfn-media-empty" aria-hidden="true">
-                <Show when={kind() === "video"} fallback={<Image />}>
-                  <Film />
-                </Show>
-              </span>
+              // A result with no address yet still comes from the host. Null: it cannot show here.
+              <Show
+                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
+                fallback={<CardPictureLoading />}
+              >
+                <span class="wfn-media-empty" aria-hidden="true">
+                  <Show when={kind() === "video"} fallback={<Image />}>
+                    <Film />
+                  </Show>
+                </span>
+              </Show>
             }
           >
             {(url) => (
               <Show
                 when={kind() === "video"}
                 fallback={
-                  <img
-                    ref={(element: HTMLImageElement) => {
+                  <CardPicture
+                    ref={(element) => {
                       media = element;
                     }}
-                    class="wfn-media"
                     src={url()}
                     alt={prompt() || text("description")}
-                    draggable="false"
                   />
                 }
               >
@@ -638,25 +736,36 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 )}
               </Show>
               <Show when={kind() === "video"}>
-                <ChipMenu
-                  label={t("workflow.video.lengthLabel", { value: durationText(specs().duration) })}
+                <ChipMenu<LengthChoice>
+                  label={t("workflow.video.lengthLabel", { value: lengthText() })}
                   title={t("workflow.video.length")}
-                  text={durationText(specs().duration)}
-                  value={String(specs().duration)}
+                  text={lengthText()}
+                  value={lengthIsCustom() ? CUSTOM_LENGTH : `${specs().duration}`}
                   groups={[
                     {
-                      options: workflowVideoDurations(model()).map((value) => ({
-                        value: String(value),
-                        label: durationText(value),
-                      })),
+                      options: [
+                        ...lengthChoices().map((value) => ({ value: `${value}` as const, label: durationText(value) })),
+                        ...(customLengthAllowed()
+                          ? [{ value: CUSTOM_LENGTH, label: t("workflow.video.length.custom") }]
+                          : []),
+                      ],
                     },
                   ]}
                   disabled={specsDisabled()}
-                  onSelect={(value) => {
-                    const next = workflowVideoDurations(model()).find((option) => String(option) === value);
-                    if (next !== undefined) setDuration(next);
-                  }}
+                  onSelect={chooseLength}
                 />
+                <Show when={lengthIsCustom()}>
+                  <LengthChip
+                    seconds={specs().duration}
+                    lengths={lengths()}
+                    disabled={specsDisabled()}
+                    onChange={(seconds) => {
+                      // A slider stop on the short list keeps Custom, so the slider stays open.
+                      setCustomLengthModel(model()?.id ?? "");
+                      setDuration(seconds);
+                    }}
+                  />
+                </Show>
               </Show>
               {/* A custom size sets the resolution that the model makes. */}
               <Show when={!specs().size && specs().resolution}>

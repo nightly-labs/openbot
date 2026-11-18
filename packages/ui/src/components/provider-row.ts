@@ -331,7 +331,7 @@ export function providerStatusLabel(
   updatable = false,
 ): string {
   // Downloads outrank connection words; the row reports progress until it ends. An update that waits
-  // for the provider's turns to end has a message and no progress yet.
+  // for the provider's turns to end has a message, after its download.
   if (runtimeStatus?.phase === "downloading" && runtimeStatus.message)
     return translate("provider.status.updateWaiting");
   if (runtimeStatus?.phase === "downloading") {

@@ -32,7 +32,12 @@ export function useAgentMentionSkills(agentId: string, serverId: string, online:
   return useMemo(() => {
     const tools: MentionSkill[] = [
       ...(skills.data ?? [])
-        .filter((skill) => skill.enabled !== false && skill.state !== "needs-repair")
+        // A member's list gets a skill that has a problem from `skill-problems-v1`. The phone has no
+        // note for it yet, so it keeps that list as before; an admin's list always had those skills.
+        .filter(
+          (skill) =>
+            skill.enabled !== false && skill.state !== "needs-repair" && (manage || skill.problem === undefined),
+        )
         .map((skill) => ({
           kind: "skill" as const,
           id: skill.skillId,
@@ -44,5 +49,5 @@ export function useAgentMentionSkills(agentId: string, serverId: string, online:
         .map((app) => ({ kind: "mcp" as const, id: app.id, name: app.name, description: "" })),
     ];
     return tools.length > 0 ? tools : NO_SKILLS;
-  }, [skills.data, apps.data]);
+  }, [skills.data, apps.data, manage]);
 }

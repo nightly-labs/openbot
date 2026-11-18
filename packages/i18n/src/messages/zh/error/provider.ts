@@ -79,6 +79,7 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "运行时更新未完成。",
   "error.provider.downloadHttp": "运行时下载失败，HTTP {status}。",
   "error.provider.downloadNoData": "运行时下载未返回任何数据。",
+  "error.provider.downloadStalled": "由于一分钟内没有收到数据，下载已停止。请检查网络连接，然后重试。",
   "error.provider.downloadSize": "运行时下载的大小异常。",
   "error.provider.downloadIntegrity": "运行时下载未通过完整性校验。",
   "error.provider.runtimeReplacing": "另一个实例正在替换该运行时，无法安装。",
@@ -205,6 +206,8 @@ export const messages = {
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go 拒绝了你保存的 API 密钥。密钥可能已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go 拒绝了该请求。新的 API 密钥无法解决此问题。你的 OpenCode Go 套餐可能未激活，或者 OpenCode Go 可能屏蔽了你的网络：某些服务会屏蔽 VPN、代理或某些国家/地区。请在 OpenCode Console 中确认套餐已激活，或关闭 VPN，然后重试。你也可以选择其他模型。",
   "error.provider.opencodeServiceFailure":
     "由于本地服务故障，OpenCode 无法完成本轮对话。请重试；若错误持续，请在设置中重新连接 OpenCode。",
   "error.provider.opencodeRateLimited":
@@ -244,6 +247,7 @@ export const messages = {
   "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
   "error.provider.noAnswerAfterSteps":
     "{provider} 执行了一些步骤后结束了本轮对话，但没有给出回答。再次发送相同请求之前，请先问问助手做了什么。",
+  "error.provider.acpRefusedNoReason": "{provider} 已停止，没有给出回答。请重新发送消息。",
   "error.provider.chatgptPageFailed": "OpenBot 无法打开 ChatGPT 连接页面。",
   "error.provider.noneReady": "没有可用的助手服务商。",
   "error.provider.claudeTurnActive": "请等待当前 Claude 对话结束，再刷新其上下文。",
@@ -329,6 +333,8 @@ export const messages = {
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.claudeApiKeyNoCredit":
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
+  "error.provider.claudeAccountNoCredit":
+    "你的 Claude 账户额度余额不足。部分请求（例如快速模式）即使在 Claude 套餐仍有用量时也会使用用量额度。请在你的 Claude 账户中添加用量额度，或在智能体的模型菜单中选择其他模型。",
   "error.provider.claudeServiceBlocked":
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":

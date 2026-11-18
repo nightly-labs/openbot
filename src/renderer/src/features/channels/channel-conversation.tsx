@@ -114,7 +114,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     if (!current) return [];
     const next = new Map<string, AgentMessage>();
-    const mappedRows = channelConversationRows(entries());
+    const mappedRows = channelConversationRows(entries(), current.tasks);
     const lastKnown = mappedRows.findLastIndex((mapped) => rowsById.has(mapped.id));
     const rows = mappedRows.map((mapped, index) => {
       const known = rowsById.get(mapped.id);

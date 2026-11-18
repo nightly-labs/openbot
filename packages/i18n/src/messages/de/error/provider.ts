@@ -89,6 +89,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Die Laufzeitaktualisierung wurde nicht abgeschlossen.",
   "error.provider.downloadHttp": "Der Laufzeitdownload ist mit HTTP {status} fehlgeschlagen.",
   "error.provider.downloadNoData": "Der Laufzeitdownload hat keine Daten zurückgegeben.",
+  "error.provider.downloadStalled":
+    "Der Download wurde angehalten, weil eine Minute lang keine Daten ankamen. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.provider.downloadSize": "Der Laufzeitdownload hat eine unerwartete Größe.",
   "error.provider.downloadIntegrity": "Der Laufzeitdownload hat die Integritätsprüfung nicht bestanden.",
   "error.provider.runtimeReplacing":
@@ -245,6 +247,8 @@ export const messages = {
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go hat die Anfrage abgelehnt. Ein neuer API-Schlüssel hilft hier nicht. Dein OpenCode-Go-Abo ist vielleicht nicht aktiv, oder OpenCode Go blockiert dein Netzwerk: Manche Dienste blockieren VPNs, Proxys oder bestimmte Länder. Prüfe in der OpenCode Console, ob dein Abo aktiv ist, oder schalte das VPN aus. Versuche es dann erneut. Du kannst auch ein anderes Modell wählen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode konnte diesen Durchlauf nicht abschließen, da sein lokaler Dienst fehlgeschlagen ist. Versuche es erneut. Falls der Fehler weiter auftritt, verbinde OpenCode in den Einstellungen erneut.",
   "error.provider.opencodeRateLimited":
@@ -291,6 +295,7 @@ export const messages = {
     "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
+  "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":
@@ -390,6 +395,8 @@ export const messages = {
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
+  "error.provider.claudeAccountNoCredit":
+    "Das Guthaben deines Claude-Kontos ist zu niedrig. Manche Anfragen, zum Beispiel im Schnellmodus, nutzen Nutzungsguthaben, auch wenn dein Claude-Abo noch Nutzung übrig hat. Lade Nutzungsguthaben in deinem Claude-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.",
   "error.provider.claudeServiceBlocked":
     "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":

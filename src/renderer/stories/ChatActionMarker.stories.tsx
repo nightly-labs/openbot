@@ -15,6 +15,7 @@ const agents: AgentProfile[] = [
 const onSelectAgent = fn();
 const onOpenRoutine = fn();
 const onOpenHostedSite = fn();
+const onSignInProvider = fn();
 
 const meta = {
   title: "Conversation/Chat Action Marker",
@@ -75,8 +76,18 @@ export const AllStates: Story = {
             agents={agents}
             onSelectAgent={onSelectAgent}
             onOpenRoutine={onOpenRoutine}
+            routineRunFailure={(runId) =>
+              runId === "run-failed" ? "The calendar service did not answer, so the brief has no meetings." : undefined
+            }
           />
         ))}
+        <ChatActionMarker
+          marker={{ ...routineMarker("failed"), runId: "run-failed-long" }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+          routineRunFailure={() => longRunError}
+        />
         {routineActions.map((action) => (
           <ChatActionMarker
             marker={lifecycleMarker(action)}
@@ -102,6 +113,17 @@ export const AllStates: Story = {
           onSelectAgent={onSelectAgent}
         />
         <ChatActionMarker marker={{ kind: "context-reset", timestamp }} agents={agents} onSelectAgent={onSelectAgent} />
+        <ChatActionMarker
+          marker={{
+            kind: "sign-in-failure",
+            provider: "claude",
+            text: "Your Claude sign-in expired. Sign in again to continue.",
+            timestamp,
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onSignInProvider={onSignInProvider}
+        />
       </section>
     </main>
   ),
@@ -406,6 +428,9 @@ function agentMarker(
     expectsReply: true,
   };
 }
+
+/** A provider error as a failed turn stores it on its run: long, with no limit. */
+const longRunError = `Provider request failed: 529 overloaded_error. ${"The service is busy now. Try the request again later. ".repeat(12)}request_id=req_011CXa9`;
 
 function routineMarker(
   status: Extract<ChatActionMarkerModel, { kind: "routine-run" }>["status"],

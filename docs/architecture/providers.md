@@ -768,6 +768,14 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
 
+OpenCode 2.2.5 sends a 401 and a 403 as the same `-32000`, but it keeps the provider's status in the
+newest `session_message` row of the failed turn (`{"error":{"type":"provider.auth","status":403,…}}`).
+OpenCode Go answers a bad key with 401, and refuses a valid key with 403, for example when the Go
+plan is not active or the network is blocked. The client's `providerRefusalStatus` option reads that
+row read-only (`readOpenCodeRefusalStatus` in `opencode-usage.ts`), and with a saved key a 403 shows
+`error.provider.opencodeGoRequestRefused`, which does not ask for a new key (#12281). No row, another
+status, or a database that cannot be read keeps `error.provider.opencodeKeyRefused`.
+
 OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
 when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
 OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
