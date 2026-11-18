@@ -191,6 +191,12 @@ describe("redactText", () => {
     expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
       "Write to jan@example.com, password=[redacted]",
     );
+    // Only the email rule hid a URL password before, as a part of an address.
+    expect(redactPostText("postgres://admin:s3cretpw@db.example.com/app")).toBe(
+      "postgres://admin:[redacted]@db.example.com/app",
+    );
+    expect(redactText("https://user:s3cretpw@db.example.com/x")).toBe("https://user:[redacted]@db.example.com/x");
+    expect(redactSecrets("redis://:s3cretpw@cache:6379")).toBe("redis://:[redacted]@cache:6379");
     expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
       "[redacted-unscanned]",
     );

@@ -74,6 +74,11 @@ const COOKIE_HEADER =
 // or a template is not taken for a secret. The search for the digit is bounded, so a line of
 // repeated `?key=` with no digit does not scan the rest of the line once each.
 const QUERY_SECRET = /([?&](?:key|code|ticket|sig)=)(?!\[redacted\])(?=[^&#\s"'<>)\]]{0,256}\d)[^&#\s"'<>)\]]{8,}/giu;
+// The password of a URL such as `postgres://admin:password@db.example.com`. The user name and the
+// host stay. The email rule hides it only as a part of an address, and `redactSecrets` and
+// `redactPostText` do not have that rule. Each run is bounded and cannot hold an `@`, so a long
+// line cannot backtrack far.
+const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s:/?#@[\]"'<>]{0,256}:)[^\s/?#@"'<>]{1,256}(?=@)/giu;
 // Bounded for the same reason as the label above, and more sharply: with `+`
 // on the local part, every character of a long payload consumed the rest of
 // the run looking for an `@` and then backtracked over all of it.
@@ -262,6 +267,7 @@ function applyTextRules(value: string, emails: boolean): string {
     // After the assignment rule: its value runs over `&`, and a query value redacted first would
     // leave a `]` behind it.
     .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(URL_PASSWORD, "$1[redacted]")
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(JSON_WEB_TOKEN, "[redacted]");
   return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
