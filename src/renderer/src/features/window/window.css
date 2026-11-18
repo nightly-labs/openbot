@@ -884,8 +884,8 @@
     visibility: hidden;
   }
 
-  /* New agent and New section add to the agent list, so the button shows only on the agents page. */
-  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .sidebar-new-button {
+  /* New and the filter act on the agent list, so the buttons show only on the agents page. */
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar :is(.sidebar-new-button, .sidebar-filter-button) {
     display: none;
   }
 

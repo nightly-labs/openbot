@@ -1,6 +1,6 @@
 import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
@@ -98,6 +98,33 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
   /* The computed width is the layout width, which the bounce does not scale. While the pill
      resizes, it is the width on screen, so a new change continues from there. */
   const measure = () => (badge?.isConnected ? Number.parseFloat(getComputedStyle(badge).width) : undefined);
+  /* A sidebar row off screen is not rendered (`content-visibility: auto`). A width read in such a row
+     lays out that row alone, one time for each badge. Thus such a badge reads its width only when its
+     row comes on screen. */
+  const onScreen = () => badge?.checkVisibility?.({ contentVisibilityAuto: true }) !== false;
+  let stopWaitingForRow: (() => void) | undefined;
+  const readWidthLater = () => {
+    const run = ++measureRun;
+    requestAnimationFrame(() => {
+      if (run !== measureRun || pillWidth !== undefined) return;
+      const row = badge?.closest<HTMLElement>(".sidebar-agent-item");
+      if (!row || onScreen()) {
+        pillWidth = measure();
+        return;
+      }
+      const rowShown = () => {
+        if (!onScreen()) return;
+        stopWaitingForRow?.();
+        if (run === measureRun) pillWidth ??= measure();
+      };
+      row.addEventListener("contentvisibilityautostatechange", rowShown);
+      stopWaitingForRow = () => {
+        row.removeEventListener("contentvisibilityautostatechange", rowShown);
+        stopWaitingForRow = undefined;
+      };
+    });
+  };
+  onCleanup(() => stopWaitingForRow?.());
 
   createEffect(
     () => badgeSnapshot(props.state()),
@@ -108,17 +135,21 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       if (leavingBadge === undefined && current?.count !== undefined && current.count === next?.count) return;
       const fromWidth = resize?.playState === "running" ? measure() : pillWidth;
       measureRun++;
+      stopWaitingForRow?.();
       resize?.cancel();
       resize = undefined;
-      pillWidth = next?.count !== undefined ? measure() : undefined;
-      /* A badge that has just appeared, or the first run, can come before the badge is in the
-         document; the next frame measures it. */
-      if (next?.count !== undefined && pillWidth === undefined) {
-        const run = ++measureRun;
-        requestAnimationFrame(() => {
-          if (run === measureRun) pillWidth ??= measure();
-        });
-      }
+      /* A width read after a change makes the browser lay out the page again. Only a count that
+         changes on screen needs the new width now, for its resize. Each other badge reads its width in
+         the next frame, so a list that shows many badges at once lays out one time, not once a badge. */
+      const resizesNow =
+        mounted &&
+        leavingBadge === undefined &&
+        current?.count !== undefined &&
+        next?.count !== undefined &&
+        !prefersReducedMotion() &&
+        onScreen();
+      pillWidth = resizesNow ? measure() : undefined;
+      if (next?.count !== undefined && pillWidth === undefined) readWidthLater();
       if (!mounted) {
         mounted = true;
         return;

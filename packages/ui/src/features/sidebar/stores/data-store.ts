@@ -13,11 +13,19 @@ import {
   sidebarFolderHeight,
   sidebarFolderParents,
 } from "@openbot/contracts/ipc";
-import { createMemo } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import { sidebarSectionResolver, sortByLayoutOrder } from "../sidebar-agent-order";
+import {
+  SIDEBAR_NO_LIST_FILTER,
+  type SidebarChatFacts,
+  type SidebarFolderNode,
+  type SidebarListFilter,
+  sidebarChatMatchesFilter,
+  sidebarListFilterIsSet,
+} from "../sidebar-list-filter";
 import { sidebarPinnedItemKey } from "../sidebar-pins";
 import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
@@ -54,6 +62,9 @@ export function createSidebarDataStore(deps: {
   const personById = createMemo(() => new Map(props.people.map((member) => [member.id, member])));
   const channels = () => props.channels ?? [];
   const channelById = createMemo(() => new Map(channels().map((channel) => [channel.id, channel])));
+  /** The filter of the list. It is a view only: it does not change the layout or any saved value. */
+  const [listFilter, setListFilter] = createSignal<SidebarListFilter>(SIDEBAR_NO_LIST_FILTER);
+  const listFiltered = createMemo(() => sidebarListFilterIsSet(listFilter()));
   let pinnedItemCache = new Map<string, { source: PinnedItemSource; item: ResolvedPinnedItem }>();
   /** Both kinds of pinned chat, resolved against the chats the sidebar has: a pin that names none is
    * kept in storage and simply not drawn, because the chat can be absent for a passing reason.
@@ -120,8 +131,78 @@ export function createSidebarDataStore(deps: {
   /** A hidden agent at work that waits for the user. It shows in "Needs you", not in the "Hidden" group. */
   const hiddenAgentWaits = (agentId: string) =>
     props.userHiddenAgentsWork === true && agentIsUserHidden(agentId) && chatWaits(agentId);
-  const chatOrder = () => props.chatOrder ?? "manual";
+  /**
+   * While folders are the filter, "Unread in a group" acts as "Unread first": the unread chats of a
+   * selected folder stay at the top of that folder, not in a group above all folders.
+   */
+  const chatOrder = () => {
+    const order = props.chatOrder ?? "manual";
+    return order === "unread-group" && listFilter().folders.length > 0 ? "unread-first" : order;
+  };
   const activeChatId = () => props.activeChannelId || props.activeAgentId || "";
+  const sectionOfChat = createMemo(() => sidebarSectionResolver(props.layout));
+  /**
+   * What the filter knows of each chat. Lazy: nothing reads it while no filter is set and the filter
+   * menu is closed, so the agent states do not rebuild it on each change.
+   */
+  const filterFacts = createMemo(
+    (): SidebarChatFacts[] => {
+      const sectionOf = sectionOfChat();
+      return [
+        ...props.agents.map(
+          (agent): SidebarChatFacts => ({
+            id: agent.id,
+            kind: "agent",
+            folder: sectionOf(agent.id),
+            unread: props.agentStates[agent.id]?.kind === "unread" || (props.unreadAgentIds?.has(agent.id) ?? false),
+            working: props.agentStates[agent.id]?.kind === "working",
+          }),
+        ),
+        ...channels().map(
+          (channel): SidebarChatFacts => ({
+            id: channel.id,
+            kind: "channel",
+            folder: sectionOf(channel.id),
+            unread: (channel.unreadCount ?? 0) > 0,
+            working: false,
+          }),
+        ),
+      ];
+    },
+    { lazy: true },
+  );
+  /**
+   * The chats that the filter shows. The open chat stays while the pointer is over the list, so a
+   * chat that the user reads under "Unread" does not go away under the pointer. A new filter drops it.
+   *
+   * The key is a string, so a state change that keeps the same chats stops here and does not rebuild
+   * the rows.
+   */
+  let heldShownKey = "";
+  let heldShownFilter = SIDEBAR_NO_LIST_FILTER;
+  const shownKey = createMemo(() => {
+    const filter = listFilter();
+    if (!listFiltered()) {
+      heldShownKey = "";
+      heldShownFilter = filter;
+      return "";
+    }
+    const previous = new Set(heldShownFilter === filter && heldShownKey ? heldShownKey.split("\n") : []);
+    const active = activeChatId();
+    heldShownFilter = filter;
+    heldShownKey = filterFacts()
+      .filter(
+        (chat) =>
+          sidebarChatMatchesFilter(chat, filter) ||
+          (chat.id === active && previous.has(chat.id) && deps.pointerInList()),
+      )
+      .map((chat) => chat.id)
+      .sort()
+      .join("\n");
+    return heldShownKey;
+  });
+  const shownIds = createMemo(() => new Set(shownKey() ? shownKey().split("\n") : []));
+  const chatShown = (chatId: string) => !listFiltered() || shownIds().has(chatId);
   /**
    * A chat with unread messages of its own. An agent whose only unread messages are in side threads
    * has an unread mark with no number. Opening its chat does not clear that mark, and a routine thread
@@ -170,23 +251,27 @@ export function createSidebarDataStore(deps: {
   const chatInUnreadGroup = (chatId: string) =>
     chatOrder() === "unread-group" && unreadIds().has(chatId) && !chatWaits(chatId);
   const filteredAgents = createMemo(() =>
-    listedAgents().filter((agent) => !chatWaits(agent.id) && !chatInUnreadGroup(agent.id)),
+    listedAgents().filter((agent) => !chatWaits(agent.id) && !chatInUnreadGroup(agent.id) && chatShown(agent.id)),
   );
   /**
    * The hidden agents, pinned ones included, in their layout order. They are not drag sources. One
    * that waits for the user is in "Needs you" until the wait ends.
    */
   const userHiddenAgentList = createMemo(() =>
-    sortByLayoutOrder(
-      props.agents.filter((agent) => agentIsUserHidden(agent.id) && !hiddenAgentWaits(agent.id)),
-      props.layout.agentOrder,
-    ),
+    listFiltered()
+      ? []
+      : sortByLayoutOrder(
+          props.agents.filter((agent) => agentIsUserHidden(agent.id) && !hiddenAgentWaits(agent.id)),
+          props.layout.agentOrder,
+        ),
   );
   const listedChannels = createMemo(() =>
     channels().filter((channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id }))),
   );
   const filteredChannels = createMemo(() =>
-    listedChannels().filter((channel) => !chatWaits(channel.id) && !chatInUnreadGroup(channel.id)),
+    listedChannels().filter(
+      (channel) => !chatWaits(channel.id) && !chatInUnreadGroup(channel.id) && chatShown(channel.id),
+    ),
   );
   /**
    * Agents and channels as one ordered list, because the layout places them together: a channel is a
@@ -277,18 +362,20 @@ export function createSidebarDataStore(deps: {
   );
   /** The "Needs you" group, in the order the chats have in the layout. */
   const waitingChats = createChatItems(() => ({
-    channels: listedChannels().filter((channel) => chatWaits(channel.id)),
-    agents: props.agents.filter((agent) =>
-      agentIsUserHidden(agent.id)
-        ? hiddenAgentWaits(agent.id)
-        : chatWaits(agent.id) && !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })),
+    channels: listedChannels().filter((channel) => chatWaits(channel.id) && chatShown(channel.id)),
+    agents: props.agents.filter(
+      (agent) =>
+        chatShown(agent.id) &&
+        (agentIsUserHidden(agent.id)
+          ? hiddenAgentWaits(agent.id)
+          : chatWaits(agent.id) && !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id }))),
     ),
   }));
   /** The "Unread" group of the "unread in a group" order, by last activity. */
   const unreadChats = createChatItems(
     () => ({
-      channels: listedChannels().filter((channel) => chatInUnreadGroup(channel.id)),
-      agents: listedAgents().filter((agent) => chatInUnreadGroup(agent.id)),
+      channels: listedChannels().filter((channel) => chatInUnreadGroup(channel.id) && chatShown(channel.id)),
+      agents: listedAgents().filter((agent) => chatInUnreadGroup(agent.id) && chatShown(agent.id)),
     }),
     byRecent,
   );
@@ -320,24 +407,39 @@ export function createSidebarDataStore(deps: {
   // one ever reaches the sidebar another way. `sidebarSectionResolver` holds the rule.
   const filteredChatsBySection = createMemo(() => {
     const groups = new Map<string, SidebarChatItem[]>();
-    const sectionOf = sidebarSectionResolver(props.layout);
+    const sectionOf = sectionOfChat();
     for (const item of filteredChats()) {
       const sectionId = sectionOf(item.id);
       groups.set(sectionId, [...(groups.get(sectionId) ?? []), item]);
     }
     return groups;
   });
+  /** The folder that holds each folder that has one. */
+  const folderParents = createMemo(() => sidebarFolderParents(props.layout));
+  /**
+   * While a filter is set, the folders with a chat that it shows, and the folders that hold them. A
+   * folder with nothing left goes. Null: no filter, so each folder shows, empty or not.
+   */
+  const foldersWithShownChats = createMemo(() => {
+    if (!listFiltered()) return null;
+    const folders = new Set<string>();
+    for (const [sectionId, items] of filteredChatsBySection()) {
+      if (items.length === 0) continue;
+      folders.add(sectionId);
+      for (const ancestorId of sidebarFolderAncestors(folderParents(), sectionId)) folders.add(ancestorId);
+    }
+    return folders;
+  });
   const visibleSectionIds = createMemo(() =>
     props.layout.order.filter((sectionId) => {
-      if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return props.showPeople !== false && orderedPeople().length > 0;
-      if (customSectionById().has(sectionId)) return true;
+      if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) {
+        return props.showPeople !== false && !listFiltered() && orderedPeople().length > 0;
+      }
+      if (customSectionById().has(sectionId)) return foldersWithShownChats()?.has(sectionId) ?? true;
       if (sectionId !== SIDEBAR_UNASSIGNED_SECTION_ID) return false;
       return (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
     }),
   );
-
-  /** The folder that holds each folder that has one. */
-  const folderParents = createMemo(() => sidebarFolderParents(props.layout));
   /** The visible sections in each folder, and at the top (`null`), in the order of the layout. */
   const folderChildren = createMemo(() => {
     const children = new Map<string | null, string[]>();
@@ -452,8 +554,45 @@ export function createSidebarDataStore(deps: {
     return [...names, customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback")].join(" / ");
   }
 
+  /** The pinned chats that the filter shows. */
+  const shownPinnedItems = createMemo(() =>
+    listFiltered() ? resolvedPinnedItems().filter((item) => chatShown(item.chat.id)) : resolvedPinnedItems(),
+  );
+
   function visiblePinnedKeys(): string[] {
-    return resolvedPinnedItems().map((item) => sidebarPinnedItemKey(item.ref));
+    return shownPinnedItems().map((item) => sidebarPinnedItemKey(item.ref));
+  }
+
+  /**
+   * The folders for the filter menu, as the layout nests them, then the unassigned section. Empty when
+   * the layout has no folder, because then the whole list is one section.
+   */
+  const filterFolders = createMemo(
+    (): SidebarFolderNode[] => {
+      if (props.layout.sections.length === 0) return [];
+      const parents = folderParents();
+      const build = (parentId: string | null): SidebarFolderNode[] =>
+        props.layout.order
+          .filter((sectionId) => customSectionById().has(sectionId) && (parents.get(sectionId) ?? null) === parentId)
+          .map((sectionId) => ({
+            id: sectionId,
+            name: customSectionById().get(sectionId)?.name ?? "",
+            children: build(sectionId),
+          }));
+      return [...build(null), { id: SIDEBAR_UNASSIGNED_SECTION_ID, name: null, children: [] }];
+    },
+    { lazy: true },
+  );
+
+  /** The chats that the list would show with `patch` applied to the filter, for the counts in its menu. */
+  function listFilterCount(patch: Partial<SidebarListFilter>) {
+    const filter = { ...listFilter(), ...patch };
+    let count = 0;
+    for (const chat of filterFacts()) {
+      if (chat.kind === "agent" && agentIsUserHidden(chat.id) && !hiddenAgentWaits(chat.id)) continue;
+      if (sidebarChatMatchesFilter(chat, filter)) count += 1;
+    }
+    return count;
   }
 
   /** The ISO time when the user hid the agent, or undefined when the agent is not hidden. */
@@ -471,13 +610,17 @@ export function createSidebarDataStore(deps: {
     chatPinnedItems,
     customSectionById,
     directThreadByMember,
+    filterFolders,
     filteredAgents,
     filteredChannels,
     filteredChats,
     filteredChatsBySection,
+    listFilter,
+    listFilterCount,
+    listFiltered,
     orderedPeople,
     personById,
-    resolvedPinnedItems,
+    resolvedPinnedItems: shownPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
     sectionChatCount,
@@ -488,6 +631,7 @@ export function createSidebarDataStore(deps: {
     sectionLabel,
     sectionPosition,
     sectionUnreadCount,
+    setListFilter,
     unreadChats,
     visiblePinnedKeys,
     userHiddenAgentList,

@@ -19,8 +19,6 @@ import { createSidebarPendingStore } from "./stores/pending-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
-  /** A chat drags only in the manual orders. "Recent activity" and "Unread first" sort each section. */
-  const chatsDraggable = () => layoutMutable() && !sidebarChatOrderSortsSections(props.chatOrder);
   const scrollFades = createScrollFades({ stuck: ".sidebar-folder > header" });
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
@@ -41,9 +39,13 @@ export function createSidebarScope(props: SidebarProps) {
     chatPinnedItems,
     customSectionById,
     directThreadByMember,
+    filterFolders,
     filteredAgents,
     filteredChats,
     filteredChatsBySection,
+    listFilter,
+    listFilterCount,
+    listFiltered,
     orderedPeople,
     personById,
     resolvedPinnedItems,
@@ -57,6 +59,7 @@ export function createSidebarScope(props: SidebarProps) {
     sectionParent,
     sectionPosition,
     sectionUnreadCount,
+    setListFilter,
     unreadChats,
     userHiddenAgentList,
     userHiddenSince,
@@ -64,6 +67,13 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
     waitingChats,
   } = createSidebarDataStore({ props, dragActive: () => dragActive(), pointerInList });
+  /**
+   * Nothing drags while a filter is set: a drop places a row among the rows that show, and the rows
+   * that the filter hides would lose their place. A chat drags only in the manual orders, because
+   * "Recent activity" and "Unread first" sort each section.
+   */
+  const layoutDraggable = () => layoutMutable() && !listFiltered();
+  const chatsDraggable = () => layoutDraggable() && !sidebarChatOrderSortsSections(props.chatOrder);
   const {
     cancelSectionEditor,
     closeDelete,
@@ -228,12 +238,17 @@ export function createSidebarScope(props: SidebarProps) {
     duplicateSection,
     emptyPinnedDropVisible: dragState.emptyPinnedDropVisible,
     endChatDragging,
+    filterFolders,
     filteredAgents,
     filteredChats,
     filteredChatsBySection,
     foldersSupported,
     handleListDragLeave,
+    layoutDraggable,
     layoutMutable,
+    listFilter,
+    listFilterCount,
+    listFiltered,
     movePersonByKeyboard,
     movePinnedItem,
     moveFolderTo,
@@ -260,6 +275,7 @@ export function createSidebarScope(props: SidebarProps) {
     sectionSiblingIndex,
     sectionUnreadCount,
     setAgentListElement,
+    setListFilter,
     setSectionNameInput,
     sidebarClickIsSuppressed,
     startChatDragging,
