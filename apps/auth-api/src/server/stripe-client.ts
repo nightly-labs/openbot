@@ -74,6 +74,7 @@ const customerTaxSchema = Schema.Struct({
 const taxRateListSchema = Schema.Struct({
   data: Schema.Array(Schema.Struct({ id: Schema.String, metadata: Metadata })),
 });
+const promotionCodeListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) });
 
 /** The session metadata that records the VAT decision of a Checkout page (`billing-tax.ts`), for the webhook check. */
 export const VAT_METADATA = {
@@ -487,6 +488,8 @@ export class StripeClient {
       tax: CheckoutTax | null;
       /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
       trialEndSeconds?: number;
+      /** The code of a discount link (`promotion-code.ts`). Absent: the buyer can type a code in Checkout. */
+      promotionCode?: string;
       successUrl: string;
       cancelUrl: string;
       nowSeconds: number;
@@ -547,9 +550,36 @@ export class StripeClient {
       for (const [key, value] of Object.entries(input.metadata ?? {})) body.set(`${prefix}[${key}]`, value);
     }
     for (const [key, value] of Object.entries(input.sessionMetadata ?? {})) body.set(`metadata[${key}]`, value);
-    const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
+    const create = (form: URLSearchParams) =>
+      this.#requestEffect("POST", "/v1/checkout/sessions", form, checkoutSessionSchema);
+    const promotionCodeId = input.promotionCode ? yield* this.#activePromotionCodeId(input.promotionCode) : null;
+    // Stripe refuses a page with both a discount and the code field.
+    const discounted = new URLSearchParams(body);
+    discounted.delete("allow_promotion_codes");
+    if (promotionCodeId) discounted.set("discounts[0][promotion_code]", promotionCodeId);
+    const session = yield* promotionCodeId
+      ? // A code whose restrictions this order does not meet (a first order only, a minimum amount, other
+        // products or another currency) gives the page with the code field instead.
+        create(discounted).pipe(
+          Effect.catchIf(
+            (error) => error._tag === "StripeRequestError" && error.status === 400,
+            () => create(body),
+          ),
+        )
+      : create(body);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
+  }).bind(this);
+
+  /** The ID of the active promotion code with this code, or null when Stripe has none. */
+
+  readonly #activePromotionCodeId = Effect.fn("StripeClient.activePromotionCodeId")(function* (
+    this: StripeClient,
+    code: string,
+  ): Effect.fn.Return<string | null, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ code, active: "true", limit: "1" });
+    const codes = yield* this.#requestEffect("GET", `/v1/promotion_codes?${query}`, null, promotionCodeListSchema);
+    return codes.data[0]?.id ?? null;
   }).bind(this);
 
   /**
