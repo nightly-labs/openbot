@@ -1113,6 +1113,20 @@ try {
             ["text", "file"],
           );
 
+          // WhatsApp refuses the captioned post: it fails, and no second post goes, which WhatsApp would count too.
+          phone.refused.set(GROUP, "463");
+          from = phone.sent.length;
+          const refusedPost = await post({ text: "Refused", files: ["offer.png"] }).finally(() =>
+            phone.refused.delete(GROUP),
+          );
+          assert.equal(refusedPost.success, false, "A refused post counted as sent.");
+          assert.ok(refusedPost.contentItems[0]?.text?.includes("whatsapp_463"), refusedPost.contentItems[0]?.text);
+          assert.equal(
+            toGroup(from).filter((sent) => "image" in sent.content || "text" in sent.content).length,
+            1,
+            "A refused post was sent again apart.",
+          );
+
           // The socket closes after it took the text, before WhatsApp's ack: the text goes again with its id.
           const sockets = phone.sockets.length;
           phone.dropNext = GROUP;
