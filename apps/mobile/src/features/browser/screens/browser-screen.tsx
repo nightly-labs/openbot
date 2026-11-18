@@ -149,9 +149,9 @@ function BrowserView({
   onReconnect: () => void;
 }) {
   const { t, sourceText, format, errorMessage } = useText();
-  // The hand back waits for the server: the user can close the browser in that time. Only the
-  // browser route closes then, never the chat under it.
-  const closeBrowser = useCloseScreen(stayOpen);
+  // The hand back waits for the server: the user can close the browser in that time. Then nothing
+  // closes, never the chat under it. A sheet above the browser closes with it.
+  const closeBrowser = useCloseScreen(leaveFirstBrowser);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reducedMotion = useReducedMotion();
@@ -840,7 +840,9 @@ function BrowserView({
 
 function ignoreInput() {}
 
-function stayOpen() {}
+function leaveFirstBrowser() {
+  if (router.canGoBack()) router.back();
+}
 
 /**
  * A glass circle of the control size, as the chat header draws one. The menu owns the touch. Hidden,

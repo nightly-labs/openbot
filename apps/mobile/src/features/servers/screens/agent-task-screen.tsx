@@ -37,6 +37,7 @@ import {
   useComposerDictationWithSettings,
 } from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
+import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
@@ -91,13 +92,6 @@ function onThreadDeleted(task: AgentTask) {
   router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
 }
 
-/** Leaves the task. A task opened from a notification or a link has no screen under it. */
-function leaveTask() {
-  void Keyboard.dismiss();
-  if (router.canGoBack()) router.back();
-  else router.replace("/connected");
-}
-
 /**
  * One thread of an agent, laid out as the agent's chat: the same header, message list and composer.
  * The agent's name in the header opens the thread menu, the header has the thread's actions in place
@@ -132,6 +126,7 @@ export function AgentTaskScreen() {
 /** A full screen note with a way back, for a task or an agent that this phone cannot show. */
 function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   const { t } = useText();
+  const leaveTask = useLeaveChat();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   return (
@@ -171,6 +166,7 @@ function AgentTaskChat({
   focusMessageId: string | null;
 }) {
   const { t, errorMessage } = useText();
+  const leaveTask = useLeaveChat();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
