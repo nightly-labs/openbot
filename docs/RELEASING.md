@@ -686,9 +686,11 @@ AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships
 runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
-for later offline use. The optional Whisper large-v3 turbo int8 model, which takes a fixed dictation
-language, is downloaded the same way only when the user selects Download in Settings > Voice. Its
-three pinned files go in `runtimes/whisper-turbo-int8`. The Underdog Bark 3.0 Plus int8 model,
+for later offline use. The Whisper large-v3 turbo model (an int8 encoder and a full-precision
+decoder), which takes a fixed dictation language, is downloaded the same way when the user selects
+Download in Settings > Voice or dictates with it. Its three pinned files go in
+`runtimes/whisper-turbo-int8`. The int8 decoder of earlier versions in that directory is deleted
+after the three files are verified. The Underdog Bark 3.0 Plus int8 model,
 which recognizes English only, is no longer offered: Settings > Voice shows it only while it is in
 use or downloaded, and a saved choice of it still works. Its four pinned files go in
 `runtimes/bark-3.0-plus-int8`. They come from an
