@@ -553,16 +553,8 @@ function MarkdownList(props: {
   });
   const list = () => (
     <For each={renderedItems()}>
-      {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
-          <Show when={renderedItem.item.task}>
-            <Checkbox
-              class="message-markdown-checkbox"
-              checked={renderedItem.item.checked === true}
-              disabled
-              aria-label={renderedItem.item.text}
-            />
-          </Show>
+      {(renderedItem, index) => {
+        const blocks = () => (
           <MarkdownBlocks
             tokens={renderedItem.item.tokens.filter((child) => child.type !== "checkbox")}
             content={props.content}
@@ -573,8 +565,24 @@ function MarkdownList(props: {
               tailAfter()[index()],
             )}
           />
-        </li>
-      )}
+        );
+        return (
+          <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
+            <Show when={renderedItem.item.task}>
+              <Checkbox
+                class="message-markdown-checkbox"
+                checked={renderedItem.item.checked === true}
+                disabled
+                aria-label={renderedItem.item.text}
+              />
+            </Show>
+            {/* A task item is a row. One body keeps its text, code and nested lists in one column. */}
+            <Show when={renderedItem.item.task} fallback={blocks()}>
+              <div class="message-markdown-task-body">{blocks()}</div>
+            </Show>
+          </li>
+        );
+      }}
     </For>
   );
 
