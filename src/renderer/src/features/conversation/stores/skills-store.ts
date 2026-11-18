@@ -21,7 +21,8 @@ function skillAgentIds(props: ConversationProps): string[] {
   return props.agent?.id ? [props.agent.id] : [];
 }
 
-const usable = (skill: InstalledSkill) => skill.state !== "needs-repair" && skill.enabled !== false;
+const usable = (skill: InstalledSkill) =>
+  skill.state !== "needs-repair" && skill.enabled !== false && skill.problem === undefined;
 
 /**
  * One entry for each skill id: agents that have the same skill give the same id. A usable copy wins,

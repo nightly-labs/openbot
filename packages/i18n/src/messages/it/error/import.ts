@@ -112,6 +112,8 @@ export const messages = {
     "{name}: i valori che possono contenere un segreto sono stati rimossi dagli argomenti o dall'indirizzo. Inseriscili di nuovo nelle Impostazioni.",
   "error.import.transferSharedKept":
     "{number} file della cartella condivisa sono già presenti qui, quindi restano come sono.",
+  "error.import.transferPartSkipped":
+    "Alcune parti del file non sono state importate. Le altre parti sono su questo server, quindi non importare di nuovo il file.",
   "error.import.transferChannelInvalid": "Il canale {number} nel file non è valido, quindi viene saltato.",
   "error.import.transferChannelLimit": "Nel file ci sono solo i primi {limit} canali.",
   "error.import.transferWorkflowInvalid": "Un flusso di lavoro nel file non è valido, quindi viene saltato.",

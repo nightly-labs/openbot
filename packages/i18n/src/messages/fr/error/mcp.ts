@@ -21,6 +21,7 @@ export const messages = {
     "Ce serveur ne prend pas en charge les apps de connexion. Mettez à jour OpenBot sur l’hôte.",
   "error.mcp.redirectRelayed": "OpenBot a envoyé la connexion au serveur. Vous pouvez fermer cette fenêtre.",
   "error.mcp.relayEnded": "Cette connexion est terminée. Relancez-la.",
+  "error.mcp.signInLinkNotReady": "La page de connexion n’est pas encore ouverte. Réessayez dans un instant.",
   "error.mcp.relayNoState":
     "La page de connexion du serveur ne protège pas son adresse de retour : OpenBot ne l’ouvre donc pas sur cet ordinateur.",
   "error.mcp.relayAddressInvalid":

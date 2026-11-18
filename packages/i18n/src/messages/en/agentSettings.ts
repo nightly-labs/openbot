@@ -201,6 +201,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.fullAccess.askConfirm": "Use Ask first",
 
   "agentSettings.links.usage": "Usage",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "All agents",
   "agentSettings.links.memories": "Memories",
   "agentSettings.links.memoriesCount": { one: "{count} saved", other: "{count} saved" },
   "agentSettings.links.skills": "Skills",

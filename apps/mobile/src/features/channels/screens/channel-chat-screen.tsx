@@ -52,8 +52,9 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
-    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null, progressUpdates),
-    [page?.messages, server?.membershipId, progressUpdates],
+    () =>
+      projectChannelMessages(page?.messages ?? [], page?.tasks ?? [], server?.membershipId ?? null, progressUpdates),
+    [page?.messages, page?.tasks, server?.membershipId, progressUpdates],
   );
   // A host with channel-attention-v1 names the thread of each member in this channel. A request on
   // one of them belongs here, and not in the agent's own chat.

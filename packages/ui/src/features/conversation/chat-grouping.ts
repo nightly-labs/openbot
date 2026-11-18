@@ -10,6 +10,12 @@
  */
 const CHAT_GROUPING_WINDOW_MS = 5 * 60_000;
 
+/**
+ * With the compact action row, a separator with the time stands above a message that comes this long
+ * after the one before it, in the agent chat and in a thread.
+ */
+export const CHAT_TIME_GAP_MS = 60 * 60 * 1000;
+
 /** A row of a transcript, as the fields the grouping rule reads. */
 export interface SenderRunRow {
   /** Who wrote the row. The agent chat carries "you" or "agent"; a channel carries an author id. */

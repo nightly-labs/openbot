@@ -20,6 +20,7 @@ export const messages = {
     "Este servidor não é compatível com apps de login. Atualize o OpenBot no computador anfitrião.",
   "error.mcp.redirectRelayed": "O OpenBot enviou o login para o servidor. Você pode fechar esta janela.",
   "error.mcp.relayEnded": "Este login terminou. Inicie-o novamente.",
+  "error.mcp.signInLinkNotReady": "A página de login ainda não está aberta. Tente novamente em instantes.",
   "error.mcp.relayNoState":
     "A página de login do servidor não protege o endereço de retorno, então o OpenBot não a abre neste computador.",
   "error.mcp.relayAddressInvalid": "Este não é o endereço do fim deste login. Copie o endereço completo do navegador.",

@@ -67,6 +67,7 @@ import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
+import { backgroundWorkKey } from "../conversation/background-work-key";
 import { messagePromptRequestKey, promptRequestKey } from "../conversation/conversation-keys";
 import {
   mergeConversationPage,
@@ -183,6 +184,11 @@ interface WebWorkspaceState {
   contextStates: Record<string, AgentContextState>;
   /** As `contextStates`, for each side thread, by thread id. */
   threadContextStates: Record<string, AgentContextState>;
+  /**
+   * When the background work of each chat started, by `backgroundWorkKey`, while it runs after its turn
+   * ended. The host's runtime snapshot sends it under `agent-background-work-v1`.
+   */
+  backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
@@ -290,6 +296,7 @@ export function createWebWorkspace(
     takeovers: [],
     contextStates: {},
     threadContextStates: {},
+    backgroundWork: {},
     browserTabs: [],
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
@@ -568,6 +575,7 @@ export function createWebWorkspace(
           if (update.state !== "online") {
             draft.approvals = [];
             draft.contextStates = {};
+            draft.backgroundWork = {};
             draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
@@ -652,6 +660,13 @@ export function createWebWorkspace(
             );
             draft.threadContextStates = Object.fromEntries(
               (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
+            );
+            // A host without `agent-background-work-v1` sends no list, so its chats show no waiting line.
+            draft.backgroundWork = Object.fromEntries(
+              (event.snapshot.backgroundWork ?? []).map((work) => [
+                backgroundWorkKey(work.agentId, work.taskId),
+                work.since,
+              ]),
             );
           });
           readWholeApprovals();
@@ -1130,6 +1145,7 @@ export function createWebWorkspace(
             draft.queues = {};
             draft.approvals = [];
             draft.contextStates = {};
+            draft.backgroundWork = {};
             draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
@@ -1260,6 +1276,7 @@ export function createWebWorkspace(
       draft.selectedId = null;
       draft.approvals = [];
       draft.contextStates = {};
+      draft.backgroundWork = {};
       draft.threadContextStates = {};
       draft.prompts = [];
       draft.progress = {};
@@ -1389,6 +1406,7 @@ export function createWebWorkspace(
       }
       draft.approvals = [];
       draft.contextStates = {};
+      draft.backgroundWork = {};
       draft.threadContextStates = {};
       draft.prompts = [];
       draft.takeovers = [];

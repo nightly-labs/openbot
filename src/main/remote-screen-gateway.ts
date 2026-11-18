@@ -25,6 +25,7 @@ import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import { remoteDesktopPasteScript } from "./remote-desktop-paste";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
+import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import {
   RemoteRuntimeStartError,
@@ -1203,13 +1204,18 @@ export class RemoteScreenGateway {
       response.end();
       return;
     }
-    if (writeClipboard && upstreamPath === PASTE_SCRIPT_PATH) {
+    // The stream watcher uses the paste script's path, so released clients and proxies load it too.
+    if (upstreamPath === PASTE_SCRIPT_PATH) {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
-      response.end(remoteDesktopPasteScript(this.#options.platform));
+      response.end(
+        remoteDesktopStreamWatchScript(session.snapshot.serverId) +
+          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
+      );
       return;
     }
-    // The viewer page loads the paste script before Moonlight's own, so its listeners run first.
-    const addPasteScript = writeClipboard !== undefined && upstreamPath === "/stream.html" && request.method === "GET";
+    // The viewer page loads this script before Moonlight's own, so its listeners run first and the
+    // watcher sees Moonlight's peer connection.
+    const addViewerScript = upstreamPath === "/stream.html" && request.method === "GET";
     const target = new URL(`${upstreamPath}${search}`, this.#runtimeState.baseUrl);
     const authHeader = this.#runtimeState.authHeader;
     yield* Effect.callback<void>((resume) => {
@@ -1227,7 +1233,7 @@ export class RemoteScreenGateway {
         (upstreamResponse) => {
           const headers = { ...upstreamResponse.headers };
           delete headers["set-cookie"];
-          if (addPasteScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
+          if (addViewerScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
             const chunks: Buffer[] = [];
             upstreamResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
             upstreamResponse.once("end", () => {

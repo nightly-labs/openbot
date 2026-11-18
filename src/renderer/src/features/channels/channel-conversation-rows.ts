@@ -12,6 +12,7 @@ import {
   type ChannelTask,
   type ChannelThread,
   type ConversationQuestionPrompt,
+  channelRoutineRequest,
   channelRoutingConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
@@ -56,6 +57,20 @@ function foldedEntry(entry: ChannelMessage): boolean {
 }
 
 /**
+ * A routine's request as its routine marker, as in an agent chat. Its text is the routine
+ * instruction, with the event data of a webhook, and stays out of the view (#11686).
+ */
+function channelRoutineRow(row: AgentMessage, entry: ChannelMessage, tasks: readonly ChannelTask[]): AgentMessage {
+  const run = channelRoutineRequest(entry, tasks);
+  if (!run) return row;
+  return {
+    ...row,
+    kind: "action-marker",
+    actionMarker: { kind: "routine-run", sourceAgentId: null, ...run, timestamp: entry.message.createdAt },
+  };
+}
+
+/**
  * The rows of a channel page. The thinking and narration of a member's turn fold into one thinking
  * row, as in an agent chat, and show as the steps above the member's answer. With the Natural style
  * the narration also shows as the member's progress updates (`narrationRows`) until the answer
@@ -63,13 +78,16 @@ function foldedEntry(entry: ChannelMessage): boolean {
  * as a message, and a model that streams its whole reasoning (DeepSeek through OpenCode) showed a
  * very long one.
  */
-export function channelConversationRows(entries: readonly ChannelMessage[]): AgentMessage[] {
+export function channelConversationRows(
+  entries: readonly ChannelMessage[],
+  tasks: readonly ChannelTask[],
+): AgentMessage[] {
   const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,
     (message, index) => {
       const entry = entries[index];
-      return entry ? channelConversationMessage(entry) : toAgentMessage(message);
+      return entry ? channelRoutineRow(channelConversationMessage(entry), entry, tasks) : toAgentMessage(message);
     },
   );
   // A thinking row names the member of its turn, so its progress updates show as that member's.

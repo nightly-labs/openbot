@@ -64,9 +64,11 @@ const piBashPath = Effect.fn("PiWindowsShell.bashPath")(function* (cwd: string, 
     const gitBash = `${root}\\Git\\bin\\bash.exe`;
     if (yield* exists(gitBash)) return gitBash;
   }
-  // Pi takes the first answer of `where`, which also looks in the folder that Pi runs in.
+  // Pi takes the first answer of `where`, which also looks in the folder that Pi runs in. The full path
+  // keeps a `where.exe` in that folder from running: Windows looks in the current folder first.
+  const where = win32.join(variable(environment, "SystemRoot") ?? "C:\\Windows", "System32", "where.exe");
   const found = yield* Effect.tryPromise((signal) =>
-    execFileAsync("where.exe", ["bash.exe"], { cwd, env: environment, signal, timeout: 5_000, windowsHide: true }),
+    execFileAsync(where, ["bash.exe"], { cwd, env: environment, signal, timeout: 5_000, windowsHide: true }),
   ).pipe(
     Effect.map(({ stdout }) => stdout.trim().split(/\r?\n/u)[0]?.trim() ?? ""),
     Effect.orElseSucceed(() => ""),

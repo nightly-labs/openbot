@@ -259,6 +259,19 @@ export class BrowserViewGateway {
     (operation) => this.#provide(operation),
   ).bind(this);
 
+  /** Closes each view whose member may no longer see its tab, such as after a change of the roles. */
+  readonly closeRefusedSessions = Effect.fn("BrowserViewGateway.closeRefusedSessions")(
+    function* (
+      this: BrowserViewGateway,
+      refused: (view: { memberId: string; tabId: string }) => boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError, BrowserViewPort> {
+      for (const session of [...this.#sessions.values()]) {
+        if (refused(session)) yield* this.#closeSession(session, "Access to the agent ended.");
+      }
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
+
   readonly stop = Effect.fn("BrowserViewGateway.stop")(function* (this: BrowserViewGateway) {
     if (this.#stopping) return yield* Deferred.await(this.#stopping);
     const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();

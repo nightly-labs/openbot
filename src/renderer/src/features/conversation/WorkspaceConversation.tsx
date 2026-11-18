@@ -58,6 +58,7 @@ import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
 import { useWindowPage } from "../window/window-page-context";
+import { backgroundWorkKey } from "./background-work-key";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
 import { useConversationController } from "./conversation-controller-context";
@@ -166,6 +167,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     reorderQueue,
     stopActiveTurn,
     stoppableSubagentTurn,
+    backgroundWork,
     usageLimits,
     usageLimitedModels,
     waitedUsageLimits,
@@ -667,6 +669,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
         activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
         activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
+        backgroundWorkSince={(taskId) => {
+          const agentId = activeAgent()?.id;
+          return agentId ? backgroundWork()[backgroundWorkKey(agentId, taskId)] : undefined;
+        }}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
         mcpSettingsOpen={skillsMarketplaceOpen()}

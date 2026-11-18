@@ -20,6 +20,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Dieser Server unterstützt keine Anmelde-Apps. Aktualisiere OpenBot auf dem Host.",
   "error.mcp.redirectRelayed": "OpenBot hat die Anmeldung an den Server gesendet. Du kannst dieses Fenster schließen.",
   "error.mcp.relayEnded": "Diese Anmeldung ist beendet. Starte sie erneut.",
+  "error.mcp.signInLinkNotReady": "Die Anmeldeseite ist noch nicht geöffnet. Versuche es gleich noch einmal.",
   "error.mcp.relayNoState":
     "Die Anmeldeseite des Servers schützt ihre Rückkehradresse nicht, darum öffnet OpenBot sie nicht auf diesem Computer.",
   "error.mcp.relayAddressInvalid":

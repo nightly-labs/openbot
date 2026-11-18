@@ -2647,6 +2647,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       cancelMcpSignIn: async () => {
         cancelPendingMcpSignIn?.();
       },
+      copyMcpSignInLink: async () => undefined,
       signOutMcpServer: async ({ mcpServerId }) => {
         forgetMcpSignIn(mcpServerId);
         return mcpSignInStates();

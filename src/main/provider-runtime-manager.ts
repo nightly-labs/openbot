@@ -121,6 +121,13 @@ const OWN_STAMP_PRECISION_MS = 1;
  */
 const COMMIT_ATTEMPTS = 3;
 /**
+ * How long a download waits for its next bytes. Only silence stops it: a total deadline would stop
+ * a slow but working connection. A connection that stalls, for example after the computer sleeps,
+ * otherwise kept the update, and every agent on the provider that waits for it, waiting with no end
+ * (#11613). The next try resumes from the bytes already saved.
+ */
+const DOWNLOAD_STALL_MS = 60_000;
+/**
  * How long a move waits, in turn, for a file in its source that another program still holds open.
  * About a second and a half, the same budget Node gives `rm` with `maxRetries: 5`.
  */
@@ -1185,30 +1192,43 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* () {
       let installed = false;
       const result = yield* Effect.result(
-        this.#updateRuntime(
-          spec.runtime,
-          () =>
-            Effect.gen({ self: this }, function* () {
-              // The wait for the provider's turns, if there was one, is over.
+        Effect.gen({ self: this }, function* () {
+          // The download runs before `updateRuntime`, which holds new turns of every agent on the
+          // provider. Its agents keep working on the installed version while the bytes arrive, and
+          // only the swap waits for their turns (#11613).
+          // The archive stays until the new copy runs. A copy that installs but does not connect,
+          // such as one that answers too late, is removed below, and a Retry installs it again from
+          // the archive when it still verifies, without a second download (#11713).
+          if (download) installed = yield* this.#runDownloadEffect(spec, signal);
+          yield* this.#updateRuntime(
+            spec.runtime,
+            () =>
+              Effect.sync(() => {
+                // The wait for the provider's turns, if there was one, is over.
+                const status = this.#statuses[spec.runtime];
+                if (download) this.#setFinishing(spec.runtime);
+                else if (status.message !== null) this.#setStatus(spec.runtime, { ...status, message: null });
+                this.#stages.set(spec.runtime, "activate");
+                return join(this.#installRoot(spec), "bin", spec.executableName);
+              }),
+            signal,
+            () => {
               const status = this.#statuses[spec.runtime];
-              if (status.message !== null) this.#setStatus(spec.runtime, { ...status, message: null });
-              // The archive stays until the new copy runs. A copy that installs but does not connect,
-              // such as one that answers too late, is removed below, and a Retry installs it again from
-              // the archive when it still verifies, without a second download (#11713).
-              if (download) installed = yield* this.#runDownloadEffect(spec, signal);
-              this.#stages.set(spec.runtime, "activate");
-              return join(this.#installRoot(spec), "bin", spec.executableName);
-            }),
-          signal,
-          () =>
-            this.#setStatus(spec.runtime, {
-              ...this.#statuses[spec.runtime],
-              message: sourceText("status.provider.updateWaiting"),
-            }),
-        ),
+              // A downloaded update shows its wait as the row always did: a download with a message.
+              this.#setStatus(spec.runtime, {
+                ...status,
+                ...(download ? { phase: "downloading" as const, progress: 100 } : {}),
+                message: sourceText("status.provider.updateWaiting"),
+              });
+            },
+          );
+        }),
       );
       if (Result.isFailure(result)) {
-        if (installed) yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
+        // An install that verified stays when the app stops while the update waits for the provider's
+        // turns: the next start runs it, as it runs one that a sibling installed, and nothing downloads again.
+        if (installed && !this.#stopping)
+          yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
         return yield* result.failure;
       }
       // Also the archives of other versions, such as one that a failed update kept and that no Retry used.
@@ -1540,7 +1560,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
             ...(offset > 0 ? { Range: `bytes=${offset}-`, ...(etag ? { "If-Range": etag } : {}) } : {}),
           },
         }),
-      ).pipe(Effect.mapError(({ cause }) => requestFailure(spec.url, cause)));
+      ).pipe(
+        Effect.mapError(({ cause }) => requestFailure(spec.url, cause)),
+        failWhenStalled,
+      );
     });
   }
 
@@ -2185,6 +2208,20 @@ function releaseDownloadResponse(response: Response): Effect.Effect<void> {
   }).pipe(Effect.catch(() => Effect.void));
 }
 
+/**
+ * Fails a download step that gets no answer for `DOWNLOAD_STALL_MS`. Its interruption aborts the request.
+ * The step is interruptible also where it runs as the acquire step of `acquireRelease`.
+ */
+const failWhenStalled = <A>(step: Effect.Effect<A, ProviderRuntimeFailure>): Effect.Effect<A, ProviderRuntimeFailure> =>
+  step.pipe(
+    Effect.interruptible,
+    Effect.timeoutOrElse({
+      duration: DOWNLOAD_STALL_MS,
+      orElse: () =>
+        Effect.fail(new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadStalled")) })),
+    }),
+  );
+
 const streamResponse = Effect.fn("ProviderRuntime.streamResponse")(function* (
   response: Response,
   path: string,
@@ -2206,7 +2243,7 @@ const streamResponse = Effect.fn("ProviderRuntime.streamResponse")(function* (
         let received = offset;
         while (true) {
           if (signal.aborted) return yield* new ProviderRuntimeFailure({ cause: abortError() });
-          const chunk = yield* runtimeIO(() => reader.read());
+          const chunk = yield* runtimeIO(() => reader.read()).pipe(failWhenStalled);
           if (chunk.done) break;
           yield* Effect.callback<void, ProviderRuntimeFailure>((resume) => {
             writer.write(chunk.value, (error) =>

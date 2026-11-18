@@ -33,8 +33,9 @@
 //      skills, which of them can take an update, and the work steps. The user's next message brings
 //      the question to the agent; the message after it does not. A later review sees the question.
 //  18. A suggestion is dropped when it updates a skill that is not in the local library or that the
-//      agent does not have, when a new skill takes the name of one the agent has, or when it has a
-//      bad shape. The memory changes of the same answer still apply.
+//      agent does not have, when a new skill takes the name of one the agent has, when it has a
+//      bad shape, or when it names no signal (a message that only says to skip). The memory changes
+//      of the same answer still apply.
 //  19. When a clear starts the review, the user's next message brings the cleared chat with the
 //      question, so the agent can write the skill from it. Without a clear, the note has no chat.
 //  20. Skill learning "automatic": the review saves a new skill with no question to the user. The
@@ -862,7 +863,7 @@ try {
     const count = reviews().length;
     control({
       operations: [],
-      skill: { action: "create", name: "Cloudflare Worker deploys", message: question },
+      skill: { action: "create", signal: "technique", name: "Cloudflare Worker deploys", message: question },
     });
     await chat(learner.id, 2, "Learner deploy");
     await reviewed(count + 1);
@@ -897,12 +898,19 @@ try {
     const answers = [
       {
         text: "The user deploys on Fridays.",
-        skill: { action: "update", skillId: "docs-style", name: "Docs style", message: "Add it to Docs style?" },
+        skill: {
+          action: "update",
+          signal: "technique",
+          skillId: "docs-style",
+          name: "Docs style",
+          message: "Add it to Docs style?",
+        },
       },
       {
         text: "The user deploys from main.",
         skill: {
           action: "update",
+          signal: "technique",
           skillId: "local-skill-00000000-0000-4000-8000-000000000009",
           name: "Gone",
           message: "Add it to Gone?",
@@ -910,9 +918,28 @@ try {
       },
       {
         text: "The user reads release notes.",
-        skill: { action: "create", name: "release notes", message: "Save it as release notes?" },
+        skill: { action: "create", signal: "technique", name: "release notes", message: "Save it as release notes?" },
       },
       { text: "The user tags releases.", skill: { action: "delete", name: "Bad", message: "Delete it?" } },
+      {
+        text: "The user reads feeds.",
+        skill: {
+          action: "update",
+          skillId: LOCAL_SKILL_ID,
+          name: "Release notes",
+          message: "Not applicable: the skill was not used in this chat. Skip.",
+        },
+      },
+      {
+        text: "The user reads feeds daily.",
+        skill: {
+          action: "update",
+          skillId: LOCAL_SKILL_ID,
+          signal: "none",
+          name: "Release notes",
+          message: "Nothing to add to Release notes. Skip.",
+        },
+      },
     ];
     for (const answer of answers) {
       const count = reviews().length;
@@ -941,6 +968,7 @@ try {
       operations: [],
       skill: {
         action: "create",
+        signal: "technique",
         name: "CSV tables",
         message: "Should I save the table method as the skill CSV tables?",
       },
@@ -966,6 +994,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Add the tag rule to Release notes?",
@@ -987,6 +1016,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Release notes",
         message: "Add the tag rule to Release notes?",
@@ -1017,7 +1047,10 @@ try {
     const asker = await createAgent("Asker");
     let count = reviews().length;
     const lesson = "Should I save the D1 step before a Worker deploy as the skill Worker deploys?";
-    control({ operations: [], skill: { action: "create", name: "Worker deploys", message: lesson } });
+    control({
+      operations: [],
+      skill: { action: "create", signal: "technique", name: "Worker deploys", message: lesson },
+    });
     await send(asker.id, `My deploy token is ${SECRET}.`);
     await chat(asker.id, 1, "Asker deploy");
     await reviewed(count + 1);
@@ -1054,6 +1087,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Tag each release before the notes?",
@@ -1084,7 +1118,7 @@ try {
     count = reviews().length;
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice export", message: "Save the invoice export?" },
+      skill: { action: "create", signal: "technique", name: "Invoice export", message: "Save the invoice export?" },
     });
     await chat(asker.id, 3, "Asker invoice");
     await reviewed(count + 1);
@@ -1105,7 +1139,10 @@ try {
     const writes = writers().length;
     const lesson = "A Worker deploy must wait for the D1 migration.";
     writer(WORKER_SKILL);
-    control({ operations: [], skill: { action: "create", name: "Worker deploys", message: lesson } });
+    control({
+      operations: [],
+      skill: { action: "create", signal: "technique", name: "Worker deploys", message: lesson },
+    });
     await send(auto.id, `My deploy token is ${SECRET}.`);
     await chat(auto.id, 1, "Automatic deploy");
     await reviewed(count + 1);
@@ -1152,6 +1189,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Tag each release before the notes.",
@@ -1182,7 +1220,13 @@ try {
     writer({ description: "How the user wants release notes.", instructions: "Write release notes as a short list." });
     control({
       operations: [],
-      skill: { action: "update", skillId: LOCAL_SKILL_ID, name: "Notes", message: "Link each issue in the notes." },
+      skill: {
+        action: "update",
+        signal: "technique",
+        skillId: LOCAL_SKILL_ID,
+        name: "Notes",
+        message: "Link each issue in the notes.",
+      },
     });
     await chat(improver.id, 3, "Improver links");
     await reviewed(count + 1);
@@ -1202,7 +1246,12 @@ try {
     writer("Not JSON.");
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice export", message: "Should I save the invoice export as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice export",
+        message: "Should I save the invoice export as a skill?",
+      },
     });
     await chat(fallback.id, 2, "Fallback invoice");
     await reviewed(count + 1);
@@ -1213,7 +1262,12 @@ try {
     saveFails = true;
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice reminders", message: "Should I save the reminders as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice reminders",
+        message: "Should I save the reminders as a skill?",
+      },
     });
     await chat(fallback.id, 3, "Fallback reminder");
     await reviewed(count + 1);
@@ -1243,6 +1297,7 @@ try {
             operations: [],
             skill: {
               action: "update",
+              signal: "technique",
               skillId: LOCAL_SKILL_ID,
               name: "Notes",
               message: `Change the notes (${label})?`,
@@ -1284,7 +1339,12 @@ try {
     const writes = writers().length;
     control({
       operations: [{ type: "add", text: "The user exports invoices on Mondays.", inclusion: "searchable" }],
-      skill: { action: "create", name: "Invoice export", message: "Should I save the invoice export as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice export",
+        message: "Should I save the invoice export as a skill?",
+      },
     });
     await chat(quiet.id, 2, "Quiet invoice");
     await reviewed(count + 1);
