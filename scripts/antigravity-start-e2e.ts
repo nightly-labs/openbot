@@ -1,8 +1,8 @@
 // Starts the Antigravity provider end to end on the real driver and `ProviderRuntime`, with a fake
 // server that, like the Windows PyInstaller build, unpacks itself into the temporary folder at each
 // start. Checks that each process gets its own temporary folder and that OpenBot removes it, that
-// failed starts stop the restarts after the limit while each request, an automatic refresh and a user
-// refresh start the provider once more (#8071), that low disk space stops a start before the process spawns, that a
+// failed starts stop the restarts and the automatic refresh after the limit while each request and a
+// user refresh start the provider once more (#8071), that low disk space stops a start before the process spawns, that a
 // launch removes what an earlier run left, and that a server that unpacks for longer than the
 // request timeout connects on the retry and after a key change (#2311), that a key change that
 // ends after the runtime is disposed does not keep its new process or the previous one, and that a
@@ -356,10 +356,11 @@ try {
   assert.equal(capRow?.state, "error");
   assert.equal(capRow?.message, sourceText("error.provider.startPaused", { provider: "Gemini" }));
 
-  // 3. An automatic refresh, such as the one an auth error asks for, is a request too.
+  // 3. An automatic refresh, such as the one an auth error asks for, does not start it again: a failed
+  // start can send that auth error.
   await runCauseEffect(providers.refreshProviders({ automatic: true }).pipe(Effect.ignore));
   report.automaticRefresh = { spawns: (await starts()).length - attempts };
-  assert.equal(report.automaticRefresh.spawns, 1);
+  assert.equal(report.automaticRefresh.spawns, 0);
 
   // 3a. Requests at the same time, such as routines that run together, share one start.
   const together = (await starts()).length;

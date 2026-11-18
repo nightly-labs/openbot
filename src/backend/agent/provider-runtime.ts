@@ -1811,7 +1811,7 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * `automatic`: the app asked, not the user, so the failed starts in a row (`START_FAILURE_LIMIT`)
-   * stay. Like any request, it starts a stopped provider again, unless only the user can fix its failure.
+   * stay, and a provider with that many does not start (`#refreshProviders`).
    */
   readonly refreshProviders = Effect.fn("ProviderRuntime.refreshProviders")(function* (
     this: ProviderRuntime,
@@ -1832,7 +1832,7 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#status.phase === "starting" || this.#status.phase === "restarting") return this.status();
     const completion = Deferred.makeUnsafe<AgentStatus, ProviderOperationFailed>();
     this.#providerRefresh = completion;
-    const exit = yield* Effect.exit(this.#refreshProviders());
+    const exit = yield* Effect.exit(this.#refreshProviders(options.automatic));
     yield* Deferred.done(completion, exit);
     if (this.#providerRefresh === completion) this.#providerRefresh = null;
     return yield* exit;
@@ -3477,7 +3477,10 @@ export class ProviderRuntime implements ProviderPort {
     return yield* exit;
   }, Effect.uninterruptible);
 
-  readonly #refreshProviders = Effect.fn("ProviderRuntime.refreshProviders")(function* (this: ProviderRuntime) {
+  readonly #refreshProviders = Effect.fn("ProviderRuntime.refreshProviders")(function* (
+    this: ProviderRuntime,
+    automatic: boolean,
+  ) {
     yield* Effect.forEach(
       BUILT_IN_PROVIDER_DRIVERS.filter((driver) => !this.#off.has(driver.id)),
       (driver) =>
@@ -3506,8 +3509,13 @@ export class ProviderRuntime implements ProviderPort {
       discard: true,
     });
 
+    // The renderer refreshes after each auth error, also the error of a failed start. After the failed
+    // starts in a row, that refresh must not start the provider: a start that fails with a 401 would
+    // ask for the next refresh, and the starts would never end. A message or a routine still starts it.
     const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter(
-      (provider) => !this.#off.has(provider),
+      (provider) =>
+        !this.#off.has(provider) &&
+        !(automatic && (this.#startFailures.get(provider) ?? 0) >= START_FAILURE_LIMIT && !this.#clients.has(provider)),
     );
     // Join earlier starts before claiming their provider slots.
     const pendingStarts = () => providers.flatMap((provider) => this.#providerStarts.get(provider) ?? []);
@@ -4225,7 +4233,7 @@ export class ProviderRuntime implements ProviderPort {
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
             // The process answered, so it ends the failed starts in a row: a later failure starts a
-            // new count, not the next wait (#8071).
+            // new count (#8071).
             this.#startFailures.delete(provider);
             yield* candidate.stop().pipe(Effect.catch(() => Effect.void));
             this.#setStatus({
