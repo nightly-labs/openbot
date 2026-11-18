@@ -330,6 +330,7 @@ export class McpGateway {
       removedResource &&
       !list.some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === removedResource)
     ) {
+      this.#signInFailures.delete(removedResource);
       if (this.#oauth) yield* this.#oauth.forget(removed.url).pipe(toMcpGatewayFailed);
     }
     return list;

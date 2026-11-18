@@ -426,12 +426,12 @@ const SIGN_IN_NEXT =
  * The fields of a `needs_sign_in` answer. After a failed sign-in, the reason that only the sign-in
  * page showed, so the agent tells the user why instead of asking for the same sign-in again (#12017).
  */
-function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, next = SIGN_IN_NEXT) {
+function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, when = "") {
   const failure = servers.signInFailure(config);
-  if (failure === null) return { next };
+  if (failure === null) return { next: `${when}${SIGN_IN_NEXT}` };
   return {
     lastSignInError: servers.redact(failure),
-    next: `The user's last sign-in to this server failed with lastSignInError. Tell the user this reason in plain words first. ${next}`,
+    next: `${when}The user's last sign-in to this server failed with lastSignInError. Tell the user this reason in plain words first. ${SIGN_IN_NEXT}`,
   };
 }
 
@@ -461,7 +461,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
         return {
           status: "needs_sign_in",
           server: describeServer(config, signIns),
-          ...signInNeeded(servers, config, `When the user's request needs this server: ${SIGN_IN_NEXT}`),
+          ...signInNeeded(servers, config, "When the user's request needs this server: "),
         };
       }),
     { concurrency: "unbounded" },

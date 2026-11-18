@@ -1948,7 +1948,8 @@ export async function createApplicationServices({
     preferredPort: MCP_OAUTH_REDIRECT_PORT,
     deliver: (state, code, query) => {
       const elsewhere = mcpOAuthAuthority?.openedElsewhere(state) ?? false;
-      // Read before the grant is handed over, which ends the wait that holds it.
+      // Read before the grant is handed over, which ends the wait that holds it. A relayed sign-in
+      // and one opened elsewhere end on another computer, which no answer reports back to here.
       const exchange = elsewhere ? null : (mcpOAuthAuthority?.grantExchange(state) ?? null);
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code))
         return signInRelayClient.deliver(state, query) ? "relayed" : false;
