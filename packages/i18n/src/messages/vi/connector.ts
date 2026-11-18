@@ -15,8 +15,7 @@ export const messages = {
   "connector.github.cancel": "Hủy",
   "connector.github.connectedAs": "Đã kết nối với tên @{login}",
   "connector.github.repositoriesTitle": "Kho mã",
-  "connector.github.repositoriesDescription":
-    "Agent chỉ có thể dùng các kho mã đã cài OpenBot GitHub App.",
+  "connector.github.repositoriesDescription": "Agent chỉ có thể dùng các kho mã đã cài OpenBot GitHub App.",
   "connector.github.chooseRepositories": "Chọn kho mã",
   "connector.github.repositoriesLoading": "Đang đọc kho mã từ GitHub",
   "connector.github.repositoriesFailed": "OpenBot không thể đọc kho mã từ GitHub.",
@@ -25,7 +24,8 @@ export const messages = {
   "connector.github.private": "Riêng tư",
   "connector.github.disconnect": "Ngắt kết nối",
   "connector.github.disconnectTitle": "Ngắt kết nối GitHub",
-  "connector.github.disconnectSummary": "Mọi agent sẽ mất quyền dùng GitHub. Cuộc trò chuyện và tệp của bạn vẫn được giữ.",
+  "connector.github.disconnectSummary":
+    "Mọi agent sẽ mất quyền dùng GitHub. Cuộc trò chuyện và tệp của bạn vẫn được giữ.",
   "connector.github.expiredTitle": "Kết nối GitHub đã hết hạn",
   "connector.github.expiredDescription": "Hãy kết nối lại với tên @{login} để agent dùng lại GitHub.",
   "connector.github.reconnect": "Kết nối lại",
@@ -50,7 +50,8 @@ export const messages = {
   "connector.github.done": "Xong",
   "connector.github.later": "Để sau",
   "connector.github.disconnectConfirmTitle": "Ngắt kết nối GitHub?",
-  "connector.github.disconnectConfirmDescription": "Ngắt kết nối sẽ xóa thông tin đăng nhập của @{login} khỏi máy tính này.",
+  "connector.github.disconnectConfirmDescription":
+    "Ngắt kết nối sẽ xóa thông tin đăng nhập của @{login} khỏi máy tính này.",
   "connector.github.disconnectEffectTools": "Mọi agent sẽ mất công cụ GitHub, gh và git.",
   "connector.github.disconnectEffectRevoke": "Sau đó GitHub sẽ mở ra để bạn có thể thu hồi quyền của OpenBot.",
   "connector.github.disconnectEffectKept": "Cuộc trò chuyện, tệp và bộ nhớ của agent vẫn ở trên máy tính này.",
@@ -60,7 +61,8 @@ export const messages = {
     one: "{count} kho mã · mọi agent trên {host}",
     other: "{count} kho mã · mọi agent trên {host}",
   },
-  "connector.github.disconnectConfirmDescriptionHost": "Ngắt kết nối sẽ xóa thông tin đăng nhập của @{login} khỏi {host}.",
+  "connector.github.disconnectConfirmDescriptionHost":
+    "Ngắt kết nối sẽ xóa thông tin đăng nhập của @{login} khỏi {host}.",
   "connector.github.disconnectEffectKeptHost": "Cuộc trò chuyện, tệp và bộ nhớ của agent vẫn ở trên {host}.",
   "connector.github.keepConnected": "Giữ kết nối",
   "connector.github.close": "Đóng",
@@ -102,7 +104,8 @@ export const messages = {
   "connector.slack.orchestratorDescription":
     "Agent này nhận mọi yêu cầu từ Slack. Nó tự trả lời các yêu cầu ngắn, giao việc khác cho đúng agent và đăng câu trả lời trong luồng.",
   "connector.slack.orchestratorNone": "Chưa có agent nào trả lời",
-  "connector.slack.orchestratorNoneDescription": "Hãy thêm Slack Orchestrator, nếu không Slack sẽ không nhận được câu trả lời.",
+  "connector.slack.orchestratorNoneDescription":
+    "Hãy thêm Slack Orchestrator, nếu không Slack sẽ không nhận được câu trả lời.",
   "connector.slack.inviteNote":
     "OpenBot tự tham gia mọi kênh công khai, kể cả kênh mới. Với kênh riêng tư, hãy mời nó: /invite @OpenBot.",
   "connector.slack.stepWorkspace": "Không gian làm việc",
@@ -116,8 +119,7 @@ export const messages = {
   "connector.slack.connectInSlack": "Kết nối trong Slack",
   "connector.slack.connectWaiting": "Đang chờ Slack. Hãy hoàn tất cài đặt trong trình duyệt.",
   "connector.slack.agentStepTitle": "Thêm Slack Orchestrator",
-  "connector.slack.agentStepDescription":
-    "Agent mới này trả lời mọi thứ mọi người gửi tới @OpenBot trong {workspace}.",
+  "connector.slack.agentStepDescription": "Agent mới này trả lời mọi thứ mọi người gửi tới @OpenBot trong {workspace}.",
   "connector.slack.orchestratorName": "Slack Orchestrator",
   "connector.slack.orchestratorRole": "Trả lời trong Slack và hỏi nhóm",
   "connector.slack.orchestratorDoesReceive": "Nhận mọi yêu cầu Slack trước tiên",
@@ -125,7 +127,8 @@ export const messages = {
   "connector.slack.orchestratorDoesAnswer": "Đăng câu trả lời trong luồng Slack",
   "connector.slack.orchestratorModel": "Mô hình",
   "connector.slack.doneTitle": "OpenBot đã có mặt trong {workspace}",
-  "connector.slack.doneDescription": "Hãy nhắc @OpenBot trong bất kỳ kênh công khai nào, hoặc gửi tin nhắn trực tiếp cho nó.",
+  "connector.slack.doneDescription":
+    "Hãy nhắc @OpenBot trong bất kỳ kênh công khai nào, hoặc gửi tin nhắn trực tiếp cho nó.",
   "connector.slack.done": "Xong",
   "connector.slack.disconnectTitle": "Ngắt kết nối {workspace}?",
   "connector.slack.disconnectDescription":
@@ -181,7 +184,8 @@ export const messages = {
   "connector.discord.orchestratorDescription":
     "Agent này nhận mọi yêu cầu từ Discord. Nó tự trả lời các yêu cầu ngắn, giao việc khác cho đúng agent và trả lời trong kênh.",
   "connector.discord.orchestratorNone": "Chưa có agent nào trả lời",
-  "connector.discord.orchestratorNoneDescription": "Hãy thêm Discord Orchestrator, nếu không Discord sẽ không nhận được câu trả lời.",
+  "connector.discord.orchestratorNoneDescription":
+    "Hãy thêm Discord Orchestrator, nếu không Discord sẽ không nhận được câu trả lời.",
   "connector.discord.channelsNote": "OpenBot thấy các kênh mà vai trò của nó được xem.",
   "connector.discord.stepWorkspace": "Máy chủ Discord",
   "connector.discord.stepAgent": "Agent",
@@ -226,7 +230,8 @@ export const messages = {
   "connector.discord.accessTitle": "Ai có thể dùng OpenBot",
   "connector.discord.accessDescription": "OpenBot chỉ trả lời những người này và bỏ qua lượt nhắc từ người khác.",
   "connector.discord.accessEveryone": "Mọi người trong máy chủ",
-  "connector.discord.accessEveryoneDescription": "Bất kỳ ai có thể đăng bài trong kênh mà OpenBot thấy đều có thể nhắc nó.",
+  "connector.discord.accessEveryoneDescription":
+    "Bất kỳ ai có thể đăng bài trong kênh mà OpenBot thấy đều có thể nhắc nó.",
   "connector.discord.accessRoles": "Thành viên có vai trò {roles}",
   "connector.discord.accessChoose": "Chọn vai trò",
   "connector.discord.accessDialogTitle": "Ai có thể dùng OpenBot trong {workspace}?",
@@ -261,15 +266,18 @@ export const messages = {
   "connector.telegram.actionFailed": "Telegram không chấp nhận thay đổi",
   "connector.telegram.chatsTitle": "Cuộc trò chuyện",
   "connector.telegram.groupDescription": "Mọi người nhắc bot hoặc trả lời tin nhắn của bot.",
-  "connector.telegram.directDescription": "Mọi tin nhắn trong cuộc trò chuyện này đều được gửi tới Telegram Orchestrator.",
+  "connector.telegram.directDescription":
+    "Mọi tin nhắn trong cuộc trò chuyện này đều được gửi tới Telegram Orchestrator.",
   "connector.telegram.helpRemoved":
     "Bot OpenBot không còn trong cuộc trò chuyện này. Hãy ngắt kết nối cuộc trò chuyện, rồi thêm lại bot.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot không thể nhận tin nhắn Telegram trên máy tính này. Hãy đăng nhập, đặt tên cho máy tính này trong Cài đặt máy chủ và giữ OpenBot mở.",
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot trên {host} không thể nhận tin nhắn Telegram. Trên {host}, hãy đăng nhập, đặt tên cho máy chủ trong Cài đặt máy chủ và giữ OpenBot mở.",
-  "connector.telegram.helpError": "OpenBot không thể truy cập cuộc trò chuyện này. Hãy kết nối lại hoặc ngắt kết nối cuộc trò chuyện.",
-  "connector.telegram.helpNotLinked": "Cuộc trò chuyện này chưa được liên kết với máy chủ này. Hãy chọn Kết nối lại để liên kết.",
+  "connector.telegram.helpError":
+    "OpenBot không thể truy cập cuộc trò chuyện này. Hãy kết nối lại hoặc ngắt kết nối cuộc trò chuyện.",
+  "connector.telegram.helpNotLinked":
+    "Cuộc trò chuyện này chưa được liên kết với máy chủ này. Hãy chọn Kết nối lại để liên kết.",
   "connector.telegram.retryAt": "Telegram yêu cầu OpenBot chờ. OpenBot sẽ thử lại lúc {time}.",
   "connector.telegram.pause": "Tạm dừng",
   "connector.telegram.resume": "Tiếp tục",
@@ -288,7 +296,8 @@ export const messages = {
   "connector.telegram.orchestratorDescription":
     "Agent này nhận tin nhắn gửi OpenBot từ mọi cuộc trò chuyện Telegram của bạn. Nó tự trả lời các tin nhắn ngắn, giao việc khác cho đúng agent và đăng câu trả lời trong cuộc trò chuyện.",
   "connector.telegram.orchestratorNone": "Chưa có agent nào trả lời",
-  "connector.telegram.orchestratorNoneDescription": "Hãy thêm Telegram Orchestrator, nếu không Telegram sẽ không nhận được câu trả lời.",
+  "connector.telegram.orchestratorNoneDescription":
+    "Hãy thêm Telegram Orchestrator, nếu không Telegram sẽ không nhận được câu trả lời.",
   "connector.telegram.mentionNote":
     "Trong nhóm, hãy nhắc bot hoặc trả lời tin nhắn của bot. Trong cuộc trò chuyện trực tiếp, mọi tin nhắn đều được gửi tới bot.",
   "connector.telegram.stepChat": "Trò chuyện",
@@ -344,12 +353,16 @@ export const messages = {
   "connector.whatsapp.actionFailed": "WhatsApp không chấp nhận thay đổi",
   "connector.whatsapp.numbersTitle": "Số điện thoại",
   "connector.whatsapp.linkNumber": "Liên kết số",
-  "connector.whatsapp.ownNumberNote": "Cuộc trò chuyện “Nhắn tin cho chính bạn” và những người bạn cho phép có thể liên hệ OpenBot.",
-  "connector.whatsapp.dedicatedNote": "Những người bạn cho phép có thể liên hệ OpenBot. Người khác sẽ nhận một mã để gửi cho bạn.",
-  "connector.whatsapp.helpLoggedOut": "WhatsApp đã xóa máy tính này khỏi các thiết bị đã liên kết. Hãy liên kết lại số.",
+  "connector.whatsapp.ownNumberNote":
+    "Cuộc trò chuyện “Nhắn tin cho chính bạn” và những người bạn cho phép có thể liên hệ OpenBot.",
+  "connector.whatsapp.dedicatedNote":
+    "Những người bạn cho phép có thể liên hệ OpenBot. Người khác sẽ nhận một mã để gửi cho bạn.",
+  "connector.whatsapp.helpLoggedOut":
+    "WhatsApp đã xóa máy tính này khỏi các thiết bị đã liên kết. Hãy liên kết lại số.",
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp đã xóa máy chủ này khỏi các thiết bị đã liên kết. Hãy liên kết lại số.",
-  "connector.whatsapp.helpError": "OpenBot không thể truy cập WhatsApp trên số này. Hãy kết nối lại hoặc ngắt kết nối số.",
+  "connector.whatsapp.helpError":
+    "OpenBot không thể truy cập WhatsApp trên số này. Hãy kết nối lại hoặc ngắt kết nối số.",
   "connector.whatsapp.helpKeysUnreadable": "OpenBot không thể đọc các khóa đã lưu của số này. Hãy liên kết lại số.",
   "connector.whatsapp.retryAt": "WhatsApp yêu cầu OpenBot chờ. OpenBot sẽ thử lại lúc {time}.",
   "connector.whatsapp.pause": "Tạm dừng",
@@ -376,7 +389,8 @@ export const messages = {
   "connector.whatsapp.orchestratorDescription":
     "Agent này nhận tin nhắn gửi OpenBot từ mọi số bạn đã liên kết. Nó tự trả lời các tin nhắn ngắn, giao việc khác cho đúng agent và trả lời trong WhatsApp.",
   "connector.whatsapp.orchestratorNone": "Chưa có agent nào trả lời",
-  "connector.whatsapp.orchestratorNoneDescription": "Hãy thêm WhatsApp Orchestrator, nếu không WhatsApp sẽ không nhận được câu trả lời.",
+  "connector.whatsapp.orchestratorNoneDescription":
+    "Hãy thêm WhatsApp Orchestrator, nếu không WhatsApp sẽ không nhận được câu trả lời.",
   "connector.whatsapp.note":
     "Với số cá nhân, hãy nhắn trong cuộc trò chuyện “Nhắn tin cho chính bạn”. Những người bạn cho phép sẽ nhắn tới số này.",
   "connector.whatsapp.stepNumber": "Số",
@@ -538,7 +552,8 @@ export const messages = {
     "{host} sẽ xóa khóa API và mật khẩu chính. Agent trên {host} không thể điền thông tin đăng nhập từ Bitwarden nữa.",
   "connector.bitwarden.connected": "Đã kết nối",
   "connector.bitwarden.actionFailed": "OpenBot không thể thay đổi kết nối Bitwarden.",
-  "connector.bitwarden.descriptionHost": "Điền thông tin đăng nhập trình duyệt trên {host} từ Bitwarden hoặc Vaultwarden.",
+  "connector.bitwarden.descriptionHost":
+    "Điền thông tin đăng nhập trình duyệt trên {host} từ Bitwarden hoặc Vaultwarden.",
   "connector.bitwarden.setupHost":
     "{host} đăng nhập bằng Bitwarden CLI của riêng nó. Trong kho của bạn, hãy tạo một thư mục tên Shared with OpenBot và chỉ đặt vào đó những mục đăng nhập agent được phép dùng. Trong kho web, mở Settings › Security › Keys và xem khóa API. Nhập địa chỉ máy chủ, client_id, client_secret và mật khẩu chính của bạn vào bên dưới.",
   "connector.bitwarden.scopeHost":
@@ -556,7 +571,8 @@ export const messages = {
   "connector.bitwarden.masterPassword": "Mật khẩu chính",
   "connector.bitwarden.connecting": "Đang kết nối",
   "connector.protonPass.title": "Proton Pass",
-  "connector.protonPass.description": "Cho phép agent đăng nhập trang web bằng thông tin đăng nhập trong một kho Proton Pass chia sẻ.",
+  "connector.protonPass.description":
+    "Cho phép agent đăng nhập trang web bằng thông tin đăng nhập trong một kho Proton Pass chia sẻ.",
   "connector.protonPass.descriptionHost":
     "Cho phép agent trên {host} đăng nhập trang web bằng thông tin đăng nhập trong một kho Proton Pass chia sẻ.",
   "connector.protonPass.connect": "Kết nối",
@@ -570,7 +586,8 @@ export const messages = {
   "connector.protonPass.setupDescriptionHost":
     "Kết nối sẽ mở trang đăng nhập Proton trong trình duyệt. Sau đó {host} tạo kho chia sẻ và chỉ giữ một khóa chỉ đọc cho kho đó.",
   "connector.protonPass.vaultName": "Shared with OpenBot",
-  "connector.protonPass.vaultSetup": "OpenBot tạo kho này khi bạn kết nối. Hãy chuyển thông tin đăng nhập vào đó để chia sẻ.",
+  "connector.protonPass.vaultSetup":
+    "OpenBot tạo kho này khi bạn kết nối. Hãy chuyển thông tin đăng nhập vào đó để chia sẻ.",
   "connector.protonPass.showSteps": "Hiện các bước",
   "connector.protonPass.stepsLabel": "Các bước kết nối",
   "connector.protonPass.stepSignIn": "Đăng nhập",
@@ -601,7 +618,8 @@ export const messages = {
   "connector.protonPass.statusConnected": "Đã kết nối",
   "connector.protonPass.statusExpired": "Khóa đã hết hạn",
   "connector.protonPass.expiredTitle": "Khóa Proton Pass đã hết hạn",
-  "connector.protonPass.expiredDescription": "Agent không thể đăng nhập bằng thông tin đăng nhập chia sẻ cho đến khi bạn đăng nhập lại.",
+  "connector.protonPass.expiredDescription":
+    "Agent không thể đăng nhập bằng thông tin đăng nhập chia sẻ cho đến khi bạn đăng nhập lại.",
   "connector.protonPass.reconnect": "Kết nối lại",
   "connector.protonPass.planTitle": "Proton Pass cần gói trả phí",
   "connector.protonPass.planDescription":

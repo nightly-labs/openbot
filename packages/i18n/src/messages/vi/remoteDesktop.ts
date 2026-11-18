@@ -67,7 +67,8 @@ export const messages = {
   "remoteDesktop.setup.videoFailed": "Kết nối video thử nghiệm thất bại.",
   "remoteDesktop.setup.inputInstructions":
     "Nhấp vào mục tiêu trong bảng kiểm tra, sau đó gõ {code}. Chuột: {mouse}. Bàn phím: {keyboard}.",
-  "remoteDesktop.setup.videoOnly": "Chỉ kiểm tra video. Để kiểm tra chuột và bàn phím, cần bản Sunshine runtime đã cập nhật.",
+  "remoteDesktop.setup.videoOnly":
+    "Chỉ kiểm tra video. Để kiểm tra chuột và bàn phím, cần bản Sunshine runtime đã cập nhật.",
   "remoteDesktop.setup.pictureConfirmed": "Đã xác nhận hình ảnh",
   "remoteDesktop.setup.seeDesktop": "Tôi thấy màn hình của mình",
   "remoteDesktop.setup.seeTestPanel": "Tôi thấy bảng kiểm tra",

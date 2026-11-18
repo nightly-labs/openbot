@@ -31,7 +31,8 @@ export const messages = {
   "agentSettings.folders.notFound": "Không tìm thấy trong {path}",
   "agentSettings.folders.locate": "Định vị…",
   "agentSettings.folders.remove": "Gỡ {folder}",
-  "agentSettings.folders.wideAccess": "{access} cho phép {agent} thay đổi mọi tệp. Các thư mục này áp dụng trong {workspace}.",
+  "agentSettings.folders.wideAccess":
+    "{access} cho phép {agent} thay đổi mọi tệp. Các thư mục này áp dụng trong {workspace}.",
   "agentSettings.folders.changeAccess": "Thay đổi",
   "agentSettings.folders.toastAdded": "{agent} giờ có thể thay đổi tệp trong {folder}",
   "agentSettings.folders.toastRemoved": "{agent} không còn có thể thay đổi tệp trong {folder}",
@@ -40,7 +41,8 @@ export const messages = {
   "agentSettings.folders.inWorkspace": "{folder} nằm trong không gian làm việc, nên {agent} đã có thể thay đổi nó",
   "agentSettings.folders.inShared": "{folder} nằm trong thư mục dùng chung, nên {agent} đã có thể thay đổi nó",
   "agentSettings.folders.inFolder": "{folder} nằm trong {parent}, thư mục này đã được thêm",
-  "agentSettings.folders.protected": "Bạn không thể thêm {folder}: thư mục này chứa dữ liệu OpenBot hoặc tệp của các agent khác",
+  "agentSettings.folders.protected":
+    "Bạn không thể thêm {folder}: thư mục này chứa dữ liệu OpenBot hoặc tệp của các agent khác",
   "agentSettings.folders.missing": "{folder} không phải là thư mục trên máy tính này",
   "agentSettings.folders.limit": {
     one: "Bạn chỉ có thể thêm tối đa {count} thư mục",

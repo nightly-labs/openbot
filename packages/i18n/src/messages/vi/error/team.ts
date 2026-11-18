@@ -41,7 +41,8 @@ export const messages = {
   "error.team.avatarUrlInvalid": "URL ảnh đại diện của tài khoản không hợp lệ.",
   "error.team.serverNameLength": "Tên máy chủ phải có từ {min} đến {max} ký tự.",
   "error.team.serverNameHostname": "Tên máy chủ phải tạo được một hostname công khai hợp lệ.",
-  "error.team.usernameInvalid": "Tên người dùng phải có từ 3 đến 32 ký tự gồm chữ cái, chữ số, dấu chấm, dấu gạch ngang hoặc dấu gạch dưới.",
+  "error.team.usernameInvalid":
+    "Tên người dùng phải có từ 3 đến 32 ký tự gồm chữ cái, chữ số, dấu chấm, dấu gạch ngang hoặc dấu gạch dưới.",
   "error.team.passwordLength": "Mật khẩu phải có từ 12 đến 256 ký tự.",
   "error.team.bindFailed": "Không thể gắn Team API.",
   "error.team.signInRequired": "Cần đăng nhập OpenBot.",
@@ -77,7 +78,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Kết nối này không thể lưu tác vụ định kỳ chỉ chạy một lần.",
   "error.team.routineRunCommandUnsupported": "Kết nối này không thể cung cấp lệnh chạy của tác vụ định kỳ.",
   "error.team.threadQueueUnsupported": "Kết nối này không thể hiển thị hàng đợi của luồng phụ.",
-  "error.team.threadRequestsUnsupported": "Kết nối này không thể hiển thị các yêu cầu của luồng phụ gửi đến agent khác.",
+  "error.team.threadRequestsUnsupported":
+    "Kết nối này không thể hiển thị các yêu cầu của luồng phụ gửi đến agent khác.",
   "error.team.hostTurnLimitsUnsupported": "Kết nối này không thể hiển thị hoặc thay đổi giới hạn luồng của máy chủ.",
   "error.team.usageLimitUnsupported": "Kết nối này không thể hiển thị hoặc thay đổi giới hạn sử dụng của agent.",
   "error.team.hermesImportUnsupported": "Kết nối này không thể nhập hồ sơ Hermes từ máy chủ.",
@@ -150,7 +152,8 @@ export const messages = {
     "Hãy cập nhật OpenBot trên thiết bị này để dùng nhiều hơn {limit} máy chủ MCP trên máy chủ này.",
   "error.team.storageUnsupported": "Kết nối này không hỗ trợ bộ lưu trữ.",
   "error.team.machineResourcesUnsupported": "Kết nối này không hỗ trợ xem mức sử dụng máy.",
-  "error.team.machineAlertMemberInvalid": "Chỉ chủ sở hữu hoặc quản trị viên của máy chủ này mới nhận được cảnh báo về máy.",
+  "error.team.machineAlertMemberInvalid":
+    "Chỉ chủ sở hữu hoặc quản trị viên của máy chủ này mới nhận được cảnh báo về máy.",
   "error.team.hostedSitesUnsupported": "Kết nối này không hỗ trợ trang web.",
   "error.team.hostedSitesUnregistered": "Máy chủ này chưa đăng ký với OpenBot nên không có trang web nào.",
   "error.team.hostedSiteNotFound": "Không tìm thấy trang web.",
@@ -181,7 +184,8 @@ export const messages = {
     "Máy chủ này không thể quản lý các kết nối của nó từ đây. Hãy cập nhật OpenBot trên host.",
   "error.team.vaultUnsupported": "Máy chủ này không thể mở Kho bảo mật từ đây. Hãy cập nhật OpenBot trên host.",
   "error.team.vaultResetReadable": "Kho bảo mật trên máy chủ này vẫn đọc được nên chưa được đặt lại.",
-  "error.team.discordAccessUnsupported": "Máy chủ này không thể đặt vai trò Discord. Hãy cập nhật OpenBot trên máy chủ.",
+  "error.team.discordAccessUnsupported":
+    "Máy chủ này không thể đặt vai trò Discord. Hãy cập nhật OpenBot trên máy chủ.",
   "error.team.connectorPageRefused": "Máy chủ đã gửi một trang mà OpenBot không mở.",
   "error.team.signInRelayUnknown": "Lượt đăng nhập này đã kết thúc hoặc không tồn tại.",
   "error.team.signInRelayUsed": "Lượt đăng nhập này đã được gửi.",

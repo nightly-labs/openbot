@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/composer";
 
 export const messages = {
-  "composer.queueEdit.body": "Bạn đang sửa một tin nhắn trong hàng đợi. Hãy lưu hoặc hủy chỉnh sửa để tin nhắn được chạy.",
+  "composer.queueEdit.body":
+    "Bạn đang sửa một tin nhắn trong hàng đợi. Hãy lưu hoặc hủy chỉnh sửa để tin nhắn được chạy.",
   "composer.queueEdit.cancel": "Hủy chỉnh sửa",
   "composer.feedbackFix.body": "Đang sửa báo cáo #{number}. Hãy gửi yêu cầu, hoặc hủy để giữ nguyên báo cáo.",
   "composer.feedbackFix.cancel": "Hủy",
@@ -26,7 +27,8 @@ export const messages = {
   "composer.imageInput.label": "Bật hình ảnh cho {model}",
   "composer.imageInput.pending": "Đang bật…",
   "composer.imageInput.action": "Bật hình ảnh",
-  "composer.usageLimit.credits": "Bạn đã dùng hết hạn mức gói {provider}. Các agent của bạn hiện dùng tín dụng của bạn.",
+  "composer.usageLimit.credits":
+    "Bạn đã dùng hết hạn mức gói {provider}. Các agent của bạn hiện dùng tín dụng của bạn.",
   "composer.usageLimit.creditsResets":
     "Bạn đã dùng hết hạn mức gói {provider}. Các agent của bạn dùng tín dụng của bạn cho đến khi hạn mức được đặt lại {reset}.",
   "composer.usageLimit.creditsTitle": "Đang dùng tín dụng",
@@ -122,7 +124,8 @@ export const messages = {
     "Agent đã nhận tin nhắn này, nên việc chỉnh sửa của bạn đã kết thúc. Các thay đổi của bạn vẫn còn trong ô soạn tin.",
   "composer.queueEdit.deletedKept":
     "Tin nhắn này đã bị xóa, nên việc chỉnh sửa của bạn đã kết thúc. Các thay đổi của bạn vẫn còn trong ô soạn tin.",
-  "composer.queueEdit.endedKept": "Việc chỉnh sửa đã kết thúc trước khi được lưu. Các thay đổi của bạn vẫn còn trong ô soạn tin.",
+  "composer.queueEdit.endedKept":
+    "Việc chỉnh sửa đã kết thúc trước khi được lưu. Các thay đổi của bạn vẫn còn trong ô soạn tin.",
   "composer.voice.prepareFailed": "Không chuẩn bị được mô hình giọng nói. Hãy thử lại.",
   "composer.voice.noSpeechRecorded": "Không ghi được giọng nói nào.",
   "composer.voice.noSpeechDetected": "Không phát hiện được giọng nói.",

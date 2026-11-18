@@ -39,7 +39,8 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Cần có tin nhắn hoặc tệp đính kèm.",
   "error.agent.promptAnswersTooLong": "Câu trả lời cho prompt quá dài.",
   "error.agent.gone": "Agent này không còn tồn tại.",
-  "error.agent.instructionsTooLarge": "Tệp hướng dẫn quá lớn để mở tại đây. Hãy rút gọn tệp trong trình soạn thảo văn bản.",
+  "error.agent.instructionsTooLarge":
+    "Tệp hướng dẫn quá lớn để mở tại đây. Hãy rút gọn tệp trong trình soạn thảo văn bản.",
   "error.agent.instructionsOutside":
     "Tệp hướng dẫn liên kết tới một vị trí bên ngoài không gian làm việc của agent, nên OpenBot không mở tệp.",
   "error.agent.instructionsReadFailed": "Không thể đọc tệp hướng dẫn.",
@@ -78,7 +79,8 @@ export const messages = {
   "error.agent.waitBeforeProviderChange": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi đổi nhà cung cấp.",
   "error.agent.waitForTasksBeforeProviderChange":
     "Các tác vụ của agent này đang chạy. Hãy đợi chúng hoàn tất, hoặc dừng chúng, trước khi đổi nhà cung cấp.",
-  "error.agent.waitBeforeClearContext": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi bắt đầu cuộc trò chuyện mới.",
+  "error.agent.waitBeforeClearContext":
+    "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi bắt đầu cuộc trò chuyện mới.",
   "error.agent.waitBeforeCompactContext": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi thu gọn ngữ cảnh.",
   "error.agent.waitBeforeDeleteHistory": "Hãy đợi lượt hiện tại và hàng đợi hoàn tất trước khi xóa lịch sử.",
   "error.agent.compactContextUnavailable": "Agent này hiện không thể thu gọn ngữ cảnh.",
@@ -91,7 +93,8 @@ export const messages = {
   "error.agent.changedWhileDuplicating": "Agent đã thay đổi trong khi đang được nhân bản. Hãy thử lại.",
   "error.agent.duplicatedAgentGone": "Agent được nhân bản không còn tồn tại.",
   "error.agent.stateCorrupt": "Trạng thái agent bị hỏng hoặc đến từ phiên bản OpenBot mới hơn; từ chối ghi đè.",
-  "error.agent.oldRoleField": "Hồ sơ agent đã lưu dùng trường role cũ; hãy cập nhật dữ liệu trước khi khởi động OpenBot.",
+  "error.agent.oldRoleField":
+    "Hồ sơ agent đã lưu dùng trường role cũ; hãy cập nhật dữ liệu trước khi khởi động OpenBot.",
   "error.agent.duplicateIds": "Trạng thái agent chứa id agent trùng lặp; từ chối ghi đè.",
   "error.agent.copyNameFailed": "OpenBot không thể tạo tên riêng cho bản sao agent.",
   "error.agent.endpointRemoved": "Endpoint mà agent này dùng đã bị xóa. Hãy chọn mô hình khác cho agent.",
@@ -111,8 +114,7 @@ export const messages = {
   "error.agent.selectedGone": "Agent đã chọn không còn tồn tại.",
   "error.agent.profileEndpointsChanged": "Các endpoint tùy chỉnh đã thay đổi trong lúc tạo. Hãy thử lại.",
   "error.agent.profileInvalid": "Nhà cung cấp trả về hồ sơ không hợp lệ. Hãy thử sửa prompt của bạn.",
-  "error.agent.profileSectionUnavailable":
-    "Phần được tạo không khả dụng. Hãy thử lại hoặc tự chọn một phần.",
+  "error.agent.profileSectionUnavailable": "Phần được tạo không khả dụng. Hãy thử lại hoặc tự chọn một phần.",
   "error.agent.profileTimedOut": "Tạo hồ sơ đã hết thời gian chờ. Hãy thử lại.",
   "error.agent.profileDisconnected": "Nhà cung cấp đã ngắt kết nối trong lúc tạo hồ sơ.",
   "error.agent.profileToolUse": "Nhà cung cấp đã cố dùng một công cụ. Hãy thử sửa prompt của bạn.",

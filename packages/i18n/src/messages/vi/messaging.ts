@@ -8,7 +8,8 @@ export const messages = {
     "OpenBot không đọc được các token đã lưu trên máy tính này. Hãy ngắt kết nối không gian làm việc, rồi kết nối lại.",
   "messaging.help.relay_unavailable":
     "OpenBot không nhận được sự kiện Slack trên máy tính này. Hãy đăng nhập, đặt tên cho máy tính này trong Cài đặt máy chủ và giữ OpenBot mở.",
-  "messaging.help.not_linked": "Không gian làm việc này chưa được liên kết với máy chủ này. Chọn Kết nối lại để liên kết.",
+  "messaging.help.not_linked":
+    "Không gian làm việc này chưa được liên kết với máy chủ này. Chọn Kết nối lại để liên kết.",
   "messaging.discordHelp.invalid_token":
     "Discord không còn chấp nhận OpenBot trong máy chủ Discord này. Có thể ứng dụng đã bị gỡ. Hãy kết nối lại máy chủ Discord.",
   "messaging.discordHelp.secret_storage_unavailable":

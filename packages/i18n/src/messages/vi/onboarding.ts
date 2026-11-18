@@ -86,7 +86,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "Chuyển sang mô hình miễn phí",
   "onboarding.consent.notice": "Khi tiếp tục, bạn chấp nhận {terms} và xác nhận đã đọc {privacy}.",
   "onboarding.consent.analyticsTitle": "Giúp OpenBot tốt hơn",
-  "onboarding.consent.analyticsDetail": "Chia sẻ dữ liệu sử dụng kèm tài khoản của bạn. Không bao giờ gồm cuộc trò chuyện hay tệp.",
+  "onboarding.consent.analyticsDetail":
+    "Chia sẻ dữ liệu sử dụng kèm tài khoản của bạn. Không bao giờ gồm cuộc trò chuyện hay tệp.",
   "onboarding.consent.thanksTitle": "Cảm ơn bạn! Cả nhóm nợ bạn một lần.",
   "onboarding.consent.thanksToast": "Cảm ơn bạn đã giúp OpenBot tốt hơn 💜",
   "onboarding.consent.thanksToastDetail": "Bạn có thể thay đổi điều này bất cứ lúc nào trong Cài đặt.",
@@ -104,6 +105,7 @@ export const messages = {
   "onboarding.server.description":
     "OpenBot không kèm gói AI trả phí. Hãy kết nối nhà cung cấp của riêng bạn với máy chủ này trước khi tạo agent.",
   "onboarding.server.label": "Chọn nhà cung cấp AI của máy chủ này",
-  "onboarding.server.hint": "Thông tin đăng nhập được giữ trên máy chủ. Bạn có thể đổi nhà cung cấp của từng agent sau.",
+  "onboarding.server.hint":
+    "Thông tin đăng nhập được giữ trên máy chủ. Bạn có thể đổi nhà cung cấp của từng agent sau.",
   "onboarding.server.continue": "Tiếp tục",
 } as const satisfies PartialTranslation<typeof source>;

@@ -3,7 +3,8 @@ import type { messages as source } from "../../en/error/kind";
 
 export const messages = {
   "error.kind.network": "Không thể kết nối. Hãy kiểm tra kết nối mạng rồi thử lại.",
-  "error.kind.timeout": "Yêu cầu mất quá nhiều thời gian. Hãy kiểm tra xem thao tác đã hoàn tất chưa trước khi thử lại.",
+  "error.kind.timeout":
+    "Yêu cầu mất quá nhiều thời gian. Hãy kiểm tra xem thao tác đã hoàn tất chưa trước khi thử lại.",
   "error.kind.storage":
     "Không đủ dung lượng lưu trữ. Hãy giải phóng dung lượng trên máy tính đang chạy OpenBot rồi thử lại.",
   "error.kind.filePermission":

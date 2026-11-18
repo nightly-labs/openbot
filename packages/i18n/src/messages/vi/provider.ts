@@ -116,7 +116,8 @@ export const messages = {
   "provider.picker.olderModels": "Mô hình cũ hơn",
   "provider.picker.olderModelsList": "Mô hình {name} cũ hơn",
   "provider.picker.noModels": "{name} không có mô hình nào khả dụng.",
-  "provider.picker.endpointModelsInCustom": "{name} chạy các endpoint tùy chỉnh của bạn. Mô hình của chúng nằm trong tab Tùy chỉnh.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} chạy các endpoint tùy chỉnh của bạn. Mô hình của chúng nằm trong tab Tùy chỉnh.",
   "provider.picker.showCustomModels": "Hiện mô hình",
   "provider.picker.museNoModels":
     "Muse không gửi mô hình nào cho tài khoản này. Có thể Muse không khả dụng ở quốc gia nơi agent này chạy. Hãy chọn mô hình từ nhà cung cấp khác.",
@@ -294,7 +295,8 @@ export const messages = {
   "provider.settings.noKey": "Chưa có khóa",
   "provider.settings.keyOptional": "Không bắt buộc. Khóa sẽ thêm các mô hình trả phí.",
   "provider.settings.keyAlternative": "Hoặc dán khóa API {name}.",
-  "provider.settings.geminiKeyInUse": "Gemini dùng khóa này, không dùng gói Google AI của bạn. Mức sử dụng của gói không được hiển thị.",
+  "provider.settings.geminiKeyInUse":
+    "Gemini dùng khóa này, không dùng gói Google AI của bạn. Mức sử dụng của gói không được hiển thị.",
   "provider.settings.geminiKeyReplacesAccount":
     "Khóa API Gemini đã lưu được dùng thay cho đăng nhập Google. Để dùng gói Google và các mô hình của gói, hãy gỡ khóa.",
   "provider.settings.claudeKeyInUse":
@@ -318,8 +320,7 @@ export const messages = {
   "provider.settings.diagnostics": "Chẩn đoán",
   "provider.settings.cache": "Bộ nhớ đệm",
   "provider.settings.promptCache": "Bộ nhớ đệm prompt",
-  "provider.settings.promptCacheDescription":
-    "Thời gian Claude giữ ngữ cảnh của agent trong bộ nhớ đệm giữa các lượt.",
+  "provider.settings.promptCacheDescription": "Thời gian Claude giữ ngữ cảnh của agent trong bộ nhớ đệm giữa các lượt.",
   "provider.settings.promptCacheHour": "1 giờ",
   "provider.settings.promptCacheDefault": "Mặc định của Claude Code",
   "provider.settings.promptCacheLoadFailed": "Không thể tải thời gian lưu bộ nhớ đệm prompt của máy chủ này.",

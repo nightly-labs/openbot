@@ -7,8 +7,7 @@ export const messages = {
   "skill.detailsDescription": "Chi tiết {name}",
   "skill.assignedDescription": "Kỹ năng được gán cho {name}",
   "skill.addFromMarketplace": "Thêm từ Cửa hàng",
-  "skill.limitReached":
-    "Agent này đã đạt giới hạn {limit} kỹ năng. Hãy gỡ một kỹ năng trước khi thêm kỹ năng khác.",
+  "skill.limitReached": "Agent này đã đạt giới hạn {limit} kỹ năng. Hãy gỡ một kỹ năng trước khi thêm kỹ năng khác.",
   "skill.managedOnHost": "Kỹ năng của agent này được quản lý trên host.",
   "skill.loading": "Đang tải kỹ năng…",
   "skill.loadingDetails": "Đang tải chi tiết…",
@@ -70,8 +69,14 @@ export const messages = {
   "skill.preview.try": "Dùng thử kỹ năng",
   "skill.preview.linkFailed": "Không thể mở liên kết.",
 
-  "skill.marketplace.changed": { one: "Đã thay đổi {name} trên {count} agent.", other: "Đã thay đổi {name} trên {count} agent." },
-  "skill.marketplace.updated": { one: "Đã cập nhật {name} trên {count} agent.", other: "Đã cập nhật {name} trên {count} agent." },
+  "skill.marketplace.changed": {
+    one: "Đã thay đổi {name} trên {count} agent.",
+    other: "Đã thay đổi {name} trên {count} agent.",
+  },
+  "skill.marketplace.updated": {
+    one: "Đã cập nhật {name} trên {count} agent.",
+    other: "Đã cập nhật {name} trên {count} agent.",
+  },
   "skill.marketplace.undone": "Đã hoàn tác thay đổi đối với {name}.",
   "skill.marketplace.confirmAgents": "Agent: {agents}.",
   "skill.marketplace.limitReason": "Mỗi agent có thể có tối đa {limit} kỹ năng.",

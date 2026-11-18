@@ -28,7 +28,8 @@ export const messages = {
     "OpenBot không xác nhận được mã đăng nhập đã được gửi hay chưa. Hãy kiểm tra trước khi gửi lại.",
   "error.auth.companySignInFailed": "Đăng nhập bằng tài khoản công ty chưa hoàn tất. Hãy thử lại.",
   "error.auth.companySignInCancelled": "Đăng nhập bằng tài khoản công ty đã bị hủy.",
-  "error.auth.companySignInTimeout": "Đăng nhập bằng tài khoản công ty mất quá nhiều thời gian. Hãy mở lại trang đăng nhập.",
+  "error.auth.companySignInTimeout":
+    "Đăng nhập bằng tài khoản công ty mất quá nhiều thời gian. Hãy mở lại trang đăng nhập.",
   "error.auth.companySignInRefused": "Việc đăng nhập tại công ty của bạn đã bị hủy hoặc bị từ chối.",
   "error.auth.companySignInDomainMismatch": "Tài khoản công ty có email thuộc tên miền không có trong thiết lập.",
   "error.auth.companySignInAccountDisabled": "Công ty của bạn đã tắt tài khoản này. Hãy hỏi quản trị viên.",

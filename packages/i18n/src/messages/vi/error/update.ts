@@ -10,10 +10,8 @@ export const messages = {
   "error.update.downloadFailed": "Không thể tải xuống bản cập nhật. Hãy thử lại.",
   "error.update.checkFailed": "Không thể kiểm tra bản cập nhật. Hãy thử lại.",
   "error.update.checkStalled": "Quá trình kiểm tra bản cập nhật đã ngừng phản hồi. Hãy thử lại.",
-  "error.update.checkOffline":
-    "Không thể kết nối tới dịch vụ cập nhật. Hãy kiểm tra kết nối internet, rồi thử lại.",
-  "error.update.checkUnavailable":
-    "Dịch vụ cập nhật không phản hồi. OpenBot sẽ tự thử lại sau vài phút.",
+  "error.update.checkOffline": "Không thể kết nối tới dịch vụ cập nhật. Hãy kiểm tra kết nối internet, rồi thử lại.",
+  "error.update.checkUnavailable": "Dịch vụ cập nhật không phản hồi. OpenBot sẽ tự thử lại sau vài phút.",
   "error.update.checkNoRelease":
     "Không tìm thấy bản cập nhật nào đã phát hành cho nền tảng này. OpenBot sẽ tự thử lại sau vài phút.",
   "error.update.managedByNix": "Nix cài đặt bản cập nhật cho bản OpenBot này. Hãy cập nhật bằng Nix.",

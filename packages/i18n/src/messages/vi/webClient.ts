@@ -20,7 +20,8 @@ export const messages = {
   "webClient.pane.routines": "Tác vụ định kỳ",
   "webClient.pane.workspace": "Không gian làm việc",
   "webClient.phoneApp.title": "Dùng ứng dụng OpenBot",
-  "webClient.phoneApp.description": "Trên điện thoại, OpenBot hoạt động tốt nhất trong ứng dụng. Hãy đăng nhập bằng cùng email.",
+  "webClient.phoneApp.description":
+    "Trên điện thoại, OpenBot hoạt động tốt nhất trong ứng dụng. Hãy đăng nhập bằng cùng email.",
   "webClient.phoneApp.ios": "Tải về cho iPhone",
   "webClient.phoneApp.android": "Tải về cho Android",
   "webClient.phoneApp.continue": "Tiếp tục trên trình duyệt",
@@ -67,7 +68,8 @@ export const messages = {
   "webClient.error.attachmentLimit": "Mỗi tin nhắn có thể có tối đa {limit} tệp đính kèm.",
   "webClient.error.linkBlocked": "Không thể mở liên kết này.",
   "webClient.error.fileTransfer": "Truyền tệp không thành công.",
-  "webClient.error.noLocks": "Trình duyệt này không thể bảo vệ kết nối máy chủ. Hãy dùng một trình duyệt máy tính phiên bản mới.",
+  "webClient.error.noLocks":
+    "Trình duyệt này không thể bảo vệ kết nối máy chủ. Hãy dùng một trình duyệt máy tính phiên bản mới.",
   "webClient.error.otherTab": "Máy chủ này đang mở trong một tab khác. Hãy đóng kết nối đó trước khi thử lại.",
   "webClient.error.connectionClosed": "Kết nối trình duyệt đã đóng.",
   "webClient.error.hostChanged": "Máy chủ đã chọn đã thay đổi.",

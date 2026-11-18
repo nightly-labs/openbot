@@ -30,7 +30,8 @@ export const messages = {
     one: "Một agent có thể xuất bản tối đa {count} kỹ năng cục bộ. Hãy gỡ bớt một số kỹ năng.",
     other: "Một agent có thể xuất bản tối đa {count} kỹ năng cục bộ. Hãy gỡ bớt một số kỹ năng.",
   },
-  "error.marketplace.templateSkill": "Không thể xuất bản kỹ năng “{name}”. Hãy kiểm tra tên và tệp SKILL.md của kỹ năng.",
+  "error.marketplace.templateSkill":
+    "Không thể xuất bản kỹ năng “{name}”. Hãy kiểm tra tên và tệp SKILL.md của kỹ năng.",
   "error.marketplace.templateRoutines": {
     one: "Một agent có thể xuất bản tối đa {count} tác vụ định kỳ. Hãy gỡ bớt một số tác vụ.",
     other: "Một agent có thể xuất bản tối đa {count} tác vụ định kỳ. Hãy gỡ bớt một số tác vụ.",
@@ -52,7 +53,8 @@ export const messages = {
     "Hãy xóa thông tin bí mật hoặc địa chỉ email khỏi chỉ dẫn trước khi xuất bản.",
   "error.marketplace.secretInRoutine":
     "Hãy xóa thông tin bí mật hoặc địa chỉ email khỏi tác vụ định kỳ “{name}” trước khi xuất bản.",
-  "error.marketplace.secretInSkill": "Hãy xóa thông tin bí mật hoặc địa chỉ email khỏi kỹ năng “{name}” trước khi xuất bản.",
+  "error.marketplace.secretInSkill":
+    "Hãy xóa thông tin bí mật hoặc địa chỉ email khỏi kỹ năng “{name}” trước khi xuất bản.",
   "error.marketplace.catalogLoadFailed": "Không thể tải Cửa hàng. Hãy thử lại.",
   "error.marketplace.templateUnreadable": "Không thể đọc agent được chia sẻ này. Có thể chủ sở hữu đã gỡ nó.",
 } as const satisfies PartialTranslation<typeof source>;

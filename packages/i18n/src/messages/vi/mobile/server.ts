@@ -6,7 +6,8 @@ export const messages = {
   "mobile.server.remoteDesktop.title": "Điều khiển máy tính",
   "mobile.server.remoteDesktop.unlockPrompt": "Mở khóa để điều khiển máy tính",
   "mobile.server.remoteDesktop.connecting": "Đang kết nối với máy tính…",
-  "mobile.server.remoteDesktop.unsupported": "Máy chủ này không chia sẻ được màn hình. Hãy cập nhật OpenBot trên máy tính.",
+  "mobile.server.remoteDesktop.unsupported":
+    "Máy chủ này không chia sẻ được màn hình. Hãy cập nhật OpenBot trên máy tính.",
   "mobile.server.remoteDesktop.notReady":
     "Máy tính này chưa thiết lập điều khiển từ xa. Hãy thiết lập trong OpenBot trên máy tính, ở mục Cài đặt.",
   "mobile.server.remoteDesktop.offline": "Máy chủ chưa kết nối. Hãy thử lại khi máy chủ trực tuyến.",
@@ -226,7 +227,8 @@ export const messages = {
   "mobile.server.hosted.closeHint":
     "Bạn có thể đóng bảng này. Việc thiết lập vẫn tiếp tục, và máy chủ sẽ hiện trong danh sách khi sẵn sàng.",
   "mobile.server.hosted.readyTitle": "{name} đã sẵn sàng",
-  "mobile.server.hosted.readyDescription": "Máy chủ hoạt động cả khi máy tính của bạn tắt, và tự khởi động lại khi bạn dùng.",
+  "mobile.server.hosted.readyDescription":
+    "Máy chủ hoạt động cả khi máy tính của bạn tắt, và tự khởi động lại khi bạn dùng.",
   "mobile.server.hosted.open": "Mở máy chủ",
   "mobile.server.hosted.failedTitle": "Máy chủ không khởi động được",
   "mobile.server.hosted.failedDescription":
@@ -267,7 +269,10 @@ export const messages = {
   "mobile.server.routines.viewDay": "Ngày",
   "mobile.server.routines.viewWeek": "Tuần",
   "mobile.server.routines.more": { one: "Thêm {count}", other: "Thêm {count}" },
-  "mobile.server.routines.showAll": { one: "Hiện {count} lần chạy vào {day}", other: "Hiện cả {count} lần chạy vào {day}" },
+  "mobile.server.routines.showAll": {
+    one: "Hiện {count} lần chạy vào {day}",
+    other: "Hiện cả {count} lần chạy vào {day}",
+  },
   "mobile.server.routines.previousWeek": "Tuần trước",
   "mobile.server.routines.nextWeek": "Tuần sau",
   "mobile.server.routines.today": "Hôm nay",
@@ -355,7 +360,8 @@ export const messages = {
     "Máy chủ sẽ dừng và khởi động lại, mất khoảng một phút. Các lượt agent đang chạy sẽ dừng, và thành viên mất kết nối cho đến khi máy chủ hoạt động lại. Tệp và cuộc trò chuyện vẫn được giữ.",
   "mobile.server.settings.restartConfirm": "Khởi động lại",
   "mobile.server.settings.restarted": "{name} đang khởi động lại",
-  "mobile.server.settings.restartUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để khởi động lại máy chủ tại đây.",
+  "mobile.server.settings.restartUnsupported":
+    "Hãy cập nhật OpenBot trên máy chủ này để khởi động lại máy chủ tại đây.",
   "mobile.server.settings.leaveTitle": "Rời {name}?",
   "mobile.server.settings.leaveBody": "Bạn sẽ cần lời mời khác để tham gia lại.",
   "mobile.server.settings.leave": "Rời máy chủ",
@@ -397,8 +403,7 @@ export const messages = {
   "mobile.server.members.send": "Gửi lời mời",
   "mobile.server.members.create": "Tạo liên kết mời",
   "mobile.server.members.permanentLimit": "Hãy thu hồi một liên kết mời vĩnh viễn trước khi tạo liên kết khác.",
-  "mobile.server.members.full":
-    "Máy chủ này đã có tối đa {limit} thành viên. Hãy gỡ một thành viên để mời người mới.",
+  "mobile.server.members.full": "Máy chủ này đã có tối đa {limit} thành viên. Hãy gỡ một thành viên để mời người mới.",
   "mobile.server.members.inviteUsed": "Lời mời đã được chấp nhận. Thành viên đã tham gia máy chủ này.",
   "mobile.server.members.inviteSent": "Đã gửi lời mời đến {email}.",
   "mobile.server.members.permanentCreated":
@@ -521,7 +526,8 @@ export const messages = {
   "mobile.server.members.activeLinks": "Liên kết đang hoạt động",
   "mobile.server.members.gone": "Người này không còn là thành viên của máy chủ này.",
   "mobile.server.members.inviteGone": "Lời mời này không còn hiệu lực.",
-  "mobile.server.members.roleHint": "Quản trị viên có thể mời người khác, quản lý thành viên và thay đổi cài đặt máy chủ.",
+  "mobile.server.members.roleHint":
+    "Quản trị viên có thể mời người khác, quản lý thành viên và thay đổi cài đặt máy chủ.",
   "mobile.server.members.ownerHint":
     "Chủ sở hữu có toàn quyền với máy chủ này. Bạn không thể đổi vai trò của chủ sở hữu.",
   "mobile.server.members.joined": "Đã tham gia",
@@ -548,7 +554,8 @@ export const messages = {
   "mobile.server.settings.timezoneLoading": "Đang tải múi giờ…",
   "mobile.server.settings.timezoneLoadFailed": "Không thể tải múi giờ của máy chủ.",
   "mobile.server.settings.timezoneSaveFailed": "Không thể lưu múi giờ. Hãy thử lại.",
-  "mobile.server.settings.timezoneUnavailable": "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để đổi múi giờ.",
+  "mobile.server.settings.timezoneUnavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để đổi múi giờ.",
   "mobile.server.settings.timezoneUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để đổi múi giờ tại đây.",
   "mobile.server.settings.keySection": "Khóa máy chủ",
   "mobile.server.settings.keyChanged": "Lần đổi gần nhất",
@@ -568,11 +575,12 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Không thể đổi khóa máy chủ. Hãy thử lại.",
   "mobile.server.settings.keyOwnerOnly": "Chỉ chủ sở hữu mới đổi được khóa máy chủ.",
   "mobile.server.settings.keyUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để đổi khóa tại đây.",
-  "mobile.server.settings.memoryLimit": "Ký ức mỗi agent",
-  "mobile.server.settings.memoryLimitDescription": "Số ký ức mà mỗi agent trên máy chủ này có thể lưu giữ.",
+  "mobile.server.settings.memoryLimit": "Mục bộ nhớ mỗi agent",
+  "mobile.server.settings.memoryLimitDescription": "Số mục bộ nhớ mà mỗi agent trên máy chủ này có thể lưu giữ.",
   "mobile.server.settings.memoryLimitLoadFailed": "Không thể tải giới hạn bộ nhớ của máy chủ này.",
   "mobile.server.settings.memoryLimitSaveFailed": "Không thể lưu giới hạn bộ nhớ. Hãy thử lại.",
-  "mobile.server.settings.memoryLimitUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để đổi giới hạn bộ nhớ tại đây.",
+  "mobile.server.settings.memoryLimitUnsupported":
+    "Hãy cập nhật OpenBot trên máy chủ này để đổi giới hạn bộ nhớ tại đây.",
   "mobile.server.settings.memoryReview": "Xem lại bộ nhớ",
   "mobile.server.settings.memoryReviewDescription":
     "Tần suất agent trên máy chủ này lưu các thông tin lâu dài từ cuộc trò chuyện ở chế độ nền.",
@@ -580,7 +588,8 @@ export const messages = {
   "mobile.server.settings.memoryReviewTurns": { one: "Mỗi {count} lượt", other: "Mỗi {count} lượt" },
   "mobile.server.settings.memoryReviewLoadFailed": "Không thể tải cài đặt xem lại bộ nhớ.",
   "mobile.server.settings.skillLearning": "Học kỹ năng",
-  "mobile.server.settings.skillLearningDescription": "Agent trên máy chủ này có lưu những gì học được thành kỹ năng hay không.",
+  "mobile.server.settings.skillLearningDescription":
+    "Agent trên máy chủ này có lưu những gì học được thành kỹ năng hay không.",
   "mobile.server.settings.skillLearningAutomatic": "Tự động",
   "mobile.server.settings.skillLearningAsk": "Hỏi trước",
   "mobile.server.settings.skillLearningOff": "Tắt",
@@ -597,13 +606,15 @@ export const messages = {
   "mobile.server.settings.responseStyleClassic": "Cổ điển",
   "mobile.server.settings.personalityLoadFailed": "Không thể tải tính cách của máy chủ.",
   "mobile.server.settings.personalitySaveFailed": "Không thể lưu kiểu phản hồi. Hãy thử lại.",
-  "mobile.server.settings.personalityUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để đổi kiểu phản hồi tại đây.",
+  "mobile.server.settings.personalityUnsupported":
+    "Hãy cập nhật OpenBot trên máy chủ này để đổi kiểu phản hồi tại đây.",
   "mobile.server.settings.agentsUnavailable":
     "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để đổi cài đặt agent.",
   "mobile.server.route.browserProfiles": "Hồ sơ trình duyệt",
   "mobile.server.browserProfiles.unavailable":
     "Chỉ chủ sở hữu hoặc quản trị viên của máy chủ đang trực tuyến mới quản lý được hồ sơ trình duyệt.",
-  "mobile.server.browserProfiles.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý hồ sơ trình duyệt tại đây.",
+  "mobile.server.browserProfiles.unsupported":
+    "Hãy cập nhật OpenBot trên máy chủ này để quản lý hồ sơ trình duyệt tại đây.",
   "mobile.server.browserProfiles.loading": "Đang tải hồ sơ trình duyệt…",
   "mobile.server.browserProfiles.loadFailed": "OpenBot không thể tải hồ sơ trình duyệt.",
   "mobile.server.browserProfiles.saveFailed": "OpenBot không thể thay đổi hồ sơ trình duyệt.",
@@ -681,15 +692,20 @@ export const messages = {
     other: "{count} hồ sơ đang dùng proxy này. Các hồ sơ sẽ chuyển sang Tự động.",
   },
   "mobile.server.browserProxies.deleteUnused": "Không có hồ sơ nào dùng proxy này.",
-  "mobile.server.browserProxies.closesTabs": { one: "{count} tab đang mở sẽ đóng.", other: "{count} tab đang mở sẽ đóng." },
+  "mobile.server.browserProxies.closesTabs": {
+    one: "{count} tab đang mở sẽ đóng.",
+    other: "{count} tab đang mở sẽ đóng.",
+  },
   "mobile.server.browserProxies.changeTitle": "Đổi proxy của {name}?",
   "mobile.server.browserProxies.change": "Đổi proxy",
   "mobile.server.browserProxies.choiceHint":
     "Tự động dùng cài đặt proxy của máy tính chạy máy chủ. Mỗi thay đổi sẽ đóng các tab đang mở của hồ sơ.",
-  "mobile.server.browserProxies.shareHint": "Để dùng máy tính của bạn, hãy chia sẻ nó trong ứng dụng OpenBot trên máy tính.",
+  "mobile.server.browserProxies.shareHint":
+    "Để dùng máy tính của bạn, hãy chia sẻ nó trong ứng dụng OpenBot trên máy tính.",
   "mobile.server.route.vault": "Kho bảo mật",
   "mobile.server.settings.vault": "Kho bảo mật",
-  "mobile.server.vault.unavailable": "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý Kho bảo mật.",
+  "mobile.server.vault.unavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý Kho bảo mật.",
   "mobile.server.vault.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý Kho bảo mật tại đây.",
   "mobile.server.vault.loading": "Đang tải Kho bảo mật…",
   "mobile.server.vault.loadFailed": "Không thể đọc Kho bảo mật của máy chủ này.",
@@ -740,7 +756,8 @@ export const messages = {
   "mobile.server.vault.secretSavedShort": "Đã lưu",
   "mobile.server.vault.requiredNote": "* Bắt buộc",
   "mobile.server.vault.contactRequiredNote": "Hãy điền ít nhất một mục: họ tên, địa chỉ, điện thoại hoặc email.",
-  "mobile.server.vault.secretHint": "Thông tin này được gửi đến {host} một lần. Điện thoại này không lưu và không thể hiển thị nó.",
+  "mobile.server.vault.secretHint":
+    "Thông tin này được gửi đến {host} một lần. Điện thoại này không lưu và không thể hiển thị nó.",
   "mobile.server.vault.label": "Tên",
   "mobile.server.vault.cardLabelPlaceholder": "Thẻ du lịch",
   "mobile.server.vault.contactLabelPlaceholder": "Nhà",
@@ -821,7 +838,8 @@ export const messages = {
   "mobile.server.vault.twoStep.codeLoading": "Đang tải mã…",
   "mobile.server.vault.twoStep.codeFailed": "Không thể tải mã. OpenBot sẽ thử lại sau 30 giây.",
   "mobile.server.vault.twoStep.theSite": "trang web",
-  "mobile.server.vault.twoStep.noSetup": "Không có quá trình thiết lập nào đang diễn ra. Hãy mở thông tin đăng nhập và chọn lại Thiết lập.",
+  "mobile.server.vault.twoStep.noSetup":
+    "Không có quá trình thiết lập nào đang diễn ra. Hãy mở thông tin đăng nhập và chọn lại Thiết lập.",
   "mobile.server.vault.twoStep.setupTitle": "Thiết lập mã xác minh hai bước",
   "mobile.server.vault.twoStep.setupIntro":
     "Trên {site}, hãy bật xác minh hai bước bằng ứng dụng xác thực. Khi trang web hiện mã QR, hãy quét mã hoặc đưa khóa của mã cho OpenBot.",
@@ -837,14 +855,16 @@ export const messages = {
   "mobile.server.vault.twoStep.imageFailed": "Không thể đọc ảnh này.",
   "mobile.server.vault.twoStep.next": "Tiếp",
   "mobile.server.vault.twoStep.checkTitle": "Kiểm tra mã",
-  "mobile.server.vault.twoStep.checkIntro": "Nhập mã này trên {site} để hoàn tất. Khi trang web chấp nhận, hãy chạm Xong.",
+  "mobile.server.vault.twoStep.checkIntro":
+    "Nhập mã này trên {site} để hoàn tất. Khi trang web chấp nhận, hãy chạm Xong.",
   "mobile.server.vault.twoStep.checkHint": {
     one: "Mã thay đổi mỗi {count} giây. Trang web cũng chấp nhận mã trước đó.",
     other: "Mã thay đổi mỗi {count} giây. Trang web cũng chấp nhận mã trước đó.",
   },
   "mobile.server.vault.twoStep.done": "Xong",
   "mobile.server.route.connectors": "Trình kết nối",
-  "mobile.server.connectors.unavailable": "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý trình kết nối.",
+  "mobile.server.connectors.unavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý trình kết nối.",
   "mobile.server.connectors.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý trình kết nối tại đây.",
   "mobile.server.connectors.loading": "Đang tải trình kết nối…",
   "mobile.server.connectors.localOnly": "Chỉ ứng dụng máy tính",
@@ -866,7 +886,8 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Thêm agent",
   "mobile.server.connectors.later": "Để sau",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.description": "Điền thông tin đăng nhập trình duyệt trên {host} từ Bitwarden hoặc Vaultwarden.",
+  "mobile.server.connectors.bitwarden.description":
+    "Điền thông tin đăng nhập trình duyệt trên {host} từ Bitwarden hoặc Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
     "{host} đăng nhập bằng Bitwarden CLI riêng của máy chủ. Trong kho của bạn, hãy tạo thư mục tên Shared with OpenBot và chỉ đặt vào đó các thông tin đăng nhập mà agent được phép dùng. Trong kho trên web, mở Settings › Security › Keys và xem khóa API của bạn.",
   "mobile.server.connectors.bitwarden.serverUrl": "Địa chỉ máy chủ",
@@ -902,8 +923,7 @@ export const messages = {
   "mobile.server.connectors.github.accountTitle": "Tài khoản",
   "mobile.server.connectors.github.connectedAs": "Đã kết nối dưới tên @{login}",
   "mobile.server.connectors.github.chooseRepositories": "Chọn kho mã",
-  "mobile.server.connectors.github.repositoriesFooter":
-    "Agent chỉ dùng được những kho mã đã cài OpenBot GitHub App.",
+  "mobile.server.connectors.github.repositoriesFooter": "Agent chỉ dùng được những kho mã đã cài OpenBot GitHub App.",
   "mobile.server.connectors.github.repositoriesTitle": "Kho mã",
   "mobile.server.connectors.github.repositoriesLoading": "Đang đọc kho mã từ GitHub",
   "mobile.server.connectors.github.repositoriesFailed": "OpenBot không thể đọc kho mã từ GitHub.",
@@ -935,7 +955,10 @@ export const messages = {
   "mobile.server.connectors.onePassword.vaultTitle": "Kho dùng chung",
   "mobile.server.connectors.onePassword.vaultFooter":
     "Chuyển một thông tin đăng nhập vào kho này trong 1Password để agent đăng nhập bằng nó. Gỡ ra để ngừng.",
-  "mobile.server.connectors.onePassword.loginCount": { one: "{count} thông tin đăng nhập", other: "{count} thông tin đăng nhập" },
+  "mobile.server.connectors.onePassword.loginCount": {
+    one: "{count} thông tin đăng nhập",
+    other: "{count} thông tin đăng nhập",
+  },
   "mobile.server.connectors.onePassword.disconnect": "Ngắt kết nối 1Password",
   "mobile.server.connectors.onePassword.disconnectTitle": "Ngắt kết nối 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
@@ -969,7 +992,10 @@ export const messages = {
   "mobile.server.connectors.passwordManager.vaultTitle": "Kho dùng chung",
   "mobile.server.connectors.passwordManager.vaultFooter":
     "Chuyển một thông tin đăng nhập vào kho này trong {name} để agent đăng nhập bằng nó. Gỡ ra để ngừng.",
-  "mobile.server.connectors.passwordManager.loginCount": { one: "{count} thông tin đăng nhập", other: "{count} thông tin đăng nhập" },
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} thông tin đăng nhập",
+    other: "{count} thông tin đăng nhập",
+  },
   "mobile.server.connectors.passwordManager.keyTitle": "Khóa truy cập",
   "mobile.server.connectors.passwordManager.keyReadOnly": "Chỉ đọc",
   "mobile.server.connectors.passwordManager.keyExpires": "Chỉ đọc. Hết hạn vào {date}.",
@@ -1009,11 +1035,13 @@ export const messages = {
     "OpenBot không đọc được các token đã lưu trên {host}. Hãy ngắt kết nối không gian làm việc, rồi kết nối lại.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot trên {host} không nhận được sự kiện Slack. Trên {host}, hãy đăng nhập, đặt tên cho máy chủ trong Cài đặt máy chủ và giữ OpenBot mở.",
-  "mobile.server.connectors.slack.helpNotLinked": "Không gian làm việc này chưa liên kết với {host}. Chạm Kết nối lại để liên kết.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Không gian làm việc này chưa liên kết với {host}. Chạm Kết nối lại để liên kết.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Agent này nhận mọi yêu cầu từ Slack. Agent tự trả lời yêu cầu ngắn, giao việc khác cho đúng agent và đăng câu trả lời trong luồng.",
-  "mobile.server.connectors.slack.orchestratorNone": "Hãy thêm Slack Orchestrator, nếu không Slack sẽ không nhận được câu trả lời.",
+  "mobile.server.connectors.slack.orchestratorNone":
+    "Hãy thêm Slack Orchestrator, nếu không Slack sẽ không nhận được câu trả lời.",
   "mobile.server.connectors.slack.addAgent": "Thêm Slack Orchestrator",
   "mobile.server.connectors.slack.note":
     "OpenBot tự tham gia mọi kênh công khai, kể cả kênh mới. Với kênh riêng tư, hãy mời: /invite @OpenBot.",
@@ -1059,13 +1087,15 @@ export const messages = {
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Agent này nhận mọi yêu cầu từ Discord. Agent tự trả lời yêu cầu ngắn, giao việc khác cho đúng agent và trả lời trong kênh.",
-  "mobile.server.connectors.discord.orchestratorNone": "Hãy thêm Discord Orchestrator, nếu không Discord sẽ không nhận được câu trả lời.",
+  "mobile.server.connectors.discord.orchestratorNone":
+    "Hãy thêm Discord Orchestrator, nếu không Discord sẽ không nhận được câu trả lời.",
   "mobile.server.connectors.discord.addAgent": "Thêm Discord Orchestrator",
   "mobile.server.connectors.discord.note": "OpenBot thấy các kênh mà vai trò của nó được xem.",
   "mobile.server.connectors.discord.disconnectTitle": "Ngắt kết nối {workspace}?",
   "mobile.server.connectors.discord.disconnectBody":
     "OpenBot ngừng trả lời trong {workspace} và xóa kết nối Discord khỏi {host}.",
-  "mobile.server.connectors.discord.disconnectKept": "Các cuộc trò chuyện và Discord Orchestrator vẫn còn trong OpenBot.",
+  "mobile.server.connectors.discord.disconnectKept":
+    "Các cuộc trò chuyện và Discord Orchestrator vẫn còn trong OpenBot.",
   "mobile.server.connectors.discord.disconnectDeleted":
     "Discord Orchestrator và các cuộc trò chuyện của agent này sẽ bị xóa khỏi OpenBot.",
   "mobile.server.connectors.discord.agentPromptTitle": "Thêm Discord Orchestrator?",
@@ -1088,8 +1118,10 @@ export const messages = {
     "Bot OpenBot không còn trong cuộc trò chuyện này. Hãy ngắt kết nối cuộc trò chuyện, rồi thêm lại bot.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot trên {host} không nhận được tin nhắn Telegram. Trên {host}, hãy đăng nhập, đặt tên cho máy chủ trong Cài đặt máy chủ và giữ OpenBot mở.",
-  "mobile.server.connectors.telegram.helpError": "OpenBot không kết nối được tới cuộc trò chuyện này. Hãy kết nối lại, hoặc ngắt kết nối cuộc trò chuyện.",
-  "mobile.server.connectors.telegram.helpNotLinked": "Cuộc trò chuyện này chưa liên kết với {host}. Chạm Kết nối lại để liên kết.",
+  "mobile.server.connectors.telegram.helpError":
+    "OpenBot không kết nối được tới cuộc trò chuyện này. Hãy kết nối lại, hoặc ngắt kết nối cuộc trò chuyện.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Cuộc trò chuyện này chưa liên kết với {host}. Chạm Kết nối lại để liên kết.",
   "mobile.server.connectors.telegram.retryAt": "Telegram yêu cầu OpenBot chờ. OpenBot sẽ thử lại lúc {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Liên kết cuộc trò chuyện",
   "mobile.server.connectors.telegram.linkAnother": "Liên kết cuộc trò chuyện khác",
@@ -1104,11 +1136,11 @@ export const messages = {
   "mobile.server.connectors.telegram.orchestratorTitle": "Telegram Orchestrator",
   "mobile.server.connectors.telegram.orchestratorDescription":
     "Agent này nhận tin nhắn gửi tới OpenBot từ mọi cuộc trò chuyện Telegram của bạn. Agent tự trả lời tin nhắn ngắn, giao việc khác cho đúng agent và đăng câu trả lời trong cuộc trò chuyện.",
-  "mobile.server.connectors.telegram.orchestratorNone": "Hãy thêm Telegram Orchestrator, nếu không Telegram sẽ không nhận được câu trả lời.",
+  "mobile.server.connectors.telegram.orchestratorNone":
+    "Hãy thêm Telegram Orchestrator, nếu không Telegram sẽ không nhận được câu trả lời.",
   "mobile.server.connectors.telegram.addAgent": "Thêm Telegram Orchestrator",
   "mobile.server.connectors.telegram.disconnectTitle": "Ngắt kết nối {chat}?",
-  "mobile.server.connectors.telegram.disconnectBody":
-    "Bot OpenBot sẽ rời {chat}, và OpenBot ngừng trả lời ở đó.",
+  "mobile.server.connectors.telegram.disconnectBody": "Bot OpenBot sẽ rời {chat}, và OpenBot ngừng trả lời ở đó.",
   "mobile.server.connectors.telegram.disconnectKept":
     "Các cuộc trò chuyện và Telegram Orchestrator vẫn còn trong OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
@@ -1146,7 +1178,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Agent này nhận tin nhắn gửi tới OpenBot từ mọi số đã liên kết của bạn. Agent tự trả lời tin nhắn ngắn, giao việc khác cho đúng agent và trả lời trong WhatsApp.",
-  "mobile.server.connectors.whatsapp.orchestratorNone": "Hãy thêm WhatsApp Orchestrator, nếu không WhatsApp sẽ không nhận được câu trả lời.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Hãy thêm WhatsApp Orchestrator, nếu không WhatsApp sẽ không nhận được câu trả lời.",
   "mobile.server.connectors.whatsapp.addAgent": "Thêm WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.note":
     "Trên số cá nhân, hãy nhắn trong cuộc trò chuyện “Nhắn tin cho chính bạn”. Những người bạn cho phép sẽ nhắn tới số đó.",
@@ -1176,7 +1209,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.failedTitle": "WhatsApp chưa liên kết",
   "mobile.server.connectors.whatsapp.failedTimeout": "Mã đã hết hạn trước khi điện thoại sử dụng.",
   "mobile.server.connectors.whatsapp.failedRefused": "WhatsApp đã từ chối liên kết. Hãy chờ vài phút, rồi thử lại.",
-  "mobile.server.connectors.whatsapp.failedBusy": "Đang có một lượt liên kết khác. Hãy chờ lượt đó kết thúc, rồi thử lại.",
+  "mobile.server.connectors.whatsapp.failedBusy":
+    "Đang có một lượt liên kết khác. Hãy chờ lượt đó kết thúc, rồi thử lại.",
   "mobile.server.connectors.whatsapp.failedUnavailable":
     "OpenBot không kết nối được tới WhatsApp. Hãy kiểm tra kết nối internet.",
   "mobile.server.connectors.whatsapp.tryAgain": "Thử lại",
@@ -1187,14 +1221,16 @@ export const messages = {
   "mobile.server.connectors.whatsapp.disconnectTitle": "Ngắt kết nối {number}?",
   "mobile.server.connectors.whatsapp.disconnectBody":
     "OpenBot sẽ đăng xuất WhatsApp trên {number}. Nếu OpenBot đã tắt, hãy gỡ cả thiết bị trong WhatsApp > Thiết bị liên kết.",
-  "mobile.server.connectors.whatsapp.disconnectEffect": "Mọi người sẽ không liên lạc được với agent của bạn qua {number} nữa.",
+  "mobile.server.connectors.whatsapp.disconnectEffect":
+    "Mọi người sẽ không liên lạc được với agent của bạn qua {number} nữa.",
   "mobile.server.connectors.whatsapp.removeEffectKept":
     "Các cuộc trò chuyện và WhatsApp Orchestrator vẫn còn trong OpenBot.",
   "mobile.server.connectors.whatsapp.removeEffectDeleted":
     "Đây là số cuối cùng, nên WhatsApp Orchestrator và các cuộc trò chuyện của agent này sẽ bị xóa khỏi OpenBot.",
   "mobile.server.connectors.whatsapp.keep": "Giữ liên kết",
   "mobile.server.connectors.whatsapp.sendersTitle": "Ai có thể nhắn tới {number}",
-  "mobile.server.connectors.whatsapp.sendersDescription": "Những liên hệ và nhóm này có thể giao việc cho agent của bạn.",
+  "mobile.server.connectors.whatsapp.sendersDescription":
+    "Những liên hệ và nhóm này có thể giao việc cho agent của bạn.",
   "mobile.server.connectors.whatsapp.sendersEmpty": "Chỉ bạn mới nhắn được. Hãy thêm liên hệ hoặc nhóm.",
   "mobile.server.connectors.whatsapp.sendersLimit": "Mỗi số cho phép tối đa {count} liên hệ và nhóm.",
   "mobile.server.connectors.whatsapp.senderGroup": "Nhóm",
@@ -1204,7 +1240,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactTitle": "Thêm liên hệ",
   "mobile.server.connectors.whatsapp.contactDescription": "Người này có thể giao việc cho agent của bạn từ WhatsApp.",
   "mobile.server.connectors.whatsapp.contactName": "Tên",
-  "mobile.server.connectors.whatsapp.contactNameDescription": "Không bắt buộc. Nếu để trống, danh sách sẽ hiện số điện thoại.",
+  "mobile.server.connectors.whatsapp.contactNameDescription":
+    "Không bắt buộc. Nếu để trống, danh sách sẽ hiện số điện thoại.",
   "mobile.server.connectors.whatsapp.add": "Thêm",
   "mobile.server.connectors.whatsapp.groupTitle": "Thêm nhóm",
   "mobile.server.connectors.whatsapp.groupDescription": "Mọi người trong nhóm này có thể giao việc cho agent của bạn.",
@@ -1232,7 +1269,8 @@ export const messages = {
   "mobile.server.providers.loading": "Đang tải nhà cung cấp…",
   "mobile.server.providers.loadFailed": "Không thể tải nhà cung cấp của máy chủ này.",
   "mobile.server.providers.runtimesFailed": "Không thể tải các bản tải xuống của máy chủ này.",
-  "mobile.server.providers.unavailable": "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý nhà cung cấp.",
+  "mobile.server.providers.unavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý nhà cung cấp.",
   "mobile.server.providers.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý nhà cung cấp tại đây.",
   "mobile.server.providers.signInUnsupported": "Máy chủ này không thể đăng nhập nhà cung cấp này từ điện thoại.",
   "mobile.server.providers.actionFailed": "OpenBot không thể hoàn tất thao tác này. Hãy thử lại.",
@@ -1326,8 +1364,7 @@ export const messages = {
   "mobile.server.providers.accountGone": "Tài khoản này không còn trên máy chủ này.",
   "mobile.server.providers.accountFailed": "Không thể thay đổi tài khoản này. Hãy thử lại.",
   "mobile.server.providers.accountName": "Tên",
-  "mobile.server.providers.accountNameHint":
-    "Chỉ bạn và quản trị viên của máy chủ này thấy. Để trống để hiện email.",
+  "mobile.server.providers.accountNameHint": "Chỉ bạn và quản trị viên của máy chủ này thấy. Để trống để hiện email.",
   "mobile.server.providers.accountSignInAgain": "Đăng nhập lại",
   "mobile.server.providers.accountSignInWithCode": "Đăng nhập bằng mã",
   "mobile.server.providers.accountsKeyHint":
@@ -1464,7 +1501,8 @@ export const messages = {
   "mobile.server.customAgents.addArgument": "Thêm tham số",
   "mobile.server.customAgents.removeArgument": "Gỡ tham số {position}",
   "mobile.server.customAgents.env": "Biến môi trường",
-  "mobile.server.customAgents.envHint": "Không bắt buộc. Giá trị được gửi tới máy chủ, và điện thoại này không lưu chúng.",
+  "mobile.server.customAgents.envHint":
+    "Không bắt buộc. Giá trị được gửi tới máy chủ, và điện thoại này không lưu chúng.",
   "mobile.server.customAgents.envKeptHint":
     "Để trống giá trị của biến đã lưu để giữ nguyên. Giá trị được gửi tới máy chủ, và điện thoại này không lưu chúng.",
   "mobile.server.customAgents.envValue": "Giá trị",
@@ -1506,7 +1544,8 @@ export const messages = {
   "mobile.server.acpRegistry.rowLabel": "{name}, {status}",
   "mobile.server.acpRegistry.installTitle": "Cài {name}?",
   "mobile.server.acpRegistry.installBody": "Máy chủ sẽ tải agent xuống và thêm agent với ID {id}.",
-  "mobile.server.acpRegistry.removeBody": "Gỡ môi trường chạy vẫn giữ cài đặt, thông tin xác thực và cuộc trò chuyện của agent.",
+  "mobile.server.acpRegistry.removeBody":
+    "Gỡ môi trường chạy vẫn giữ cài đặt, thông tin xác thực và cuộc trò chuyện của agent.",
   "mobile.server.acpRegistry.cancelTitle": "Hủy cài đặt {name}?",
   "mobile.server.acpRegistry.cancelInstall": "Hủy cài đặt",
   "mobile.server.acpRegistry.keepInstalling": "Tiếp tục cài",
@@ -1521,7 +1560,8 @@ export const messages = {
     "Mô hình từ một endpoint tương thích OpenAI, ví dụ Ollama hoặc LM Studio trên máy tính của máy chủ này.",
   "mobile.server.customProviders.add": "Thêm nhà cung cấp tùy chỉnh",
   "mobile.server.customProviders.addConfirm": "Thêm",
-  "mobile.server.customProviders.presetHint": "Mẫu có sẵn sẽ điền biểu mẫu. Bạn có thể đổi từng giá trị trước khi thêm.",
+  "mobile.server.customProviders.presetHint":
+    "Mẫu có sẵn sẽ điền biểu mẫu. Bạn có thể đổi từng giá trị trước khi thêm.",
   "mobile.server.customProviders.preset.ollama": "Ollama",
   "mobile.server.customProviders.preset.ollamaDescription":
     "Mô hình cục bộ tại 127.0.0.1:11434 trên máy tính của máy chủ.",
@@ -1534,8 +1574,7 @@ export const messages = {
   "mobile.server.customProviders.preset.acp": "Agent ACP tùy chỉnh",
   "mobile.server.customProviders.preset.acpDescription": "Cursor, Copilot CLI, Qwen Code, Goose và các agent khác.",
   "mobile.server.customProviders.desktopOnly": "Chỉ trên máy tính",
-  "mobile.server.customProviders.agentsHint":
-    "Thêm và quản lý agent ACP trong OpenBot trên máy tính chạy máy chủ này.",
+  "mobile.server.customProviders.agentsHint": "Thêm và quản lý agent ACP trong OpenBot trên máy tính chạy máy chủ này.",
   "mobile.server.customProviders.agentsCustomHint":
     "Máy chủ khởi động từng agent trên máy tính của máy chủ, bằng tài khoản người dùng của máy tính. Chỉ thêm agent mà bạn tin tưởng.",
   "mobile.server.customProviders.agentsRegistryHint":
@@ -1597,11 +1636,14 @@ export const messages = {
   "mobile.server.customProviders.editHint": "Để thay đổi endpoint này, hãy gỡ rồi thêm lại.",
   "mobile.server.customProviders.remove": "Gỡ",
   "mobile.server.customProviders.removeTitle": "Gỡ {name}?",
-  "mobile.server.customProviders.removeBody": "Agent trên máy chủ này sẽ không dùng được các mô hình của nhà cung cấp này nữa.",
+  "mobile.server.customProviders.removeBody":
+    "Agent trên máy chủ này sẽ không dùng được các mô hình của nhà cung cấp này nữa.",
   "mobile.server.customProviders.removeFailed": "OpenBot không thể gỡ endpoint này.",
   "mobile.server.mcp.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý máy chủ MCP tại đây.",
-  "mobile.server.mcp.unavailable": "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý máy chủ MCP.",
-  "mobile.server.mcp.accessUnsupported": "Hãy cập nhật OpenBot trên máy chủ này để chọn ai được dùng máy chủ MCP của máy chủ.",
+  "mobile.server.mcp.unavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để quản lý máy chủ MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Hãy cập nhật OpenBot trên máy chủ này để chọn ai được dùng máy chủ MCP của máy chủ.",
   "mobile.server.mcp.loading": "Đang tải máy chủ MCP…",
   "mobile.server.mcp.gone": "Máy chủ MCP này không còn trên máy chủ này.",
   "mobile.server.mcp.addTitle": "Thêm máy chủ MCP",
@@ -1647,12 +1689,10 @@ export const messages = {
   "mobile.server.mcp.key": "Tên",
   "mobile.server.mcp.value": "Giá trị",
   "mobile.server.mcp.enabledLabel": "Cấp cho agent",
-  "mobile.server.mcp.enabledDescription":
-    "Khi tắt, agent của máy chủ này không nhận được công cụ của máy chủ MCP này.",
+  "mobile.server.mcp.enabledDescription": "Khi tắt, agent của máy chủ này không nhận được công cụ của máy chủ MCP này.",
   "mobile.server.mcp.test": "Kiểm tra kết nối",
   "mobile.server.mcp.testing": "Đang kết nối…",
-  "mobile.server.mcp.testDescription":
-    "Kết nối một lần với các cài đặt này và hiện số công cụ. Không có gì được lưu.",
+  "mobile.server.mcp.testDescription": "Kết nối một lần với các cài đặt này và hiện số công cụ. Không có gì được lưu.",
   "mobile.server.mcp.testFailed": "Máy chủ MCP không phản hồi.",
   "mobile.server.mcp.connected": { one: "Đã kết nối · {count} công cụ", other: "Đã kết nối · {count} công cụ" },
   "mobile.server.mcp.signInOnComputer":
@@ -1661,7 +1701,8 @@ export const messages = {
   "mobile.server.mcp.signOut": "Đăng xuất",
   "mobile.server.mcp.saveFailed": "Không thể lưu thay đổi. Hãy thử lại.",
   "mobile.server.mcp.removeTitle": "Gỡ {name}?",
-  "mobile.server.mcp.removeBody": "Agent của máy chủ này sẽ không nhận công cụ của máy chủ MCP này nữa. Cài đặt không được giữ lại.",
+  "mobile.server.mcp.removeBody":
+    "Agent của máy chủ này sẽ không nhận công cụ của máy chủ MCP này nữa. Cài đặt không được giữ lại.",
   "mobile.server.mcp.remove": "Gỡ máy chủ MCP",
   "mobile.server.mcp.access.title": "Quyền truy cập",
   "mobile.server.mcp.access.agents": "Agent",
@@ -1681,8 +1722,10 @@ export const messages = {
   "mobile.server.usage.agents": "Agent",
   "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Không có mức sử dụng agent nào được ghi nhận trong khoảng này.",
-  "mobile.server.usage.unsupported": "Host này không hỗ trợ phân tích mức sử dụng. Hãy cập nhật host để dùng chế độ xem này.",
-  "mobile.server.usage.planLimitsNote": "Giới hạn hiện tại của từng nhà cung cấp. Khoảng thời gian bên dưới không ảnh hưởng đến chúng.",
+  "mobile.server.usage.unsupported":
+    "Host này không hỗ trợ phân tích mức sử dụng. Hãy cập nhật host để dùng chế độ xem này.",
+  "mobile.server.usage.planLimitsNote":
+    "Giới hạn hiện tại của từng nhà cung cấp. Khoảng thời gian bên dưới không ảnh hưởng đến chúng.",
   "mobile.server.machine.title": "Máy",
   "mobile.server.machine.cpu": "CPU",
   "mobile.server.machine.memory": "Bộ nhớ",
@@ -1737,5 +1780,302 @@ export const messages = {
     "Trên Docker host, hãy kéo image OpenBot mới và tạo lại container với cùng các volume dữ liệu. Hãy chờ công việc đang chạy hoàn tất trước. Giữ nguyên các volume hiện có để bảo toàn dữ liệu của bạn.",
   "mobile.server.update.path.manual":
     "Bản cài đặt này không thể tự thay thế. Hãy nhờ quản trị viên host cài bản phát hành tương thích từ github.com/nightly-labs/openbot/releases. Giữ nguyên dữ liệu OpenBot hiện có.",
-//@@END
+  "mobile.server.update.path.unavailable":
+    "Đây là bản dựng phát triển. Hãy dùng bản phát hành OpenBot đã cài để kiểm tra cập nhật.",
+  "mobile.server.update.check": "Kiểm tra cập nhật",
+  "mobile.server.update.start": "Cập nhật khi rảnh",
+  "mobile.server.update.restartNow": "Khởi động lại ngay",
+  "mobile.server.update.cancel": "Hủy cập nhật",
+  "mobile.server.update.scheduledTitle": "{name} sẽ khởi động lại khi các agent rảnh",
+  "mobile.server.update.scheduledNowTitle": "{name} sẽ khởi động lại khi tải xong bản cập nhật",
+  "mobile.server.update.requestedBy": "{member} đã yêu cầu bản cập nhật này.",
+  "mobile.server.update.automatic": "{name} tự động cài bản cập nhật.",
+  "mobile.server.update.autoDownloadTitle": "Tự động tải bản cập nhật",
+  "mobile.server.update.autoDownloadDescription": "{name} tải từng phiên bản OpenBot mới ngay khi phát hành.",
+  "mobile.server.update.autoInstallTitle": "Tự động cài bản cập nhật",
+  "mobile.server.update.autoInstallDescription":
+    "{name} khởi động lại vào bản cập nhật đã tải khi các agent rảnh. Thành viên bị ngắt kết nối trong thời gian ngắn và tự động kết nối lại.",
+  "mobile.server.update.waitingFor": "Đang chờ {reasons}.",
+  "mobile.server.update.disabledTitle": "Cập nhật từ xa đang tắt",
+  "mobile.server.update.disabledDescription":
+    "Người dùng của {name} đã tắt cập nhật từ thành viên máy chủ. Hãy nhờ họ cập nhật OpenBot hoặc bật cài đặt này.",
+  "mobile.server.update.managedTitle": "Host Manager kiểm soát việc cập nhật",
+  "mobile.server.update.managedDescription": "OpenBot Host Manager cập nhật {name}. Hãy liên hệ quản trị viên host.",
+  "mobile.server.update.unsupportedTitle": "{name} không thể tự cập nhật",
+  "mobile.server.update.unsupportedDescription":
+    "Bản dựng OpenBot này không có trình cập nhật. Hãy cài phiên bản mới trên {name}.",
+  "mobile.server.update.restarting": "Đang khởi động lại…",
+  "mobile.server.update.loadFailed": "Không tải được trạng thái cập nhật của {name}.",
+  "mobile.server.update.dialog.offerTitle": "Cập nhật {name} lên OpenBot {version}",
+  "mobile.server.update.dialog.offerDescription":
+    "{name} đang dùng OpenBot {current}. Máy chủ sẽ tải bản cập nhật trước, rồi khởi động lại.",
+  "mobile.server.update.dialog.offerReadyDescription":
+    "{name} đang dùng OpenBot {current}. Bản cập nhật đã được tải. {name} sẽ khởi động lại để cài đặt.",
+  "mobile.server.update.dialog.waitIdleDescription":
+    "Việc khởi động lại sẽ chờ các lượt agent và lần chạy tác vụ định kỳ hoàn tất.",
+  "mobile.server.update.dialog.updateNow": "Cập nhật ngay",
+  "mobile.server.update.dialog.restartWhenIdle": "Khởi động lại khi rảnh",
+  "mobile.server.update.reason.agentTurn": "một lượt agent",
+  "mobile.server.update.reason.queuedDelivery": "một tin nhắn trong hàng đợi",
+  "mobile.server.update.reason.drainTask": "công việc nền của agent",
+  "mobile.server.update.reason.routineRun": "một lần chạy tác vụ định kỳ",
+  "mobile.server.update.reason.channelWork": "công việc trong kênh",
+  "mobile.server.update.reason.providerProcess": "một tiến trình của nhà cung cấp",
+  "mobile.server.update.reason.remoteDesktop": "một phiên điều khiển từ xa",
+  "mobile.server.update.reason.browserView": "một chế độ xem trình duyệt",
+  "mobile.server.update.reason.fileTransfer": "một lượt truyền tệp",
+  "mobile.server.update.reason.browserControl": "agent đang điều khiển trình duyệt",
+  "mobile.server.update.reason.updateOperation": "một bước cập nhật khác",
+  "mobile.server.update.reason.initialization": "OpenBot khởi động",
+  "mobile.server.update.reason.other": "công việc khác",
+  "mobile.server.update.actionFailed": "Thao tác trên máy chủ thất bại.",
+  "mobile.server.update.unavailable": "Hãy kết nối với máy chủ này để xem các bản cập nhật OpenBot của máy chủ.",
+  "mobile.server.update.loading": "Đang tải bản cập nhật…",
+  "mobile.server.route.sites": "Trang web",
+  "mobile.server.settings.sites": "Trang web",
+  "mobile.server.settings.siteCount": { other: "{count}/{limit}" },
+  "mobile.server.sites.usage": { one: "{used}/{count} trang web", other: "{used}/{count} trang web" },
+  "mobile.server.sites.expiryNote":
+    "Trang web hết hạn 30 ngày sau khi xuất bản. Hãy nhờ agent xuất bản hoặc cập nhật trang web.",
+  "mobile.server.sites.empty": "Máy chủ này chưa có trang web lưu trữ nào. Hãy nhờ agent xuất bản một trang.",
+  "mobile.server.sites.loading": "Đang tải trang web…",
+  "mobile.server.sites.loadFailed": "Không thể tải trang web lưu trữ.",
+  "mobile.server.sites.retry": "Thử lại",
+  "mobile.server.sites.expires": "Hết hạn {date}",
+  "mobile.server.sites.blocked": "Bị chặn",
+  "mobile.server.sites.unlinked": "Chưa liên kết với máy chủ",
+  "mobile.server.sites.deleteTitle": "Xóa {hostname}?",
+  "mobile.server.sites.deleteDescription": "Địa chỉ này sẽ trả về 410 Gone ngay lập tức.",
+  "mobile.server.sites.deleteFailed": "Không thể xóa trang web.",
+  "mobile.server.sites.openFailed": "Không thể mở trang web.",
+  "mobile.server.sites.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để xem trang web của máy chủ tại đây.",
+  "mobile.server.sites.offline": "Hãy kết nối với máy chủ này để xem trang web của máy chủ.",
+  "mobile.server.route.roles": "Quyền",
+  "mobile.server.route.role": "Vai trò",
+  "mobile.server.roles.description":
+    "Chọn những agent mà thành viên có thể dùng. Chủ sở hữu và quản trị viên dùng được mọi agent.",
+  "mobile.server.roles.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để quản lý vai trò.",
+  "mobile.server.roles.unavailable":
+    "Chỉ chủ sở hữu hoặc quản trị viên của máy chủ đang trực tuyến mới quản lý được vai trò.",
+  "mobile.server.roles.loading": "Đang tải vai trò…",
+  "mobile.server.roles.loadFailed": "Không thể tải vai trò của máy chủ này.",
+  "mobile.server.roles.saveFailed": "Không thể lưu vai trò. Hãy thử lại.",
+  "mobile.server.roles.gone": "Vai trò này không còn tồn tại.",
+  "mobile.server.roles.everyone": "Mọi người",
+  "mobile.server.roles.everyoneHint": "Mọi thành viên đều có quyền truy cập này với từng agent.",
+  "mobile.server.roles.roleHint":
+    "Thành viên có vai trò này cũng nhận quyền truy cập này. Thành viên nhận quyền cao nhất giữa Mọi người và các vai trò của họ.",
+  "mobile.server.roles.title": "Vai trò",
+  "mobile.server.roles.empty": "Chưa có vai trò nào. Chạm + để tạo vai trò.",
+  "mobile.server.roles.assignHint": "Để gán vai trò cho thành viên, hãy mở thành viên đó trong Thành viên.",
+  "mobile.server.roles.create": "Tạo vai trò",
+  "mobile.server.roles.newRole": "Vai trò mới",
+  "mobile.server.roles.name": "Tên vai trò",
+  "mobile.server.roles.agents": "Agent",
+  "mobile.server.roles.noAgents": "Máy chủ này không có agent nào.",
+  "mobile.server.roles.agentCount": { one: "{count} agent", other: "{count} agent" },
+  "mobile.server.roles.memberCount": { one: "{count} thành viên", other: "{count} thành viên" },
+  "mobile.server.roles.agentLevel": "Quyền truy cập của {role} đối với {agent}",
+  "mobile.server.roles.changeInEveryone": "Đổi trong Mọi người",
+  "mobile.server.roles.setAll": "Đặt tất cả",
+  "mobile.server.roles.setAllLabel": "Đặt tất cả: quyền truy cập của {role} đối với mọi agent",
+  "mobile.server.roles.mixed": "Hỗn hợp",
+  "mobile.server.roles.delete": "Xóa vai trò",
+  "mobile.server.roles.deleteTitle": "Xóa {name}?",
+  "mobile.server.roles.deleteBody": "Thành viên có vai trò này sẽ mất các agent mà vai trò cấp cho họ.",
+  "mobile.server.roles.memberHint": "Thành viên nhận quyền cao nhất giữa Mọi người và các vai trò của họ.",
+  "mobile.server.roles.memberEmpty": "Máy chủ này chưa có vai trò nào.",
+  "mobile.server.roles.memberTitle": "Vai trò của {name}",
+  "mobile.server.roles.memberNone": "Không có vai trò",
+  "mobile.server.roles.memberAdmin": "Chủ sở hữu và quản trị viên dùng được mọi agent.",
+  "mobile.server.roles.level.none": "Không có quyền",
+  "mobile.server.roles.level.view": "Được xem",
+  "mobile.server.roles.level.chat": "Được trò chuyện",
+  "mobile.server.roles.level.manage": "Được quản lý",
+  "mobile.server.route.audit": "Nhật ký kiểm tra",
+  "mobile.server.audit.description":
+    "Các thay đổi về thành viên, vai trò và quyền truy cập agent của máy chủ này, mới nhất trước. Host giữ 500 thay đổi gần nhất.",
+  "mobile.server.audit.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để xem nhật ký kiểm tra.",
+  "mobile.server.audit.unavailable":
+    "Chỉ chủ sở hữu hoặc quản trị viên của máy chủ đang trực tuyến mới xem được nhật ký kiểm tra.",
+  "mobile.server.audit.loading": "Đang tải thay đổi…",
+  "mobile.server.audit.loadFailed": "Không thể tải nhật ký kiểm tra của máy chủ này.",
+  "mobile.server.audit.filter": "Loại thay đổi",
+  "mobile.server.audit.filterAll": "Mọi thay đổi",
+  "mobile.server.audit.filterMembers": "Thành viên",
+  "mobile.server.audit.filterRoles": "Vai trò",
+  "mobile.server.audit.filterAgents": "Quyền truy cập agent",
+  "mobile.server.audit.search": "Tìm thay đổi",
+  "mobile.server.audit.changes": "Thay đổi",
+  "mobile.server.audit.empty": "Chưa có thay đổi nào.",
+  "mobile.server.audit.noMatch": "Không có thay đổi nào khớp.",
+  "mobile.server.audit.unknownActor": "Thành viên không xác định",
+  "mobile.server.audit.to": "thành",
+  "mobile.server.audit.memberJoined": "{member} đã tham gia với vai trò {role}",
+  "mobile.server.audit.memberLeft": "{member} đã rời máy chủ",
+  "mobile.server.audit.memberRemoved": "{member} đã bị gỡ khỏi máy chủ",
+  "mobile.server.audit.memberRole": "{member}: {change}",
+  "mobile.server.audit.roleCreated": "Đã tạo vai trò {role}",
+  "mobile.server.audit.roleRenamed": "Đã đổi tên {change}",
+  "mobile.server.audit.roleDeleted": "Đã xóa vai trò {role}",
+  "mobile.server.audit.roleMemberAdded": "Đã thêm {member} vào {role}",
+  "mobile.server.audit.roleMemberRemoved": "Đã gỡ {member} khỏi {role}",
+  "mobile.server.audit.agentLevel": "{agent} cho {role}: {change}",
+  "mobile.server.settings.importAgents": "Nhập agent",
+  "mobile.server.route.import": "Nhập agent",
+  "mobile.server.import.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để nhập agent tại đây.",
+  "mobile.server.import.unavailable": "Hãy kết nối với máy chủ này để nhập agent.",
+  "mobile.server.import.count.agent": { one: "{count} agent", other: "{count} agent" },
+  "mobile.server.import.count.channel": { one: "{count} kênh", other: "{count} kênh" },
+  "mobile.server.import.count.skill": { one: "{count} kỹ năng", other: "{count} kỹ năng" },
+  "mobile.server.import.count.routine": { one: "{count} tác vụ định kỳ", other: "{count} tác vụ định kỳ" },
+  "mobile.server.import.count.memory": { one: "{count} mục bộ nhớ", other: "{count} mục bộ nhớ" },
+  "mobile.server.import.count.file": { one: "{count} tệp", other: "{count} tệp" },
+  "mobile.server.import.sourceTitle": "Agent của bạn hiện ở đâu?",
+  "mobile.server.import.sourceLede":
+    "OpenBot sao chép chúng vào máy chủ này. Bạn sẽ thấy từng mục trước khi có bất kỳ thay đổi nào.",
+  "mobile.server.import.hermesNote": "Xuất tệp .zip từ Hermes.",
+  "mobile.server.import.grokNote": "Trên đám mây. Một agent xuất dữ liệu ở đó sẽ tạo tệp .zip.",
+  "mobile.server.import.transfer": "Máy chủ OpenBot khác",
+  "mobile.server.import.transferNote": "Dùng Chuyển để di chuyển agent cùng cài đặt.",
+  "mobile.server.import.grokLede":
+    "Một agent xuất dữ liệu trong Grok Bot đóng gói tên, hướng dẫn, ảnh đại diện, kỹ năng, tác vụ định kỳ, bộ nhớ và các tệp bạn chọn vào một tệp .zip.",
+  "mobile.server.import.hermesLede":
+    "Mỗi hồ sơ Hermes trở thành một agent. Kỹ năng xuất trong Hermes đóng gói chúng vào một tệp .zip.",
+  "mobile.server.import.grokStep1": "1. Thêm agent xuất dữ liệu vào Grok Bot",
+  "mobile.server.import.hermesStep1": "1. Thêm kỹ năng xuất vào Hermes",
+  "mobile.server.import.agentMeta": "Agent Grok Bot · có kỹ năng xuất",
+  "mobile.server.import.agentNote": "Cài agent có sẵn từ trang Grok Bot của nó. Bản xuất không bao gồm agent này.",
+  "mobile.server.import.openAgentFailed": "Không thể mở trang Grok Bot.",
+  "mobile.server.import.commandNote":
+    "Nhập lệnh này trong một cuộc trò chuyện Hermes. Trong terminal, hãy chạy hermes skills install với cùng tên. Hermes quét kỹ năng trước khi cài.",
+  "mobile.server.import.step2": "2. Gửi cho nó tin nhắn này",
+  "mobile.server.import.copy": "Sao chép",
+  "mobile.server.import.copied": "Đã sao chép",
+  "mobile.server.import.copyLabel": "Sao chép {text}",
+  "mobile.server.import.grokMessageNote":
+    "Agent sẽ hỏi có được kèm tệp trong không gian làm việc không, rồi lưu tệp .zip vào Tải xuống.",
+  "mobile.server.import.hermesMessageNote":
+    "Hermes sẽ hỏi cần xuất những hồ sơ nào, rồi lưu tệp .zip vào Tải xuống. Khóa và máy chủ MCP vẫn ở lại Hermes.",
+  "mobile.server.import.step3": "3. Chọn tệp .zip",
+  "mobile.server.import.choose": "Chọn tệp xuất",
+  "mobile.server.import.reading": "Đang đọc bản xuất…",
+  "mobile.server.import.sending": "Đang gửi bản xuất… {percent}%",
+  "mobile.server.import.chooseNote":
+    "Hãy đưa tệp vào điện thoại này trước, ví dụ trong Tệp. Bạn sẽ thấy các agent trong đó trước khi có bất kỳ thay đổi nào.",
+  "mobile.server.import.readFailed": "Không thể đọc bản xuất.",
+  "mobile.server.import.reviewTitle": "Bản xuất {source}",
+  "mobile.server.import.exported": "Đã xuất {date}",
+  "mobile.server.import.fileSize": "{size} tệp",
+  "mobile.server.import.noFiles": "Không có tệp không gian làm việc",
+  "mobile.server.import.chooseAnother": "Chọn bản xuất khác",
+  "mobile.server.import.warnings": "Một số mục sẽ không được chuyển",
+  "mobile.server.import.agents": "Agent",
+  "mobile.server.import.channels": "Kênh",
+  "mobile.server.import.selected": "Đã chọn {selected}/{total}",
+  "mobile.server.import.nameExists": "Đã có agent tên {name}. Việc nhập sẽ thêm một agent khác.",
+  "mobile.server.import.channelNeedsMember": "Hãy chọn ít nhất một agent của kênh để nhập kênh.",
+  "mobile.server.import.channelWithout": "Nhập mà không có {names}.",
+  "mobile.server.import.importAgents": "Nhập {agents}",
+  "mobile.server.import.importBoth": "Nhập {agents} và {channels}",
+  "mobile.server.import.importing": "Đang nhập…",
+  "mobile.server.import.applyFailed": "Việc nhập chưa hoàn tất.",
+  "mobile.server.import.duplicatesTitle": "Nhập agent trùng lặp?",
+  "mobile.server.import.duplicatesBody":
+    "Các agent này đã có trên máy chủ này: {names}. Việc nhập sẽ thêm bản sao thứ hai cho mỗi agent. Mỗi bản sao là một agent riêng với cuộc trò chuyện, tệp và bộ nhớ riêng.",
+  "mobile.server.import.duplicatesConfirm": "Nhập bản trùng",
+  "mobile.server.import.resultTitle": "Đã nhập xong",
+  "mobile.server.import.importedAgents": "Đã nhập {agents}",
+  "mobile.server.import.importedBoth": "Đã nhập {agents} và {channels}",
+  "mobile.server.import.notImported": "Không nhập được {items}.",
+  "mobile.server.import.notImportedBoth": "Không nhập được {agents} và {channels}.",
+  "mobile.server.import.imported": "Đã nhập",
+  "mobile.server.import.channel": "Kênh",
+  "mobile.server.import.notImportedTitle": "Chưa nhập",
+  "mobile.server.import.resultWarnings": "Một số mục không được chuyển",
+  "mobile.server.settings.transfer": "Chuyển",
+  "mobile.server.route.transfer": "Chuyển",
+  "mobile.server.route.transferExport": "Xuất",
+  "mobile.server.route.transferImport": "Nhập",
+  "mobile.server.route.transferCopy": "Sao chép sang máy chủ khác",
+  "mobile.server.transfer.unsupported": "Hãy cập nhật OpenBot trên máy chủ này để chuyển máy chủ tại đây.",
+  "mobile.server.transfer.unavailable":
+    "Hãy kết nối với máy chủ này với vai trò chủ sở hữu hoặc quản trị viên để chuyển máy chủ.",
+  "mobile.server.transfer.title": "Chuyển máy chủ này sang máy tính khác",
+  "mobile.server.transfer.lede": "Agent cùng kỹ năng, tác vụ định kỳ, bộ nhớ và tệp của chúng được gom vào một tệp.",
+  "mobile.server.transfer.export": "Xuất từ máy chủ này",
+  "mobile.server.transfer.exportNote": "Lưu agent và cài đặt máy chủ vào một tệp.",
+  "mobile.server.transfer.import": "Nhập vào máy chủ này",
+  "mobile.server.transfer.importNote": "Thêm agent và cài đặt máy chủ từ một tệp.",
+  "mobile.server.transfer.notMoved":
+    "Khóa API, thông tin đăng nhập, trình kết nối, tùy chọn ứng dụng và lịch sử trò chuyện không được chuyển. Hãy thiết lập lại chúng trên máy chủ mới.",
+  "mobile.server.transfer.loading": "Đang đọc agent…",
+  "mobile.server.transfer.loadFailed": "Không thể đọc agent của máy chủ này.",
+  "mobile.server.transfer.retry": "Thử lại",
+  "mobile.server.transfer.contains": "Nội dung tệp",
+  "mobile.server.transfer.filesSize": "{size} tệp",
+  "mobile.server.transfer.noFiles": "Không có tệp",
+  "mobile.server.transfer.settings": "Cài đặt máy chủ",
+  "mobile.server.transfer.noSettings": "Không có cài đặt máy chủ",
+  "mobile.server.transfer.includeFiles": "Kèm tệp không gian làm việc",
+  "mobile.server.transfer.includeFilesNote":
+    "Tệp do agent tạo, và thư mục Shared. Tắt để có tệp nhỏ. Tệp từ điện thoại phải dưới 100 MB.",
+  "mobile.server.transfer.includeSettings": "Kèm cài đặt máy chủ",
+  "mobile.server.transfer.includeSettingsNote":
+    "Máy chủ MCP, nhà cung cấp mô hình tùy chỉnh, mục thanh bên và luồng tác vụ định kỳ.",
+  "mobile.server.transfer.exportAgents": "Agent cần xuất",
+  "mobile.server.transfer.exportFile": "Xuất và chia sẻ",
+  "mobile.server.transfer.exporting": "Đang xuất…",
+  "mobile.server.transfer.exportFailed": "Việc xuất chưa hoàn tất.",
+  "mobile.server.transfer.sharingUnavailable": "Điện thoại này không thể chia sẻ tệp.",
+  "mobile.server.transfer.saved": "Bản xuất đã sẵn sàng",
+  "mobile.server.transfer.savedStep1": "Sao chép tệp sang máy tính của máy chủ mới",
+  "mobile.server.transfer.savedStep1Note": "Dùng AirDrop, thư mục đám mây hoặc ổ USB.",
+  "mobile.server.transfer.savedStep2": "Mở Cài đặt máy chủ › Chuyển của máy chủ mới",
+  "mobile.server.transfer.savedStep2Note":
+    "Chọn “Nhập vào máy chủ này” và chọn tệp. Bạn sẽ thấy nội dung tệp trước khi có bất kỳ thay đổi nào.",
+  "mobile.server.transfer.shareAgain": "Chia sẻ lại tệp",
+  "mobile.server.transfer.exportAgain": "Xuất lại",
+  "mobile.server.transfer.importLede": "Chọn tệp bạn đã xuất từ máy chủ kia. Tệp có đuôi .zip và phải dưới 100 MB.",
+  "mobile.server.transfer.choose": "Chọn tệp",
+  "mobile.server.transfer.reading": "Đang đọc tệp…",
+  "mobile.server.transfer.sending": "Đang gửi tệp… {percent}%",
+  "mobile.server.transfer.openFailed": "Không thể mở tệp.",
+  "mobile.server.transfer.source": "OpenBot {version} · xuất {date}",
+  "mobile.server.transfer.sourceNoDate": "OpenBot {version}",
+  "mobile.server.transfer.importWarnings": "Trước khi bắt đầu nhập",
+  "mobile.server.transfer.importAgents": "Agent trong tệp",
+  "mobile.server.transfer.nameExists": "Tên đã được dùng",
+  "mobile.server.transfer.importSettings": "Nhập cài đặt máy chủ",
+  "mobile.server.transfer.importSettingsNote":
+    "Thêm các máy chủ MCP, nhà cung cấp mô hình tùy chỉnh và mục thanh bên mà máy chủ này chưa có.",
+  "mobile.server.transfer.submit": { one: "Nhập {count} agent", other: "Nhập {count} agent" },
+  "mobile.server.transfer.submitSettings": "Nhập cài đặt máy chủ",
+  "mobile.server.transfer.importing": "Đang nhập…",
+  "mobile.server.transfer.importFailed": "Việc nhập chưa hoàn tất.",
+  "mobile.server.transfer.chooseAnother": "Chọn tệp khác",
+  "mobile.server.transfer.imported": { one: "Đã nhập {count} agent", other: "Đã nhập {count} agent" },
+  "mobile.server.transfer.next": "Agent đã nhập dùng quy tắc phê duyệt của máy chủ này.",
+  "mobile.server.transfer.signIn": "Đăng nhập lại",
+  "mobile.server.transfer.signInNote":
+    "Các nhà cung cấp này đã đăng nhập trên máy chủ kia nhưng chưa đăng nhập ở đây. Hãy đăng nhập trong Cài đặt máy chủ › Nhà cung cấp.",
+  "mobile.server.transfer.notImported": "Chưa nhập",
+  "mobile.server.transfer.warnings": "Hãy kiểm tra",
+  "mobile.server.transfer.copy": "Sao chép sang máy chủ khác",
+  "mobile.server.transfer.copyNote": "Gửi agent sang một máy chủ khác của bạn.",
+  "mobile.server.transfer.copyTo": "Đến",
+  "mobile.server.transfer.copyNoAgents": "Máy chủ này không có agent nào.",
+  "mobile.server.transfer.copyNotMoved":
+    "Kênh, luồng tác vụ định kỳ, quy trình và thư mục Shared của agent cũng được sao chép. Khóa API, thông tin đăng nhập, trình kết nối và lịch sử trò chuyện không được sao chép. Hãy thiết lập lại chúng trên máy chủ kia.",
+  "mobile.server.transfer.copySubmit": { one: "Sao chép {count} agent", other: "Sao chép {count} agent" },
+  "mobile.server.transfer.copying": "Đang sao chép…",
+  "mobile.server.transfer.copyFailed": "Việc sao chép chưa hoàn tất.",
+  "mobile.server.transfer.copied": {
+    one: "Đã sao chép {count} agent sang {server}.",
+    other: "Đã sao chép {count} agent sang {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agent cần sao chép",
+  "mobile.server.transfer.copyNext": "Agent đã sao chép dùng quy tắc phê duyệt của {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Hãy kết nối với một máy chủ khác với vai trò chủ sở hữu hoặc quản trị viên để sao chép agent sang đó.",
 } as const satisfies PartialTranslation<typeof source>;

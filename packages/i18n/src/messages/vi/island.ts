@@ -46,7 +46,8 @@ export const messages = {
   "island.takeover.title": "Bước trong trình duyệt cần bạn",
   "island.takeover.detail": "Hoàn tất đăng nhập, xác minh hoặc đồng ý trong trình duyệt.",
   "island.approval.fallback": "Xem lại hành động được yêu cầu trước khi chạy.",
-  "island.approval.openOnDesktop": "Mở yêu cầu này trong ứng dụng trên máy tính để xem đầy đủ chi tiết trước khi phê duyệt.",
+  "island.approval.openOnDesktop":
+    "Mở yêu cầu này trong ứng dụng trên máy tính để xem đầy đủ chi tiết trước khi phê duyệt.",
   "island.approval.command": "Lệnh",
   "island.approval.files": "Tệp",
   "island.approval.workspace": "Không gian làm việc của agent",

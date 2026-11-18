@@ -62,13 +62,13 @@ export const messages = {
   "mobile.browser.help.rightClick.title": "Nhấp chuột phải",
   "mobile.browser.help.rightClick.body": "Chạm bằng hai ngón tay, hoặc nhấn giữ.",
   "mobile.browser.help.zoom.title": "Phóng to",
-  "mobile.browser.help.zoom.body": "Chụm ngón tay để thu phóng. Khi đã phóng to, hai ngón tay sẽ kéo khung nhìn thay vì cuộn.",
+  "mobile.browser.help.zoom.body":
+    "Chụm ngón tay để thu phóng. Khi đã phóng to, hai ngón tay sẽ kéo khung nhìn thay vì cuộn.",
   "mobile.browser.help.pages": "Trang và thẻ",
   "mobile.browser.help.navigate.title": "Lùi và tiến",
   "mobile.browser.help.navigate.body": "Chạm vào các mũi tên ở thanh dưới cùng. Tải lại trang nằm trong menu ···.",
   "mobile.browser.help.tabs.title": "Thẻ",
-  "mobile.browser.help.tabs.body":
-    "Chạm vào nút thẻ ở thanh dưới cùng để chuyển thẻ, mở thẻ mới hoặc đóng thẻ này.",
+  "mobile.browser.help.tabs.body": "Chạm vào nút thẻ ở thanh dưới cùng để chuyển thẻ, mở thẻ mới hoặc đóng thẻ này.",
   "mobile.browser.help.typing": "Nhập liệu và bộ nhớ tạm",
   "mobile.browser.help.type.title": "Nhập",
   "mobile.browser.help.type.body": "Chạm vào nút bàn phím ở thanh dưới cùng.",

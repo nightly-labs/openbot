@@ -90,7 +90,8 @@ export const messages = {
   "browser.secret.saveHintLocal": "Sau đó, các agent trên máy tính này có thể đăng nhập mà không cần hỏi bạn.",
   "browser.secret.saveHintRemote":
     "Thông tin được lưu trên {server}. Sau đó, các agent của máy chủ có thể đăng nhập mà không cần hỏi bạn.",
-  "browser.secret.saveBlockedRole": "Chỉ chủ sở hữu hoặc quản trị viên của {server} mới có thể lưu vào Kho bảo mật của máy chủ.",
+  "browser.secret.saveBlockedRole":
+    "Chỉ chủ sở hữu hoặc quản trị viên của {server} mới có thể lưu vào Kho bảo mật của máy chủ.",
   "browser.secret.saveBlockedVersion": "Cập nhật OpenBot trên {server} để lưu mật khẩu vào Kho bảo mật của máy chủ.",
   "browser.secret.signInPage": "Trang đăng nhập",
   "browser.secret.openSignInPage": "Mở trang đăng nhập trong trình duyệt",
@@ -173,15 +174,13 @@ export const messages = {
     "Một số trang từ chối đăng nhập từ máy chủ. Hãy đăng nhập trên máy tính này, OpenBot sẽ gửi thông tin đăng nhập {site} đến {server}. Sau đó, mọi agent và thành viên trên {server} đều có thể dùng nó trong trình duyệt.",
   "browser.signIn.windowOpen":
     "Hãy đăng nhập trong cửa sổ vừa mở. OpenBot sẽ gửi thông tin đăng nhập khi hoàn tất. Nếu cửa sổ vẫn mở, hãy chọn Xong.",
-  "browser.signIn.windowClosed":
-    "Cửa sổ đăng nhập đã đóng. Chọn Xong để gửi thông tin đăng nhập, hoặc mở lại cửa sổ.",
+  "browser.signIn.windowClosed": "Cửa sổ đăng nhập đã đóng. Chọn Xong để gửi thông tin đăng nhập, hoặc mở lại cửa sổ.",
   "browser.signIn.reopen": "Mở cửa sổ đăng nhập",
   "browser.signIn.sending": "Đang gửi đến {server}…",
   "browser.signIn.sent": "Đã đăng nhập vào {site} trên {server}",
   "browser.signIn.notFound":
     "OpenBot không tìm thấy thông tin đăng nhập cho {site}. Hãy đăng nhập trong cửa sổ, rồi chọn Xong.",
-  "browser.signIn.stillSignedOut":
-    "{server} vẫn hiện trang đăng nhập của {site}. Hãy hoàn tất đăng nhập trong cửa sổ.",
+  "browser.signIn.stillSignedOut": "{server} vẫn hiện trang đăng nhập của {site}. Hãy hoàn tất đăng nhập trong cửa sổ.",
   "browser.signIn.failed": "OpenBot không thể gửi thông tin đăng nhập.",
   "browser.profiles.title": "Hồ sơ trình duyệt",
   "browser.profiles.subtitle":

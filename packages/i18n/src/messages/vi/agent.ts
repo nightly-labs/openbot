@@ -31,7 +31,8 @@ export const messages = {
   "agent.setup.suggestion.tripPlanner.purpose":
     "So sánh các lựa chọn đi lại và biến ý tưởng sơ bộ của tôi thành lịch trình thực tế theo từng ngày.",
   "agent.setup.suggestion.personalOrganizer.name": "Thư ký cá nhân",
-  "agent.setup.suggestion.personalOrganizer.description": "Biến ghi chú, việc vặt và công việc thành một kế hoạch đơn giản.",
+  "agent.setup.suggestion.personalOrganizer.description":
+    "Biến ghi chú, việc vặt và công việc thành một kế hoạch đơn giản.",
   "agent.setup.suggestion.personalOrganizer.purpose":
     "Sắp xếp ghi chú, việc vặt và các công việc rời rạc của tôi thành những ưu tiên rõ ràng và các bước tiếp theo đơn giản.",
   "agent.setup.suggestion.shoppingScout.name": "Trợ lý mua sắm",

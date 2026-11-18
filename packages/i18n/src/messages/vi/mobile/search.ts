@@ -12,7 +12,8 @@ export const messages = {
   "mobile.search.thread.changeAgent": "Chọn agent khác",
   "mobile.search.thread.newTextFor": "Luồng mới “{text}” với",
   "mobile.search.thread.newFor": "Luồng mới với {name}",
-  "mobile.search.thread.how": "{name} sẽ làm việc này trong một luồng mới và báo cáo lại ở đó. Bạn chỉ muốn trò chuyện?",
+  "mobile.search.thread.how":
+    "{name} sẽ làm việc này trong một luồng mới và báo cáo lại ở đó. Bạn chỉ muốn trò chuyện?",
   "mobile.search.thread.message": "Nhắn tin cho {name}",
   "mobile.search.thread.ideas": "Ý tưởng",
   "mobile.search.thread.ideaHint": "Đưa nội dung này vào ô tin nhắn.",

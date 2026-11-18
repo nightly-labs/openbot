@@ -3,8 +3,7 @@ import type { messages as source } from "../en/sitePage";
 
 export const messages = {
   "sitePage.error.title": "Không thể tải trang này",
-  "sitePage.error.body":
-    "Hãy kiểm tra kết nối và tải lại trang. Nếu trang vẫn không tải được, hãy quay về trang chủ.",
+  "sitePage.error.body": "Hãy kiểm tra kết nối và tải lại trang. Nếu trang vẫn không tải được, hãy quay về trang chủ.",
   "sitePage.error.reload": "Tải lại trang",
   "sitePage.error.home": "Về trang chủ",
   "sitePage.join.title": "Tham gia máy chủ OpenBot",
@@ -12,8 +11,7 @@ export const messages = {
   "sitePage.join.eyebrow": "Lời mời riêng",
   "sitePage.join.intro":
     "Mở lời mời này trong OpenBot. Ứng dụng sẽ kiểm tra máy chủ và yêu cầu bạn xác nhận trước khi kết nối.",
-  "sitePage.join.invalid":
-    "Liên kết mời này không hợp lệ hoặc không đầy đủ. Hãy xin chủ máy chủ một lời mời mới.",
+  "sitePage.join.invalid": "Liên kết mời này không hợp lệ hoặc không đầy đủ. Hãy xin chủ máy chủ một lời mời mới.",
   "sitePage.join.open": "Mở OpenBot",
   "sitePage.join.browser": "Mở trong trình duyệt",
   "sitePage.join.noApp": "Chưa có ứng dụng? {browser} hoặc {download}.",
@@ -138,8 +136,7 @@ export const messages = {
   "sitePage.teams.audience.agencies": "Agency triển khai môi trường agent cho khách hàng của mình.",
   "sitePage.teams.audience.allDay": "Nhóm cần agent sẵn sàng suốt ngày đêm.",
   "sitePage.teams.audience.integrations": "Tổ chức cần tích hợp với các công cụ nội bộ.",
-  "sitePage.teams.audience.support":
-    "Doanh nghiệp muốn được hỗ trợ triển khai thay vì tự xây dựng mọi thứ.",
+  "sitePage.teams.audience.support": "Doanh nghiệp muốn được hỗ trợ triển khai thay vì tự xây dựng mọi thứ.",
   "sitePage.teams.closing.heading": "Hãy cho chúng tôi biết bạn muốn {accent} của mình làm được gì",
   "sitePage.teams.closing.accent": "đồng nghiệp AI",
   "sitePage.teams.closing.action": "Trao đổi về cách thiết lập",
@@ -148,7 +145,8 @@ export const messages = {
     "Gửi tin nhắn cho đội ngũ OpenBot về thiết lập tùy chỉnh, hợp tác hoặc báo chí. Mỗi tin nhắn đều được một người đọc.",
   "sitePage.contact.imageAlt": "Small team. Always on it. Các agent OpenBot quanh một hành tinh giấy",
   "sitePage.contact.heading": "Trao đổi với đội ngũ",
-  "sitePage.contact.intro": "Hãy cho chúng tôi biết bạn cần gì. Mỗi tin nhắn đều được một thành viên đội ngũ OpenBot đọc.",
+  "sitePage.contact.intro":
+    "Hãy cho chúng tôi biết bạn cần gì. Mỗi tin nhắn đều được một thành viên đội ngũ OpenBot đọc.",
   "sitePage.contact.channel.discord": "Cộng đồng và trợ giúp",
   "sitePage.contact.channel.github": "Lỗi và mã nguồn",
   "sitePage.contact.channel.x": "Tin tức",
@@ -215,7 +213,8 @@ export const messages = {
     "Do một người dùng OpenBot khác tạo. OpenBot đã xem xét trước khi phát hành. Sau khi được thêm, agent có thể thay bạn thực hiện hành động.",
   "sitePage.marketplace.trust.agentPending":
     "Được người tạo chia sẻ trước khi OpenBot xem xét. Sau khi được thêm, agent có thể thay bạn thực hiện hành động.",
-  "sitePage.marketplace.trust.skillReviewed": "Do một người dùng OpenBot khác tạo. OpenBot đã xem xét trước khi phát hành.",
+  "sitePage.marketplace.trust.skillReviewed":
+    "Do một người dùng OpenBot khác tạo. OpenBot đã xem xét trước khi phát hành.",
   "sitePage.marketplace.source.verified": "Đã được OpenBot xác minh",
   "sitePage.marketplace.source.reviewed": "Đã được OpenBot xem xét",
   "sitePage.marketplace.source.pending": "Chưa được xem xét",
@@ -253,8 +252,10 @@ export const messages = {
   "sitePage.landing.network.eggs.party": "Chế độ tiệc tùng.\nAi mang pháo giấy đến vậy?\nGiờ nhảy múa.",
   "sitePage.landing.network.eggs.sudo": "Sự việc này sẽ được báo cáo.\nCố lắm đấy.\nBạn không có trong tệp sudoers.",
   "sitePage.landing.network.eggs.tickle": "Nhột quá.\nNày.\nTôi thấy rồi nhé.",
-  "sitePage.landing.network.eggs.awake": "Được rồi, được rồi. Tôi tỉnh rồi.\nSao thế? Tôi giúp gì được?\nTôi đang nghe đây.",
-  "sitePage.landing.network.eggs.busy": "Làm ơn. Tôi đang chuyển tin nhắn.\nTôi còn việc phải làm.\nĐừng làm vậy nữa mà.",
+  "sitePage.landing.network.eggs.awake":
+    "Được rồi, được rồi. Tôi tỉnh rồi.\nSao thế? Tôi giúp gì được?\nTôi đang nghe đây.",
+  "sitePage.landing.network.eggs.busy":
+    "Làm ơn. Tôi đang chuyển tin nhắn.\nTôi còn việc phải làm.\nĐừng làm vậy nữa mà.",
   "sitePage.landing.network.eggs.wonder": "Gì thế nhỉ?\nBạn có thấy không?\nTrung tâm có ổn không vậy?",
   "sitePage.landing.network.eggs.sneeze": "Hắt xì!\nHắt… xì!",
   "sitePage.landing.network.eggs.blessings": "Sống lâu trăm tuổi.\nGesundheit.\nSalud.\nChúc sức khỏe!",
@@ -325,18 +326,22 @@ export const messages = {
   "sitePage.landing.pricing.license": "Giấy phép cho công việc",
   "sitePage.landing.teams.title": "OpenBot cho nhóm",
   "sitePage.landing.teams.statement": "Đồng nghiệp AI cho cả công ty của bạn.",
-  "sitePage.landing.teams.description": "Chúng tôi chạy OpenBot trên máy chủ được quản lý và thiết lập theo nhóm cũng như công cụ của bạn.",
+  "sitePage.landing.teams.description":
+    "Chúng tôi chạy OpenBot trên máy chủ được quản lý và thiết lập theo nhóm cũng như công cụ của bạn.",
   "sitePage.landing.teams.contact": "Liên hệ chúng tôi",
   "sitePage.landing.teams.learn": "Tìm hiểu về Teams",
   "sitePage.landing.teams.servers.label": "Máy chủ được quản lý",
   "sitePage.landing.teams.servers.title": "Luôn hoạt động",
-  "sitePage.landing.teams.servers.description": "Agent chạy trên máy chủ được quản lý, không phải trên laptop của ai đó.",
+  "sitePage.landing.teams.servers.description":
+    "Agent chạy trên máy chủ được quản lý, không phải trên laptop của ai đó.",
   "sitePage.landing.teams.environments.label": "Môi trường nhóm",
   "sitePage.landing.teams.environments.title": "Dùng chung hoặc cá nhân",
-  "sitePage.landing.teams.environments.description": "Một máy chủ cho cả công ty, mỗi nhân viên một máy chủ, hoặc cả hai.",
+  "sitePage.landing.teams.environments.description":
+    "Một máy chủ cho cả công ty, mỗi nhân viên một máy chủ, hoặc cả hai.",
   "sitePage.landing.teams.integrations.label": "Tích hợp tùy chỉnh",
   "sitePage.landing.teams.integrations.title": "Công cụ của bạn",
-  "sitePage.landing.teams.integrations.description": "Chúng tôi kết nối OpenBot với hệ thống, API và quy trình của bạn.",
+  "sitePage.landing.teams.integrations.description":
+    "Chúng tôi kết nối OpenBot với hệ thống, API và quy trình của bạn.",
   "sitePage.landing.teams.support.label": "Triển khai và hỗ trợ",
   "sitePage.landing.teams.support.title": "Chúng tôi cùng bạn triển khai",
   "sitePage.landing.teams.support.description": "Thiết lập, kiểm thử, hướng dẫn ban đầu và hỗ trợ lâu dài.",

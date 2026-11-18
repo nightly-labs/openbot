@@ -64,13 +64,15 @@ export const messages = {
   "update.whatsNew.failed.body":
     "Hãy kiểm tra kết nối mạng rồi thử lại. Nhật ký thay đổi đầy đủ cũng liệt kê mọi thay đổi.",
   "update.whatsNew.empty.title": "Phiên bản này không có tính năng mới",
-  "update.whatsNew.empty.body": "Phiên bản này không có ghi chú để hiển thị tại đây. Nhật ký thay đổi đầy đủ liệt kê mọi thay đổi.",
+  "update.whatsNew.empty.body":
+    "Phiên bản này không có ghi chú để hiển thị tại đây. Nhật ký thay đổi đầy đủ liệt kê mọi thay đổi.",
   "update.whatsNew.changelog": "Nhật ký thay đổi đầy đủ",
   "update.whatsNew.changelogFailed": "OpenBot không thể mở nhật ký thay đổi.",
   "update.whatsNew.done": "Đã hiểu",
 
   "update.required.title": "Cần cập nhật",
-  "update.required.description": "OpenBot {version} không còn được hỗ trợ. Hãy cập nhật lên {minimum} trở lên để tiếp tục.",
+  "update.required.description":
+    "OpenBot {version} không còn được hỗ trợ. Hãy cập nhật lên {minimum} trở lên để tiếp tục.",
   "update.required.download": "Tải OpenBot",
   "update.required.continue": "Tiếp tục mà không cập nhật",
   "update.required.failed": "Cập nhật chưa hoàn tất.",

@@ -91,7 +91,8 @@ export const messages = {
   "billing.license.buy": "Mua giấy phép",
   "billing.license.offer.title": "Giấy phép thương mại",
   "billing.license.offer.description": "Starter cho 1 người dùng, hoặc Team cho từ {count} người dùng trở lên.",
-  "billing.license.buy.description": "Có bao nhiêu người dùng OpenBot trong công việc? Agent AI không tính là người dùng.",
+  "billing.license.buy.description":
+    "Có bao nhiêu người dùng OpenBot trong công việc? Agent AI không tính là người dùng.",
   "billing.license.buy.confirm": "Tiếp tục thanh toán",
   "billing.license.trial.until": "Miễn phí đến {date}",
   "billing.license.trial.confirm": "Bắt đầu dùng thử miễn phí",
@@ -112,7 +113,8 @@ export const messages = {
   "billing.license.action.changeToYear": "Chuyển sang theo năm",
   "billing.license.action.cancel": "Hủy giấy phép",
   "billing.license.action.renew": "Gia hạn giấy phép",
-  "billing.license.paymentFailed": "Một khoản thanh toán giấy phép thất bại. Hãy cập nhật phương thức thanh toán để giữ giấy phép.",
+  "billing.license.paymentFailed":
+    "Một khoản thanh toán giấy phép thất bại. Hãy cập nhật phương thức thanh toán để giữ giấy phép.",
   "billing.license.overLimit":
     "{used} người đang dùng giấy phép, nhưng giấy phép chỉ dành cho {users} người dùng. Người mới không thể tham gia cho đến khi bạn thêm người dùng vào giấy phép.",
   "billing.license.overLimitOneUser":
@@ -120,7 +122,8 @@ export const messages = {
   "billing.license.covered.title": "Thuộc phạm vi giấy phép",
   "billing.license.covered.description": "Công việc trên máy chủ của {owners} thuộc phạm vi giấy phép của họ.",
   "billing.license.change.title": "Đổi số người dùng",
-  "billing.license.change.description": "Hiện tại: {users} người dùng, {amount} mỗi tháng. Agent AI không tính là người dùng.",
+  "billing.license.change.description":
+    "Hiện tại: {users} người dùng, {amount} mỗi tháng. Agent AI không tính là người dùng.",
   "billing.license.change.minimum": "Hiện có {used} người đang dùng giấy phép. Bạn không thể đặt ít người dùng hơn.",
   "billing.license.change.more": { other: "Hơn {count}" },
   "billing.license.change.custom": "Tùy chỉnh",
@@ -136,7 +139,8 @@ export const messages = {
   "billing.license.plan.charge": "Bạn trả ngay phần chênh lệch cho thời gian còn lại của kỳ này.",
   "billing.license.change.decrease": "Mức giá thấp hơn bắt đầu từ hóa đơn tiếp theo. Không có hoàn tiền.",
   "billing.license.users.title": "Người dùng giấy phép",
-  "billing.license.users.description": "{used}/{users} người dùng. Thành viên máy chủ của bạn được tính. Agent AI thì không.",
+  "billing.license.users.description":
+    "{used}/{users} người dùng. Thành viên máy chủ của bạn được tính. Agent AI thì không.",
   "billing.license.users.owner": "Chủ sở hữu",
   "billing.license.cancel.title": "Hủy giấy phép?",
   "billing.license.cancel.description":
@@ -182,7 +186,10 @@ export const messages = {
     other: "Máy chủ {plan}, tối đa {count} thành viên",
   },
   "billing.order.summary.starterLicense": "Giấy phép Starter, 1 thành viên",
-  "billing.order.summary.license": { one: "Giấy phép Team, {count} thành viên", other: "Giấy phép Team, {count} thành viên" },
+  "billing.order.summary.license": {
+    one: "Giấy phép Team, {count} thành viên",
+    other: "Giấy phép Team, {count} thành viên",
+  },
   "billing.order.summary.yearlyDiscount": "Giảm giá theo năm ({percent}%)",
   "billing.order.summary.bundleDiscount": "Giảm giá trọn gói",
   "billing.order.summary.personal": "Sử dụng cá nhân trên máy tính của bạn",

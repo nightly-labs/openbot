@@ -22,8 +22,7 @@ export const messages = {
     "Dùng chữ thường, chữ số, dấu gạch ngang hoặc dấu gạch dưới, bắt đầu bằng một chữ cái hoặc chữ số.",
   "customProvider.error.providerIdLength": "ID nhà cung cấp phải ngắn hơn {max} ký tự.",
   "customProvider.error.providerIdBuiltIn": "OpenBot đã có nhà cung cấp tên {id}. Hãy chọn ID khác.",
-  "customProvider.error.providerIdSaved":
-    "Đã lưu một endpoint tên {id}. Hãy gỡ nó trước, hoặc chọn ID khác.",
+  "customProvider.error.providerIdSaved": "Đã lưu một endpoint tên {id}. Hãy gỡ nó trước, hoặc chọn ID khác.",
   "customProvider.error.displayNameRequired": "Hãy nhập tên hiển thị.",
   "customProvider.error.displayNameLength": "Tên hiển thị phải ngắn hơn {max} ký tự.",
   "customProvider.error.apiKeyLength": "Khóa API phải ngắn hơn {max} ký tự.",
@@ -31,7 +30,8 @@ export const messages = {
   "customProvider.error.modelsLimit": "Chỉ thêm tối đa {max} mô hình.",
   "customProvider.error.modelIdRequired": "Hãy nhập ID mô hình.",
   "customProvider.error.modelIdDuplicate": "Nhà cung cấp này đã có {id}.",
-  "customProvider.error.modelIdInvalid": "Không dùng được ID mô hình này. Hãy bỏ dấu cách, dấu ngoặc kép và các dấu câu khác.",
+  "customProvider.error.modelIdInvalid":
+    "Không dùng được ID mô hình này. Hãy bỏ dấu cách, dấu ngoặc kép và các dấu câu khác.",
   "customProvider.error.contextWindowInvalid": "Hãy nhập số token nguyên từ {min} đến {max}.",
   "customProvider.error.maxOutputInvalid": "Hãy nhập số token nguyên từ {min} đến {max}.",
   "customProvider.error.maxOutputNeedsWindow": "Đầu ra tối đa cần có cửa sổ ngữ cảnh.",
@@ -234,10 +234,12 @@ export const messages = {
     "Các biến đã lưu của agent này sẽ bị loại bỏ, và mỗi agent đang dùng nó sẽ chuyển sang mô hình mặc định.",
   "customProvider.agents.saveFailed": "OpenBot không lưu được agent này.",
   "customProvider.agents.saved.restarted": "Đã lưu. OpenBot đã khởi động lại các agent tùy chỉnh.",
-  "customProvider.agents.saved.skippedBusy": "Đã lưu. Các agent tùy chỉnh sẽ khởi động lại sau khi tác vụ hiện tại dừng.",
+  "customProvider.agents.saved.skippedBusy":
+    "Đã lưu. Các agent tùy chỉnh sẽ khởi động lại sau khi tác vụ hiện tại dừng.",
   "customProvider.agents.saved.notRunning": "Đã lưu. Các agent tùy chỉnh sẽ đọc thay đổi vào lần khởi động tới.",
   "customProvider.agents.removed.restarted": "Đã gỡ. OpenBot đã khởi động lại các agent tùy chỉnh.",
-  "customProvider.agents.removed.skippedBusy": "Đã gỡ. Các agent tùy chỉnh sẽ khởi động lại sau khi tác vụ hiện tại dừng.",
+  "customProvider.agents.removed.skippedBusy":
+    "Đã gỡ. Các agent tùy chỉnh sẽ khởi động lại sau khi tác vụ hiện tại dừng.",
   "customProvider.agents.removed.notRunning": "Đã gỡ. Các agent tùy chỉnh sẽ đọc thay đổi vào lần khởi động tới.",
   "customProvider.list.title": "Nhà cung cấp tùy chỉnh",
   "customProvider.list.description": "Các endpoint bạn đã lưu. Hãy gỡ những endpoint bạn không còn dùng.",

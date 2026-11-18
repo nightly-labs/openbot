@@ -312,7 +312,8 @@ export const messages = {
   "mobile.chat.message.agentReaction": "{name} đã bày tỏ cảm xúc bằng {emoji}",
   "mobile.chat.message.reactionFailed": "Không cập nhật được biểu cảm",
   "mobile.chat.message.deleteTitle": "Xóa tin nhắn này?",
-  "mobile.chat.message.deleteBody": "Tin nhắn sẽ bị xóa với mọi người trong cuộc trò chuyện này. Agent vẫn có thể nhớ nó.",
+  "mobile.chat.message.deleteBody":
+    "Tin nhắn sẽ bị xóa với mọi người trong cuộc trò chuyện này. Agent vẫn có thể nhớ nó.",
   "mobile.chat.message.deleteFailed": "Không xóa được tin nhắn",
   "mobile.chat.message.sendToChannel": "Gửi tới kênh",
   "mobile.chat.message.chooseChannel": "Chọn một kênh",
@@ -443,7 +444,8 @@ export const messages = {
   "mobile.chat.approval.network": "Truy cập mạng",
   "mobile.chat.approval.read": "Đọc {path}",
   "mobile.chat.approval.write": "Ghi {path}",
-  "mobile.chat.approval.effect.command": "Cho phép sẽ chạy lệnh này trên {server}. Từ chối sẽ báo {name} không chạy lệnh.",
+  "mobile.chat.approval.effect.command":
+    "Cho phép sẽ chạy lệnh này trên {server}. Từ chối sẽ báo {name} không chạy lệnh.",
   "mobile.chat.approval.effect.fileChange":
     "Cho phép sẽ để {name} thay đổi các tệp này trên {server}. Từ chối sẽ giữ nguyên các tệp.",
   "mobile.chat.approval.effect.permissions":
@@ -575,7 +577,8 @@ export const messages = {
   "mobile.chat.threads.agentInfo": "Thông tin agent",
   "mobile.chat.pullInfo.agent": "Thông tin agent",
   "mobile.chat.pullInfo.channel": "Thông tin kênh",
-  "mobile.chat.threads.draftNote": "Tin nhắn đầu tiên của bạn sẽ bắt đầu một luồng mới. Cuộc trò chuyện chính với {name} không thay đổi.",
+  "mobile.chat.threads.draftNote":
+    "Tin nhắn đầu tiên của bạn sẽ bắt đầu một luồng mới. Cuộc trò chuyện chính với {name} không thay đổi.",
   "mobile.chat.threads.draftPlaceholder": "Luồng mới với {name}",
   "mobile.chat.threads.rename": "Đổi tên",
   "mobile.chat.threads.renameTitle": "Đổi tên luồng",

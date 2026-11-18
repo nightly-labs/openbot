@@ -67,16 +67,15 @@ export const messages = {
   "mobile.marketplace.permission.unavailable":
     "Máy chủ này đang ngoại tuyến hoặc OpenBot trên đó quá cũ. Hãy cập nhật OpenBot trên máy tính chạy máy chủ.",
   "mobile.marketplace.error.agentUnsupported": "Hãy cập nhật OpenBot trên máy chủ để thêm agent từ Cửa hàng.",
-  "mobile.marketplace.error.agentUpdateUnsupported":
-    "Hãy cập nhật OpenBot trên máy chủ để cập nhật agent từ Cửa hàng.",
-  "mobile.marketplace.error.signInUnsupported": "Hãy cập nhật OpenBot trên máy chủ để đăng nhập ứng dụng từ điện thoại.",
+  "mobile.marketplace.error.agentUpdateUnsupported": "Hãy cập nhật OpenBot trên máy chủ để cập nhật agent từ Cửa hàng.",
+  "mobile.marketplace.error.signInUnsupported":
+    "Hãy cập nhật OpenBot trên máy chủ để đăng nhập ứng dụng từ điện thoại.",
   "mobile.marketplace.agent.add": "Thêm agent",
   "mobile.marketplace.agent.adding": "Đang thêm agent",
   "mobile.marketplace.agent.update": "Cập nhật agent",
   "mobile.marketplace.agent.updating": "Đang cập nhật agent",
   "mobile.marketplace.agent.openChat": "Mở cuộc trò chuyện",
-  "mobile.marketplace.agent.updateAvailable":
-    "Đã có phiên bản mới của agent này. Hãy dùng nút cập nhật ở trên cùng.",
+  "mobile.marketplace.agent.updateAvailable": "Đã có phiên bản mới của agent này. Hãy dùng nút cập nhật ở trên cùng.",
   "mobile.marketplace.agent.skills": "Kỹ năng",
   "mobile.marketplace.agent.routines": "Tác vụ định kỳ",
   "mobile.marketplace.agent.skillVersion": "Phiên bản {version}",
@@ -99,7 +98,8 @@ export const messages = {
   "mobile.marketplace.app.connect": "Kết nối",
   "mobile.marketplace.app.connectTitle": "Kết nối {name}",
   "mobile.marketplace.app.keyIntro": "Dán khóa từ tài khoản của bạn. Máy chủ sẽ kiểm tra khóa trước khi lưu ứng dụng.",
-  "mobile.marketplace.app.signInIntro": "Đăng nhập trên trang của ứng dụng. Máy chủ giữ thông tin đăng nhập, không phải điện thoại này.",
+  "mobile.marketplace.app.signInIntro":
+    "Đăng nhập trên trang của ứng dụng. Máy chủ giữ thông tin đăng nhập, không phải điện thoại này.",
   "mobile.marketplace.app.stepOpen": "Mở trang đăng nhập {name}.",
   "mobile.marketplace.app.stepAllow": "Đăng nhập và cho phép truy cập.",
   "mobile.marketplace.app.stepReturn": "Quay lại đây. {name} sẽ kết nối trên máy chủ của bạn.",
@@ -107,12 +107,14 @@ export const messages = {
   "mobile.marketplace.app.keySecure": "Khóa chỉ được gửi tới máy chủ của bạn qua kết nối được mã hóa.",
   "mobile.marketplace.app.connecting": "Đang kết nối",
   "mobile.marketplace.app.connected": "Đã kết nối",
-  "mobile.marketplace.app.connectedHint": "Các agent của bạn có thể dùng ứng dụng này. Hãy quản lý nó trong cài đặt MCP của máy chủ.",
+  "mobile.marketplace.app.connectedHint":
+    "Các agent của bạn có thể dùng ứng dụng này. Hãy quản lý nó trong cài đặt MCP của máy chủ.",
   "mobile.marketplace.app.connectFailed": "Ứng dụng chưa kết nối được.",
   "mobile.marketplace.app.linkInvalid": "Hãy dùng liên kết https trên {hostname}.",
   "mobile.marketplace.app.docs": "Lấy khóa",
   "mobile.marketplace.app.local": "Ứng dụng này chạy trên máy tính có OpenBot. Hãy thiết lập nó trên máy tính đó.",
-  "mobile.marketplace.app.needsMac": "Ứng dụng này chỉ hoạt động trên máy Mac chạy OpenBot, và máy chủ này không phải máy Mac.",
+  "mobile.marketplace.app.needsMac":
+    "Ứng dụng này chỉ hoạt động trên máy Mac chạy OpenBot, và máy chủ này không phải máy Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Ứng dụng này cần đăng nhập qua trình duyệt. Hãy cập nhật OpenBot trên máy chủ, hoặc kết nối ứng dụng trên máy tính.",
   "mobile.marketplace.app.waiting": "Đang chờ trang đăng nhập…",

@@ -8,7 +8,8 @@ export const messages = {
     "OpenBot không thể đăng ký Điều khiển máy tính trong cấu hình Codex. Hãy kiểm tra rằng tệp config.toml của Codex hợp lệ và có thể ghi, rồi khởi động lại OpenBot. Bạn có thể tắt Điều khiển máy tính trong cài đặt của đồng đội để tiếp tục mà không dùng tính năng này.",
   "error.provider.codexUnresponsive": "Codex ngừng phản hồi, nên OpenBot đã kết thúc tiến trình của nó.",
   "error.provider.acpUnresponsive": "{provider} không phản hồi kịp thời, nên OpenBot đã kết thúc tiến trình của nó.",
-  "error.provider.acpSignInLost": "{provider} bị mất đăng nhập, nên OpenBot đã kết thúc tiến trình của nó. Hãy gửi lại tin nhắn.",
+  "error.provider.acpSignInLost":
+    "{provider} bị mất đăng nhập, nên OpenBot đã kết thúc tiến trình của nó. Hãy gửi lại tin nhắn.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} đã từ chối một tin nhắn, nên OpenBot đã kết thúc tiến trình của nó. Hãy gửi lại tin nhắn.",
   "error.provider.acpServerLost": "{provider} bị mất kết nối. Hãy gửi lại tin nhắn.",
@@ -80,7 +81,8 @@ export const messages = {
   "error.provider.closing": "OpenBot đang đóng.",
   "error.provider.removeWhileOn": "Hãy tắt nhà cung cấp trước khi xóa bản tải xuống của nó.",
   "error.provider.removeWhileDownloading": "Hãy chờ quá trình tải xuống kết thúc, rồi xóa nó.",
-  "error.provider.removeIncomplete": "Một chương trình đang dùng một số tệp của CLI này. Hãy đóng chương trình đó, rồi thử lại.",
+  "error.provider.removeIncomplete":
+    "Một chương trình đang dùng một số tệp của CLI này. Hãy đóng chương trình đó, rồi thử lại.",
   "error.provider.removeDownloadsFailed": "Không thể xóa các bản tải xuống CLI của {providers}.",
   "error.provider.cliOverride": "Hãy xóa đường dẫn CLI ghi đè trước khi cập nhật trong OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "Bản cập nhật runtime chưa hoàn tất.",
@@ -101,7 +103,8 @@ export const messages = {
   "error.provider.installRecordMismatch": "Bản ghi cài đặt runtime không khớp.",
   "error.provider.runtimeChecksum": "Checksum của runtime nhà cung cấp không khớp.",
   "error.provider.codexReleaseShape": "Bản phát hành Codex có cấu trúc không như mong đợi.",
-  "error.provider.codexReleaseNoDownload": "Bản phát hành Codex không có bản tải xuống có thể xác minh cho máy tính này.",
+  "error.provider.codexReleaseNoDownload":
+    "Bản phát hành Codex không có bản tải xuống có thể xác minh cho máy tính này.",
   "error.provider.claudeReleaseShape": "Bản phát hành Claude có cấu trúc không như mong đợi.",
   "error.provider.grokReleaseVersion": "Bản phát hành Grok có phiên bản không như mong đợi.",
   "error.provider.blockedListShape": "Danh sách phiên bản bị chặn có cấu trúc không như mong đợi.",
@@ -119,8 +122,7 @@ export const messages = {
   "error.provider.modelsTooMany": "Có quá nhiều mô hình.",
   "error.provider.modelIdCharacter": "Một ID mô hình chứa ký tự không dùng được.",
   "error.provider.modelIdDuplicate": "Hai mô hình có cùng ID.",
-  "error.provider.contextWindowInvalid":
-    "Cửa sổ ngữ cảnh của mô hình phải là số token nguyên từ {min} đến {max}.",
+  "error.provider.contextWindowInvalid": "Cửa sổ ngữ cảnh của mô hình phải là số token nguyên từ {min} đến {max}.",
   "error.provider.maxOutputInvalid": "Đầu ra tối đa của mô hình phải là số token nguyên từ {min} đến {max}.",
   "error.provider.reasoningEffortsInvalid": "Các mức suy luận của mô hình không hợp lệ.",
   "error.provider.inputsInvalid": "Các loại đầu vào của mô hình không hợp lệ.",
@@ -143,15 +145,13 @@ export const messages = {
   "error.provider.codexNotStarted": "Đã tìm thấy Codex CLI nhưng không thể khởi động.",
   "error.provider.codexNotStartedHint":
     "Đã tìm thấy Codex CLI nhưng không thể khởi động. Hãy chạy `codex --version` trong một terminal mới.",
-  "error.provider.codexManagedNotStarted":
-    "Đã tải ChatGPT xuống nhưng không thể khởi động. Hãy tải lại trong OpenBot.",
+  "error.provider.codexManagedNotStarted": "Đã tải ChatGPT xuống nhưng không thể khởi động. Hãy tải lại trong OpenBot.",
   "error.provider.codexMissing": "Chưa tải ChatGPT xuống. Hãy tải xuống trong OpenBot để tiếp tục.",
   "error.provider.claudeOutdated": "Claude Code {version} đã quá cũ. OpenBot yêu cầu phiên bản 2.1.232 trở lên.",
   "error.provider.claudeNotStarted": "Đã tìm thấy Claude CLI nhưng không thể khởi động.",
   "error.provider.claudeNotStartedHint":
     "Đã tìm thấy Claude CLI nhưng không thể khởi động. Hãy chạy `claude --version` trong một terminal mới.",
-  "error.provider.claudeManagedNotStarted":
-    "Đã tải Claude xuống nhưng không thể khởi động. Hãy tải lại trong OpenBot.",
+  "error.provider.claudeManagedNotStarted": "Đã tải Claude xuống nhưng không thể khởi động. Hãy tải lại trong OpenBot.",
   "error.provider.claudeMissing": "Chưa tải Claude xuống. Hãy tải xuống trong OpenBot để tiếp tục.",
   "error.provider.grokOutdated": "Grok CLI {version} đã quá cũ. OpenBot yêu cầu phiên bản 1.0.5 trở lên.",
   "error.provider.grokNotStarted": "Đã tìm thấy Grok CLI nhưng không thể khởi động.",
@@ -175,7 +175,8 @@ export const messages = {
     "{provider} không thể kết nối tới dịch vụ của nó. Hãy kiểm tra kết nối internet. OpenBot sẽ thử lại.",
   "error.provider.serviceUnreachableRefresh":
     "{provider} không thể kết nối tới dịch vụ của nó. Hãy kiểm tra kết nối internet, rồi làm mới danh sách nhà cung cấp.",
-  "error.provider.acpStartTimedOut": "{provider} không khởi động xong trong vòng {seconds} giây. Máy tính có thể đang bận.",
+  "error.provider.acpStartTimedOut":
+    "{provider} không khởi động xong trong vòng {seconds} giây. Máy tính có thể đang bận.",
   "error.provider.acpModelsTimedOut":
     "{provider} không liệt kê mô hình trong vòng {seconds} giây. Máy tính có thể đang bận.",
   "error.provider.startStopped":
@@ -253,7 +254,8 @@ export const messages = {
     "Một ứng dụng Codex khác đang mở cuộc trò chuyện này, chẳng hạn ứng dụng Codex cho máy tính, Codex CLI hoặc một tiện ích mở rộng IDE. Mỗi lúc chỉ một ứng dụng có thể ghi vào cuộc trò chuyện Codex. Hãy đóng cuộc trò chuyện trong ứng dụng đó, rồi gửi lại tin nhắn.",
   "error.provider.realtimeLimitZero":
     "Linux đã dừng nhà cung cấp vì OpenBot có giới hạn CPU thời gian thực bằng 0. Giới hạn này đến từ hệ thống của bạn. Hãy cài đặt và khởi động rtkit (`rtkit-daemon`), chạy `systemctl --user restart xdg-desktop-portal`, rồi khởi động lại OpenBot. Chỉ khởi động lại xdg-desktop-portal sẽ không có tác dụng khi còn thiếu rtkit.",
-  "error.provider.cpuUnsupported": "Bộ xử lý của máy tính này không thể chạy nhà cung cấp này. Hãy dùng nhà cung cấp khác.",
+  "error.provider.cpuUnsupported":
+    "Bộ xử lý của máy tính này không thể chạy nhà cung cấp này. Hãy dùng nhà cung cấp khác.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode không thể mở cơ sở dữ liệu vì một phiên bản OpenCode mới hơn đã thay đổi nó. Hãy cập nhật OpenCode lên phiên bản 2 trở lên, rồi thử lại.",
   "error.provider.opencodeNoAnswer":
@@ -337,7 +339,8 @@ export const messages = {
   "error.provider.hermesMissing": "Chưa cài đặt Hermes Agent. Hãy cài đặt, rồi thử lại.",
   "error.provider.hermesNotStarted": "Hermes Agent không thể khởi động. Hãy chạy `hermes --version` trong terminal.",
   "error.provider.hermesVersionUnreadable": "Không thể đọc phiên bản Hermes Agent.",
-  "error.provider.hermesSignIn": "Hãy đăng nhập bằng Nous Portal, hoặc chạy `hermes setup` trong terminal, để dùng Hermes.",
+  "error.provider.hermesSignIn":
+    "Hãy đăng nhập bằng Nous Portal, hoặc chạy `hermes setup` trong terminal, để dùng Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes không thể hoàn tất lượt này. Nếu câu trả lời của nó nêu lý do, hãy làm theo. Nếu không, một máy chủ MCP của agent này có thể không khả dụng: hãy kiểm tra trong Cửa hàng, Ứng dụng, rồi gửi lại tin nhắn.",
   "error.provider.hermesRefused":
@@ -436,7 +439,8 @@ export const messages = {
   "error.provider.customAgentRemoveBusy":
     "Hãy chờ lượt đang chạy và hàng đợi hoàn tất trước khi xóa agent tùy chỉnh này.",
   "error.provider.customAgentNone": "Chưa lưu agent tùy chỉnh nào.",
-  "error.provider.customAgentsUnavailable": "Máy chủ này không thể thay đổi agent tùy chỉnh. Hãy cập nhật OpenBot trên máy chủ.",
+  "error.provider.customAgentsUnavailable":
+    "Máy chủ này không thể thay đổi agent tùy chỉnh. Hãy cập nhật OpenBot trên máy chủ.",
   "error.provider.customAgentMissing": "Agent tùy chỉnh này hiện không còn được lưu. Hãy chọn mô hình khác.",
   "error.provider.customAgentSignIn": "Hãy đăng nhập bằng lệnh riêng của agent, rồi thử lại.",
   "error.provider.customAgentsReadOnly":
@@ -444,11 +448,13 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Máy tính này không có kho lưu trữ an toàn, nên không thể lưu giá trị biến môi trường. Hãy xóa chúng và thử lại.",
   "error.provider.customAgentNotSaved": "Agent tùy chỉnh này chưa được lưu. Hãy làm mới danh sách và thử lại.",
-  "error.provider.customAgentWorkspaceOnly": "{reason}. Chế độ Chỉ không gian làm việc chặn thao tác này. Hãy thử Toàn quyền.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. Chế độ Chỉ không gian làm việc chặn thao tác này. Hãy thử Toàn quyền.",
   "error.provider.customAgentTooMany": "Bạn có thể lưu tối đa {count} agent tùy chỉnh.",
   "error.provider.customAgentEnvValueMissing": "Hãy nhập giá trị cho {name}.",
   "error.provider.off": "{provider} đang tắt trong OpenBot. Hãy bật trong cài đặt nhà cung cấp trước.",
-  "error.provider.inUse": "Một agent đang dùng {provider}. Hãy đổi mô hình của agent đó trước khi tắt nhà cung cấp này.",
+  "error.provider.inUse":
+    "Một agent đang dùng {provider}. Hãy đổi mô hình của agent đó trước khi tắt nhà cung cấp này.",
   "error.provider.useBusy": "Hãy chờ quá trình kiểm tra nhà cung cấp hoặc đăng nhập hoàn tất, rồi thử lại.",
   "error.provider.useSettingsReadOnly":
     "Không thể đọc cài đặt nhà cung cấp đã lưu. Hãy cập nhật OpenBot trước khi thay đổi chúng.",

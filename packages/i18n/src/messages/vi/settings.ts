@@ -27,7 +27,8 @@ export const messages = {
   "settings.backgroundBlur.title": "Làm mờ nền",
   "settings.backgroundBlur.description": "Làm mờ phía sau menu và hộp thoại. Mặc định tắt trên máy tính không có GPU.",
   "settings.movingFaces.title": "Khuôn mặt agent chuyển động",
-  "settings.movingFaces.description": "Khuôn mặt agent chớp mắt và chuyển động. Mặc định đứng yên trên máy tính không có GPU.",
+  "settings.movingFaces.description":
+    "Khuôn mặt agent chớp mắt và chuyển động. Mặc định đứng yên trên máy tính không có GPU.",
   "settings.logoColor.title": "Màu logo",
   "settings.logoColor.description": "Hiển thị trên Dock, thanh tác vụ và Dynamic Island.",
   "settings.logoColor.buildNote": "Bản dựng này giữ màu logo riêng. Lựa chọn của bạn áp dụng cho bản phát hành.",
@@ -61,7 +62,8 @@ export const messages = {
   "settings.chatBackdrop.saveFailed": "Chưa lưu được phông nền.",
   "settings.chatBackdrop.removeFailed": "Chưa gỡ được phông nền.",
   "settings.chatColor.title": "Màu trò chuyện",
-  "settings.chatColor.description": "Tô màu bong bóng tin nhắn của bạn. Mọi người trên máy chủ của bạn cũng thấy màu này.",
+  "settings.chatColor.description":
+    "Tô màu bong bóng tin nhắn của bạn. Mọi người trên máy chủ của bạn cũng thấy màu này.",
   "settings.chatColor.yours": "Màu trò chuyện của bạn",
   "settings.chatColor.agentLabel": "Màu trò chuyện của {name}",
   "settings.chatColor.none": "Không có",
@@ -80,7 +82,8 @@ export const messages = {
   "settings.chatColor.green": "Xanh lá",
   "settings.chatColor.blue": "Xanh dương",
   "settings.bubbleStyle.title": "Bong bóng của bạn",
-  "settings.bubbleStyle.description": "Trong cuộc trò chuyện với agent, bong bóng của bạn mang màu của agent. Chỉ bạn thấy màu này.",
+  "settings.bubbleStyle.description":
+    "Trong cuộc trò chuyện với agent, bong bóng của bạn mang màu của agent. Chỉ bạn thấy màu này.",
   "settings.bubbleStyle.solid": "Đặc",
   "settings.bubbleStyle.tint": "Nhạt",
   "settings.bubbleStyle.classic": "Cổ điển",
@@ -93,20 +96,20 @@ export const messages = {
   "settings.menuBar.title": "Hiện OpenBot trên thanh menu",
   "settings.menuBar.description": "Mở hoặc thoát OpenBot từ biểu tượng trên thanh menu.",
   "settings.keepAwake.title": "Giữ máy tính này không ngủ",
-  "settings.keepAwake.description":
-    "Tác vụ định kỳ chạy đúng giờ khi máy tính đang cắm sạc. Màn hình vẫn có thể tắt.",
+  "settings.keepAwake.description": "Tác vụ định kỳ chạy đúng giờ khi máy tính đang cắm sạc. Màn hình vẫn có thể tắt.",
   "settings.keepAwakeOnBattery.title": "Cả khi dùng pin",
-  "settings.keepAwakeOnBattery.description":
-    "Giữ máy tính không ngủ cả khi dùng pin. Pin sẽ hao nhanh hơn.",
+  "settings.keepAwakeOnBattery.description": "Giữ máy tính không ngủ cả khi dùng pin. Pin sẽ hao nhanh hơn.",
   "settings.restoreWorkspace.title": "Khôi phục không gian làm việc gần nhất khi mở",
   "settings.restoreWorkspace.description": "Mở không gian làm việc và tác vụ từ phiên trước của bạn.",
   "settings.quitGuard.title": "Giữ ⌘Q để thoát",
-  "settings.quitGuard.description": "Giữ ⌘Q hoặc nhấn hai lần để thoát. Với Không bao giờ, nhấn ⌘Q một lần sẽ thoát và dừng các agent.",
+  "settings.quitGuard.description":
+    "Giữ ⌘Q hoặc nhấn hai lần để thoát. Với Không bao giờ, nhấn ⌘Q một lần sẽ thoát và dừng các agent.",
   "settings.quitGuard.working": "Khi agent đang làm việc",
   "settings.quitGuard.always": "Luôn luôn",
   "settings.quitGuard.never": "Không bao giờ",
   "settings.externalLinks.title": "Mở liên kết ngoài bằng",
-  "settings.externalLinks.description": "Liên kết trong cuộc trò chuyện, trang đăng nhập và trang thanh toán sẽ mở tại đây.",
+  "settings.externalLinks.description":
+    "Liên kết trong cuộc trò chuyện, trang đăng nhập và trang thanh toán sẽ mở tại đây.",
   "settings.externalLinks.defaultBrowser": "Trình duyệt mặc định",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Trình duyệt mặc định ({name})",
@@ -260,8 +263,7 @@ export const messages = {
   "settings.agentDock.show.title": "Hiện thanh agent",
   "settings.agentDock.show.description": "Hiện các agent của bạn ở cạnh màn hình, sẵn sàng để trò chuyện nhanh.",
   "settings.agentDock.placement.title": "Vị trí",
-  "settings.agentDock.placement.description":
-    "Phía trên ứng dụng khác giữ thanh trên màn hình khi OpenBot chạy nền.",
+  "settings.agentDock.placement.description": "Phía trên ứng dụng khác giữ thanh trên màn hình khi OpenBot chạy nền.",
   "settings.agentDock.placement.screen": "Phía trên ứng dụng khác",
   "settings.agentDock.placement.window": "Trong cửa sổ OpenBot",
   "settings.agentDock.xwayland.title": "Cần khởi động lại",
@@ -351,7 +353,8 @@ export const messages = {
   "settings.mobileConnect.phones.description": "Các điện thoại dùng OpenBot với tài khoản này.",
   "settings.mobileConnect.phones.add": "Thêm điện thoại",
   "settings.mobileConnect.phones.empty.title": "Chưa có điện thoại nào",
-  "settings.mobileConnect.phones.empty.description": "Trò chuyện với agent và theo dõi công việc của chúng từ điện thoại.",
+  "settings.mobileConnect.phones.empty.description":
+    "Trò chuyện với agent và theo dõi công việc của chúng từ điện thoại.",
   "settings.mobileConnect.devices.lastActive": "Hoạt động lần cuối: {time}",
   "settings.mobileConnect.add.title": "Thêm điện thoại",
   "settings.mobileConnect.add.question": "Điện thoại đã cài OpenBot chưa?",
@@ -545,7 +548,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} đã sẵn sàng. Khởi động lại để áp dụng.",
   "settings.updates.status.installing": "Đang khởi động lại để áp dụng {target}…",
   "settings.updates.status.upToDate": "OpenBot đã là bản mới nhất trên nhánh Ổn định.",
-  "settings.updates.status.staged": "{target} đang được phát hành dần cho một số máy tính. Kiểm tra cập nhật để nhận ngay.",
+  "settings.updates.status.staged":
+    "{target} đang được phát hành dần cho một số máy tính. Kiểm tra cập nhật để nhận ngay.",
   "settings.updates.status.checkFailed": "OpenBot không thể kiểm tra cập nhật. Hãy thử lại.",
   "settings.updates.status.unsupported": "Bản dựng này không hỗ trợ cập nhật.",
   "settings.updates.actionFailed": "Không thể cập nhật OpenBot.",
@@ -631,7 +635,10 @@ export const messages = {
   "settings.hostedServers.plan.linux": "Máy Linux",
   "settings.hostedServers.plan.startsOnUse": "Khởi động khi bạn dùng",
   "settings.hostedServers.plan.members": { one: "Tối đa {count} thành viên", other: "Tối đa {count} thành viên" },
-  "settings.hostedServers.plan.sites": { one: "Tối đa {count} trang web được lưu trữ", other: "Tối đa {count} trang web được lưu trữ" },
+  "settings.hostedServers.plan.sites": {
+    one: "Tối đa {count} trang web được lưu trữ",
+    other: "Tối đa {count} trang web được lưu trữ",
+  },
   "settings.hostedServers.plan.license.starter": "Giấy phép thương mại: {price} / tháng",
   "settings.hostedServers.plan.license.team": "Dùng cho công việc cần giấy phép Team",
   "settings.hostedServers.plan.speed.base": "Tốc độ cơ bản",
@@ -644,12 +651,10 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Cho nhiều agent và công việc trình duyệt nặng.",
   "settings.voice.dictation.section": "Đọc chính tả",
   "settings.voice.model.parakeet.description": "Nhanh. Tự nhận diện ngôn ngữ nói, trong 25 ngôn ngữ châu Âu.",
-  "settings.voice.model.parakeetUnified.description":
-    "Nhanh. Chỉ tiếng Anh. Có dấu câu, ít lỗi hơn Parakeet TDT.",
+  "settings.voice.model.parakeetUnified.description": "Nhanh. Chỉ tiếng Anh. Có dấu câu, ít lỗi hơn Parakeet TDT.",
   "settings.voice.model.bark.description": "Nhanh. Chỉ tiếng Anh. Chủ yếu viết chữ thường, ít dấu câu.",
   "settings.voice.model.whisper.description": "Chậm hơn. Khoảng 100 ngôn ngữ, và bạn có thể đặt ngôn ngữ nói.",
-  "settings.voice.model.cohere.description":
-    "Chậm hơn. 14 ngôn ngữ. Bạn đặt ngôn ngữ nói. Dùng khoảng 4 GB RAM.",
+  "settings.voice.model.cohere.description": "Chậm hơn. 14 ngôn ngữ. Bạn đặt ngôn ngữ nói. Dùng khoảng 4 GB RAM.",
   "settings.voice.model.size": "Dung lượng tải xuống: {size}",
   "settings.voice.model.failed": "Quá trình tải đã dừng. Hãy kiểm tra kết nối rồi thử lại.",
   "settings.voice.model.progressLabel": "Đang tải {name}",

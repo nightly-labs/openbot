@@ -80,7 +80,8 @@ export const messages = {
   "mobile.agent.files.missing": "Bị thiếu",
   "mobile.agent.files.removeTitle": "Gỡ tệp này?",
   "mobile.agent.files.deleteTitle": "Xóa tệp này?",
-  "mobile.agent.files.removeBody": "“{name}” sẽ bị gỡ khỏi danh sách. Tin nhắn đã gửi tệp này vẫn còn trong cuộc trò chuyện.",
+  "mobile.agent.files.removeBody":
+    "“{name}” sẽ bị gỡ khỏi danh sách. Tin nhắn đã gửi tệp này vẫn còn trong cuộc trò chuyện.",
   "mobile.agent.files.deleteBody":
     "“{name}” sẽ bị xóa khỏi ổ đĩa. Các tin nhắn hiển thị tệp này vẫn còn trong cuộc trò chuyện nhưng không có tệp.",
   "mobile.agent.files.keep": "Giữ lại",
@@ -216,7 +217,8 @@ export const messages = {
   "mobile.agent.webhook.eventsAll": "Tất cả sự kiện",
   "mobile.agent.webhook.filterCount": { one: "{count} bộ lọc", other: "{count} bộ lọc" },
   "mobile.agent.webhook.rotateTitle": "Tạo lại khóa bí mật ký?",
-  "mobile.agent.webhook.rotateBody": "Khóa bí mật hiện tại sẽ ngừng hoạt động. Host sẽ từ chối các yêu cầu dùng khóa đó.",
+  "mobile.agent.webhook.rotateBody":
+    "Khóa bí mật hiện tại sẽ ngừng hoạt động. Host sẽ từ chối các yêu cầu dùng khóa đó.",
   "mobile.agent.webhook.rotateConfirm": "Tạo lại",
   "mobile.agent.webhook.rotateFailed": "Không thể tạo lại khóa bí mật. Hãy thử lại.",
   "mobile.agent.webhook.activity": "Hoạt động",
@@ -379,8 +381,7 @@ export const messages = {
   "mobile.agent.taskLimit.label": "Luồng song song",
   "mobile.agent.taskLimit.footer": "Số luồng chạy cùng lúc",
   "mobile.agent.taskLimit.default": "Mặc định ({count})",
-  "mobile.agent.taskLimit.oneTurn":
-    "{provider} chạy từng lượt một. Các luồng của agent này sẽ chờ lẫn nhau.",
+  "mobile.agent.taskLimit.oneTurn": "{provider} chạy từng lượt một. Các luồng của agent này sẽ chờ lẫn nhau.",
   "mobile.agent.browserProfile.label": "Hồ sơ trình duyệt",
   "mobile.agent.browserProfile.shared": "Dùng chung",
   "mobile.agent.browserProfile.own": "Chỉ agent này",
@@ -482,7 +483,8 @@ export const messages = {
   "mobile.agent.usage.chartCost": "Chi phí hằng ngày",
   "mobile.agent.usage.tokenCount": "{tokens} token",
   "mobile.agent.usage.noDailyCost": "Không có ước tính chi phí hằng ngày trong khoảng thời gian này.",
-  "mobile.agent.usage.noDailyTokens": "Không có mức sử dụng token hằng ngày nào được ghi nhận trong khoảng thời gian này.",
+  "mobile.agent.usage.noDailyTokens":
+    "Không có mức sử dụng token hằng ngày nào được ghi nhận trong khoảng thời gian này.",
   "mobile.agent.usage.selectedDay": "{date} · {tokens} token · {cost} · {sessions} phiên",
   "mobile.agent.usage.selectDay": "Chọn một ngày để xem tổng số liệu.",
   "mobile.agent.usage.tryOtherRange": "Hãy thử khoảng ngày khác để xem hoạt động trước đó.",
@@ -554,7 +556,8 @@ export const messages = {
   "mobile.agent.form.name": "Tên",
   "mobile.agent.add.namePlaceholder": "Đặt tên cho agent",
   "mobile.agent.add.descriptionLabel": "Agent này nên giúp bạn việc gì?",
-  "mobile.agent.add.descriptionPlaceholder": "Lên kế hoạch chuyến đi, so sánh lựa chọn hoặc hỗ trợ công việc hằng ngày.",
+  "mobile.agent.add.descriptionPlaceholder":
+    "Lên kế hoạch chuyến đi, so sánh lựa chọn hoặc hỗ trợ công việc hằng ngày.",
   "mobile.agent.add.nameRequired": "Hãy nhập tên cho agent này.",
   "mobile.agent.edit.loading": "Đang tải agent…",
   "mobile.agent.edit.gone": "Agent này không còn khả dụng trên host này.",
@@ -565,8 +568,7 @@ export const messages = {
   "mobile.agent.edit.description": "Mô tả",
   "mobile.agent.edit.descriptionPlaceholder": "Mục đích của agent này",
   "mobile.agent.instructions.length": "{length} / {limit}",
-  "mobile.agent.instructions.tooLong":
-    "Hãy rút ngắn hướng dẫn còn {limit} ký tự. Hướng dẫn dài hơn sẽ không được lưu.",
+  "mobile.agent.instructions.tooLong": "Hãy rút ngắn hướng dẫn còn {limit} ký tự. Hướng dẫn dài hơn sẽ không được lưu.",
   "mobile.agent.edit.unavailable":
     "Agent này không khả dụng. Các chỉnh sửa của bạn được giữ đến khi bạn đóng trang này.",
   "mobile.agent.sectionForm.saveFailed": "Không thể lưu thư mục. Hãy thử lại.",
@@ -578,7 +580,8 @@ export const messages = {
   "mobile.agent.sectionForm.unavailable":
     "Thư mục này không khả dụng. Hãy kết nối lại với máy chủ hoặc đóng biểu mẫu này.",
   "mobile.agent.hidden.title": "Cuộc trò chuyện đã ẩn",
-  "mobile.agent.hidden.body": "Cuộc trò chuyện đã ẩn vẫn tiếp tục hoạt động. Chúng chỉ không hiển thị trên màn hình chính.",
+  "mobile.agent.hidden.body":
+    "Cuộc trò chuyện đã ẩn vẫn tiếp tục hoạt động. Chúng chỉ không hiển thị trên màn hình chính.",
   "mobile.agent.hidden.bodySynced":
     "Cuộc trò chuyện đã ẩn vẫn giữ lịch sử. Agent của nó không chạy tác vụ định kỳ và không nhận tin nhắn mới. Mọi thiết bị trên máy chủ này đều ẩn nó.",
   "mobile.agent.hidden.bodySyncedWorking":
@@ -686,8 +689,7 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Dùng",
   "mobile.agent.folders.notAddedTitle": "Chưa thêm thư mục",
   "mobile.agent.folders.notExcludedTitle": "Chưa loại trừ thư mục",
-  "mobile.agent.fastMode.footer":
-    "Agent yêu cầu nhà cung cấp trả lời nhanh hơn. Thay đổi áp dụng từ lượt tiếp theo.",
+  "mobile.agent.fastMode.footer": "Agent yêu cầu nhà cung cấp trả lời nhanh hơn. Thay đổi áp dụng từ lượt tiếp theo.",
   "mobile.agent.fastMode.speed": "Tốc độ",
   "mobile.agent.fastMode.standard": "Tiêu chuẩn",
   "mobile.agent.fastMode.fast": "Nhanh",
@@ -698,7 +700,8 @@ export const messages = {
   "mobile.agent.fastMode.confirm": "Bật",
   "mobile.agent.compact.title": "Thu gọn ngữ cảnh",
   "mobile.agent.compact.compacting": "Đang bắt đầu thu gọn…",
-  "mobile.agent.compact.footer": "Nhà cung cấp sẽ rút ngắn ngữ cảnh của cuộc trò chuyện này. Các tin nhắn vẫn được giữ.",
+  "mobile.agent.compact.footer":
+    "Nhà cung cấp sẽ rút ngắn ngữ cảnh của cuộc trò chuyện này. Các tin nhắn vẫn được giữ.",
   "mobile.agent.compact.started": "Đã bắt đầu thu gọn. Nhà cung cấp sẽ rút ngắn ngữ cảnh trên host.",
   "mobile.agent.compact.failed": "Không thể thu gọn ngữ cảnh",
   "mobile.agent.compact.failedBody": "Host không thể thu gọn ngữ cảnh.",

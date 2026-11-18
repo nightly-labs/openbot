@@ -46,7 +46,10 @@ export const messages = {
   "agentTemplate.publish.skillsAttention": "Kỹ năng cần xem lại",
   "agentTemplate.publish.instructionsAndSkills": "Hướng dẫn và kỹ năng",
   "agentTemplate.publish.noRoutines": "Không có tác vụ định kỳ",
-  "agentTemplate.publish.routinesMore": { one: "{name} và {count} tác vụ khác", other: "{name} và {count} tác vụ khác" },
+  "agentTemplate.publish.routinesMore": {
+    one: "{name} và {count} tác vụ khác",
+    other: "{name} và {count} tác vụ khác",
+  },
   "agentTemplate.publish.readFailed": "Không thể đọc agent.",
   "agentTemplate.publish.copied": "Đã sao chép liên kết",
   "agentTemplate.publish.updated": "Đã cập nhật agent",

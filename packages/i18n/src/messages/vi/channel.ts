@@ -30,7 +30,8 @@ export const messages = {
   "channel.settings.browserNone": "Không ai",
   "channel.settings.memoryCount": { one: "Đã lưu {count}", other: "Đã lưu {count}" },
   "channel.settings.newConversation.title": "Cuộc trò chuyện mới",
-  "channel.settings.newConversation.description": "Các thành viên quên các tin nhắn trước đó. Thiết lập kênh vẫn giữ nguyên.",
+  "channel.settings.newConversation.description":
+    "Các thành viên quên các tin nhắn trước đó. Thiết lập kênh vẫn giữ nguyên.",
   "channel.settings.newConversation.button": "Bắt đầu",
   "channel.settings.newConversation.confirmTitle": "Bắt đầu cuộc trò chuyện mới trong {name}?",
   "channel.settings.newConversation.confirmDescription":

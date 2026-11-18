@@ -110,8 +110,7 @@ export const messages = {
   "server.add.join.action": "Tham gia máy chủ",
   "server.add.otherOptions": "Tùy chọn khác",
   "server.local.createTitle": "Máy chủ mới trên máy tính này",
-  "server.local.createDescription":
-    "Máy chủ có agent, cuộc trò chuyện và tệp riêng. Máy chủ chạy trên máy tính này.",
+  "server.local.createDescription": "Máy chủ có agent, cuộc trò chuyện và tệp riêng. Máy chủ chạy trên máy tính này.",
   "server.local.nameLabel": "Tên máy chủ",
   "server.local.create": "Tạo máy chủ",
   "server.local.creating": "Đang tạo máy chủ…",
@@ -148,8 +147,7 @@ export const messages = {
   },
   "server.add.limit.manage": "Quản lý máy chủ",
   "server.upsell.modal.title": "Tác vụ định kỳ dừng khi máy tính của bạn ngủ",
-  "server.upsell.modal.description":
-    "{name} chỉ chạy khi máy tính của bạn bật. Máy chủ OpenBot giúp nó chạy 24/7.",
+  "server.upsell.modal.description": "{name} chỉ chạy khi máy tính của bạn bật. Máy chủ OpenBot giúp nó chạy 24/7.",
   "server.upsell.modal.computer": "Máy tính của bạn",
   "server.upsell.modal.server": "Máy chủ OpenBot",
   "server.upsell.modal.running": "Đang chạy",
@@ -191,8 +189,7 @@ export const messages = {
   "server.hosted.detail.connect.publish": "Đang thêm máy chủ vào tài khoản của bạn",
   "server.hosted.detail.connect.check": "Đang kiểm tra kết nối",
   "server.hosted.readyTitle": "{name} đã sẵn sàng",
-  "server.hosted.readyDescription":
-    "Máy chủ vẫn hoạt động khi máy tính này tắt, và sẽ khởi động lại khi bạn dùng đến.",
+  "server.hosted.readyDescription": "Máy chủ vẫn hoạt động khi máy tính này tắt, và sẽ khởi động lại khi bạn dùng đến.",
   "server.hosted.open": "Mở máy chủ",
   "server.hosted.failedTitle": "Không thể khởi động máy chủ",
   "server.hosted.failedDescription": "Hãy thử lại. Nếu vẫn thất bại, hãy xóa máy chủ trong Cài đặt.",
@@ -217,8 +214,7 @@ export const messages = {
   "server.state.incompatible": "không tương thích",
   "server.state.sleeping": "đang ngủ",
   "server.state.waking": "đang đánh thức",
-  "server.sleep.tooltipSleeping":
-    "{name} đang ngủ vì không ai dùng. Nhấn một phím hoặc nhấp chuột để đánh thức.",
+  "server.sleep.tooltipSleeping": "{name} đang ngủ vì không ai dùng. Nhấn một phím hoặc nhấp chuột để đánh thức.",
   "server.sleep.tooltipWaking": "{name} đang được đánh thức. Việc này mất khoảng một phút.",
   "server.menu.open": "Mở menu máy chủ cho {name}",
   "server.menu.label": "Menu máy chủ",
@@ -278,10 +274,10 @@ export const messages = {
   "server.settings.desktopTitle": "Màn hình từ xa",
   "server.settings.desktopDescription": "Cấu hình hoặc kết nối tới màn hình của máy chủ này.",
   "server.settings.storageTitle": "Lưu trữ",
-  "server.settings.storageDescription":
-    "Xem những gì OpenBot lưu trên ổ đĩa của máy chủ này và giải phóng dung lượng.",
+  "server.settings.storageDescription": "Xem những gì OpenBot lưu trên ổ đĩa của máy chủ này và giải phóng dung lượng.",
   "server.settings.hostedSitesTitle": "Trang web",
-  "server.settings.hostedSitesDescription": "Các trang web tĩnh mà agent trên máy chủ này đã xuất bản lên openbot.site.",
+  "server.settings.hostedSitesDescription":
+    "Các trang web tĩnh mà agent trên máy chủ này đã xuất bản lên openbot.site.",
   "server.settings.importTitle": "Nhập",
   "server.settings.importDescription": "Chuyển agent của bạn từ Grok Bot hoặc Hermes Agent sang máy chủ này.",
   "server.settings.transferTitle": "Chuyển dữ liệu",
@@ -789,8 +785,7 @@ export const messages = {
   "server.setup.online": "{name} đang trực tuyến",
   "server.setup.starting": "{name} đang khởi động",
   "server.setup.openApp": "Mở OpenBot",
-  "server.setup.signOutDescription":
-    "Để dùng tài khoản khác, hãy chạy openbot logout trong terminal của container.",
+  "server.setup.signOutDescription": "Để dùng tài khoản khác, hãy chạy openbot logout trong terminal của container.",
   "server.setup.errorCompany": "Email này đăng nhập qua công ty của bạn. Hãy dùng email khác.",
   "server.setup.errorRefused": "OpenBot đã từ chối yêu cầu.",
   "server.setup.errorNoAnswer": "OpenBot không phản hồi. Hãy tải lại trang.",

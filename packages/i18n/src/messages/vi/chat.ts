@@ -154,8 +154,7 @@ export const messages = {
   "chat.usageLimit.title": "Đã đạt giới hạn sử dụng của {provider}",
   "chat.usageLimit.modelTitle": "Đã đạt giới hạn sử dụng của {model}",
   "chat.usageLimit.onHold": "Tin nhắn đang tạm giữ",
-  "chat.usageLimit.bodyReset":
-    "Tin nhắn của bạn chưa bắt đầu. Gửi ngay đến mô hình khác, hoặc chờ đến {reset}.",
+  "chat.usageLimit.bodyReset": "Tin nhắn của bạn chưa bắt đầu. Gửi ngay đến mô hình khác, hoặc chờ đến {reset}.",
   "chat.usageLimit.body": "Tin nhắn của bạn chưa bắt đầu. Gửi ngay đến mô hình khác, hoặc chờ đến khi hết giới hạn.",
   "chat.usageLimit.channelBodyReset":
     "{name} chưa bắt đầu công việc này. Chuyển {name} sang mô hình khác ngay, hoặc chờ đến {reset}.",
@@ -271,8 +270,7 @@ export const messages = {
   "chat.preview.drawing": "Đang vẽ sơ đồ…",
   "chat.preview.diagramUnavailable": "Không thể tải công cụ vẽ sơ đồ.",
   "chat.preview.diagramInvalid": "Không thể vẽ sơ đồ.",
-  "chat.preview.canvasLabel":
-    "{title}. Kéo để di chuyển, cuộn để lia, chụm ngón tay hoặc Ctrl-cuộn để thu phóng.",
+  "chat.preview.canvasLabel": "{title}. Kéo để di chuyển, cuộn để lia, chụm ngón tay hoặc Ctrl-cuộn để thu phóng.",
   "chat.preview.zoomLabel": "Thu phóng",
   "chat.preview.zoomIn": "Phóng to",
   "chat.preview.zoomOut": "Thu nhỏ",
@@ -509,8 +507,7 @@ export const messages = {
     "Gỡ báo cáo này khỏi GitHub? Báo cáo sẽ bị gỡ với mọi người và bạn không thể hoàn tác.",
   "chat.feedbackSent.fixOrRemove": "Sửa hoặc gỡ",
   "chat.feedbackSent.fixChoice": "Gửi báo cáo đã sửa",
-  "chat.feedbackSent.fixChoiceHint":
-    "Agent sẽ gỡ báo cáo này và gửi lại mà không có những phần bạn chọn.",
+  "chat.feedbackSent.fixChoiceHint": "Agent sẽ gỡ báo cáo này và gửi lại mà không có những phần bạn chọn.",
   "chat.feedbackSent.removeChoice": "Gỡ báo cáo",
   "chat.feedbackSent.removeChoiceHint": "Gỡ khỏi GitHub. Bạn không thể hoàn tác.",
   "chat.feedbackSent.fixPrompt": "Gỡ báo cáo #{number} của tôi khỏi GitHub và gửi lại mà không có nội dung này:",

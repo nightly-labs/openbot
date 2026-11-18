@@ -26,7 +26,8 @@ export const messages = {
   "import.guide.step2": "Gửi tin nhắn này cho agent",
   "import.guide.copyMessage": "Sao chép tin nhắn",
   "import.guide.messageCopied": "Đã sao chép tin nhắn",
-  "import.guide.messageNote": "Agent sẽ hỏi có được đưa tệp trong không gian làm việc vào không, rồi lưu tệp .zip vào Downloads.",
+  "import.guide.messageNote":
+    "Agent sẽ hỏi có được đưa tệp trong không gian làm việc vào không, rồi lưu tệp .zip vào Downloads.",
   "import.guide.step3": "Chọn tệp .zip",
   "import.guide.reading": "Đang đọc bản xuất…",
   "import.guide.choose": "Chọn tệp xuất",
@@ -91,8 +92,10 @@ export const messages = {
   "import.result.notImportedTitle": "Chưa nhập",
   "import.result.warnings": "Một số mục chưa được chuyển",
   "import.source.title": "Agent của bạn hiện đang ở đâu?",
-  "import.source.lede": "OpenBot sao chép chúng sang máy tính này. Bạn sẽ thấy từng mục trước khi có bất kỳ thay đổi nào.",
-  "import.source.ledeServer": "OpenBot sao chép chúng sang máy chủ. Bạn sẽ thấy từng mục trước khi có bất kỳ thay đổi nào.",
+  "import.source.lede":
+    "OpenBot sao chép chúng sang máy tính này. Bạn sẽ thấy từng mục trước khi có bất kỳ thay đổi nào.",
+  "import.source.ledeServer":
+    "OpenBot sao chép chúng sang máy chủ. Bạn sẽ thấy từng mục trước khi có bất kỳ thay đổi nào.",
   "import.source.hermesNote": "Đọc thư mục Hermes trên máy tính này, hoặc xuất tệp .zip từ Hermes.",
   "import.source.hermesNoteServer": "Đọc thư mục Hermes trên máy chủ, hoặc xuất tệp .zip từ Hermes.",
   "import.source.hermesNoteExport": "Xuất tệp .zip từ Hermes.",
@@ -102,8 +105,7 @@ export const messages = {
   "import.hermes.reading": "Đang đọc các hồ sơ Hermes…",
   "import.hermes.readFailed": "Không thể đọc thư mục Hermes",
   "import.hermes.notFound": "Không có hồ sơ Hermes nào trên máy tính này",
-  "import.hermes.notFoundNote":
-    "Nếu Hermes dùng thư mục khác, ví dụ thư mục do HERMES_HOME đặt, hãy chọn thư mục đó.",
+  "import.hermes.notFoundNote": "Nếu Hermes dùng thư mục khác, ví dụ thư mục do HERMES_HOME đặt, hãy chọn thư mục đó.",
   "import.hermes.notFoundServer": "Không có hồ sơ Hermes nào trên máy chủ này",
   "import.hermes.notFoundServerNote":
     "OpenBot đọc thư mục Hermes của máy chủ. Để nhập Hermes từ máy tính này, hãy xuất tệp .zip từ Hermes.",
@@ -140,7 +142,8 @@ export const messages = {
   "import.hermes.item.history": "Các phiên trước đây",
   "import.hermes.reason.defaultSoul": "Đây là nội dung mặc định của Hermes, nên agent giữ hướng dẫn của OpenBot.",
   "import.hermes.reason.scripts": "Mục này chạy script riêng. Chỉ cho phép nếu bạn tin tưởng mã nguồn.",
-  "import.hermes.reason.unsafeFile": "Mục này có tệp bí mật, khóa riêng tư hoặc tệp nén. OpenBot không bao giờ sao chép các tệp này.",
+  "import.hermes.reason.unsafeFile":
+    "Mục này có tệp bí mật, khóa riêng tư hoặc tệp nén. OpenBot không bao giờ sao chép các tệp này.",
   "import.hermes.reason.invalidSkill": "Tệp SKILL.md của mục này không có tên và mô tả hợp lệ.",
   "import.hermes.reason.duplicateSkill": "Một kỹ năng khác trong hồ sơ này có cùng tên.",
   "import.hermes.reason.builtIn": "Các kỹ năng này đi kèm Hermes. OpenBot có kỹ năng riêng.",

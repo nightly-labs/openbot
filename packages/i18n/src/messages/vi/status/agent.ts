@@ -2,8 +2,7 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.mcpSignInPage":
-    "{name} yêu cầu bạn đăng nhập tại `{address}`. [Đăng nhập]({url}), rồi chọn Tiếp tục.",
+  "status.agent.mcpSignInPage": "{name} yêu cầu bạn đăng nhập tại `{address}`. [Đăng nhập]({url}), rồi chọn Tiếp tục.",
   "status.agent.mcpSignInPageDoneDetail": "Agent sẽ thử lại yêu cầu.",
   "status.agent.mcpSignInPageDecline": "Không đăng nhập",
   "status.agent.mcpSignInPageDeclineDetail": "Yêu cầu sẽ dừng lại.",
@@ -42,7 +41,8 @@ export const messages = {
     "Nội dung này sẽ trở thành một issue công khai trên GitHub, kèm phiên bản ứng dụng và hệ thống của bạn. Tên của bạn không được hiển thị.",
   "status.agent.reportPhoneProblem":
     "Nội dung này sẽ trở thành một issue công khai trên GitHub, kèm phiên bản ứng dụng, hệ thống của bạn, cùng phiên bản, hệ thống và nhật ký hỗ trợ của điện thoại. Tên của bạn không được hiển thị.",
-  "status.agent.sendIdea": "Nội dung này sẽ trở thành một issue công khai trên GitHub. Tên của bạn không được hiển thị.",
+  "status.agent.sendIdea":
+    "Nội dung này sẽ trở thành một issue công khai trên GitHub. Tên của bạn không được hiển thị.",
   "status.agent.feedbackRecentErrors": "Các lỗi gần đây trong cuộc trò chuyện:",
   "status.agent.feedbackSameAs": "Bổ sung vào issue #{issue}",
   "status.agent.feedbackSent": "Đã gửi đến đội ngũ OpenBot: {title}",
@@ -62,7 +62,8 @@ export const messages = {
     "Tạo hồ sơ trình duyệt mới {profile} và chuyển {agents} sang đó. Hồ sơ này chưa có thông tin đăng nhập nào. Các thẻ đang mở của chúng sẽ đóng.",
   "status.agent.browserProfileShared":
     "Chuyển {agents} sang hồ sơ trình duyệt dùng chung. Các agent sẽ nhận thông tin đăng nhập và cookie của hồ sơ đó. Các thẻ đang mở của chúng sẽ đóng.",
-  "status.agent.browserProfileOwn": "Cấp cho mỗi agent trong {agents} một hồ sơ trình duyệt riêng. Các thẻ đang mở của chúng sẽ đóng.",
+  "status.agent.browserProfileOwn":
+    "Cấp cho mỗi agent trong {agents} một hồ sơ trình duyệt riêng. Các thẻ đang mở của chúng sẽ đóng.",
   "status.agent.feedbackSending": "Đang gửi phản hồi của bạn đến đội ngũ OpenBot…",
   "status.agent.workflowDelete":
     "Xóa quy trình {title} cùng các lần chạy và phiên bản của nó. Các bước đang mở sẽ dừng.",
@@ -123,10 +124,10 @@ export const messages = {
     "Đổi máy chủ MCP {name} thành {target}. Mọi agent trên máy chủ này sẽ nhận các công cụ của nó. OpenBot sẽ kết nối để kiểm tra.",
   "status.agent.mcpServerEnable": "Bật máy chủ MCP {name} cho mọi agent trên máy chủ này.",
   "status.agent.mcpServerDisable": "Tắt máy chủ MCP {name} cho mọi agent trên máy chủ này.",
-  "status.agent.mcpServerRemove": "Gỡ máy chủ MCP {name} và thông tin đăng nhập của nó khỏi mọi agent trên máy chủ này.",
+  "status.agent.mcpServerRemove":
+    "Gỡ máy chủ MCP {name} và thông tin đăng nhập của nó khỏi mọi agent trên máy chủ này.",
   "status.agent.mcpToolCall": "Chạy công cụ {tool} của máy chủ MCP {name}.",
-  "status.agent.mcpSignInRequested":
-    "Máy chủ MCP {name} cần đăng nhập. Hãy đăng nhập từ Cửa hàng, Ứng dụng, {name}.",
+  "status.agent.mcpSignInRequested": "Máy chủ MCP {name} cần đăng nhập. Hãy đăng nhập từ Cửa hàng, Ứng dụng, {name}.",
   "status.agent.uiBlockClosedByMessage": "Đã đóng do có tin nhắn mới",
   "status.agent.vaultAdded": "Đã lưu vào Kho bảo mật: {name}",
   "status.agent.vaultUpdated": "Đã thay đổi trong Kho bảo mật: {name}",

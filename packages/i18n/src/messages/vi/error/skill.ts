@@ -64,8 +64,7 @@ export const messages = {
   "error.skill.pathSymlink": "Đường dẫn kỹ năng không được chứa liên kết tượng trưng.",
   "error.skill.folderNotRead": "{provider} không đọc {folder}. Hãy sao chép thư mục này vào {target}.",
   "error.skill.githubLinkInvalid": "Hãy dán liên kết tới một kho mã hoặc thư mục GitHub.",
-  "error.skill.githubNotFound":
-    "OpenBot không thể mở {repository}. Kho mã này là riêng tư hoặc không tồn tại.",
+  "error.skill.githubNotFound": "OpenBot không thể mở {repository}. Kho mã này là riêng tư hoặc không tồn tại.",
   "error.skill.githubNoSkills": "Không có SKILL.md trong {folder}.",
   "error.skill.githubUnavailable": "OpenBot hiện không thể đọc GitHub. Hãy thử lại sau.",
   "error.skill.githubRateLimited":

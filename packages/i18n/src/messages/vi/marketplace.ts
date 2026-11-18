@@ -105,7 +105,8 @@ export const messages = {
   "marketplace.app.connected": "Đã kết nối",
   "marketplace.app.attention": "Cần chú ý",
   "marketplace.app.partialTitle": "{name} chưa hoàn chỉnh",
-  "marketplace.app.partialDescription": "Một số ứng dụng hoặc kỹ năng của plugin này chưa được cài đặt. Kết nối lại sẽ cài đặt chúng.",
+  "marketplace.app.partialDescription":
+    "Một số ứng dụng hoặc kỹ năng của plugin này chưa được cài đặt. Kết nối lại sẽ cài đặt chúng.",
   "marketplace.app.notConnected": "Chưa kết nối",
   "marketplace.app.paused": "Đã tạm dừng",
   "marketplace.app.custom": "Máy chủ MCP",
@@ -128,7 +129,8 @@ export const messages = {
     "Gỡ {name} và các kỹ năng của nó khỏi máy tính này. Bạn có thể kết nối lại sau.",
   "marketplace.app.disconnect.action": "Ngắt kết nối",
   "marketplace.app.remove.title": "Gỡ máy chủ",
-  "marketplace.app.remove.description": "Agent của bạn sẽ không thể dùng máy chủ này nữa. Cài đặt của máy chủ sẽ bị xóa.",
+  "marketplace.app.remove.description":
+    "Agent của bạn sẽ không thể dùng máy chủ này nữa. Cài đặt của máy chủ sẽ bị xóa.",
   "marketplace.app.remove.action": "Gỡ",
   "marketplace.app.remove.confirmTitle": "Gỡ {name}?",
   "marketplace.app.remove.keep": "Giữ",
@@ -180,7 +182,8 @@ export const messages = {
     "Aave giúp người dùng khám phá các thị trường Aave V3 và V4 theo thời gian thực, xem vị thế ví và quản trị DAO, mô phỏng các thao tác cho vay và chuẩn bị giao dịch phi lưu ký. Mọi giao dịch đều được trả về ở dạng chưa ký: plugin đọc thị trường và soạn lệnh gọi, còn ví vẫn do người dùng giữ.",
   "marketplace.plugin.aave.app":
     "Thị trường V3 và V4 theo thời gian thực, vị thế ví, quản trị DAO và giao dịch đã chuẩn bị, qua một máy chủ MCP.",
-  "marketplace.plugin.aave.prompt.stablecoinYield": "Hiện tại tôi có thể kiếm lời nhiều nhất từ stablecoin ở đâu trên Aave?",
+  "marketplace.plugin.aave.prompt.stablecoinYield":
+    "Hiện tại tôi có thể kiếm lời nhiều nhất từ stablecoin ở đâu trên Aave?",
   "marketplace.plugin.aave.prompt.usdcRates": "Hiện tại Aave V3 hay V4 trên Ethereum trả lãi USDC cao hơn?",
   "marketplace.plugin.aave.prompt.healthFactor":
     "Health factor của 0x0a42b2f3a0d54157dbd7cc346335a4f1909fc02c là bao nhiêu, và còn cách mức thanh lý bao xa?",
@@ -190,8 +193,10 @@ export const messages = {
   "marketplace.plugin.canva.app":
     "Tạo và chỉnh sửa thiết kế, tìm trong thư viện, quản lý tài sản và thương hiệu, xuất tệp và bình luận, qua một máy chủ MCP.",
   "marketplace.plugin.canva.prompt.recentDesign": "Cho tôi xem thiết kế Canva tôi chỉnh sửa gần đây nhất.",
-  "marketplace.plugin.canva.prompt.socialResize": "Đổi kích thước poster ra mắt của tôi cho Instagram và xuất cả hai bản dưới dạng PNG.",
-  "marketplace.plugin.canva.prompt.deckFromNotes": "Biến ghi chú phát hành này thành một bản trình bày Canva sáu trang.",
+  "marketplace.plugin.canva.prompt.socialResize":
+    "Đổi kích thước poster ra mắt của tôi cho Instagram và xuất cả hai bản dưới dạng PNG.",
+  "marketplace.plugin.canva.prompt.deckFromNotes":
+    "Biến ghi chú phát hành này thành một bản trình bày Canva sáu trang.",
   "marketplace.plugin.linear.tagline": "Issue và phân loại dự án",
   "marketplace.plugin.linear.description":
     "Linear cho phép agent liệt kê các issue được giao, phân loại backlog, cập nhật trạng thái và soạn issue mới trong không gian làm việc của tài khoản đã đăng nhập. Mỗi người dùng đăng nhập vào tài khoản Linear của riêng mình qua trình duyệt.",
@@ -199,7 +204,8 @@ export const messages = {
     "Tìm issue, phân loại, cập nhật trạng thái và tạo issue, qua máy chủ MCP của Linear với đăng nhập trên trình duyệt.",
   "marketplace.plugin.linear.prompt.myWeek": "Tuần này tôi được giao những gì?",
   "marketplace.plugin.linear.prompt.backlog": "Phân loại backlog: mục nào đã cũ, bị chặn hoặc chưa có người phụ trách?",
-  "marketplace.plugin.linear.prompt.newIssue": "Tạo một issue cho lỗi crash trong hàng đợi đồng bộ, kèm các bước tái hiện.",
+  "marketplace.plugin.linear.prompt.newIssue":
+    "Tạo một issue cho lỗi crash trong hàng đợi đồng bộ, kèm các bước tái hiện.",
   "marketplace.plugin.notion.tagline": "Tài liệu và cơ sở tri thức",
   "marketplace.plugin.notion.description":
     "Notion cho phép agent đọc và viết trang, tìm trong không gian làm việc, và lưu ghi chú cuộc họp cùng đặc tả ngay nơi nhóm đang làm việc. Mỗi người dùng đăng nhập vào tài khoản Notion của riêng mình qua trình duyệt.",
@@ -208,18 +214,22 @@ export const messages = {
   "marketplace.plugin.notion.prompt.findSpec": "Tìm đặc tả ra mắt hiện tại và tóm tắt các câu hỏi còn mở.",
   "marketplace.plugin.notion.prompt.meetingNotes":
     "Biến các gạch đầu dòng này thành một ghi chú cuộc họp có cấu trúc trong không gian nhóm của tôi.",
-  "marketplace.plugin.notion.prompt.updateDoc": "Cập nhật tài liệu hướng dẫn người mới với danh sách kiểm tra phát hành mới.",
+  "marketplace.plugin.notion.prompt.updateDoc":
+    "Cập nhật tài liệu hướng dẫn người mới với danh sách kiểm tra phát hành mới.",
   "marketplace.plugin.cobrain.tagline": "Bộ nhớ chung cho các agent AI của bạn",
   "marketplace.plugin.cobrain.description":
     "Cobrain là bộ nhớ dạng Markdown mà mọi AI bạn kết nối đều có thể đọc và ghi. Agent tải ngữ cảnh của một khách hàng hoặc dự án trước khi làm việc, tìm các ghi chú và quyết định trước đây, và lưu những gì học được để luồng tiếp theo bắt đầu từ nơi luồng trước kết thúc. Mỗi người dùng đăng nhập vào tài khoản Cobrain của riêng mình.",
   "marketplace.plugin.cobrain.app": "Đọc, tìm và viết ghi chú trong bộ não Cobrain của bạn qua một máy chủ MCP.",
   "marketplace.plugin.cobrain.prompt.startSession": "Tải ngữ cảnh Cobrain của tôi cho dự án này trước khi bắt đầu.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "Tìm trong ghi chú Cobrain của tôi xem chúng ta đã quyết định gì về giá.",
-  "marketplace.plugin.cobrain.prompt.saveNote": "Lưu một ghi chú trong Cobrain về những gì chúng ta đã làm hôm nay và những gì còn lại.",
+  "marketplace.plugin.cobrain.prompt.searchDecision":
+    "Tìm trong ghi chú Cobrain của tôi xem chúng ta đã quyết định gì về giá.",
+  "marketplace.plugin.cobrain.prompt.saveNote":
+    "Lưu một ghi chú trong Cobrain về những gì chúng ta đã làm hôm nay và những gì còn lại.",
   "marketplace.plugin.honcho.tagline": "Bộ nhớ của bạn trên các công cụ AI",
   "marketplace.plugin.honcho.description":
     "Honcho của Plastic Labs cung cấp cho agent bộ nhớ dài hạn về bạn, có thể chia sẻ với các công cụ AI khác mà bạn kết nối. Agent lưu những gì học được, và Honcho suy luận trên đó để xây dựng mô hình về sở thích, mục tiêu và cách làm việc của bạn. Agent đặt câu hỏi cho Honcho trước khi bắt đầu. Agent OpenBot cũng có bộ nhớ riêng; Honcho là bộ nhớ đi theo bạn sang các công cụ khác. Tin nhắn mà agent lưu sẽ được gửi đến tài khoản Honcho của bạn.",
-  "marketplace.plugin.honcho.app": "Lưu và truy vấn bộ nhớ dài hạn trong các không gian làm việc Honcho của bạn qua một máy chủ MCP.",
+  "marketplace.plugin.honcho.app":
+    "Lưu và truy vấn bộ nhớ dài hạn trong các không gian làm việc Honcho của bạn qua một máy chủ MCP.",
   "marketplace.plugin.honcho.prompt.recall": "Hỏi Honcho xem nó biết gì về cách tôi thích làm việc trước khi bắt đầu.",
   "marketplace.plugin.honcho.prompt.save": "Lưu các quyết định từ luồng này vào Honcho.",
   "marketplace.plugin.honcho.prompt.preferences": "Honcho nói gì về văn phong của tôi? Hãy dùng nó cho bản nháp này.",
@@ -231,8 +241,7 @@ export const messages = {
     "Ghi nhớ, gợi lại và suy ngẫm về ký ức trong các bank Hindsight Cloud của bạn qua một máy chủ MCP.",
   "marketplace.plugin.hindsight.prompt.recall":
     "Gợi lại từ Hindsight những gì chúng ta biết về dự án này trước khi bắt đầu.",
-  "marketplace.plugin.hindsight.prompt.retain":
-    "Ghi nhớ các quyết định và câu hỏi còn mở từ luồng này vào Hindsight.",
+  "marketplace.plugin.hindsight.prompt.retain": "Ghi nhớ các quyết định và câu hỏi còn mở từ luồng này vào Hindsight.",
   "marketplace.plugin.hindsight.prompt.reflect":
     "Suy ngẫm về ký ức Hindsight của tôi: bạn thấy những khuôn mẫu nào trong công việc tháng vừa qua của tôi?",
   "marketplace.plugin.hindsight.hint.apiKey": "Tạo khóa trên trang Connect của Hindsight Cloud.",
@@ -242,7 +251,8 @@ export const messages = {
   "marketplace.plugin.figma.app":
     "Ngữ cảnh thiết kế, siêu dữ liệu, biến và ảnh chụp màn hình, qua máy chủ MCP trong ứng dụng Figma desktop. Hiện chỉ đọc.",
   "marketplace.plugin.figma.prompt.handoff": "Bàn giao tệp checkout: liệt kê màn hình, component và style.",
-  "marketplace.plugin.figma.prompt.audit": "Kiểm tra tệp này xem khoảng cách và màu sắc có được dùng không nhất quán không.",
+  "marketplace.plugin.figma.prompt.audit":
+    "Kiểm tra tệp này xem khoảng cách và màu sắc có được dùng không nhất quán không.",
   "marketplace.plugin.figma.prompt.assets": "Xuất các biểu tượng marketing ở kích thước 2x cho gói ứng dụng.",
   "marketplace.plugin.paper.tagline": "Canvas thiết kế xây dựng trên HTML và CSS",
   "marketplace.plugin.paper.description":
@@ -261,8 +271,7 @@ export const messages = {
   "marketplace.plugin.higgsfield.app":
     "Tạo hình ảnh, video và âm thanh, nhân vật, credit và tài sản, qua máy chủ MCP của Higgsfield với đăng nhập trên trình duyệt.",
   "marketplace.plugin.higgsfield.prompt.credits": "Tôi còn bao nhiêu credit Higgsfield?",
-  "marketplace.plugin.higgsfield.prompt.productShot":
-    "Tạo một ảnh sản phẩm Higgsfield về chiếc cốc gốm trên bàn gỗ.",
+  "marketplace.plugin.higgsfield.prompt.productShot": "Tạo một ảnh sản phẩm Higgsfield về chiếc cốc gốm trên bàn gỗ.",
   "marketplace.plugin.higgsfield.prompt.clip": "Tạo một video Higgsfield dài 5 giây về sóng biển lúc hoàng hôn.",
   "marketplace.plugin.sunra.tagline": "Hình ảnh, video, âm thanh và 3D bằng AI",
   "marketplace.plugin.sunra.description":
@@ -280,7 +289,8 @@ export const messages = {
     "Chuyển văn bản thành giọng nói, giọng đọc và quản lý voice agent, qua máy chủ MCP của ElevenLabs với đăng nhập trên trình duyệt.",
   "marketplace.plugin.elevenlabs.prompt.speech":
     "Đọc to đoạn văn này bằng một giọng ElevenLabs điềm tĩnh và gửi tôi tệp âm thanh.",
-  "marketplace.plugin.elevenlabs.prompt.agents": "Liệt kê các voice agent ElevenLabs của tôi và giọng đọc mà mỗi agent dùng.",
+  "marketplace.plugin.elevenlabs.prompt.agents":
+    "Liệt kê các voice agent ElevenLabs của tôi và giọng đọc mà mỗi agent dùng.",
   "marketplace.plugin.elevenlabs.prompt.conversations":
     "Tóm tắt mười cuộc trò chuyện gần nhất của voice agent hỗ trợ của tôi.",
   "marketplace.plugin.appleApps.tagline": "Mail, Lịch và nhiều ứng dụng khác trên máy Mac của bạn",
@@ -298,7 +308,8 @@ export const messages = {
   "marketplace.plugin.sentry.app":
     "Tìm lỗi, kiểm tra issue và tình trạng bản phát hành, qua máy chủ MCP của Sentry với đăng nhập trên trình duyệt.",
   "marketplace.plugin.sentry.prompt.newErrors": "Những lỗi mới nào đã xuất hiện kể từ lần triển khai hôm qua?",
-  "marketplace.plugin.sentry.prompt.topCrash": "Giải thích crash phổ biến nhất trong dự án di động và nguyên nhân có thể.",
+  "marketplace.plugin.sentry.prompt.topCrash":
+    "Giải thích crash phổ biến nhất trong dự án di động và nguyên nhân có thể.",
   "marketplace.plugin.sentry.prompt.releaseHealth": "Bản phát hành hiện tại ổn định đến đâu so với bản trước?",
   "marketplace.plugin.gitlab.tagline": "Issue, merge request và pipeline",
   "marketplace.plugin.gitlab.description":
@@ -307,7 +318,8 @@ export const messages = {
     "Dự án, issue, merge request, kho mã và pipeline CI, qua máy chủ MCP của GitLab với đăng nhập trên trình duyệt.",
   "marketplace.plugin.gitlab.prompt.reviewQueue": "Những merge request nào đang chờ tôi xem xét?",
   "marketplace.plugin.gitlab.prompt.failedPipeline": "Vì sao pipeline gần nhất trên nhánh mặc định bị lỗi?",
-  "marketplace.plugin.gitlab.prompt.newIssue": "Tạo một issue cho lỗi crash trong hàng đợi đồng bộ, kèm các bước tái hiện.",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "Tạo một issue cho lỗi crash trong hàng đợi đồng bộ, kèm các bước tái hiện.",
   "marketplace.plugin.vercel.tagline": "Bản triển khai, nhật ký build và dự án",
   "marketplace.plugin.vercel.description":
     "Vercel cho phép agent liệt kê dự án và các bản triển khai gần đây, đọc nhật ký build và runtime, và tìm lý do build bị lỗi. Mỗi người dùng đăng nhập vào tài khoản Vercel của riêng mình qua trình duyệt và chọn các team mà agent có thể dùng. Trong các team đó, agent có cùng quyền như tài khoản của người dùng. Agent cũng có thể thay đổi biến môi trường, tên miền, bản ghi DNS và bản triển khai, cũng như mua tên miền.",
@@ -321,9 +333,11 @@ export const messages = {
     "Cloudflare cho phép agent liệt kê và quản lý Workers, bản ghi DNS, R2, D1 và KV qua Cloudflare API, truy vấn nhật ký Workers và tìm trong tài liệu Cloudflare. Mỗi người dùng đăng nhập vào tài khoản Cloudflare của riêng mình qua trình duyệt. Trên trang đồng ý của Cloudflare, hãy chọn Read only: tùy chọn mặc định, Minimal, không cho agent xem Workers, nhật ký hay bản ghi DNS. Với quyền ghi, agent có thể triển khai và xóa Workers, thay đổi bản ghi DNS và các cài đặt tài khoản khác.",
   "marketplace.plugin.cloudflare.app":
     "Workers, DNS, lưu trữ và nhật ký, qua máy chủ API MCP của Cloudflare với đăng nhập trên trình duyệt.",
-  "marketplace.plugin.cloudflare.prompt.workers": "Những Workers nào đã được triển khai trong tài khoản Cloudflare của tôi?",
+  "marketplace.plugin.cloudflare.prompt.workers":
+    "Những Workers nào đã được triển khai trong tài khoản Cloudflare của tôi?",
   "marketplace.plugin.cloudflare.prompt.errors": "Những Cloudflare Workers nào ghi nhận lỗi trong một giờ qua?",
-  "marketplace.plugin.cloudflare.prompt.dns": "Liệt kê các bản ghi DNS của từng zone trong tài khoản Cloudflare của tôi.",
+  "marketplace.plugin.cloudflare.prompt.dns":
+    "Liệt kê các bản ghi DNS của từng zone trong tài khoản Cloudflare của tôi.",
   "marketplace.plugin.supabase.tagline": "Cơ sở dữ liệu, nhật ký và edge function",
   "marketplace.plugin.supabase.description":
     "Supabase cho phép agent liệt kê dự án, chạy SQL, đọc schema bảng và nhật ký, xem các advisor về bảo mật và hiệu năng, quản lý edge function và nhánh, và tìm trong tài liệu Supabase. Mỗi người dùng đăng nhập vào tài khoản Supabase của riêng mình qua trình duyệt và chọn một tổ chức. Agent có toàn quyền truy cập: có thể chạy SQL làm thay đổi hoặc xóa dữ liệu, áp dụng migration, triển khai edge function, và tạo hoặc tạm dừng dự án.",
@@ -371,8 +385,7 @@ export const messages = {
   "marketplace.plugin.airtable.tagline": "Base và bản ghi",
   "marketplace.plugin.airtable.description":
     "Airtable cho phép agent liệt kê base, đọc và cập nhật bản ghi, và tóm tắt nội dung bảng. Khóa API từ trang tài khoản được truyền cho máy chủ cục bộ dưới dạng một biến môi trường.",
-  "marketplace.plugin.airtable.app":
-    "Liệt kê base và truy cập bản ghi, qua máy chủ MCP cục bộ với khóa API Airtable.",
+  "marketplace.plugin.airtable.app": "Liệt kê base và truy cập bản ghi, qua máy chủ MCP cục bộ với khóa API Airtable.",
   "marketplace.plugin.airtable.prompt.bases": "Tôi có quyền truy cập những base nào?",
   "marketplace.plugin.airtable.prompt.records": "Tóm tắt bảng theo dõi ra mắt.",
   "marketplace.plugin.airtable.prompt.update": "Đánh dấu các tính năng đã phát hành là hoàn tất trong base lộ trình.",
@@ -425,31 +438,36 @@ export const messages = {
     "Kênh, bản nháp, bài đã lên lịch và nội dung đa phương tiện, qua máy chủ MCP của Postiz với đăng nhập trên trình duyệt hoặc khóa API.",
   "marketplace.plugin.postiz.prompt.channels": "Những kênh mạng xã hội nào đã kết nối với Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Những bài nào đã được lên lịch cho tuần sau?",
-  "marketplace.plugin.postiz.prompt.draft": "Soạn một bài LinkedIn về bản phát hành mới của chúng ta, nhưng đừng lên lịch.",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Soạn một bài LinkedIn về bản phát hành mới của chúng ta, nhưng đừng lên lịch.",
   "marketplace.plugin.trypost.tagline": "Lên lịch mạng xã hội",
   "marketplace.plugin.trypost.description":
     "TryPost cho phép agent liệt kê các kênh đã kết nối của bạn, và soạn, lên lịch, xếp hàng đợi, đăng bài trên X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest và nhiều mạng khác. Agent cũng có thể đọc số liệu phân tích, quản lý ý tưởng và phê duyệt, và đặt giờ đăng. Hãy đăng nhập vào tài khoản TryPost qua trình duyệt và chọn một không gian làm việc. Agent có thể đăng bài ngay lập tức, vì vậy hãy xem lại từng bài trước khi chấp thuận.",
   "marketplace.plugin.trypost.app":
     "Kênh, bài đăng, hàng đợi, ý tưởng và phân tích, qua máy chủ MCP của TryPost với đăng nhập trên trình duyệt.",
   "marketplace.plugin.trypost.prompt.week": "Những bài nào đã được lên lịch cho tuần này?",
-  "marketplace.plugin.trypost.prompt.draft": "Soạn một bài LinkedIn về bản phát hành mới của chúng ta, nhưng đừng lên lịch.",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Soạn một bài LinkedIn về bản phát hành mới của chúng ta, nhưng đừng lên lịch.",
   "marketplace.plugin.trypost.prompt.analytics": "Bài nào của tôi trong tháng trước có lượt tương tác cao nhất?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub và hơn 1.000 ứng dụng khác",
   "marketplace.plugin.composio.description":
     "Composio kết nối agent của bạn với Gmail, Slack, GitHub và hơn 1.000 ứng dụng khác qua một máy chủ MCP. Hãy đăng nhập bằng tài khoản Composio của bạn. Khi agent cần một ứng dụng, agent sẽ đề nghị bạn kết nối ứng dụng đó.",
   "marketplace.plugin.composio.app":
     "Các ứng dụng bạn kết nối trong tài khoản Composio. Agent sẽ đề nghị bạn kết nối một ứng dụng khi cần.",
-  "marketplace.plugin.composio.prompt.inbox": "Tóm tắt các email chưa đọc của tôi và soạn trả lời cho những email khẩn cấp.",
+  "marketplace.plugin.composio.prompt.inbox":
+    "Tóm tắt các email chưa đọc của tôi và soạn trả lời cho những email khẩn cấp.",
   "marketplace.plugin.composio.prompt.handoff": "Đăng bản tóm tắt pull request này lên kênh của nhóm chúng ta.",
   "marketplace.plugin.composio.prompt.apps": "Bạn có thể dùng những ứng dụng và thao tác nào qua Composio?",
-  "marketplace.plugin.composio.hint.apiKey": "Tìm khóa trong tài khoản Composio của bạn, tại Settings > Sessions & API Key.",
+  "marketplace.plugin.composio.hint.apiKey":
+    "Tìm khóa trong tài khoản Composio của bạn, tại Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Dự án, nhánh và migration Postgres",
   "marketplace.plugin.neon.description":
     "Neon cho phép agent liệt kê dự án và nhánh, chạy SQL, đọc schema bảng, thử thay đổi schema trên một nhánh tạm, tìm truy vấn chậm và tìm trong tài liệu Neon. Mỗi người dùng đăng nhập vào tài khoản Neon của riêng mình qua trình duyệt và có thể chọn quyền chỉ đọc khi cấp phép. Với toàn quyền, agent có thể chạy SQL làm thay đổi hoặc xóa dữ liệu, và tạo, đặt lại hoặc xóa nhánh, cơ sở dữ liệu và dự án. Neon khuyến nghị dùng máy chủ MCP của mình cho phát triển và kiểm thử, không dùng cho cơ sở dữ liệu production.",
   "marketplace.plugin.neon.app":
     "Dự án, nhánh, SQL và migration Postgres, qua máy chủ MCP của Neon với đăng nhập trên trình duyệt.",
   "marketplace.plugin.neon.prompt.projects": "Tài khoản Neon của tôi có những dự án và nhánh nào?",
-  "marketplace.plugin.neon.prompt.slowQueries": "Những truy vấn nào chậm nhất trên cơ sở dữ liệu Neon của tôi, và vì sao?",
+  "marketplace.plugin.neon.prompt.slowQueries":
+    "Những truy vấn nào chậm nhất trên cơ sở dữ liệu Neon của tôi, và vì sao?",
   "marketplace.plugin.neon.prompt.migration":
     "Thêm một index trên bảng orders trong một nhánh tạm, và cho tôi xem kết quả trước khi áp dụng.",
   "marketplace.plugin.prisma.tagline": "Cơ sở dữ liệu Postgres, bản sao lưu và ứng dụng Compute",
@@ -480,7 +498,8 @@ export const messages = {
   "marketplace.plugin.render.tagline": "Dịch vụ, bản triển khai và nhật ký",
   "marketplace.plugin.render.description":
     "Render cho phép agent liệt kê không gian làm việc và dịch vụ, đọc nhật ký, sự kiện và chỉ số, xem lịch sử triển khai, kích hoạt triển khai và chạy SQL chỉ đọc trên Render Postgres. Khóa API của Render được đặt trong một header Authorization. Khóa truy cập được mọi không gian làm việc của tài khoản Render. Agent có thể tạo dịch vụ web, trang tĩnh, cron job, cơ sở dữ liệu Postgres và phiên bản Key Value, có thể phát sinh chi phí, và có thể thay thế biến môi trường của một dịch vụ. Máy chủ không thể xóa tài nguyên.",
-  "marketplace.plugin.render.app": "Dịch vụ, bản triển khai, nhật ký và chỉ số, qua máy chủ MCP của Render với khóa API.",
+  "marketplace.plugin.render.app":
+    "Dịch vụ, bản triển khai, nhật ký và chỉ số, qua máy chủ MCP của Render với khóa API.",
   "marketplace.plugin.render.prompt.services": "Không gian làm việc Render của tôi có những dịch vụ nào?",
   "marketplace.plugin.render.prompt.logs": "Dịch vụ web Render của tôi đã ghi nhận những lỗi nào trong một giờ qua?",
   "marketplace.plugin.render.prompt.deploy": "Vì sao lần triển khai gần nhất của dịch vụ Render của tôi bị lỗi?",
@@ -496,7 +515,8 @@ export const messages = {
   "marketplace.plugin.todoist.tagline": "Việc cần làm, dự án và lời nhắc",
   "marketplace.plugin.todoist.description":
     "Todoist cho phép agent tìm việc cần làm theo ngày, văn bản, nhãn hoặc bộ lọc, thêm và đổi lịch việc cần làm, và quản lý dự án, mục, nhãn, bình luận và lời nhắc. Mỗi người dùng đăng nhập vào tài khoản Todoist của riêng mình qua trình duyệt. Agent có quyền đọc và ghi: có thể thay đổi, hoàn tất và xóa việc cần làm, dự án và các mục khác.",
-  "marketplace.plugin.todoist.app": "Việc cần làm, dự án và lời nhắc, qua máy chủ MCP của Todoist với đăng nhập trên trình duyệt.",
+  "marketplace.plugin.todoist.app":
+    "Việc cần làm, dự án và lời nhắc, qua máy chủ MCP của Todoist với đăng nhập trên trình duyệt.",
   "marketplace.plugin.todoist.prompt.today": "Những việc Todoist nào đến hạn hôm nay?",
   "marketplace.plugin.todoist.prompt.capture": "Thêm các đầu việc này vào Inbox Todoist của tôi.",
   "marketplace.plugin.todoist.prompt.overdue": "Chuyển các việc Todoist quá hạn của tôi sang ngày mai.",
@@ -538,8 +558,10 @@ export const messages = {
     "Robinhood cho phép agent đọc tài khoản, vị thế, số dư, lịch sử giao dịch và danh sách theo dõi của khách hàng Robinhood, đọc dữ liệu thị trường, và đặt lệnh cổ phiếu, quyền chọn và tiền mã hóa. Mỗi người dùng đăng nhập vào tài khoản Robinhood của riêng mình qua trình duyệt. Ở lần đăng nhập đầu tiên, Robinhood yêu cầu người dùng mở một tài khoản Agentic riêng. Agent chỉ có thể giao dịch trong tài khoản đó, và theo mặc định sẽ đặt lệnh mà không cần người dùng chấp thuận từng lệnh.",
   "marketplace.plugin.robinhood.app":
     "Tài khoản, vị thế, dữ liệu thị trường và giao dịch, qua máy chủ MCP của Robinhood với đăng nhập trên trình duyệt.",
-  "marketplace.plugin.robinhood.prompt.positions": "Tóm tắt các vị thế Robinhood của tôi và biến động của chúng hôm nay.",
-  "marketplace.plugin.robinhood.prompt.watchlist": "Từng cổ phiếu trong danh sách theo dõi Robinhood của tôi biến động thế nào trong tuần này?",
+  "marketplace.plugin.robinhood.prompt.positions":
+    "Tóm tắt các vị thế Robinhood của tôi và biến động của chúng hôm nay.",
+  "marketplace.plugin.robinhood.prompt.watchlist":
+    "Từng cổ phiếu trong danh sách theo dõi Robinhood của tôi biến động thế nào trong tuần này?",
   "marketplace.plugin.robinhood.prompt.agenticCash": "Tài khoản Robinhood Agentic của tôi có bao nhiêu tiền mặt?",
   "marketplace.plugin.huggingface.tagline": "Mô hình, tập dữ liệu và bài báo trên Hub",
   "marketplace.plugin.huggingface.description":
@@ -548,7 +570,8 @@ export const messages = {
     "Tìm mô hình, tập dữ liệu, Space, bài báo và tài liệu, qua máy chủ MCP của Hugging Face, không cần đăng nhập.",
   "marketplace.plugin.huggingface.prompt.models": "Tìm các mô hình mở nhỏ cho nhận dạng giọng nói trên Hugging Face.",
   "marketplace.plugin.huggingface.prompt.papers": "Những bài báo nào đang thịnh hành trên Hugging Face hôm nay?",
-  "marketplace.plugin.huggingface.prompt.dataset": "Tìm một tập dữ liệu chuỗi thời gian thời tiết và hiện các cột của nó.",
+  "marketplace.plugin.huggingface.prompt.dataset":
+    "Tìm một tập dữ liệu chuỗi thời gian thời tiết và hiện các cột của nó.",
   "marketplace.auth.apiKey": "Khóa API",
   "marketplace.auth.personalApiKey": "Khóa API cá nhân",
   "marketplace.auth.createKey": "Tạo khóa",
@@ -560,7 +583,8 @@ export const messages = {
   "marketplace.skills.seeAll": "Xem tất cả",
   "marketplace.skills.seeAllName": "Xem tất cả: {name}",
   "marketplace.skills.none": "Chưa có agent nào có kỹ năng.",
-  "marketplace.skills.noneHint": "Mỗi kỹ năng dạy agent một tác vụ. Hãy thêm một kỹ năng bên dưới, hoặc tự tạo kỹ năng của bạn.",
+  "marketplace.skills.noneHint":
+    "Mỗi kỹ năng dạy agent một tác vụ. Hãy thêm một kỹ năng bên dưới, hoặc tự tạo kỹ năng của bạn.",
   "marketplace.skills.sourceLabel": "Nguồn",
   "marketplace.skills.source.all": "Tất cả",
   "marketplace.skills.source.verified": "Đã xác minh",

@@ -77,8 +77,7 @@ export const messages = {
   "vault.field.phone": "Điện thoại",
   "vault.field.email": "Địa chỉ email",
   "vault.field.variableName": "Tên biến",
-  "vault.variableNameHint":
-    "Biến môi trường mà chương trình đọc, ví dụ OPENAI_API_KEY. Agent tìm khóa theo tên này.",
+  "vault.variableNameHint": "Biến môi trường mà chương trình đọc, ví dụ OPENAI_API_KEY. Agent tìm khóa theo tên này.",
   "vault.field.apiKey": "Khóa API",
   "vault.removeSite": "Gỡ {site}",
   "vault.placeholder.website": "example.com",
@@ -146,7 +145,8 @@ export const messages = {
   "vault.twoStep.setupIntro":
     "Trên {site}, hãy bật xác minh hai bước bằng ứng dụng xác thực. Khi trang hiện mã QR, hãy đưa khóa của mã đó cho OpenBot.",
   "vault.twoStep.keyLabel": "Khóa thiết lập hoặc liên kết otpauth://",
-  "vault.twoStep.keyHint": "Hầu hết các trang hiện khóa này bên dưới mã QR, dưới dạng “Không quét được?” hoặc “Nhập khóa thủ công”.",
+  "vault.twoStep.keyHint":
+    "Hầu hết các trang hiện khóa này bên dưới mã QR, dưới dạng “Không quét được?” hoặc “Nhập khóa thủ công”.",
   "vault.twoStep.keyInvalid": "Đây không phải là khóa hai bước.",
   "vault.twoStep.or": "hoặc",
   "vault.twoStep.chooseImage": "Chọn ảnh chụp màn hình mã QR",

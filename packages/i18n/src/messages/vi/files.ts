@@ -108,7 +108,8 @@ export const messages = {
   "files.delete.titleRemoved": "Gỡ tệp này?",
   "files.delete.descriptionAvailable":
     "“{name}” sẽ bị xóa khỏi ổ đĩa. Các tin nhắn hiển thị tệp này vẫn ở lại cuộc trò chuyện nhưng không còn tệp.",
-  "files.delete.descriptionRemoved": "“{name}” sẽ bị gỡ khỏi danh sách. Tin nhắn đã gửi tệp này vẫn ở lại cuộc trò chuyện.",
+  "files.delete.descriptionRemoved":
+    "“{name}” sẽ bị gỡ khỏi danh sách. Tin nhắn đã gửi tệp này vẫn ở lại cuộc trò chuyện.",
   "files.delete.deleting": "Đang xóa…",
   "files.delete.removing": "Đang gỡ…",
   "files.delete.failed": "Không xóa được tệp.",
@@ -161,7 +162,8 @@ export const messages = {
   "files.machine.alertSent": "Cảnh báo được gửi đến {name}.",
   "files.machine.alerts": "Cảnh báo",
   "files.machine.notify": "Thông báo",
-  "files.machine.notifyDescription": "Nhận thông báo khi vượt quá một mức. Chỉ chủ sở hữu và quản trị viên mới nhận được.",
+  "files.machine.notifyDescription":
+    "Nhận thông báo khi vượt quá một mức. Chỉ chủ sở hữu và quản trị viên mới nhận được.",
   "files.machine.notifyLabel": "Thành viên nhận thông báo: {name}",
   "files.machine.diskAlert": "Cảnh báo ổ đĩa",
   "files.machine.memoryAlert": "Cảnh báo bộ nhớ",

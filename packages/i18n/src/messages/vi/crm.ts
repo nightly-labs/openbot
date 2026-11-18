@@ -167,7 +167,10 @@ export const messages = {
   "crm.payment.actions": "Thao tác cho {invoice}",
   "crm.payment.markPaid": "Đánh dấu đã trả",
   "crm.payment.markUnpaid": "Đánh dấu chưa trả",
-  "crm.payment.markedPaid": { one: "Đã đánh dấu {count} thanh toán là đã trả", other: "Đã đánh dấu {count} thanh toán là đã trả" },
+  "crm.payment.markedPaid": {
+    one: "Đã đánh dấu {count} thanh toán là đã trả",
+    other: "Đã đánh dấu {count} thanh toán là đã trả",
+  },
   "crm.payment.paid": "Đã trả",
   "crm.payment.edit": "Sửa",
   "crm.payment.split": "Chia nhỏ",
@@ -269,7 +272,10 @@ export const messages = {
   "crm.proposal.paymentUpdate": "Thay đổi {invoice} của {customer}",
   "crm.proposal.paymentUpdateOther": "Thay đổi một thanh toán của {customer}",
   "crm.proposal.paymentPaidOne": "Đánh dấu {invoice} của {customer} là đã trả",
-  "crm.proposal.paymentPaid": { one: "Đánh dấu {count} thanh toán là đã trả", other: "Đánh dấu {count} thanh toán là đã trả" },
+  "crm.proposal.paymentPaid": {
+    one: "Đánh dấu {count} thanh toán là đã trả",
+    other: "Đánh dấu {count} thanh toán là đã trả",
+  },
   "crm.proposal.paymentUnpaid": {
     one: "Đánh dấu {count} thanh toán là chưa trả",
     other: "Đánh dấu {count} thanh toán là chưa trả",
@@ -340,7 +346,8 @@ export const messages = {
   "crm.source.never": "Chưa có",
   "crm.source.failed": "Đồng bộ thất bại",
   "crm.source.errorInvalidKey": "{source} không chấp nhận khóa. Hãy ngắt kết nối và kết nối lại bằng khóa mới.",
-  "crm.source.errorPermission": "Khóa không đọc được mọi dữ liệu mà quá trình đồng bộ cần. Hãy cấp quyền Read cho khóa trong {source}.",
+  "crm.source.errorPermission":
+    "Khóa không đọc được mọi dữ liệu mà quá trình đồng bộ cần. Hãy cấp quyền Read cho khóa trong {source}.",
   "crm.source.errorRateLimited": "{source} nhận quá nhiều yêu cầu. Lần đồng bộ tiếp theo sẽ thử lại.",
   "crm.source.errorNetwork": "OpenBot không thể kết nối tới {source}. Lần đồng bộ tiếp theo sẽ thử lại.",
   "crm.source.errorFailed": "{source} gửi phản hồi mà OpenBot không đọc được. Lần đồng bộ tiếp theo sẽ thử lại.",

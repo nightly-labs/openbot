@@ -18,8 +18,7 @@ export const messages = {
   "mobile.appLock.lockAfter.minutes": { one: "Sau {count} phút", other: "Sau {count} phút" },
   "mobile.appLock.lockAfter.hours": { one: "Sau {count} giờ", other: "Sau {count} giờ" },
   "mobile.appLock.lockWithPhone": "Khi điện thoại khóa",
-  "mobile.appLock.lockAfter.footer":
-    "Thời gian bắt đầu tính khi bạn rời OpenBot. OpenBot luôn khóa khi khởi động lại.",
+  "mobile.appLock.lockAfter.footer": "Thời gian bắt đầu tính khi bạn rời OpenBot. OpenBot luôn khóa khi khởi động lại.",
   "mobile.appLock.device.turnOnPrompt": "Bật {method} cho OpenBot",
   "mobile.appLock.device.failed": "{method} không xác nhận được. Hãy thử lại.",
   "mobile.appLock.device.unavailable": "Hãy đặt mật mã cho điện thoại trước.",
@@ -48,7 +47,8 @@ export const messages = {
     other: "Quá nhiều lần thử. Hãy thử lại sau {count} phút.",
   },
   "mobile.appLock.lock.checkFailed": "Không thể kiểm tra mã PIN. Hãy thử lại.",
-  "mobile.appLock.lock.pinMissing": "Điện thoại này chưa có mã PIN cho OpenBot. Hãy đăng xuất để đặt lại khóa ứng dụng.",
+  "mobile.appLock.lock.pinMissing":
+    "Điện thoại này chưa có mã PIN cho OpenBot. Hãy đăng xuất để đặt lại khóa ứng dụng.",
   "mobile.appLock.lock.loadFailed": "Không thể đọc cài đặt khóa ứng dụng.",
   "mobile.appLock.lock.retry": "Thử lại",
   "mobile.appLock.lock.forgotPin": "Quên mã PIN?",

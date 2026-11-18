@@ -191,7 +191,8 @@ export const messages = {
   "mobile.settings.feedback.footer": "Phản hồi khi chạm cho các thao tác trong ứng dụng trên thiết bị này.",
   "mobile.settings.feedback.haptics": "Phản hồi rung",
   "mobile.settings.feedback.replies": "Rung khi trả lời",
-  "mobile.settings.feedback.repliesFooter": "Rung nhẹ khi câu trả lời của agent xuất hiện trong cuộc trò chuyện. Các phản hồi rung khác vẫn bật.",
+  "mobile.settings.feedback.repliesFooter":
+    "Rung nhẹ khi câu trả lời của agent xuất hiện trong cuộc trò chuyện. Các phản hồi rung khác vẫn bật.",
   "mobile.settings.feedback.retry": "Thử lưu lại cài đặt phản hồi rung",
   "mobile.settings.liveActivities.title": "Hoạt động trực tiếp",
   "mobile.settings.liveActivities.footer":
@@ -277,8 +278,7 @@ export const messages = {
   "mobile.settings.conversations.messageField": "Ô nhập tin nhắn",
   "mobile.settings.conversations.compact": "Thu gọn",
   "mobile.settings.conversations.fullSize": "Kích thước đầy đủ",
-  "mobile.settings.conversations.compactFooter":
-    "Thu gọn biến ô nhập tin nhắn thành một thanh nhỏ khi bàn phím đóng.",
+  "mobile.settings.conversations.compactFooter": "Thu gọn biến ô nhập tin nhắn thành một thanh nhỏ khi bàn phím đóng.",
   "mobile.settings.conversations.compactComposerReduced":
     "Chuyển động đang được giảm trong Hiệu ứng chuyển động hoặc trong cài đặt điện thoại, nên ô nhập tin nhắn giữ kích thước đầy đủ.",
   "mobile.settings.conversations.media": "Ảnh và tệp",
@@ -360,7 +360,8 @@ export const messages = {
     "Phiên bản ứng dụng này không thể đọc to câu trả lời. Hãy cập nhật ứng dụng để dùng cuộc trò chuyện bằng giọng nói.",
   "mobile.settings.voice.removeFailed": "Không thể xóa. Hãy thử lại.",
   "mobile.settings.voice.engine.title": "Giọng đọc câu trả lời",
-  "mobile.settings.voice.engine.footer": "Giọng đọc được chọn sẽ đọc câu trả lời của agent trong cuộc trò chuyện bằng giọng nói.",
+  "mobile.settings.voice.engine.footer":
+    "Giọng đọc được chọn sẽ đọc câu trả lời của agent trong cuộc trò chuyện bằng giọng nói.",
   "mobile.settings.voice.engine.supertonic": "Supertonic 3",
   "mobile.settings.voice.engine.elevenLabs": "ElevenLabs",
   "mobile.settings.voice.supertonic.title": "Supertonic 3",
@@ -435,7 +436,8 @@ export const messages = {
   "mobile.settings.voice.recognition.elevenLabsHint": "Hơn 90 ngôn ngữ · gửi giọng nói của bạn đến ElevenLabs",
   "mobile.settings.voice.recognition.model": "Mô hình giọng nói",
   "mobile.settings.voice.recognition.removeTitle": "Xóa mô hình giọng nói?",
-  "mobile.settings.voice.recognition.removeBody": "Trình nhận dạng của điện thoại sẽ nghe cho đến khi bạn tải lại mô hình.",
+  "mobile.settings.voice.recognition.removeBody":
+    "Trình nhận dạng của điện thoại sẽ nghe cho đến khi bạn tải lại mô hình.",
   "mobile.settings.voice.elevenLabs.permissionTranscription": "Speech to Text: Access",
   "mobile.settings.voice.elevenLabs.permissionTranscriptionHint":
     "Nhận dạng giọng nói của bạn khi ElevenLabs Scribe được chọn.",
@@ -449,7 +451,8 @@ export const messages = {
     "Trong cuộc trò chuyện bằng giọng nói, OpenBot gửi lời của bạn khi không nhận ra từ mới nào trong khoảng thời gian này. Tiếng ồn không có lời sẽ không giữ OpenBot tiếp tục nghe. Hãy chọn khoảng dừng dài hơn nếu bạn nói chậm hoặc hay dừng lại để suy nghĩ.",
   "mobile.settings.voice.pause.seconds": "{seconds} giây",
   "mobile.settings.voice.speed.title": "Tốc độ đọc câu trả lời",
-  "mobile.settings.voice.speed.footer": "Tốc độ OpenBot đọc to câu trả lời, kể cả trong cuộc trò chuyện bằng giọng nói.",
+  "mobile.settings.voice.speed.footer":
+    "Tốc độ OpenBot đọc to câu trả lời, kể cả trong cuộc trò chuyện bằng giọng nói.",
   "mobile.settings.voice.speed.value": "{speed}×",
   "mobile.settings.voice.gptLive.title": "Giọng nói GPT live",
   "mobile.settings.voice.gptLive.footer":
@@ -508,7 +511,8 @@ export const messages = {
   "mobile.settings.agents.offline": "Kết nối với máy chủ này để thay đổi cài đặt agent của máy chủ.",
   "mobile.settings.agents.loadFailed": "Không thể đọc các agent.",
   "mobile.settings.agents.defaults": "Mặc định",
-  "mobile.settings.agents.defaultsFooter": "Các agent theo những giá trị mặc định này, trừ khi bạn thay đổi cho từng agent.",
+  "mobile.settings.agents.defaultsFooter":
+    "Các agent theo những giá trị mặc định này, trừ khi bạn thay đổi cho từng agent.",
   "mobile.settings.agents.value": "Mặc định: {value}",
   "mobile.settings.agents.on": "Bật",
   "mobile.settings.agents.off": "Tắt",
@@ -516,7 +520,8 @@ export const messages = {
   "mobile.settings.agents.followDefault": "Mặc định ({value})",
   "mobile.settings.agents.default": "Mặc định",
   "mobile.settings.agents.agentsSection": "Agent",
-  "mobile.settings.agents.agentsFooter": "Agent đặt Mặc định sẽ theo giá trị mặc định. Agent mới dùng giá trị mặc định.",
+  "mobile.settings.agents.agentsFooter":
+    "Agent đặt Mặc định sẽ theo giá trị mặc định. Agent mới dùng giá trị mặc định.",
   "mobile.settings.agents.setAll": "Đặt cho tất cả",
   "mobile.settings.agents.setAllLabel": "Đặt {setting} cho tất cả agent",
   "mobile.settings.agents.agentLabel": "{setting} cho {agent}",
@@ -571,7 +576,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Chọn agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot đang bị khóa",
   "mobile.settings.shortcuts.card.locked.action": "Mở OpenBot",
-  "mobile.settings.shortcuts.footer": "Gửi tin nhắn trong ứng dụng Phím tắt sẽ gửi đến agent này. Ứng dụng OpenBot không mở ra.",
+  "mobile.settings.shortcuts.footer":
+    "Gửi tin nhắn trong ứng dụng Phím tắt sẽ gửi đến agent này. Ứng dụng OpenBot không mở ra.",
   "mobile.settings.shortcuts.send.sent": "Đã gửi",
   "mobile.settings.shortcuts.send.failed": "OpenBot không thể gửi nội dung này.",
   "mobile.settings.shortcuts.send.unconfirmed": "Máy chủ không phản hồi. Tin nhắn có thể đã có trong cuộc trò chuyện.",

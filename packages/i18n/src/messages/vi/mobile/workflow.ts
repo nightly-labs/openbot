@@ -129,7 +129,8 @@ export const messages = {
   "mobile.workflow.step.ruleHint":
     "Một mô hình trả lời có hoặc không dựa trên đầu ra của bước trước đó. Mỗi câu trả lời có nhánh riêng.",
   "mobile.workflow.step.question": "Câu hỏi",
-  "mobile.workflow.step.questionHint": "Lần chạy sẽ chờ đến khi bạn phê duyệt hoặc từ chối. Bạn sẽ nhận được thông báo.",
+  "mobile.workflow.step.questionHint":
+    "Lần chạy sẽ chờ đến khi bạn phê duyệt hoặc từ chối. Bạn sẽ nhận được thông báo.",
   "mobile.workflow.step.text": "Văn bản",
   "mobile.workflow.step.sendTo": "Gửi đến",
   "mobile.workflow.step.channelHint": "Chủ sở hữu hoặc quản trị viên chọn nơi nhắn tin trong OpenBot trên máy tính.",
@@ -229,7 +230,8 @@ export const messages = {
   "mobile.workflow.output.discord": "Discord",
   "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
-  "mobile.workflow.output.telegramHint": "Trả lời, đăng bài hoặc thêm biểu cảm trong một cuộc trò chuyện Telegram đã liên kết.",
+  "mobile.workflow.output.telegramHint":
+    "Trả lời, đăng bài hoặc thêm biểu cảm trong một cuộc trò chuyện Telegram đã liên kết.",
   "mobile.workflow.output.slackHint": "Trả lời, đăng bài hoặc thêm biểu cảm trong một kênh Slack.",
   "mobile.workflow.run.stopStep": "Dừng bước",
   "mobile.workflow.run.stopStepFailed": "Không thể dừng bước",
@@ -295,8 +297,7 @@ export const messages = {
   "mobile.workflow.github.alert.pullRequestOnly":
     "{action} chỉ dùng được với pull request. Kích hoạt bắt đầu với issue.",
   "mobile.workflow.github.runLastEvent": "Chạy với sự kiện gần nhất",
-  "mobile.workflow.github.runLastEventHint":
-    "Chạy quy trình với issue hoặc pull request mới nhất khớp với kích hoạt.",
+  "mobile.workflow.github.runLastEventHint": "Chạy quy trình với issue hoặc pull request mới nhất khớp với kích hoạt.",
   "mobile.workflow.github.runItem": "Mục GitHub",
   "mobile.workflow.github.openItem": "Mở #{number} trên GitHub",
   "mobile.workflow.github.history.title": "Sự kiện GitHub",

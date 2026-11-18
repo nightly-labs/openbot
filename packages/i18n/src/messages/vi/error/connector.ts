@@ -60,8 +60,7 @@ export const messages = {
   "error.connector.protonPassFailed": "Không thể kết nối Proton Pass. Hãy kết nối lại.",
   "error.connector.protonPassCliInstallFailed":
     "Không thể cài đặt Proton Pass CLI. Hãy kiểm tra kết nối mạng rồi kết nối lại.",
-  "error.connector.protonPassPlan":
-    "Gói Proton của bạn không hỗ trợ Proton Pass CLI. Hãy đổi gói rồi kết nối lại.",
+  "error.connector.protonPassPlan": "Gói Proton của bạn không hỗ trợ Proton Pass CLI. Hãy đổi gói rồi kết nối lại.",
   "error.connector.protonPassExpired": "Quyền truy cập Proton Pass đã hết hạn. Hãy kết nối lại.",
   "error.connector.protonPassKeyInvalid": "Nhập khóa truy cập Proton Pass bắt đầu bằng pst_.",
   "error.connector.protonPassExtraPassword": "Mật khẩu bổ sung không đúng. Hãy nhập lại.",

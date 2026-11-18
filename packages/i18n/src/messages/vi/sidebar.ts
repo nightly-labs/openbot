@@ -16,7 +16,10 @@ export const messages = {
   "sidebar.new.menuWithChannel": "Agent, kênh hoặc thư mục mới",
   "sidebar.markAllRead": "Đánh dấu tất cả là đã đọc",
   "sidebar.filter.button": "Lọc cuộc trò chuyện",
-  "sidebar.filter.buttonActive": { one: "Lọc cuộc trò chuyện, đã đặt {count}", other: "Lọc cuộc trò chuyện, đã đặt {count}" },
+  "sidebar.filter.buttonActive": {
+    one: "Lọc cuộc trò chuyện, đã đặt {count}",
+    other: "Lọc cuộc trò chuyện, đã đặt {count}",
+  },
   "sidebar.filter.allChats": "Tất cả cuộc trò chuyện",
   "sidebar.filter.agents": "Agent",
   "sidebar.filter.channels": "Kênh",

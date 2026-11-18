@@ -22,7 +22,8 @@ export const messages = {
   "error.backend.windowUnavailable": "Cửa sổ OpenBot không khả dụng.",
   "error.backend.sunshineApiHttp": "API Sunshine thất bại với HTTP {status}.",
   "error.backend.sunshinePortsUnavailable": "Không thể dành riêng một nhóm cổng Sunshine trống cho Remote Desktop.",
-  "error.backend.moonlightPortsUnavailable": "Không thể dành riêng một dải cổng WebRTC Moonlight trống cho Remote Desktop.",
+  "error.backend.moonlightPortsUnavailable":
+    "Không thể dành riêng một dải cổng WebRTC Moonlight trống cho Remote Desktop.",
   "error.backend.iceServerNoPort": "Máy chủ ICE của Remote Desktop không nhận được cổng.",
   "error.backend.remoteDesktopStoppedWhileStarting": "Môi trường chạy remote desktop đã bị dừng trong lúc khởi động.",
   "error.backend.sunshineNotStarted": "Sunshine không khởi động trên nhóm cổng đã dành riêng.",
@@ -95,15 +96,18 @@ export const messages = {
   "error.backend.channelTaskComplete": "Tác vụ này đã hoàn tất.",
   "error.backend.channelTaskNotStopped": "Chỉ có thể hủy tác vụ đã dừng hoặc thất bại.",
   "error.backend.channelSelectAgent": "Hãy chọn một agent.",
-  "error.backend.channelLeadRequired": "Hãy chọn một trưởng nhóm kênh khả dụng hoặc giao tác vụ này cho một thành viên.",
+  "error.backend.channelLeadRequired":
+    "Hãy chọn một trưởng nhóm kênh khả dụng hoặc giao tác vụ này cho một thành viên.",
   "error.backend.channelRoutingTooLong":
     "Yêu cầu này vượt quá giới hạn ngữ cảnh điều phối. Hãy chọn một thành viên hoặc gửi yêu cầu ngắn hơn.",
   "error.backend.channelTaskMemberRequired": "Hãy chọn một thành viên cho tác vụ này.",
   "error.backend.channelTaskStopped": "Đã dừng. Hãy tiếp tục hoặc giao lại tác vụ này.",
-  "error.backend.channelRoutingUnreadable": "Trưởng nhóm không thể điều phối tin nhắn này. Hãy giao lại cho một thành viên.",
+  "error.backend.channelRoutingUnreadable":
+    "Trưởng nhóm không thể điều phối tin nhắn này. Hãy giao lại cho một thành viên.",
   "error.backend.channelRoutingFailed": "Điều phối thất bại. Hãy chọn một thành viên hoặc thử lại.",
   "error.backend.channelLeadTimedOut": "Trưởng nhóm kênh không trả lời kịp. Hãy chọn một thành viên hoặc thử lại.",
-  "error.backend.channelLeadFailed": "Trưởng nhóm kênh không thể điều phối tin nhắn này. Hãy chọn một thành viên hoặc thử lại.",
+  "error.backend.channelLeadFailed":
+    "Trưởng nhóm kênh không thể điều phối tin nhắn này. Hãy chọn một thành viên hoặc thử lại.",
   "error.backend.channelRequestMemberRequired": "Hãy chọn một thành viên cho yêu cầu này.",
   "error.backend.channelDeliveryNotCreated": "Chưa tạo được lượt gửi trong kênh.",
   "error.backend.channelAssignmentStopped": "Lượt giao việc trong kênh này đã bị dừng hoặc thay thế.",
@@ -115,7 +119,8 @@ export const messages = {
   "error.backend.memoryEssentialBudget":
     "Các mục bộ nhớ thiết yếu vượt quá giới hạn prompt. Hãy đặt một mục thành tìm kiếm khi cần, rồi thử lại.",
   "error.backend.memorySelectionConflict": "Bộ nhớ đã thay đổi. Hãy tải lại và thử lại.",
-  "error.backend.memorySelectionUserControlled": "Người dùng kiểm soát lựa chọn bộ nhớ này. Hãy giữ lựa chọn của người dùng.",
+  "error.backend.memorySelectionUserControlled":
+    "Người dùng kiểm soát lựa chọn bộ nhớ này. Hãy giữ lựa chọn của người dùng.",
   "error.backend.memorySearchQuery": "Hãy nhập một hoặc nhiều từ tìm kiếm, tối đa 256 ký tự.",
   "error.backend.memoryOperationFailed": "Thao tác bộ nhớ thất bại. Hãy thử lại.",
   "error.backend.memoryGone": "Mục bộ nhớ này không còn tồn tại.",
@@ -190,14 +195,16 @@ export const messages = {
   "error.backend.routineCronTooOften": "Lịch tùy chỉnh không được chạy thường xuyên hơn mỗi {minutes} phút.",
   "error.backend.routineAnchorInvalid": "Mốc thời gian của khoảng lặp không hợp lệ.",
   "error.backend.routineNoOccurrence": "Lịch này không có lần chạy nào trong năm năm tới.",
-  "error.backend.routineOncePassed": "Thời điểm của tác vụ định kỳ chạy một lần này đã qua. Hãy chọn ngày hoặc giờ muộn hơn.",
+  "error.backend.routineOncePassed":
+    "Thời điểm của tác vụ định kỳ chạy một lần này đã qua. Hãy chọn ngày hoặc giờ muộn hơn.",
   "error.backend.routineTimezoneInvalid": "Múi giờ của tác vụ định kỳ không hợp lệ.",
   "error.backend.routineCronFields": "Lịch tùy chỉnh phải dùng năm trường cron.",
   "error.backend.routineCronValueInvalid": "Giá trị cron {field} không hợp lệ.",
   "error.backend.routineCronFieldEmpty": "Trường cron {field} đang trống.",
   "error.backend.routineDeletionBusy": "Một thao tác xóa tác vụ định kỳ khác đang diễn ra cho agent này.",
   "error.backend.routineWaitForAgent": "Hãy đợi thao tác của agent hoàn tất trước khi chạy tác vụ định kỳ.",
-  "error.backend.routineRunStarting": "Lượt chạy tác vụ định kỳ này vẫn đang khởi động. Hãy thử lại sau khi lượt bắt đầu.",
+  "error.backend.routineRunStarting":
+    "Lượt chạy tác vụ định kỳ này vẫn đang khởi động. Hãy thử lại sau khi lượt bắt đầu.",
   "error.backend.routineRunNoSession":
     "OpenBot không thể ngắt lượt chạy tác vụ định kỳ đang hoạt động vì phiên của nhà cung cấp không khả dụng.",
   "error.backend.interruptSelf": "Agent không thể tự ngắt chính mình.",
@@ -206,8 +213,7 @@ export const messages = {
   "error.backend.interruptSharedWork":
     "Lượt của agent này đang xử lý tin nhắn của bạn và cả tin nhắn từ người dùng hoặc agent khác. Chỉ người dùng mới có thể dừng, bằng Dừng agent trong cuộc trò chuyện của agent đó.",
   "error.backend.interruptStarting": "Agent này vẫn đang bắt đầu một lượt. Hãy thử lại sau khi lượt bắt đầu.",
-  "error.backend.interruptNoSession":
-    "OpenBot không thể ngắt agent này vì phiên của nhà cung cấp không khả dụng.",
+  "error.backend.interruptNoSession": "OpenBot không thể ngắt agent này vì phiên của nhà cung cấp không khả dụng.",
   "error.backend.memoryTextRequired": "Cần có nội dung bộ nhớ.",
   "error.backend.memoryTextTooLong": "Nội dung bộ nhớ quá dài.",
   "error.backend.mcpServerGone": "Máy chủ MCP này không còn tồn tại.",
@@ -215,7 +221,8 @@ export const messages = {
   "error.backend.routineFlowSameAgent": "Agent không thể chuyển việc cho chính mình.",
   "error.backend.routineFlowIntoOwner":
     "Tác vụ định kỳ bắt đầu bằng agent của chính nó, nên agent đó không thể nhận việc từ agent khác.",
-  "error.backend.routineFlowNotOnPath": "Agent này chưa thuộc tác vụ định kỳ. Hãy kết nối agent với tác vụ định kỳ trước.",
+  "error.backend.routineFlowNotOnPath":
+    "Agent này chưa thuộc tác vụ định kỳ. Hãy kết nối agent với tác vụ định kỳ trước.",
   "error.backend.routineFlowDuplicate": "Các agent này đã được kết nối trong tác vụ định kỳ này.",
   "error.backend.routineFlowCycle": "Kết nối này sẽ tạo thành vòng lặp.",
   "error.backend.routineFlowLinkLimit": "Một tác vụ định kỳ chỉ có thể có tối đa {limit} kết nối.",
@@ -223,19 +230,20 @@ export const messages = {
     "Agent này đã có {count} lượt chờ đang mở. Hãy đóng một lượt chờ bằng openbot.close_wait trước khi mở lượt khác.",
   "error.backend.agentWaitGone": "Lượt chờ này không mở. Agent đã đóng nó, hoặc ai đó đã hủy nó.",
   "error.backend.agentWaitNoRequest": "Lượt chờ cần một tin nhắn để tiếp tục. Lượt này không có tin nhắn.",
-  "error.backend.agentWaitOwnChatOnly": "Chỉ mở lượt chờ trong cuộc trò chuyện của chính bạn. Tác vụ của kênh hoặc nhắn tin không thể chờ.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Chỉ mở lượt chờ trong cuộc trò chuyện của chính bạn. Tác vụ của kênh hoặc nhắn tin không thể chờ.",
   "error.backend.agentWaitNoteRequired": "Hãy viết một ghi chú ngắn cho biết lượt chờ dùng để làm gì.",
   "error.backend.agentWaitRoutineGone": "Agent này không có tác vụ định kỳ nào với id này.",
   "error.backend.agentWaitNoRoutine":
     "Chỉ một lượt chạy của một trong các tác vụ định kỳ của bạn mới đánh thức được lượt chờ, và bạn chưa có tác vụ định kỳ nào. Hãy tạo một tác vụ bằng openbot.create_routine, rồi mở lượt chờ.",
-  "error.backend.markUnreadRemoteUnsupported":
-    "Chỉ có thể đánh dấu tin nhắn là chưa đọc cho agent trên máy tính này.",
+  "error.backend.markUnreadRemoteUnsupported": "Chỉ có thể đánh dấu tin nhắn là chưa đọc cho agent trên máy tính này.",
   "error.backend.messageDeleteUnsupported": "Máy chủ này không hỗ trợ xóa tin nhắn.",
   "error.backend.messageDeleteNotFound": "Tin nhắn này không có trong cuộc trò chuyện.",
   "error.backend.messageDeleteBusy": "Tin nhắn này thuộc một lượt đang chạy. Hãy xóa khi lượt kết thúc.",
   "error.backend.messageDeleteForbidden": "Bạn chỉ có thể xóa tin nhắn do bạn gửi.",
   "error.backend.messagePinNotFound": "Tin nhắn cần ghim không có trong cuộc trò chuyện này.",
-  "error.backend.messagePinLimit": "Cuộc trò chuyện này có 50 tin nhắn đã ghim. Hãy bỏ ghim một tin nhắn trước khi ghim tin khác.",
+  "error.backend.messagePinLimit":
+    "Cuộc trò chuyện này có 50 tin nhắn đã ghim. Hãy bỏ ghim một tin nhắn trước khi ghim tin khác.",
   "error.backend.routineFlowHandoffFailed": "Tác vụ định kỳ không thể chuyển tiếp công việc cho agent này.",
   "error.backend.mcpServerLimit": "OpenBot chỉ giữ tối đa {limit} máy chủ MCP.",
   "error.backend.mcpServerNameTaken": "Đã có máy chủ MCP tên {name}.",
@@ -258,7 +266,8 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "Đăng nhập MCP đã bị bỏ dở.",
   "error.backend.mcpSignInNoBrowser": "Đăng nhập MCP này không thể mở trình duyệt.",
   "error.backend.mcpSignInNotWebPage": "Địa chỉ đăng nhập không phải là trang web.",
-  "error.backend.mcpSignInRequired": "Máy chủ này yêu cầu bạn đăng nhập. Hãy chọn Đăng nhập để tiếp tục trong trình duyệt.",
+  "error.backend.mcpSignInRequired":
+    "Máy chủ này yêu cầu bạn đăng nhập. Hãy chọn Đăng nhập để tiếp tục trong trình duyệt.",
   "error.backend.mcpSignInOnHost": "Máy chủ này yêu cầu đăng nhập. Hãy đăng nhập trong OpenBot trên máy tính host.",
   "error.backend.mcpSignInNeedsHttps":
     "Máy chủ này yêu cầu đăng nhập, và OpenBot chỉ đăng nhập qua https. Hãy đổi URL thành {url}.",
@@ -269,8 +278,7 @@ export const messages = {
     "OpenBot không thể đọc thông tin đăng nhập của máy chủ này. Hãy kiểm tra địa chỉ máy chủ và thử lại.",
   "error.backend.mcpSignInAnswerUnreadable":
     "Máy chủ đăng nhập gửi một phản hồi mà OpenBot không đọc được. Nếu dịch vụ cấp cho bạn khóa API hoặc token, hãy thêm vào cài đặt của máy chủ này, rồi kiểm tra kết nối lại.",
-  "error.backend.mcpServerExited":
-    "Máy chủ đã dừng trước khi phản hồi. Hãy chạy lệnh trong terminal để xem lỗi.",
+  "error.backend.mcpServerExited": "Máy chủ đã dừng trước khi phản hồi. Hãy chạy lệnh trong terminal để xem lỗi.",
   "error.backend.mcpServerExitedWithOutput": "Máy chủ đã dừng trước khi phản hồi. Nội dung xuất ra: {detail}",
   "error.backend.mcpServerFailedToStart": "Máy chủ không khởi động được: {reason}",
   "error.backend.mcpServerStartAbandoned":
@@ -349,11 +357,11 @@ export const messages = {
   "error.backend.editFinished": "Bản sửa này đã hoàn tất.",
   "error.backend.editCancelled": "Bản sửa này đã bị hủy, nên tin nhắn giữ nguyên nội dung gốc.",
   "error.backend.editSaved": "Bản sửa này đã được lưu.",
-  "error.backend.editSavedDifferent":
-    "Bản sửa này đã được lưu với nội dung khác. Các thay đổi của bạn chưa được lưu.",
+  "error.backend.editSavedDifferent": "Bản sửa này đã được lưu với nội dung khác. Các thay đổi của bạn chưa được lưu.",
   "error.backend.useChannelTaskControlsWork": "Hãy dùng các nút điều khiển tác vụ của kênh cho công việc trong kênh.",
   "error.backend.steerTurnChanged": "Lượt hiện tại đã thay đổi trước khi tin nhắn này kịp định hướng.",
-  "error.backend.steerUnsupported": "Nhà cung cấp này không thể định hướng lượt đang chạy. Tin nhắn của bạn vẫn nằm trong hàng đợi.",
+  "error.backend.steerUnsupported":
+    "Nhà cung cấp này không thể định hướng lượt đang chạy. Tin nhắn của bạn vẫn nằm trong hàng đợi.",
   "error.backend.steerRoutineRun":
     "Một tác vụ định kỳ đang chạy. Tin nhắn của bạn vẫn nằm trong hàng đợi và sẽ bắt đầu sau tác vụ định kỳ.",
   "error.backend.steerQueuedOnly": "Chỉ có thể định hướng bằng tin nhắn trong hàng đợi.",
@@ -427,7 +435,8 @@ export const messages = {
     "Trang đã chuyển tiêu điểm đi trước khi gõ hết văn bản. Chỉ phần đầu của văn bản có trong ô. Hãy chụp snapshot mới và kiểm tra ô trước khi gõ lại.",
   "error.backend.browserTypingSubmitSkipped":
     "Văn bản đã có trong ô, nhưng trang đã chuyển tiêu điểm đi, nên phím Enter chưa được gửi. Đừng gõ lại văn bản. Hãy chụp snapshot mới.",
-  "error.backend.mcpServerHttpCredentials": "Máy chủ trả về {status}. Hãy kiểm tra khóa API hoặc thông tin xác thực khác.",
+  "error.backend.mcpServerHttpCredentials":
+    "Máy chủ trả về {status}. Hãy kiểm tra khóa API hoặc thông tin xác thực khác.",
   "error.backend.mcpServerHttpUrl":
     "Máy chủ trả về {status}. Hãy kiểm tra URL. Liên kết có thể sai, đã hết hạn hoặc đã bị xóa.",
   "error.backend.mcpServerBearerKey":
@@ -436,7 +445,8 @@ export const messages = {
   "error.backend.mcpSignInAppClientId": "Hãy nhập client ID của ứng dụng đăng nhập.",
   "error.backend.mcpSignInAppIssuerChanged":
     "Máy chủ đăng nhập của máy chủ MCP này đã thay đổi, nên OpenBot không gửi ứng dụng đăng nhập cho nó. Nếu thay đổi là đúng, hãy xóa ứng dụng đăng nhập và thêm lại.",
-  "error.backend.mcpSignInAppNoServer": "Hãy lưu máy chủ MCP này dưới dạng máy chủ URL trước khi thêm ứng dụng đăng nhập.",
+  "error.backend.mcpSignInAppNoServer":
+    "Hãy lưu máy chủ MCP này dưới dạng máy chủ URL trước khi thêm ứng dụng đăng nhập.",
   "error.backend.mcpSignInAppUnavailable": "Máy tính này không thể lưu ứng dụng đăng nhập.",
   "error.backend.taskMoveRefused": "Chỉ tin nhắn bạn gửi riêng cho agent này mới có thể chạy như một tác vụ.",
   "error.backend.taskNotFound": "Tác vụ này không khả dụng.",
@@ -455,7 +465,8 @@ export const messages = {
   "error.backend.feedbackWithdrawRemoteUnsupported": "Để xóa báo cáo này, hãy yêu cầu agent xóa nó.",
   "error.backend.threadMoveRefused": "Chỉ tin nhắn bạn gửi riêng cho agent này mới có thể chạy trong luồng mới.",
   "error.backend.taskTitleRequired": "Hãy đặt cho tác vụ một tiêu đề ngắn.",
-  "error.backend.taskToolInvalid": "Hãy đặt cho tác vụ một tiêu đề tối đa 120 ký tự và một mô tả ngắn cho biết cần làm gì.",
+  "error.backend.taskToolInvalid":
+    "Hãy đặt cho tác vụ một tiêu đề tối đa 120 ký tự và một mô tả ngắn cho biết cần làm gì.",
   "error.backend.taskOwnChatOnly":
     "Chỉ bắt đầu tác vụ từ cuộc trò chuyện của chính bạn. Kênh, cuộc trò chuyện nhắn tin hoặc tác vụ khác không thể bắt đầu tác vụ.",
   "error.backend.taskUnfinishedLimit":

@@ -299,8 +299,7 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot không thấy {repository} trên GitHub.",
   "workflow.github.alert.readOnly": "OpenBot không thể thay đổi issue và pull request trong {repository}.",
   "workflow.github.alert.eventsOff": "GitHub chưa gửi sự kiện từ {repository}.",
-  "workflow.github.alert.noEvent":
-    "Kích hoạt không phải là sự kiện GitHub. Hãy chọn một kho mã và lấy số từ đầu vào.",
+  "workflow.github.alert.noEvent": "Kích hoạt không phải là sự kiện GitHub. Hãy chọn một kho mã và lấy số từ đầu vào.",
   "workflow.github.alert.pullRequestOnly": "{action} chỉ hoạt động với pull request. Kích hoạt này bắt đầu từ issue.",
   "workflow.github.history.name": "Sự kiện",
   "workflow.github.history.none": "Không có",
@@ -509,6 +508,7 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "Đã xóa {name}",
   "workflow.canvas.deleteUndo.action": "Hoàn tác",
   "workflow.page.failed": "OpenBot không thể thực hiện thao tác này. Hãy thử lại.",
-  "workflow.page.needsNewerApp": "Quy trình này có các bước từ phiên bản OpenBot mới hơn. Hãy cập nhật OpenBot để thay đổi.",
+  "workflow.page.needsNewerApp":
+    "Quy trình này có các bước từ phiên bản OpenBot mới hơn. Hãy cập nhật OpenBot để thay đổi.",
   "workflow.page.manageOnly": "Để thay đổi quy trình này, bạn cần quyền “Có thể quản lý” với từng agent của quy trình.",
 } as const satisfies PartialTranslation<typeof source>;

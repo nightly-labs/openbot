@@ -41,8 +41,7 @@ export const messages = {
   "mobile.liveActivity.island.takeoverTitle": "Bước trong trình duyệt cần bạn",
   "mobile.liveActivity.island.takeoverDetail": "Hoàn tất đăng nhập, xác minh hoặc đồng ý trong trình duyệt.",
   "mobile.liveActivity.island.failureTitle": "Tác vụ thất bại",
-  "mobile.liveActivity.island.failureDetail":
-    "Tác vụ đã dừng trước khi kịp hoàn tất. Mở cuộc trò chuyện để thử lại.",
+  "mobile.liveActivity.island.failureDetail": "Tác vụ đã dừng trước khi kịp hoàn tất. Mở cuộc trò chuyện để thử lại.",
   "mobile.liveActivity.island.approvalCommand": "Lệnh cần xem lại",
   "mobile.liveActivity.island.approvalFileChange": "Thay đổi tệp cần xem lại",
   "mobile.liveActivity.island.approvalPermissions": "Quyền cần xem lại",

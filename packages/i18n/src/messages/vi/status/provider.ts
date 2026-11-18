@@ -9,8 +9,7 @@ export const messages = {
   "status.provider.confirmCancel": "Hủy",
   "status.provider.retryUnreachable":
     "{provider} không thể kết nối tới máy chủ của mình. Thử lại lần {attempt}/{maxAttempts}.",
-  "status.provider.retryServerError":
-    "Máy chủ {provider} đang bận hoặc gặp lỗi. Thử lại lần {attempt}/{maxAttempts}.",
+  "status.provider.retryServerError": "Máy chủ {provider} đang bận hoặc gặp lỗi. Thử lại lần {attempt}/{maxAttempts}.",
   "status.provider.modelRetryUnreachable":
     "{provider} không thể kết nối tới nhà cung cấp mô hình. Đang thử lại: lần {attempt}.",
   "status.provider.modelRetryServerError":

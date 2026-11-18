@@ -9,8 +9,7 @@ export const messages = {
   "error.workflow.branch": "Chỉ điều kiện mới có thể có kết nối có và không.",
   "error.workflow.conditionBranch": "Mỗi kết nối từ một điều kiện phải là có hoặc không.",
   "error.workflow.duplicateEdge": "Hai bước này đã có kết nối này.",
-  "error.workflow.serverTooOld":
-    "Máy chủ này không hỗ trợ quy trình. Hãy cập nhật OpenBot trên máy tính chạy máy chủ.",
+  "error.workflow.serverTooOld": "Máy chủ này không hỗ trợ quy trình. Hãy cập nhật OpenBot trên máy tính chạy máy chủ.",
   "error.workflow.nodeUnsupported": "Phiên bản OpenBot này chưa thể chạy các bước hình ảnh, tệp và tin nhắn.",
   "error.workflow.interrupted": "OpenBot đã dừng trong khi bước này đang chạy. Hãy chạy lại.",
   "error.workflow.agentMissing": "Chọn một agent cho bước này.",
@@ -54,8 +53,7 @@ export const messages = {
   "error.workflow.outputRefused": "Nơi nhắn tin đã từ chối bài đăng. Hãy đảm bảo OpenBot có thể đăng ở đó.",
   "error.workflow.outputUncertain":
     "Bài đăng đã dừng giữa chừng. Một phần có thể đã có ở nơi nhắn tin. Hãy kiểm tra ở đó trước khi thử lại.",
-  "error.workflow.tooLarge":
-    "Quy trình này quá lớn để lưu. Hãy gỡ bớt hình vẽ hoặc văn bản dài, rồi thử lại.",
+  "error.workflow.tooLarge": "Quy trình này quá lớn để lưu. Hãy gỡ bớt hình vẽ hoặc văn bản dài, rồi thử lại.",
   "error.workflow.tooLargeToSend":
     "Quy trình này quá lớn để gửi sang máy tính khác. Hãy mở trên máy tính chạy máy chủ.",
   "error.workflow.webhookMissing": "Bước này không phải trình kích hoạt webhook. Hãy lưu quy trình, rồi thử lại.",

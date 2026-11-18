@@ -19,8 +19,7 @@ export const messages = {
   "status.remote.stageAgents": "Đang tải agent: {reason}",
   "status.remote.stageReads": "Đang tải trạng thái đã đọc: {reason}",
   "status.remote.suspendedDetail": "Hãy cập nhật OpenBot Mobile hoặc ứng dụng máy tính trước khi kết nối.\n{detail}",
-  "status.remote.cooldownDetail":
-    "Kết nối thất bại sau {limit} lần thử. Thử lại sau {minutes}:{seconds}.\n{detail}",
+  "status.remote.cooldownDetail": "Kết nối thất bại sau {limit} lần thử. Thử lại sau {minutes}:{seconds}.\n{detail}",
   "status.remote.cooldown": "Kết nối thất bại sau {limit} lần thử. Thử lại sau {minutes}:{seconds}.",
   "status.remote.connectionLostDetail": {
     one: "Mất kết nối. Thử lại sau {count} giây.\n{detail}",
@@ -42,7 +41,10 @@ export const messages = {
     one: "Đang kết nối lại {attempt}/{count}\n{detail}",
     other: "Đang kết nối lại {attempt}/{count}\n{detail}",
   },
-  "status.remote.reconnecting": { one: "Đang kết nối lại {attempt}/{count}", other: "Đang kết nối lại {attempt}/{count}" },
+  "status.remote.reconnecting": {
+    one: "Đang kết nối lại {attempt}/{count}",
+    other: "Đang kết nối lại {attempt}/{count}",
+  },
   "status.remote.messageCut":
     "[{size} MB của tin nhắn này không hiển thị trên thiết bị này. Hãy mở trên máy tính chạy máy chủ để đọc toàn bộ.]",
 } as const satisfies PartialTranslation<typeof source>;

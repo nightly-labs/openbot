@@ -76,7 +76,8 @@ export const messages = {
   "app.githubStar.thanksTitle": "Cảm ơn bạn!",
   "app.githubStar.thanksBody": "Bạn vừa làm chúng tôi vui cả ngày.",
   "app.socialFollow.title": "Bạn đang thích OpenBot?",
-  "app.socialFollow.description": "Hãy giới thiệu cho bạn bè bằng một bài đăng. Điều đó giúp chúng tôi hơn mọi quảng cáo.",
+  "app.socialFollow.description":
+    "Hãy giới thiệu cho bạn bè bằng một bài đăng. Điều đó giúp chúng tôi hơn mọi quảng cáo.",
   "app.socialFollow.networks": "Đăng về OpenBot trên",
   "app.socialFollow.post": "Đăng trên {name}",
   "app.socialFollow.postCopy": "Sao chép bài đăng và mở {name}",

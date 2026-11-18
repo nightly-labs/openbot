@@ -19,7 +19,8 @@ export const messages = {
   "mobile.link.plugin.openFailed": "Không mở được trang plugin.",
   "mobile.link.plugin.view": "Xem plugin",
   "mobile.link.unavailable.title": "Liên kết không khả dụng",
-  "mobile.link.unavailable.description": "Liên kết này không hợp lệ, không còn khả dụng hoặc không được hỗ trợ trên thiết bị di động.",
+  "mobile.link.unavailable.description":
+    "Liên kết này không hợp lệ, không còn khả dụng hoặc không được hỗ trợ trên thiết bị di động.",
   "mobile.link.template.signInTitle": "Đăng nhập để thêm agent này",
   "mobile.link.template.signInDescription":
     "Hãy quét mã QR trong OpenBot trên máy tính của bạn. Sau đó bạn có thể xem lại agent trước khi thêm.",
@@ -35,7 +36,8 @@ export const messages = {
   "mobile.link.template.server.title": "Thêm vào máy chủ",
   "mobile.link.template.server.footer": "Chỉ hiển thị các máy chủ mà bạn là chủ sở hữu hoặc quản trị viên.",
   "mobile.link.template.server.updateRequired": "Hãy cập nhật OpenBot trên máy chủ này để thêm agent được chia sẻ.",
-  "mobile.link.template.server.none": "Bạn phải là chủ sở hữu hoặc quản trị viên của một máy chủ để thêm agent được chia sẻ.",
+  "mobile.link.template.server.none":
+    "Bạn phải là chủ sở hữu hoặc quản trị viên của một máy chủ để thêm agent được chia sẻ.",
   "mobile.link.template.install.action": "Thêm agent",
   "mobile.link.template.install.pending": "Đang thêm…",
   "mobile.link.template.install.failed": "Không thêm được agent.",

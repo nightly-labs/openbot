@@ -24,8 +24,7 @@ export const messages = {
   "error.crm.invalidChange": "Thay đổi này không hợp lệ.",
   "error.crm.agentNotAllowed":
     "Agent này không thể dùng CRM. Chủ sở hữu hoặc quản trị viên có thể cho phép: mở trang CRM, nhấp Đề xuất, nhấp nút có số lượng agent, rồi bật agent này.",
-  "error.crm.tooManyProposals":
-    "Có quá nhiều đề xuất đang chờ quyết định. Hãy chờ đến khi có người quyết định.",
+  "error.crm.tooManyProposals": "Có quá nhiều đề xuất đang chờ quyết định. Hãy chờ đến khi có người quyết định.",
   "error.crm.amountInvalid": "Hãy nhập số tiền dưới dạng số, ví dụ 129.00.",
   "error.crm.amountDecimals": "Số tiền có quá nhiều chữ số thập phân cho {currency}.",
   "error.crm.fieldPrivate": "Trường này là riêng tư. Agent không thể đọc hoặc lọc theo trường này.",
@@ -42,7 +41,6 @@ export const messages = {
   "error.crm.sourceNetwork": "OpenBot không thể kết nối tới Stripe. Hãy kiểm tra kết nối internet.",
   "error.crm.sourceFailed": "Stripe gửi một phản hồi mà OpenBot không đọc được. Hãy thử lại sau.",
   "error.crm.sourceKeySaveFailed": "OpenBot không thể lưu khóa Stripe trên máy tính này.",
-  "error.crm.off":
-    "CRM đang tắt. Chủ sở hữu hoặc quản trị viên có thể bật CRM trong Cài đặt máy chủ > Thử nghiệm.",
+  "error.crm.off": "CRM đang tắt. Chủ sở hữu hoặc quản trị viên có thể bật CRM trong Cài đặt máy chủ > Thử nghiệm.",
   "error.crm.settingsSaveFailed": "OpenBot không thể lưu cài đặt CRM trên máy chủ này.",
 } as const satisfies PartialTranslation<typeof source>;

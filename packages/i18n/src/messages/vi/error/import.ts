@@ -14,8 +14,7 @@ export const messages = {
   "error.import.routineLimit": "{name}: chỉ {limit} tác vụ định kỳ đầu tiên được nhập.",
   "error.import.routineInvalid":
     "{name}: tác vụ định kỳ “{routine}” bị bỏ qua vì tên, nội dung hoặc lịch chạy không hợp lệ.",
-  "error.import.memoriesSkipped":
-    "{name}: {skipped} mục bộ nhớ bị bỏ qua vì trống hoặc dài hơn {limit} ký tự.",
+  "error.import.memoriesSkipped": "{name}: {skipped} mục bộ nhớ bị bỏ qua vì trống hoặc dài hơn {limit} ký tự.",
   "error.import.memoryLimit": "{name}: chỉ {limit} mục bộ nhớ đầu tiên được nhập.",
   "error.import.manifestMissing": "Bản xuất phải chứa {manifest}.",
   "error.import.skillFolderMissing": "{name}: thư mục kỹ năng {skill} không có SKILL.md.",
@@ -59,8 +58,7 @@ export const messages = {
   "error.import.hermesSoulLong":
     "{name}: SOUL.md dài hơn {limit} ký tự, nên hướng dẫn chỉ giữ phần đầu. Toàn bộ tệp nằm ở imported/hermes/SOUL.md.",
   "error.import.hermesSkillSkipped": "{name}: kỹ năng “{skill}” bị bỏ qua. {reason}",
-  "error.import.hermesSkillCodeAdded":
-    "Kỹ năng có mã mà lúc đọc hồ sơ chưa có. Hãy đọc lại hồ sơ để cho phép.",
+  "error.import.hermesSkillCodeAdded": "Kỹ năng có mã mà lúc đọc hồ sơ chưa có. Hãy đọc lại hồ sơ để cho phép.",
   "error.import.hermesLinkNotSaved":
     "{name}: OpenBot không thể lưu agent nào đến từ hồ sơ này, nên lần nhập sau sẽ thêm nó thành agent mới.",
   "error.import.transferRemoteTooLarge":
@@ -90,7 +88,8 @@ export const messages = {
     one: "{count} tùy chọn máy chủ trong tệp không hợp lệ ở đây, nên không được nhập.",
     other: "{count} tùy chọn máy chủ trong tệp không hợp lệ ở đây, nên không được nhập.",
   },
-  "error.import.transferRoutineFlowSkipped": "Quá trình nhập đã bỏ qua một liên kết tác vụ định kỳ giữa các agent. {reason}",
+  "error.import.transferRoutineFlowSkipped":
+    "Quá trình nhập đã bỏ qua một liên kết tác vụ định kỳ giữa các agent. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: agent tùy chỉnh không được nhập vì chúng chạy một lệnh. Hãy kiểm tra lệnh “{command}” và thêm lại agent trong Cài đặt.",
   "error.import.transferSkillLimit":
@@ -102,8 +101,7 @@ export const messages = {
     "{name}: máy chủ MCP được thêm ở trạng thái tắt. Hãy kiểm tra lệnh, nhập lại các giá trị và địa chỉ đầy đủ, rồi bật nó trong Cửa hàng, Ứng dụng.",
   "error.import.transferValuesCleared":
     "{name}: các giá trị có thể chứa bí mật đã bị xóa khỏi đối số hoặc địa chỉ. Hãy nhập lại trong Cài đặt.",
-  "error.import.transferSharedKept":
-    "{number} tệp trong thư mục Shared đã có ở đây, nên được giữ nguyên.",
+  "error.import.transferSharedKept": "{number} tệp trong thư mục Shared đã có ở đây, nên được giữ nguyên.",
   "error.import.transferChannelInvalid": "Kênh {number} trong tệp không hợp lệ, nên bị bỏ qua.",
   "error.import.transferChannelLimit": "Tệp chỉ chứa {limit} kênh đầu tiên.",
   "error.import.transferWorkflowInvalid": "Một quy trình trong tệp không hợp lệ, nên bị bỏ qua.",

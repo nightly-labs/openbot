@@ -5,7 +5,8 @@ export const messages = {
   "error.site.absolutePath": "Hãy chọn đường dẫn tuyệt đối cho thư mục trang web.",
   "error.site.rootSymlink": "Trang web được lưu trữ không được chứa liên kết tượng trưng (symlink).",
   "error.site.notDirectory": "Nguồn của trang web phải là một thư mục.",
-  "error.site.outsideWorkspace": "Trang web phải nằm trong không gian làm việc của agent này hoặc trong OpenBot Shared.",
+  "error.site.outsideWorkspace":
+    "Trang web phải nằm trong không gian làm việc của agent này hoặc trong OpenBot Shared.",
   "error.site.packageJsonInvalid": "Tệp package.json của trang web không hợp lệ.",
   "error.site.astroServerOutput": "Astro phải dùng đầu ra tĩnh (static).",
   "error.site.astroAdapter": "Không cho phép adapter máy chủ Astro và tích hợp React.",

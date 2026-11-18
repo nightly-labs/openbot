@@ -289,7 +289,8 @@ export const messages = {
   "routine.webhook.urlAfterSave": "Lưu tác vụ định kỳ để nhận endpoint và khóa bí mật ký.",
   "routine.webhook.urlPending": "Đang tạo endpoint…",
   "routine.webhook.urlPendingOffline": "Sẽ hiển thị khi host kết nối với relay.",
-  "routine.webhook.relayOffline": "Host đang ngoại tuyến. Các yêu cầu đến endpoint này sẽ thất bại cho đến khi host kết nối.",
+  "routine.webhook.relayOffline":
+    "Host đang ngoại tuyến. Các yêu cầu đến endpoint này sẽ thất bại cho đến khi host kết nối.",
   "routine.webhook.events": "Sự kiện",
   "routine.webhook.filterEvents": "Lọc sự kiện",
   "routine.webhook.eventsAll": "Tất cả sự kiện",
@@ -337,7 +338,8 @@ export const messages = {
     "OpenBot ký một sự kiện khớp với tác vụ định kỳ này và nhận nó như một yêu cầu thật. Tác vụ định kỳ sẽ chạy một lần.",
   "routine.webhook.sendTest": "Gửi sự kiện thử",
   "routine.webhook.sendingTest": "Đang gửi…",
-  "routine.webhook.testStarted": "Sự kiện thử {eventType} đã khởi chạy một lần chạy. Lần chạy này có trong lịch sử chạy.",
+  "routine.webhook.testStarted":
+    "Sự kiện thử {eventType} đã khởi chạy một lần chạy. Lần chạy này có trong lịch sử chạy.",
   "routine.webhook.testIgnoredInactive": "Tác vụ định kỳ đang tạm dừng nên sự kiện thử không khởi chạy lần chạy nào.",
   "routine.webhook.testIgnoredEventType": "Sự kiện thử không khớp với loại sự kiện nên không có lần chạy nào bắt đầu.",
   "routine.webhook.testIgnoredFilter": "Sự kiện thử không khớp với bộ lọc nên không có lần chạy nào bắt đầu.",
@@ -363,7 +365,8 @@ export const messages = {
   "routine.settings.resultDestination.unavailable": "{place} (tắt)",
   "routine.settings.resultDestination.placesFailed": "Không thể tải các nơi nhận của {connection}.",
   "routine.settings.resultDestination.loadFailed": "Không thể tải các nơi nhận tin nhắn.",
-  "routine.settings.resultDestination.saveFailed": "Đã lưu tác vụ định kỳ, nhưng chưa lưu được nơi nhận tin nhắn. Hãy thử lại.",
+  "routine.settings.resultDestination.saveFailed":
+    "Đã lưu tác vụ định kỳ, nhưng chưa lưu được nơi nhận tin nhắn. Hãy thử lại.",
   "routine.settings.discardTitle": "Hủy các thay đổi?",
   "routine.settings.discardDescription": "Những thay đổi chưa lưu của tác vụ định kỳ này sẽ bị mất.",
   "routine.settings.discardConfirm": "Hủy thay đổi",

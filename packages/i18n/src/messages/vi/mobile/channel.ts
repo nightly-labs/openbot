@@ -83,7 +83,8 @@ export const messages = {
   "mobile.channel.form.delete": "Xóa kênh",
   "mobile.channel.newConversation.title": "Cuộc trò chuyện mới",
   "mobile.channel.newConversation.starting": "Đang bắt đầu cuộc trò chuyện mới…",
-  "mobile.channel.newConversation.footer": "Các thành viên sẽ quên các tin nhắn trước đó. Thiết lập kênh vẫn giữ nguyên.",
+  "mobile.channel.newConversation.footer":
+    "Các thành viên sẽ quên các tin nhắn trước đó. Thiết lập kênh vẫn giữ nguyên.",
   "mobile.channel.newConversation.confirmTitle": "Bắt đầu cuộc trò chuyện mới trong {name}?",
   "mobile.channel.newConversation.confirmBody":
     "Các thành viên sẽ quên các tin nhắn trước đó của kênh này. Các tin nhắn vẫn hiển thị phía trên một đường phân cách. Thành viên, hướng dẫn, bộ nhớ và tác vụ định kỳ không thay đổi.",
@@ -99,7 +100,8 @@ export const messages = {
   "mobile.channel.compact.failedBody": "Host không thể thu gọn ngữ cảnh.",
   "mobile.channel.deleteHistory.title": "Xóa lịch sử",
   "mobile.channel.deleteHistory.deleting": "Đang xóa lịch sử…",
-  "mobile.channel.deleteHistory.footer": "Các tin nhắn sẽ bị xóa và các thành viên sẽ quên chúng. Thiết lập kênh vẫn giữ nguyên.",
+  "mobile.channel.deleteHistory.footer":
+    "Các tin nhắn sẽ bị xóa và các thành viên sẽ quên chúng. Thiết lập kênh vẫn giữ nguyên.",
   "mobile.channel.deleteHistory.confirmTitle": "Xóa lịch sử của {name}?",
   "mobile.channel.deleteHistory.confirmBody":
     "Tất cả tin nhắn và tệp của kênh này sẽ bị xóa khỏi OpenBot, và các thành viên sẽ quên chúng. Bạn không thể hoàn tác thao tác này. Thành viên, hướng dẫn, bộ nhớ, tác vụ định kỳ và tác vụ không thay đổi.",

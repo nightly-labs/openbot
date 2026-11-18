@@ -14,13 +14,13 @@ export const messages = {
     "Thu thập những thay đổi từ hôm qua trên thị trường và trong quy trình bán hàng, rồi biến chúng thành các ưu tiên hôm nay.",
   "diagram.board.sample.researchName": "Nghiên cứu",
   "diagram.board.sample.researchTitle": "Cộng sự nghiên cứu",
-  "diagram.board.sample.researchTask":
-    "Thu thập tin tức thị trường và sản phẩm từ hôm qua, kèm nguồn cho từng mục.",
+  "diagram.board.sample.researchTask": "Thu thập tin tức thị trường và sản phẩm từ hôm qua, kèm nguồn cho từng mục.",
   "diagram.board.sample.researchOutput":
     "1. Northwind giảm 20% giá API.\n2. Hướng dẫn của EU cho các mô hình đa dụng đã được chốt.\n3. Hai đối thủ ra mắt canvas cho agent trong tuần này.",
   "diagram.board.sample.salesName": "Bán hàng",
   "diagram.board.sample.salesTitle": "Chuyên viên bán hàng chủ động",
-  "diagram.board.sample.salesTask": "Liệt kê các thương vụ đã đổi giai đoạn từ hôm qua và bước tiếp theo cho từng thương vụ.",
+  "diagram.board.sample.salesTask":
+    "Liệt kê các thương vụ đã đổi giai đoạn từ hôm qua và bước tiếp theo cho từng thương vụ.",
   "diagram.board.sample.salesOutput":
     "- Contoso chuyển sang Đàm phán. Bước tiếp theo: gửi bản đánh giá bảo mật.\n- Fabrikam đứng yên 9 ngày. Bước tiếp theo: gọi cho người ủng hộ.",
   "diagram.board.sample.writerName": "Người viết",

@@ -13,8 +13,7 @@ export const messages = {
     "Chuyển giọng nói thành văn bản cục bộ không khả dụng. Hãy chạy `bun run voice:prepare` và khởi động lại OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot không thể chuyển bản ghi âm này thành văn bản.",
   "error.voice.cloud.keyRequired": "Hãy thêm khóa API {provider} trong Cài đặt → Giọng nói.",
-  "error.voice.cloud.keyRejected":
-    "{provider} không chấp nhận khóa API. Hãy kiểm tra khóa trong Cài đặt → Giọng nói.",
+  "error.voice.cloud.keyRejected": "{provider} không chấp nhận khóa API. Hãy kiểm tra khóa trong Cài đặt → Giọng nói.",
   "error.voice.cloud.quotaExceeded": "Bạn đã dùng hết hạn mức {provider}.",
   "error.voice.cloud.rateLimited": "{provider} đang bận. Hãy thử lại sau giây lát.",
   "error.voice.cloud.termsRequired":
@@ -44,7 +43,6 @@ export const messages = {
     "Máy chủ giọng nói chưa được thiết lập cho việc này. Hãy kiểm tra Cài đặt → Giọng nói.",
   "error.voice.server.keyRefused": "{host} đã từ chối khóa API.",
   "error.voice.server.invalidAnswer": "{host} không gửi câu trả lời tương thích OpenAI.",
-  "error.voice.server.invalidAudio":
-    "{host} đã gửi âm thanh mà OpenBot không thể phát. Hãy dùng máy chủ gửi WAV.",
+  "error.voice.server.invalidAudio": "{host} đã gửi âm thanh mà OpenBot không thể phát. Hãy dùng máy chủ gửi WAV.",
   "error.voice.server.tooLarge": "Câu trả lời từ {host} quá lớn.",
 } as const satisfies PartialTranslation<typeof source>;
