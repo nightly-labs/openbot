@@ -4605,6 +4605,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
           this.options.savedKey?.(thread.currentModelId) ?? false,
           (provider) => this.options.providerKeyStored?.(provider) ?? false,
+          this.#label,
         ) ??
         detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
