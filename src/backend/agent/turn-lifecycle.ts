@@ -479,10 +479,11 @@ export class TurnLifecycle {
   readonly #unreadReports = new Map<string, Map<string, string>>();
   /**
    * The teammate requests to which the last turn of each thread, by agent and thread, sent its answer as
-   * the result. A turn that the provider then starts itself, as OpenCode does when a background task
-   * ends, sends its answer to them too (#12258). Kept in memory only: a restart also ends that work.
+   * the result, and the turns that answered them. A turn that the provider then starts itself, as OpenCode
+   * does when a background task ends, sends its answer to them too (#12258). Kept in memory only: a
+   * restart also ends that work.
    */
-  readonly #lastResults = new Map<string, readonly DeliveryContext[]>();
+  readonly #lastResults = new Map<string, { turnIds: readonly string[]; requests: readonly DeliveryContext[] }>();
   /** The drain's start of each starting delivery, until its turn starts. */
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   /** The timing of each finished turn, until host analytics takes it. */
@@ -2552,7 +2553,7 @@ export class TurnLifecycle {
             if (yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult))
               resulted.push(delivery);
         }
-        if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, resulted);
+        if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
         else this.#lastResults.delete(resultsKey);
         // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
         // ends a request steered into the turn too, so its sender gets a note and does not wait.
@@ -2574,11 +2575,18 @@ export class TurnLifecycle {
         // The provider started this turn itself after the last turn's result went to a teammate, as
         // OpenCode does when a background task ends. Its answer finishes that request, so it goes to
         // the same teammate. Before, that teammate kept only the earlier "waiting" result (#12258).
-        const kept: DeliveryContext[] = [];
-        for (const request of this.#lastResults.get(resultsKey) ?? [])
-          if (yield* this.#relayLaterResult(agentId, turnId, request, answerText)) kept.push(request);
-        if (kept.length > 0) this.#lastResults.set(resultsKey, kept);
-        else this.#lastResults.delete(resultsKey);
+        // Claude names the turns whose background work ended (`continues`). The work of another turn, such
+        // as a person's request before the teammate's, does not go to that teammate.
+        const last = this.#lastResults.get(resultsKey);
+        if (last && (running.continues.length === 0 || running.continues.some((id) => last.turnIds.includes(id)))) {
+          const kept: DeliveryContext[] = [];
+          for (const request of last.requests)
+            if (yield* this.#relayLaterResult(agentId, turnId, request, answerText)) kept.push(request);
+          // This turn can start more background work, whose turn then continues this one.
+          if (kept.length > 0)
+            this.#lastResults.set(resultsKey, { turnIds: [...last.turnIds, turnId], requests: kept });
+          else this.#lastResults.delete(resultsKey);
+        }
       }
       if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
         yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
