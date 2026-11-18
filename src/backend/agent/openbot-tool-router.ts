@@ -639,7 +639,7 @@ export class OpenBotToolRouter {
           Effect.map((html) => (html === null ? null : visualPageText(html))),
           Effect.catch(() => Effect.succeed(null)),
         ),
-      recentThreads: (agentId, after, limit) => options.tasks.recent(agentId, after, limit),
+      recentThreads: (agentId, after, limit, last) => options.tasks.recent(agentId, after, limit, last),
     });
     this.#store = options.store;
     this.#mailbox = options.mailbox;
