@@ -63,11 +63,6 @@ function asksForPage(island: BrowserIslandContent | null | undefined): boolean {
   return island?.kind === "activity" && island.control === "request";
 }
 
-/** The agent waits for the user on the page: the step, or the code or password of the step. */
-function inTakeover(island: BrowserIslandContent | null | undefined): boolean {
-  return asksForPage(island) || island?.kind === "secret";
-}
-
 function px(value: number): string {
   return `${value}px`;
 }
@@ -180,21 +175,29 @@ export function BrowserDock(props: BrowserDockProps) {
    * A step that the agent asks for on the page hides the box by itself, because the box is over the page
    * and a button of the page can be under it (#12206). The box shows again when the step ends.
    */
-  let foldedForStep = untrack(() => asksForPage(props.island));
+  let foldedForStep = untrack(() => asksForPage(props.island) && !props.value.trim());
   const [phase, setPhase] = createSignal<DockPhase>(foldedForStep ? "hidden" : "open");
   const tucked = () => phase() === "hidden";
   let tab: HTMLButtonElement | undefined;
   /** A question arrived while the box was shrinking, so the box grows back when it is a tab. */
   let reopen = false;
+  /** The box that grows back after it shrank gives the focus to its field. */
+  let reopenFocus = true;
   /** The tab fades out before the phase changes, so this stops a second `show` in that time. */
   let showing = false;
 
-  /** An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. */
-  function requestShow() {
+  /**
+   * An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. A box that
+   * opens with no request from the user keeps the focus where it is, with `focusField` false.
+   */
+  function requestShow(focusField = true) {
     queueMicrotask(() => {
       const current = untrack(phase);
-      if (current === "hidden") void show();
-      else if (current === "hiding") reopen = true;
+      if (current === "hidden") void show(focusField);
+      else if (current === "hiding") {
+        reopen = true;
+        reopenFocus = focusField;
+      }
     });
   }
 
@@ -208,25 +211,22 @@ export function BrowserDock(props: BrowserDockProps) {
     },
   );
   /**
-   * Once for each step: the box hides when the step starts, and shows again when it ends, only when it
-   * hid by itself. A box that the user opens or hides during the step stays as the user left it.
+   * The box hides when a step on the page starts, and shows again when the step ends, only when it hid by
+   * itself. A box that the user opens or hides during the step stays as the user left it. A box with a
+   * draft stays open, so that the text that the user writes does not hide.
    */
-  let stepHandled = foldedForStep;
   createEffect(
-    () => (asksForPage(props.island) ? "page" : inTakeover(props.island) ? "code" : ""),
-    (step) => {
-      if (!step) {
-        stepHandled = false;
+    () => asksForPage(props.island),
+    (asks) => {
+      if (!asks) {
         if (foldedForStep) {
           foldedForStep = false;
-          requestShow();
+          requestShow(false);
         }
         return;
       }
-      if (step !== "page" || stepHandled) return;
-      stepHandled = true;
       queueMicrotask(() => {
-        if (untrack(phase) !== "open") return;
+        if (untrack(phase) !== "open" || untrack(() => !asksForPage(props.island) || props.value.trim())) return;
         foldedForStep = true;
         void tuck(false);
       });
@@ -329,28 +329,28 @@ export function BrowserDock(props: BrowserDockProps) {
     if (focusTab) tab.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
-      void show();
+      void show(reopenFocus);
     }
   }
 
-  async function show() {
+  async function show(focusField = true) {
     if (untrack(phase) !== "hidden" || showing) return;
     showing = true;
     foldedForStep = false;
     try {
-      await grow();
+      await grow(focusField);
     } finally {
       showing = false;
     }
   }
 
-  async function grow() {
+  async function grow(focusField: boolean) {
     reopen = false;
     const from = tab?.getBoundingClientRect();
     if (!from || !form || prefersReducedMotion()) {
       setPhase("open");
       flush();
-      fieldText()?.focus({ preventScroll: true });
+      if (focusField) fieldText()?.focus({ preventScroll: true });
       closeLater(false);
       return;
     }
@@ -377,7 +377,7 @@ export function BrowserDock(props: BrowserDockProps) {
     flush();
     fadeIn(boxParts(), 0);
     done();
-    fieldText()?.focus({ preventScroll: true });
+    if (focusField) fieldText()?.focus({ preventScroll: true });
     closeLater(false);
   }
 
@@ -553,12 +553,17 @@ export function BrowserDock(props: BrowserDockProps) {
     props.onSteer?.(id);
   };
 
-  onSettled(() => () => {
-    mounted = false;
-    clearTimeout(closeTimer);
-    clearTimeout(queueCloseTimer);
-    settleIsland?.();
-    takePending();
+  onSettled(() => {
+    // A box that starts as the tab keeps the width that it has open, as a box that the user hid does.
+    // The overlay over a page is still as wide as the box here: it gets the width of the tab later.
+    if (untrack(phase) === "hidden" && dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
+    return () => {
+      mounted = false;
+      clearTimeout(closeTimer);
+      clearTimeout(queueCloseTimer);
+      settleIsland?.();
+      takePending();
+    };
   });
 
   const placeholder = () =>

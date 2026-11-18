@@ -94,7 +94,7 @@ export const UserControl: Story = {
 
 /**
  * The agent asks the user to do a step on the page, such as a CAPTCHA. The box starts as the tab, so the
- * page under it gets the clicks (#12206). The tab opens the box with Done.
+ * page under it gets the clicks (#12206). The tab opens the box with I’m done.
  */
 export const PageRequest: Story = {
   args: { working: true, island: { kind: "activity", control: "request" }, onHandoff: fn() },

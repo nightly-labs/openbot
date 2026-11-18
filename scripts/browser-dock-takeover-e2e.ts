@@ -14,10 +14,7 @@ declare global {
   interface Window {
     /** The channel of the Storybook preview, which changes the args of the open story. */
     __STORYBOOK_ADDONS_CHANNEL__?: {
-      emit: (
-        event: "updateStoryArgs",
-        payload: { storyId: string; updatedArgs: { island: BrowserDockIsland | null } },
-      ) => void;
+      emit: (event: "updateStoryArgs", payload: { storyId: string; updatedArgs: StoryArgs }) => void;
     };
   }
 }
@@ -31,6 +28,23 @@ assert.ok(storybook, "Pass --storybook=<url> with the URL that `bun run storyboo
 
 const STORY = "conversation-browserdock";
 const REQUEST: BrowserDockIsland = { kind: "activity", control: "request" };
+const SECRET: BrowserDockIsland = {
+  kind: "secret",
+  request: {
+    requestId: "e2e-code",
+    agentId: "e2e-agent",
+    threadId: "e2e-thread",
+    turnId: "e2e-turn",
+    tabId: "e2e-tab",
+    secret: { method: "otp", origin: "https://accounts.example.com", digits: 6 },
+  },
+};
+
+/** The args of the dock story that the host changes: what the agent does, and the draft in the field. */
+interface StoryArgs {
+  island?: BrowserDockIsland | null;
+  value?: string;
+}
 
 interface Report {
   cases: string[];
@@ -45,16 +59,27 @@ async function openStory(page: Page, name: string): Promise<void> {
   await page.locator(".browser-dock").waitFor({ timeout: 60_000 });
 }
 
-/** Changes the island of the open story, as the host does when the agent's state changes. */
-async function setIsland(page: Page, name: string, island: BrowserDockIsland | null): Promise<void> {
+/** Changes the args of the open story, as the host does when the agent's state or the draft changes. */
+async function setArgs(page: Page, name: string, updatedArgs: StoryArgs): Promise<void> {
   await page.evaluate(
-    ({ storyId, island }) => {
+    ({ storyId, updatedArgs }) => {
       const channel = window.__STORYBOOK_ADDONS_CHANNEL__;
       if (!channel) throw new Error("Storybook has no channel.");
-      channel.emit("updateStoryArgs", { storyId, updatedArgs: { island } });
+      channel.emit("updateStoryArgs", { storyId, updatedArgs });
     },
-    { storyId: `${STORY}--${name}`, island },
+    { storyId: `${STORY}--${name}`, updatedArgs },
   );
+}
+
+async function setIsland(page: Page, name: string, island: BrowserDockIsland | null): Promise<void> {
+  await setArgs(page, name, { island });
+}
+
+/** True when the focus is in the message field of the box. */
+async function fieldHasFocus(page: Page): Promise<boolean> {
+  return page
+    .getByRole("textbox", { name: /^Message to / })
+    .evaluate((field) => field === document.activeElement || field.contains(document.activeElement));
 }
 
 async function waitTucked(page: Page, tucked: boolean): Promise<void> {
@@ -128,7 +153,9 @@ try {
   await setIsland(page, "agent-acting", null);
   await waitTucked(page, false);
   await page.getByRole("textbox", { name: /^Message to / }).waitFor();
-  report.cases.push("An open box hides when a step starts and shows again when the step ends.");
+  await settleMotion(page);
+  assert.ok(!(await fieldHasFocus(page)), "A box that opens again by itself must not take the focus from the page.");
+  report.cases.push("An open box hides when a step starts and shows again, without the focus, when the step ends.");
 
   // 4. A box that the user hid stays hidden after the step.
   await openStory(page, "idle");
@@ -143,16 +170,31 @@ try {
   assert.equal(await page.locator(".browser-dock").getAttribute("data-phase"), "hidden");
   report.cases.push("A box that the user hid stays hidden after the step.");
 
-  // 5. A code card in a step shows the box. The page step after it hides the box, and the end shows it.
-  await openStory(page, "secret-request");
-  await waitTucked(page, false);
-  await setIsland(page, "secret-request", REQUEST);
+  // 5. A code card in a step shows the box. The page step after it hides the box again, and the end shows it.
+  await openStory(page, "page-request");
   await waitTucked(page, true);
-  await setIsland(page, "secret-request", null);
+  await setIsland(page, "page-request", SECRET);
   await waitTucked(page, false);
-  report.cases.push("A page step after a code card hides the box, and the end of the step shows it.");
+  await setIsland(page, "page-request", REQUEST);
+  await waitTucked(page, true);
+  await setIsland(page, "page-request", null);
+  await waitTucked(page, false);
+  report.cases.push("A page step after a code card hides the box again, and the end of the step shows it.");
 
-  // 6. When the user takes the page, the box stays as it is.
+  // 6. A box with a draft stays open when a step starts, so the text that the user writes stays in view.
+  await openStory(page, "idle");
+  await setArgs(page, "idle", { value: "Check the plan first" });
+  await page.getByText("Check the plan first").waitFor();
+  await setIsland(page, "idle", REQUEST);
+  await page
+    .getByText(/needs you on this page/)
+    .first()
+    .waitFor({ state: "attached" });
+  await settleMotion(page);
+  assert.equal(await page.locator(".browser-dock").getAttribute("data-phase"), "open");
+  report.cases.push("A box with a draft stays open when a step starts.");
+
+  // 7. When the user takes the page, the box stays as it is.
   await openStory(page, "user-control");
   await waitTucked(page, false);
   await page.getByRole("button", { name: "I’m done", exact: true }).waitFor();
