@@ -565,6 +565,10 @@ export class TurnLifecycle {
     return this.#failedTurns;
   }
 
+  hasRunningSubagents(agentId: string): boolean {
+    return this.#subagentTurns.has(agentId);
+  }
+
   /** The newest turn with running subagents of each agent in `agentIds`. */
   subagentTurns(agentIds: ReadonlySet<string>): Array<{ agentId: string; turnId: string }> {
     const turns: Array<{ agentId: string; turnId: string }> = [];

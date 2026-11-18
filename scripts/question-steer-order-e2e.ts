@@ -310,6 +310,9 @@ try {
       .listQueue(agent.id)
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
   await waitFor("the first turn to end", idle);
+  const firstIdle = agents.getAgentActivity(agent.id);
+  assert.equal(firstIdle.state, "idle");
+  assert.ok(firstIdle.since, "The first turn end records when the agent became idle.");
 
   // The turn that the CLI starts by itself asks its question.
   writeFileSync(askTrigger, "");
@@ -319,6 +322,11 @@ try {
     async () => (await live()).messages.find((message) => message.questionPrompt)?.turnId,
   );
   report.questionTurnId = questionTurnId;
+  const waiting = agents.getAgentActivity(agent.id);
+  assert.equal(waiting.state, "waiting");
+  assert.ok(waiting.since, "The question records when the agent began waiting.");
+  assert.ok(waiting.since >= firstIdle.since);
+  assert.deepEqual(agents.getAgentActivity(agent.id), waiting, "Reading activity keeps the transition time.");
 
   const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: MESSAGE }));
   const deliveryId = receipt.deliveries[0]?.id;
@@ -335,6 +343,9 @@ try {
     "The message reaches the CLI before the question's result.",
   );
   const conversation = await live();
+  const finalIdle = agents.getAgentActivity(agent.id);
+  assert.equal(finalIdle.state, "idle");
+  assert.ok(finalIdle.since && finalIdle.since >= waiting.since, "The completed turn records the new idle time.");
   report.messageTurnId = conversation.messages.find((message) => message.id === deliveryId)?.turnId ?? null;
   assert.equal(report.messageTurnId, questionTurnId, "The message stays in the turn that read it.");
   report.shownLive = conversation.messages.flatMap((message) => checked(message.text) ?? []);

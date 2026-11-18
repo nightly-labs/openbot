@@ -98,6 +98,10 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
   agentDefaults: () => ({ ...DEFAULT_AGENT_DEFAULTS, automationRunsPerHour }),
   listModels: () => models,
   listRoutines: () => [],
+  getAgentActivity: (agentId) => {
+    assert.equal(agentId, "agent-ada", "read activity only for agents that allow Local scripts");
+    return { state: "busy", since: "2026-01-01T00:00:00.000Z" };
+  },
   runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
   sendMessage: (input) => {
     const id = `delivery-${deliveries.size + 1}`;
@@ -208,7 +212,10 @@ try {
 
   await check("list shows only agents with Local scripts", ["list", "--json"], 0, (run) => {
     const value = parsed(run);
-    return value.ok === true && value.agents.length === 1 && value.agents[0].name === "Ada";
+    assert.deepEqual(value.agents, [
+      { id: "agent-ada", name: "Ada", routines: [], state: "busy", since: "2026-01-01T00:00:00.000Z" },
+    ]);
+    return value.ok === true;
   });
   await check("run without --wait returns the queued delivery", ["run", "ada", "hello", "--json"], 0, (run) => {
     const value = parsed(run);
