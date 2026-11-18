@@ -356,7 +356,8 @@ function describeProbeFailure(
   // With no metadata, the SDK registers at a guessed address, and a token server answers that with
   // a status such as Laravel's 419, or 401. The sign-in never existed; the key is what it wants.
   if (signIn?.signInServerMissing()) return BEARER_KEY;
-  if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
+  if (signIn && isRegistrationRefusal(error, signIn))
+    return signIn.registrationUnsupported() ? REGISTRATION_UNAVAILABLE : REGISTRATION_REFUSED;
   if (accountRefused) return sourceText("error.backend.mcpSignInAccountRefused");
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
@@ -971,6 +972,12 @@ function isProtocolMismatch(error: Error, code: string | null): boolean {
  * registers only the MCP clients it approved. "Try again" and the API key cannot change it.
  */
 const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
+
+/**
+ * The sign-in server has no registration at all, as Google's has (#8398). A sign-in app is then the
+ * only client it can accept, so the sentence names it: a local MCP server is not the way forward.
+ */
+const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpRegistrationUnavailable");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;

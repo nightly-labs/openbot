@@ -272,6 +272,8 @@ export const messages = {
     "Cet agent ne peut utiliser qu’un nombre limité de serveurs MCP. Pour utiliser ce serveur, désactivez un serveur MCP dont l’agent n’a pas besoin.",
   "error.backend.mcpRegistrationRefused":
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, enregistrez ce serveur dans Marketplace, Apps, puis ajoutez-lui une app de connexion.",
   "error.backend.mcpSignInAbandonedGeneric": "La connexion a été abandonnée.",
   "error.backend.mcpSignInForgotten": "La connexion MCP a été oubliée pendant son exécution.",
   "error.backend.mcpSignInAbandoned": "La connexion MCP a été abandonnée.",
