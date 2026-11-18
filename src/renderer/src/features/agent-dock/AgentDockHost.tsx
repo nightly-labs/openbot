@@ -1,3 +1,4 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -55,6 +56,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import {
   channelConversationRows,
   channelMessageHasContent,
+  channelWorkingTurns,
   sentChannelMessageId,
 } from "../channels/channel-conversation-rows";
 import { useChannels } from "../channels/channels-context";
@@ -62,6 +64,7 @@ import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
+import { narrationRows } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -384,9 +387,20 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn);
+    return withStepAnswers(
+      channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn),
+      new Set(channelWorkingTurns(page, new Set())),
+      (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
+    );
   });
-  const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
+  const agentMessages = (agentId: string): AgentMessage[] => {
+    const running = workingTurns()[agentId];
+    return withStepAnswers(
+      (conversations[agentId]?.messages ?? []).map(asOwn),
+      new Set(running ? [running] : []),
+      () => agentList().find((agent) => agent.id === agentId)?.provider,
+    );
+  };
 
   /* The answers that failed, by request. A failure shows the card's controls again. */
   const [failedAnswers, setFailedAnswers] = createSignal<Record<string, number>>({});
@@ -1118,6 +1132,28 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
         previewUrl: attachment.previewUrl,
       })),
   };
+}
+
+/**
+ * The rows of a dock chat. A turn that ends on a tool call has no answer: its text stays in the turn's
+ * steps, which the dock does not show, so the chat showed only the reader's messages (#12030). Such a
+ * turn shows its last note to the reader as its answer. A turn in `running` waits until it ends, so a
+ * note does not show and then go when the answer comes.
+ */
+function withStepAnswers(
+  messages: readonly AgentMessage[],
+  running: ReadonlySet<string>,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage[] {
+  const answered = new Set<string>();
+  for (const message of messages)
+    if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
+  return messages.map((message) => {
+    const turnId = message.turnId;
+    if (message.kind !== "thinking" || message.streaming || !turnId || answered.has(turnId) || running.has(turnId))
+      return message;
+    return narrationRows(message, provider(message)).at(-1) ?? message;
+  });
 }
 
 /** The unread agent answers: from the first unread message, or the last `count` messages. */
