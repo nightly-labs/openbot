@@ -421,9 +421,9 @@ const IMAGE_QUOTA_PERIOD =
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
  * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
  * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
- * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not a count in one request, so a
- * clause that names a period does not match. A period in a different clause, such as "try again in a
- * minute", does not stop the match.
+ * "maximum of", a number, and "images", or "maximum number of images". A daily quota of images is not
+ * a count in one request, so a clause that names a period does not match. A period in a different
+ * clause, such as "try again in a minute", does not stop the match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
   return (
