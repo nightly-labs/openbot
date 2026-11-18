@@ -46,7 +46,7 @@ interface SafeModeErrorBody {
 type SafeModeBody = SafeModeSupport | SafeModeErrorBody | ServerSafeModeReason;
 
 /** The compatibility answer. A protocol 10 request gets the two protocol 10 lists. */
-export function serverSafeModeCompatibility(appVersion: string, protocol: number | null): SafeModeSupport {
+function serverSafeModeCompatibility(appVersion: string, protocol: number | null): SafeModeSupport {
   const support: TeamProtocolSupportV1 = {
     appVersion,
     protocol: { minimum: TEAM_PROTOCOL_V10, maximum: TEAM_PROTOCOL_V10 },

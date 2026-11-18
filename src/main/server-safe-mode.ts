@@ -33,13 +33,12 @@ import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
 const logger = createOpenBotLogger("server-safe-mode");
 
 /** The marker that `openbot-hosted-update` and `openbot` look for. It is empty. */
-export const SERVER_SAFE_MODE_MARKER = "server-safe-mode";
+const SERVER_SAFE_MODE_MARKER = "server-safe-mode";
 
 /** The safe mode could not start. The caller exits as before, with the start-loop exit code. */
-export class ServerSafeModeUnavailable extends Schema.TaggedError<ServerSafeModeUnavailable>()(
-  "ServerSafeModeUnavailable",
-  { cause: Schema.Defect() },
-) {}
+class ServerSafeModeUnavailable extends Schema.TaggedError<ServerSafeModeUnavailable>()("ServerSafeModeUnavailable", {
+  cause: Schema.Defect(),
+}) {}
 
 export interface ServerSafeModeOptions {
   userDataPath: string;

@@ -18,7 +18,7 @@ const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 let userDataSecretStorage: SecretStorage | null = null;
 
 /** The secret storage of userData. Made at first use, when userData has its final path. */
-export function secretStorage(): SecretStorage {
+function secretStorage(): SecretStorage {
   userDataSecretStorage ??= createSecretStorage({
     keyPath: join(app.getPath("userData"), SECRET_STORAGE_KEY_FILE),
   });
@@ -42,7 +42,7 @@ export function safeStorageCipher(
  * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
  * An abort rejects with the signal's reason, as in Node.
  */
-export async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
   try {
     return await net.fetch(input instanceof URL ? input.href : input, {
       ...init,
