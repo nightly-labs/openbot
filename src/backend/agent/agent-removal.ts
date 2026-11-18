@@ -27,9 +27,10 @@ export interface AgentRemovalHooks {
   /** Ends the agent's background memory review, so that it does not write to a deleted agent. */
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
   /**
-   * Stops the agent's own provider process, which runs in its workspace. On Windows it also stops the
-   * shared OpenCode process when no turn uses it, because that process watches the folder (#7029).
-   * True when work of another agent keeps that shared process, so the folder can stay in use.
+   * Stops the agent's own provider process, which runs in its workspace. On Windows it also stops each
+   * shared provider process that the agent used, when no work uses it, because that process or a command
+   * that it started can hold the folder (#7029, #12294).
+   * True when work of another agent keeps such a shared process, so the folder can stay in use.
    */
   stopAgentProcess(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
   /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
