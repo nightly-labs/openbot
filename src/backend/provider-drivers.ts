@@ -832,7 +832,8 @@ interface ProviderModelCatalog {
    */
   readonly relistAfterStart?: true;
   /**
-   * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
+   * The list can change while the CLI runs: the user changes it in the CLI's own settings, or the
+   * service gives the account a new model, as Google does for Antigravity (#12308). The idle check reads
    * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
    * not keep the list it had at its start (#8495). For a CLI whose list never changes while it runs,
    * such as Codex, the reread compares the settings of `source` and restarts the CLI when they change.
@@ -1342,7 +1343,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // The Antigravity CLI 1.5.5 lists the plan's Gemini models first, best first: an Ultra plan gives
     // Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS 120B. Sorted by
     // version, "GPT-OSS 120B" read as version 120 and came first, so a new agent ran it.
-    catalog: { slowList: true, ownOrder: true },
+    // Google gives the account new models while the CLI runs, such as Gemini 4 Neon. A busy process
+    // kept the list of its start until a restart (#12308). The reread resumes the kept probe session.
+    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
